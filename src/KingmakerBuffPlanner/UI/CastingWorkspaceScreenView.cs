@@ -10,6 +10,7 @@ using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.Planning;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace KingmakerBuffPlanner.UI
@@ -89,6 +90,15 @@ namespace KingmakerBuffPlanner.UI
         private Button _modeButton;
         private Button _readyOnlyButton;
         private Button _undoButton;
+        // Right-click spell description panel (everyday-use v1.2): a
+        // read-only, scrollable presentation of the exact concrete
+        // variant's native localized description. It never authors,
+        // targets, casts or persists anything.
+        private RectTransform _inspectRoot;
+        private Text _inspectTitle;
+        private Text _inspectMeta;
+        private Text _inspectBody;
+        private ScrollRect _inspectScroll;
 
         internal CastingWorkspaceScreenView(
             StaticCanvas nativeCanvas,
@@ -134,7 +144,15 @@ namespace KingmakerBuffPlanner.UI
         // false when there was nothing to leave, so the caller closes.
         internal bool HandleEscape()
         {
-            if (_disposed || _session.EditingFocusCastingId == null) return false;
+            if (_disposed) return false;
+            // The description panel is the innermost surface: Escape closes
+            // it first, leaving the planner exactly as it was.
+            if (_inspectRoot != null && _inspectRoot.gameObject.activeSelf)
+            {
+                CloseSpellInspect();
+                return true;
+            }
+            if (_session.EditingFocusCastingId == null) return false;
             _session.ClearGraphFocus();
             RefreshView();
             return true;
@@ -360,6 +378,111 @@ namespace KingmakerBuffPlanner.UI
             return evidence;
         }
 
+        // ------------------------------------------------------------------
+        // Right-click spell description (read-only)
+        // ------------------------------------------------------------------
+
+        // Fires only for the right mouse button, leaving left-click
+        // authoring semantics untouched on the same control.
+        internal sealed class RightClickProxy : MonoBehaviour, IPointerClickHandler
+        {
+            internal Action OnRightClick;
+            public void OnPointerClick(PointerEventData eventData)
+            {
+                if (eventData.button == PointerEventData.InputButton.Right && OnRightClick != null)
+                    OnRightClick();
+            }
+        }
+
+        internal bool SpellInspectOpen
+        {
+            get { return _inspectRoot != null && _inspectRoot.gameObject.activeSelf; }
+        }
+
+        internal void ShowSpellInspect(string title, string description, string durationText,
+            bool exactVariant)
+        {
+            if (_disposed || _frame == null) return;
+            if (_inspectRoot == null) BuildSpellInspect();
+            _inspectTitle.text = title ?? string.Empty;
+            string meta = (durationText ?? string.Empty).Trim();
+            _inspectMeta.text = (meta.Length == 0 ? string.Empty : meta + "  ·  ") +
+                (exactVariant ? "exact selected source" : "base spell — select a caster/source for exact values");
+            _inspectBody.text = string.IsNullOrWhiteSpace(description)
+                ? "The game provides no description for this spell."
+                : description;
+            _inspectRoot.gameObject.SetActive(true);
+            if (_inspectScroll != null) _inspectScroll.verticalNormalizedPosition = 1f;
+            PropagateUiLayer();
+        }
+
+        internal void CloseSpellInspect()
+        {
+            if (_inspectRoot != null) _inspectRoot.gameObject.SetActive(false);
+        }
+
+        private void BuildSpellInspect()
+        {
+            _inspectRoot = KingmakerUiFactory.CreateRect("SpellInspect", _root);
+            KingmakerUiFactory.AddPanel(_inspectRoot, new Color(0f, 0f, 0f, 0.35f));
+            KingmakerUiFactory.Stretch(_inspectRoot);
+            // The panel consumes every click over itself (a full-block
+            // graphic is already the background) so a right-click can never
+            // fall through to the graph beneath.
+            RectTransform panel = KingmakerUiFactory.CreateRect("Panel", _inspectRoot);
+            KingmakerUiFactory.AddFramedPanel(panel, _theme.ParchmentPanel, _theme.GoldAccent, 2f);
+            KingmakerUiFactory.SetAnchors(panel, 0.5f, 0.5f, 0.5f, 0.5f, 760f, 520f, 0f, 0f);
+            _inspectTitle = KingmakerUiFactory.CreateText("Title", panel, _theme, string.Empty, 20,
+                TextAnchor.UpperLeft);
+            _inspectTitle.fontStyle = FontStyle.Bold;
+            KingmakerUiFactory.Stretch(_inspectTitle.rectTransform, 16, 4, 44, 40);
+            _inspectMeta = KingmakerUiFactory.CreateText("Meta", panel, _theme, string.Empty, 13,
+                TextAnchor.UpperLeft);
+            _inspectMeta.color = _theme.MutedBrownText;
+            KingmakerUiFactory.Stretch(_inspectMeta.rectTransform, 16, 4, 64, 34);
+            Button close = KingmakerUiFactory.CreateButton("Close", panel, _theme, "Close",
+                CloseSpellInspect);
+            KingmakerUiFactory.SetAnchors(RectOf(close), 1f, 1f, 1f, 1f, 110f, 30f, -12f, -8f);
+            RectTransform viewport = KingmakerUiFactory.CreateRect("Viewport", panel);
+            KingmakerUiFactory.Stretch(viewport, 10, 10, 12, 90);
+            Image mask = viewport.gameObject.AddComponent<Image>();
+            mask.color = new Color(0.95f, 0.90f, 0.78f, 0.9f);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            RectTransform content = KingmakerUiFactory.CreateRect("Content", viewport);
+            KingmakerUiFactory.SetAnchors(content, 0f, 1f, 1f, 1f);
+            content.pivot = new Vector2(0.5f, 1f);
+            ContentSizeFitter fitter = content.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            _inspectBody = KingmakerUiFactory.CreateText("Body", content, _theme, string.Empty, 15,
+                TextAnchor.UpperLeft);
+            _inspectBody.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _inspectBody.verticalOverflow = VerticalWrapMode.Overflow;
+            KingmakerUiFactory.Stretch(_inspectBody.rectTransform, 8, 8, 8, 8);
+            _inspectScroll = panel.gameObject.AddComponent<ScrollRect>();
+            _inspectScroll.viewport = viewport;
+            _inspectScroll.content = content;
+            _inspectScroll.horizontal = false;
+            _inspectScroll.vertical = true;
+            _inspectScroll.scrollSensitivity = 24f;
+            _inspectRoot.gameObject.SetActive(false);
+        }
+
+        // Wires right-click on one control to show the exact spell's
+        // native description.
+        private void AddSpellInspect(Component control, System.Func<CastingGraphView> view,
+            string spellTitle, string description, string durationText, bool exactVariant)
+        {
+            if (control == null) return;
+            RightClickProxy proxy = control.GetComponent<RightClickProxy>();
+            if (proxy == null) proxy = control.gameObject.AddComponent<RightClickProxy>();
+            RightClickProxy captured = proxy;
+            captured.OnRightClick = () =>
+            {
+                _lastView = view();
+                ShowSpellInspect(spellTitle, description, durationText, exactVariant);
+            };
+        }
+
         private void PropagateUiLayer()
         {
             if (_root == null) return;
@@ -417,6 +540,14 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(title.rectTransform, 0f, 1f, 1f, 1f);
             title.rectTransform.pivot = new Vector2(0.5f, 1f);
             title.rectTransform.sizeDelta = new Vector2(0f, 22f);
+            // Discoverability (addendum 6): the right-click description
+            // gesture is stated, not left undocumented.
+            Text hint = KingmakerUiFactory.CreateText("InspectHint", lane, _theme,
+                "Right-click a spell for its description", 11, TextAnchor.LowerLeft);
+            hint.color = _theme.MutedBrownText;
+            KingmakerUiFactory.SetAnchors(hint.rectTransform, 0f, 0f, 1f, 0f);
+            hint.rectTransform.pivot = new Vector2(0.5f, 0f);
+            hint.rectTransform.sizeDelta = new Vector2(0f, 18f);
             _buffSearch = KingmakerUiFactory.CreateInputField("BuffSearch", lane, _theme, "Search buffs…");
             RectTransform search = RectOf(_buffSearch);
             KingmakerUiFactory.SetAnchors(search, 0f, 1f, 1f, 1f);
@@ -703,6 +834,11 @@ namespace KingmakerBuffPlanner.UI
                 button.targetGraphic = background;
                 ApplyRowHover(button, entry.Selected);
                 button.onClick.AddListener(() => Command(() => _session.SelectGraphBuff(captured, _inputs())));
+                // Right-click reads the spell; it never selects, authors or
+                // mutates anything (everyday-use v1.2 E05).
+                AddSpellInspect(button, () => _session.BuildGraph(_freshInputs()),
+                    entry.Label, entry.Source.Description, entry.Source.DurationText,
+                    entry.Selected && view.SelectedSourceExact);
                 if (entry.Selected)
                 {
                     RectTransform rule = KingmakerUiFactory.CreateRect("Selected", rect);
@@ -748,6 +884,12 @@ namespace KingmakerBuffPlanner.UI
                 (view.OtherRoutineCastings == 0 ? string.Empty
                     : " · " + view.OtherRoutineCastings + " in other routines (shown there)");
             _guidance.text = view.Guidance;
+            // Right-click the selected-spell header: the exact variant's
+            // description when a concrete row is selected, else base text.
+            AddSpellInspect(_bannerIcon != null ? (Component)_bannerIcon : (Component)_bannerTitle,
+                () => _session.BuildGraph(_freshInputs()), view.SelectedSourceCaption,
+                view.SelectedSourceDescription, view.SelectedSourceDurationText,
+                view.SelectedSourceExact);
         }
 
         private GraphLayoutMetrics MetricsFor(float width)
@@ -977,6 +1119,9 @@ namespace KingmakerBuffPlanner.UI
             button.targetGraphic = background;
             ApplyRowHover(button, casting.Selected);
             button.onClick.AddListener(() => Command(() => _session.FocusGraphCasting(captured)));
+            AddSpellInspect(button, () => _session.BuildGraph(_freshInputs()),
+                casting.OrderLabel + " " + ChipSpellTitle(casting),
+                casting.SpellDescription, casting.SpellDurationText, true);
             string status = casting.StatusLabel +
                 (casting.ShortInOnePass ? " · short in one pass" : string.Empty) +
                 (casting.RedundantInOnePass ? " · covered earlier" : string.Empty) +
@@ -1003,6 +1148,15 @@ namespace KingmakerBuffPlanner.UI
             second.resizeTextMinSize = 10;
             second.resizeTextMaxSize = 12;
             KingmakerUiFactory.Stretch(second.rectTransform, 7, 5, 4, 24);
+        }
+
+        // The chip's spell title for the inspect: the provider key's tail
+        // (book/level context lives in the inspector), or the order label.
+        private static string ChipSpellTitle(CastingGraphCasting casting)
+        {
+            string key = casting.SourceProviderKey ?? string.Empty;
+            int bar = key.LastIndexOf('|');
+            return bar >= 0 && bar + 1 < key.Length ? key.Substring(bar + 1) : key;
         }
 
         // A straight ink segment: one rotated Image (graph y points down,

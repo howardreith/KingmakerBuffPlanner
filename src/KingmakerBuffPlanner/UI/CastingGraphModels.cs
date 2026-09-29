@@ -59,7 +59,8 @@ namespace KingmakerBuffPlanner.UI
             string providerKey, string casterUnitId, string label, string detail,
             string poolKey, string poolLabel, ResourcePoolKind? poolKind,
             CastingCapacityEstimate capacity, string capacityText, bool pinnable,
-            string blockedReason, bool selected, bool group)
+            string blockedReason, bool selected, bool group,
+            string description = "", string durationText = "")
         {
             ProviderKey = providerKey ?? string.Empty;
             CasterUnitId = casterUnitId ?? string.Empty;
@@ -74,6 +75,8 @@ namespace KingmakerBuffPlanner.UI
             BlockedReason = blockedReason ?? string.Empty;
             Selected = selected;
             IsGroup = group;
+            Description = description ?? string.Empty;
+            DurationText = durationText ?? string.Empty;
         }
 
         public string ProviderKey { get; private set; }
@@ -99,6 +102,10 @@ namespace KingmakerBuffPlanner.UI
         // The ability reaches a group from one origin (one casting, several
         // beneficiaries); otherwise it has one direct target.
         public bool IsGroup { get; private set; }
+        // The exact concrete variant's native localized description and
+        // duration (read-only spell facts for the right-click inspect).
+        public string Description { get; private set; }
+        public string DurationText { get; private set; }
         // Labels of this caster's other rows drawing on the same pool: their
         // counts are alternatives, never a sum.
         public IReadOnlyList<string> SharedPoolWith { get { return _sharedPoolWith; } }
@@ -174,9 +181,12 @@ namespace KingmakerBuffPlanner.UI
             IEnumerable<string> coverageGaps, ResolvedCastingReadiness readiness,
             string statusLabel, string reasonText, IEnumerable<string> enhancementBadges,
             string costText, bool selected, CastingAuthoringState state, bool needsReview,
-            bool shortInOnePass, bool redundantInOnePass = false)
+            bool shortInOnePass, bool redundantInOnePass = false,
+            string spellDescription = "", string spellDurationText = "")
         {
             RedundantInOnePass = redundantInOnePass;
+            SpellDescription = spellDescription ?? string.Empty;
+            SpellDurationText = spellDurationText ?? string.Empty;
             CastingId = castingId ?? string.Empty;
             RoutineId = routineId ?? string.Empty;
             Order = order;
@@ -220,6 +230,10 @@ namespace KingmakerBuffPlanner.UI
         public ResolvedCastingReadiness Readiness { get; private set; }
         public string StatusLabel { get; private set; }
         public string ReasonText { get; private set; }
+        // This casting's exact native spell description/duration (for the
+        // read-only right-click inspect on its chip).
+        public string SpellDescription { get; private set; }
+        public string SpellDurationText { get; private set; }
         public IReadOnlyList<string> EnhancementBadges { get; private set; }
         public string CostText { get; private set; }
         public bool Selected { get; private set; }
@@ -292,6 +306,7 @@ namespace KingmakerBuffPlanner.UI
             IEnumerable<string> costLines, IEnumerable<CastingGraphEnhancementOption> enhancements,
             IEnumerable<WorkspaceProviderChoice> providers,
             IEnumerable<CastingGraphTargetNode> retargets, string coverageText,
+            string description, string durationText,
             string limitation, IEnumerable<string> existingEffectNotes, string lastRun)
         {
             Casting = casting ?? throw new ArgumentNullException("casting");
@@ -313,6 +328,8 @@ namespace KingmakerBuffPlanner.UI
             Retargets = new ReadOnlyCollection<CastingGraphTargetNode>(
                 (retargets ?? new CastingGraphTargetNode[0]).ToList());
             CoverageText = coverageText ?? string.Empty;
+            Description = description ?? string.Empty;
+            DurationText = durationText ?? string.Empty;
             ExecutionLimitation = limitation ?? string.Empty;
             ExistingEffectNotes = new ReadOnlyCollection<string>(
                 (existingEffectNotes ?? new string[0]).ToList());
@@ -321,6 +338,10 @@ namespace KingmakerBuffPlanner.UI
 
         public PlannedCasting Casting { get; private set; }
         public string CastingId { get { return Casting.CastingId; } }
+        // The focused casting's exact native spell description/duration
+        // (read-only facts for the right-click inspect).
+        public string Description { get; private set; }
+        public string DurationText { get; private set; }
         public CastingGraphCasting Chip { get; private set; }
         public string Title { get; private set; }
         public string Headline { get; private set; }
@@ -358,6 +379,13 @@ namespace KingmakerBuffPlanner.UI
 
         public string SelectedSourceId { get; internal set; }
         public string SelectedSourceCaption { get; internal set; }
+        // The selected exact source row's native spell description and
+        // duration (empty when no concrete row is selected; read-only).
+        public string SelectedSourceDescription { get; internal set; }
+        public string SelectedSourceDurationText { get; internal set; }
+        // True when a concrete caster/source row is selected, so the
+        // description is the exact variant's; false = base text.
+        public bool SelectedSourceExact { get; internal set; }
         public AbilityKey SelectedSourceIcon { get; internal set; }
         // True for a group buff, false for single target, null unknown.
         public bool? SelectedSourceIsGroup { get; internal set; }
