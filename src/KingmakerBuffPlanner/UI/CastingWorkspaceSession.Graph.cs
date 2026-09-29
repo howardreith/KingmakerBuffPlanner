@@ -394,7 +394,17 @@ namespace KingmakerBuffPlanner.UI
             view.SelectedProviderKey = chosenRow == null ? null : chosenRow.ProviderKey;
             ProviderPlanningOption chosenOption = chosenRow == null ? null
                 : FindProviderOption(inputs, source, chosenRow.ProviderKey);
-            view.Targets = BuildGraphTargets(inputs, chosenOption, view.SelectedSourceIsGroup == true,
+            // §4: the target lane shows the SAME eligibility the Add path
+            // and the compiler judge — the draft's selected targeting
+            // modifiers applied to the chosen option.
+            ProviderPlanningOption targetOption = chosenOption;
+            if (chosenOption != null && Draft.TargetingModifiers.Count != 0)
+            {
+                string targetModifierRefusal;
+                targetOption = ApplyGraphTargetingModifiers(Draft.TargetingModifiers,
+                    inputs, chosenOption, out targetModifierRefusal);
+            }
+            view.Targets = BuildGraphTargets(inputs, targetOption, view.SelectedSourceIsGroup == true,
                 chips, nameOf);
             view.Inspector = BuildGraphInspector(inputs, plan, onePass.Plan, chips, nameOf);
             view.Guidance = CastingGraphText.Guidance(source.Length != 0,
@@ -774,6 +784,12 @@ namespace KingmakerBuffPlanner.UI
             var retargets = new List<CastingGraphTargetNode>();
             if (option != null)
             {
+                // §4: retarget eligibility sees the focused casting's own
+                // selected modifiers, mirroring the compiler.
+                string retargetModifierRefusal;
+                ProviderPlanningOption retargetOption = ApplyGraphTargetingModifiers(
+                    focused.TargetingModifiers, inputs, option, out retargetModifierRefusal);
+                if (retargetOption != null) option = retargetOption;
                 bool group = focused.TargetMode != CastingTargetMode.DirectTarget;
                 foreach (UnitSnapshot unit in inputs.Snapshot.Units)
                 {
