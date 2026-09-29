@@ -1318,7 +1318,7 @@ namespace KingmakerBuffPlanner.UI
                 () => SwitchPlannerFromScreen(PlannerMode.CastingFirst));
             _hud = new BuffPlannerHudButtonController(_session, _diagnostics, log,
                 () => { OpenSetup(); }, routineId => ExecuteRoutineRequest(routineId),
-                CastingFirstRoutineTooltip);
+                CastingFirstRoutineTooltip, () => CastingFirstActive);
             _spellbookEntry = new BuffPlannerSpellbookEntryController(
                 value => _log.Info(value),
                 () => OpenSetup(),

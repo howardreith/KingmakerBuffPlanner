@@ -4868,16 +4868,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     InvokeRetarget(newTarget);
                     string doneClick = Invoke("DoneEditing");
                     bool doneCleared = session.EditingFocusCastingId == null;
-                    string saveClick = Invoke("Save");
                     _workspaceSavedIntentIds = session.DocumentIntentSignature();
                     _workspaceInteraction.DoneControl = doneClick;
                     _workspaceInteraction.DoneClearedFocus = doneCleared;
-                    _workspaceInteraction.SaveControl = saveClick;
-                    // Saved is observed, not asserted: the session must
-                    // report its authored intent clean after the control.
-                    _workspaceInteraction.Saved =
-                        saveClick == WorkspaceControlOutcome.Invoked &&
-                        !session.IsDirty;
+                    // v1.2: there is no Save control; deliberate edits
+                    // autosave. Saved is observed, not asserted: the
+                    // session must report its authored intent durable
+                    // after the edit sequence (autosave completed).
+                    _workspaceInteraction.SaveControl = WorkspaceControlOutcome.AlreadyReady;
+                    _workspaceInteraction.Saved = !session.IsDirty;
                     SyncInteractionEvidence();
                     _log.Info("[KBP-WORKSPACE] interaction authored and saved;" +
                         _workspaceInteractionEvidence + ".");
@@ -5972,7 +5971,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     UI.CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
                     _hoverButtons = new[]
                     {
-                        "Reload", "Save", "ExecutionMode",
+                        "Undo", "Run", "ExecutionMode",
                         "Routine." + (session == null ? "long" : session.SelectedRoutineId),
                         disabled == null ? "none" : disabled.name
                     };
@@ -6006,7 +6005,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         .Select(control => control.name));
                     _hoverSweep.AddRange(new[]
                     {
-                        "Caster." + _interactionCasters.LastOrDefault(), "Source." + _interactionSourceId, "Save",
+                        "Caster." + _interactionCasters.LastOrDefault(), "Source." + _interactionSourceId, "Run",
                         "Routine." + (session == null ? "long" : session.SelectedRoutineId)
                     });
                     _hoverSweepIndex = 0;

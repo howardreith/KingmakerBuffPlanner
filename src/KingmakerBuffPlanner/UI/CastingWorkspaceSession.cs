@@ -241,6 +241,15 @@ namespace KingmakerBuffPlanner.UI
             // The dirty baseline covers every load state — an absent or
             // blocked candidate starts exactly as clean as a loaded one.
             _savedIntentSignature = DocumentIntentSignature();
+            // Everyday-use v1.2 §4: autosave IS persistence. Every
+            // completed deliberate edit (the authoring service announces
+            // exactly those, Undo included) is persisted immediately
+            // through the existing atomic repository and campaign-bound
+            // writer. Blocked or unreadable stored data keeps its existing
+            // protection: the in-memory edit stays, the disk bytes stay,
+            // and the failure is reported (never a silent default
+            // overwrite, never "Saved" for an undurable revision).
+            _authoring.DocumentChanged += OnDocumentChangedForAutosave;
             RaiseCastingIdMark(_authoring.Document.Castings.Select(value => value.CastingId));
             SelectedRoutineId = "long";
             // Accepted review state from an earlier session: it authorizes
@@ -253,6 +262,60 @@ namespace KingmakerBuffPlanner.UI
                 ReviewStoreWarning = review.Warning;
                 foreach (KeyValuePair<string, string> pair in review.AcceptedDigests)
                     _review.RestoreAccepted(pair.Key, pair.Value);
+            }
+        }
+
+        // v1.2 §4: revision-ordered autosave. A late write completion can
+        // never replace a newer edit: only the announced revision that is
+        // still current reaches the repository; superseded announcements
+        // are dropped. Persistence failure keeps the in-memory document
+        // and the last good disk file and is reported here.
+        private int _autosaveRevision;
+        private string _autosaveStatus;
+
+        private void OnDocumentChangedForAutosave(CastingPlanDocument document, int revision)
+        {
+            if (revision <= _autosaveRevision) return;
+            _autosaveRevision = revision;
+            if (PersistenceBlocked)
+            {
+                _autosaveStatus = "save-refused:stored-data-unresolved";
+                return;
+            }
+            try
+            {
+                _repository.Save(CastingPlanProfile.FromDocument(
+                    document, _uiSettings, _executionSettings));
+                _savedIntentSignature = DocumentIntentSignature();
+                LoadStatus = CastingPlanLoadStatus.Loaded;
+                LoadWarning = string.Empty;
+                _autosaveStatus = "saved";
+            }
+            catch (Exception exception)
+            {
+                // The edit is kept in memory; the last good disk file is
+                // untouched (the repository's atomic replace failed before
+                // replacing anything). Never claim Saved.
+                _autosaveStatus = "save-failed:" + exception.GetType().Name;
+            }
+        }
+
+        // A settings change the workflow makes persists the current
+        // document + settings through the same atomic path (v1.2 §4).
+        private void AutosaveSettingsNow()
+        {
+            OnDocumentChangedForAutosave(_authoring.Document,
+                _autosaveRevision + 1);
+        }
+
+        // Passive save state for the footer (v1.2 §2): "saved" for the
+        // durable current revision, otherwise the precise condition.
+        public string AutosaveStatus
+        {
+            get
+            {
+                if (_autosaveStatus == "saved" && IsDirty) return "saving";
+                return _autosaveStatus ?? (IsDirty ? "saving" : "saved");
             }
         }
 
@@ -317,6 +380,7 @@ namespace KingmakerBuffPlanner.UI
             next.OutOfCombatOnly = value;
             _executionSettings = next;
             _executionSettingsChosen = true;
+            AutosaveSettingsNow();
         }
 
         // "animated" (native casting animations, the default) or "instant".
@@ -328,6 +392,7 @@ namespace KingmakerBuffPlanner.UI
             next.Mode = mode;
             _executionSettings = next;
             _executionSettingsChosen = true;
+            AutosaveSettingsNow();
         }
 
         public void SetAllowAnimatedFallback(bool allow)
@@ -336,6 +401,7 @@ namespace KingmakerBuffPlanner.UI
             next.AllowAnimatedFallback = allow;
             _executionSettings = next;
             _executionSettingsChosen = true;
+            AutosaveSettingsNow();
         }
 
         public string CampaignId { get; private set; }
@@ -1284,7 +1350,12 @@ namespace KingmakerBuffPlanner.UI
                 return new WorkspaceApplyResult(false,
                     "nothing-to-cast:" + decision.Omissions.Count, decision, null);
             CastingPlanSignature signature = CastingPlanSignature.For(plan, scope);
-            CastingReviewDecision review = _review.TrySubmit(scope, signature);
+            // v1.2 §5: the deliberate Run request authorizes THIS exact
+            // revision; no editor acceptance prerequisite remains. All
+            // other refusals above (unresolved imports, blocked gate,
+            // nothing to cast) are unchanged, and the digest recorded here
+            // still fails a later submission after any material change.
+            CastingReviewDecision review = _review.AuthorizeRun(scope, signature);
             if (!review.Allowed)
                 return new WorkspaceApplyResult(
                     false, review.Reason, decision, null);
