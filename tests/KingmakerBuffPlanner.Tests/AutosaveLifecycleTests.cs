@@ -57,26 +57,52 @@ namespace KingmakerBuffPlanner.Tests
             Directory.CreateDirectory(dir);
             var session = new CastingWorkspaceSession(dir, "campaign:life",
                 new DisabledCastingDispatchBoundary());
+            // §5: durable disk/session state verified after EVERY step — a
+            // later save can never conceal an earlier skipped one.
+            Action<string> verify = label =>
+            {
+                CastingWorkspaceSession check = new CastingWorkspaceSession(dir, "campaign:life");
+                if (check.IsDirty || check.AutosaveStatus != "saved")
+                    throw new InvalidOperationException(label + ": fresh session not durable.");
+                if (!string.Equals(check.DocumentIntentSignature(),
+                        session.DocumentIntentSignature(), StringComparison.Ordinal))
+                    throw new InvalidOperationException(label + ": durable file is not the " +
+                        "live intent.");
+                if (!string.Equals(check.ExecutionMode, session.ExecutionMode,
+                        StringComparison.Ordinal) ||
+                    check.AllowAnimatedFallback != session.AllowAnimatedFallback ||
+                    check.OutOfCombatOnly != session.OutOfCombatOnly)
+                    throw new InvalidOperationException(label + ": durable settings are not " +
+                        "the live settings.");
+            };
             // A settings change, then a document edit: the document edit
             // must persist even though the settings save just ran (the old
             // cross-counter bug skipped exactly this).
             session.SetExecutionMode("animated");
+            verify("after settings-1");
             if (!session.AddCastingForRuntime(LifecycleCasting("cast-1", "unit-t1")).Applied)
                 throw new InvalidOperationException("authoring refused.");
             if (session.IsDirty || session.AutosaveStatus != "saved")
                 throw new InvalidOperationException("edit after settings did not autosave: " +
                     session.AutosaveStatus + " dirty=" + session.IsDirty);
+            verify("after add-1");
             // Interleave the other direction and repeatedly.
             session.SetAllowAnimatedFallback(false);
+            verify("after settings-2");
             if (!session.AddCastingForRuntime(LifecycleCasting("cast-2", "unit-t2")).Applied)
                 throw new InvalidOperationException("second authoring refused.");
+            verify("after add-2");
             session.SetOutOfCombatOnly(true);
+            verify("after settings-3");
             if (!session.AddCastingForRuntime(LifecycleCasting("cast-3", "unit-t3")).Applied)
                 throw new InvalidOperationException("third authoring refused.");
+            verify("after add-3");
             session.SetExecutionMode("instant");
+            verify("after settings-4");
             session.Undo();
             if (session.IsDirty)
                 throw new InvalidOperationException("undo did not autosave.");
+            verify("after undo");
             // The durable file holds the LATEST settings and the post-undo
             // castings (cast-3 gone, cast-1/cast-2 present), read back by a
             // genuinely fresh session.
@@ -117,22 +143,27 @@ namespace KingmakerBuffPlanner.Tests
             PlannedCasting persisted = FirstPersistedCasting(dir, "campaign:life");
             if (persisted == null)
                 throw new InvalidOperationException("nothing durable after the reload cycle.");
-            // Repeat replacement (reload again) and Undo on the newest
-            // instance; the file tracks the newest intent exactly.
+            // §5/R2: repeat replacement, then EDIT on the newest instance,
+            // then a genuine Undo of that edit (the replacement's empty
+            // history means Undo alone proves nothing) — and compare the
+            // retained LIVE document with the durable result.
             session.Reload();
-            session.Undo();
+            if (!session.AddCastingForRuntime(LifecycleCasting("cast-3", "unit-t3")).Applied)
+                throw new InvalidOperationException("post-second-reload authoring refused.");
+            string beforeUndo = session.DocumentIntentSignature();
+            if (!session.Undo())
+                throw new InvalidOperationException("undo after the second reload had no " +
+                    "history to restore.");
+            if (string.Equals(session.DocumentIntentSignature(), beforeUndo,
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException("undo did not change the live document.");
             if (session.IsDirty)
                 throw new InvalidOperationException("undo after second reload did not autosave.");
-            var fresh = new CastingWorkspaceSession(dir, "campaign:life");
-            if (fresh.Document.Castings.Count != session.Document.Castings.Count)
-                throw new InvalidOperationException("durable file diverged from the live intent.");
-            // An obsolete instance never writes: after all replacements, the
-            // file's campaign is still ours and its castings are exactly
-            // the live document's (no foreign or duplicated records).
             var durableRead = new CastingWorkspaceSession(dir, "campaign:life");
             if (!string.Equals(durableRead.DocumentIntentSignature(),
-                    fresh.DocumentIntentSignature(), StringComparison.Ordinal))
-                throw new InvalidOperationException("durable file is not the live intent.");
+                    session.DocumentIntentSignature(), StringComparison.Ordinal))
+                throw new InvalidOperationException("durable file is not the LIVE post-undo " +
+                    "intent.");
         }
 
         // R3: while the CURRENT revision cannot persist, a Run submits zero
@@ -144,8 +175,8 @@ namespace KingmakerBuffPlanner.Tests
         {
             string dir = Path.Combine(root, "autosave-run-durability");
             Directory.CreateDirectory(dir);
-            var session = new CastingWorkspaceSession(dir, "campaign:life",
-                new DisabledCastingDispatchBoundary());
+            var boundary = new DisabledCastingDispatchBoundary();
+            var session = new CastingWorkspaceSession(dir, "campaign:life", boundary);
             if (!session.AddCastingForRuntime(LifecycleCasting("cast-1", "unit-t1")).Applied)
                 throw new InvalidOperationException("baseline authoring refused.");
             if (session.AutosaveStatus != "saved")
@@ -179,12 +210,9 @@ namespace KingmakerBuffPlanner.Tests
                         "not refused for persistence: " + refused.ReviewReason);
             }
             // Persistence recovered: ONE deliberate Run must now use the
-            // latest intent (both castings) with no manual Save. The
-            // disabled dispatch boundary records the submission identity.
-            var boundary = (DisabledCastingDispatchBoundary)typeof(CastingWorkspaceSession)
-                .GetField("_dispatch", System.Reflection.BindingFlags.NonPublic |
-                    System.Reflection.BindingFlags.Instance)
-                .GetValue(session);
+            // latest intent (BOTH castings, exact identities and targets —
+            // an omitted cast-2 must fail this) with no manual Save. The
+            // injected boundary is held directly (§5, no reflection).
             if (boundary.RecordedSubmissions.Count != 0)
                 throw new InvalidOperationException("the refused run submitted something.");
             WorkspaceApplyResult applied = session.Apply(CastingApplyMode.Ordinary,
@@ -196,9 +224,35 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("the recovered run did not reach the " +
                     "boundary: " + applied.ReviewReason);
             if (boundary.RecordedSubmissions.Count != 1 ||
-                !boundary.RecordedSubmissions[0].Contains("cast-1"))
+                !boundary.RecordedSubmissions[0].Contains("cast-1") ||
+                !boundary.RecordedSubmissions[0].Contains("cast-2"))
                 throw new InvalidOperationException("the recovered run did not submit the " +
-                    "latest durable intent.");
+                    "complete latest durable intent: " +
+                    boundary.RecordedSubmissions[0]);
+            // §5: exact ordered identities and targets from the run's own
+            // gate decision — an omitted or reordered casting fails this.
+            if (applied.GateDecision == null ||
+                applied.GateDecision.ExecutableCastingIds.Count != 2 ||
+                !string.Equals(applied.GateDecision.ExecutableCastingIds[0], "cast-1",
+                    StringComparison.Ordinal) ||
+                !string.Equals(applied.GateDecision.ExecutableCastingIds[1], "cast-2",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException("the recovered run's executable set is " +
+                    "not exactly [cast-1, cast-2] in order.");
+            var submitted = session.Document.Castings.Where(value =>
+                applied.GateDecision.ExecutableCastingIds.Contains(value.CastingId)).ToList();
+            if (submitted.Any(value => !string.Equals(value.DirectTargetUnitId,
+                    value.CastingId == "cast-1" ? "unit-t1" : "unit-t2",
+                    StringComparison.Ordinal)) ||
+                submitted.Any(value => !string.Equals(value.CasterUnitId, "unit-cleric",
+                    StringComparison.Ordinal) ||
+                    !string.Equals(value.SourceId, "source-lifecycle", StringComparison.Ordinal)))
+                throw new InvalidOperationException("the submitted castings' exact targets, " +
+                    "caster or source drifted.");
+            // The LIVE post-run intent equals the durable intent (the run
+            // flush persisted exactly what was submitted).
+            if (session.IsDirty)
+                throw new InvalidOperationException("the run left the session non-durable.");
             if (session.AutosaveStatus != "saved" || session.IsDirty)
                 throw new InvalidOperationException("the run flush did not restore durability.");
         }
