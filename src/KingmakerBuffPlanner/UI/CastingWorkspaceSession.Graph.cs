@@ -158,7 +158,8 @@ namespace KingmakerBuffPlanner.UI
                 if (invalid != null) return GraphRefusal(invalid + ":" + unitId);
                 casting = new PlannedCasting(castingId, SelectedRoutineId, 0, source,
                     option.Provider.Key.Ability, caster, NullIfEmpty(option.Provider.Key.SpellbookGuid),
-                    CastingTargetMode.DirectTarget, unitId, null, null, null, null,
+                    CastingTargetMode.DirectTarget, unitId, null, null,
+                    Draft.TargetingModifiers.ToList(), Draft.Enhancements.ToList(),
                     Draft.ExistingEffectPolicy, null, CastingAuthoringState.Ready, null);
             }
             else

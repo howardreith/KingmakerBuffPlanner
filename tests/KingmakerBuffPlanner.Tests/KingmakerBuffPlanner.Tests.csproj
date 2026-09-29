@@ -32,6 +32,8 @@
     <Compile Include="ProductionExecutionTests.cs" />
     <Compile Include="CastingGraphTests.cs" />
     <Compile Include="AutosaveLifecycleTests.cs" />
+    <Compile Include="SharePlanningTests.cs" />
+    <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\ShareCastingModifierAdapter.cs"><Link>GameAdapters\ShareCastingModifierAdapter.cs</Link></Compile>
     <Compile Include="TestBuildInfo.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\ActionGraphScanner.cs"><Link>Discovery\ActionGraphScanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\AreaRecipientSemantics.cs"><Link>Discovery\AreaRecipientSemantics.cs</Link></Compile>

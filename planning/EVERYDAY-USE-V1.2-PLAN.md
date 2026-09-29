@@ -49,6 +49,52 @@ targeting, profile protection, protected saves, or native safeguards.
 
 ## Status (updated as slices complete)
 
+### Session 3 (2026-09-29 night) — R1–R3 repaired; Share planning pipeline in
+
+- **R1–R3 REPAIRED** (`dd8fb79`, protocol 370/370 then 371/371): ONE
+  persistence entry point (PersistNow) for document + settings changes
+  (R1: no cross-counter suppression possible); ReplaceAuthoring detaches/
+  reattaches the autosave subscription at EVERY authoring-instance change
+  — ctor load/import paths and both Reload() branches (R2); Apply now
+  flushes once and refuses with `persistence-failed:<reason>` when the
+  current revision cannot persist, empty-plan no-op exempt, zero
+  submissions while undurable (R3). Regressions in
+  `tests/KingmakerBuffPlanner.Tests/AutosaveLifecycleTests.cs`: real
+  authoring+repository services, interleaved settings/edits/Undo with
+  fresh-session file verification, reload-then-edit x2 + Undo, and a
+  genuine OS file-lock failure → Run refused (0 submissions) → recovery →
+  one deliberate Run submits the latest intent. No manual Save anywhere.
+- **Share planning pipeline IN** (uncommitted-to-pushed flow, 371/371):
+  pure `GameAdapters/ShareCastingModifier.cs` (personal-spell expansion to
+  verified legal allies; deterministic; refuses share-not-needed and
+  share-feature-unavailable with reasons; declares the verified reservoir
+  demand 1/use in the atomic cost vector — same pool as Powerful Change);
+  wired into `BuffPlannerUiRoot.CurrentCastingInputs` (one registration
+  per party unit from the snapshot); `AddGraphCasting` now carries
+  `Draft.TargetingModifiers` (Share selected BEFORE target survives into
+  the record). Source regressions in
+  `tests/KingmakerBuffPlanner.Tests/SharePlanningTests.cs`:
+  `share-expands-personal-targets-purely` PASSES (expansion, purity,
+  not-needed refusal, demand, no-allies refusal).
+- **EXACT RESUME POINT**: `share-graph-gesture-carries-and-persists`
+  (complete test body in SharePlanningTests.cs, Run line commented with
+  the reason) fails because the synthetic party fixture yields ZERO
+  caster nodes from `session.BuildGraph` — the fixture's effect
+  expression / provider option must satisfy the live catalogue scan
+  (see `BuildSourceOptions`/`OptionServesExpression` serving rule; likely
+  the AbilityKey Canonical format or EffectLeafExpression target/kind
+  must match what `GraphCapableCasters` accepts — copy the shape from
+  CastingGraphTests' `GraphAbilityA` fixtures which DO serve). After it
+  passes, the remaining Share work: UI toggle (Next-casting Share control
+  after caster/source before targets + inspector toggle via
+  UpdateFocusedCasting), execution-phase native bridge (arm exact
+  verified toggle → cast once → restore on ALL paths; never swallow
+  restoration), combined Share+PowerfulChange reservoir verification
+  against the installed build, then E16–E20 live.
+- Still open: Share UI + native execution + combined-cost live proof;
+  Classic cutover route map completion; gates + unattended batch +
+  E01–E27 matrix + private delivery (slice 4).
+
 ### Session 2026-09-29 (later) — slices 1 and 2 complete; Share next
 
 - Slice 1 COMPLETE: right-click native spell descriptions (`fb51138`);
