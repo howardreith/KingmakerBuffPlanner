@@ -49,6 +49,88 @@ targeting, profile protection, protected saves, or native safeguards.
 
 ## Status (updated as slices complete)
 
+### Session 5 (2026-09-29 night) — review F1–F5 + E1 of f0483fc repaired
+
+Source: `KBP_Z_Review_f0483fc_2026-09-29.md` (request changes; §1–§5 of
+the earlier addendum preserved, not redone).
+
+- **F1** — Failed-flush intent now has an explicit production owner:
+  `CastingSessionOwner` (pure, no Unity) performs every controlled
+  transition the root makes (`Ensure` for campaign resolve/switch,
+  `Release` for teardown); a session whose discard-time flush fails is
+  CAPTURED (`PendingSessionRecovery`: latest document + settings, bound to
+  its original mod path and campaign) and REGISTERED with the
+  process-wide `CastingWorkspaceRecoveryStore` BEFORE ownership passes.
+  The root's session factory adopts a pending recovery for the exact
+  campaign (`Take`), and the adopting session immediately retries the
+  save (clean on success; honestly dirty + retryable on failure). Root
+  teardown registers the same way, so a replacement root in the same
+  process recovers it. Regression runs the PRODUCTION owner with ONE
+  shared mod dir and campaign-keyed files, drops every old-session
+  reference, and recovers through the owner/factory alone: switch-to-B
+  under lock (B uncontaminated, A's file untouched, failure reported with
+  its campaign) → return to A recovers the exact latest intent durably;
+  root teardown under lock → a REPLACEMENT owner adopts the intent;
+  storage healed before the discard → flush succeeds, nothing registered.
+  Mutant (register dropped): caught.
+- **F2** — ShareCapability now carries the integration's immutable
+  EXACT-SOURCE contract (the snapshot's ability + spellbook whitelists)
+  and its own verified legal recipients; Apply refuses a non-genuine
+  spellbook source, an unverified spellbook, an unverified ability, and
+  keeps the verified-variant identity rule — the same applicability
+  semantics as `CastEnhancementSnapshot.ApplicabilityFailure`. The graph
+  paths (Add, next-casting lane, focused retarget) build the COMPLETE
+  prospective casting and pass it through the same resolver the compiler
+  uses (`ApplyGraphTargetingModifiers` no longer passes a null casting).
+  Reordered capability/party records change nothing. Mutant (contract
+  dropped): caught.
+- **F3** — `IsSupportedSpell` is now IMMUTABLE (genuine spellbook +
+  personal range + transmutation school from blueprint data; no live
+  toggle anywhere in ordinary `Discover`/`ForCast`). The native
+  TargetAnchor probe is isolated in `TryProbeShareTargeting`, which arms
+  the exact toggle and REPORTS failed restoration as probe failure
+  (overrides a passing observation; never swallowed). Boundary regression
+  is an exact assembly-backed IL scan of the BUILT assembly: zero
+  ActivatableAbility state-mutation calls (set_IsOn/TurnOn/TurnOff/Stop/
+  set_ResourceCount) in every ordinary discovery method of the
+  compatibility type and the enhancement adapter; the probe is the ONLY
+  method that arms, and doubles as the scan's positive control.
+- **F4** — Legality is separated from affordability: a verified-zero (or
+  unknown) remaining balance no longer refuses Apply; the capability and
+  its cost shape survive any balance, and the compiler/ledger decides
+  (AlreadySatisfied for a sufficiently active effect; atomic resource
+  block otherwise). Compiler regressions: active effect + zero reservoir
+  → AlreadySatisfied with zero reservation; missing effect + zero →
+  `enhancement-pool-exhausted`; Overwrite + zero → resource block; mixed
+  routine (skipped shared + ordinary fundable) keeps the ordinary
+  casting's full funding. The direct modifier test now asserts zero
+  balance APPLIES with an unchanged cost shape. Mutant (old refusal
+  re-added): caught.
+- **F5** — `TryReserveAtomically` fails CLOSED on enhancement pools it
+  has no verified balance for: a demanded pool absent from the ledger
+  (`enhancement-pool-unknown`) or reporting an unknown balance
+  (`enhancement-balance-unknown`) can never fund — the commit pass can no
+  longer record a demanded-but-unknown cost as allocated. Integrated
+  compile/budget regressions (real enhancement + resource snapshots): two
+  allies = two invocations with combined reservoir accounting; 1-use
+  reservoir funds the first and blocks the second with the real shortage,
+  no partial reservation anywhere; Share + Powerful Change on ONE shared
+  pool validate as combined demand (agreeing snapshots; conservative MIN)
+  and a shortage blocks atomically while a later ordinary casting still
+  funds; unknown/missing balances block. Mutant (skip restored): caught.
+- **E1** — R3's submitted assertions now read the boundary's own
+  `LastProjection`: exact ordered casting ids and executor steps, each
+  step's target/provider/caster/source identities and reserved native
+  cost, projection identity present, the returned projection is the
+  boundary's object, durability from an actual fresh read, and the
+  submitted projection is IMMUTABLE after a later editor mutation (which
+  is itself durable).
+- The converter's targeting-modifier refusal and the compiler's
+  `enhancement-changes-targeting` block are INTENTIONALLY untouched
+  (fail-closed until the §6 execution contract exists).
+- State: protocol 379/379; full source-only gate at the exact candidate;
+  commits c1..c3 + plan; guarded push.
+
 ### Session 4 (2026-09-29 late) — review addendum §1–§5 all repaired and pushed (b1d1aef, 375/375)
 
 - §1 (`3f5c2b9`): PushHistory trim keeps the NEWEST 64 in LIFO order (the
