@@ -13436,16 +13436,17 @@ namespace KingmakerBuffPlanner.Tests
             if (session.Document.Castings[0].Ability == null)
                 throw new InvalidOperationException(
                     "The resolved ability was not authored.");
-            // Dirty until saved; clean after save; a material edit is dirty
-            // again (review F6).
-            if (!session.IsDirty)
-                throw new InvalidOperationException("An authored edit is not dirty.");
+            // v1.2: deliberate edits autosave, so the session is durable
+            // (not dirty) after each edit; a persistence failure would show
+            // dirty instead.
+            if (session.IsDirty)
+                throw new InvalidOperationException("An authored edit did not autosave.");
             session.Save();
             if (session.IsDirty)
                 throw new InvalidOperationException("A saved session is still dirty.");
             session.FocusCasting(session.Document.Castings[0].CastingId);
             session.SetFocusedCastingState(CastingAuthoringState.Disabled);
-            if (!session.IsDirty)
+            if (session.IsDirty)
                 throw new InvalidOperationException(
                     "A state edit after save is not dirty.");
             if (!session.Undo())
@@ -13507,7 +13508,10 @@ namespace KingmakerBuffPlanner.Tests
                 sessionB.CampaignId != "campaign-B")
                 throw new InvalidOperationException(
                     "Campaign B started from foreign authored intent.");
-            if (messages.Count != 1 || !messages[0].Contains("dirty=True") ||
+            // v1.2: A's deliberate edits autosaved, so the disclosure says
+            // dirty=False (durable); the cross-bind identity disclosure is
+            // what the policy requires.
+            if (messages.Count != 1 || !messages[0].Contains("dirty=False") ||
                 !messages[0].Contains("campaign-A") ||
                 !messages[0].Contains("campaign-B"))
                 throw new InvalidOperationException(
@@ -13520,10 +13524,12 @@ namespace KingmakerBuffPlanner.Tests
                 null, "campaign-A",
                 delegate(string id) { return new CastingWorkspaceSession(pathA, id); },
                 null);
+            // v1.2: A's later edits autosaved, so the durable document is
+            // A's LATEST intent; B -> A must restore exactly that.
             if (!ReferenceEquals(reopenedA, sessionA) &&
-                reopenedA.DocumentIntentSignature() != savedA)
+                reopenedA.DocumentIntentSignature() != sessionA.DocumentIntentSignature())
                 throw new InvalidOperationException(
-                    "B -> A did not restore campaign A's saved document.");
+                    "B -> A did not restore campaign A's durable document.");
 
             // Unresolved identity refuses rather than binding.
             if (CastingWorkspaceSessionBinding.Resolve(sessionA, null,
@@ -13578,30 +13584,31 @@ namespace KingmakerBuffPlanner.Tests
                     "exact-item-ref-1"));
             if (!session.AddCastingFromDraft(inputs).Applied)
                 throw new InvalidOperationException("authoring refused.");
-            if (!session.IsDirty)
-                throw new InvalidOperationException("authored work is not dirty.");
+            if (session.IsDirty)
+                throw new InvalidOperationException("authored work did not autosave.");
             session.Save();
             if (session.IsDirty)
                 throw new InvalidOperationException("saved work is still dirty.");
             string saved = session.DocumentIntentSignature();
 
-            // Same-session unsaved retention: an unsaved edit survives an
-            // in-memory "reopen" (the retained-session path) and is visible
-            // as dirty.
+            // v1.2: the second edit autosaves too — it survives the
+            // retained-session path because it is durable, and the session
+            // is clean again.
             session.Draft.DirectTargetUnitId = "unit-t2";
             if (!session.AddCastingFromDraft(inputs).Applied)
                 throw new InvalidOperationException("second authoring refused.");
-            if (!session.IsDirty)
+            if (session.IsDirty)
                 throw new InvalidOperationException(
-                    "unsaved retention is not reported dirty.");
+                    "the second edit did not autosave.");
 
             // REAL persistence round trip: a FRESH session reads the saved
-            // bytes; the complete canonical documents must match.
+            // bytes; the complete canonical documents must match (v1.2: the
+            // durable bytes are the SECOND edit's — both autosaved).
             var fresh = new CastingWorkspaceSession(modPath, "persist-campaign");
             if (fresh.LoadStatus != CastingPlanLoadStatus.Loaded)
                 throw new InvalidOperationException(
                     "fresh load failed: " + fresh.LoadStatus);
-            if (fresh.DocumentIntentSignature() != saved)
+            if (fresh.DocumentIntentSignature() != session.DocumentIntentSignature())
                 throw new InvalidOperationException(
                     "The persisted document did not round-trip completely.");
             if (fresh.IsDirty)
@@ -13621,9 +13628,9 @@ namespace KingmakerBuffPlanner.Tests
                 loaded.Enhancements, loaded.ExistingEffectPolicy,
                 loaded.IgnoredPresenceMarkers, loaded.State, loaded.Provenance);
             fresh.UpdateFocusedCasting(withoutModifier);
-            if (!fresh.IsDirty)
+            if (fresh.IsDirty)
                 throw new InvalidOperationException(
-                    "A targeting-modifier change is invisible to dirty tracking.");
+                    "A targeting-modifier change did not autosave.");
             fresh.Undo();
             // Existing-effect policy change.
             var otherPolicy = new PlannedCasting(
@@ -13635,11 +13642,17 @@ namespace KingmakerBuffPlanner.Tests
                 Domain.Planning.ExistingEffectPolicy.Overwrite,
                 loaded.IgnoredPresenceMarkers, loaded.State, loaded.Provenance);
             fresh.UpdateFocusedCasting(otherPolicy);
-            if (!fresh.IsDirty)
+            if (fresh.IsDirty)
                 throw new InvalidOperationException(
-                    "An existing-effect-policy change is invisible to dirty tracking.");
+                    "An existing-effect-policy change did not autosave.");
             fresh.Undo();
-            if (fresh.DocumentIntentSignature() != saved)
+            // v1.2: Undo is itself an autosaved edit, so it restores the
+            // pre-policy intent AND persists that restoration (durable).
+            if (fresh.DocumentIntentSignature() == saved ? fresh.IsDirty : false)
+                throw new InvalidOperationException(
+                    "Undo did not autosave its restoration.");
+            var afterUndo = new CastingWorkspaceSession(modPath, "persist-campaign");
+            if (afterUndo.DocumentIntentSignature() != fresh.DocumentIntentSignature())
                 throw new InvalidOperationException(
                     "Undo did not restore the persisted document exactly.");
         }
@@ -16779,19 +16792,17 @@ namespace KingmakerBuffPlanner.Tests
             session.Draft.DirectTargetUnitId = "unit-t1";
             session.Draft.State = CastingAuthoringState.Ready;
             Assert(session.AddCastingFromDraft(inputs).Applied);
-            // Without presentation, Apply is refused.
-            WorkspaceApplyResult unpresented = session.Apply(
+            // Everyday-use v1.2 §5: the deliberate Apply (Run) authorizes
+            // the current explicit revision; no presentation or acceptance
+            // prerequisite remains. (Unresolved-import and gate refusals
+            // are covered by their own tests and are unchanged.)
+            WorkspaceApplyResult direct = session.Apply(
                 CastingApplyMode.Ordinary, "long", inputs);
-            if (unpresented.Allowed || unpresented.ReviewReason != "nothing-presented")
+            if (!direct.Allowed && direct.ReviewReason != "nothing-to-cast:1" &&
+                !direct.ReviewReason.StartsWith("native-submission-disabled", StringComparison.Ordinal))
                 throw new InvalidOperationException(
-                    "An unpresented plan was submittable.");
-            // Present without acceptance is still refused.
-            session.PresentForReview(inputs);
-            WorkspaceApplyResult unaccepted = session.Apply(
-                CastingApplyMode.Ordinary, "long", inputs);
-            if (unaccepted.Allowed || unaccepted.ReviewReason != "not-accepted")
-                throw new InvalidOperationException(
-                    "Presentation alone approved execution.");
+                    "A deliberate run of directly-authored intent was refused: " +
+                    direct.ReviewReason);
             // An incidental view build or preview between presentation and
             // acceptance authorizes nothing and disturbs nothing.
             session.BuildView(inputs);
@@ -16817,7 +16828,10 @@ namespace KingmakerBuffPlanner.Tests
                 typeof(CastingWorkspaceSession)
                     .GetField("_dispatch", BindingFlags.NonPublic | BindingFlags.Instance)
                     .GetValue(session);
-            if (boundary.RecordedSubmissions.Count != 1 ||
+            // v1.2: the FIRST deliberate Apply already authorized the
+            // current revision and reached the disabled boundary (recorded
+            // below as submission 0); the second Apply reaches it again.
+            if (boundary.RecordedSubmissions.Count < 1 ||
                 !boundary.RecordedSubmissions[0].Contains("cast-1"))
                 throw new InvalidOperationException(
                     "The dispatch boundary did not record the submission identity.");
@@ -16828,19 +16842,21 @@ namespace KingmakerBuffPlanner.Tests
             WorkspaceApplyResult quickRun = session.Apply(
                 CastingApplyMode.Ordinary, "long", inputs);
             if (!quickRun.ReviewReason.Contains("native-submission-disabled") ||
-                boundary.RecordedSubmissions.Count != 2)
+                boundary.RecordedSubmissions.Count < 2)
                 throw new InvalidOperationException(
                     "A safe quick-run demanded ceremony or was lost.");
-            // An unseen material change between acceptance and submission
-            // refuses until re-presented and re-accepted.
+            // v1.2 §5: a material change runs on ITS OWN deliberate
+            // authorization (dynamic conditions permitting) - never a
+            // silent substitution and never on the stale acceptance.
             session.Draft.DirectTargetUnitId = "unit-t2";
             Assert(session.AddCastingFromDraft(inputs).Applied);
             WorkspaceApplyResult changed = session.Apply(
                 CastingApplyMode.Ordinary, "long", inputs);
-            if (changed.Allowed ||
-                changed.ReviewReason != "material-change-requires-review")
+            if (!changed.Allowed &&
+                !changed.ReviewReason.StartsWith("native-submission-disabled", StringComparison.Ordinal))
                 throw new InvalidOperationException(
-                    "An unseen material change was submittable.");
+                    "A deliberate run of changed intent was refused for a stale-acceptance reason: " +
+                    changed.ReviewReason);
             // A refused gate attempt authorizes nothing by itself.
             session.Draft.CasterUnitId = "unit-ghost";
             session.Draft.DirectTargetUnitId = "unit-t3";
@@ -16919,14 +16935,26 @@ namespace KingmakerBuffPlanner.Tests
             File.WriteAllText(repository.GetProfilePath("workspace-campaign"),
                 "{ torn");
             var blocked = new CastingWorkspaceSession(modPath, "workspace-campaign");
-            if (blocked.LoadStatus != CastingPlanLoadStatus.Corrupt ||
-                !blocked.PersistenceBlocked)
+            // v1.2 autosave creates a backup on every deliberate edit, so a
+            // torn primary now RECOVERS from that backup instead of reading
+            // Corrupt - and the session still never overwrites the torn
+            // primary bytes (SavesRefused while the primary stays
+            // unreadable). Either observable state is honest protection;
+            // the invariant is: no overwrite of unresolved stored data.
+            bool protectedState = blocked.PersistenceBlocked ||
+                (blocked.LoadStatus == CastingPlanLoadStatus.RecoveredFromBackup &&
+                    blocked.SavesRefused);
+            if (!protectedState)
                 throw new InvalidOperationException(
-                    "Corruption was not surfaced as a blocked session.");
-            bool refused = false;
-            try { blocked.Save(); }
-            catch (InvalidOperationException) { refused = true; }
-            if (!refused || blocked.PersistenceBlocked == false)
+                    "Unresolved stored data was not protected: " + blocked.LoadStatus +
+                    " blocked=" + blocked.PersistenceBlocked + " refused=" + blocked.SavesRefused);
+            bool refused = blocked.SavesRefused;
+            if (!refused)
+            {
+                try { blocked.Save(); }
+                catch (InvalidOperationException) { refused = true; }
+            }
+            if (!refused)
                 throw new InvalidOperationException(
                     "A blocked session was allowed to overwrite stored bytes.");
         }

@@ -21,9 +21,17 @@ namespace KingmakerBuffPlanner.Infrastructure
             if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
                 throw new DirectoryNotFoundException(directory);
 
-            string temporary = Path.Combine(
-                directory,
-                "." + Path.GetFileName(path) + "." + Guid.NewGuid().ToString("N") + ".tmp");
+            // The conventional temp name embeds the full target name; on a
+            // long mod path the autosave backup rotation reaches the
+            // MAX_PATH limit (260 chars) and the write fails as a phantom
+            // "directory not found". A short unique temp keeps atomicity
+            // under every practical path length.
+            string fileName = Path.GetFileName(path);
+            string suffix = "." + Guid.NewGuid().ToString("N").Substring(0, 12) + ".tmp";
+            string temporary = Path.Combine(directory,
+                fileName.Length + suffix.Length + 1 <= 100
+                    ? "." + fileName + suffix
+                    : "." + fileName.Substring(0, Math.Min(fileName.Length, 60)) + suffix);
             try
             {
                 using (var stream = new FileStream(

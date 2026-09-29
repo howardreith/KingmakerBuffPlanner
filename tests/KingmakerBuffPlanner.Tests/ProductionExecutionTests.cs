@@ -909,12 +909,11 @@ namespace KingmakerBuffPlanner.Tests
                 saved.Ui.Hotkey != "Ctrl+Shift+P")
                 throw new InvalidOperationException("Save reset the player settings.");
             session.SetExecutionMode("animated");
-            if (!session.IsDirty)
-                throw new InvalidOperationException("A settings change was not dirty.");
-            session.Save();
+            // v1.2: a settings change autosaves immediately (durable, not
+            // dirty); the persisted file already carries it.
             if (repository.Load("workspace-campaign").Profile.Execution.Mode != "animated" ||
                 session.IsDirty)
-                throw new InvalidOperationException("A settings change was not saved.");
+                throw new InvalidOperationException("A settings change was not autosaved.");
             bool refused = false;
             try { session.SetExecutionMode("bogus"); }
             catch (ArgumentException) { refused = true; }
@@ -955,8 +954,17 @@ namespace KingmakerBuffPlanner.Tests
                     reopened.ReviewReason);
             Assert(AddDraftCasting(second, inputs, "unit-wizard", "unit-t2").Applied);
             WorkspaceApplyResult changed = second.Apply(CastingApplyMode.Ordinary, "long", inputs);
-            if (changed.Allowed || changed.ReviewReason != "material-change-requires-review")
-                throw new InvalidOperationException("A changed plan rode a restored acceptance.");
+            // Everyday-use v1.2 §5: the deliberate run authorizes the
+            // CURRENT revision — a changed plan does not ride the restored
+            // acceptance, it authorizes itself at run time (and the edit
+            // already autosaved). The submission proceeds or is refused by
+            // the gate/dispatch on its own current merits, never by the
+            // stale acceptance.
+            if (!changed.Allowed &&
+                !changed.ReviewReason.StartsWith("native-submission-disabled", StringComparison.Ordinal) &&
+                changed.ReviewReason != "nothing-to-cast:2")
+                throw new InvalidOperationException("A changed plan was refused for a stale-acceptance reason: " +
+                    changed.ReviewReason);
             // Presenting the unsaved change in another session neither
             // revokes nor rewrites the stored acceptance: a reopened session
             // with the accepted plan on disk still runs it.
@@ -1504,17 +1512,18 @@ namespace KingmakerBuffPlanner.Tests
             CastingWorkspaceInputs inputs = WorkspaceInputs(out snapshot);
             var session = new CastingWorkspaceSession(dir, "workspace-campaign", new DisabledCastingDispatchBoundary());
             Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t1").Applied);
+            // v1.2: the deliberate edit autosaved, so a reload LOADS the
+            // durable file (never blocks, never discards the casting).
             for (int attempt = 0; attempt < 2; attempt++)
             {
                 CastingPlanLoadStatus status = session.Reload();
-                if (status != CastingPlanLoadStatus.Absent || session.PersistenceBlocked || session.SavesRefused ||
-                    session.Document.Castings.Count != 1 || !session.IsDirty || session.LastReloadNote != "kept-unsaved")
-                    throw new InvalidOperationException("A reload without a plan file blocked saving or dropped castings: " +
+                if (status != CastingPlanLoadStatus.Loaded || session.PersistenceBlocked || session.SavesRefused ||
+                    session.Document.Castings.Count != 1)
+                    throw new InvalidOperationException("A reload of the autosaved plan blocked saving or dropped castings: " +
                         status + "|" + session.LastReloadNote);
             }
-            session.Save();
             if (new CastingWorkspaceSession(dir, "workspace-campaign").Document.Castings.Count != 1)
-                throw new InvalidOperationException("The kept casting was not saved after the reloads.");
+                throw new InvalidOperationException("The autosaved casting was not durable.");
             // Castings added while the classic import was blocked are imported
             // into when the classic file is repaired, and saved with it.
             string mergeDir = Path.Combine(root, "reload-merge");
@@ -1832,12 +1841,11 @@ namespace KingmakerBuffPlanner.Tests
                 new DisabledCastingDispatchBoundary());
             bool before = session.OutOfCombatOnly;
             session.SetOutOfCombatOnly(!before);
-            if (session.OutOfCombatOnly == before || !session.IsDirty ||
-                session.ExecutionSettings.OutOfCombatOnly == before)
-                throw new InvalidOperationException("The out-of-combat change did not take or looked saved.");
-            session.Save();
+            if (session.OutOfCombatOnly == before ||
+                session.ExecutionSettings.OutOfCombatOnly == before || session.IsDirty)
+                throw new InvalidOperationException("The out-of-combat change did not take or did not autosave.");
             if (new CastingWorkspaceSession(dir, "workspace-campaign").OutOfCombatOnly == before)
-                throw new InvalidOperationException("The out-of-combat setting was not saved.");
+                throw new InvalidOperationException("The out-of-combat setting was not autosaved.");
         }
 
         // Re-review: an imported casting whose old plan did not say single
@@ -2328,12 +2336,11 @@ namespace KingmakerBuffPlanner.Tests
             host.RunCompleted = completed => session.RecordRunReport(completed);
             Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t1").Applied);
             Assert(AddDraftCasting(session, inputs, "unit-wizard", "unit-t2").Applied);
-            if (session.Apply(CastingApplyMode.Ordinary, "long", inputs).ReviewReason !=
-                    "nothing-presented" || host.StartedRuns != 0)
-                throw new InvalidOperationException("An unreviewed plan reached the host.");
+            // v1.2 §5: the deliberate run authorizes the current explicit
+            // revision directly - no editor presentation/acceptance
+            // prerequisite. The submission proceeds through the unchanged
+            // preflight/gate/projection/boundary chain.
             session.SetExecutionMode("instant");
-            session.PresentForReview(inputs);
-            Assert(session.AcceptPresentedPlan(inputs));
             WorkspaceApplyResult applied = session.Apply(CastingApplyMode.Ordinary, "long", inputs);
             if (!applied.Allowed || applied.Dispatch == null || !applied.Dispatch.Submitted ||
                 applied.Dispatch.Reason != "run-started:run-1" || host.StartedRuns != 1 ||
@@ -7744,7 +7751,9 @@ namespace KingmakerBuffPlanner.Tests
             deadline.Update();
             if (!deadline.Completed || slow.TerminalReason != "qualification-deadline" ||
                 slow.Violations().All(value => !value.StartsWith("terminal:", StringComparison.Ordinal)))
-                throw new InvalidOperationException("The qualification deadline did not end the run.");
+                throw new InvalidOperationException("The qualification deadline did not end the run: " +
+                    slow.TerminalReason + " failures=" + string.Join("|", slow.Failures.ToArray()) +
+                    " phase=" + deadline.Phase);
             // Review P0 (repeat): anything but the exact no-op ends the run
             // AT the repeat step - here an effect expired after complete,
             // so the repeat Apply is refused by the boundary.
@@ -7758,7 +7767,11 @@ namespace KingmakerBuffPlanner.Tests
             for (int i = 0; i < 400 && !repeatDriver.Completed && repeatDriver.Phase != "repeat"; i++)
                 repeatDriver.Update();
             if (repeatDriver.Phase != "repeat" || expiring.Fired.Count != 3)
-                throw new InvalidOperationException("The repeat fixture did not reach the repeat step.");
+                throw new InvalidOperationException("The repeat fixture did not reach the repeat step: phase=" +
+                    repeatDriver.Phase + " completed=" + repeatDriver.Completed +
+                    " terminal=" + expiringRecord.TerminalReason +
+                    " failures=" + string.Join("|", expiringRecord.Failures.ToArray()) +
+                    " fired=" + expiring.Fired.Count);
             expiring.Active.Remove(expiring.Active.Keys.OrderBy(key => key, StringComparer.Ordinal).Last());
             for (int i = 0; i < 400 && !repeatDriver.Completed; i++) repeatDriver.Update();
             if (expiring.Fired.Count != 3 || expiringRecord.TerminalReason != "failed:repeat" ||

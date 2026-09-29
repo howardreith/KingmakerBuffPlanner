@@ -87,6 +87,7 @@ namespace KingmakerBuffPlanner.UI
         private Text _footerSelectedRun;
         private Text _footerOnePass;
         private Text _footerResult;
+        private Text _footerSave;
         private Button _modeButton;
         private Button _readyOnlyButton;
         private Button _undoButton;
@@ -712,14 +713,20 @@ namespace KingmakerBuffPlanner.UI
             _footerOnePass = FooterLine(footer, "OnePassBudget", 0.34f, 0.67f);
             _footerResult = FooterLine(footer, "Result", 0f, 0.34f);
             _footerResult.color = Burgundy;
-            string[] names = { "Save", "Reload", "ExecutionMode", "Undo", "Accept", "Apply" };
-            string[] captions = { "Save", "Reload", ModeCaption(), "Undo", "Accept Plan", "Review & Apply" };
+            // Everyday-use v1.2 §2/§5: autosave replaced Save (a passive
+            // status shows it), the Run click authorizes the current
+            // revision (no Accept Plan / Review & Apply ceremony), and
+            // Reload moved out of everyday use (Recovery in the settings
+            // area keeps migration/repair tooling).
+            string[] names = { "ExecutionMode", "Undo", "Run" };
+            string[] captions = { ModeCaption(), "Undo", "Run Long" };
             Action[] actions =
             {
-                SaveCommand, ReloadCommand, ToggleModeCommand, UndoCommand, AcceptCommand,
+                ToggleModeCommand, UndoCommand,
                 () => RunApply(CastingApplyMode.Ordinary)
             };
-            float[] widths = { 90f, 90f, 150f, 90f, 130f, 160f };
+            float[] widths = { 150f, 90f, 120f };
+            _footerSave = FooterLine(footer, "SaveStatus", 1f, 1f);
             float right = 0f;
             for (int index = names.Length - 1; index >= 0; index--)
             {
@@ -743,6 +750,13 @@ namespace KingmakerBuffPlanner.UI
             ready.sizeDelta = new Vector2(170f, 0f);
             ready.anchoredPosition = new Vector2(-right, 0f);
             _readyOnlyButton.gameObject.SetActive(false);
+            _footerSave.rectTransform.anchorMin = new Vector2(0f, 1f);
+            _footerSave.rectTransform.anchorMax = new Vector2(0.22f, 1f);
+            _footerSave.rectTransform.pivot = new Vector2(0f, 1f);
+            _footerSave.rectTransform.anchoredPosition = new Vector2(8f, -2f);
+            _footerSave.rectTransform.sizeDelta = new Vector2(0f, 16f);
+            _footerSave.text = "Saved";
+            _footerSave.color = _theme.MutedBrownText;
             // The text lines end where the buttons begin.
             float textRight = right + 180f;
             foreach (Text line in new[] { _footerSelectedRun, _footerOnePass, _footerResult })
@@ -755,6 +769,9 @@ namespace KingmakerBuffPlanner.UI
             ground.raycastTarget = false;
             ledger.SetAsFirstSibling();
             _footerResult.text = DescribeReadiness();
+            if (_footerSave != null)
+                _footerSave.text = string.IsNullOrEmpty(_session.AutosaveStatus)
+                    ? "Saved" : _session.AutosaveStatus;
         }
 
         private Text FooterLine(RectTransform footer, string name, float from, float to)

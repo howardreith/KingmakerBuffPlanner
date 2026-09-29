@@ -25,6 +25,10 @@ namespace KingmakerBuffPlanner.UI
         private readonly ModLog _log;
         private readonly Action _openSetup;
         private readonly Action<string> _quickExecute;
+        // Everyday-use v1.2 §5: in casting-first mode the primary HUD
+        // button left-click runs Long (never opens the planner on the
+        // successful path); a long press opens the editor.
+        private readonly Func<bool> _castingFirstForMoon;
         private readonly List<Sprite> _ownedSprites = new List<Sprite>();
         private readonly List<Texture2D> _ownedTextures = new List<Texture2D>();
         private RectTransform _root;
@@ -58,7 +62,8 @@ namespace KingmakerBuffPlanner.UI
             ModLog log,
             Action openSetup,
             Action<string> quickExecute,
-            Func<string, string> routineTooltipOverride = null)
+            Func<string, string> routineTooltipOverride = null,
+            Func<bool> castingFirstForMoon = null)
         {
             _session = session ?? throw new ArgumentNullException("session");
             _diagnostics = diagnostics ?? throw new ArgumentNullException("diagnostics");
@@ -66,6 +71,7 @@ namespace KingmakerBuffPlanner.UI
             _openSetup = openSetup ?? throw new ArgumentNullException("openSetup");
             _quickExecute = quickExecute ?? throw new ArgumentNullException("quickExecute");
             _routineTooltipOverride = routineTooltipOverride;
+            _castingFirstForMoon = castingFirstForMoon;
         }
 
         // Casting-first mode describes its own plan; null keeps the classic
@@ -291,8 +297,8 @@ namespace KingmakerBuffPlanner.UI
 
             _buttons = new[]
             {
-                CreatePlannerButton("Setup", "setup", width, height, _openSetup,
-                    () => "Open Buff Planner setup. Shortcut: " + PlannerHotkey.Binding + "."),
+                CreatePlannerButton("Setup", "setup", width, height, MoonClick,
+                    () => MoonTooltip()),
                 CreatePlannerButton("Long", "long", width, height,
                     () => _quickExecute("long"), () => RoutineTooltip("long")),
                 CreatePlannerButton("Important", "important", width, height,
@@ -305,7 +311,7 @@ namespace KingmakerBuffPlanner.UI
             foreach (Button button in _buttons) button.interactable = false;
             _tooltips = new Func<string>[]
             {
-                () => "Open Buff Planner setup. Shortcut: " + PlannerHotkey.Binding + ".",
+                MoonTooltip,
                 () => RoutineTooltip("long"),
                 () => RoutineTooltip("important"),
                 () => RoutineTooltip("short")
@@ -628,6 +634,27 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        // v1.2 §5: casting-first moon = left-click runs Long (never opens
+        // the planner on the successful path); long press opens the editor.
+        // Classic keeps the editor-opening click during retirement.
+        private void MoonClick()
+        {
+            if (_castingFirstForMoon != null && _castingFirstForMoon())
+            {
+                _quickExecute("long");
+                return;
+            }
+            _openSetup();
+        }
+
+        private string MoonTooltip()
+        {
+            return _castingFirstForMoon != null && _castingFirstForMoon()
+                ? "Run the Long plan. Hold to open the planner; shortcut: " +
+                    PlannerHotkey.Binding + "."
+                : "Open Buff Planner setup. Shortcut: " + PlannerHotkey.Binding + ".";
+        }
+
         private Button CreatePlannerButton(
             string displayName,
             string iconKind,
@@ -655,6 +682,9 @@ namespace KingmakerBuffPlanner.UI
             sink.Diagnostics = _diagnostics;
             sink.RoutineId = iconKind == "setup" ? string.Empty : iconKind;
             sink.HoverChanged = active => _nativeTooltipActive = active;
+            // v1.2 §5: holding the moon opens the editor (click runs Long).
+            if (iconKind == "setup")
+                sink.HoldAction = _openSetup;
             TooltipTrigger nativeTooltip = button.gameObject.AddComponent<TooltipTrigger>();
             nativeTooltip.SetNameAndDescription(TooltipTitle(iconKind),
                 tooltip == null ? string.Empty : tooltip());

@@ -928,7 +928,9 @@ namespace KingmakerBuffPlanner.Execution
             {
                 if (_host.IsRunning) _host.Cancel("qualification-exception");
                 RecordInterruptedStep();
-                Fail("exception:" + exception.GetType().Name + ":" + exception.Message);
+                string where = exception.StackTrace == null ? string.Empty
+                    : " @at " + exception.StackTrace.Split(Environment.NewLine.ToCharArray())[0];
+                Fail("exception:" + exception.GetType().Name + ":" + exception.Message + where);
             }
         }
 

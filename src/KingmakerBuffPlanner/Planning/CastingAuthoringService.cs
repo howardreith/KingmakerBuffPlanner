@@ -58,6 +58,24 @@ namespace KingmakerBuffPlanner.Planning
 
         public CastingPlanDocument Document { get { return _document; } }
 
+        // Everyday-use v1.2 §4: raised once for every COMPLETED deliberate
+        // document mutation (never for reads, focus or preview), carrying a
+        // monotonic revision so a persistence owner can order writes and an
+        // older completion can never overwrite a newer edit. Immutable
+        // snapshots: handlers receive the exact revised document.
+        public event Action<CastingPlanDocument, int> DocumentChanged;
+        private int _revision;
+
+        private void Announce()
+        {
+            _revision++;
+            Action<CastingPlanDocument, int> handlers = DocumentChanged;
+            if (handlers != null) handlers(_document, _revision);
+        }
+
+        // The session's own persistence hookup uses this revision counter.
+        public int CurrentRevision { get { return _revision; } }
+
         public bool CanUndo { get { return _history.Count != 0; } }
 
         // Appends a casting at the end of its routine. The casting ID is the
@@ -242,6 +260,8 @@ namespace KingmakerBuffPlanner.Planning
         {
             if (_history.Count == 0) return false;
             _document = _history.Pop();
+            // Undo is itself a deliberate edit (v1.2 §4): it persists.
+            Announce();
             return true;
         }
 
@@ -253,6 +273,7 @@ namespace KingmakerBuffPlanner.Planning
                 _document.ImportNotices, _document.AcknowledgedImportNotices);
             PushHistory();
             _document = replacement;
+            Announce();
             return AuthoringEditResult.Accept(scope, affected);
         }
 

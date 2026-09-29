@@ -252,6 +252,24 @@ namespace KingmakerBuffPlanner.Planning
             return TrySubmit(DefaultScope, current);
         }
 
+        // Everyday-use v1.2 §5: a deliberate Run request IS the
+        // authorization of the current explicit revision. The run service
+        // calls this with the exact signature it is about to execute: the
+        // authorization is recorded for that digest (identical
+        // digest-exactness to an editor acceptance - a material change
+        // between authorization and submission still refuses), so an
+        // unchanged plan stays authorized across reopen while every edit
+        // requires its own deliberate run. This is NOT an acceptance
+        // manufactured by a render: it lives in the run path only.
+        public CastingReviewDecision AuthorizeRun(string scope, CastingPlanSignature current)
+        {
+            if (current == null) throw new ArgumentNullException("current");
+            string key = scope ?? DefaultScope;
+            _presented[key] = current.Digest;
+            _accepted[key] = current.Digest;
+            return new CastingReviewDecision(true, string.Empty);
+        }
+
         // A submission is allowed only when accepted contents match the
         // submitted contents exactly. A material change between acceptance
         // and submission refuses; the refusal itself changes nothing, so a
