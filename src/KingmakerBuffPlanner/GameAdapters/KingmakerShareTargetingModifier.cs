@@ -54,7 +54,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (!BrownFurShareTransmutationCompatibility.TryResolveToggle(
                     caster, out toggle, out reason) ||
                 !BrownFurShareTransmutationCompatibility.IsSupportedSpell(
-                    ability, option.Provider.Key, toggle, out reason))
+                    ability, option.Provider.Key, out reason))
                 return Reject(option, reason);
 
             bool original = toggle.IsOn;
