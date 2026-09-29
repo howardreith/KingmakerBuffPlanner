@@ -240,9 +240,14 @@ namespace KingmakerBuffPlanner.Persistence
 
         internal static ExecutionProfile Default()
         {
+            // Everyday-use v1.2: Instant is the default for genuinely new
+            // or unset execution preferences. An explicit saved "animated"
+            // choice is a user preference and is never reset by this
+            // default (the repositories only call here when no explicit
+            // mode exists).
             return new ExecutionProfile
             {
-                Mode = "animated",
+                Mode = "instant",
                 AllowAnimatedFallback = true,
                 OutOfCombatOnly = true,
                 RecastExisting = false
