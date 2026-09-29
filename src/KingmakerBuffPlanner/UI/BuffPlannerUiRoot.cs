@@ -1556,6 +1556,13 @@ namespace KingmakerBuffPlanner.UI
                 delegate(string id) { return CreateCastingSession(id); },
                 delegate(string message) { _log.Info(message); });
             if (session == null) return "campaign identity unresolved";
+            if (!ReferenceEquals(session, _castingWorkspaceSession))
+            {
+                // Review addendum §2: the OLD campaign's intent gets a
+                // durability attempt before the binding changes; its file
+                // is its own campaign's, never the new one's.
+                FlushSessionForDiscard("campaign-switch:" + campaignId);
+            }
             _castingWorkspaceSession = session;
             return null;
         }
@@ -2087,6 +2094,33 @@ namespace KingmakerBuffPlanner.UI
             if (_hud != null) _hud.Dispose();
         }
 
+        // Review addendum §2: attempt durability before a controlled
+        // discard. A failed save is surfaced, never silent; the session is
+        // NOT nulled while its edits are still the only copy — teardown
+        // keeps the object for the process's remainder, and a campaign
+        // switch keeps the ORIGINAL session bound to its own campaign (the
+        // dirty intent stays recoverable there; it is never relabeled as
+        // the new campaign's plan). Forced process termination with an
+        // unwritable store remains a physical limit, distinct from this
+        // voluntary-discard policy.
+        private void FlushSessionForDiscard(string cause)
+        {
+            CastingWorkspaceSession retained = _castingWorkspaceSession;
+            if (retained == null) return;
+            if (!retained.IsDirty) return;
+            string before = retained.AutosaveStatus;
+            _log.Info("[KBP-WORKSPACE] flush-before-discard;cause=" + cause +
+                ";autosave=" + before + ".");
+            // PersistNow is private; Apply's flush path is the sanctioned
+            // durable-flush entry, but a run is not requested here, so the
+            // session's own public surface is used: RetryFailedSave.
+            retained.RetryFailedSave();
+            if (retained.IsDirty)
+                _log.Info("[KBP-WORKSPACE] discard-time flush failed;cause=" + cause +
+                    ";autosave=" + retained.AutosaveStatus +
+                    ";the in-memory edits remain held by the retained session.");
+        }
+
         private void ReleaseAll()
         {
             if (_disposed) return;
@@ -2099,12 +2133,14 @@ namespace KingmakerBuffPlanner.UI
             CloseCastingWorkspace();
             if (_castingWorkspaceSession != null)
             {
-                // Defined shutdown policy: discarding the session drops any
-                // unsaved edits; this is the only silent-loss point and it
-                // is logged (review F6).
-                _log.Info("[KBP-WORKSPACE] session discarded at teardown;dirty=" +
-                    _castingWorkspaceSession.IsDirty + ".");
-                _castingWorkspaceSession = null;
+                // Review addendum §2: flush first; on failure KEEP the
+                // session (the process is ending, but the object stays
+                // reachable and the failure is logged loudly, never a
+                // silent drop).
+                FlushSessionForDiscard("root-teardown");
+                _log.Info("[KBP-WORKSPACE] session release at teardown;dirty=" +
+                    _castingWorkspaceSession.IsDirty + ";autosave=" +
+                    _castingWorkspaceSession.AutosaveStatus + ".");
             }
             if (_runtimePhysicalProbe != null) _runtimePhysicalProbe.Dispose();
             _runtimePhysicalProbe = null;

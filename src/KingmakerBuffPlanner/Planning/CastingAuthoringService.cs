@@ -211,6 +211,9 @@ namespace KingmakerBuffPlanner.Planning
             _document = new CastingPlanDocument(_document.CampaignId,
                 _document.Routines, _document.Castings, _document.ImportNotices,
                 _document.AcknowledgedImportNotices.Concat(pending));
+            // A deliberate document mutation (review addendum §2): it
+            // announces so autosave persists it like every other edit.
+            Announce();
             return AuthoringEditResult.Accept(
                 "acknowledge-import-notices:" + string.Join(" | ", pending), new string[0]);
         }
@@ -280,13 +283,17 @@ namespace KingmakerBuffPlanner.Planning
         private void PushHistory()
         {
             _history.Push(_document);
-            if (_history.Count > HistoryLimit)
-            {
-                var retained = new List<CastingPlanDocument>();
-                while (_history.Count > 0) retained.Add(_history.Pop());
-                retained.RemoveRange(0, retained.Count - HistoryLimit);
-                foreach (CastingPlanDocument document in retained) _history.Push(document);
-            }
+            if (_history.Count <= HistoryLimit) return;
+            // Trim the OLDEST overflow while preserving LIFO order. Draining
+            // yields newest-first; keep the newest HistoryLimit entries and
+            // push them back in reverse so the newest stays on top (the old
+            // code kept the oldest and rebuilt the stack inverted, so the
+            // first Undo after 65 edits restored the near-empty start).
+            var retained = new List<CastingPlanDocument>();
+            while (_history.Count > 0) retained.Add(_history.Pop());
+            retained.RemoveRange(HistoryLimit, retained.Count - HistoryLimit);
+            for (int index = retained.Count - 1; index >= 0; index--)
+                _history.Push(retained[index]);
         }
 
         private int IndexOf(string castingId)

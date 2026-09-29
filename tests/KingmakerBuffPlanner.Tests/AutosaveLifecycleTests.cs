@@ -20,6 +20,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("autosave-interleaves-settings-and-edits", () => TestAutosaveInterleaved(root));
             Run("autosave-survives-reload-then-edit", () => TestAutosaveReloadThenEdit(root));
             Run("autosave-run-refuses-when-persistence-fails", () => TestAutosaveRunDurability(root));
+            Run("autosave-recovers-at-lifecycle-boundaries", () => TestAutosaveLifecycleBoundaries(root));
+            Run("acknowledge-import-notices-persists-like-any-edit", () => TestAcknowledgePersistence(root));
         }
 
         private static AbilityKey LifecycleAbility()
@@ -199,6 +201,106 @@ namespace KingmakerBuffPlanner.Tests
                     "latest durable intent.");
             if (session.AutosaveStatus != "saved" || session.IsDirty)
                 throw new InvalidOperationException("the run flush did not restore durability.");
+        }
+
+
+        // Review addendum §2: controlled lifecycle boundaries attempt
+        // durability before discarding; a campaign switch never relabels
+        // campaign A's intent as campaign B's; RetryFailedSave is the
+        // recovery surface. Real repository files throughout.
+        private static void TestAutosaveLifecycleBoundaries(string root)
+        {
+            string dirA = Path.Combine(root, "lifecycle-campaign-A");
+            string dirB = Path.Combine(root, "lifecycle-campaign-B");
+            Directory.CreateDirectory(dirA);
+            Directory.CreateDirectory(dirB);
+            var sessionA = new CastingWorkspaceSession(dirA, "campaign:A",
+                new DisabledCastingDispatchBoundary());
+            if (!sessionA.AddCastingForRuntime(LifecycleCasting("cast-a", "unit-t1")).Applied)
+                throw new InvalidOperationException("A authoring refused.");
+            // Failed-save → the retry surface recovers once storage heals.
+            string planA = RepositoryOf(dirA).GetProfilePath("campaign:A");
+            string baseline = File.ReadAllText(planA);
+            using (var hold = new FileStream(planA, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                if (!sessionA.AddCastingForRuntime(LifecycleCasting("cast-a2", "unit-t2")).Applied)
+                    throw new InvalidOperationException("locked A authoring refused.");
+                if (sessionA.RetryFailedSave())
+                    throw new InvalidOperationException("retry succeeded while the store " +
+                        "was locked.");
+                if (File.ReadAllText(planA) != baseline)
+                    throw new InvalidOperationException("the last good A file was disturbed.");
+            }
+            if (!sessionA.RetryFailedSave() || sessionA.IsDirty)
+                throw new InvalidOperationException("retry failed after storage healed: " +
+                    sessionA.AutosaveStatus);
+            // Campaign switch with a FAILED save on A: A's edits stay with
+            // A (RetryFailedSave refused), A's file is never written into
+            // B, and B starts empty of A's castings.
+            using (var hold = new FileStream(planA, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                if (!sessionA.AddCastingForRuntime(LifecycleCasting("cast-a3", "unit-t3")).Applied)
+                    throw new InvalidOperationException("second locked A authoring refused.");
+                var sessionB = new CastingWorkspaceSession(dirB, "campaign:B",
+                    new DisabledCastingDispatchBoundary());
+                var binding = CastingWorkspaceSessionBinding.Resolve(sessionA, "campaign:B",
+                    id => new CastingWorkspaceSession(id == "campaign:B" ? dirB : dirA, id),
+                    message => { });
+                if (ReferenceEquals(binding, sessionA))
+                    throw new InvalidOperationException("the binding reused A's session for B.");
+                if (binding.CampaignId != "campaign:B" || binding.Document.Castings.Count != 0)
+                    throw new InvalidOperationException("B started with foreign intent.");
+            }
+            // A recovers its own intent under its own campaign afterwards.
+            if (!sessionA.RetryFailedSave() || sessionA.IsDirty)
+                throw new InvalidOperationException("A's recovery failed.");
+            var freshA = new CastingWorkspaceSession(dirA, "campaign:A");
+            if (freshA.Document.Castings.Count != 3)
+                throw new InvalidOperationException("A's durable file is not its latest " +
+                    "intent: " + freshA.Document.Castings.Count);
+            var freshB = new CastingWorkspaceSession(dirB, "campaign:B");
+            if (freshB.Document.Castings.Count != 0)
+                throw new InvalidOperationException("B was contaminated by A.");
+        }
+
+        // Review addendum §2: acknowledging import notices is a deliberate
+        // document mutation — it must announce, autosave, persist across a
+        // fresh load, and stay undoable.
+        private static void TestAcknowledgePersistence(string root)
+        {
+            string dir = Path.Combine(root, "acknowledge-persist");
+            Directory.CreateDirectory(dir);
+            // A plan with a pending import notice (an unresolved provenance
+            // marker) persisted directly through the repository.
+            var ability = LifecycleAbility();
+            var casting = new PlannedCasting("cast-imp", "long", 0, "source-lifecycle",
+                ability, "unit-cleric", "book", CastingTargetMode.DirectTarget,
+                "unit-t1", null, null, null, null,
+                ExistingEffectPolicy.SkipAlreadyActive, null,
+                CastingAuthoringState.Draft,
+                new MigrationProvenance("legacy-assign-1", 5, "long",
+                    "imported:cap-3", null, new[] { "legacy-buff-cap:3" }));
+            var document = new CastingPlanDocument("campaign:ack",
+                new[] { new RoutineDefinition("long", "Long") },
+                new[] { casting },
+                new[] { "legacy-provider-ban:Fireball" });
+            RepositoryOf(dir).Save(CastingPlanProfile.FromDocument(document));
+            var session = new CastingWorkspaceSession(dir, "campaign:ack",
+                new DisabledCastingDispatchBoundary());
+            if (session.Document.PendingImportNotices.Count == 0)
+                throw new InvalidOperationException("the fixture produced no pending notice.");
+            var acknowledged = session.AcknowledgeImportNotices();
+            if (!acknowledged.Applied)
+                throw new InvalidOperationException("acknowledgement refused: " +
+                    acknowledged.Reason);
+            if (session.IsDirty || session.AutosaveStatus != "saved")
+                throw new InvalidOperationException("acknowledgement did not autosave: " +
+                    session.AutosaveStatus);
+            var fresh = new CastingWorkspaceSession(dir, "campaign:ack");
+            if (fresh.Document.PendingImportNotices.Count != 0 ||
+                fresh.Document.AcknowledgedImportNotices.Count == 0)
+                throw new InvalidOperationException("acknowledgement did not survive a fresh " +
+                    "load.");
         }
 
         private static PartyProviderSnapshot PartyForLifecycle()
