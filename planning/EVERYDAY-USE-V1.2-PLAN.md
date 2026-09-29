@@ -49,6 +49,43 @@ targeting, profile protection, protected saves, or native safeguards.
 
 ## Status (updated as slices complete)
 
+### Session 2026-09-29 (later) — slices 1 and 2 complete; Share next
+
+- Slice 1 COMPLETE: right-click native spell descriptions (`fb51138`);
+  rod relevance policy (`33476c7`); harmful-ally-disposition catalogue
+  fix (`e3e1130`) + excluded-source persistence regression (`89241a9`).
+- Slice 2 COMPLETE (`2d342e0`, protocol 367/367): autosave through the
+  authoring service's revision-announced mutation boundary (settings and
+  Undo included; blocked/unreadable data never overwritten; MAX_PATH
+  robustness fix in AtomicFile temp names); run-authorization
+  (`CastingReviewCoordinator.AuthorizeRun`) — the deliberate Run/Apply
+  authorizes the exact current revision (digest-exact, run-path only);
+  moon left-click runs Long in casting-first (hold opens the editor);
+  everyday footer = passive save status + Undo + Run <routine>.
+- NEXT (slice 3, Share): the pure pipeline is READY —
+  `TargetingModifierSelection` persists,
+  `ExplicitCastingCompiler.ApplyTargetingModifiers` applies registered
+  pure modifiers with unresolved/unknown/unavailable blocks and folds
+  `ModifierUsageDemand` into the atomic cost vector. Remaining work:
+  (1) pure `ShareTransmutationCastingModifier` (planning-side; expands
+  the option's reachable targets to verified legal allies via the
+  Brown-Fur snapshot facts; distinct refusal reasons: self-only,
+  feature-missing, source-unsupported, reservoir-short; reservoir
+  demands); (2) wire into `CurrentCastingWorkspaceInputs`'
+  `targetingModifiers` argument (currently null) from the verified
+  Brown-Fur compatibility snapshot; (3) UI: Share control in "Next
+  casting" AFTER caster/source but BEFORE target selection, and on an
+  existing casting's inspector (persisted per-casting intent; disabling
+  keeps an ally target visibly blocked); (4) execution-phase native
+  bridge adapting the verified `KingmakerShareTargetingModifier`
+  pattern (arm exact toggle → cast once → restore on ALL terminal
+  paths, never swallow restoration) behind the pure modifier's
+  execution hook; (5) combined Share+PowerfulChange reservoir demand
+  verified against the installed implementation (both draw the arcane
+  reservoir — verify actual pool identity once, reserve once).
+  Reference: docs/INSTANT-SHARE-FAILED-VALIDATION.md (the prior
+  validation failure and what the bridge proved).
+
 - [x] Package read; branch `codex/kingmaker-buff-planner-everyday-use`
       created from `dd50ed1`; state reconciled.
 - [x] Map + milestone record committed `8a8a996`.
