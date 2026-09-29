@@ -311,7 +311,25 @@ namespace KingmakerBuffPlanner.Planning
             {
                 if (demand.Category == CastingCostCategory.EnhancementPool)
                 {
-                    if (!_enhancementInitial.ContainsKey(demand.PoolKey)) continue;
+                    // Review F5: a demanded enhancement pool the ledger has
+                    // no verified snapshot for can NEVER fund the cast — it
+                    // is refused, not skipped. The same applies to a pool
+                    // whose reported balance is unknown (null): unknown is
+                    // never zero and never free. A deliberate, VERIFIED
+                    // unlimited contract would be an explicit future marker
+                    // (like the native Unlimited kind), never a missing
+                    // balance, so nothing here can fund it by omission.
+                    int? available;
+                    if (!_enhancementInitial.TryGetValue(demand.PoolKey, out available))
+                    {
+                        reason = "enhancement-pool-unknown:" + demand.PoolKey;
+                        return false;
+                    }
+                    if (available == null)
+                    {
+                        reason = "enhancement-balance-unknown:" + demand.PoolKey;
+                        return false;
+                    }
                     int remaining;
                     if (_enhancementRemaining.TryGetValue(demand.PoolKey, out remaining) &&
                         remaining < demand.Units)
