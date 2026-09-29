@@ -746,6 +746,28 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "Hostile current-target effect was mistaken for a self buff.");
 
+            // Everyday-use v1.2 §8: the game's own ally-disposition data is
+            // authoritative. An ability marked harmful to allies is never a
+            // beneficial party buff, even when the buff blueprint forgets
+            // m_Harmful (the owner's Irresistible Dance report) and even
+            // though it can technically target friends.
+            NativeCandidateAuditDecision harmfulAlly = classifier.Classify(new NativeCandidateAuditFacts
+            {
+                IsPlayerAccessible = true,
+                CanTargetSelf = true,
+                CanTargetFriends = true,
+                CanTargetEnemies = true,
+                EffectOnAlly = "Harmful",
+                EffectOnEnemy = "None",
+                Effects = new[] { CandidateEffect("Buff", "CurrentTarget", false,
+                    "ContextActionApplyBuff", "root") },
+                DiagnosticContracts = new string[0]
+            });
+            if (harmfulAlly.Disposition != "exclude" ||
+                !harmfulAlly.Reason.StartsWith("harmful-ally-disposition:", StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "An ability the game marks harmful to allies entered the beneficial catalogue.");
+
             NativeCandidateAuditDecision point = classifier.Classify(new NativeCandidateAuditFacts
             {
                 IsPlayerAccessible = true,
