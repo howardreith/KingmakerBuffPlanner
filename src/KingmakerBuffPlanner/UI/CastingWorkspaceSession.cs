@@ -216,8 +216,8 @@ namespace KingmakerBuffPlanner.UI
             {
                 case CastingPlanLoadStatus.Loaded:
                 case CastingPlanLoadStatus.RecoveredFromBackup:
-                    _authoring = new CastingAuthoringService(
-                        loaded.Profile.ToDocument());
+                    ReplaceAuthoring(new CastingAuthoringService(
+                        loaded.Profile.ToDocument()));
                     AdoptSettings(loaded.Profile);
                     break;
                 case CastingPlanLoadStatus.Absent:
@@ -226,8 +226,8 @@ namespace KingmakerBuffPlanner.UI
                     // exact original archived, legacy file untouched,
                     // candidate written and reopened — so the player's
                     // existing buffs are not silently lost (charter §7).
-                    _authoring = new CastingAuthoringService(
-                        MigrateLegacyOrEmpty(modPath, campaignId, legacyGroupings));
+                    ReplaceAuthoring(new CastingAuthoringService(
+                        MigrateLegacyOrEmpty(modPath, campaignId, legacyGroupings)));
                     break;
                 default:
                     // Corrupt or unsupported candidate data is never
@@ -235,7 +235,7 @@ namespace KingmakerBuffPlanner.UI
                     // empty in-memory document and saving stays refused
                     // until the operator resolves the stored bytes.
                     PersistenceBlocked = true;
-                    _authoring = new CastingAuthoringService(NewDocument());
+                    ReplaceAuthoring(new CastingAuthoringService(NewDocument()));
                     break;
             }
             // The dirty baseline covers every load state — an absent or
@@ -249,7 +249,6 @@ namespace KingmakerBuffPlanner.UI
             // protection: the in-memory edit stays, the disk bytes stay,
             // and the failure is reported (never a silent default
             // overwrite, never "Saved" for an undurable revision).
-            _authoring.DocumentChanged += OnDocumentChangedForAutosave;
             RaiseCastingIdMark(_authoring.Document.Castings.Select(value => value.CastingId));
             SelectedRoutineId = "long";
             // Accepted review state from an earlier session: it authorizes
@@ -265,18 +264,70 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
-        // v1.2 §4: revision-ordered autosave. A late write completion can
-        // never replace a newer edit: only the announced revision that is
-        // still current reaches the repository; superseded announcements
-        // are dropped. Persistence failure keeps the in-memory document
-        // and the last good disk file and is reported here.
-        private int _autosaveRevision;
+        // v1.2 §4 persistence lifecycle (review R1/R2): ONE entry point
+        // persists every completed deliberate change - document mutations
+        // announced by the authoring service, the workflow's settings
+        // changes, run-time flushes. There is no second revision counter
+        // to suppress a later edit: each call persists the CURRENT
+        // document+settings through the existing atomic repository, so a
+        // settings save and a subsequent edit save can never collide.
+        // Synchronous by design (discrete gestures); the last outcome is
+        // recorded for the footer and the run durability barrier.
         private string _autosaveStatus;
+
+        // Review R2: the ONE place the authoring service instance changes
+        // (construction, reload, import). The previous instance's autosave
+        // subscription is detached and the new instance's announcements
+        // are connected exactly once, so a reload can never leave edits
+        // unsaved, and no instance ever carries two subscriptions.
+        private void ReplaceAuthoring(CastingAuthoringService replacement)
+        {
+            if (_authoring != null) _authoring.DocumentChanged -= OnDocumentChangedForAutosave;
+            _authoring = replacement ?? throw new ArgumentNullException("replacement");
+            _authoring.DocumentChanged += OnDocumentChangedForAutosave;
+        }
 
         private void OnDocumentChangedForAutosave(CastingPlanDocument document, int revision)
         {
-            if (revision <= _autosaveRevision) return;
-            _autosaveRevision = revision;
+            PersistNow("document");
+        }
+
+        private void AutosaveSettingsNow()
+        {
+            PersistNow("settings");
+        }
+
+        // The single durability gate for a run (review R3): true when the
+        // CURRENT authored intent is durable on disk (not dirty, and the
+        // last persistence attempt did not fail or get refused).
+        private bool IntentIsDurable
+        {
+            get
+            {
+                return !IsDirty && !SaveFailed && !SaveRefused;
+            }
+        }
+
+        private bool SaveFailed
+        {
+            get
+            {
+                return _autosaveStatus != null &&
+                    _autosaveStatus.StartsWith("save-failed", StringComparison.Ordinal);
+            }
+        }
+
+        private bool SaveRefused
+        {
+            get
+            {
+                return _autosaveStatus != null &&
+                    _autosaveStatus.StartsWith("save-refused", StringComparison.Ordinal);
+            }
+        }
+
+        private void PersistNow(string cause)
+        {
             if (PersistenceBlocked)
             {
                 _autosaveStatus = "save-refused:stored-data-unresolved";
@@ -285,7 +336,7 @@ namespace KingmakerBuffPlanner.UI
             try
             {
                 _repository.Save(CastingPlanProfile.FromDocument(
-                    document, _uiSettings, _executionSettings));
+                    _authoring.Document, _uiSettings, _executionSettings));
                 _savedIntentSignature = DocumentIntentSignature();
                 LoadStatus = CastingPlanLoadStatus.Loaded;
                 LoadWarning = string.Empty;
@@ -298,14 +349,6 @@ namespace KingmakerBuffPlanner.UI
                 // replacing anything). Never claim Saved.
                 _autosaveStatus = "save-failed:" + exception.GetType().Name;
             }
-        }
-
-        // A settings change the workflow makes persists the current
-        // document + settings through the same atomic path (v1.2 §4).
-        private void AutosaveSettingsNow()
-        {
-            OnDocumentChangedForAutosave(_authoring.Document,
-                _autosaveRevision + 1);
         }
 
         // Passive save state for the footer (v1.2 §2): "saved" for the
@@ -1349,6 +1392,22 @@ namespace KingmakerBuffPlanner.UI
             if (decision.ExecutableCastingIds.Count == 0)
                 return new WorkspaceApplyResult(false,
                     "nothing-to-cast:" + decision.Omissions.Count, decision, null);
+            // v1.2 §4/§5 durability barrier (review R3): native casts may
+            // only be submitted for an intent that is durable on disk. A
+            // failed or refused autosave gets one fresh flush attempt here;
+            // if the CURRENT revision still cannot persist, the run is
+            // refused with the precise reason, the in-memory edit and the
+            // last good disk file stay untouched, and nothing is cast.
+            // (The empty-plan no-op above never demands a write.)
+            if (!IntentIsDurable)
+            {
+                string before = _autosaveStatus;
+                PersistNow("run-flush");
+                if (!IntentIsDurable)
+                    return new WorkspaceApplyResult(false,
+                        "persistence-failed:" + (_autosaveStatus ?? before ?? "unknown"),
+                        decision, null);
+            }
             CastingPlanSignature signature = CastingPlanSignature.For(plan, scope);
             // v1.2 §5: the deliberate Run request authorizes THIS exact
             // revision; no editor acceptance prerequisite remains. All
@@ -2050,7 +2109,7 @@ namespace KingmakerBuffPlanner.UI
                 bool imported = !LegacyImportBlocked && LoadStatus == CastingPlanLoadStatus.Loaded;
                 if (imported || !unsaved)
                 {
-                    _authoring = new CastingAuthoringService(next);
+                    ReplaceAuthoring(new CastingAuthoringService(next));
                     EditingFocusCastingId = null;
                 }
                 // Only a plan written by the import is saved; anything else
@@ -2067,8 +2126,8 @@ namespace KingmakerBuffPlanner.UI
             {
                 case CastingPlanLoadStatus.Loaded:
                 case CastingPlanLoadStatus.RecoveredFromBackup:
-                    _authoring = new CastingAuthoringService(
-                        loaded.Profile.ToDocument());
+                    ReplaceAuthoring(new CastingAuthoringService(
+                        loaded.Profile.ToDocument()));
                     AdoptSettings(loaded.Profile);
                     PersistenceBlocked = false;
                     LegacyImportBlocked = false;
