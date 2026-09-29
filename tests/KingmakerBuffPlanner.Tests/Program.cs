@@ -2373,7 +2373,7 @@ namespace KingmakerBuffPlanner.Tests
             File.WriteAllText(path, document.ToString());
             ProfileLoadResult migrated = repository.Load("campaign:migration");
             if (!migrated.Migrated || migrated.Profile.SchemaVersion != 5 ||
-                migrated.Profile.Ui.Scale != 1.0f || migrated.Profile.Execution.Mode != "animated" ||
+                migrated.Profile.Ui.Scale != 1.0f || migrated.Profile.Execution.Mode != "instant" ||
                 migrated.Profile.Ui.Hotkey != "Ctrl+Shift+B")
                 throw new InvalidOperationException("Schema-one profile was not migrated with safe defaults.");
             SourceAssignmentProfile legacy = migrated.Profile.Routines[0].Assignments[0];
@@ -2590,7 +2590,7 @@ namespace KingmakerBuffPlanner.Tests
             if (!reloaded.IsTargetWanted("long", "unit-a") || !reloaded.IsTargetWanted("long", "unit-b") ||
                 reloaded.GetProviderPreference(provider.Key.Canonical).MaximumCasts != 1 ||
                 reloaded.Profile.Ui.Scale != 1.25f ||
-                reloaded.Profile.Execution.Mode != "instant" ||
+                reloaded.Profile.Execution.Mode != "animated" ||
                 reloaded.Profile.Execution.OutOfCombatOnly ||
                 reloaded.Profile.Execution.AllowAnimatedFallback ||
                 !reloaded.Profile.Execution.RecastExisting ||
@@ -3077,7 +3077,7 @@ namespace KingmakerBuffPlanner.Tests
                 warningTarget.State != TargetPortraitState.DirectSelectedButUnavailable ||
                 invalidTarget.Status != PlannerPresentationStatus.Failure ||
                 invalidTarget.State != TargetPortraitState.InvalidTarget ||
-                routine.Label != "Long  1 ready" || settings.CastingMode != "Animated" ||
+                routine.Label != "Long  1 ready" || settings.CastingMode != "Instant" ||
                 saves != beforePreview)
                 throw new InvalidOperationException("Player-facing presentation summaries are invalid.");
             model.SetAllValidTargets("long", false);

@@ -922,7 +922,10 @@ namespace KingmakerBuffPlanner.Tests
             string freshDir = Path.Combine(root, "settings-default");
             Directory.CreateDirectory(freshDir);
             var fresh = new CastingWorkspaceSession(freshDir, "workspace-campaign");
-            if (fresh.ExecutionMode != "animated" || !fresh.AllowAnimatedFallback)
+            // Everyday-use v1.2: a genuinely new plan starts from the
+            // Instant default (an explicit saved animated choice — set and
+            // verified above — is the user's preference and persists).
+            if (fresh.ExecutionMode != "instant" || !fresh.AllowAnimatedFallback)
                 throw new InvalidOperationException("A new plan did not start from the defaults.");
         }
 
