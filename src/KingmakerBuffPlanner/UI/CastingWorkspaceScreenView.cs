@@ -328,68 +328,36 @@ namespace KingmakerBuffPlanner.UI
             _frame = KingmakerUiFactory.CreateRect("Frame", _root);
             KingmakerUiFactory.AddFramedPanel(_frame, _theme.ParchmentPanel, _theme.GoldAccent, 2f);
             KingmakerUiFactory.Stretch(_frame, 24, 24, 24, 60);
-            bool pageArt = ApplyNativePageArt(_frame, nativeCanvas);
+            // Everyday-use v1.2: one continuous scroll. The borrowed
+            // two-page book sprite (with its central binding under the
+            // graph connections) is retired; the composed continuous
+            // native-compatible parchment below IS the writing surface.
+            _pageArtEvidence = ApplyContinuousScrollArt(_frame);
             BuildHeader(_frame);
             BuildCatalogue(_frame);
             BuildGraphArea(_frame);
             BuildInspector(_frame);
             BuildFooter(_frame);
-            if (pageArt) LetPageShowThrough();
             PropagateUiLayer();
         }
 
-        // The game's own spellbook page, borrowed onto OUR frame only (the
-        // donor is never modified); a missing donor keeps the parchment.
+        // Historical donors of the retired two-page book art, retained for
+        // the evidence string only (everyday-use v1.2 removed their use:
+        // the binding sat under the casting connections).
         internal static readonly string[] PageArtLocators =
         {
             "ServiceWindow/SpellBook/BookBackground",
             "ServiceWindow/CharacterScreen/BookBackground"
         };
 
-        private bool ApplyNativePageArt(RectTransform frame, StaticCanvas nativeCanvas)
+        // The continuous writing surface: the composed parchment frame with
+        // no central fold. A native continuous-paper donor may replace the
+        // composed tint when one is verified; nothing here mutates a donor.
+        private static string ApplyContinuousScrollArt(RectTransform frame)
         {
-            try
-            {
-                foreach (string locator in PageArtLocators)
-                {
-                    Transform donor = nativeCanvas.transform.Find(locator);
-                    Image image = donor == null ? null : donor.GetComponent<Image>();
-                    if (image == null || image.sprite == null) continue;
-                    Image target = frame.GetComponent<Image>();
-                    target.sprite = image.sprite;
-                    target.type = Image.Type.Simple;
-                    target.preserveAspect = false;
-                    target.color = Color.white;
-                    Outline outline = frame.GetComponent<Outline>();
-                    if (outline != null) outline.enabled = false;
-                    _pageArtEvidence = "page=native;locator=" + locator + ";sprite=" + image.sprite.name;
-                    Debug.Log("[KBP-THEME] workspace page art " + _pageArtEvidence);
-                    return true;
-                }
-                _pageArtEvidence = "page=fallback;no-donor-sprite";
-            }
-            catch (Exception exception)
-            {
-                _pageArtEvidence = "page=fallback;error=" + exception.GetType().Name;
-            }
-            Debug.LogWarning("[KBP-THEME] workspace page art " + _pageArtEvidence);
-            return false;
-        }
-
-        // Over real page art the panels are unfilled (the page shows through)
-        // and the header, which sits on the dark margin above the book, uses
-        // light ink.
-        private void LetPageShowThrough()
-        {
-            foreach (ScrollRect scroll in _frame.GetComponentsInChildren<ScrollRect>(true))
-            {
-                Image panel = scroll.GetComponent<Image>();
-                if (panel != null) panel.color = new Color(panel.color.r, panel.color.g, panel.color.b, 0f);
-                Outline outline = scroll.GetComponent<Outline>();
-                if (outline != null) outline.effectColor = new Color(0.45f, 0.32f, 0.20f, 0.35f);
-            }
-            foreach (Text text in new[] { _title, _headerStatus })
-                if (text != null) text.color = _theme.ButtonText;
+            string evidence = "page=continuous-scroll;book-art-retired";
+            Debug.Log("[KBP-THEME] workspace page art " + evidence);
+            return evidence;
         }
 
         private void PropagateUiLayer()
