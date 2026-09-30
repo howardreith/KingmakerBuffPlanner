@@ -2304,3 +2304,47 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
   4. Then the verified private delivery (unique everyday-use filename;
      prior beta 214b795b...8b20564 untouched).
 - Tree remains clean at the gate-passed candidate; no source work started.
+
+## Session 10 addendum 2 — SharedPersonal recipe design (pinned, not yet implemented)
+
+Concrete design established by reading the recipe/driver framework (next
+work block implements exactly this):
+
+- Recipe id `shared-personal` in CastingQualificationRecipe: IsKnown true;
+  ForecastSteps 2; MinimumCastings 2; NOT group, NOT two-phase, NO disable
+  step (sequences like zero-cost-mixed's plain flow, two castings).
+- SelectSharedPersonal(inputs, campaignId):
+  1. Share snapshot = first inputs.Enhancements with AffectsTargeting and
+     EnhancementId prefix "share-transmutation|" (rejection reason
+     otherwise: no-share-snapshot). Caster/whitelists/reservoir pool from
+     it; recipients from the registered Share modifier's capability (find
+     inputs.TargetingModifiers ShareCastingModifier instance - expose a
+     read accessor if needed) or structurally (targetable, friendly, alive,
+     conscious, != caster, without the effect).
+  2. Provider option: caster + selected ability guid in the snapshot's
+     AbilityWhiteList + spellbook in SpellbookWhiteList + personal
+     (ReachableTargetIds == [caster]) + DirectRuleCast base strategy.
+  3. qual-cast-1 = shared casting: that option, ally target,
+     TargetingModifiers [share-transmutation enabled];
+     qual-cast-2 = plain isolation casting: a verified-free plain buff from
+     EligibleOptions (zero-cost-mixed rules) on a fresh recipient.
+  4. Forecast both (CastingQualificationForecast.Project); require step 1
+     Ready with the share enhancement id among applied ids, an
+     EnhancementPool line on the reservoir pool, and the strategy the
+     installed contract selected (ProviderDirectRuleCast when the direct
+     provider id is present, else NativeCommandRequired); step 2 plain.
+- Driver: author step 1 through the PRODUCTION graph commands
+  (SelectGraphBuff/SelectGraphCaster/SelectGraphSource ->
+  ToggleDraftTargetingModifier(share) -> AddGraphCasting(ally); verify the
+  persisted record carries the per-casting modifier selection), step 2 via
+  the driver's ordinary add path; judge: ally effect present, Arcane
+  Reservoir pool AND the native slot decremented exactly the reserved
+  amounts (fresh discovery read), plain step 2 executes normally (lease
+  restored - no share arming on the plain cast), toggle ends in its
+  pre-run state.
+- Launcher: add the recipe to the -Recipe ValidateSet; allowance schema-5
+  binds the ordered forecast projections generically (verify only).
+- Then: protocol tests for SelectSharedPersonal (synthetic inputs with a
+  Share snapshot + modifier, mirroring the existing recipe tests);
+  Build-Local + COMPLETE Test-SourceOnly at the new commit; NEW freeze
+  record; dispatcher jobs instant+animated; E18/E19/E20 evidence.
