@@ -117,25 +117,10 @@ namespace KingmakerBuffPlanner.UI
             if (inputs != null) _lastInputs = inputs;
             if (_lastInputs == null)
                 return GraphRefusal("draft-ability-unresolved:no-discovery-inputs");
+            ProviderPlanningOption option = ResolveDraftOption(out string draftRefusal);
+            if (option == null) return GraphRefusal(draftRefusal);
             string source = SelectedSourceId;
-            if (string.IsNullOrEmpty(source)) return GraphRefusal("no-buff-selected");
             string caster = Draft.CasterUnitId ?? SelectedCasterUnitId;
-            if (string.IsNullOrEmpty(caster))
-                return GraphRefusal("draft-ability-unresolved:no-caster-selected");
-            List<ProviderPlanningOption> sources = SourceOptionsFor(_lastInputs, source, caster);
-            if (sources.Count == 0)
-                return GraphRefusal("draft-ability-unresolved:no-provider-for-source-and-caster");
-            ProviderPlanningOption option = Draft.Ability == null ? null : sources.FirstOrDefault(value =>
-                string.Equals(value.Provider.Key.Ability.Canonical, Draft.Ability.Canonical,
-                    StringComparison.Ordinal) &&
-                string.Equals(NullIfEmpty(value.Provider.Key.SpellbookGuid),
-                    NullIfEmpty(Draft.SpellbookGuid), StringComparison.Ordinal));
-            if (option == null)
-                return GraphRefusal(sources.Count > 1
-                    ? "draft-ability-unresolved:exact-source-ambiguous:" + sources.Count
-                    : "draft-ability-unresolved:no-provider-for-source-and-caster");
-            if (TwinCount(_lastInputs, option.Provider.Key) > 1)
-                return GraphRefusal("provider-not-pinnable:" + option.Provider.Key.Canonical);
             UnitSnapshot unit = _lastInputs.Snapshot.Units.FirstOrDefault(value =>
                 string.Equals(value.UnitId, unitId, StringComparison.Ordinal));
             if (unit == null) return GraphRefusal("target-not-in-party:" + unitId);
@@ -399,23 +384,23 @@ namespace KingmakerBuffPlanner.UI
             // §4: the target lane shows the SAME eligibility the Add path
             // and the compiler judge — the draft's selected targeting
             // modifiers applied to the chosen option, with the complete
-            // prospective draft intent (review F2).
+            // prospective draft intent (review F2). v1.2 §7/E16: the
+            // modifier controls (Share Transmutation) sit exactly here —
+            // after the exact source, before the target click.
             ProviderPlanningOption targetOption = chosenOption;
-            if (chosenOption != null && Draft.TargetingModifiers.Count != 0 &&
-                !string.IsNullOrEmpty(Draft.CasterUnitId ?? chosenCaster?.UnitId))
+            PlannedCasting draftIntent = chosenOption == null ||
+                string.IsNullOrEmpty(Draft.CasterUnitId ?? chosenCaster?.UnitId)
+                    ? null : ProspectiveDraftCasting(chosenOption);
+            if (draftIntent != null)
             {
-                string targetModifierRefusal;
-                targetOption = ApplyGraphTargetingModifiers(Draft.TargetingModifiers,
-                    inputs,
-                    new PlannedCasting("draft-prospective", SelectedRoutineId, 0, source,
-                        chosenOption.Provider.Key.Ability,
-                        Draft.CasterUnitId ?? chosenCaster.UnitId,
-                        NullIfEmpty(chosenOption.Provider.Key.SpellbookGuid),
-                        CastingTargetMode.DirectTarget,
-                        Draft.CasterUnitId ?? chosenCaster.UnitId, null, null,
-                        Draft.TargetingModifiers.ToList(), Draft.Enhancements.ToList(),
-                        Draft.ExistingEffectPolicy, null, CastingAuthoringState.Ready, null),
-                    chosenOption, out targetModifierRefusal);
+                view.NextCastingModifiers = BuildModifierOptions(inputs, draftIntent,
+                    chosenOption, Draft.TargetingModifiers);
+                if (Draft.TargetingModifiers.Count != 0)
+                {
+                    string targetModifierRefusal;
+                    targetOption = ApplyGraphTargetingModifiers(Draft.TargetingModifiers,
+                        inputs, draftIntent, chosenOption, out targetModifierRefusal);
+                }
             }
             view.Targets = BuildGraphTargets(inputs, targetOption, view.SelectedSourceIsGroup == true,
                 chips, nameOf);
@@ -491,7 +476,7 @@ namespace KingmakerBuffPlanner.UI
                         : (IEnumerable<string>)casting.PredictedBeneficiaryUnitIds,
                     casting.RequiredCoverageUnitIds,
                     casting.CoverageGaps.Select(gap => gap.UnitId),
-                    casting.Readiness, GraphStatusLabel(casting), reason,
+                    casting.Readiness, GraphStatusLabel(casting, inputs), reason,
                     casting.Enhancements.Select(selection => EnhancementBadge(inputs,
                         selection.EnhancementId, casting.CasterUnitId)),
                     string.Join(", ", casting.Cost.Select(CostLabel).ToArray()),
@@ -519,13 +504,15 @@ namespace KingmakerBuffPlanner.UI
             return chips;
         }
 
-        private static string GraphStatusLabel(ResolvedCasting casting)
+        private static string GraphStatusLabel(ResolvedCasting casting,
+            CastingWorkspaceInputs inputs = null)
         {
             switch (casting.Readiness)
             {
                 case ResolvedCastingReadiness.AlreadySatisfied: return "Already active";
                 case ResolvedCastingReadiness.Ready:
-                    return ExplicitCastingStepConverter.StandardExecutionLimitation(casting) == null
+                    return ExplicitCastingStepConverter.StandardExecutionLimitation(casting,
+                        TargetingModifierEnhancementMap(inputs)) == null
                         ? "Ready" : "Ready - cannot run yet";
                 case ResolvedCastingReadiness.Disabled: return "Disabled";
                 case ResolvedCastingReadiness.Draft: return "Draft";
@@ -794,6 +781,11 @@ namespace KingmakerBuffPlanner.UI
             }
             IEnumerable<WorkspaceProviderChoice> providers = ProviderChoices(inputs, focused.SourceId, null,
                 focused.CasterUnitId, focused.Ability, focused.SpellbookGuid);
+            // E16/E17: the focused casting's own modifier controls, judged
+            // against its UNMODIFIED option (the retarget block below
+            // reassigns option with its selected modifiers applied).
+            List<CastingGraphModifierOption> modifierOptions = BuildModifierOptions(
+                inputs, focused, option, focused.TargetingModifiers);
             var retargets = new List<CastingGraphTargetNode>();
             if (option != null)
             {
@@ -832,17 +824,20 @@ namespace KingmakerBuffPlanner.UI
                 : inspectOption.Provider.Description;
             string inspectDuration = inspectOption == null ? string.Empty
                 : inspectOption.Provider.DurationText;
-            return new CastingGraphInspector(focused, chip,
+            CastingGraphInspector inspector = new CastingGraphInspector(focused, chip,
                 "Casting " + (focused.Order + 1) + " in " + RoutineDisplayName(focused.RoutineId),
                 casterName + " → " + targetLabel, casterName, sourceLabel, targetLabel,
                 RoutineDisplayName(focused.RoutineId), routineCount, reasons, reviewItems, costLines,
                 enhancements, providers, retargets, coverageText,
                 inspectDescription, inspectDuration,
                 resolved == null ? null : CastingRunPresentation.DescribeLimitation(
-                    ExplicitCastingStepConverter.StandardExecutionLimitation(resolved)),
+                    ExplicitCastingStepConverter.StandardExecutionLimitation(resolved,
+                        TargetingModifierEnhancementMap(inputs))),
                 resolved == null ? new string[0] : resolved.ExistingEffectNotes.Select(note =>
                     CastingRunPresentation.DescribeExistingEffectNote(note, nameOf)),
                 CastingRunPresentation.DescribeEntry(lastRun));
+            inspector.Modifiers = modifierOptions;
+            return inspector;
         }
 
         private static string LeftAfterPlan(CastingCapacity capacity, CastingCostCategory category,
@@ -867,6 +862,196 @@ namespace KingmakerBuffPlanner.UI
             if (remaining == null) return " · left after the whole plan: unknown";
             return " · " + remaining.Value + (available == null ? string.Empty : " of " + available.Value) +
                 " left after the whole plan";
+        }
+
+        // v1.2 (S7) / E16: arm or disarm a targeting modifier (Share
+        // Transmutation) on the NEXT casting - the control between the
+        // exact source and the target click. Enabling validates through
+        // the SAME pure resolver the compiler and the Add path use, so a
+        // refusal here is the honest reason the cast would give. This
+        // mutates the DRAFT only (the next casting's defaults): it is not
+        // a document edit and persists exactly when the added casting
+        // persists.
+        public AuthoringEditResult ToggleDraftTargetingModifier(string modifierId,
+            CastingWorkspaceInputs inputs = null)
+        {
+            if (inputs != null) _lastInputs = inputs;
+            if (string.IsNullOrWhiteSpace(modifierId))
+                return AuthoringEditResult.Refuse("targeting-modifier-unavailable:");
+            if (_lastInputs == null)
+                return AuthoringEditResult.Refuse("draft-ability-unresolved:no-discovery-inputs");
+            TargetingModifierSelection existing = Draft.TargetingModifiers.FirstOrDefault(
+                value => string.Equals(value.ModifierId, modifierId, StringComparison.Ordinal));
+            if (existing != null)
+            {
+                // Disarming is always allowed: the next casting simply
+                // returns to the unmodified spell.
+                Draft.TargetingModifiers.Remove(existing);
+                return AuthoringEditResult.Accept(
+                    "draft-targeting-modifier-off:" + modifierId, new string[0]);
+            }
+            string draftRefusal;
+            ProviderPlanningOption option = ResolveDraftOption(out draftRefusal);
+            if (option == null) return AuthoringEditResult.Refuse(draftRefusal);
+            ICastingTargetingModifier resolved = RegisteredModifier(_lastInputs, modifierId);
+            if (resolved == null)
+                return AuthoringEditResult.Refuse("targeting-modifier-unavailable:" + modifierId);
+            PlannedCasting prospective = ProspectiveDraftCasting(option);
+            string modifierRefusal;
+            if (ApplyGraphTargetingModifiers(
+                    new[] { new TargetingModifierSelection(modifierId, true, null) },
+                    _lastInputs, prospective, option, out modifierRefusal) == null)
+                return AuthoringEditResult.Refuse(modifierRefusal);
+            Draft.TargetingModifiers.Add(
+                new TargetingModifierSelection(modifierId, true, null));
+            return AuthoringEditResult.Accept(
+                "draft-targeting-modifier-on:" + modifierId, new string[0]);
+        }
+
+        // The focused casting's own Share control (E16/E17): on/off through
+        // the normal authoring boundary, so the change announces, autosaves
+        // and is undoable exactly like every deliberate edit. Disabling
+        // keeps a now-illegal ally target as blocked, repairable intent.
+        public AuthoringEditResult ToggleFocusedTargetingModifier(string modifierId,
+            CastingWorkspaceInputs inputs = null)
+        {
+            if (inputs != null) _lastInputs = inputs;
+            PlannedCasting focused = FocusedCasting();
+            if (focused == null) return AuthoringEditResult.Refuse("no-editing-focus");
+            if (string.IsNullOrWhiteSpace(modifierId))
+                return AuthoringEditResult.Refuse("targeting-modifier-unavailable:");
+            if (_lastInputs == null)
+                return AuthoringEditResult.Refuse("draft-ability-unresolved:no-discovery-inputs");
+            bool selected = focused.TargetingModifiers.Any(value =>
+                string.Equals(value.ModifierId, modifierId, StringComparison.Ordinal));
+            List<TargetingModifierSelection> next = selected
+                ? focused.TargetingModifiers.Where(value => !string.Equals(value.ModifierId,
+                        modifierId, StringComparison.Ordinal)).ToList()
+                : focused.TargetingModifiers.Concat(
+                        new[] { new TargetingModifierSelection(modifierId, true, null) })
+                    .ToList();
+            if (!selected)
+            {
+                ICastingTargetingModifier resolved = RegisteredModifier(_lastInputs, modifierId);
+                if (resolved == null)
+                    return AuthoringEditResult.Refuse(
+                        "targeting-modifier-unavailable:" + modifierId);
+                ProviderPlanningOption option = FindRecordOption(_lastInputs, focused);
+                if (option == null)
+                    return AuthoringEditResult.Refuse(
+                        "source-unresolved:targeting-modifier:" + modifierId);
+                string modifierRefusal;
+                if (ApplyGraphTargetingModifiers(next, _lastInputs, focused, option,
+                        out modifierRefusal) == null)
+                    return AuthoringEditResult.Refuse(modifierRefusal);
+            }
+            return UpdateFocusedCasting(new PlannedCasting(focused.CastingId,
+                focused.RoutineId, focused.Order, focused.SourceId, focused.Ability,
+                focused.CasterUnitId, focused.SpellbookGuid, focused.TargetMode,
+                focused.DirectTargetUnitId, focused.Origin, focused.RequiredCoverageUnitIds,
+                next, focused.Enhancements, focused.ExistingEffectPolicy,
+                focused.IgnoredPresenceMarkers, focused.State, focused.Provenance));
+        }
+
+        // The exact option the next casting would use (the same resolution
+        // AddGraphCasting performs, shared with the modifier controls).
+        private ProviderPlanningOption ResolveDraftOption(out string refusal)
+        {
+            refusal = null;
+            string source = SelectedSourceId;
+            if (string.IsNullOrEmpty(source)) { refusal = "no-buff-selected"; return null; }
+            string caster = Draft.CasterUnitId ?? SelectedCasterUnitId;
+            if (string.IsNullOrEmpty(caster))
+            { refusal = "draft-ability-unresolved:no-caster-selected"; return null; }
+            List<ProviderPlanningOption> sources = SourceOptionsFor(_lastInputs, source, caster);
+            if (sources.Count == 0)
+            { refusal = "draft-ability-unresolved:no-provider-for-source-and-caster"; return null; }
+            ProviderPlanningOption option = Draft.Ability == null ? null : sources.FirstOrDefault(
+                value => string.Equals(value.Provider.Key.Ability.Canonical,
+                        Draft.Ability.Canonical, StringComparison.Ordinal) &&
+                    string.Equals(NullIfEmpty(value.Provider.Key.SpellbookGuid),
+                        NullIfEmpty(Draft.SpellbookGuid), StringComparison.Ordinal));
+            if (option == null)
+            {
+                refusal = sources.Count > 1
+                    ? "draft-ability-unresolved:exact-source-ambiguous:" + sources.Count
+                    : "draft-ability-unresolved:no-provider-for-source-and-caster";
+                return null;
+            }
+            if (TwinCount(_lastInputs, option.Provider.Key) > 1)
+            { refusal = "provider-not-pinnable:" + option.Provider.Key.Canonical; return null; }
+            return option;
+        }
+
+        // The draft's own intent as a shape-valid prospective record (the
+        // target is the lane's decision, so the caster stands in; the
+        // modifiers judge caster and source only).
+        private PlannedCasting ProspectiveDraftCasting(ProviderPlanningOption option)
+        {
+            string caster = Draft.CasterUnitId ?? SelectedCasterUnitId;
+            return new PlannedCasting("draft-prospective", SelectedRoutineId, 0,
+                SelectedSourceId, option.Provider.Key.Ability, caster,
+                NullIfEmpty(option.Provider.Key.SpellbookGuid),
+                CastingTargetMode.DirectTarget, caster, null, null,
+                Draft.TargetingModifiers.ToList(), Draft.Enhancements.ToList(),
+                Draft.ExistingEffectPolicy, null, CastingAuthoringState.Ready, null);
+        }
+
+        private static ICastingTargetingModifier RegisteredModifier(
+            CastingWorkspaceInputs inputs, string modifierId)
+        {
+            if (inputs == null || inputs.TargetingModifiers == null) return null;
+            return inputs.TargetingModifiers.FirstOrDefault(value => value != null &&
+                string.Equals(value.ModifierId, modifierId, StringComparison.Ordinal));
+        }
+
+        // The modifier control rows for a resolved option and intent: each
+        // REGISTERED modifier with the honest availability the pure resolver
+        // reports for this exact caster and source, and the presentation
+        // facts of the matching verified enhancement snapshot.
+        internal static List<CastingGraphModifierOption> BuildModifierOptions(
+            CastingWorkspaceInputs inputs, PlannedCasting intent,
+            ProviderPlanningOption option,
+            IReadOnlyList<TargetingModifierSelection> selected)
+        {
+            var rows = new List<CastingGraphModifierOption>();
+            if (inputs == null || inputs.TargetingModifiers == null || option == null ||
+                intent == null)
+                return rows;
+            foreach (ICastingTargetingModifier modifier in inputs.TargetingModifiers
+                .Where(value => value != null))
+            {
+                bool isSelected = (selected ?? new TargetingModifierSelection[0]).Any(value =>
+                    value != null && value.Enabled && string.Equals(value.ModifierId,
+                        modifier.ModifierId, StringComparison.Ordinal));
+                string refusal;
+                bool available = ApplyGraphTargetingModifiers(
+                    new[] { new TargetingModifierSelection(modifier.ModifierId, true, null) },
+                    inputs, intent, option, out refusal) != null;
+                string title = modifier.ModifierId;
+                string detail = string.Empty;
+                string cost = string.Empty;
+                CastEnhancementSnapshot snapshot = (inputs.Enhancements ??
+                    new CastEnhancementSnapshot[0]).FirstOrDefault(value => value != null &&
+                    value.AffectsTargeting &&
+                    string.Equals(value.CasterUnitId, option.Provider.Key.CasterUnitId,
+                        StringComparison.Ordinal) &&
+                    value.EnhancementId.StartsWith(modifier.ModifierId + "|",
+                        StringComparison.Ordinal));
+                if (snapshot != null)
+                {
+                    title = snapshot.DisplayName;
+                    detail = snapshot.Description;
+                    cost = snapshot.UsageUnitsPerCast +
+                        (snapshot.UsageUnitsPerCast == 1 ? " use" : " uses") + " of " +
+                        snapshot.UsagePoolDisplayName +
+                        (snapshot.RemainingUses == null ? " (uses left unknown)"
+                            : " · " + snapshot.RemainingUses.Value + " left");
+                }
+                rows.Add(new CastingGraphModifierOption(modifier.ModifierId, title, detail,
+                    cost, isSelected, available, available ? string.Empty : refusal));
+            }
+            return rows;
         }
 
         // ------------------------------------------------------------------

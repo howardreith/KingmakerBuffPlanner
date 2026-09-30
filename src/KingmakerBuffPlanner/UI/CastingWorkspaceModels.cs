@@ -662,6 +662,12 @@ namespace KingmakerBuffPlanner.UI
                 case "predicted-coverage-empty": return "no party member would be reached";
                 case "ability-targeting-unsupported": return "this buff's targeting is not supported";
                 case "targeting-modifier-unavailable": return "a required targeting modifier is not available";
+                case "share-source-unresolved": return "the exact spell for sharing was not resolved";
+                case "share-feature-unavailable": return "the caster does not have Share Transmutation";
+                case "share-source-not-supported": return "Share Transmutation does not support this exact spell";
+                case "share-no-legal-recipient": return "no legal ally to share it with";
+                case "share-not-needed": return "this spell can already target others";
+                case "share-unverified-caster": return "the sharing caster could not be verified";
                 case "enhancements-unvalidated": return "an enhancement could not be checked";
                 case "enhancement-incompatible": return "an enhancement does not fit this casting";
                 case "enhancement-changes-targeting":
@@ -671,6 +677,18 @@ namespace KingmakerBuffPlanner.UI
                 case "present-effect-not-sufficient": return "the active effect is weaker or about to expire";
                 default: return head.Length == 0 ? "not ready" : head.Replace('-', ' ');
             }
+        }
+
+        // A nested refusal ("targeting-modifier-unavailable:<id>:<reason>")
+        // described by its inner reason, so a Share toggle row shows the
+        // specific honest cause, not the wrapper.
+        public static string DescribeNested(string code)
+        {
+            string value = code ?? string.Empty;
+            string[] parts = value.Split(':');
+            if (parts.Length >= 3 && parts[0] == "targeting-modifier-unavailable")
+                return Describe(string.Join(":", parts, 2, parts.Length - 2));
+            return Describe(value);
         }
 
         public static string DescribeReviewItem(string item)

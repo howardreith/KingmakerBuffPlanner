@@ -1342,6 +1342,32 @@ namespace KingmakerBuffPlanner.UI
                     row.Usable ? LegalInk : BlockedInk, false);
                 if (!row.Usable) Line("SourceBlocked", row.BlockedReason, 13, BlockedInk, false);
             }
+            // v1.2 §7 / E16: the Share control sits between the exact
+            // source and the target click - the owner's authoring order.
+            if (row != null && view.NextCastingModifiers != null &&
+                view.NextCastingModifiers.Count != 0)
+            {
+                Section("Share with an ally (next casting)");
+                foreach (CastingGraphModifierOption modifier in view.NextCastingModifiers)
+                {
+                    string id = modifier.ModifierId;
+                    Button toggle = ActionButton("DraftModifier." + id,
+                        (modifier.Selected ? "[x] " : "[  ] ") + modifier.Title,
+                        () => Surface(_session.ToggleDraftTargetingModifier(id, _inputs()), "share"));
+                    if (!modifier.Selected && !modifier.Available)
+                        KingmakerUiFactory.SetInteractable(toggle, false);
+                    if (modifier.Selected) KingmakerUiFactory.ApplyPalette(toggle, true);
+                    if (modifier.Detail.Length != 0)
+                        Line("DraftModifierDetail", modifier.Detail, 12, _theme.MutedBrownText, false);
+                    if (modifier.CostText.Length != 0)
+                        Line("DraftModifierCost", "Cost: " + modifier.CostText, 12,
+                            _theme.DarkBrownText, false);
+                    if (!modifier.Selected && modifier.UnavailableReason.Length != 0)
+                        Line("DraftModifierUnavailable",
+                            WorkspaceReasonText.DescribeNested(modifier.UnavailableReason),
+                            12, BlockedInk, false);
+                }
+            }
             // The next casting's existing-effect choice (each casting keeps its
             // own afterwards; its inspector changes only that one).
             bool recastDraft = _session.Draft.ExistingEffectPolicy == ExistingEffectPolicy.Overwrite;
@@ -1467,6 +1493,34 @@ namespace KingmakerBuffPlanner.UI
                         ActionButton("Coverage." + unit, (required ? "[x] " : "[  ] ") + "Required: " +
                             target.DisplayName, () => Surface(_session.SetFocusedCoverage(unit, !required), "coverage"));
                     }
+            }
+            // v1.2 §7 / E16: this casting's own Share control - on/off
+            // through the normal authoring boundary (announces, autosaves,
+            // undoable), with the same honest availability the compiler
+            // judges. Disabling keeps a now-illegal ally target visible
+            // and repairable.
+            if (inspector.Modifiers != null && inspector.Modifiers.Count != 0)
+            {
+                Section("Share with an ally");
+                foreach (CastingGraphModifierOption modifier in inspector.Modifiers)
+                {
+                    string id = modifier.ModifierId;
+                    Button toggle = ActionButton("FocusedModifier." + id,
+                        (modifier.Selected ? "[x] " : "[  ] ") + modifier.Title,
+                        () => Surface(_session.ToggleFocusedTargetingModifier(id, _inputs()), "share"));
+                    if (!modifier.Selected && !modifier.Available)
+                        KingmakerUiFactory.SetInteractable(toggle, false);
+                    if (modifier.Selected) KingmakerUiFactory.ApplyPalette(toggle, true);
+                    if (modifier.Detail.Length != 0)
+                        Line("FocusedModifierDetail", modifier.Detail, 12, _theme.MutedBrownText, false);
+                    if (modifier.CostText.Length != 0)
+                        Line("FocusedModifierCost", "Cost: " + modifier.CostText, 12,
+                            _theme.DarkBrownText, false);
+                    if (!modifier.Selected && modifier.UnavailableReason.Length != 0)
+                        Line("FocusedModifierUnavailable",
+                            WorkspaceReasonText.DescribeNested(modifier.UnavailableReason),
+                            12, BlockedInk, false);
+                }
             }
             // Enhancements: this casting only.
             Section("Enhancements (this casting only)");

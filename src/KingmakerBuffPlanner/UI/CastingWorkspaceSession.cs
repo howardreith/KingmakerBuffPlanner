@@ -1486,7 +1486,9 @@ namespace KingmakerBuffPlanner.UI
             // per approved casting is refused here, never partially run.
             ExplicitStepConversion projection = decision.Allowed
                 ? ExplicitCastingStepConverter.Convert(plan, decision,
-                    inputs.ProviderOptions, inputs.EffectsBySource)
+                    inputs.ProviderOptions, inputs.EffectsBySource,
+                    ExplicitProjectionScope.Standard,
+                    TargetingModifierEnhancementMap(inputs))
                 : null;
             if (projection != null && !projection.Converted)
                 return new WorkspaceApplyResult(false,
@@ -1510,6 +1512,34 @@ namespace KingmakerBuffPlanner.UI
 
         // The last production run started from this session (any route),
         // recorded by the run owner when the run reached its terminal.
+        // The VERIFIED execution identities of enabled targeting modifiers:
+        // for each registered modifier, each targeting-affecting enhancement
+        // snapshot the installed integration produced for it (its
+        // EnhancementId embeds the caster) maps modifierId|casterUnitId to
+        // that exact enhancement id. The converter executes a modifier ONLY
+        // through this mapping (fail-closed otherwise), so the step's
+        // enhancement lease arms exactly the verified toggle for the one
+        // cast and restores it on every terminal path.
+        internal static Dictionary<string, string> TargetingModifierEnhancementMap(
+            CastingWorkspaceInputs inputs)
+        {
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (inputs == null || inputs.TargetingModifiers == null ||
+                inputs.Enhancements == null)
+                return map;
+            foreach (ICastingTargetingModifier modifier in inputs.TargetingModifiers
+                .Where(value => value != null))
+                foreach (CastEnhancementSnapshot snapshot in inputs.Enhancements
+                    .Where(value => value != null && value.AffectsTargeting &&
+                        value.EnhancementId.StartsWith(modifier.ModifierId + "|",
+                            StringComparison.Ordinal)))
+                {
+                    string key = modifier.ModifierId + "|" + snapshot.CasterUnitId;
+                    if (!map.ContainsKey(key)) map[key] = snapshot.EnhancementId;
+                }
+            return map;
+        }
+
         public CastingRunReport LastRunReport { get; private set; }
 
         public void RecordRunReport(CastingRunReport report)
@@ -2397,7 +2427,8 @@ namespace KingmakerBuffPlanner.UI
                         casting.Provenance.UnresolvedReviewItems,
                         casting.Provenance.ResolvedReviewItems);
                 cards[cards.Count - 1].ApplyExecutionDetail(
-                    ExplicitCastingStepConverter.StandardExecutionLimitation(casting),
+                    ExplicitCastingStepConverter.StandardExecutionLimitation(casting,
+                        TargetingModifierEnhancementMap(_lastInputs)),
                     casting.ExistingEffectNotes);
                 CastingOutcomeEntry lastRun = LastRunReport == null ? null
                     : LastRunReport.Entries.FirstOrDefault(entry => string.Equals(
