@@ -266,6 +266,11 @@ namespace KingmakerBuffPlanner.Execution
         // SAME caster as the isolation witness (its ordinary effect and
         // cost, and no unexpected Share activity).
         public const string SharedPersonal = "shared-personal";
+        // The combined variant (E19): the shared casting ALSO carries the
+        // applicable Powerful Change enhancement, so one armed cast spends
+        // the shared reservoir's COMBINED demand and lands the enhanced
+        // result on the ally.
+        public const string SharedPowerful = "shared-powerful";
         public const string RoutineId = "long";
 
         public static bool IsKnown(string recipe)
@@ -277,7 +282,7 @@ namespace KingmakerBuffPlanner.Execution
 
         public static bool IsSharedRecipe(string recipe)
         {
-            return recipe == SharedPersonal;
+            return recipe == SharedPersonal || recipe == SharedPowerful;
         }
 
         // The recipes that cast one buff plain and then again with a
@@ -337,6 +342,8 @@ namespace KingmakerBuffPlanner.Execution
             if (recipe == AbilityPoolDirect) return SelectAbilityPool(inputs, campaignId);
             if (recipe == RodExtendDirect) return SelectRodExtend(inputs, campaignId);
             if (recipe == SharedPersonal) return SelectSharedPersonal(inputs, campaignId);
+            if (recipe == SharedPowerful) return SelectSharedPersonal(inputs, campaignId,
+                combined: true);
             return new CastingQualificationSelection("unknown-recipe:" + recipe, null, null,
                 null, 0, null, recipe);
         }
@@ -353,7 +360,7 @@ namespace KingmakerBuffPlanner.Execution
         // document (graph-assigned identities), so the projections bound
         // by the allowance are the production ones.
         public static CastingQualificationSelection SelectSharedPersonal(
-            CastingWorkspaceInputs inputs, string campaignId)
+            CastingWorkspaceInputs inputs, string campaignId, bool combined = false)
         {
             if (inputs == null) throw new ArgumentNullException("inputs");
             var rejections = new List<string>();
@@ -465,20 +472,46 @@ namespace KingmakerBuffPlanner.Execution
                     }
                     if (plainCasting == null)
                     { reject(provider.Key.Canonical + "|no-plain-witness-same-caster"); continue; }
+                    var sharedEnhancements = new List<AuthoredEnhancementSelection>();
+                    CastingQualificationEnhancement combinedEnhancement = null;
+                    if (combined)
+                    {
+                        CastEnhancementSnapshot powerful = (inputs.Enhancements ??
+                            new CastEnhancementSnapshot[0])
+                            .FirstOrDefault(value => value != null &&
+                                !value.AffectsTargeting &&
+                                value.Category == CastEnhancementCategory.ClassFeature &&
+                                string.Equals(value.CasterUnitId, caster,
+                                    StringComparison.Ordinal) &&
+                                value.ApplicabilityFailure(provider).Length == 0 &&
+                                value.RemainingUses != null &&
+                                value.RemainingUses.Value >= value.UsageUnitsPerCast);
+                        if (powerful == null)
+                        { reject(provider.Key.Canonical + "|no-applicable-powerful-change"); continue; }
+                        sharedEnhancements.Add(new AuthoredEnhancementSelection(
+                            powerful.EnhancementId, true, null));
+                        combinedEnhancement = new CastingQualificationEnhancement(
+                            powerful.EnhancementId, powerful.DisplayName, caster,
+                            powerful.UsagePoolId, powerful.UsageUnitsPerCast, null, null, 0);
+                    }
                     var shared = new PlannedCasting(CastingIds[0], RoutineId, 0, sourceId,
                         provider.Key.Ability, caster, provider.Key.SpellbookGuid,
                         CastingTargetMode.DirectTarget, ally, null, null,
                         new[] { new TargetingModifierSelection(
                             GameAdapters.ShareCastingModifier.Id, true, null) },
-                        null, ExistingEffectPolicy.SkipAlreadyActive, null,
+                        sharedEnhancements, ExistingEffectPolicy.SkipAlreadyActive, null,
                         CastingAuthoringState.Ready, null);
                     return new CastingQualificationSelection(null, sourceId,
                         provider.Key.Ability, new[] { shared, plainCasting }, considered,
-                        rejections, recipe: CastingQualificationRecipe.SharedPersonal,
+                        rejections,
+                        recipe: combined
+                            ? CastingQualificationRecipe.SharedPowerful
+                            : CastingQualificationRecipe.SharedPersonal,
                         coverage: new[] { "share:" + share.EnhancementId,
                             "reservoir:" + share.UsagePoolId,
                             "units:" + share.UsageUnitsPerCast,
-                            "toggle:" + share.SourceBlueprintGuid });
+                            "toggle:" + share.SourceBlueprintGuid },
+                        enhancement: combinedEnhancement);
                 }
                 if (selectedGuid == null)
                     reject(share.EnhancementId + "|no-whitelisted-personal-option");

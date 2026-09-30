@@ -85,6 +85,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("shared-personal-selection-and-forecast", TestSharedPersonalSelection);
             Run("shared-isolation-judge-rejects-false-success",
                 TestSharedIsolationJudge);
+            Run("shared-powerful-combined-selection-and-demand",
+                TestSharedPowerfulCombined);
             Run("qualification-forecast-and-boundary", TestQualificationForecastAndBoundary);
             Run("qualification-driver-end-to-end", () => TestQualificationDriverEndToEnd(root));
             Run("qualification-animated-player-stop", () => TestQualificationAnimatedPlayerStop(root));
@@ -3748,7 +3750,8 @@ namespace KingmakerBuffPlanner.Tests
         // the execution identity.
         private static CastingWorkspaceInputs SharedQualificationInputs(
             bool withShareSnapshot = true, bool withModifier = true,
-            int? reservoir = 3, bool withWitness = true, bool whitelist = true)
+            int? reservoir = 3, bool withWitness = true, bool whitelist = true,
+            bool withPowerfulChange = false)
         {
             const string shareId = "share-transmutation|unit-wiz|8641e6c39ff133ad71f669e35e1ee688";
             var units = new[]
@@ -3805,6 +3808,14 @@ namespace KingmakerBuffPlanner.Tests
                 { plainAbility.Canonical, plainExpression }
             };
             var enhancements = new List<CastEnhancementSnapshot>();
+            if (withPowerfulChange)
+                enhancements.Add(new CastEnhancementSnapshot(
+                    "powerful-change|unit-wiz", "unit-wiz", "powerful-change-guid",
+                    "Powerful Change", "Spend the reservoir for a stronger form.",
+                    CastEnhancementCategory.ClassFeature, 0, 0, reservoir,
+                    new[] { "beast-shape" }, "Powerful Change", new[] { "book-wiz" },
+                    "res-wiz", false, "powerful-change", 1, false,
+                    "powerful-change", "Arcane Reservoir", "brown-fur-direct-cast-v1"));
             if (withShareSnapshot)
                 enhancements.Add(new CastEnhancementSnapshot(
                     shareId, "unit-wiz", "8641e6c39ff133ad71f669e35e1ee688",
@@ -3910,6 +3921,55 @@ namespace KingmakerBuffPlanner.Tests
                     value.EndsWith("|no-plain-witness-same-caster", StringComparison.Ordinal)))
                 throw new InvalidOperationException("a party without a same-caster " +
                     "witness selected.");
+        }
+
+        // The combined variant (E19): the shared casting carries the
+        // applicable Powerful Change selection; the forecast's shared step
+        // demands the COMBINED reservoir units exactly once, keeps the
+        // Share execution identity, and selects the provider-direct route
+        // (Powerful Change's verified direct provider). Without an
+        // applicable Powerful Change snapshot the selection refuses
+        // honestly.
+        private static void TestSharedPowerfulCombined()
+        {
+            CastingWorkspaceInputs inputs = SharedQualificationInputs(
+                withPowerfulChange: true);
+            CastingQualificationSelection selection = CastingQualificationRecipe
+                .SelectSharedPersonal(inputs, "fixture-campaign", combined: true);
+            if (!selection.Selected || selection.Refusal.Length != 0)
+                throw new InvalidOperationException("the combined selection was refused: " +
+                    selection.Refusal + ";" + string.Join(";", selection.Rejections.ToArray()));
+            if (selection.Castings[0].Enhancements.Count != 1 ||
+                selection.Castings[0].Enhancements[0].EnhancementId != "powerful-change|unit-wiz")
+                throw new InvalidOperationException("the combined shared casting does not " +
+                    "carry Powerful Change.");
+            IReadOnlyList<CastingQualificationStepForecast> steps =
+                CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign");
+            if (steps.Count != 2 || steps.Any(step => step.ProjectionId == null))
+                throw new InvalidOperationException("the combined forecast is wrong: " +
+                    string.Join(";", steps.Select(step => step.Name + "=" +
+                        (step.Refusal ?? "ok")).ToArray()));
+            int combined = steps[0].Projection.Plan.Steps[0].EnhancementUsageByPool
+                .Where(pair => pair.Key == "res-wiz").Sum(pair => pair.Value);
+            if (combined != 2)
+                throw new InvalidOperationException("the combined reservoir demand was not " +
+                    "the exact sum (share + powerful change): " + combined);
+            if (!steps[0].CanonicalContract.Contains("share-transmutation|unit-wiz|") ||
+                !steps[0].CanonicalContract.Contains("powerful-change|unit-wiz"))
+                throw new InvalidOperationException("the combined projection lost an " +
+                    "execution identity.");
+            if (steps[0].Projection.Plan.Steps[0].ExecutionStrategy !=
+                    CastExecutionStrategy.ProviderDirectRuleCast)
+                throw new InvalidOperationException("the combined step did not select the " +
+                    "provider-direct route.");
+            CastingQualificationSelection unavailable = CastingQualificationRecipe
+                .SelectSharedPersonal(SharedQualificationInputs(), "fixture-campaign",
+                    combined: true);
+            if (unavailable.Selected || !unavailable.Rejections.Any(value =>
+                    value.EndsWith("|no-applicable-powerful-change",
+                        StringComparison.Ordinal)))
+                throw new InvalidOperationException("a party without an applicable " +
+                    "Powerful Change selected the combined recipe.");
         }
 
         // The isolation judge (E18): a Share state leak that the next

@@ -166,6 +166,10 @@ namespace KingmakerBuffPlanner.Execution
         public string ShareToggleBeforeShared { get; set; }
         public string ShareToggleAfterShared { get; set; }
         public string ShareToggleBeforeWitness { get; set; }
+        // The EXACT reservoir units the shared step's approved projection
+        // demands (Share alone, or Share + Powerful Change combined); the
+        // OBSERVED delta across the shared step must equal it exactly.
+        public int? ShareExpectedSpend { get; set; }
 
         private bool HasDisableStep
         {
@@ -243,6 +247,12 @@ namespace KingmakerBuffPlanner.Execution
                 else if (ShareReservoirAfterWitness.Value != ShareReservoirAfterShared.Value)
                     violations.Add("share-spent-on-witness:" + ShareReservoirAfterShared +
                         ">" + ShareReservoirAfterWitness);
+                else if (ShareExpectedSpend != null &&
+                    ShareReservoirBefore.Value - ShareReservoirAfterShared.Value !=
+                        ShareExpectedSpend.Value)
+                    violations.Add("share-spend-not-exact:" +
+                        (ShareReservoirBefore.Value - ShareReservoirAfterShared.Value) +
+                        "!=" + ShareExpectedSpend.Value);
                 if (string.Equals(ShareToggleBeforeWitness, "on",
                         System.StringComparison.Ordinal) &&
                     !string.Equals(ShareToggleBeforeShared, "on",
@@ -1194,6 +1204,18 @@ namespace KingmakerBuffPlanner.Execution
             inputs = _freshInputs();
             Record.Forecast = CastingQualificationForecast.Forecast(Record.Selection,
                 inputs, _campaignId);
+            // The exact reservoir demand the approved shared projection
+            // carries (the verified Share units, plus Powerful Change's
+            // when combined) - what the observed native delta must equal.
+            Record.ShareExpectedSpend = Record.Forecast
+                .Where(step => step.Name == CastingQualificationForecast.Shared)
+                .Select(step => step.Projection == null ? null : (int?)step.Projection.Plan
+                    .Steps.SelectMany(value => value.EnhancementUsageByPool)
+                    .Where(pair => pair.Key == Record.Selection.Coverage.FirstOrDefault(
+                        value2 => value2.StartsWith("reservoir:",
+                            System.StringComparison.Ordinal))?.Substring("reservoir:".Length))
+                    .Sum(pair => pair.Value))
+                .FirstOrDefault();
             if (!Record.CastingScenario)
             {
                 // Selection-only run: nothing was submitted; the authored
@@ -1268,6 +1290,10 @@ namespace KingmakerBuffPlanner.Execution
                     string.Equals(value.ProviderKey, canonical, System.StringComparison.Ordinal));
             if (row == null) { Fail("graph-source-row-missing:" + canonical); return null; }
             _session.SelectGraphSource(row.ProviderKey, inputs);
+            // The combined variant arms Share on the draft exactly as the
+            // alone variant; Powerful Change is chosen on the FOCUSED
+            // casting through the workspace's own enhancement control
+            // after the graph add (below).
             bool shareArmed = _session.Draft.TargetingModifiers.Any(value =>
                 value != null && value.Enabled &&
                 string.Equals(value.ModifierId, GameAdapters.ShareCastingModifier.Id,
@@ -1292,6 +1318,17 @@ namespace KingmakerBuffPlanner.Execution
                     (added.Edit == null ? "null" : added.Edit.Reason));
                 return null;
             }
+            if (withShare && script.Enhancements.Count != 0)
+            {
+                // The combined case: the applicable enhancement is chosen
+                // through the focused casting's own production control.
+                _session.FocusCasting(added.CastingId);
+                AuthoringEditResult enhanced = _session.ToggleFocusedEnhancement(
+                    script.Enhancements[0].EnhancementId, inputs);
+                if (!enhanced.Applied)
+                { Fail("combined-enhancement-refused:" + script.Enhancements[0].EnhancementId +
+                        ":" + enhanced.Reason); return null; }
+            }
             PlannedCasting authored = _session.Document.Castings.FirstOrDefault(value =>
                 string.Equals(value.CastingId, added.CastingId, System.StringComparison.Ordinal));
             if (authored == null ||
@@ -1306,7 +1343,10 @@ namespace KingmakerBuffPlanner.Execution
                         !string.Equals(authored.TargetingModifiers[0].ModifierId,
                             GameAdapters.ShareCastingModifier.Id, System.StringComparison.Ordinal) ||
                         !authored.TargetingModifiers[0].Enabled
-                    : authored.TargetingModifiers.Count != 0))
+                    : authored.TargetingModifiers.Count != 0) ||
+                !script.Enhancements.All(selection => authored.Enhancements.Any(value =>
+                    string.Equals(value.EnhancementId, selection.EnhancementId,
+                        System.StringComparison.Ordinal) && value.Required)))
             {
                 Fail("authored-intent-mismatch:" + added.CastingId);
                 return null;
