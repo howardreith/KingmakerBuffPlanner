@@ -711,6 +711,25 @@ namespace KingmakerBuffPlanner.UI
                 throw new InvalidOperationException("Runtime Long HUD click could not be dispatched.");
         }
 
+        // Physical casting-first seams (v1.2 E12/E04-E06): the default
+        // route flag and the live session's durable document signature
+        // (browsing and inspecting must not mutate it); the started-run
+        // count is CastingRunsStartedForRuntime above.
+        internal static bool CastingFirstActiveForRuntime
+        {
+            get { return _instance != null && _instance.CastingFirstActive; }
+        }
+
+        internal static string CastingSessionDocumentSignatureForRuntime
+        {
+            get
+            {
+                CastingWorkspaceSession session = _instance == null
+                    ? null : _instance.CastingSession;
+                return session == null ? null : session.DocumentIntentSignature();
+            }
+        }
+
         internal static Vector2 HudButtonCenterForRuntime(string routineId)
         {
             if (_instance == null || _instance._hud == null)
