@@ -2224,3 +2224,26 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
   (E18 Share alone AND Share+Powerful Change, both modes, observed
   spending/effects, plain-cast isolation; E19; E03; scroll frames;
   right-click), E01-E27 matrix, verified private delivery.
+
+## Session 9 checkpoint — 2026-09-30 — downstream gate receipts; launcher stage alone pending
+
+- R736 disposition received (both findings closed; no new source repair
+  requested). Proceeding to the complete mandatory gate, then the
+  authorized native qualification.
+- Downstream stages run INDIVIDUALLY at HEAD ee00ec1 (none touches the
+  game, UMM, or the build manifest - verified by script inspection):
+  Test-FixtureInventoryEvidence 3/3, Test-RestoreInstallLocal 16/16
+  (rollback evidence recorded), Test-PublishReleaseGate 3/3. Logs:
+  artifacts/gate-stage-*.log. Per the disposition these are their own
+  receipts; the complete end-to-end Test-SourceOnly run still happens in
+  the quiet window.
+- Manifest note: a Build-Local at ee00ec1 produced a different DLL hash
+  (ee189893...) than the reviewed 6eb58ff build (6fd7e91e...) - the build
+  is not byte-reproducible across commits. Per the disposition, that
+  rebuild is NOT the qualification candidate. The launcher stage's
+  manifest check (manifest.commit == HEAD) is satisfied only by the
+  final-HEAD procedure: when the owner's UMM window closes, the sequence
+  is final HEAD -> Build-Local -> complete Test-SourceOnly end to end,
+  and THAT build (with its hashes/MVID) is the qualified candidate.
+- The owner's UMM process (PID 14008, opened 2026-09-29 12:38) remains
+  running; the launcher guard is respected, polling continues.
