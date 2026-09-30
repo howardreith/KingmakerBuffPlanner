@@ -255,41 +255,42 @@ namespace KingmakerBuffPlanner.Compatibility
             return true;
         }
 
-        // Review F3: the NATIVE contract probe — does the installed
+        // Review F3/R579-2: the NATIVE contract probe - does the installed
         // provider's targeting patch actually augment this spell while the
-        // exact Share toggle is armed? This temporarily arms the toggle and
-        // MUST report a failed restoration as failure (a leak is never
-        // swallowed). It is deliberately NOT part of ordinary discovery:
-        // only an explicitly authorized caller (execution-time setup with
-        // its own verified cleanup, or a guarded qualification probe) may
-        // invoke it — never a refresh, render, or authoring path.
+        // exact Share toggle is armed? This temporarily arms the toggle.
+        // Restoration is attempted after EVERY attempted mutation,
+        // including one whose setter changed state and then threw - never
+        // conditional on an "armed" flag - and the expected final state
+        // (the ORIGINAL value) is verified by reading it back. A restore
+        // that cannot be established IS probe failure (a leak is never
+        // swallowed) and overrides a passing observation. Deliberately NOT
+        // part of ordinary discovery: only an explicitly authorized caller
+        // (execution-time setup with its own verified cleanup, or a guarded
+        // qualification probe) may invoke it - never a refresh, render, or
+        // authoring path.
         internal static bool TryProbeShareTargeting(AbilityData ability,
             ActivatableAbility toggle, out string reason)
         {
             reason = string.Empty;
             if (ability == null || toggle == null)
                 return Fail("probe-inputs-unresolved", out reason);
-            bool original = toggle.IsOn;
-            bool armed = false;
+            bool original;
+            try { original = toggle.IsOn; }
+            catch (Exception exception)
+            {
+                return Fail("share-probe-unreadable-original:" +
+                    exception.GetType().Name, out reason);
+            }
             bool outcome = false;
             string outcomeReason = string.Empty;
             string restoreFailure = null;
             try
             {
                 toggle.IsOn = true;
-                armed = toggle.IsOn;
-                if (!armed)
-                {
-                    outcomeReason = "native-share-activation-refused";
-                }
-                else if (ability.TargetAnchor != AbilityTargetAnchor.Unit)
-                {
+                if (ability.TargetAnchor != AbilityTargetAnchor.Unit)
                     outcomeReason = "native-share-target-anchor-not-augmented";
-                }
                 else
-                {
                     outcome = true;
-                }
             }
             catch (Exception exception)
             {
@@ -298,23 +299,16 @@ namespace KingmakerBuffPlanner.Compatibility
             }
             finally
             {
-                // Restore the exact original state. A failed restoration IS
-                // probe failure (review F3): the leak is reported, never
-                // swallowed — and it overrides a passing observation,
-                // because a probe that leaks has not proven anything.
-                if (armed)
+                try
                 {
-                    try
-                    {
-                        toggle.IsOn = original;
-                        if (toggle.IsOn != original)
-                            restoreFailure = "share-probe-restore-failed:state-mismatch";
-                    }
-                    catch (Exception exception)
-                    {
-                        restoreFailure = "share-probe-restore-failed:" +
-                            exception.GetType().Name;
-                    }
+                    toggle.IsOn = original;
+                    if (toggle.IsOn != original)
+                        restoreFailure = "share-probe-restore-failed:state-mismatch";
+                }
+                catch (Exception exception)
+                {
+                    restoreFailure = "share-probe-restore-failed:" +
+                        exception.GetType().Name;
                 }
             }
             if (restoreFailure != null)

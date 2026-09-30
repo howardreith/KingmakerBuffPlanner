@@ -420,9 +420,11 @@ namespace KingmakerBuffPlanner.Planning
             IReadOnlyList<string> predicted = new string[0];
             var gaps = new List<CoverageGap>();
             modifierDemands = new List<ModifierUsageDemand>();
+            var appliedModifiers = new List<ICastingTargetingModifier>();
             if (option != null)
                 option = ApplyTargetingModifiers(
-                    casting, targetingModifiers, option, reasons, modifierDemands);
+                    casting, targetingModifiers, option, reasons, modifierDemands,
+                    appliedModifiers);
             // Resources are judged AFTER targeting, enhancements and the live
             // existing-effect assessment: a casting whose effect is already
             // sufficiently active needs no resources, so an exhausted pool
@@ -458,15 +460,66 @@ namespace KingmakerBuffPlanner.Planning
             {
                 ResolveEnhancements(casting, option, enhancements, applied, omitted,
                     matched, intended, requiredExhausted, reasons, resourceReasons);
+                // R579-1: the COMPLETE executable enhancement contract
+                // resolves BEFORE the strategy freezes. An applied targeting
+                // modifier (Share) contributes its VERIFIED enhancement
+                // snapshot — resolved against the same enhancement list the
+                // host supplied, applicability checked — so the existing
+                // execution policy selects the correct route (native command
+                // precedence, verified direct provider, fallbacks). The
+                // modifier's cost is NOT counted again: UsageDemands already
+                // carries it, and the ledger aggregates `matched` only.
+                var modifierExecuted = new List<CastEnhancementSnapshot>();
+                foreach (ICastingTargetingModifier modifier in appliedModifiers)
+                    foreach (string executionId in modifier.ExecutionEnhancementIds(
+                             casting, option))
+                    {
+                        CastEnhancementSnapshot execution = enhancements.FirstOrDefault(
+                            value => string.Equals(value.EnhancementId, executionId,
+                                StringComparison.Ordinal) &&
+                            string.Equals(value.CasterUnitId, casting.CasterUnitId,
+                                StringComparison.Ordinal));
+                        if (execution == null)
+                        {
+                            reasons.Add("targeting-modifier-execution-unverified:" +
+                                executionId);
+                            option = null;
+                            continue;
+                        }
+                        string executionApplicability =
+                            execution.ApplicabilityFailure(option.Provider);
+                        if (executionApplicability.Length != 0)
+                        {
+                            reasons.Add("targeting-modifier-execution-inapplicable:" +
+                                executionId + ":" + executionApplicability);
+                            option = null;
+                            continue;
+                        }
+                        if (!modifierExecuted.Contains(execution))
+                            modifierExecuted.Add(execution);
+                    }
                 // The applied enhancements decide how the cast must execute,
-                // exactly as for the classic planner. The effective strategy
-                // (after targeting modifiers too) is always recorded.
-                ProviderPlanningOption effective = CastEnhancementExecutionPolicy.Apply(matched, option);
+                // exactly as for the classic planner - now together with the
+                // modifier-backed ones. The effective strategy (after
+                // targeting modifiers too) is always recorded.
+                ProviderPlanningOption effective = option == null ? null
+                    : CastEnhancementExecutionPolicy.Apply(
+                        modifierExecuted.Count == 0
+                            ? matched
+                            : matched.Concat(modifierExecuted), option);
                 if (effective != null)
                 {
                     strategy = effective.ExecutionStrategy;
                     strategyReason = effective.ExecutionStrategyReason;
                 }
+                // The modifier's execution identities join the resolved
+                // casting's APPLIED ids: the converter's step arms exactly
+                // them through the enhancement lease, and the projection
+                // hash covers them. They do not join `matched` (cost and
+                // satisfaction semantics keep using the authored set).
+                foreach (CastEnhancementSnapshot execution in modifierExecuted)
+                    if (!applied.Contains(execution.EnhancementId))
+                        applied.Add(execution.EnhancementId);
             }
             else
                 foreach (AuthoredEnhancementSelection selection in casting.Enhancements)
@@ -538,7 +591,8 @@ namespace KingmakerBuffPlanner.Planning
             List<ICastingTargetingModifier> modifiers,
             ProviderPlanningOption option,
             List<string> reasons,
-            List<ModifierUsageDemand> modifierDemands)
+            List<ModifierUsageDemand> modifierDemands,
+            List<ICastingTargetingModifier> appliedModifiers)
         {
             var applied = new List<ICastingTargetingModifier>();
             foreach (TargetingModifierSelection selection in casting.TargetingModifiers)
@@ -570,6 +624,7 @@ namespace KingmakerBuffPlanner.Planning
                 }
                 option = result.Option;
                 applied.Add(modifier);
+                appliedModifiers.Add(modifier);
             }
             // Every applied modifier's verified cost enters the same atomic
             // cost vector; an unresolved modifier never reaches here, so an

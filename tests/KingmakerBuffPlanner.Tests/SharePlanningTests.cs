@@ -11,6 +11,7 @@ using KingmakerBuffPlanner.GameAdapters;
 using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.UI;
+using KingmakerBuffPlanner.Execution;
 
 namespace KingmakerBuffPlanner.Tests
 {
@@ -39,6 +40,12 @@ namespace KingmakerBuffPlanner.Tests
                 TestShareDiscoveryBoundary);
             Run("share-projection-executes-only-the-verified-modifier-contract",
                 TestShareProjectionContract);
+            Run("share-alone-selects-the-provider-direct-strategy",
+                TestShareStrategyResolution);
+            Run("enhancement-cleanup-is-observable-and-halts-later-casts",
+                TestEnhancementCleanupObservable);
+            Run("recovery-preservation-never-drops-intent",
+                () => TestRecoveryPreservation(root));
         }
 
         private static AbilityKey ShapeAbility()
@@ -77,7 +84,8 @@ namespace KingmakerBuffPlanner.Tests
         // it (whitelists = the verified supported sources; the reservoir
         // pool the ledger must know to fund the modifier's demand).
         private static CastEnhancementSnapshot ShareEnhancement(
-            string caster, string poolId, int? remaining)
+            string caster, string poolId, int? remaining,
+            string directCastProviderId = null, bool requiresNativeCommand = false)
         {
             return new CastEnhancementSnapshot(
                 "share-transmutation|" + caster + "|" + ShareActivatableGuid,
@@ -85,8 +93,9 @@ namespace KingmakerBuffPlanner.Tests
                 "Share Transmutation", "Share a personal transmutation with an ally.",
                 CastEnhancementCategory.ClassFeature, 0, 0, remaining,
                 new[] { "beast-shape" }, "Share Transmutation", new[] { "book" },
-                poolId, false, "brown-fur-share-transmutation", 1, true,
-                "brown-fur-share-transmutation", "Arcane Reservoir", null);
+                poolId, requiresNativeCommand, "brown-fur-share-transmutation", 1, true,
+                "brown-fur-share-transmutation", "Arcane Reservoir",
+                directCastProviderId);
         }
 
         private static PlannedCasting SharedCasting(string id, string caster, string target,
@@ -785,6 +794,445 @@ namespace KingmakerBuffPlanner.Tests
             if (native == null || native.AllocatedUsage != 1)
                 throw new InvalidOperationException("the ordinary casting did not reserve its " +
                     "native slot.");
+        }
+
+        // R579-1: the COMPLETE executable enhancement contract - including
+        // the modifier-backed Share enhancement - resolves BEFORE the
+        // strategy freezes, through the existing execution policy. Share
+        // ALONE (no ordinary enhancements) must select the verified
+        // provider-direct route; a native-command requirement routes
+        // accordingly; Share + Powerful Change resolve once, together,
+        // without double-charging the shared reservoir; a modifier with no
+        // execution identity keeps the base strategy.
+        private static void TestShareStrategyResolution()
+        {
+            var units = new[]
+            {
+                new UnitSnapshot("unit-wiz", "Wiz", false, null,
+                    new TargetValidationSnapshot(true, true, true, true)),
+                new UnitSnapshot("unit-cleric", "Cleric", false, null,
+                    new TargetValidationSnapshot(true, true, true, true))
+            };
+            var shapeExpression = new Domain.Effects.EffectLeafExpression(
+                Domain.Effects.EffectKind.Buff, "buff-shape",
+                Domain.Effects.EffectTarget.CurrentTarget, "shape", "shape/a");
+            var effects = new Dictionary<string, Domain.Effects.EffectExpression>
+            {
+                { "source-shape", shapeExpression },
+                { ShapeAbility().Canonical, shapeExpression }
+            };
+            var snapshot = new PartyProviderSnapshot(units, new[]
+            {
+                ShapeProvider("unit-wiz")
+            }, new[]
+            {
+                new ResourcePoolSnapshot("pool-unit-wiz", ResourcePoolKind.SpontaneousLevel,
+                    10, 10, null)
+            });
+            string shareId = ShareEnhancement("unit-wiz", WizardReservoir, 3).EnhancementId;
+            Func<string, bool, string, ShareCastingModifier.ShareCapability> capability =
+                (providerId, nativeCommand, executionId) =>
+                    new ShareCastingModifier.ShareCapability("unit-wiz", WizardReservoir,
+                        1, 3, new[] { "beast-shape" }, new[] { "book" },
+                        new[] { "unit-cleric" }, executionId);
+            Func<string, bool, ShareCastingModifier> shareWith =
+                (providerId, nativeCommand) => new ShareCastingModifier(new[]
+                {
+                    capability(providerId, nativeCommand, shareId)
+                });
+            Func<CastEnhancementSnapshot[], ShareCastingModifier, ExplicitCastingPlan> compile =
+                (enhancementList, share) => new ExplicitCastingCompiler().Compile(
+                    new CastingPlanDocument("campaign:strategy",
+                        new[] { new RoutineDefinition("long", "Long") },
+                        new[] { SharedCasting("share-1", "unit-wiz", "unit-cleric") }, null),
+                    snapshot, new[] { PersonalOption("unit-wiz") }, effects, enhancementList,
+                    null, new[] { share });
+            // Share ALONE with a verified direct provider: the provider
+            // transaction route is selected (the base direct-rule spell
+            // would otherwise bypass it), from the compiler through the
+            // projected executor step, with the reservoir charged ONCE.
+            {
+                var share = shareWith("brown-fur-direct-cast-v1", false);
+                ExplicitCastingPlan plan = compile(
+                    new[] { ShareEnhancement("unit-wiz", WizardReservoir, 3,
+                        "brown-fur-direct-cast-v1") }, share);
+                ResolvedCasting resolved = plan.CastingById("share-1");
+                if (resolved == null || resolved.Readiness != ResolvedCastingReadiness.Ready ||
+                    resolved.ExecutionStrategy != CastExecutionStrategy.ProviderDirectRuleCast)
+                    throw new InvalidOperationException("Share alone did not select the " +
+                        "provider-direct route: " + (resolved == null ? "missing" :
+                        resolved.ExecutionStrategy + ";" + string.Join(";",
+                            resolved.ReadinessReasons.ToArray())));
+                CastingApplyDecision decision = new CastingExecutionGate().Evaluate(plan,
+                    CastingApplyMode.Ordinary, "long");
+                ExplicitStepConversion projection = ExplicitCastingStepConverter.Convert(
+                    plan, decision, new[] { PersonalOption("unit-wiz") }, effects,
+                    ExplicitProjectionScope.Standard,
+                    CastingWorkspaceSession.TargetingModifierEnhancementMap(
+                        new CastingWorkspaceInputs(snapshot,
+                            new[] { PersonalOption("unit-wiz") }, effects,
+                            new[] { ShareEnhancement("unit-wiz", WizardReservoir, 3,
+                                "brown-fur-direct-cast-v1") },
+                            new ICastingTargetingModifier[] { share })));
+                if (!projection.Converted)
+                    throw new InvalidOperationException("the provider-direct Share step " +
+                        "did not project: " + projection.Refusal);
+                if (projection.Plan.Steps[0].ExecutionStrategy !=
+                        CastExecutionStrategy.ProviderDirectRuleCast ||
+                    !projection.Plan.Steps[0].EnhancementIds.Contains(shareId))
+                    throw new InvalidOperationException("the projected step lost the " +
+                        "route or the verified toggle identity.");
+                int reservoir = projection.Plan.Steps[0]
+                    .EnhancementUsageByPool[WizardReservoir];
+                if (reservoir != 1)
+                    throw new InvalidOperationException("the Share reservoir was charged " +
+                        reservoir + " times.");
+            }
+            // A verified native-command requirement routes accordingly.
+            {
+                ExplicitCastingPlan plan = compile(
+                    new[] { ShareEnhancement("unit-wiz", WizardReservoir, 3, null, true) },
+                    shareWith(null, true));
+                ResolvedCasting resolved = plan.CastingById("share-1");
+                if (resolved == null || resolved.ExecutionStrategy !=
+                        CastExecutionStrategy.NativeCommandRequired)
+                    throw new InvalidOperationException("a native-command Share did not " +
+                        "require the native route: " + (resolved == null ? "missing" :
+                        resolved.ExecutionStrategy.ToString()));
+            }
+            // Share + Powerful Change: one shared reservoir, combined demand
+            // exactly once, one provider route.
+            {
+                var powerfulChange = new CastEnhancementSnapshot(
+                    "powerful-change|unit-wiz", "unit-wiz", "powerful-change-guid",
+                    "Powerful Change", "Spend the reservoir for a stronger form.",
+                    CastEnhancementCategory.ClassFeature, 0, 0, 2,
+                    new[] { "beast-shape" }, "Powerful Change", new[] { "book" },
+                    WizardReservoir, false, "powerful-change", 1, false,
+                    "powerful-change", "Arcane Reservoir", "brown-fur-direct-cast-v1");
+                var share = shareWith("brown-fur-direct-cast-v1", false);
+                var combined = new PlannedCasting("share-pc", "long", 0, "source-shape",
+                    ShapeAbility(), "unit-wiz", "book", CastingTargetMode.DirectTarget,
+                    "unit-cleric", null, null,
+                    new[] { new TargetingModifierSelection(ShareCastingModifier.Id, true, null) },
+                    new[] { new AuthoredEnhancementSelection("powerful-change|unit-wiz", true, null) },
+                    ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null);
+                ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(
+                    new CastingPlanDocument("campaign:strategy",
+                        new[] { new RoutineDefinition("long", "Long") },
+                        new[] { combined }, null),
+                    snapshot, new[] { PersonalOption("unit-wiz") }, effects,
+                    new[]
+                    {
+                        ShareEnhancement("unit-wiz", WizardReservoir, 2,
+                            "brown-fur-direct-cast-v1"),
+                        powerfulChange
+                    },
+                    null, new[] { share });
+                ResolvedCasting resolved = plan.CastingById("share-pc");
+                if (resolved == null || resolved.Readiness != ResolvedCastingReadiness.Ready ||
+                    resolved.ExecutionStrategy != CastExecutionStrategy.ProviderDirectRuleCast)
+                    throw new InvalidOperationException("the combined features did not " +
+                        "resolve one provider route: " + (resolved == null ? "missing" :
+                        resolved.ExecutionStrategy + ";" + string.Join(";",
+                            resolved.ReadinessReasons.ToArray())));
+                if (resolved.Cost.First(line => line.PoolKey == WizardReservoir).Units != 2)
+                    throw new InvalidOperationException("the shared reservoir was not " +
+                        "charged exactly the combined demand.");
+            }
+            // No execution identity declared (synthetic capability): the base
+            // strategy is preserved and no toggle id is armed.
+            {
+                ExplicitCastingPlan plan = compile(
+                    new[] { ShareEnhancement("unit-wiz", WizardReservoir, 3) },
+                    new ShareCastingModifier(new[]
+                    {
+                        new ShareCastingModifier.ShareCapability("unit-wiz", WizardReservoir,
+                            1, 3, new[] { "beast-shape" }, new[] { "book" },
+                            new[] { "unit-cleric" })
+                    }));
+                ResolvedCasting resolved = plan.CastingById("share-1");
+                if (resolved == null || resolved.Readiness != ResolvedCastingReadiness.Ready)
+                    throw new InvalidOperationException("a modifier without an execution " +
+                        "identity did not stay Ready.");
+                if (resolved.ExecutionStrategy != CastExecutionStrategy.DirectRuleCast ||
+                    resolved.AppliedEnhancementIds.Contains(shareId))
+                    throw new InvalidOperationException("a modifier without an execution " +
+                        "identity changed the route or armed the toggle.");
+            }
+        }
+
+        // R579-2: cleanup is OBSERVABLE. A lease that cannot verify its
+        // native restoration reports the failure through the preparation,
+        // the run report carries it as unsettled state (never an ordinary
+        // success), and NO later cast in the same run inherits the uncertain
+        // feature state - in BOTH executors, using true runtime-adapter
+        // stubs (no mocked planner services).
+        private sealed class FailingCleanupLease : IDisposable,
+            IEnhancementCleanupOutcome
+        {
+            public string CleanupFailure
+            { get { return "restore-mismatch:share-toggle;expected=True;actual=False"; } }
+            public void Dispose() { }
+        }
+
+        private sealed class CleanupStubWorld : IInstantCastRuntimeAdapter,
+            ICastRuntimeAdapter, ICastEnhancementRuntimeAdapter
+        {
+            internal bool FailCleanup;
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step)
+            { return CastRuntimeValidation.Pass(); }
+            public IAnimatedCastOperation StartAnimated(CastStep step)
+            { return new SucceedingAnimatedOperation(); }
+            public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+            {
+                return FailCleanup
+                    ? CastEnhancementPreparation.Pass(new FailingCleanupLease())
+                    : CastEnhancementPreparation.Pass(null);
+            }
+            public InstantCastResult Fire(CastStep step)
+            { return new InstantCastResult(true, true, true, false, "simulated"); }
+            public bool EffectsObserved(CastStep step) { return true; }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("simulated-settled"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("simulated-clean"); }
+        }
+
+        private sealed class SucceedingAnimatedOperation : IAnimatedCastOperation
+        {
+            public bool IsCompleted { get { return true; } }
+            public bool IsStarted { get { return true; } }
+            public bool TimedOut { get { return false; } }
+            public bool Succeeded { get { return true; } }
+            public bool EffectsObserved { get { return true; } }
+            public bool ResourceSpent { get { return false; } }
+            public string ResourceCountViolation { get { return null; } }
+            public bool HasResidualDeliveryState { get { return false; } }
+            public string Detail { get { return "simulated"; } }
+            public void Dispose() { }
+        }
+
+        private static CastStep CleanupStep(string id)
+        {
+            return new CastStep("source-shape", id,
+                ShapeProvider("unit-wiz").Key, null,
+                new[] { "unit-cleric" }, new[] { "unit-cleric" },
+                new ResourceReservation("pool-unit-wiz", 1, new string[0], false),
+                null,
+                new Domain.Effects.EffectLeafExpression(Domain.Effects.EffectKind.Buff,
+                    "buff-shape", Domain.Effects.EffectTarget.CurrentTarget, "shape", "shape/a"),
+                false, CastExecutionStrategy.DirectRuleCast, string.Empty,
+                new[] { "share-transmutation|unit-wiz|" + ShareActivatableGuid });
+        }
+
+        private static void TestEnhancementCleanupObservable()
+        {
+            var failing = new CleanupStubWorld { FailCleanup = true };
+            var plan = new CastPlan(new[] { CleanupStep("share-1"), CleanupStep("share-2") },
+                new TargetPlanOutcome[0], new string[0]);
+            var animatedReport = new ExecutionReport(plan);
+            var animated = new AnimatedCastExecutor(failing, false);
+            var iterator = animated.Execute(plan, animatedReport);
+            while (iterator.MoveNext()) { }
+            if (!animatedReport.Records.Any(record =>
+                    record.Detail.Contains("enhancement-cleanup-failed:") &&
+                    record.Detail.Contains("restore-mismatch")))
+                throw new InvalidOperationException("the Animated run did not surface the " +
+                    "cleanup failure.");
+            if (!animatedReport.Records.Any(record =>
+                    record.Status == CastExecutionStatus.ResidualStateUnsettled &&
+                    record.AssignmentId == "share-1"))
+                throw new InvalidOperationException("the failed cleanup was not terminal " +
+                    "unsettled state for its own casting.");
+            if (!animatedReport.Records.Any(record =>
+                    record.AssignmentId == "share-2" &&
+                    record.Detail.Contains("prior-animated-transaction-unsettled")))
+                throw new InvalidOperationException("a later cast inherited the uncertain " +
+                    "enhancement state.");
+            var instantReport = new ExecutionReport(plan);
+            var instant = new InstantCastExecutor(failing, false, 8);
+            var instantIterator = instant.Execute(plan, instantReport);
+            while (instantIterator.MoveNext()) { }
+            if (!instantReport.Records.Any(record =>
+                    record.Detail.Contains("enhancement-cleanup-failed:")))
+                throw new InvalidOperationException("the Instant run did not surface the " +
+                    "cleanup failure.");
+            if (!instantReport.Records.Any(record =>
+                    record.AssignmentId == "share-2" &&
+                    record.Status == CastExecutionStatus.FailedValidation))
+                throw new InvalidOperationException("the Instant run let a later cast " +
+                    "proceed after uncertain enhancement state.");
+            // A clean lease stays an ordinary success with no such entries.
+            var clean = new CleanupStubWorld();
+            var cleanReport = new ExecutionReport(new CastPlan(new[] { CleanupStep("share-1"), CleanupStep("share-2") },
+                    new TargetPlanOutcome[0], new string[0]));
+            var cleanIterator = new AnimatedCastExecutor(clean, false)
+                .Execute(new CastPlan(new[] { CleanupStep("share-1"), CleanupStep("share-2") },
+                    new TargetPlanOutcome[0], new string[0]), cleanReport);
+            while (cleanIterator.MoveNext()) { }
+            if (cleanReport.Records.Any(record =>
+                    record.Detail.Contains("enhancement-cleanup-failed")))
+                throw new InvalidOperationException("a verified-clean cleanup reported a " +
+                    "failure.");
+        }
+
+        // R579-3: unrecovered intent is never dropped. Nine distinct
+        // failed-flush recoveries all stay retrievable; the transition that
+        // cannot be preserved is REFUSED with ownership retained; and a
+        // factory failure after acquisition leaves the exact recovery for
+        // the next attempt (no test-held session references anywhere).
+        private static void TestRecoveryPreservation(string root)
+        {
+            string dir = Path.Combine(root, "recovery-preservation");
+            Directory.CreateDirectory(dir);
+            var store = new CastingWorkspaceRecoveryStore();
+            var messages = new System.Collections.Generic.List<string>();
+            var owner = new CastingSessionOwner(
+                id => store.Adopt(dir, id,
+                    pending => new CastingWorkspaceSession(dir, id,
+                        new DisabledCastingDispatchBoundary(), null, null, pending),
+                    () => new CastingWorkspaceSession(dir, id,
+                        new DisabledCastingDispatchBoundary())),
+                store, messages.Add);
+            // Eight campaigns' failed flushes are registered THROUGH THE
+            // OWNER (it owns every dirty session before the transition);
+            // the ninth is REFUSED with ownership retained.
+            string ninth = null;
+            for (int index = 1; index <= 9; index++)
+            {
+                string campaign = "campaign:pad" + index;
+                CastingWorkspaceSession session;
+                if (owner.Ensure(campaign, out session) != null)
+                    throw new InvalidOperationException("owning " + campaign + " failed.");
+                string casting = "cast-p" + index;
+                if (!session.AddCastingForRuntime(LifecycleCasting(casting, "unit-t1")).Applied)
+                    throw new InvalidOperationException(campaign + " authoring refused.");
+                if (session.IsDirty)
+                    throw new InvalidOperationException(campaign + " was not durable.");
+                string planPath = new CastingPlanRepository(dir).GetProfilePath(campaign);
+                using (var hold = new FileStream(planPath, FileMode.Open,
+                    FileAccess.Read, FileShare.Read))
+                {
+                    if (!session.AddCastingForRuntime(
+                            LifecycleCasting(casting + "b", "unit-t2")).Applied)
+                        throw new InvalidOperationException("locked authoring refused.");
+                    CastingWorkspaceSession hub;
+                    string unavailable = owner.Ensure("campaign:hub", out hub);
+                    if (index < 9)
+                    {
+                        if (unavailable != null)
+                            throw new InvalidOperationException("transition " + index +
+                                " was refused early: " + unavailable);
+                    }
+                    else
+                    {
+                        ninth = unavailable;
+                        if (ninth == null || !ninth.StartsWith("transition-refused",
+                                StringComparison.Ordinal) ||
+                            !ReferenceEquals(owner.Current, session))
+                            throw new InvalidOperationException("the unpreservable " +
+                                "transition was not refused with retained ownership: " +
+                                (ninth ?? "allowed"));
+                    }
+                }
+                if (index < 9 && !store.HasPending(dir, campaign))
+                    throw new InvalidOperationException("campaign " + index + "'s intent " +
+                        "was not preserved.");
+            }
+            if (store.Count != 8)
+                throw new InvalidOperationException("expected exactly the eight " +
+                    "preserved recoveries, found " + store.Count);
+            // All eight remain retrievable EXACTLY (latest intent each).
+            for (int index = 1; index <= 8; index++)
+            {
+                string campaign = "campaign:pad" + index;
+                PendingSessionRecovery pending = store.Peek(dir, campaign);
+                if (pending == null ||
+                    pending.Document.Castings.Count != 2 ||
+                    !pending.Document.Castings.Any(value =>
+                        value.CastingId == "cast-p" + index + "b"))
+                    throw new InvalidOperationException("recovery " + index + " lost the " +
+                        "latest intent.");
+            }
+            // Adopt pad1's recovery through the owner: it proves retrieval
+            // of the exact latest intent AND frees a preservation slot for
+            // the next case.
+            {
+                CastingWorkspaceSession pad1Back;
+                if (owner.Ensure("campaign:pad1", out pad1Back) != null)
+                    throw new InvalidOperationException("adopting pad1 failed.");
+                if (pad1Back.Document.Castings.Count != 2 ||
+                    !pad1Back.Document.Castings.Any(value => value.CastingId == "cast-p1b"))
+                    throw new InvalidOperationException("pad1's recovery lost the latest " +
+                        "intent.");
+                if (store.HasPending(dir, "campaign:pad1"))
+                    throw new InvalidOperationException("adoption left a stale entry.");
+            }
+            // A factory failure AFTER acquisition leaves the exact recovery
+            // available to the next successful attempt.
+            {
+                string campaign = "campaign:factory";
+                CastingWorkspaceSession session;
+                if (owner.Ensure(campaign, out session) != null)
+                    throw new InvalidOperationException("owning the factory campaign failed.");
+                if (!session.AddCastingForRuntime(LifecycleCasting("cast-f1", "unit-t1")).Applied)
+                    throw new InvalidOperationException("factory authoring refused.");
+                string planPath = new CastingPlanRepository(dir).GetProfilePath(campaign);
+                using (var hold = new FileStream(planPath, FileMode.Open,
+                    FileAccess.Read, FileShare.Read))
+                {
+                    if (!session.AddCastingForRuntime(
+                            LifecycleCasting("cast-f2", "unit-t2")).Applied)
+                        throw new InvalidOperationException("locked factory authoring " +
+                            "refused.");
+                    CastingWorkspaceSession hub;
+                    if (owner.Ensure("campaign:hub", out hub) != null)
+                        throw new InvalidOperationException("switch-away failed.");
+                }
+                bool failedOnce = false;
+                var retryOwner = new CastingSessionOwner(
+                    id =>
+                    {
+                        if (string.Equals(id, campaign, StringComparison.Ordinal) &&
+                            !failedOnce && store.HasPending(dir, id))
+                        {
+                            failedOnce = true;
+                            throw new InvalidOperationException("simulated construction " +
+                                "failure after acquisition");
+                        }
+                        return store.Adopt(dir, id,
+                            pending => new CastingWorkspaceSession(dir, id,
+                                new DisabledCastingDispatchBoundary(), null, null, pending),
+                            () => new CastingWorkspaceSession(dir, id,
+                                new DisabledCastingDispatchBoundary()));
+                    },
+                    store, messages.Add);
+                bool threw = false;
+                try
+                {
+                    CastingWorkspaceSession failed;
+                    retryOwner.Ensure(campaign, out failed);
+                }
+                catch (InvalidOperationException)
+                {
+                    threw = true;
+                }
+                if (!threw || !store.HasPending(dir, campaign))
+                    throw new InvalidOperationException("a construction failure after " +
+                        "acquisition consumed the only recoverable copy.");
+                CastingWorkspaceSession recovered;
+                if (retryOwner.Ensure(campaign, out recovered) != null)
+                    throw new InvalidOperationException("the retry was refused.");
+                if (recovered.Document.Castings.Count != 2 ||
+                    !recovered.Document.Castings.Any(value => value.CastingId == "cast-f2"))
+                    throw new InvalidOperationException("the retry did not recover the " +
+                        "latest intent.");
+                if (store.HasPending(dir, campaign))
+                    throw new InvalidOperationException("successful adoption left a stale " +
+                        "entry.");
+            }
         }
 
         // F3: the ordinary discovery path NEVER mutates native activatable

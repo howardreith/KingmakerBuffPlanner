@@ -2025,15 +2025,13 @@ namespace KingmakerBuffPlanner.Tests
                 directory = directory.Parent;
             Func<string, string> source = name => File.ReadAllText(Path.Combine(directory.FullName, "src",
                 "KingmakerBuffPlanner", "UI", name)).Replace("\r\n", "\n");
-            // Review F1 note: the factory also hands the recovery store's
-            // pending intent for the exact campaign to the new session, but
-            // the LIVE classic-plan delegates below are unchanged — the
-            // rebound plan is still read by its current bytes, never cached.
-            if (!source("BuffPlannerUiRoot.cs").Contains("_session.Model == null ? null : _session.Model.SourceGroupings(),\n" +
-                    "                () => _session.Model == null ? null\n" +
-                    "                    : new ClassicPlanInMemory(_session.Model.Profile, _session.ClassicPrimarySha256,\n" +
-                    "                        _session.Model.SourceGroupings()),\n" +
-                    "                pending);") ||
+            // Review F1/R579-3 note: the factory adopts pending recovery
+            // transactionally, but the LIVE classic-plan delegates are
+            // unchanged - the rebound plan is still read by its current
+            // bytes, never cached.
+            if (!source("BuffPlannerUiRoot.cs").Contains("new ClassicPlanInMemory(_session.Model.Profile,") ||
+                System.Text.RegularExpressions.Regex.Matches(source("BuffPlannerUiRoot.cs"),
+                    @"new ClassicPlanInMemory\(_session\.Model\.Profile,").Count < 3 ||
                 !source("CastingWorkspaceSession.cs").Contains(".Migrate(campaignId, effectiveGroupings, inMemory, unsaved,") ||
                 !source("PlannerUiSession.cs").Contains("ClassicPrimarySha256 = loaded.PrimarySha256;") ||
                 !source("PlannerUiSession.cs").Contains(

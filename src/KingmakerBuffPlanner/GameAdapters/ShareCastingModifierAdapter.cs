@@ -42,8 +42,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                 int unitsPerUse, int? remainingUses,
                 IEnumerable<string> supportedAbilityGuids,
                 IEnumerable<string> supportedSpellbookGuids,
-                IEnumerable<string> legalRecipientUnitIds)
+                IEnumerable<string> legalRecipientUnitIds,
+                string executionEnhancementId = null)
             {
+                ExecutionEnhancementId = string.IsNullOrWhiteSpace(
+                    executionEnhancementId) ? null : executionEnhancementId;
                 if (string.IsNullOrWhiteSpace(casterUnitId))
                     throw new ArgumentException("Caster unit ID is required.", "casterUnitId");
                 CasterUnitId = casterUnitId;
@@ -69,6 +72,11 @@ namespace KingmakerBuffPlanner.GameAdapters
             public IReadOnlyList<string> SupportedSpellbookGuids { get; private set; }
             // The verified recipients Share may reach for this caster.
             public IReadOnlyList<string> LegalRecipientUnitIds { get; private set; }
+            // The integration's own enhancement snapshot id that EXECUTES
+            // Share for this caster (strategy resolution + the executor's
+            // enhancement lease). Null only in synthetic fixtures; the host
+            // always passes the snapshot's id.
+            public string ExecutionEnhancementId { get; private set; }
         }
 
         private readonly Dictionary<string, ShareCapability> _capabilities;
@@ -139,6 +147,18 @@ namespace KingmakerBuffPlanner.GameAdapters
                         StringComparer.Ordinal)));
         }
 
+        // R579-1: the VERIFIED native execution identity — the executor
+        // arms exactly this enhancement for the one cast, and strategy
+        // resolution sees it through the existing execution policy.
+        public IReadOnlyList<string> ExecutionEnhancementIds(
+            PlannedCasting casting, ProviderPlanningOption option)
+        {
+            ShareCapability capability = CapabilityOf(casting, option);
+            return capability == null || capability.ExecutionEnhancementId == null
+                ? new string[0]
+                : new[] { capability.ExecutionEnhancementId };
+        }
+
         public IReadOnlyList<ModifierUsageDemand> UsageDemands(
             PlannedCasting casting, ProviderPlanningOption option)
         {
@@ -158,6 +178,17 @@ namespace KingmakerBuffPlanner.GameAdapters
             {
                 new ModifierUsageDemand(capability.ReservoirPoolId, capability.UnitsPerUse)
             };
+        }
+
+        private ShareCapability CapabilityOf(PlannedCasting casting,
+            ProviderPlanningOption option)
+        {
+            ShareCapability capability = null;
+            string caster = casting == null ? null : casting.CasterUnitId;
+            if (caster != null) _capabilities.TryGetValue(caster, out capability);
+            if (capability == null && option != null && option.Provider != null)
+                _capabilities.TryGetValue(option.Provider.Key.CasterUnitId, out capability);
+            return capability;
         }
 
         // The same applicability semantics as the enhancement snapshots the

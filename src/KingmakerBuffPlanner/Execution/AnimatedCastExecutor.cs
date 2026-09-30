@@ -67,6 +67,14 @@ namespace KingmakerBuffPlanner.Execution
                 if (!validation.Valid)
                 {
                     enhancement.Dispose();
+                    if (enhancement.CleanupFailure.Length != 0)
+                    {
+                        priorTransactionUnsettled = true;
+                        report.Add(index, step,
+                            CastExecutionStatus.ResidualStateUnsettled,
+                            "enhancement-cleanup-failed:" +
+                            enhancement.CleanupFailure);
+                    }
                     report.Add(index, step, CastExecutionStatus.FailedValidation,
                         validation.Reason);
                     continue;
@@ -76,6 +84,14 @@ namespace KingmakerBuffPlanner.Execution
                 catch (Exception exception)
                 {
                     enhancement.Dispose();
+                    if (enhancement.CleanupFailure.Length != 0)
+                    {
+                        priorTransactionUnsettled = true;
+                        report.Add(index, step,
+                            CastExecutionStatus.ResidualStateUnsettled,
+                            "enhancement-cleanup-failed:" +
+                            enhancement.CleanupFailure);
+                    }
                     report.Add(index, step, CastExecutionStatus.FailedSubmission,
                         "start-exception:" + exception.GetType().FullName + ":" + exception.Message);
                     continue;
@@ -83,6 +99,14 @@ namespace KingmakerBuffPlanner.Execution
                 if (operation == null)
                 {
                     enhancement.Dispose();
+                    if (enhancement.CleanupFailure.Length != 0)
+                    {
+                        priorTransactionUnsettled = true;
+                        report.Add(index, step,
+                            CastExecutionStatus.ResidualStateUnsettled,
+                            "enhancement-cleanup-failed:" +
+                            enhancement.CleanupFailure);
+                    }
                     report.Add(index, step, CastExecutionStatus.FailedSubmission, "operation-null");
                     continue;
                 }
@@ -201,6 +225,18 @@ namespace KingmakerBuffPlanner.Execution
                 }
                 try
                 {
+                    // R579-2: an enhancement lease that could not verify its
+                    // native restoration is unsettled state exactly like a
+                    // delivery residue: reported, and no later cast runs
+                    // until the state is re-established.
+                    if (enhancement.CleanupFailure.Length != 0)
+                    {
+                        priorTransactionUnsettled = true;
+                        report.Add(index, step,
+                            CastExecutionStatus.ResidualStateUnsettled,
+                            "enhancement-cleanup-failed:" +
+                            enhancement.CleanupFailure);
+                    }
                     if (cleanupFailure != null ||
                         operation.HasResidualDeliveryState)
                     {
