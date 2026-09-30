@@ -2197,3 +2197,30 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
   qualification batch (E18 Share alone AND Share+Powerful Change, both
   modes, spending/effects/plain-cast isolation; E19; E03 smoke; scroll
   frames; right-click), E01-E27 matrix, verified private delivery.
+
+## Session 8 checkpoint — 2026-09-29 latest — review R736-1/2 of 736e248 repaired
+
+- R736-1: one shared IActivatableStateAccess (duplicate removed from the
+  adapter); the source validator's consumed-group guard now spans the
+  extracted cleanup file as well. PRODUCTION BUILD EVIDENCE: Build-Local
+  PASS — source 42/42, Release sha256
+  6fd7e91eadc1bcd3c09daa67a54b9f47a4722ecd38af1da5397ff21fd140106d,
+  package sha256
+  ccd8159ffb935c70b4caea1e96eb8287b21adb40390d3c3c2dbd47126fc36dca
+  (artifacts/build-session7.log).
+- R736-2: the Animated finalizer REPORTS the enhancement cleanup outcome
+  on disposal-only exits (deduped on normal completion). Regression
+  disposes a suspended in-flight iterator with a failing lease: exactly
+  one unsettled record with the original detail beside the abandonment
+  record; no later cast; clean cancellation invents nothing.
+- Focused corrections: rejected-preparation regression (both details
+  reach the report; no StartAnimated; later casts halt); the lying setter
+  genuinely lies (postcondition mismatch asserted); unreadable
+  consumption proves no positive one-shot write (write-counted stub) and
+  still restores an independent ordinary state.
+- Protocol suite 384/384. Still outstanding, unchanged: the COMPLETE
+  Test-SourceOnly gate (all stages, launcher WhatIf included) on this
+  frozen candidate in a quiet window; then the authorized live batch
+  (E18 Share alone AND Share+Powerful Change, both modes, observed
+  spending/effects, plain-cast isolation; E19; E03; scroll frames;
+  right-click), E01-E27 matrix, verified private delivery.
