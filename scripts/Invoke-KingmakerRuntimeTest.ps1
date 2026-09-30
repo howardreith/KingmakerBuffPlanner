@@ -504,6 +504,19 @@ public static class KbpPhysicalInput {
     // injecting keys into whichever window currently owns focus.
     return SetForegroundWindow(window);
   }
+  public static void RightClick(IntPtr window) {
+    if (window == IntPtr.Zero || GetForegroundWindow() != window)
+      throw new InvalidOperationException("Kingmaker lost foreground before right-click; refusing blind click.");
+    Point cursor;
+    Rect client;
+    if (!GetCursorPos(out cursor) || !GetClientRect(window, out client) ||
+        !ScreenToClient(window, ref cursor))
+      throw new InvalidOperationException("Kingmaker right-click-position verification failed.");
+    if (cursor.X < 0 || cursor.Y < 0 || cursor.X > client.Right || cursor.Y > client.Bottom)
+      throw new InvalidOperationException("Cursor drifted outside Kingmaker client; refusing blind right-click.");
+    mouse_event(0x0008, 0, 0, 0, UIntPtr.Zero);
+    mouse_event(0x0010, 0, 0, 0, UIntPtr.Zero);
+  }
   public static void Click(IntPtr window) {
     // Revalidate ownership immediately before injection (review F7): the
     // game must still be foreground AND the cursor must still be inside
@@ -753,11 +766,19 @@ public static class KbpPhysicalInput {
                 $deliveryDetail = $null
                 # Typing and the focus cycle are never repeated: a retry
                 # after a partial delivery would change what was delivered.
-                $singleShot = @('type', 'focus-cycle') -ccontains [string]$physical.action
+                $singleShot = @('type', 'focus-cycle', 'hotkey') -ccontains [string]$physical.action
                 $maxAttempts = if ($singleShot) { 1 } else { 3 }
                 for ($attempt = 1; $attempt -le $maxAttempts -and -not $delivered; $attempt++) {
                     try {
-                        if ([string]$physical.action -eq 'key-escape') {
+                        if ([string]$physical.action -eq 'hotkey') {
+                            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x11)
+                            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x10)
+                            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x42)
+                            Start-Sleep -Milliseconds 100
+                            [KbpPhysicalInput]::KeyUp([byte]0x42)
+                            [KbpPhysicalInput]::KeyUp([byte]0x10)
+                            [KbpPhysicalInput]::KeyUp([byte]0x11)
+                        } elseif ([string]$physical.action -eq 'key-escape') {
                             [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
                             Start-Sleep -Milliseconds 100
                             [KbpPhysicalInput]::KeyUp([byte]0x1B)
@@ -772,6 +793,8 @@ public static class KbpPhysicalInput {
                             Start-Sleep -Milliseconds 250
                             if ([string]$physical.action -eq 'click') {
                                 [KbpPhysicalInput]::Click($process.MainWindowHandle)
+                            } elseif ([string]$physical.action -eq 'rightclick') {
+                                [KbpPhysicalInput]::RightClick($process.MainWindowHandle)
                             } elseif ([string]$physical.action -eq 'wheel') {
                                 [KbpPhysicalInput]::Wheel($process.MainWindowHandle, [int]$physical.delta)
                             } elseif ([string]$physical.action -ne 'hover') {

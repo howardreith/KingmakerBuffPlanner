@@ -19,6 +19,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             "ws-focus-cycle", "ws-click-search-again", "ws-type-more", "ws-escape"
         };
 
+        // The casting-first (v1.2 default route) action set: one cold moon
+        // click runs Long with the editor closed; the workspace then opens
+        // through the physical hotkey, the continuous scroll answers the
+        // wheel, a right-click opens the native spell inspect without any
+        // mutation, and Escape closes the inspect first and the workspace
+        // second.
+        public static readonly string[] CastingActions =
+        {
+            "cf-moon", "cf-open", "cf-wheel", "cf-right-click", "cf-escape-inspect",
+            "cf-escape-close"
+        };
+
         // The typed query comes from the label of a tile that was NOT
         // selected (review B5): the first four letters of its first word,
         // then its fifth letter after the focus loss. Clicking that tile must
@@ -70,6 +82,32 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool LeaseReleased { get; set; }
         // The game mode after Escape; the world mode is "Default".
         public string ModeAfterClose { get; set; }
+        // Casting-first evidence (v1.2 E04/E05/E06/E12).
+        public bool CastingFirst { get; set; }
+        // The moon click ran Long while the editor stayed closed.
+        public bool MoonRunStarted { get; set; }
+        public bool MoonWorkspaceStayedClosed { get; set; }
+        // The continuous scroll answered the physical wheel.
+        public bool GraphOverflow { get; set; }
+        public float? GraphScrollBefore { get; set; }
+        public float? GraphScrollAfter { get; set; }
+        public string GraphWheelEvidence
+        {
+            get
+            {
+                if (GraphScrollBefore == null || GraphScrollAfter == null) return "unread";
+                bool moved = Math.Abs(GraphScrollAfter.Value - GraphScrollBefore.Value) >= 0.001f;
+                if (!GraphOverflow) return moved ? "moved-without-overflow" : "not-applicable:no-overflow";
+                return moved ? "scrolled" : "no-scroll";
+            }
+        }
+        // The right-click opened the native spell inspect; no document
+        // revision was created by browsing or inspecting.
+        public string InspectChip { get; set; }
+        public bool InspectOpened { get; set; }
+        public bool InspectClosedByEscape { get; set; }
+        public string DocumentSignatureBeforeBrowse { get; set; }
+        public string DocumentSignatureAfterInspect { get; set; }
         // The world-input isolation probe over the whole sequence.
         public int PlayerCommands { get; set; }
         public int MovementCommands { get; set; }
@@ -101,6 +139,25 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!string.IsNullOrEmpty(ExpectedScreen) && ExpectedScreen != screen)
                 violations.Add("screen:" + screen + "!=" + ExpectedScreen);
             if (!OpenedPhysically) violations.Add("workspace-opened-programmatically");
+            if (CastingFirst)
+            {
+                foreach (string action in CastingActions)
+                    if (!Acknowledged.Contains(action))
+                        violations.Add("unacknowledged:" + action);
+                if (!MoonRunStarted) violations.Add("moon:no-run");
+                if (!MoonWorkspaceStayedClosed) violations.Add("moon:editor-opened");
+                if (GraphWheelEvidence == "unread") violations.Add("graph-scroll:unread");
+                else if (GraphWheelEvidence == "no-scroll") violations.Add("graph-scroll:no-scroll");
+                else if (GraphWheelEvidence == "moved-without-overflow")
+                    violations.Add("graph-scroll:moved-without-overflow");
+                if (!InspectOpened) violations.Add("inspect:not-opened");
+                if (!InspectClosedByEscape) violations.Add("inspect:not-closed");
+                if (DocumentSignatureBeforeBrowse == null ||
+                    DocumentSignatureAfterInspect == null ||
+                    DocumentSignatureBeforeBrowse != DocumentSignatureAfterInspect)
+                    violations.Add("inspect:document-mutated");
+                return violations;
+            }
             foreach (string action in Actions)
                 if (!Acknowledged.Contains(action)) violations.Add("unacknowledged:" + action);
             if (string.IsNullOrEmpty(Query) || Query.Length != 4 || string.IsNullOrEmpty(QuerySuffix))

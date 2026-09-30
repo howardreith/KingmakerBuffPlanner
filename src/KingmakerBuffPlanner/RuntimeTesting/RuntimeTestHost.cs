@@ -3419,6 +3419,102 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private System.Diagnostics.Stopwatch _physicalClock;
         private System.Diagnostics.Stopwatch _physicalSettle;
 
+        // The casting-first physical sequence (v1.2 E04/E05/E06/E12): the
+        // workspace is closed at the start of this phase, so the moon runs
+        // Long cold; the hotkey then opens the graph, the wheel scrolls the
+        // continuous parchment, a right-click opens the native spell
+        // inspect with the document unchanged, and Escape closes the
+        // inspect first and the workspace second.
+        private int _physicalRunsBeforeMoon;
+
+        private bool UpdatePhysicalCastingFirst(CastingWorkspaceScreenView view, double settled)
+        {
+            if (_physicalStep == 0)
+            {
+                // COLD MOON: the editor is closed; one physical click on the
+                // HUD long-routine button runs Long with no editor detour.
+                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen)
+                    return FinishPhysical("moon:editor-already-open");
+                Vector2 moon = BuffPlannerUiRoot.HudButtonCenterForRuntime("long");
+                _physicalRunsBeforeMoon = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
+                return RequestPhysical("cf-moon", "click", moon, null, 1);
+            }
+            if (_physicalStep == 1)
+            {
+                if (settled < 2) return false;
+                _physicalRecord.MoonRunStarted =
+                    BuffPlannerUiRoot.CastingRunsStartedForRuntime > _physicalRunsBeforeMoon;
+                if (!_physicalRecord.MoonRunStarted && settled < 10) return false;
+                _physicalRecord.MoonRunStarted =
+                    BuffPlannerUiRoot.CastingRunsStartedForRuntime > _physicalRunsBeforeMoon;
+                _physicalRecord.MoonWorkspaceStayedClosed =
+                    !BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                // Wait for the cold run to finish before the editor opens.
+                if (BuffPlannerUiRoot.IsCastingRunActive && settled < 60) return false;
+                return RequestPhysical("cf-open", "hotkey", Vector2.zero, null, 2);
+            }
+            if (_physicalStep == 2)
+            {
+                if (view == null) return FinishPhysical("workspace-not-opened");
+                _physicalRecord.DocumentSignatureBeforeBrowse =
+                    BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                float? before = view.GraphScrollPositionForRuntime;
+                if (before == null) return FinishPhysical("graph-scroll-absent");
+                _physicalRecord.GraphScrollBefore = before;
+                _physicalRecord.GraphOverflow = view.GraphScrollOverflowForRuntime;
+                Vector2? graphPoint = view.ScreenPointForRuntime("graph");
+                if (graphPoint == null) return FinishPhysical("graph-not-on-screen");
+                return RequestPhysical("cf-wheel", "wheel", graphPoint.Value, ",\"delta\":-360", 3);
+            }
+            if (_physicalStep == 3)
+            {
+                if (settled < 1) return false;
+                _physicalRecord.GraphScrollAfter = view == null
+                    ? null : view.GraphScrollPositionForRuntime;
+                if (view == null) return FinishPhysical("workspace-closed-early:wheel");
+                // The right-click target: the selected casting's chip (the
+                // inspector's own spell), else the first catalogue chip.
+                string chip = view.InspectTargetPartForRuntime;
+                if (chip == null)
+                    return FinishPhysical("inspect-target-not-on-screen");
+                _physicalRecord.InspectChip = chip;
+                return RequestPhysical("cf-right-click", "rightclick",
+                    view.ScreenPointForRuntime(chip).Value, null, 4);
+            }
+            if (_physicalStep == 4)
+            {
+                if (settled < 1) return false;
+                _physicalRecord.InspectOpened = view != null && view.SpellInspectOpen;
+                if (!_physicalRecord.InspectOpened && settled < 4) return false;
+                _physicalRecord.InspectOpened = view != null && view.SpellInspectOpen;
+                if (view == null) return FinishPhysical("workspace-closed-early:inspect");
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "physical-cf-inspect.png"));
+                return RequestPhysical("cf-escape-inspect", "key-escape", Vector2.zero, null, 5);
+            }
+            if (_physicalStep == 5)
+            {
+                if (view != null && view.SpellInspectOpen && settled < 4) return false;
+                _physicalRecord.InspectClosedByEscape = view == null || !view.SpellInspectOpen;
+                _physicalRecord.DocumentSignatureAfterInspect =
+                    BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                return RequestPhysical("cf-escape-close", "key-escape", Vector2.zero, null, 6);
+            }
+            if (_physicalStep == 6)
+            {
+                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen && settled < 5) return false;
+                if (settled < 1) return false;
+                _physicalRecord.ClosedByEscape = !BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                _physicalRecord.LeaseReleased =
+                    !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
+                _physicalRecord.ModeAfterClose = GameModeName();
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "physical-cf-closed.png"));
+                return FinishPhysical(null);
+            }
+            return false;
+        }
+
         private bool UpdatePhysicalWorkspace()
         {
             CastingWorkspaceScreenView view = BuffPlannerUiRoot.CastingWorkspaceViewForRuntime;
@@ -3435,6 +3531,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 // not the host's labeled programmatic fallback (review C4).
                 _physicalRecord.OpenedPhysically = !_workspaceProgrammaticOpen;
                 _physicalModeBefore = GameModeName();
+                _physicalRecord.CastingFirst = BuffPlannerUiRoot.CastingFirstActiveForRuntime;
                 BuffPlannerUiRoot.BeginPhysicalInputProbe();
                 _log.Info("[KBP-PHYSICAL] started;screen=" + Screen.width + "x" + Screen.height +
                     ";fullScreen=" + Screen.fullScreen + ";mode=" + _physicalModeBefore +
@@ -3456,6 +3553,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalSettle = System.Diagnostics.Stopwatch.StartNew();
             }
             double settled = _physicalSettle == null ? 0 : _physicalSettle.Elapsed.TotalSeconds;
+            if (_physicalRecord.CastingFirst)
+                return UpdatePhysicalCastingFirst(view, settled);
             if (view == null && _physicalStep >= 1 && _physicalStep <= 7)
                 return FinishPhysical("workspace-closed-early:step" + _physicalStep);
             if (_physicalStep == 0)

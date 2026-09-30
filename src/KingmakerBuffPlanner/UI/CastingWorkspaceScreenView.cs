@@ -212,7 +212,8 @@ namespace KingmakerBuffPlanner.UI
         internal Vector2? ScreenPointForRuntime(string part)
         {
             RectTransform rect = null;
-            if (part == "search") rect = _buffSearch == null ? null : RectOf(_buffSearch);
+            if (part == "graph") rect = _graphScroll == null ? null : RectOf(_graphScroll);
+            else if (part == "search") rect = _buffSearch == null ? null : RectOf(_buffSearch);
             else if (part == "buff-grid")
             {
                 ScrollRect scroll = CatalogueScroll();
@@ -305,6 +306,48 @@ namespace KingmakerBuffPlanner.UI
                 if (scroll == null || scroll.content == null) return false;
                 RectTransform viewport = scroll.viewport != null ? scroll.viewport : RectOf(scroll);
                 return scroll.content.rect.height > viewport.rect.height + 1f;
+            }
+        }
+
+        // The continuous scroll's own position (the graph area), for the
+        // physical wheel judgement; null when the scroll is absent.
+        internal float? GraphScrollPositionForRuntime
+        {
+            get
+            {
+                return _graphScroll == null || _graphScroll.viewport == null
+                    ? (float?)null : _graphScroll.verticalNormalizedPosition;
+            }
+        }
+
+        // True when the graph content is taller than the viewport (the
+        // wheel has something to scroll).
+        internal bool GraphScrollOverflowForRuntime
+        {
+            get
+            {
+                return _graphScroll != null && _graphScroll.content != null &&
+                    _graphScroll.viewport != null &&
+                    _graphScroll.content.rect.height > _graphScroll.viewport.rect.height + 1f;
+            }
+        }
+
+        // The right-click inspect target for the physical scenario: the
+        // focused casting's chip when it is on screen, else the first
+        // casting chip on screen.
+        internal string InspectTargetPartForRuntime
+        {
+            get
+            {
+                var candidates = new System.Collections.Generic.List<string>();
+                if (_lastView != null && !string.IsNullOrEmpty(_lastView.FocusedCastingId))
+                    candidates.Add("chip:" + _lastView.FocusedCastingId);
+                if (_lastView != null)
+                    foreach (var casting in _lastView.Castings)
+                        candidates.Add("chip:" + casting.CastingId);
+                foreach (string candidate in candidates)
+                    if (ScreenPointForRuntime(candidate) != null) return candidate;
+                return null;
             }
         }
 
