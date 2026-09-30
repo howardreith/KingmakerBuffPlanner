@@ -52,6 +52,16 @@ namespace KingmakerBuffPlanner.Execution
                 CastEnhancementPreparation enhancement = Prepare(step);
                 if (!enhancement.Valid)
                 {
+                    // C853-2A: the rejected cast is never attempted, and a
+                    // partially-set-up native state's own cleanup outcome
+                    // stays observable: residual state halts later casts.
+                    if (enhancement.CleanupFailure.Length != 0)
+                    {
+                        priorTransactionUnsettled = true;
+                        report.Add(index, step,
+                            CastExecutionStatus.ResidualStateUnsettled,
+                            "enhancement-cleanup-failed:" + enhancement.CleanupFailure);
+                    }
                     report.Add(index, step, CastExecutionStatus.FailedValidation,
                         "enhancement-unavailable:" + enhancement.Reason);
                     continue;
@@ -113,6 +123,7 @@ namespace KingmakerBuffPlanner.Execution
                 Exception cleanupFailure = null;
                 Exception operationFailure = null;
                 bool operationBodyCompleted = false;
+                string enhancementCleanupDetail = null;
                 try
                 {
                     report.Add(index, step, CastExecutionStatus.Queued, "animated-command-queued");
@@ -200,7 +211,17 @@ namespace KingmakerBuffPlanner.Execution
                     {
                         cleanupFailure = exception;
                     }
-                    finally { enhancement.Dispose(); }
+                    finally
+                    {
+                        enhancement.Dispose();
+                        // C853-2B: the enhancement outcome is captured and,
+                        // on a disposal-only exit (cancellation, deadline,
+                        // teardown - the code after this block never runs),
+                        // REPORTED here, so no exit path can bypass it.
+                        enhancementCleanupDetail =
+                            enhancement.CleanupFailure.Length == 0
+                                ? null : enhancement.CleanupFailure;
+                    }
                     // Review L2: when the iterator is disposed while the
                     // operation is in flight (owner cancellation), the code
                     // after this block never runs; report the abandonment
@@ -225,17 +246,16 @@ namespace KingmakerBuffPlanner.Execution
                 }
                 try
                 {
-                    // R579-2: an enhancement lease that could not verify its
-                    // native restoration is unsettled state exactly like a
-                    // delivery residue: reported, and no later cast runs
-                    // until the state is re-established.
-                    if (enhancement.CleanupFailure.Length != 0)
+                    // R579-2/C853-2B: an enhancement lease that could not
+                    // verify its native restoration is unsettled state
+                    // exactly like a delivery residue: reported, and no
+                    // later cast runs until the state is re-established.
+                    if (enhancementCleanupDetail != null)
                     {
                         priorTransactionUnsettled = true;
                         report.Add(index, step,
                             CastExecutionStatus.ResidualStateUnsettled,
-                            "enhancement-cleanup-failed:" +
-                            enhancement.CleanupFailure);
+                            "enhancement-cleanup-failed:" + enhancementCleanupDetail);
                     }
                     if (cleanupFailure != null ||
                         operation.HasResidualDeliveryState)

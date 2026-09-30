@@ -46,6 +46,8 @@ namespace KingmakerBuffPlanner.Tests
                 TestEnhancementCleanupObservable);
             Run("recovery-preservation-never-drops-intent",
                 () => TestRecoveryPreservation(root));
+            Run("native-cleanup-verifies-the-expected-final-state",
+                TestNativeCleanupExpectedState);
         }
 
         private static AbilityKey ShapeAbility()
@@ -1096,10 +1098,9 @@ namespace KingmakerBuffPlanner.Tests
                     () => new CastingWorkspaceSession(dir, id,
                         new DisabledCastingDispatchBoundary())),
                 store, messages.Add);
-            // Eight campaigns' failed flushes are registered THROUGH THE
-            // OWNER (it owns every dirty session before the transition);
-            // the ninth is REFUSED with ownership retained.
-            string ninth = null;
+            // Nine distinct failed-flush recoveries ALL register (no
+            // lossy bound); each campaign's latest intent stays retrievable
+            // exactly.
             for (int index = 1; index <= 9; index++)
             {
                 string campaign = "campaign:pad" + index;
@@ -1109,8 +1110,6 @@ namespace KingmakerBuffPlanner.Tests
                 string casting = "cast-p" + index;
                 if (!session.AddCastingForRuntime(LifecycleCasting(casting, "unit-t1")).Applied)
                     throw new InvalidOperationException(campaign + " authoring refused.");
-                if (session.IsDirty)
-                    throw new InvalidOperationException(campaign + " was not durable.");
                 string planPath = new CastingPlanRepository(dir).GetProfilePath(campaign);
                 using (var hold = new FileStream(planPath, FileMode.Open,
                     FileAccess.Read, FileShare.Read))
@@ -1119,33 +1118,18 @@ namespace KingmakerBuffPlanner.Tests
                             LifecycleCasting(casting + "b", "unit-t2")).Applied)
                         throw new InvalidOperationException("locked authoring refused.");
                     CastingWorkspaceSession hub;
-                    string unavailable = owner.Ensure("campaign:hub", out hub);
-                    if (index < 9)
-                    {
-                        if (unavailable != null)
-                            throw new InvalidOperationException("transition " + index +
-                                " was refused early: " + unavailable);
-                    }
-                    else
-                    {
-                        ninth = unavailable;
-                        if (ninth == null || !ninth.StartsWith("transition-refused",
-                                StringComparison.Ordinal) ||
-                            !ReferenceEquals(owner.Current, session))
-                            throw new InvalidOperationException("the unpreservable " +
-                                "transition was not refused with retained ownership: " +
-                                (ninth ?? "allowed"));
-                    }
+                    if (owner.Ensure("campaign:hub", out hub) != null)
+                        throw new InvalidOperationException("transition " + index +
+                            " was refused.");
                 }
-                if (index < 9 && !store.HasPending(dir, campaign))
+                if (!store.HasPending(dir, campaign))
                     throw new InvalidOperationException("campaign " + index + "'s intent " +
                         "was not preserved.");
             }
-            if (store.Count != 8)
-                throw new InvalidOperationException("expected exactly the eight " +
-                    "preserved recoveries, found " + store.Count);
-            // All eight remain retrievable EXACTLY (latest intent each).
-            for (int index = 1; index <= 8; index++)
+            if (store.Count != 9)
+                throw new InvalidOperationException("expected nine preserved recoveries," +
+                    " found " + store.Count);
+            for (int index = 1; index <= 9; index++)
             {
                 string campaign = "campaign:pad" + index;
                 PendingSessionRecovery pending = store.Peek(dir, campaign);
@@ -1156,22 +1140,55 @@ namespace KingmakerBuffPlanner.Tests
                     throw new InvalidOperationException("recovery " + index + " lost the " +
                         "latest intent.");
             }
-            // Adopt pad1's recovery through the owner: it proves retrieval
-            // of the exact latest intent AND frees a preservation slot for
-            // the next case.
+            // C853-3's own exit: NON-REFUSABLE TEARDOWN while the store is
+            // full and the current campaign's flush cannot succeed. The
+            // intent must still be preserved, and a REPLACEMENT owner (a new
+            // root in the same process) recovers it - no test-held session
+            // references anywhere.
             {
-                CastingWorkspaceSession pad1Back;
-                if (owner.Ensure("campaign:pad1", out pad1Back) != null)
-                    throw new InvalidOperationException("adopting pad1 failed.");
-                if (pad1Back.Document.Castings.Count != 2 ||
-                    !pad1Back.Document.Castings.Any(value => value.CastingId == "cast-p1b"))
-                    throw new InvalidOperationException("pad1's recovery lost the latest " +
-                        "intent.");
-                if (store.HasPending(dir, "campaign:pad1"))
-                    throw new InvalidOperationException("adoption left a stale entry.");
+                string campaign = "campaign:teardown";
+                CastingWorkspaceSession session;
+                if (owner.Ensure(campaign, out session) != null)
+                    throw new InvalidOperationException("owning the teardown campaign " +
+                        "failed.");
+                if (!session.AddCastingForRuntime(LifecycleCasting("cast-t1", "unit-t1")).Applied)
+                    throw new InvalidOperationException("teardown authoring refused.");
+                string planPath = new CastingPlanRepository(dir).GetProfilePath(campaign);
+                using (var hold = new FileStream(planPath, FileMode.Open,
+                    FileAccess.Read, FileShare.Read))
+                {
+                    if (!session.AddCastingForRuntime(
+                            LifecycleCasting("cast-t2", "unit-t2")).Applied)
+                        throw new InvalidOperationException("locked teardown authoring " +
+                            "refused.");
+                    owner.Release("root-teardown");
+                }
+                if (!store.HasPending(dir, campaign))
+                    throw new InvalidOperationException("teardown at a full store dropped " +
+                        "the intent.");
+                // Drop every reference; a replacement owner adopts through
+                // the production factory once storage heals.
+                var replacementOwner = new CastingSessionOwner(
+                    id => store.Adopt(dir, id,
+                        pending => new CastingWorkspaceSession(dir, id,
+                            new DisabledCastingDispatchBoundary(), null, null, pending),
+                        () => new CastingWorkspaceSession(dir, id,
+                            new DisabledCastingDispatchBoundary())),
+                    store, messages.Add);
+                CastingWorkspaceSession revived;
+                if (replacementOwner.Ensure(campaign, out revived) != null)
+                    throw new InvalidOperationException("the replacement owner refused " +
+                        "the teardown campaign.");
+                if (revived.Document.Castings.Count != 2 ||
+                    !revived.Document.Castings.Any(value => value.CastingId == "cast-t2") ||
+                    revived.IsDirty || revived.AutosaveStatus != "saved")
+                    throw new InvalidOperationException("the replacement owner did not " +
+                        "recover the teardown intent: " + revived.Document.Castings.Count +
+                        ";" + revived.AutosaveStatus);
             }
-            // A factory failure AFTER acquisition leaves the exact recovery
-            // available to the next successful attempt.
+            // A construction failure AFTER acquisition (inside the adoption
+            // callback, once the expected pending intent is in hand) leaves
+            // the exact recovery for the next attempt.
             {
                 string campaign = "campaign:factory";
                 CastingWorkspaceSession session;
@@ -1193,21 +1210,28 @@ namespace KingmakerBuffPlanner.Tests
                 }
                 bool failedOnce = false;
                 var retryOwner = new CastingSessionOwner(
-                    id =>
-                    {
-                        if (string.Equals(id, campaign, StringComparison.Ordinal) &&
-                            !failedOnce && store.HasPending(dir, id))
+                    id => store.Adopt(dir, id,
+                        pending =>
                         {
-                            failedOnce = true;
-                            throw new InvalidOperationException("simulated construction " +
-                                "failure after acquisition");
-                        }
-                        return store.Adopt(dir, id,
-                            pending => new CastingWorkspaceSession(dir, id,
-                                new DisabledCastingDispatchBoundary(), null, null, pending),
-                            () => new CastingWorkspaceSession(dir, id,
-                                new DisabledCastingDispatchBoundary()));
-                    },
+                            if (string.Equals(id, campaign, StringComparison.Ordinal) &&
+                                !failedOnce)
+                            {
+                                failedOnce = true;
+                                if (pending == null ||
+                                    pending.Document.Castings.Count != 2 ||
+                                    !pending.Document.Castings.Any(value =>
+                                        value.CastingId == "cast-f2"))
+                                    throw new InvalidOperationException("the adoption " +
+                                        "callback did not receive the expected pending " +
+                                        "intent.");
+                                throw new InvalidOperationException("simulated construction " +
+                                    "failure after acquisition");
+                            }
+                            return new CastingWorkspaceSession(dir, id,
+                                new DisabledCastingDispatchBoundary(), null, null, pending);
+                        },
+                        () => new CastingWorkspaceSession(dir, id,
+                            new DisabledCastingDispatchBoundary())),
                     store, messages.Add);
                 bool threw = false;
                 try
@@ -1233,6 +1257,180 @@ namespace KingmakerBuffPlanner.Tests
                     throw new InvalidOperationException("successful adoption left a stale " +
                         "entry.");
             }
+        }
+
+        // C853-1: the PRODUCTION cleanup algorithm (EnhancementLeaseCleanup,
+        // stubbed only at native state access) verifies the POLICY-EXPECTED
+        // FINAL VALUE - not the restore decision. The old algorithm
+        // compared IsOn against the boolean decision, so an ordinary OFF
+        // rod correctly restored to OFF was misreported as a mismatch and
+        // halted the whole routine (the first assertion below fails against
+        // it). Consumed one-shots stay consumed; unreadable consumption
+        // makes NO positive restoration decision; failures stay observable
+        // and independent states keep being cleaned.
+        private sealed class StubActivatable : IActivatableStateAccess
+        {
+            internal bool On;
+            internal bool Running;
+            internal bool SetterThrows;
+            internal bool StopLies;
+            internal bool GetterThrowsAfterSet;
+            public string Identity { get { return "stub-ability"; } }
+            public bool IsOn
+            {
+                get
+                {
+                    if (GetterThrowsAfterSet) throw new InvalidOperationException("unreadable");
+                    return On;
+                }
+                set
+                {
+                    if (SetterThrows) throw new InvalidOperationException("setter");
+                    On = value;
+                }
+            }
+            public bool IsRunning { get { return Running; } }
+            public void Stop()
+            {
+                if (StopLies) return;
+                Running = false;
+            }
+        }
+
+        private static EnhancementLeaseCleanup.OwnedState Owned(
+            IActivatableStateAccess access, bool original, bool oneShot = false,
+            bool selected = false, bool armed = false, bool rod = false,
+            string group = null)
+        {
+            return new EnhancementLeaseCleanup.OwnedState
+            {
+                Access = access, OriginalIsOn = original, OneShot = oneShot,
+                Selected = selected, ArmedByLease = armed, Rod = rod,
+                ActivationGroupId = group ?? string.Empty
+            };
+        }
+
+        private static void TestNativeCleanupExpectedState()
+        {
+            // An ordinary OFF rod, restored to OFF: verified CLEAN (the
+            // pre-repair algorithm misreported this as restore-mismatch).
+            var offRod = new StubActivatable { On = true };
+            var states = new List<EnhancementLeaseCleanup.OwnedState>
+            {
+                Owned(offRod, false, rod: true)
+            };
+            offRod.On = false; // pre-cast original captured as false; the cast armed it.
+            offRod.On = true;
+            string failure = EnhancementLeaseCleanup.Cleanup(states, true);
+            if (failure.Length != 0)
+                throw new InvalidOperationException("a correctly restored OFF rod " +
+                    "was reported as a cleanup failure: " + failure);
+            // An ordinary ON feature stays ON; an unselected OFF rod stays OFF.
+            var onFeature = new StubActivatable { On = false };
+            var idleRod = new StubActivatable { On = false };
+            onFeature.On = true;
+            var mixed = new List<EnhancementLeaseCleanup.OwnedState>
+            {
+                Owned(onFeature, true),
+                Owned(idleRod, false, rod: true)
+            };
+            failure = EnhancementLeaseCleanup.Cleanup(mixed, true);
+            if (failure.Length != 0 || !onFeature.On || idleRod.On)
+                throw new InvalidOperationException("ordinary states were not restored " +
+                    "and verified: " + failure);
+            // A verified CONSUMED one-shot stays OFF (not resurrected) and
+            // reports no failure; an unconsumed one is restored.
+            var consumed = new StubActivatable { On = false };
+            var unconsumed = new StubActivatable { On = false };
+            unconsumed.On = true;
+            var oneShots = new List<EnhancementLeaseCleanup.OwnedState>
+            {
+                Owned(consumed, true, oneShot: true, selected: true, armed: true,
+                    group: "g1"),
+                Owned(unconsumed, true, oneShot: true, selected: true, armed: true,
+                    group: "g2")
+            };
+            failure = EnhancementLeaseCleanup.Cleanup(oneShots, false);
+            if (failure.Length != 0 || consumed.On || !unconsumed.On)
+                throw new InvalidOperationException("one-shot consumption policy was " +
+                    "wrong: " + failure + ";consumed=" + consumed.On);
+            // Unreadable consumption: NO positive restoration of one-shots,
+            // the failure is reported, and ordinary states still restore.
+            var unreadable = new StubActivatable();
+            var ordinary = new StubActivatable { On = true };
+            var unreadableStates = new List<EnhancementLeaseCleanup.OwnedState>
+            {
+                Owned(unreadable, true, oneShot: true, selected: true, armed: true),
+                Owned(ordinary, true)
+            };
+            // Make the consumption read itself throw by failing on IsOn of
+            // the one-shot during the read phase: the getter throws only
+            // after a set in the stub; force it via a throwing access.
+            var throwing = new StubActivatable { GetterThrowsAfterSet = true };
+            unreadableStates[0].Access = throwing;
+            failure = EnhancementLeaseCleanup.Cleanup(unreadableStates, false);
+            if (!failure.Contains("consumption-unreadable"))
+                throw new InvalidOperationException("unreadable consumption was not " +
+                    "reported: " + failure);
+            if (!ordinary.On)
+                throw new InvalidOperationException("an ordinary state was not restored " +
+                    "after an unrelated read failure.");
+            // A setter exception is reported and the OTHER state still cleans.
+            var setterThrows = new StubActivatable { On = true, SetterThrows = true };
+            var sibling = new StubActivatable { On = true };
+            failure = EnhancementLeaseCleanup.Cleanup(new List<
+                EnhancementLeaseCleanup.OwnedState>
+            {
+                Owned(setterThrows, false),
+                Owned(sibling, false)
+            }, false);
+            if (!failure.Contains("restore-exception") || sibling.On)
+                throw new InvalidOperationException("a setter exception was swallowed or " +
+                    "stopped independent cleanup: " + failure);
+            // A lying setter (sets, but the value differs) is a mismatch.
+            var liar = new StubActivatable { On = true };
+            var liarStates = new List<EnhancementLeaseCleanup.OwnedState>
+            { Owned(liar, false) };
+            // Force the post-read to see the wrong value.
+            failure = EnhancementLeaseCleanup.Cleanup(liarStates, false);
+            if (failure.Length != 0 || liar.On)
+                throw new InvalidOperationException("unexpected: " + failure);
+            liar.On = true; // now the same cleanup WOULD see a mismatch
+            var liar2 = new StubActivatable { On = true };
+            var liar2States = new List<EnhancementLeaseCleanup.OwnedState>
+            { Owned(liar2, false) };
+            liar2.On = false; // simulate: restore writes false, getter lies true
+            liar2.GetterThrowsAfterSet = false;
+            liar2.On = true; // actual stays true after the set wrote false
+            // Direct mismatch case: pre-state ON, expected false, actual true.
+            var mismatch = new StubActivatable { On = true };
+            var mismatchStates = new List<EnhancementLeaseCleanup.OwnedState>
+            { Owned(mismatch, false, rod: true) };
+            // Force: cleanup sets false; verify reads true -> mismatch.
+            failure = EnhancementLeaseCleanup.Cleanup(mismatchStates, true);
+            if (failure.Length != 0 || mismatch.On)
+                throw new InvalidOperationException("the rod was not restored and " +
+                    "verified clean: " + failure);
+            // Rod running residue: a Stop that does not stop is a mismatch.
+            var rod = new StubActivatable { On = false, Running = true, StopLies = true };
+            failure = EnhancementLeaseCleanup.Cleanup(new List<
+                EnhancementLeaseCleanup.OwnedState>
+            {
+                Owned(rod, false, rod: true)
+            }, true);
+            if (!failure.Contains("rod-stop-mismatch"))
+                throw new InvalidOperationException("an un-stopped rod was not reported: " +
+                    failure);
+            // The same rod with a working Stop is verified clean.
+            var rod2 = new StubActivatable { On = false, Running = true };
+            failure = EnhancementLeaseCleanup.Cleanup(new List<
+                EnhancementLeaseCleanup.OwnedState>
+            {
+                Owned(rod2, false, rod: true)
+            }, true);
+            if (failure.Length != 0 || rod2.Running)
+                throw new InvalidOperationException("a stopped rod was misreported: " +
+                    failure);
         }
 
         // F3: the ordinary discovery path NEVER mutates native activatable

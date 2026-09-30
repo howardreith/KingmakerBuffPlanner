@@ -179,23 +179,31 @@ namespace KingmakerBuffPlanner.Execution
 
     public sealed class CastEnhancementPreparation : IDisposable
     {
-        private CastEnhancementPreparation(bool valid, string reason, IDisposable lease)
+        private CastEnhancementPreparation(bool valid, string reason, IDisposable lease,
+            string cleanupFailure)
         {
             Valid = valid;
             Reason = reason ?? string.Empty;
             _lease = lease;
+            _cleanupFailure = cleanupFailure ?? string.Empty;
         }
 
         private readonly IDisposable _lease;
+        private readonly string _cleanupFailure;
         public bool Valid { get; private set; }
         public string Reason { get; private set; }
         public static CastEnhancementPreparation Pass(IDisposable lease)
         {
-            return new CastEnhancementPreparation(true, string.Empty, lease);
+            return new CastEnhancementPreparation(true, string.Empty, lease, null);
         }
-        public static CastEnhancementPreparation Fail(string reason)
+
+        // C853-2A: a FAILED preparation also carries the observable cleanup
+        // outcome of the native lease it already disposed - partial setup is
+        // cleaned up, and that cleanup's own result must not vanish.
+        public static CastEnhancementPreparation Fail(string reason,
+            string cleanupFailure = null)
         {
-            return new CastEnhancementPreparation(false, reason, null);
+            return new CastEnhancementPreparation(false, reason, null, cleanupFailure);
         }
         // R579-2: the observable cleanup outcome of the disposed lease
         // (empty when the lease is absent or verified everything clean).
@@ -203,6 +211,7 @@ namespace KingmakerBuffPlanner.Execution
         {
             get
             {
+                if (_cleanupFailure.Length != 0) return _cleanupFailure;
                 IEnhancementCleanupOutcome outcome = _lease as
                     IEnhancementCleanupOutcome;
                 return outcome == null ? string.Empty : outcome.CleanupFailure;
