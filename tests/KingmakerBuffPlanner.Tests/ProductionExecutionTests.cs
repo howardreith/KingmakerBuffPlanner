@@ -87,6 +87,8 @@ namespace KingmakerBuffPlanner.Tests
                 TestSharedIsolationJudge);
             Run("shared-powerful-combined-selection-and-demand",
                 TestSharedPowerfulCombined);
+            Run("v12-autosave-contract-accepts-noop-save",
+                TestV12AutosaveNoopSaveContract);
             Run("qualification-forecast-and-boundary", TestQualificationForecastAndBoundary);
             Run("qualification-driver-end-to-end", () => TestQualificationDriverEndToEnd(root));
             Run("qualification-animated-player-stop", () => TestQualificationAnimatedPlayerStop(root));
@@ -3921,6 +3923,41 @@ namespace KingmakerBuffPlanner.Tests
                     value.EndsWith("|no-plain-witness-same-caster", StringComparison.Ordinal)))
                 throw new InvalidOperationException("a party without a same-caster " +
                     "witness selected.");
+        }
+
+        // v1.2 contract regression: there is no Save control to invoke -
+        // deliberate edits autosave, so AlreadyReady + a durable intent is
+        // the PASSING shape (the pre-repair contract demanded an invoked
+        // save and failed exactly the delivered behavior); a non-durable
+        // intent still violates, and a MISSING save observation still
+        // violates.
+        private static void TestV12AutosaveNoopSaveContract()
+        {
+            var evidence = KingmakerBuffPlanner.RuntimeTesting
+                .WorkspaceInteractionRecord.ForContractTest("already-ready", true);
+            var violations = evidence.Violations();
+            foreach (string violation in violations)
+                if (violation.StartsWith("save", System.StringComparison.Ordinal))
+                    throw new InvalidOperationException("the v1.2 no-op save was " +
+                        "rejected: " + violation);
+            var undurable = KingmakerBuffPlanner.RuntimeTesting
+                .WorkspaceInteractionRecord.ForContractTest("already-ready", false);
+            bool undurableRejected = false;
+            foreach (string violation in undurable.Violations())
+                if (violation.StartsWith("save", System.StringComparison.Ordinal))
+                    undurableRejected = true;
+            if (!undurableRejected)
+                throw new InvalidOperationException("a non-durable intent passed the " +
+                    "save contract.");
+            var missing = KingmakerBuffPlanner.RuntimeTesting
+                .WorkspaceInteractionRecord.ForContractTest(null, true);
+            bool missingRejected = false;
+            foreach (string violation in missing.Violations())
+                if (violation.StartsWith("save:not-run", System.StringComparison.Ordinal))
+                    missingRejected = true;
+            if (!missingRejected)
+                throw new InvalidOperationException("a missing save observation passed " +
+                    "the contract.");
         }
 
         // The combined variant (E19): the shared casting carries the

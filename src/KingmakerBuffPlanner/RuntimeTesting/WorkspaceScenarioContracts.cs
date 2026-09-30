@@ -179,6 +179,34 @@ namespace KingmakerBuffPlanner.RuntimeTesting
     {
         internal const int RequiredCastSteps = 3;
 
+        // Test-only construction of the v1.2 no-op-save shape (the protocol
+        // suite exercises Violations() directly; production fields keep
+        // their private setters).
+        internal static WorkspaceInteractionRecord ForContractTest(
+            string saveControl, bool? saved)
+        {
+            return new WorkspaceInteractionRecord
+            {
+                BrowseRecorded = true,
+                BrowseNoMutation = true,
+                RefusedAddControl = "invoked",
+                RefusedAddClean = true,
+                EditControl = "invoked",
+                EditFocused = true,
+                RetargetControl = "invoked",
+                RetargetApplied = true,
+                UndoControl = "invoked",
+                UndoIntentRestored = true,
+                DoneControl = "invoked",
+                DoneClearedFocus = true,
+                SaveControl = saveControl,
+                Saved = saved,
+                SourceTabsControl = "invoked",
+                SourceTabsClean = true
+            };
+        }
+
+
         private readonly List<WorkspaceCastStepEvidence> _castSteps =
             new List<WorkspaceCastStepEvidence>();
         private readonly List<string> _notes = new List<string>();
@@ -313,7 +341,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 RetargetApplied);
             RequireControl(violations, "undo", UndoControl, UndoIntentRestored);
             RequireControl(violations, "done", DoneControl, DoneClearedFocus);
-            RequireControl(violations, "save", SaveControl, Saved);
+            // v1.2: there is no Save control to invoke - deliberate edits
+            // autosave, so the step's control is AlreadyReady BY DESIGN
+            // (the host records exactly that). The durable outcome (Saved)
+            // remains required: already-ready is accepted only together
+            // with a durable authored intent.
+            if (SaveControl != null && Saved == true &&
+                SaveControl == WorkspaceControlOutcome.AlreadyReady)
+            {
+                // The v1.2 no-op save: nothing to invoke, intent durable.
+            }
+            else RequireControl(violations, "save", SaveControl, Saved);
             RequireControl(violations, "sourceTabs", SourceTabsControl, SourceTabsClean);
             return violations;
         }
