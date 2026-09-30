@@ -75,5 +75,14 @@ namespace KingmakerBuffPlanner.Planning
 
         IReadOnlyList<ModifierUsageDemand> UsageDemands(
             PlannedCasting casting, ProviderPlanningOption option);
+
+        // The VERIFIED enhancement identities that EXECUTE this modifier's
+        // native effect (armed for exactly this cast by the executor's
+        // enhancement lease; strategy resolution includes them). Empty when
+        // the modifier declares no native execution contract. Their cost is
+        // NOT counted again here: the modifier's UsageDemands already carry
+        // it, so a complete contract never double-charges its pool.
+        IReadOnlyList<string> ExecutionEnhancementIds(
+            PlannedCasting casting, ProviderPlanningOption option);
     }
 }

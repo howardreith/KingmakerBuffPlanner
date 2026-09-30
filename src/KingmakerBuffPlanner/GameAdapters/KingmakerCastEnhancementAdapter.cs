@@ -321,7 +321,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             internal string ActivationGroupId;
         }
 
-        private sealed class ActivationLease : IDisposable
+        private sealed class ActivationLease : IDisposable,
+            Execution.IEnhancementCleanupOutcome
         {
             private readonly IReadOnlyList<State> _states;
             private readonly bool _exact;
@@ -331,41 +332,92 @@ namespace KingmakerBuffPlanner.GameAdapters
                 _states = states;
                 _exact = exact;
             }
+            // R579-2: cleanup is OBSERVABLE. Empty when every owned native
+            // state was restored to its policy-expected value; otherwise the
+            // record of what could not be established. The executors surface
+            // this in the run report and halt progression to a later cast,
+            // because a non-throwing setter is not proof of restoration.
+            public string CleanupFailure { get; private set; }
+
             public void Dispose()
             {
                 if (_disposed) return;
                 _disposed = true;
-                var consumedGroups = new HashSet<string>(_states.Where(state =>
-                        state.OneShot && state.Selected && state.ArmedByLease &&
-                        !state.Ability.IsOn)
-                    .Select(state => state.ActivationGroupId),
-                    StringComparer.Ordinal);
+                var failures = new List<string>();
+                var consumedGroups = new HashSet<string>(StringComparer.Ordinal);
+                try
+                {
+                    foreach (string group in _states
+                        .Where(state => state.OneShot && state.Selected &&
+                            state.ArmedByLease && !state.Ability.IsOn)
+                        .Select(state => state.ActivationGroupId))
+                        consumedGroups.Add(group);
+                }
+                catch (Exception exception)
+                {
+                    // Consumption could not be read: every later verification
+                    // is uncertain, so the failure is reported rather than
+                    // guessed. One-shot members are NOT resurrected on this
+                    // path (resurrecting a consumed feature is the harmful
+                    // direction); the executors halt subsequent casts.
+                    failures.Add("consumption-unreadable:" +
+                        exception.GetType().Name);
+                }
                 foreach (State state in _states.Reverse())
                 {
+                    // Policy-aware expected value: a successfully consumed
+                    // one-shot member stays consumed; everything else returns
+                    // to its pre-cast state.
+                    bool expected = CastEnhancementActivationPolicy
+                        .RestoreOriginalState(state.OneShot,
+                            state.ActivationGroupId, consumedGroups);
+                    string identity = state.Ability.Blueprint == null
+                        ? "unknown" : state.Ability.Blueprint.AssetGuid;
                     try
                     {
-                        // A successful provider transaction consumes the
-                        // selected member of its mutually-exclusive one-shot
-                        // group. Do not resurrect any prior member afterward.
-                        if (CastEnhancementActivationPolicy.RestoreOriginalState(
-                                state.OneShot, state.ActivationGroupId,
-                                consumedGroups))
+                        if (expected)
                             state.Ability.IsOn = state.IsOn;
                     }
-                    catch (Exception) { }
+                    catch (Exception exception)
+                    {
+                        failures.Add("restore-exception:" + identity + ":" +
+                            exception.GetType().Name);
+                        continue;
+                    }
+                    // Verify the postcondition instead of trusting a
+                    // non-throwing setter; keep cleaning the other states.
+                    try
+                    {
+                        if (state.Ability.IsOn != expected)
+                            failures.Add("restore-mismatch:" + identity +
+                                ";expected=" + expected + ";actual=" +
+                                state.Ability.IsOn);
+                    }
+                    catch (Exception exception)
+                    {
+                        failures.Add("postcondition-unreadable:" + identity +
+                            ":" + exception.GetType().Name);
+                    }
                 }
                 // Casting-first: a rod switched on for the cast and back off
                 // would keep running until the next round, extending whatever
-                // is cast next; it is stopped now.
-                if (!_exact) return;
-                foreach (State state in _states.Where(value => value.Rod))
-                {
-                    try
+                // is cast next; it is stopped now - with the same observable
+                // failure reporting.
+                if (_exact)
+                    foreach (State state in _states.Where(value => value.Rod))
                     {
-                        if (!state.Ability.IsOn && state.Ability.IsRunning) state.Ability.Stop(true);
+                        try
+                        {
+                            if (!state.Ability.IsOn && state.Ability.IsRunning)
+                                state.Ability.Stop(true);
+                        }
+                        catch (Exception exception)
+                        {
+                            failures.Add("rod-stop-exception:" +
+                                exception.GetType().Name);
+                        }
                     }
-                    catch (Exception) { }
-                }
+                CleanupFailure = string.Join("|", failures.ToArray());
             }
         }
     }

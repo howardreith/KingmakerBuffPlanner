@@ -430,9 +430,11 @@ namespace KingmakerBuffPlanner.Tests
             var store = new CastingWorkspaceRecoveryStore();
             var messages = new System.Collections.Generic.List<string>();
             Func<string, CastingWorkspaceSession> factory = id =>
-                new CastingWorkspaceSession(dir, id,
-                    new DisabledCastingDispatchBoundary(), null, null,
-                    store.Take(dir, id));
+                store.Adopt(dir, id,
+                    pending => new CastingWorkspaceSession(dir, id,
+                        new DisabledCastingDispatchBoundary(), null, null, pending),
+                    () => new CastingWorkspaceSession(dir, id,
+                        new DisabledCastingDispatchBoundary()));
             var owner = new CastingSessionOwner(factory, store, messages.Add);
             CastingWorkspaceSession sessionA;
             if (owner.Ensure("campaign:A", out sessionA) != null)

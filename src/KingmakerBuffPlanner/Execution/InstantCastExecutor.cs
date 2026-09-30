@@ -247,6 +247,17 @@ namespace KingmakerBuffPlanner.Execution
                                 }
                             }
                             enhancement.Dispose();
+                            // R579-2: a lease that could not verify its
+                            // native restoration is unsettled state: reported
+                            // honestly, and no later cast inherits it.
+                            if (enhancement.CleanupFailure.Length != 0)
+                            {
+                                priorTransactionUnsettled = true;
+                                report.Add(index, step,
+                                    CastExecutionStatus.ResidualStateUnsettled,
+                                    "enhancement-cleanup-failed:" +
+                                        enhancement.CleanupFailure);
+                            }
                         }
                     }
                 }

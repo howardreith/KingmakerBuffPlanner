@@ -169,6 +169,14 @@ namespace KingmakerBuffPlanner.Execution
         IAnimatedCastOperation StartAnimated(CastStep step);
     }
 
+    // R579-2: what a native enhancement lease reports after its cleanup ran:
+    // empty when every owned native state was verified restored to its
+    // policy-expected value. Reading it AFTER Dispose is the contract.
+    public interface IEnhancementCleanupOutcome
+    {
+        string CleanupFailure { get; }
+    }
+
     public sealed class CastEnhancementPreparation : IDisposable
     {
         private CastEnhancementPreparation(bool valid, string reason, IDisposable lease)
@@ -189,6 +197,18 @@ namespace KingmakerBuffPlanner.Execution
         {
             return new CastEnhancementPreparation(false, reason, null);
         }
+        // R579-2: the observable cleanup outcome of the disposed lease
+        // (empty when the lease is absent or verified everything clean).
+        public string CleanupFailure
+        {
+            get
+            {
+                IEnhancementCleanupOutcome outcome = _lease as
+                    IEnhancementCleanupOutcome;
+                return outcome == null ? string.Empty : outcome.CleanupFailure;
+            }
+        }
+
         public void Dispose()
         {
             if (_lease != null) _lease.Dispose();

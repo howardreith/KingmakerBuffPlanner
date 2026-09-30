@@ -1558,7 +1558,10 @@ namespace KingmakerBuffPlanner.UI
                         snapshot.Units
                             .Where(unit => unit.TargetValidation != null &&
                                 unit.TargetValidation.Alive && unit.TargetValidation.Friendly)
-                            .Select(unit => unit.UnitId)));
+                            .Select(unit => unit.UnitId),
+                        // R579-1: the verified execution identity the
+                        // executor arms and strategy resolution sees.
+                        enhancement.EnhancementId));
             }
             if (capabilities.Count == 0)
                 return new KingmakerBuffPlanner.Planning.ICastingTargetingModifier[0];
@@ -1593,18 +1596,34 @@ namespace KingmakerBuffPlanner.UI
 
         private CastingWorkspaceSession CreateCastingSession(string campaignId)
         {
-            // Review F1: a session whose discard-time flush failed left its
-            // latest intent with the recovery store, bound to this exact
-            // mod path and campaign; the new session adopts it (and tries
-            // to make it durable at once) instead of loading stale bytes.
-            PendingSessionRecovery pending = _castingSessions == null
-                ? null : _castingSessions.Recovery.Take(_modPath, campaignId);
-            return new CastingWorkspaceSession(_modPath, campaignId, CreateDispatchBoundary(),
-                _session.Model == null ? null : _session.Model.SourceGroupings(),
-                () => _session.Model == null ? null
-                    : new ClassicPlanInMemory(_session.Model.Profile, _session.ClassicPrimarySha256,
-                        _session.Model.SourceGroupings()),
-                pending);
+            // Review F1/R579-3: a session whose discard-time flush failed
+            // left its latest intent with the recovery store, bound to this
+            // exact mod path and campaign. Adoption is TRANSACTIONAL: the
+            // new session is constructed with the pending intent and the
+            // entry leaves the store only after construction succeeds, so a
+            // construction failure leaves the only recoverable copy exactly
+            // where the next attempt can find it.
+            return _castingSessions == null
+                ? new CastingWorkspaceSession(_modPath, campaignId, CreateDispatchBoundary(),
+                    _session.Model == null ? null : _session.Model.SourceGroupings(),
+                    () => _session.Model == null ? null
+                        : new ClassicPlanInMemory(_session.Model.Profile, _session.ClassicPrimarySha256,
+                            _session.Model.SourceGroupings()))
+                : _castingSessions.Recovery.Adopt(_modPath, campaignId,
+                    pending => new CastingWorkspaceSession(_modPath, campaignId,
+                        CreateDispatchBoundary(),
+                        _session.Model == null ? null : _session.Model.SourceGroupings(),
+                        () => _session.Model == null ? null
+                            : new ClassicPlanInMemory(_session.Model.Profile,
+                                _session.ClassicPrimarySha256,
+                                _session.Model.SourceGroupings()),
+                        pending),
+                    () => new CastingWorkspaceSession(_modPath, campaignId, CreateDispatchBoundary(),
+                        _session.Model == null ? null : _session.Model.SourceGroupings(),
+                        () => _session.Model == null ? null
+                            : new ClassicPlanInMemory(_session.Model.Profile,
+                                _session.ClassicPrimarySha256,
+                                _session.Model.SourceGroupings())));
         }
 
         // Ordinary play submits through the production boundary; a

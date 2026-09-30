@@ -12247,6 +12247,14 @@ namespace KingmakerBuffPlanner.Tests
             {
                 return _demands;
             }
+
+            // R579-1: this fixture declares no native execution contract.
+            public System.Collections.Generic.IReadOnlyList<string>
+                ExecutionEnhancementIds(Domain.Authoring.PlannedCasting casting,
+                    ProviderPlanningOption option)
+            {
+                return new string[0];
+            }
         }
 
         private static void TestCastingA05TargetingModifiers()
