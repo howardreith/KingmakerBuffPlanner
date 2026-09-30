@@ -97,7 +97,8 @@ namespace KingmakerBuffPlanner.Planning
             CastingApplyDecision decision,
             IEnumerable<ProviderPlanningOption> providerOptions,
             IReadOnlyDictionary<string, EffectExpression> effectsBySource,
-            ExplicitProjectionScope scope = ExplicitProjectionScope.Standard)
+            ExplicitProjectionScope scope = ExplicitProjectionScope.Standard,
+            IDictionary<string, string> targetingModifierEnhancementIds = null)
         {
             if (plan == null) throw new ArgumentNullException("plan");
             if (decision == null) throw new ArgumentNullException("decision");
@@ -131,8 +132,16 @@ namespace KingmakerBuffPlanner.Planning
                 if (casting.Provider == null)
                     return ExplicitStepConversion.Refuse("provider-unresolved:" + castingId);
                 // Review K4: contracts the executor step cannot carry refuse
-                // the WHOLE conversion instead of vanishing from it.
-                string unsupported = UnsupportedContract(casting, scope);
+                // the WHOLE conversion instead of vanishing from it. A
+                // targeting modifier executes ONLY through its VERIFIED
+                // enhancement identity (the installed integration's own
+                // toggle snapshot, keyed by modifier and caster): the
+                // executor arms exactly that enhancement for this one cast
+                // and its lease restores it on every terminal path. Without
+                // a verified mapping the modifier stays fail-closed.
+                var mappedModifierEnhancements = new List<string>();
+                string unsupported = UnsupportedContract(casting, scope,
+                    targetingModifierEnhancementIds, mappedModifierEnhancements);
                 if (unsupported != null)
                     return ExplicitStepConversion.Refuse(unsupported, scope);
                 ProviderPlanningOption option;
@@ -229,7 +238,9 @@ namespace KingmakerBuffPlanner.Planning
                     casting.ExecutionStrategy ?? option.ExecutionStrategy,
                     casting.ExecutionStrategy == null ? option.ExecutionStrategyReason
                         : casting.ExecutionStrategyReason,
-                    casting.AppliedEnhancementIds,
+                    casting.AppliedEnhancementIds
+                        .Concat(mappedModifierEnhancements)
+                        .Distinct(StringComparer.Ordinal),
                     enhancementUsage,
                     casting.OmittedEnhancementIds,
                     mass ? casting.PreCoveredUnitIds : null,
@@ -369,24 +380,42 @@ namespace KingmakerBuffPlanner.Planning
         // The Standard-scope contract check alone, for disclosure BEFORE
         // execution (the workspace card): null when the executor step can
         // carry the casting as authored; otherwise the same refusal Apply
-        // would report for the whole conversion.
-        internal static string StandardExecutionLimitation(ResolvedCasting casting)
+        // would report for the whole conversion. A targeting modifier is
+        // executable only when the host supplies its VERIFIED enhancement
+        // identity for this exact caster (the map the session builds from
+        // the installed integration's snapshots).
+        internal static string StandardExecutionLimitation(ResolvedCasting casting,
+            IDictionary<string, string> targetingModifierEnhancementIds = null)
         {
             return casting == null ? null
-                : UnsupportedContract(casting, ExplicitProjectionScope.Standard);
+                : UnsupportedContract(casting, ExplicitProjectionScope.Standard,
+                    targetingModifierEnhancementIds, null);
         }
 
         private static string UnsupportedContract(ResolvedCasting casting,
-            ExplicitProjectionScope scope)
+            ExplicitProjectionScope scope,
+            IDictionary<string, string> targetingModifierEnhancementIds,
+            List<string> mappedModifierEnhancements)
         {
             string id = casting.CastingId;
             List<string> modifiers = (casting.TargetingModifiers ??
                     new TargetingModifierSelection[0])
                 .Where(value => value != null && value.Enabled)
                 .Select(value => value.ModifierId).ToList();
-            if (modifiers.Count != 0)
-                return "unsupported-contract:targeting-modifier:" + id + ":" +
-                    string.Join(",", modifiers);
+            if (modifiers.Count != 0 && scope == ExplicitProjectionScope.SingleCastProbe)
+                return "probe-unsupported:targeting-modifier:" + id;
+            foreach (string modifierId in modifiers)
+            {
+                string mapped = null;
+                if (targetingModifierEnhancementIds != null)
+                    targetingModifierEnhancementIds.TryGetValue(
+                        modifierId + "|" + casting.CasterUnitId, out mapped);
+                if (string.IsNullOrWhiteSpace(mapped))
+                    return "unsupported-contract:targeting-modifier:" + id + ":" +
+                        modifierId + ":execution-enhancement-unverified";
+                if (mappedModifierEnhancements != null && !mappedModifierEnhancements.Contains(mapped))
+                    mappedModifierEnhancements.Add(mapped);
+            }
             if ((casting.Enhancements ?? new AuthoredEnhancementSelection[0])
                     .Any(value => value != null && value.ExactSourceRef != null))
                 return "unsupported-contract:exact-enhancement-source:" + id;

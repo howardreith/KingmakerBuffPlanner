@@ -37,6 +37,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("share-zero-reservoir-versus-active-effects", () => TestShareZeroReservoir(root));
             Run("share-ordinary-discovery-never-arms-the-native-toggle",
                 TestShareDiscoveryBoundary);
+            Run("share-projection-executes-only-the-verified-modifier-contract",
+                TestShareProjectionContract);
         }
 
         private static AbilityKey ShapeAbility()
@@ -336,8 +338,26 @@ namespace KingmakerBuffPlanner.Tests
                     " sources=" + (wizNode == null ? 0 : wizNode.Sources.Count));
             var row = wizNode.Sources.First();
             session.SelectGraphSource(row.ProviderKey, inputs);
-            session.Draft.TargetingModifiers.Add(
-                new TargetingModifierSelection(ShareCastingModifier.Id, true, null));
+            // E16: the Share control appears between the exact source and
+            // the target click, offered through the same resolver the
+            // compiler judges with; enabling it is the UI command.
+            var withModifier = session.BuildGraph(inputs);
+            CastingGraphModifierOption offered = withModifier.NextCastingModifiers == null
+                ? null : withModifier.NextCastingModifiers.FirstOrDefault(
+                    value => value.ModifierId == ShareCastingModifier.Id);
+            if (offered == null || !offered.Available || offered.Selected)
+                throw new InvalidOperationException("the Share control was not offered " +
+                    "available after the source was chosen: " +
+                    (offered == null ? "missing" : offered.UnavailableReason));
+            if (!session.ToggleDraftTargetingModifier(ShareCastingModifier.Id, inputs).Applied)
+                throw new InvalidOperationException("enabling Share on the next casting " +
+                    "was refused.");
+            var shareOn = session.BuildGraph(inputs);
+            CastingGraphModifierOption onRow = shareOn.NextCastingModifiers.First(
+                value => value.ModifierId == ShareCastingModifier.Id);
+            if (!onRow.Selected || onRow.CostText.Length == 0)
+                throw new InvalidOperationException("the armed Share control does not show " +
+                    "its selection or verified cost.");
             CastingGraphEditResult added = session.AddGraphCasting("unit-cleric", inputs);
             if (!added.Applied)
                 throw new InvalidOperationException("the shared authoring was refused: " +
@@ -380,13 +400,9 @@ namespace KingmakerBuffPlanner.Tests
             // target visibly blocked and repairable — never deleted or
             // retargeted to the caster — and Undo restores the Ready plan.
             session.FocusGraphCasting(added.CastingId);
-            var withoutShare = new PlannedCasting(persisted.CastingId, persisted.RoutineId,
-                persisted.Order, persisted.SourceId, persisted.Ability, persisted.CasterUnitId,
-                persisted.SpellbookGuid, persisted.TargetMode, persisted.DirectTargetUnitId,
-                persisted.Origin, persisted.RequiredCoverageUnitIds, new TargetingModifierSelection[0],
-                persisted.Enhancements, persisted.ExistingEffectPolicy,
-                persisted.IgnoredPresenceMarkers, persisted.State, persisted.Provenance);
-            if (!session.UpdateFocusedCasting(withoutShare).Applied)
+            // E17: the focused casting's own Share control disables through
+            // the normal authoring boundary (autosaves, undoable).
+            if (!session.ToggleFocusedTargetingModifier(ShareCastingModifier.Id, inputs).Applied)
                 throw new InvalidOperationException("disabling Share was refused.");
             PlannedCasting disabled = session.Document.Castings.First(
                 value => value.CastingId == added.CastingId);
@@ -782,6 +798,135 @@ namespace KingmakerBuffPlanner.Tests
         // (and doubles as the scan's positive control — if the scanner can
         // see the probe's arming, it would see any arming re-added to the
         // ordinary path).
+        // The execution-only Share bridge (v1.2 §7): the converter executes
+        // a targeting modifier ONLY through its VERIFIED enhancement
+        // identity for the exact caster — the step carries that id (so the
+        // proven enhancement lease arms the exact toggle for this one cast
+        // and restores it on every terminal path) plus the reservoir usage,
+        // the projection hash covers both, and everything else stays
+        // fail-closed: no mapping, the probe scope, and a merely-disabled
+        // selection never execute a modifier.
+        private static void TestShareProjectionContract()
+        {
+            var units = new[]
+            {
+                new UnitSnapshot("unit-wiz", "Wiz", false, null,
+                    new TargetValidationSnapshot(true, true, true, true)),
+                new UnitSnapshot("unit-cleric", "Cleric", false, null,
+                    new TargetValidationSnapshot(true, true, true, true))
+            };
+            var shapeExpression = new Domain.Effects.EffectLeafExpression(
+                Domain.Effects.EffectKind.Buff, "buff-shape",
+                Domain.Effects.EffectTarget.CurrentTarget, "shape", "shape/a");
+            var effects = new Dictionary<string, Domain.Effects.EffectExpression>
+            {
+                { "source-shape", shapeExpression },
+                { ShapeAbility().Canonical, shapeExpression }
+            };
+            var snapshot = new PartyProviderSnapshot(units, new[]
+            {
+                ShapeProvider("unit-wiz")
+            }, new[]
+            {
+                new ResourcePoolSnapshot("pool-unit-wiz", ResourcePoolKind.SpontaneousLevel,
+                    10, 10, null)
+            });
+            var share = new ShareCastingModifier(new[]
+                { Capability("unit-wiz", WizardReservoir, 1, 3, new[] { "unit-cleric" }) });
+            var enhancements = new[] { ShareEnhancement("unit-wiz", WizardReservoir, 3) };
+            var gate = new CastingExecutionGate();
+            // The session's verified map: modifier|caster -> enhancement id.
+            var inputs = new CastingWorkspaceInputs(snapshot,
+                new[] { PersonalOption("unit-wiz") }, effects, enhancements,
+                new ICastingTargetingModifier[] { share });
+            var map = CastingWorkspaceSession.TargetingModifierEnhancementMap(inputs);
+            if (map.Count != 1 ||
+                !string.Equals(map["share-transmutation|unit-wiz"],
+                    ShareEnhancement("unit-wiz", WizardReservoir, 3).EnhancementId,
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException("the verified modifier map is wrong.");
+            ExplicitCastingPlan sharedPlan = new ExplicitCastingCompiler().Compile(
+                new CastingPlanDocument("campaign:bridge",
+                    new[] { new RoutineDefinition("long", "Long") },
+                    new[] { SharedCasting("share-1", "unit-wiz", "unit-cleric") }, null),
+                snapshot, new[] { PersonalOption("unit-wiz") }, effects, enhancements,
+                null, new[] { share });
+            CastingApplyDecision decision = gate.Evaluate(sharedPlan, CastingApplyMode.Ordinary,
+                "long");
+            if (!decision.Allowed || decision.ExecutableCastingIds.Count != 1)
+                throw new InvalidOperationException("the gate did not allow the shared " +
+                    "casting: " + string.Join(";", decision.BlockingReasons.ToArray()));
+            // WITHOUT the verified mapping: still fail-closed.
+            ExplicitStepConversion refused = ExplicitCastingStepConverter.Convert(
+                sharedPlan, decision, new[] { PersonalOption("unit-wiz") }, effects);
+            if (refused.Converted || !refused.Refusal.Contains(
+                    "unsupported-contract:targeting-modifier:share-1:share-transmutation:" +
+                    "execution-enhancement-unverified"))
+                throw new InvalidOperationException("an unverified modifier execution was " +
+                    "not refused fail-closed: " + refused.Refusal);
+            // WITH the verified mapping: one step carrying the exact toggle
+            // enhancement and the reservoir usage, hashed into the identity.
+            ExplicitStepConversion converted = ExplicitCastingStepConverter.Convert(
+                sharedPlan, decision, new[] { PersonalOption("unit-wiz") }, effects,
+                ExplicitProjectionScope.Standard, map);
+            if (!converted.Converted)
+                throw new InvalidOperationException("the verified modifier execution was " +
+                    "refused: " + converted.Refusal);
+            CastStep step = converted.Plan.Steps[0];
+            string shareEnhancementId = ShareEnhancement("unit-wiz", WizardReservoir, 3)
+                .EnhancementId;
+            if (!step.EnhancementIds.Contains(shareEnhancementId))
+                throw new InvalidOperationException("the step does not arm the exact " +
+                    "verified Share toggle enhancement.");
+            if (!step.EnhancementUsageByPool.ContainsKey(WizardReservoir) ||
+                step.EnhancementUsageByPool[WizardReservoir] != 1)
+                throw new InvalidOperationException("the step does not carry the verified " +
+                    "reservoir usage.");
+            if (converted.ProjectionId.Length == 0 || !converted.CanonicalContract
+                    .Contains(shareEnhancementId))
+                throw new InvalidOperationException("the projection hash does not cover the " +
+                    "modifier's identity.");
+            if (!converted.CanonicalContract.Contains(WizardReservoir))
+                throw new InvalidOperationException("the projection hash does not cover the " +
+                    "modifier's cost.");
+            // Identity sensitivity: the same spell cast WITHOUT Share
+            // (self-target, the personal spell's own legal target) hashes
+            // differently and arms nothing.
+            // The probe scope stays refuse-first for targeting modifiers.
+            ExplicitStepConversion probe = ExplicitCastingStepConverter.Convert(
+                sharedPlan, decision, new[] { PersonalOption("unit-wiz") }, effects,
+                ExplicitProjectionScope.SingleCastProbe, map);
+            if (probe.Converted || !probe.Refusal.StartsWith("probe-unsupported:targeting-modifier",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException("the probe scope accepted a targeting " +
+                    "modifier: " + probe.Refusal);
+            // A merely-DISABLED selection executes nothing.
+            ExplicitCastingPlan disabledPlan = new ExplicitCastingCompiler().Compile(
+                new CastingPlanDocument("campaign:bridge",
+                    new[] { new RoutineDefinition("long", "Long") },
+                    new[]
+                    {
+                        new PlannedCasting("share-1", "long", 0, "source-shape",
+                            ShapeAbility(), "unit-wiz", "book", CastingTargetMode.DirectTarget,
+                            "unit-wiz", null, null,
+                            new[] { new TargetingModifierSelection(
+                                ShareCastingModifier.Id, false, null) }, null,
+                            ExistingEffectPolicy.SkipAlreadyActive, null,
+                            CastingAuthoringState.Ready, null)
+                    }, null),
+                snapshot, new[] { PersonalOption("unit-wiz") }, effects, enhancements,
+                null, new[] { share });
+            CastingApplyDecision disabledDecision = gate.Evaluate(disabledPlan,
+                CastingApplyMode.Ordinary, "long");
+            ExplicitStepConversion disabledProjection = ExplicitCastingStepConverter.Convert(
+                disabledPlan, disabledDecision, new[] { PersonalOption("unit-wiz") }, effects,
+                ExplicitProjectionScope.Standard, map);
+            if (!disabledProjection.Converted ||
+                disabledProjection.Plan.Steps[0].EnhancementIds.Contains(shareEnhancementId))
+                throw new InvalidOperationException("a disabled modifier selection armed " +
+                    "the toggle.");
+        }
+
         private static void TestShareDiscoveryBoundary()
         {
             string assemblyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,

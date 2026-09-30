@@ -137,6 +137,37 @@ namespace KingmakerBuffPlanner.UI
         public bool IsUnresolved { get; private set; }
     }
 
+    // A targeting modifier the player may arm on the NEXT casting (between
+    // the exact source and the target click) or on the FOCUSED casting
+    // (its own inspector). Availability is judged with the same pure
+    // resolver the compiler uses, so the shown reason is the reason the
+    // cast would give. v1.2 §7 / E16.
+    public sealed class CastingGraphModifierOption
+    {
+        internal CastingGraphModifierOption(string modifierId, string title, string detail,
+            string costText, bool selected, bool available, string unavailableReason)
+        {
+            ModifierId = modifierId ?? string.Empty;
+            Title = string.IsNullOrWhiteSpace(title) ? ModifierId : title;
+            Detail = detail ?? string.Empty;
+            CostText = costText ?? string.Empty;
+            Selected = selected;
+            Available = available;
+            UnavailableReason = unavailableReason ?? string.Empty;
+        }
+
+        public string ModifierId { get; private set; }
+        public string Title { get; private set; }
+        public string Detail { get; private set; }
+        public string CostText { get; private set; }
+        public bool Selected { get; private set; }
+        public bool Available { get; private set; }
+        // Empty when available; the honest reason otherwise (the caster
+        // lacks the feature, the source is not verified, the spell can
+        // already target others, ...).
+        public string UnavailableReason { get; private set; }
+    }
+
     public enum CastingGraphTargetLegality
     {
         // No source is selected, so legality is not known yet.
@@ -338,6 +369,9 @@ namespace KingmakerBuffPlanner.UI
 
         public PlannedCasting Casting { get; private set; }
         public string CastingId { get { return Casting.CastingId; } }
+        // Targeting modifiers (Share Transmutation) for THIS casting -
+        // on/off with the same honest availability the compiler judges.
+        public IReadOnlyList<CastingGraphModifierOption> Modifiers { get; internal set; }
         // The focused casting's exact native spell description/duration
         // (read-only facts for the right-click inspect).
         public string Description { get; private set; }
@@ -397,6 +431,10 @@ namespace KingmakerBuffPlanner.UI
         public string SelectedCasterUnitId { get; internal set; }
         public string SelectedProviderKey { get; internal set; }
         public IReadOnlyList<CastingGraphTargetNode> Targets { get; internal set; }
+        // Targeting modifiers (Share Transmutation) offered for the NEXT
+        // casting once its exact caster/source is chosen - the control
+        // between the source and the target click (E16).
+        public IReadOnlyList<CastingGraphModifierOption> NextCastingModifiers { get; internal set; }
         public IReadOnlyList<CastingGraphCasting> Castings { get; internal set; }
         // Castings of this buff in OTHER routines (not drawn; counted).
         public int OtherRoutineCastings { get; internal set; }
