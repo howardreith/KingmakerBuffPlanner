@@ -82,6 +82,9 @@ namespace KingmakerBuffPlanner.Tests
             Run("buff-grid-is-alphabetical", () => TestBuffGridIsAlphabetical(root));
             Run("qualification-allowance-parsing", TestQualificationAllowanceParsing);
             Run("qualification-recipe-selection", TestQualificationRecipeSelection);
+            Run("shared-personal-selection-and-forecast", TestSharedPersonalSelection);
+            Run("shared-isolation-judge-rejects-false-success",
+                TestSharedIsolationJudge);
             Run("qualification-forecast-and-boundary", TestQualificationForecastAndBoundary);
             Run("qualification-driver-end-to-end", () => TestQualificationDriverEndToEnd(root));
             Run("qualification-animated-player-stop", () => TestQualificationAnimatedPlayerStop(root));
@@ -3736,6 +3739,223 @@ namespace KingmakerBuffPlanner.Tests
             if (CastingQualificationAllowance.Parse(QualificationAllowanceJson(o =>
                     o["maximumNativeSubmissions"] = 0), "qual-run-1", out refusal) != null)
                 throw new InvalidOperationException("A zero submission budget was accepted.");
+        }
+
+        // The shared recipe's fixture: a feature-owning wizard with a
+        // whitelisted personal transmutation on a verified-free native
+        // pool, a plain witness spell by the SAME caster, a legal ally, the
+        // verified Share snapshot and the registered pure modifier carrying
+        // the execution identity.
+        private static CastingWorkspaceInputs SharedQualificationInputs(
+            bool withShareSnapshot = true, bool withModifier = true,
+            int? reservoir = 3, bool withWitness = true, bool whitelist = true)
+        {
+            const string shareId = "share-transmutation|unit-wiz|8641e6c39ff133ad71f669e35e1ee688";
+            var units = new[]
+            {
+                new UnitSnapshot("unit-wiz", "Wiz", false, null,
+                    new TargetValidationSnapshot(true, true, true, true)),
+                new UnitSnapshot("unit-ally", "Ally", false, null,
+                    new TargetValidationSnapshot(true, true, true, true)),
+                new UnitSnapshot("unit-t3", "Third", false, null,
+                    new TargetValidationSnapshot(true, true, true, true))
+            };
+            var shapeAbility = new AbilityKey("beast-shape", null, 0, SourceKind.Spellbook,
+                null);
+            var plainAbility = new AbilityKey("witness-buff", null, 0, SourceKind.Spellbook,
+                null);
+            var shapeProvider = new ProviderSnapshot(
+                new ProviderKey("unit-wiz", "book-wiz", shapeAbility, "pool-shape"),
+                "Beast Shape", 2, "pool-shape", 0, null, null, 5, 600,
+                "You become a bear.", "10 minutes", string.Empty, 0, "book-wiz");
+            var plainProvider = new ProviderSnapshot(
+                new ProviderKey("unit-wiz", "book-wiz", plainAbility, "pool-plain"),
+                "Witness Buff", 1, "pool-plain", 0, null, null, 5, 100,
+                "A plain buff.", "100 rounds", string.Empty, 0, "book-wiz");
+            var providers = new List<ProviderSnapshot> { shapeProvider };
+            if (withWitness) providers.Add(plainProvider);
+            var pools = new List<ResourcePoolSnapshot>
+            {
+                new ResourcePoolSnapshot("pool-shape", ResourcePoolKind.Unlimited, 0, 0, null),
+                new ResourcePoolSnapshot("pool-plain", ResourcePoolKind.Unlimited, 0, 0, null)
+            };
+            var options = new List<ProviderPlanningOption>
+            {
+                new ProviderPlanningOption(shapeProvider, new[] { "unit-wiz" },
+                    new string[0], 5, 600, CastExecutionStrategy.DirectRuleCast,
+                    "fixture-direct",
+                    new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal))
+            };
+            if (withWitness)
+                options.Add(new ProviderPlanningOption(plainProvider,
+                    new[] { "unit-ally", "unit-t3" }, new[] { "unit-wiz" }, 5, 100,
+                    CastExecutionStrategy.DirectRuleCast, "fixture-direct",
+                    new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)));
+            var shapeExpression = new Domain.Effects.EffectLeafExpression(
+                Domain.Effects.EffectKind.Buff, "buff-shape",
+                Domain.Effects.EffectTarget.CurrentTarget, "shape", "shape/a");
+            var plainExpression = new Domain.Effects.EffectLeafExpression(
+                Domain.Effects.EffectKind.Buff, "buff-witness",
+                Domain.Effects.EffectTarget.CurrentTarget, "witness", "witness/a");
+            var effects = new Dictionary<string, Domain.Effects.EffectExpression>
+            {
+                { "source-shared", shapeExpression },
+                { shapeAbility.Canonical, shapeExpression },
+                { "source-witness", plainExpression },
+                { plainAbility.Canonical, plainExpression }
+            };
+            var enhancements = new List<CastEnhancementSnapshot>();
+            if (withShareSnapshot)
+                enhancements.Add(new CastEnhancementSnapshot(
+                    shareId, "unit-wiz", "8641e6c39ff133ad71f669e35e1ee688",
+                    "Share Transmutation", "Share a personal transmutation.",
+                    CastEnhancementCategory.ClassFeature, 0, 0, reservoir,
+                    whitelist ? new[] { "beast-shape" } : new[] { "unrelated" },
+                    "Share Transmutation", new[] { "book-wiz" },
+                    "res-wiz", false, "brown-fur-share-transmutation", 1, true,
+                    "brown-fur-share-transmutation", "Arcane Reservoir", null));
+            var modifiers = withModifier
+                ? new ICastingTargetingModifier[]
+                {
+                    new KingmakerBuffPlanner.GameAdapters.ShareCastingModifier(new[]
+                    {
+                        new KingmakerBuffPlanner.GameAdapters.ShareCastingModifier
+                            .ShareCapability("unit-wiz", "res-wiz", 1, reservoir,
+                                whitelist ? new[] { "beast-shape" } : new[] { "unrelated" },
+                                new[] { "book-wiz" },
+                                new[] { "unit-ally", "unit-t3" }, shareId)
+                    })
+                }
+                : null;
+            return new CastingWorkspaceInputs(
+                new PartyProviderSnapshot(units, providers, pools), options, effects,
+                enhancements, modifiers, null);
+        }
+
+        // The shared-personal selection finds the verified personal
+        // transmutation and the same-caster witness; its forecast projects
+        // both phases through the VERIFIED Share execution identity (the
+        // converter's modifier mapping is part of the forecast now - the
+        // parity repair), and each refusal is honest.
+        private static void TestSharedPersonalSelection()
+        {
+            CastingWorkspaceInputs inputs = SharedQualificationInputs();
+            CastingQualificationSelection selection = CastingQualificationRecipe
+                .SelectSharedPersonal(inputs, "fixture-campaign");
+            if (!selection.Selected || selection.Refusal.Length != 0)
+                throw new InvalidOperationException("the shared selection was refused: " +
+                    selection.Refusal + ";" + string.Join(";", selection.Rejections.ToArray()));
+            if (selection.Castings.Count != 2 ||
+                selection.Castings[0].CasterUnitId != "unit-wiz" ||
+                selection.Castings[0].DirectTargetUnitId != "unit-ally" ||
+                selection.Castings[0].TargetingModifiers.Count != 1 ||
+                selection.Castings[0].TargetingModifiers[0].ModifierId !=
+                    KingmakerBuffPlanner.GameAdapters.ShareCastingModifier.Id ||
+                !selection.Castings[0].TargetingModifiers[0].Enabled)
+                throw new InvalidOperationException("the shared casting is wrong.");
+            if (selection.Castings[1].CasterUnitId != "unit-wiz" ||
+                selection.Castings[1].TargetingModifiers.Count != 0 ||
+                selection.Castings[1].Ability.Canonical != new AbilityKey("witness-buff",
+                    null, 0, SourceKind.Spellbook, null).Canonical)
+                throw new InvalidOperationException("the witness casting is not a plain " +
+                    "same-caster spell.");
+            // The forecast: two phases through the production mapping; the
+            // shared step's projection carries the verified Share
+            // enhancement identity and the reservoir demand.
+            IReadOnlyList<CastingQualificationStepForecast> steps =
+                CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign");
+            if (steps.Count != 2 || steps[0].Name != CastingQualificationForecast.Shared ||
+                steps[1].Name != CastingQualificationForecast.Witness ||
+                steps.Any(step => step.ProjectionId == null))
+                throw new InvalidOperationException("the shared forecast is wrong: " +
+                    string.Join(";", steps.Select(step => step.Name + "=" +
+                        (step.Refusal ?? "ok")).ToArray()));
+            if (!steps[0].CastingIds.SequenceEqual(new[] { selection.Castings[0].CastingId }) ||
+                !steps[1].CastingIds.SequenceEqual(new[] { selection.Castings[1].CastingId }))
+                throw new InvalidOperationException("the phase executable sets are wrong.");
+            string contract = steps[0].CanonicalContract;
+            if (!contract.Contains("share-transmutation|unit-wiz|") ||
+                !contract.Contains("res-wiz"))
+                throw new InvalidOperationException("the shared projection lost the " +
+                    "verified execution identity or the reservoir cost.");
+            // Honest refusals: no snapshot, unreadable or short reservoir,
+            // nothing whitelisted, no same-caster witness.
+            CastingQualificationSelection none = CastingQualificationRecipe
+                .SelectSharedPersonal(SharedQualificationInputs(withShareSnapshot: false),
+                    "fixture-campaign");
+            if (none.Selected || none.Refusal != "no-eligible-shared-recipe")
+                throw new InvalidOperationException("a party without Share selected.");
+            CastingQualificationSelection unreadable = CastingQualificationRecipe
+                .SelectSharedPersonal(SharedQualificationInputs(reservoir: null),
+                    "fixture-campaign");
+            if (unreadable.Selected || !unreadable.Rejections.Any(value =>
+                    value.EndsWith("|reservoir-unreadable", StringComparison.Ordinal)))
+                throw new InvalidOperationException("an unreadable reservoir selected.");
+            CastingQualificationSelection shortReservoir = CastingQualificationRecipe
+                .SelectSharedPersonal(SharedQualificationInputs(reservoir: 0),
+                    "fixture-campaign");
+            if (shortReservoir.Selected || !shortReservoir.Rejections.Any(value =>
+                    value.IndexOf("|reservoir-short:", StringComparison.Ordinal) >= 0))
+                throw new InvalidOperationException("a short reservoir selected.");
+            CastingQualificationSelection unlisted = CastingQualificationRecipe
+                .SelectSharedPersonal(SharedQualificationInputs(whitelist: false),
+                    "fixture-campaign");
+            if (unlisted.Selected || !unlisted.Rejections.Any(value =>
+                    value.EndsWith("|not-whitelisted", StringComparison.Ordinal)))
+                throw new InvalidOperationException("an unwhitelisted source selected.");
+            CastingQualificationSelection witnessless = CastingQualificationRecipe
+                .SelectSharedPersonal(SharedQualificationInputs(withWitness: false),
+                    "fixture-campaign");
+            if (witnessless.Selected || !witnessless.Rejections.Any(value =>
+                    value.EndsWith("|no-plain-witness-same-caster", StringComparison.Ordinal)))
+                throw new InvalidOperationException("a party without a same-caster " +
+                    "witness selected.");
+        }
+
+        // The isolation judge (E18): a Share state leak that the next
+        // preparation would clear, or reservoir spending on the witness, or
+        // unread REQUIRED evidence - each must FAIL the qualification even
+        // when every step otherwise succeeded; the clean boundary passes.
+        private static void TestSharedIsolationJudge()
+        {
+            Func<CastingQualificationRecord> clean = () =>
+            {
+                var record = new CastingQualificationRecord();
+                record.Selection = CastingQualificationRecipe.SelectSharedPersonal(
+                    SharedQualificationInputs(), "fixture-campaign");
+                record.ShareReservoirBefore = 3;
+                record.ShareReservoirAfterShared = 2;
+                record.ShareReservoirAfterWitness = 2;
+                record.ShareToggleBeforeShared = "off";
+                record.ShareToggleAfterShared = "off";
+                record.ShareToggleBeforeWitness = "off";
+                return record;
+            };
+            if (clean().Violations().Any(value =>
+                    value.StartsWith("share-", StringComparison.Ordinal)))
+                throw new InvalidOperationException("the clean isolation boundary was " +
+                    "rejected.");
+            CastingQualificationRecord leak = clean();
+            leak.ShareToggleBeforeWitness = "on";
+            if (!leak.Violations().Any(value =>
+                    value.StartsWith("share-toggle-left-on", StringComparison.Ordinal)))
+                throw new InvalidOperationException("a leaked Share toggle passed the " +
+                    "judge.");
+            CastingQualificationRecord spend = clean();
+            spend.ShareReservoirAfterWitness = 1;
+            if (!spend.Violations().Any(value =>
+                    value.StartsWith("share-spent-on-witness", StringComparison.Ordinal)))
+                throw new InvalidOperationException("witness reservoir spending passed " +
+                    "the judge.");
+            CastingQualificationRecord unread = clean();
+            unread.ShareReservoirAfterShared = null;
+            unread.ShareToggleBeforeWitness = string.Empty;
+            if (!unread.Violations().Any(value =>
+                    value.StartsWith("share-reservoir-unread", StringComparison.Ordinal)) ||
+                !unread.Violations().Any(value =>
+                    value.StartsWith("share-toggle-unread", StringComparison.Ordinal)))
+                throw new InvalidOperationException("unread required Share evidence " +
+                    "passed the judge.");
         }
 
         // The recipe picks one free buff, two casters and fresh targets

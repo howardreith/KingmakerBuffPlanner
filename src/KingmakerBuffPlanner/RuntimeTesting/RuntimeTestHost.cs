@@ -4007,6 +4007,49 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // Qualification scenario: the Unity-free driver runs the whole
         // sequence over the production path; this host only builds it with
         // the real adapters (fresh discovery, production executors, fresh
+        // The shared recipe's authoritative native readers (E18 isolation
+        // boundaries): the reservoir balance the CURRENT discovery reports
+        // for the verified Share snapshot, and the exact toggle state of
+        // the feature-owning caster.
+        private static int? ReadShareReservoirForRuntime()
+        {
+            try
+            {
+                CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+                CastEnhancementSnapshot share = (inputs.Enhancements ?? new CastEnhancementSnapshot[0])
+                    .FirstOrDefault(value => value != null && value.AffectsTargeting &&
+                        value.EnhancementId.StartsWith("share-transmutation|",
+                            StringComparison.Ordinal));
+                return share == null ? null : share.RemainingUses;
+            }
+            catch (Exception) { return null; }
+        }
+
+        private static string ReadShareToggleForRuntime()
+        {
+            try
+            {
+                CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+                CastEnhancementSnapshot share = (inputs.Enhancements ?? new CastEnhancementSnapshot[0])
+                    .FirstOrDefault(value => value != null && value.AffectsTargeting &&
+                        value.EnhancementId.StartsWith("share-transmutation|",
+                            StringComparison.Ordinal));
+                if (share == null) return string.Empty;
+                Kingmaker.EntitySystem.Entities.UnitEntityData caster =
+                    KingmakerAnimatedCastAdapter.CollectUnits()
+                    .Values.FirstOrDefault(unit => unit != null &&
+                        string.Equals(unit.UniqueId, share.CasterUnitId, StringComparison.Ordinal));
+                if (caster == null) return string.Empty;
+                Kingmaker.UnitLogic.ActivatableAbilities.ActivatableAbility toggle;
+                string reason;
+                if (!Compatibility.BrownFurShareTransmutationCompatibility.TryResolveToggle(
+                        caster, out toggle, out reason) || toggle == null)
+                    return string.Empty;
+                return toggle.IsOn ? "on" : "off";
+            }
+            catch (Exception) { return string.Empty; }
+        }
+
         // native reads), pumps it once per update and publishes the record.
         private bool UpdateQualification()
         {
@@ -4145,7 +4188,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     () => BuffPlannerUiRoot.OwnedTicksForRuntime,
                     (step, recipient, label) => new KingmakerProbeObserver().ObserveRecipient(
                         step, recipient, label, _probeClock),
-                    (caster, pool) => new KingmakerProbeObserver().ObserveCaster(caster, pool));
+                    (caster, pool) => new KingmakerProbeObserver().ObserveCaster(caster, pool),
+                    ReadShareReservoirForRuntime, ReadShareToggleForRuntime);
                 _log.Info("[KBP-QUAL] driver built;casting=" + _qualificationRecord.CastingScenario +
                     ";allowance=" + _qualificationRecord.AllowanceStatus + ";workspaceClosed=" +
                     closed.Closed + ";campaign=" + campaignId + ".");
