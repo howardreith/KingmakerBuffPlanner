@@ -260,12 +260,24 @@ namespace KingmakerBuffPlanner.Execution
         public const string EnhancedDirect = "enhanced-direct";
         public const string AbilityPoolDirect = "ability-pool-direct";
         public const string RodExtendDirect = "rod-extend-direct";
+        // The Share Transmutation qualification (v1.2 E18/E19): step one
+        // casts a verified personal transmutation on a legal ally through
+        // the Share targeting modifier; step two casts a plain spell by the
+        // SAME caster as the isolation witness (its ordinary effect and
+        // cost, and no unexpected Share activity).
+        public const string SharedPersonal = "shared-personal";
         public const string RoutineId = "long";
 
         public static bool IsKnown(string recipe)
         {
             return recipe == ZeroCostMixed || recipe == FiniteDirectMixed || recipe == GroupMixed ||
-                recipe == EnhancedDirect || recipe == AbilityPoolDirect || recipe == RodExtendDirect;
+                recipe == EnhancedDirect || recipe == AbilityPoolDirect || recipe == RodExtendDirect ||
+                recipe == SharedPersonal;
+        }
+
+        public static bool IsSharedRecipe(string recipe)
+        {
+            return recipe == SharedPersonal;
         }
 
         // The recipes that cast one buff plain and then again with a
@@ -288,6 +300,7 @@ namespace KingmakerBuffPlanner.Execution
         // sequence.
         public static bool IsTwoPhase(string recipe)
         {
+            if (recipe == SharedPersonal) return true;
             return recipe == GroupMixed || IsEnhancedRecipe(recipe);
         }
 
@@ -323,11 +336,156 @@ namespace KingmakerBuffPlanner.Execution
             if (recipe == EnhancedDirect) return SelectEnhancedDirect(inputs, campaignId);
             if (recipe == AbilityPoolDirect) return SelectAbilityPool(inputs, campaignId);
             if (recipe == RodExtendDirect) return SelectRodExtend(inputs, campaignId);
+            if (recipe == SharedPersonal) return SelectSharedPersonal(inputs, campaignId);
             return new CastingQualificationSelection("unknown-recipe:" + recipe, null, null,
                 null, 0, null, recipe);
         }
         public const int MaximumRecordedRejections = 160;
         internal static readonly string[] CastingIds = { "qual-cast-1", "qual-cast-2", "qual-cast-3" };
+
+        // The Share Transmutation selection (v1.2 E18): deterministically
+        // search the VERIFIED Share snapshots and their exact-source
+        // whitelists for a personal transmutation a feature-owning caster
+        // can share with a legal ally, plus a plain verified-free spell by
+        // the SAME caster as the isolation witness. The returned castings
+        // are the authoring script; the driver authors them through the
+        // production graph commands and forecasts from the AUTHORED
+        // document (graph-assigned identities), so the projections bound
+        // by the allowance are the production ones.
+        public static CastingQualificationSelection SelectSharedPersonal(
+            CastingWorkspaceInputs inputs, string campaignId)
+        {
+            if (inputs == null) throw new ArgumentNullException("inputs");
+            var rejections = new List<string>();
+            Action<string> reject = value =>
+            {
+                if (rejections.Count < MaximumRecordedRejections) rejections.Add(value);
+            };
+            var targetable = new HashSet<string>(inputs.Snapshot.Units
+                .Where(unit => unit.TargetValidation.Alive && unit.TargetValidation.Conscious &&
+                    unit.TargetValidation.Friendly && unit.TargetValidation.Targetable)
+                .Select(unit => unit.UnitId), StringComparer.Ordinal);
+            var pools = inputs.Snapshot.ResourcePools.ToDictionary(
+                pool => pool.PoolKey, pool => pool, StringComparer.Ordinal);
+            int considered = 0;
+            foreach (CastEnhancementSnapshot share in (inputs.Enhancements ??
+                    new CastEnhancementSnapshot[0])
+                .Where(value => value != null && value.AffectsTargeting &&
+                    value.EnhancementId.StartsWith("share-transmutation|",
+                        StringComparison.Ordinal))
+                .OrderBy(value => value.EnhancementId, StringComparer.Ordinal))
+            {
+                considered++;
+                string caster = share.CasterUnitId;
+                if (share.RemainingUses == null)
+                { reject(share.EnhancementId + "|reservoir-unreadable"); continue; }
+                if (share.RemainingUses.Value < share.UsageUnitsPerCast)
+                { reject(share.EnhancementId + "|reservoir-short:" +
+                    share.RemainingUses.Value + "<" + share.UsageUnitsPerCast); continue; }
+                string selectedGuid = null;
+                foreach (ProviderPlanningOption option in inputs.ProviderOptions
+                    .Where(value => value != null && value.Provider != null &&
+                        string.Equals(value.Provider.Key.CasterUnitId, caster,
+                            StringComparison.Ordinal))
+                    .OrderBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal))
+                {
+                    ProviderSnapshot provider = option.Provider;
+                    if (provider.Key.Ability.SourceKind != SourceKind.Spellbook ||
+                        provider.Key.Ability.MetamagicMask != 0)
+                    { reject(provider.Key.Canonical + "|not-plain-spellbook"); continue; }
+                    if (!string.IsNullOrEmpty(provider.Key.Ability.VariantGuid)
+                            ? !share.AbilityWhiteList.Contains(provider.Key.Ability.VariantGuid)
+                            : !share.AbilityWhiteList.Contains(provider.Key.Ability.BaseAbilityGuid))
+                    { reject(provider.Key.Canonical + "|not-whitelisted"); continue; }
+                    if (!share.SpellbookWhiteList.Contains(provider.Key.SpellbookGuid))
+                    { reject(provider.Key.Canonical + "|book-not-whitelisted"); continue; }
+                    if (option.ExecutionStrategy != CastExecutionStrategy.DirectRuleCast)
+                    { reject(provider.Key.Canonical + "|base-strategy:" +
+                        option.ExecutionStrategy); continue; }
+                    IReadOnlyList<string> reachable = option.ReachableTargetIds ?? new string[0];
+                    if (reachable.Count != 1 ||
+                        !string.Equals(reachable[0], caster, StringComparison.Ordinal))
+                    { reject(provider.Key.Canonical + "|not-personal"); continue; }
+                    string sourceId = SingleCastProbeSelector.SourceIdFor(
+                        inputs.EffectsBySource, provider.Key.Ability);
+                    if (sourceId == null)
+                    { reject(provider.Key.Canonical + "|effect-shape:no-source"); continue; }
+                    if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(
+                            inputs.EffectsBySource[sourceId], provider.Key.Ability))
+                    { reject(provider.Key.Canonical + "|effect-shape:" +
+                        CastingCapabilityInventory.Structure(
+                            inputs.EffectsBySource[sourceId])); continue; }
+                    ResourcePoolSnapshot native;
+                    if (!pools.TryGetValue(provider.ResourcePoolKey, out native) ||
+                        native.Kind != ResourcePoolKind.Unlimited)
+                    { reject(provider.Key.Canonical + "|native-not-verified-free"); continue; }
+                    selectedGuid = string.IsNullOrEmpty(provider.Key.Ability.VariantGuid)
+                        ? provider.Key.Ability.BaseAbilityGuid
+                        : provider.Key.Ability.VariantGuid;
+                    // A legal ally without the effect.
+                    EffectExpression expected = inputs.EffectsBySource[sourceId];
+                    string ally = targetable
+                        .Where(unitId => !string.Equals(unitId, caster, StringComparison.Ordinal) &&
+                            !EffectActive(inputs.LiveEffects, unitId, expected))
+                        .OrderBy(unitId => unitId, StringComparer.Ordinal)
+                        .FirstOrDefault();
+                    if (ally == null)
+                    { reject(provider.Key.Canonical + "|no-fresh-ally"); continue; }
+                    // The isolation witness: a plain verified-free spell by
+                    // the SAME caster, a different ability, on a recipient
+                    // without ITS effect.
+                    var plain = EligibleOptions(inputs, reject)
+                        .Where(value => string.Equals(value.Provider.Key.CasterUnitId, caster,
+                            StringComparison.Ordinal) &&
+                            value.Provider.Key.Ability.Canonical != provider.Key.Ability.Canonical)
+                        .OrderBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal)
+                        .ToList();
+                    PlannedCasting plainCasting = null;
+                    string plainSourceId = null;
+                    foreach (ProviderPlanningOption candidate in plain)
+                    {
+                        string candidateSource = SingleCastProbeSelector.SourceIdFor(
+                            inputs.EffectsBySource, candidate.Provider.Key.Ability);
+                        if (candidateSource == null) continue;
+                        EffectExpression candidateEffect = inputs.EffectsBySource[candidateSource];
+                        string plainTarget = targetable
+                            .Where(unitId => !EffectActive(inputs.LiveEffects, unitId, candidateEffect))
+                            .OrderBy(unitId => unitId, StringComparer.Ordinal)
+                            .FirstOrDefault();
+                        if (plainTarget == null)
+                        { reject(candidate.Provider.Key.Canonical + "|no-plain-target"); continue; }
+                        plainSourceId = candidateSource;
+                        plainCasting = new PlannedCasting(CastingIds[1], RoutineId, 1,
+                            plainSourceId, candidate.Provider.Key.Ability, caster,
+                            candidate.Provider.Key.SpellbookGuid, CastingTargetMode.DirectTarget,
+                            plainTarget, null, null, null, null,
+                            ExistingEffectPolicy.SkipAlreadyActive, null,
+                            CastingAuthoringState.Ready, null);
+                        break;
+                    }
+                    if (plainCasting == null)
+                    { reject(provider.Key.Canonical + "|no-plain-witness-same-caster"); continue; }
+                    var shared = new PlannedCasting(CastingIds[0], RoutineId, 0, sourceId,
+                        provider.Key.Ability, caster, provider.Key.SpellbookGuid,
+                        CastingTargetMode.DirectTarget, ally, null, null,
+                        new[] { new TargetingModifierSelection(
+                            GameAdapters.ShareCastingModifier.Id, true, null) },
+                        null, ExistingEffectPolicy.SkipAlreadyActive, null,
+                        CastingAuthoringState.Ready, null);
+                    return new CastingQualificationSelection(null, sourceId,
+                        provider.Key.Ability, new[] { shared, plainCasting }, considered,
+                        rejections, recipe: CastingQualificationRecipe.SharedPersonal,
+                        coverage: new[] { "share:" + share.EnhancementId,
+                            "reservoir:" + share.UsagePoolId,
+                            "units:" + share.UsageUnitsPerCast,
+                            "toggle:" + share.SourceBlueprintGuid });
+                }
+                if (selectedGuid == null)
+                    reject(share.EnhancementId + "|no-whitelisted-personal-option");
+            }
+            return new CastingQualificationSelection("no-eligible-shared-recipe", null, null,
+                null, considered, rejections, CastingQualificationRecipe.SharedPersonal);
+        }
 
         // Plain spellbook buffs from verified free sources, cast by rule.
         internal static List<ProviderPlanningOption> EligibleOptions(
@@ -1288,6 +1446,11 @@ namespace KingmakerBuffPlanner.Execution
         public const string Enhanced = "enhanced";
         public const string Use = "use";
         public const string Exhausted = "exhausted";
+        // The shared recipe step names; "plain" already names the
+        // enhanced recipe first step - the same word, the same meaning
+        // (the ordinary, unenhanced cast).
+        public const string Shared = "shared";
+        public const string Witness = "witness";
 
         public static IReadOnlyList<CastingQualificationStepForecast> Forecast(
             CastingQualificationSelection selection, CastingWorkspaceInputs inputs,
@@ -1299,6 +1462,8 @@ namespace KingmakerBuffPlanner.Execution
                 return ForecastTwoPhase(selection, inputs, campaignId, Prime, Mixed);
             if (CastingQualificationRecipe.IsEnhancedRecipe(selection.Recipe))
                 return ForecastTwoPhase(selection, inputs, campaignId, Plain, Enhanced);
+            if (CastingQualificationRecipe.IsSharedRecipe(selection.Recipe))
+                return ForecastTwoPhase(selection, inputs, campaignId, Shared, Witness);
             // ability-pool-direct: only the use step casts (the repeat and the
             // exhausted step are refused before submission).
             if (selection.Recipe == CastingQualificationRecipe.AbilityPoolDirect)
@@ -1499,7 +1664,9 @@ namespace KingmakerBuffPlanner.Execution
             if (decision.ExecutableCastingIds.Count == 0)
                 return new CastingQualificationStepForecast(name, "nothing-to-cast", null, null);
             ExplicitStepConversion projection = ExplicitCastingStepConverter.Convert(plan, decision,
-                inputs.ProviderOptions, inputs.EffectsBySource);
+                inputs.ProviderOptions, inputs.EffectsBySource,
+                ExplicitProjectionScope.Standard,
+                UI.CastingWorkspaceSession.TargetingModifierEnhancementMap(inputs));
             if (!projection.Converted)
                 return new CastingQualificationStepForecast(name,
                     "projection-refused:" + projection.Refusal, null, null);

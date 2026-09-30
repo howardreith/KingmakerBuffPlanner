@@ -154,6 +154,18 @@ namespace KingmakerBuffPlanner.Execution
         // The ability-pool recipe: whether the Always recast edit was
         // accepted (recorded; the exhausted plan may be refused either way).
         public bool? ExhaustedAccepted { get; set; }
+        // The shared recipe (v1.2 E18/E19): authoritative Share state read
+        // at the isolation boundaries - the reservoir balance before the
+        // shared cast, after its cleanup (before any subsequent
+        // preparation) and after the witness plain cast, and the native
+        // toggle state at the same points. Null / empty means unread;
+        // REQUIRED unread evidence is a violation, never a pass.
+        public int? ShareReservoirBefore { get; set; }
+        public int? ShareReservoirAfterShared { get; set; }
+        public int? ShareReservoirAfterWitness { get; set; }
+        public string ShareToggleBeforeShared { get; set; }
+        public string ShareToggleAfterShared { get; set; }
+        public string ShareToggleBeforeWitness { get; set; }
 
         private bool HasDisableStep
         {
@@ -175,6 +187,15 @@ namespace KingmakerBuffPlanner.Execution
             get { return Selection != null && Selection.Recipe == CastingQualificationRecipe.AbilityPoolDirect; }
         }
 
+        public bool IsShared
+        {
+            get
+            {
+                return Selection != null &&
+                    CastingQualificationRecipe.IsSharedRecipe(Selection.Recipe);
+            }
+        }
+
         // The judged steps of this record's recipe, in order.
         public IEnumerable<string> JudgedSteps
         {
@@ -183,6 +204,7 @@ namespace KingmakerBuffPlanner.Execution
                 if (IsGroup) return GroupStepNames;
                 if (IsEnhanced) return EnhancedStepNames;
                 if (IsAbilityPool) return AbilityPoolStepNames;
+                if (IsShared) return SharedStepNames;
                 return HasDisableStep
                     ? StepNames.Concat(new[] { CastingQualificationForecast.Disable, CastingQualificationForecast.Recover })
                     : StepNames;
@@ -207,6 +229,30 @@ namespace KingmakerBuffPlanner.Execution
                 Forecast.Count != CastingQualificationRecipe.ForecastSteps(Selection.Recipe) ||
                 Forecast.Any(step => step.ProjectionId == null))
                 violations.Add("forecast-incomplete");
+            if (IsShared)
+            {
+                // The isolation contract (E18): the reservoir is read at
+                // every required boundary; the witness plain cast spends
+                // nothing from it; the native Share toggle is not left
+                // armed for the witness after the shared cast's cleanup.
+                if (ShareReservoirBefore == null || ShareReservoirAfterShared == null ||
+                    ShareReservoirAfterWitness == null)
+                    violations.Add("share-reservoir-unread:" +
+                        (ShareReservoirBefore == null ? "before" :
+                            ShareReservoirAfterShared == null ? "after-shared" : "after-witness"));
+                else if (ShareReservoirAfterWitness.Value != ShareReservoirAfterShared.Value)
+                    violations.Add("share-spent-on-witness:" + ShareReservoirAfterShared +
+                        ">" + ShareReservoirAfterWitness);
+                if (string.Equals(ShareToggleBeforeWitness, "on",
+                        System.StringComparison.Ordinal) &&
+                    !string.Equals(ShareToggleBeforeShared, "on",
+                        System.StringComparison.Ordinal))
+                    violations.Add("share-toggle-left-on:" +
+                        (ShareToggleBeforeShared ?? "none") + ">" + ShareToggleBeforeWitness);
+                if (string.IsNullOrEmpty(ShareToggleBeforeShared) ||
+                    string.IsNullOrEmpty(ShareToggleBeforeWitness))
+                    violations.Add("share-toggle-unread");
+            }
             if (!CastingScenario || violations.Count != 0) return violations;
             if (AllowanceStatus != "valid") violations.Add("allowance:" + AllowanceStatus);
             if (TerminalReason != "completed") violations.Add("terminal:" + (TerminalReason ?? "none"));
@@ -224,7 +270,7 @@ namespace KingmakerBuffPlanner.Execution
             // so there the press must land while the first cast is in
             // progress (the stop waits for it to complete). The two-phase
             // recipes have no stop step.
-            if (!IsGroup && !IsEnhanced && !IsAbilityPool)
+            if (!IsGroup && !IsEnhanced && !IsAbilityPool && !IsShared)
             {
                 if (StopPress == null) violations.Add("stop-press:none");
                 else if (!StopPressHandled) violations.Add("stop-press:not-handled:" + StopPress);
@@ -265,6 +311,7 @@ namespace KingmakerBuffPlanner.Execution
         public static readonly string[] GroupStepNames = { "prime", "mixed" };
         public static readonly string[] EnhancedStepNames = { "plain", "enhanced" };
         public static readonly string[] AbilityPoolStepNames = { "use", "repeat", "exhausted" };
+        public static readonly string[] SharedStepNames = { "shared", "witness" };
 
         // The disable rules, applied the moment the disable step ends (so a
         // failed rule stops the run before the recover run is submitted)
@@ -381,6 +428,33 @@ namespace KingmakerBuffPlanner.Execution
                     step.Report.Entries.Count != 1 || step.Report.Submitted != 1)
                     failure = "states:" + States(step);
                 else if (step.TransitionOf(first) != "new-instance")
+                    failure = "effects:" + string.Join(",", step.Transitions.ToArray());
+            }
+            else if (name == CastingQualificationForecast.Shared)
+            {
+                // The shared casting alone lands a new instance on the
+                // ally, through the armed Share execution identity.
+                if (step.Report.TerminalReason != "completed")
+                    failure = "report:" + step.Report.TerminalReason;
+                else if (step.StateOf(first) != CastingOutcomeState.EffectConfirmed ||
+                    step.Report.Entries.Count != 1 || step.Report.Submitted != 1)
+                    failure = "states:" + States(step);
+                else if (step.TransitionOf(first) != "new-instance")
+                    failure = "effects:" + string.Join(",", step.Transitions.ToArray());
+            }
+            else if (name == CastingQualificationForecast.Witness)
+            {
+                // The witness plain cast by the SAME caster: the shared
+                // casting is skipped (its ally holds the effect) and the
+                // witness lands its own ordinary effect.
+                if (step.Report.TerminalReason != "completed")
+                    failure = "report:" + step.Report.TerminalReason;
+                else if (step.StateOf(first) != CastingOutcomeState.Skipped ||
+                    rest.Any(id => step.StateOf(id) != CastingOutcomeState.EffectConfirmed) ||
+                    step.Report.Submitted != 1)
+                    failure = "states:" + States(step);
+                else if (step.TransitionOf(first) != "unchanged" ||
+                    rest.Any(id => step.TransitionOf(id) != "new-instance"))
                     failure = "effects:" + string.Join(",", step.Transitions.ToArray());
             }
             else if (name == CastingQualificationForecast.Plain)
@@ -799,6 +873,11 @@ namespace KingmakerBuffPlanner.Execution
         // The owner's lifecycle state (subscriptions, roots, mode) as one
         // comparable line; null means unprobed.
         private readonly Func<string> _lifecycleProbe;
+        // The shared recipe's authoritative native readers (injected by the
+        // runtime host; null in source tests, where unread evidence is
+        // judged as unread, never as a pass).
+        private readonly Func<int?> _shareReservoirReader;
+        private readonly Func<string> _shareToggleReader;
         // How often the planner's owner has ticked it (null: unobservable).
         private readonly Func<long> _ownerTicks;
         private long? _ownerTicksAtDisable;
@@ -825,8 +904,11 @@ namespace KingmakerBuffPlanner.Execution
             Func<string, bool> pressRoutine = null, Action<bool> setPlannerEnabled = null,
             Func<string> lifecycleProbe = null, Func<long> ownerTicks = null,
             Func<CastStep, string, string, ProbeObservation> observeRecipient = null,
-            Func<string, string, CasterEnhancementObservation> observeCaster = null)
+            Func<string, string, CasterEnhancementObservation> observeCaster = null,
+            Func<int?> shareReservoirReader = null, Func<string> shareToggleReader = null)
         {
+            _shareReservoirReader = shareReservoirReader;
+            _shareToggleReader = shareToggleReader;
             _observeRecipient = observeRecipient;
             _observeCaster = observeCaster;
             _lifecycleProbe = lifecycleProbe;
@@ -968,6 +1050,11 @@ namespace KingmakerBuffPlanner.Execution
                 case "enhance-author": EnhanceAuthor(); return;
                 case "enhanced": Begin(CastingQualificationForecast.Enhanced); return;
                 case "enhanced-wait": Wait(false, "done"); return;
+                case "shared": Begin(CastingQualificationForecast.Shared); return;
+                case "shared-wait": Wait(false, "witness-author"); return;
+                case "witness-author": WitnessAuthor(); return;
+                case "witness": Begin(CastingQualificationForecast.Witness); return;
+                case "witness-wait": Wait(false, "done"); return;
                 default: Finish("completed"); return;
             }
         }
@@ -998,6 +1085,33 @@ namespace KingmakerBuffPlanner.Execution
             Record.Roster = inputs.Snapshot.Units.ToList();
             Record.Selection = CastingQualificationRecipe.Select(Recipe, inputs, _campaignId);
             if (!Record.Selection.Selected) { Fail("selection-refused:" + Record.Selection.Refusal); return; }
+            if (CastingQualificationRecipe.IsSharedRecipe(Recipe))
+            {
+                // The shared recipe's forecast must bind the GRAPH-AUTHORED
+                // production identities, so authoring happens first; the
+                // allowance's projection check follows the authored
+                // forecast in AuthorShared. The boundary (and the mode and
+                // budget it pins) is created here so the opened session
+                // submits through it.
+                if (Record.CastingScenario)
+                {
+                    if (_allowance == null) { Fail("allowance-missing:" + Record.AllowanceStatus); return; }
+                    if (!string.Equals(_allowance.FixtureGameId, _campaignId,
+                            System.StringComparison.Ordinal))
+                    {
+                        Record.AllowanceStatus = "fixture-mismatch";
+                        Fail("allowance-fixture-mismatch");
+                        return;
+                    }
+                    Record.AllowanceStatus = "valid";
+                    Record.ExecutionMode = _allowance.ExecutionMode;
+                    Record.MaximumSubmissions = _allowance.MaximumNativeSubmissions;
+                    _boundary = new CastingQualificationBoundary(_allowance, _host,
+                        () => _session == null ? null : _session.ExecutionSettings);
+                }
+                _phase = "author";
+                return;
+            }
             Record.Forecast = CastingQualificationForecast.Forecast(Record.Selection, inputs, _campaignId);
             if (!Record.CastingScenario) { Finish("completed"); return; }
             if (_allowance == null) { Fail("allowance-missing:" + Record.AllowanceStatus); return; }
@@ -1025,6 +1139,7 @@ namespace KingmakerBuffPlanner.Execution
         private void Author()
         {
             _session = _openSession(_boundary);
+            if (CastingQualificationRecipe.IsSharedRecipe(Recipe)) { AuthorShared(); return; }
             // The two-phase recipes cast their first casting alone (the
             // group recipe's direct casting, the enhanced recipe's plain
             // one); the rest join after that step.
@@ -1044,6 +1159,177 @@ namespace KingmakerBuffPlanner.Execution
             _startedMillis = _clock();
             _phase = group ? "prime" : twoPhase ? "plain"
                 : Recipe == CastingQualificationRecipe.AbilityPoolDirect ? "use" : "stop";
+        }
+
+        // The shared recipe (v1.2 E18): the SHARED casting is authored
+        // through the PRODUCTION graph commands - buff, caster, exact
+        // source, Share armed on the next casting, then the ally click -
+        // and the forecast is built from the AUTHORED document, so the
+        // projections the allowance binds (and the casting run must
+        // reproduce) carry the graph-assigned identities. The selection
+        // run authors, records and cleans up after itself; the casting
+        // run additionally validates the allowance against the authored
+        // forecast before anything is submitted.
+        private void AuthorShared()
+        {
+            CastingWorkspaceInputs inputs = _freshInputs();
+            // Leftovers of an earlier run (a failed casting run may have
+            // persisted its authored plan) are repaired through the
+            // session's own removal gesture, never file surgery.
+            foreach (PlannedCasting leftover in _session.Document.Castings.ToList())
+            {
+                _session.FocusCasting(leftover.CastingId);
+                if (!_session.RemoveFocusedCasting().Applied)
+                { Fail("leftover-removal-refused:" + leftover.CastingId); return; }
+            }
+            PlannedCasting authored = GraphAuthor(inputs, Record.Selection.Castings[0], true);
+            if (authored == null) return;
+            Record.Selection = new CastingQualificationSelection(null,
+                Record.Selection.SourceId, Record.Selection.Ability,
+                new[] { authored, Record.Selection.Castings[1] }.ToList(),
+                Record.Selection.CandidatesConsidered,
+                Record.Selection.Rejections.ToList(),
+                Record.Selection.Recipe, Record.Selection.Coverage,
+                Record.Selection.Enhancement);
+            inputs = _freshInputs();
+            Record.Forecast = CastingQualificationForecast.Forecast(Record.Selection,
+                inputs, _campaignId);
+            if (!Record.CastingScenario)
+            {
+                // Selection-only run: nothing was submitted; the authored
+                // plan is removed so the casting run authors from clean.
+                _session.FocusCasting(authored.CastingId);
+                if (!_session.RemoveFocusedCasting().Applied)
+                { Fail("select-cleanup-refused:" + authored.CastingId); return; }
+                Finish("completed");
+                return;
+            }
+            if (!Record.Forecast.Select(step => step.ProjectionId)
+                    .SequenceEqual(_allowance.ApprovedProjectionIds, System.StringComparer.Ordinal))
+            {
+                Record.AllowanceStatus = "projections-differ-from-forecast";
+                Fail("allowance-projections-differ-from-forecast");
+                return;
+            }
+            _session.SetExecutionMode(_allowance.ExecutionMode);
+            _session.Save();
+            inputs = _freshInputs();
+            _session.PresentForReview(inputs);
+            if (!_session.AcceptPresentedPlan(inputs)) { Fail("accept-refused"); return; }
+            _startedMillis = _clock();
+            _phase = "shared";
+        }
+
+        // The witness phase: the plain casting by the SAME caster joins
+        // through the same production graph commands (Share explicitly
+        // disarmed on the next-casting draft first).
+        private void WitnessAuthor()
+        {
+            CastingWorkspaceInputs inputs = _freshInputs();
+            PlannedCasting authored = GraphAuthor(inputs, Record.Selection.Castings[1], false);
+            if (authored == null) return;
+            Record.Selection = new CastingQualificationSelection(null,
+                Record.Selection.SourceId, Record.Selection.Ability,
+                new[] { Record.Selection.Castings[0], authored }.ToList(),
+                Record.Selection.CandidatesConsidered,
+                Record.Selection.Rejections.ToList(),
+                Record.Selection.Recipe, Record.Selection.Coverage,
+                Record.Selection.Enhancement);
+            _session.Save();
+            inputs = _freshInputs();
+            _session.PresentForReview(inputs);
+            if (!_session.AcceptPresentedPlan(inputs)) { Fail("witness-accept-refused"); return; }
+            _phase = "witness";
+        }
+
+        // Authors one casting through the production graph gesture sequence
+        // (buff -> caster -> exact source -> [Share on the draft] -> target
+        // click) and returns the AUTHORED record after verifying it carries
+        // the scripted intent. Null (with the run failed) on any refusal.
+        private PlannedCasting GraphAuthor(CastingWorkspaceInputs inputs,
+            PlannedCasting script, bool withShare)
+        {
+            _session.SelectGraphBuff(script.SourceId, inputs);
+            _session.SelectGraphCaster(script.CasterUnitId, inputs);
+            string canonical = inputs.ProviderOptions
+                .Where(value => value != null && value.Provider != null &&
+                    string.Equals(value.Provider.Key.CasterUnitId, script.CasterUnitId,
+                        System.StringComparison.Ordinal) &&
+                    string.Equals(value.Provider.Key.Ability.Canonical,
+                        script.Ability.Canonical, System.StringComparison.Ordinal) &&
+                    string.Equals(value.Provider.Key.SpellbookGuid ?? string.Empty,
+                        script.SpellbookGuid ?? string.Empty, System.StringComparison.Ordinal))
+                .OrderBy(value => value.Provider.Key.Canonical, System.StringComparer.Ordinal)
+                .First().Provider.Key.Canonical;
+            UI.CastingGraphView view = _session.BuildGraph(inputs);
+            UI.CastingGraphCasterNode node = view.CasterById(script.CasterUnitId);
+            UI.CastingGraphSourceRow row = node == null ? null
+                : node.Sources.FirstOrDefault(value =>
+                    string.Equals(value.ProviderKey, canonical, System.StringComparison.Ordinal));
+            if (row == null) { Fail("graph-source-row-missing:" + canonical); return null; }
+            _session.SelectGraphSource(row.ProviderKey, inputs);
+            bool shareArmed = _session.Draft.TargetingModifiers.Any(value =>
+                value != null && value.Enabled &&
+                string.Equals(value.ModifierId, GameAdapters.ShareCastingModifier.Id,
+                    System.StringComparison.Ordinal));
+            if (withShare && !shareArmed)
+            {
+                AuthoringEditResult share = _session.ToggleDraftTargetingModifier(
+                    GameAdapters.ShareCastingModifier.Id, inputs);
+                if (!share.Applied) { Fail("share-arm-refused:" + share.Reason); return null; }
+            }
+            if (!withShare && shareArmed)
+            {
+                AuthoringEditResult off = _session.ToggleDraftTargetingModifier(
+                    GameAdapters.ShareCastingModifier.Id, inputs);
+                if (!off.Applied) { Fail("share-disarm-refused:" + off.Reason); return null; }
+            }
+            UI.CastingGraphEditResult added = _session.AddGraphCasting(
+                script.DirectTargetUnitId, inputs);
+            if (!added.Applied)
+            {
+                Fail("graph-add-refused:" + script.DirectTargetUnitId + ":" +
+                    (added.Edit == null ? "null" : added.Edit.Reason));
+                return null;
+            }
+            PlannedCasting authored = _session.Document.Castings.FirstOrDefault(value =>
+                string.Equals(value.CastingId, added.CastingId, System.StringComparison.Ordinal));
+            if (authored == null ||
+                !string.Equals(authored.DirectTargetUnitId, script.DirectTargetUnitId,
+                    System.StringComparison.Ordinal) ||
+                !string.Equals(authored.CasterUnitId, script.CasterUnitId,
+                    System.StringComparison.Ordinal) ||
+                !string.Equals(authored.Ability.Canonical, script.Ability.Canonical,
+                    System.StringComparison.Ordinal) ||
+                (withShare
+                    ? authored.TargetingModifiers.Count != 1 ||
+                        !string.Equals(authored.TargetingModifiers[0].ModifierId,
+                            GameAdapters.ShareCastingModifier.Id, System.StringComparison.Ordinal) ||
+                        !authored.TargetingModifiers[0].Enabled
+                    : authored.TargetingModifiers.Count != 0))
+            {
+                Fail("authored-intent-mismatch:" + added.CastingId);
+                return null;
+            }
+            return authored;
+        }
+
+        // Authoritative Share reads at the isolation boundaries. The
+        // readers are injected by the runtime host (native, in-process);
+        // absent or failing readers yield null / empty, which the judge
+        // treats as unread REQUIRED evidence - never a pass.
+        private int? ReadShareReservoir()
+        {
+            if (_shareReservoirReader == null) return null;
+            try { return _shareReservoirReader(); }
+            catch (Exception) { return null; }
+        }
+
+        private string ReadShareToggle()
+        {
+            if (_shareToggleReader == null) return string.Empty;
+            try { return _shareToggleReader() ?? string.Empty; }
+            catch (Exception) { return string.Empty; }
         }
 
         // Ability-pool recipe: the casting is set to Always recast through
@@ -1156,6 +1442,20 @@ namespace KingmakerBuffPlanner.Execution
             Record.Steps.Add(step);
             _observeSteps = StepsToObserve(name);
             _before = ObserveAll(step, name + "-before");
+            if (CastingQualificationRecipe.IsSharedRecipe(Recipe))
+            {
+                // The isolation boundaries (E18): the Share state is read
+                // before the shared cast and again before the witness
+                // plain cast - the latter is AFTER the shared cast's
+                // cleanup and BEFORE the witness's preparation.
+                if (name == CastingQualificationForecast.Shared)
+                {
+                    Record.ShareReservoirBefore = ReadShareReservoir();
+                    Record.ShareToggleBeforeShared = ReadShareToggle();
+                }
+                else if (name == CastingQualificationForecast.Witness)
+                    Record.ShareToggleBeforeWitness = ReadShareToggle();
+            }
             string beforeFailure = BeforeReadFailure(_observeSteps, _before);
             if (beforeFailure == null && CastingQualificationRecipe.IsEnhancedRecipe(Recipe))
             {
@@ -1291,6 +1591,20 @@ namespace KingmakerBuffPlanner.Execution
             _running = null;
             finished.Report = _host.LastReport;
             ObserveTransitions(finished, finished.Name + "-after");
+            if (CastingQualificationRecipe.IsSharedRecipe(Recipe))
+            {
+                // After the run is no longer active - its cleanup has run
+                // and nothing else is prepared yet: the authoritative
+                // post-shared boundary, and the final reservoir read after
+                // the witness.
+                if (finished.Name == CastingQualificationForecast.Shared)
+                {
+                    Record.ShareReservoirAfterShared = ReadShareReservoir();
+                    Record.ShareToggleAfterShared = ReadShareToggle();
+                }
+                else if (finished.Name == CastingQualificationForecast.Witness)
+                    Record.ShareReservoirAfterWitness = ReadShareReservoir();
+            }
             // Review P0: the step is judged NOW. A failed, uncertain,
             // cancelled or otherwise unexpected step ends the run before
             // anything else is submitted.
