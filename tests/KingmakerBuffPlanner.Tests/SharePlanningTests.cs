@@ -982,13 +982,23 @@ namespace KingmakerBuffPlanner.Tests
             ICastRuntimeAdapter, ICastEnhancementRuntimeAdapter
         {
             internal bool FailCleanup;
+            internal bool RejectPreparation;
+            internal readonly System.Collections.Generic.List<string> AnimatedStarts =
+                new System.Collections.Generic.List<string>();
             public bool IsInCombat { get { return false; } }
             public CastRuntimeValidation Validate(CastStep step)
             { return CastRuntimeValidation.Pass(); }
             public IAnimatedCastOperation StartAnimated(CastStep step)
-            { return new SucceedingAnimatedOperation(); }
+            {
+                AnimatedStarts.Add(step.AssignmentId);
+                return new SucceedingAnimatedOperation();
+            }
             public CastEnhancementPreparation PrepareEnhancements(CastStep step)
             {
+                if (RejectPreparation)
+                    return CastEnhancementPreparation.Fail("activation-refused",
+                        FailCleanup ? "restore-mismatch:share-toggle;expected=True;actual=False"
+                            : string.Empty);
                 return FailCleanup
                     ? CastEnhancementPreparation.Pass(new FailingCleanupLease())
                     : CastEnhancementPreparation.Pass(null);
@@ -1013,6 +1023,39 @@ namespace KingmakerBuffPlanner.Tests
             public string ResourceCountViolation { get { return null; } }
             public bool HasResidualDeliveryState { get { return false; } }
             public string Detail { get { return "simulated"; } }
+            public void Dispose() { }
+        }
+
+        // R736-2: a runtime whose operation NEVER completes, so the
+        // executor is genuinely suspended in flight when disposed.
+        private sealed class PendingAnimatedWorld : ICastRuntimeAdapter,
+            ICastEnhancementRuntimeAdapter
+        {
+            private readonly CleanupStubWorld _inner;
+            internal PendingAnimatedWorld(CleanupStubWorld inner) { _inner = inner; }
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step)
+            { return CastRuntimeValidation.Pass(); }
+            public IAnimatedCastOperation StartAnimated(CastStep step)
+            {
+                _inner.AnimatedStarts.Add(step.AssignmentId);
+                return new PendingAnimatedOperation();
+            }
+            public CastEnhancementPreparation PrepareEnhancements(CastStep step)
+            { return _inner.PrepareEnhancements(step); }
+        }
+
+        private sealed class PendingAnimatedOperation : IAnimatedCastOperation
+        {
+            public bool IsCompleted { get { return false; } }
+            public bool IsStarted { get { return true; } }
+            public bool TimedOut { get { return false; } }
+            public bool Succeeded { get { return false; } }
+            public bool EffectsObserved { get { return false; } }
+            public bool ResourceSpent { get { return false; } }
+            public string ResourceCountViolation { get { return null; } }
+            public bool HasResidualDeliveryState { get { return false; } }
+            public string Detail { get { return "pending"; } }
             public void Dispose() { }
         }
 
@@ -1066,6 +1109,84 @@ namespace KingmakerBuffPlanner.Tests
                     record.Status == CastExecutionStatus.FailedValidation))
                 throw new InvalidOperationException("the Instant run let a later cast " +
                     "proceed after uncertain enhancement state.");
+            // R736-2: cancellation. The operation stays in flight; the
+            // iterator is DISPOSED while suspended (never drained). The
+            // enhancement cleanup failure must survive into the report
+            // beside the abandonment record - exactly one unsettled-state
+            // record with the original detail - and the second casting
+            // never starts. A clean lease cancels without inventing a
+            // failure.
+            {
+                var cancelled = new CleanupStubWorld { FailCleanup = true };
+                var cancelPlan = new CastPlan(
+                    new[] { CleanupStep("share-1"), CleanupStep("share-2") },
+                    new TargetPlanOutcome[0], new string[0]);
+                var cancelReport = new ExecutionReport(cancelPlan);
+                var pendingCoroutine = new AnimatedCastExecutor(
+                    new PendingAnimatedWorld(cancelled), false)
+                    .Execute(cancelPlan, cancelReport);
+                if (!pendingCoroutine.MoveNext())
+                    throw new InvalidOperationException("the executor never yielded " +
+                        "with the operation in flight.");
+                ((System.IDisposable)pendingCoroutine).Dispose();
+                var unsettled = cancelReport.Records.Where(record =>
+                    record.Status == CastExecutionStatus.ResidualStateUnsettled &&
+                    record.Detail.Contains("enhancement-cleanup-failed")).ToList();
+                if (unsettled.Count != 1 ||
+                    !unsettled[0].Detail.Contains("restore-mismatch:share-toggle"))
+                    throw new InvalidOperationException("the cancellation path lost or " +
+                        "duplicated the enhancement cleanup outcome: " + unsettled.Count);
+                if (!cancelReport.Records.Any(record =>
+                        record.Detail.Contains("animated-operation-abandoned-in-flight")))
+                    throw new InvalidOperationException("the interruption record was " +
+                        "lost.");
+                if (cancelReport.Records.Any(record =>
+                        record.AssignmentId == "share-2" && record.Status ==
+                            CastExecutionStatus.CastStarted))
+                    throw new InvalidOperationException("a later casting started after " +
+                        "cancellation.");
+                var cleanCancel = new CleanupStubWorld();
+                var cleanCancelReport = new ExecutionReport(cancelPlan);
+                var cleanPending = new AnimatedCastExecutor(
+                    new PendingAnimatedWorld(cleanCancel), false)
+                    .Execute(cancelPlan, cleanCancelReport);
+                cleanPending.MoveNext();
+                ((System.IDisposable)cleanPending).Dispose();
+                if (cleanCancelReport.Records.Any(record =>
+                        record.Detail.Contains("enhancement-cleanup-failed")))
+                    throw new InvalidOperationException("a clean cancellation invented " +
+                        "a cleanup failure.");
+            }
+            // R736/C853-2A: a REJECTED preparation keeps both facts - the
+            // setup refusal AND its own cleanup outcome - and neither the
+            // rejected cast nor any later cast starts.
+            {
+                var rejected = new CleanupStubWorld
+                { RejectPreparation = true, FailCleanup = true };
+                var rejectPlan = new CastPlan(
+                    new[] { CleanupStep("share-1"), CleanupStep("share-2") },
+                    new TargetPlanOutcome[0], new string[0]);
+                var rejectReport = new ExecutionReport(rejectPlan);
+                var rejectIterator = new AnimatedCastExecutor(rejected, false)
+                    .Execute(rejectPlan, rejectReport);
+                while (rejectIterator.MoveNext()) { }
+                if (rejected.AnimatedStarts.Count != 0)
+                    throw new InvalidOperationException("a rejected preparation " +
+                        "attempted the cast.");
+                if (!rejectReport.Records.Any(record =>
+                        record.Detail.Contains("enhancement-unavailable:activation-refused")))
+                    throw new InvalidOperationException("the setup refusal was lost.");
+                if (!rejectReport.Records.Any(record =>
+                        record.Status == CastExecutionStatus.ResidualStateUnsettled &&
+                        record.Detail.Contains("enhancement-cleanup-failed")))
+                    throw new InvalidOperationException("the rejected preparation's " +
+                        "cleanup outcome was lost.");
+                if (!rejectReport.Records.Any(record =>
+                        record.AssignmentId == "share-2" &&
+                        record.Detail.Contains("prior-animated-transaction-unsettled")))
+                    throw new InvalidOperationException("a later casting was not halted " +
+                        "after the rejected preparation's residual state.");
+            }
             // A clean lease stays an ordinary success with no such entries.
             var clean = new CleanupStubWorld();
             var cleanReport = new ExecutionReport(new CastPlan(new[] { CleanupStep("share-1"), CleanupStep("share-2") },
@@ -1275,6 +1396,8 @@ namespace KingmakerBuffPlanner.Tests
             internal bool SetterThrows;
             internal bool StopLies;
             internal bool GetterThrowsAfterSet;
+            internal bool LyingSetter;
+            internal int Writes;
             public string Identity { get { return "stub-ability"; } }
             public bool IsOn
             {
@@ -1286,6 +1409,8 @@ namespace KingmakerBuffPlanner.Tests
                 set
                 {
                     if (SetterThrows) throw new InvalidOperationException("setter");
+                    if (LyingSetter) return;
+                    Writes++;
                     On = value;
                 }
             }
@@ -1363,15 +1488,21 @@ namespace KingmakerBuffPlanner.Tests
                 Owned(unreadable, true, oneShot: true, selected: true, armed: true),
                 Owned(ordinary, true)
             };
-            // Make the consumption read itself throw by failing on IsOn of
-            // the one-shot during the read phase: the getter throws only
-            // after a set in the stub; force it via a throwing access.
+            // The one-shot's read throws, so consumption cannot be known.
             var throwing = new StubActivatable { GetterThrowsAfterSet = true };
+            throwing.On = true; // its CURRENT value; NO write may occur to it
             unreadableStates[0].Access = throwing;
+            // The independent ordinary state currently DIFFERS from its
+            // original; it must still be restored despite the read failure.
+            ordinary.On = false;
             failure = EnhancementLeaseCleanup.Cleanup(unreadableStates, false);
             if (!failure.Contains("consumption-unreadable"))
                 throw new InvalidOperationException("unreadable consumption was not " +
                     "reported: " + failure);
+            // No positive one-shot write occurred: the uncertain one-shot's
+            // setter was never invoked and its current value is untouched.
+            if (throwing.Writes != 0 || !throwing.On)
+                throw new InvalidOperationException("an uncertain one-shot was written.");
             if (!ordinary.On)
                 throw new InvalidOperationException("an ordinary state was not restored " +
                     "after an unrelated read failure.");
@@ -1387,22 +1518,15 @@ namespace KingmakerBuffPlanner.Tests
             if (!failure.Contains("restore-exception") || sibling.On)
                 throw new InvalidOperationException("a setter exception was swallowed or " +
                     "stopped independent cleanup: " + failure);
-            // A lying setter (sets, but the value differs) is a mismatch.
-            var liar = new StubActivatable { On = true };
-            var liarStates = new List<EnhancementLeaseCleanup.OwnedState>
-            { Owned(liar, false) };
-            // Force the post-read to see the wrong value.
-            failure = EnhancementLeaseCleanup.Cleanup(liarStates, false);
-            if (failure.Length != 0 || liar.On)
-                throw new InvalidOperationException("unexpected: " + failure);
-            liar.On = true; // now the same cleanup WOULD see a mismatch
-            var liar2 = new StubActivatable { On = true };
-            var liar2States = new List<EnhancementLeaseCleanup.OwnedState>
-            { Owned(liar2, false) };
-            liar2.On = false; // simulate: restore writes false, getter lies true
-            liar2.GetterThrowsAfterSet = false;
-            liar2.On = true; // actual stays true after the set wrote false
-            // Direct mismatch case: pre-state ON, expected false, actual true.
+            // A LYING setter (accepts the write without applying it) is a
+            // postcondition mismatch naming the state's identity.
+            var liar = new StubActivatable { On = true, LyingSetter = true };
+            failure = EnhancementLeaseCleanup.Cleanup(new List<
+                EnhancementLeaseCleanup.OwnedState> { Owned(liar, false) }, false);
+            if (!failure.Contains("restore-mismatch:stub-ability;expected=False") ||
+                !liar.On)
+                throw new InvalidOperationException("a lying setter was not exposed " +
+                    "as a postcondition mismatch: " + failure);
             var mismatch = new StubActivatable { On = true };
             var mismatchStates = new List<EnhancementLeaseCleanup.OwnedState>
             { Owned(mismatch, false, rod: true) };

@@ -17,17 +17,6 @@ using UnityEngine;
 namespace KingmakerBuffPlanner.GameAdapters
 {
 
-    // C853-1: the seam over native activatable state, so the production
-    // cleanup algorithm is exercised by tests with stubs ONLY at native
-    // state access (never a re-implementation inside a test).
-    internal interface IActivatableStateAccess
-    {
-        string Identity { get; }
-        bool IsOn { get; set; }
-        bool IsRunning { get; }
-        void Stop();
-    }
-
     internal sealed class ActivatableAbilityStateAccess : IActivatableStateAccess
     {
         private readonly ActivatableAbility _ability;

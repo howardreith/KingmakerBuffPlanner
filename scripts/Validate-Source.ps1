@@ -407,6 +407,8 @@ $enhancementSource = Get-Content -LiteralPath (Join-Path $root `
     'src\KingmakerBuffPlanner\Domain\Planning\CastEnhancements.cs') -Raw
 $enhancementAdapterSource = Get-Content -LiteralPath (Join-Path $root `
     'src\KingmakerBuffPlanner\GameAdapters\KingmakerCastEnhancementAdapter.cs') -Raw
+$enhancementCleanupSource = Get-Content -LiteralPath (Join-Path $root `
+    'src\KingmakerBuffPlanner\GameAdapters\EnhancementLeaseCleanup.cs') -Raw
 $animatedExecutorSource = Get-Content -LiteralPath (Join-Path $root `
     'src\KingmakerBuffPlanner\Execution\AnimatedCastExecutor.cs') -Raw
 $instantExecutorSource = Get-Content -LiteralPath (Join-Path $root `
@@ -420,7 +422,8 @@ foreach ($enhancementContract in @('ExclusiveGroupId', 'UsageUnitsPerCast',
 if (-not $plannerSource.Contains('Enhancement usage ledger would become negative') -or
     -not $enhancementAdapterSource.Contains(
         'CastEnhancementSnapshot.UsageRequirements(selected.Select(') -or
-    -not $enhancementAdapterSource.Contains('consumedGroups') -or
+    -not ($enhancementAdapterSource.Contains('consumedGroups') -or
+        $enhancementCleanupSource.Contains('consumedGroups')) -or
     $animatedExecutorSource.IndexOf('CastEnhancementPreparation enhancement = Prepare(step);',
         [StringComparison]::Ordinal) -gt
         $animatedExecutorSource.IndexOf('_runtime.Validate(step)',
