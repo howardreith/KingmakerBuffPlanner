@@ -2247,3 +2247,25 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
   and THAT build (with its hashes/MVID) is the qualified candidate.
 - The owner's UMM process (PID 14008, opened 2026-09-29 12:38) remains
   running; the launcher guard is respected, polling continues.
+
+## Session 10 checkpoint — 2026-09-30 — COMPLETE mandatory gate PASS on the frozen candidate
+
+- The owner closed UMM; the recorded quiet-window procedure ran exactly:
+  final HEAD d3e515c -> Build-Local (manifest commit == HEAD, validated)
+  -> complete Test-SourceOnly.ps1 END TO END, first time with the launcher
+  stage included.
+- Candidate identity: HEAD d3e515c2cdcff5ea7c49dfd19b385df45824ab28;
+  DLL sha256 2ad99629542526453071b3f29a7d238fd3fb9cd8ef86b01db810eeb160401fb6;
+  package sha256 4f522eb4a0f4ac9a5ba4d25bfb92cd86d2b2391a6b1c1adf401772f95bca5820.
+- ALL stages PASS (artifacts/gate-final-complete.log): source validation
+  42/42; protocol 384/384; runtime harness 38/38; package validation 4/4
+  (candidate hash); deployment WhatIf purity 5/5; LAUNCHER -File WhatIf
+  purity 12/12; fixture inventory 3/3; Restore-InstallLocal 16/16;
+  guarded publisher gate 3/3; Source-only suite PASS=1 FAIL=0.
+- Exact next action: the authorized live qualification batch on this
+  frozen candidate through the dispatcher (E18 Share alone AND
+  Share+Powerful Change in both execution modes with observed native
+  spending, target effects and plain-cast isolation; E19 combined
+  reservoir; E03 route smoke; scroll-frame and right-click judgment from
+  presented frames), then the E01-E27 matrix and verified private
+  delivery. Prior beta package 214b795b...8b20564 remains untouched.
