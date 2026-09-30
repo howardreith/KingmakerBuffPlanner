@@ -2269,3 +2269,38 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
   reservoir; E03 route smoke; scroll-frame and right-click judgment from
   presented frames), then the E01-E27 matrix and verified private
   delivery. Prior beta package 214b795b...8b20564 remains untouched.
+
+## Session 10 addendum — freeze record + live-batch implementation map
+
+- FREEZE RECORD for the gate-passed candidate:
+  runtime-backups/qualification-frozen/d3e515c2cdcff5ea7c49dfd19b385df45824ab28/
+  (commit d3e515c, package 4f522eb4... lowercase, dll 2ad99629...,
+  MVID 722e3a6a-29b3-4269-a1f5-f40f585769e7, package bytes copied and
+  re-hashed to match). All later E-batch runs pin this identity.
+- Live-batch implementation map (next work block; new scenario source is
+  REQUIRED - the existing drivers have no Share gesture):
+  1. Scenario pair `live-share-qual-select` / `live-share-qual` in
+     RuntimeTestProtocol.IsQualificationScenario + launcher ValidateSet.
+     The select run drives PRODUCTION commands on the Advanced fixture:
+     SelectGraphBuff/Caster/Source -> ToggleDraftTargetingModifier(Share)
+     -> AddGraphCasting(ally); records the compiled projection (strategy
+     ProviderDirectRuleCast or NativeCommandRequired per the installed
+     contract), the reservoir demand, and the target identity; submits
+     nothing. E19 variant additionally selects Powerful Change on the
+     casting (ToggleFocusedEnhancement) for combined-demand accounting.
+  2. The qual run is allowance-bound (schema-5 pattern from
+     New-KbpRunAllowance): binds the select run's ordered projections +
+     working save + frozen identity; armed submission through the
+     production Apply path; observes the ally effect, the Arcane Reservoir
+     AND native-slot spending from a fresh discovery read, then performs
+     one plain ordinary cast to prove toggle-state isolation (no residual
+     arming) - in BOTH instant and animated modes.
+  3. Protocol tests for the new contracts in the source-only suite; then
+     Build-Local + COMPLETE Test-SourceOnly at the new commit; a NEW
+     freeze record for that commit; dispatcher jobs (instant + animated)
+     through dispatch/build-jobs.ps1 with the new hashes; unattended runs;
+     evidence to the E01-E27 matrix (E16-E20 rows) plus the E03 route
+     smoke, scroll-frame and right-click judging runs.
+  4. Then the verified private delivery (unique everyday-use filename;
+     prior beta 214b795b...8b20564 untouched).
+- Tree remains clean at the gate-passed candidate; no source work started.
