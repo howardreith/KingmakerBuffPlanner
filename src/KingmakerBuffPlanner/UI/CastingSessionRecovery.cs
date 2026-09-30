@@ -45,43 +45,32 @@ namespace KingmakerBuffPlanner.UI
 
     // Process-wide (or test-scoped) recovery registry keyed by the exact
     // mod path AND campaign the intent belongs to. Newest capture wins per
-    // key; entries leave only by adoption. A forced process kill with an
-    // unwritable store remains a physical limit this registry cannot span.
+    // key; entries leave only by adoption. There is DELIBERATELY NO
+    // capacity bound (C853-3): these entries are the only current copies of
+    // failed-save intent, so a bound is a data-loss path whether it evicts
+    // or refuses a non-refusable teardown; growth is bounded in practice by
+    // the distinct campaigns visited in one process, each holding one
+    // document. A forced process kill with an unwritable store remains a
+    // physical limit this registry cannot span.
     public sealed class CastingWorkspaceRecoveryStore
     {
         public static readonly CastingWorkspaceRecoveryStore Default =
             new CastingWorkspaceRecoveryStore();
 
-        // A bound on distinct pending campaigns so unbounded growth is
-        // impossible; reaching it REFUSES a new registration (the
-        // relinquishing transition is refused) rather than dropping
-        // any unrecovered intent (review R579-3).
-        private const int Capacity = 8;
         private readonly object _sync = new object();
         private readonly Dictionary<string, PendingSessionRecovery> _pending =
             new Dictionary<string, PendingSessionRecovery>(StringComparer.Ordinal);
-        private readonly List<string> _order = new List<string>();
 
-        // R579-3: registering intent that could not be made durable NEVER
-        // evicts an unrecovered entry - these are the only current copies of
-        // failed-save edits, not a cache. Returns false when a NEW key would
-        // exceed the bound (nothing is dropped; the CALLER must then refuse
-        // the relinquishing transition so the session keeps ownership).
-        // Updating an existing key is always allowed (the newest intent for
-        // that campaign replaces its own older capture).
-        public bool Register(PendingSessionRecovery pending)
+        // C853-3: registering intent that could not be made durable always
+        // preserves it - no bound, no eviction, no refusal. Updating an
+        // existing key replaces that campaign's own older capture with its
+        // newest intent.
+        public void Register(PendingSessionRecovery pending)
         {
             if (pending == null) throw new ArgumentNullException("pending");
             lock (_sync)
             {
-                string key = Key(pending.ModPath, pending.CampaignId);
-                if (!_pending.ContainsKey(key))
-                {
-                    if (_pending.Count >= Capacity) return false;
-                    _order.Add(key);
-                }
-                _pending[key] = pending;
-                return true;
+                _pending[Key(pending.ModPath, pending.CampaignId)] = pending;
             }
         }
 
@@ -119,9 +108,7 @@ namespace KingmakerBuffPlanner.UI
             if (pending != null)
                 lock (_sync)
                 {
-                    string key = Key(modPath, campaignId);
-                    _pending.Remove(key);
-                    _order.Remove(key);
+                    _pending.Remove(Key(modPath, campaignId));
                 }
             return session;
         }
@@ -186,15 +173,12 @@ namespace KingmakerBuffPlanner.UI
             session = CastingWorkspaceSessionBinding.Resolve(Current, campaignId,
                 _create, _log);
             if (session == null) return "campaign identity unresolved";
-            if (!ReferenceEquals(session, Current) &&
-                !ReleaseCurrent("campaign-switch:" + campaignId))
-            {
-                // Refuse the replaceable transition: ownership never passes
-                // without a durable save or a registered recovery owner.
-                session = null;
-                return "transition-refused:recovery-preservation-unavailable:" +
-                    campaignId;
-            }
+            if (!ReferenceEquals(session, Current))
+                // Review F1/R579-3/C853-3: the outgoing campaign's intent
+                // gets a durability attempt, and a failure is ALWAYS
+                // preserved with the recovery owner (the store has no
+                // lossy bound), before the binding changes.
+                ReleaseCurrent("campaign-switch:" + campaignId);
             Current = session;
             return null;
         }
@@ -211,32 +195,23 @@ namespace KingmakerBuffPlanner.UI
             ReleaseCurrent(cause);
         }
 
-        // True when the current session's intent is durable or safely
-        // registered with the recovery owner; false when ownership must NOT
-        // pass (the caller refuses the transition).
-        private bool ReleaseCurrent(string cause)
+        // C853-3: preservation is unconditional - the failed-flush intent
+        // is registered with the recovery owner (durable save attempted
+        // first), for refusable transitions AND for teardown alike.
+        private void ReleaseCurrent(string cause)
         {
             CastingWorkspaceSession retained = Current;
-            if (retained == null) return true;
-            if (!retained.IsDirty) return true;
+            if (retained == null) return;
+            if (!retained.IsDirty) return;
             _log("[KBP-WORKSPACE] flush-before-discard;cause=" + cause +
                 ";autosave=" + retained.AutosaveStatus + ".");
-            if (retained.RetryFailedSave()) return true;
+            if (retained.RetryFailedSave()) return;
             PendingSessionRecovery pending = retained.CaptureRecovery();
-            if (!Recovery.Register(pending))
-            {
-                _log("[KBP-WORKSPACE] discard-time flush failed AND recovery " +
-                    "preservation is unavailable;cause=" + cause +
-                    ";campaign=" + pending.CampaignId + ";the transition is " +
-                    "REFUSED - the retained session keeps ownership of its " +
-                    "latest intent.");
-                return false;
-            }
+            Recovery.Register(pending);
             _log("[KBP-WORKSPACE] discard-time flush failed;cause=" + cause +
                 ";campaign=" + pending.CampaignId + ";autosave=" +
                 pending.AutosaveStatus + ";the latest intent is registered " +
                 "for recovery under its own campaign and mod path.");
-            return true;
         }
     }
 }

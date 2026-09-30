@@ -16,6 +16,34 @@ using UnityEngine;
 
 namespace KingmakerBuffPlanner.GameAdapters
 {
+
+    // C853-1: the seam over native activatable state, so the production
+    // cleanup algorithm is exercised by tests with stubs ONLY at native
+    // state access (never a re-implementation inside a test).
+    internal interface IActivatableStateAccess
+    {
+        string Identity { get; }
+        bool IsOn { get; set; }
+        bool IsRunning { get; }
+        void Stop();
+    }
+
+    internal sealed class ActivatableAbilityStateAccess : IActivatableStateAccess
+    {
+        private readonly ActivatableAbility _ability;
+        internal ActivatableAbilityStateAccess(ActivatableAbility ability)
+        { _ability = ability; }
+        public string Identity
+        { get { return _ability.Blueprint == null ? "unknown" : _ability.Blueprint.AssetGuid; } }
+        public bool IsOn
+        {
+            get { return _ability.IsOn; }
+            set { _ability.IsOn = value; }
+        }
+        public bool IsRunning { get { return _ability.IsRunning; } }
+        public void Stop() { _ability.Stop(true); }
+    }
+
     internal sealed class KingmakerCastEnhancementAdapter
     {
         private readonly BrownFurPowerfulChangeCompatibility _brownFur =
@@ -166,7 +194,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 if (states.Any(value => value.Selected && !value.Ability.IsOn))
                 {
                     lease.Dispose();
-                    return CastEnhancementPreparation.Fail("activation-refused");
+                    return CastEnhancementPreparation.Fail("activation-refused",
+                        lease.CleanupFailure);
                 }
                 // Casting-first: nothing the casting did not choose stays on or
                 // running for its cast; anything that does refuses the cast.
@@ -183,7 +212,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                     {
                         lease.Dispose();
                         return CastEnhancementPreparation.Fail("deactivation-refused:" +
-                            (still.Ability.Blueprint == null ? "unknown" : still.Ability.Blueprint.AssetGuid));
+                            (still.Ability.Blueprint == null ? "unknown" : still.Ability.Blueprint.AssetGuid),
+                            lease.CleanupFailure);
                     }
                 }
                 foreach (State state in states.Where(value => value.Selected &&
@@ -194,7 +224,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             {
                 lease.Dispose();
                 return CastEnhancementPreparation.Fail("activation-exception:" +
-                    exception.GetType().FullName + ":" + exception.Message);
+                    exception.GetType().FullName + ":" + exception.Message,
+                    lease.CleanupFailure);
             }
         }
 
@@ -332,92 +363,29 @@ namespace KingmakerBuffPlanner.GameAdapters
                 _states = states;
                 _exact = exact;
             }
-            // R579-2: cleanup is OBSERVABLE. Empty when every owned native
-            // state was restored to its policy-expected value; otherwise the
-            // record of what could not be established. The executors surface
-            // this in the run report and halt progression to a later cast,
-            // because a non-throwing setter is not proof of restoration.
+            // R579-2/C853-1: cleanup is OBSERVABLE and verifies the
+            // policy-expected FINAL value of every owned state. Empty when
+            // everything was verified restored (or verified consumed); the
+            // executors surface this in the run report and halt later casts.
             public string CleanupFailure { get; private set; }
 
             public void Dispose()
             {
                 if (_disposed) return;
                 _disposed = true;
-                var failures = new List<string>();
-                var consumedGroups = new HashSet<string>(StringComparer.Ordinal);
-                try
-                {
-                    foreach (string group in _states
-                        .Where(state => state.OneShot && state.Selected &&
-                            state.ArmedByLease && !state.Ability.IsOn)
-                        .Select(state => state.ActivationGroupId))
-                        consumedGroups.Add(group);
-                }
-                catch (Exception exception)
-                {
-                    // Consumption could not be read: every later verification
-                    // is uncertain, so the failure is reported rather than
-                    // guessed. One-shot members are NOT resurrected on this
-                    // path (resurrecting a consumed feature is the harmful
-                    // direction); the executors halt subsequent casts.
-                    failures.Add("consumption-unreadable:" +
-                        exception.GetType().Name);
-                }
-                foreach (State state in _states.Reverse())
-                {
-                    // Policy-aware expected value: a successfully consumed
-                    // one-shot member stays consumed; everything else returns
-                    // to its pre-cast state.
-                    bool expected = CastEnhancementActivationPolicy
-                        .RestoreOriginalState(state.OneShot,
-                            state.ActivationGroupId, consumedGroups);
-                    string identity = state.Ability.Blueprint == null
-                        ? "unknown" : state.Ability.Blueprint.AssetGuid;
-                    try
+                var owned = new List<EnhancementLeaseCleanup.OwnedState>();
+                foreach (State state in _states)
+                    owned.Add(new EnhancementLeaseCleanup.OwnedState
                     {
-                        if (expected)
-                            state.Ability.IsOn = state.IsOn;
-                    }
-                    catch (Exception exception)
-                    {
-                        failures.Add("restore-exception:" + identity + ":" +
-                            exception.GetType().Name);
-                        continue;
-                    }
-                    // Verify the postcondition instead of trusting a
-                    // non-throwing setter; keep cleaning the other states.
-                    try
-                    {
-                        if (state.Ability.IsOn != expected)
-                            failures.Add("restore-mismatch:" + identity +
-                                ";expected=" + expected + ";actual=" +
-                                state.Ability.IsOn);
-                    }
-                    catch (Exception exception)
-                    {
-                        failures.Add("postcondition-unreadable:" + identity +
-                            ":" + exception.GetType().Name);
-                    }
-                }
-                // Casting-first: a rod switched on for the cast and back off
-                // would keep running until the next round, extending whatever
-                // is cast next; it is stopped now - with the same observable
-                // failure reporting.
-                if (_exact)
-                    foreach (State state in _states.Where(value => value.Rod))
-                    {
-                        try
-                        {
-                            if (!state.Ability.IsOn && state.Ability.IsRunning)
-                                state.Ability.Stop(true);
-                        }
-                        catch (Exception exception)
-                        {
-                            failures.Add("rod-stop-exception:" +
-                                exception.GetType().Name);
-                        }
-                    }
-                CleanupFailure = string.Join("|", failures.ToArray());
+                        Access = new ActivatableAbilityStateAccess(state.Ability),
+                        OriginalIsOn = state.IsOn,
+                        OneShot = state.OneShot,
+                        Selected = state.Selected,
+                        ArmedByLease = state.ArmedByLease,
+                        Rod = state.Rod,
+                        ActivationGroupId = state.ActivationGroupId
+                    });
+                CleanupFailure = EnhancementLeaseCleanup.Cleanup(owned, _exact);
             }
         }
     }

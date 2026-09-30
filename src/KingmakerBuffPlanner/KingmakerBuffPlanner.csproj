@@ -166,6 +166,7 @@
     <Compile Include="GameAdapters\KingmakerProviderOptionBuilder.cs" />
     <Compile Include="GameAdapters\KingmakerShareTargetingModifier.cs" />
     <Compile Include="GameAdapters\ShareCastingModifierAdapter.cs" />
+    <Compile Include="GameAdapters\EnhancementLeaseCleanup.cs" />
     <Compile Include="Infrastructure\AtomicFile.cs" />
     <Compile Include="Infrastructure\Hashing.cs" />
     <Compile Include="Infrastructure\ModLog.cs" />

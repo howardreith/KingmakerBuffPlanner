@@ -45,8 +45,21 @@ namespace KingmakerBuffPlanner.Execution
                 {
                     CastEnhancementPreparation enhancement = Prepare(step);
                     if (!enhancement.Valid)
+                    {
+                        // C853-2A: the rejected cast is never attempted, and
+                        // a partial setup's own cleanup outcome stays
+                        // observable: residual state halts later casts.
+                        if (enhancement.CleanupFailure.Length != 0)
+                        {
+                            priorTransactionUnsettled = true;
+                            report.Add(index, step,
+                                CastExecutionStatus.ResidualStateUnsettled,
+                                "enhancement-cleanup-failed:" +
+                                    enhancement.CleanupFailure);
+                        }
                         report.Add(index, step, CastExecutionStatus.FailedValidation,
                             "enhancement-unavailable:" + enhancement.Reason);
+                    }
                     else
                     {
                         bool runtimeLifecycleEntered = false;
