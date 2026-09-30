@@ -214,13 +214,24 @@ namespace KingmakerBuffPlanner.Execution
                     finally
                     {
                         enhancement.Dispose();
-                        // C853-2B: the enhancement outcome is captured and,
-                        // on a disposal-only exit (cancellation, deadline,
-                        // teardown - the code after this block never runs),
-                        // REPORTED here, so no exit path can bypass it.
+                        // R736-2: on a disposal-only exit (cancellation,
+                        // deadline, teardown - the code after this block
+                        // never runs) the enhancement outcome is REPORTED
+                        // here, never merely captured: the unsettled native
+                        // state detail survives the iterator's death next
+                        // to the interruption record. Clearing the detail
+                        // after reporting keeps normal completion from
+                        // double-reporting in the post-block.
                         enhancementCleanupDetail =
                             enhancement.CleanupFailure.Length == 0
                                 ? null : enhancement.CleanupFailure;
+                        if (!operationBodyCompleted && enhancementCleanupDetail != null)
+                        {
+                            report.Add(index, step,
+                                CastExecutionStatus.ResidualStateUnsettled,
+                                "enhancement-cleanup-failed:" + enhancementCleanupDetail);
+                            enhancementCleanupDetail = null;
+                        }
                     }
                     // Review L2: when the iterator is disposed while the
                     // operation is in flight (owner cancellation), the code
