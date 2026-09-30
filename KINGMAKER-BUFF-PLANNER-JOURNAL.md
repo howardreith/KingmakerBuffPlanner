@@ -2172,3 +2172,28 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
   E19 combined reservoir, E03 route smoke, scroll frames, right-click) and
   the E01-E27 matrix; verified private delivery. The owner's UMM window
   was respected throughout.
+
+## Session 7 checkpoint — 2026-09-29 latest — review C853-1/2/3 of c8535b0 repaired
+
+- C853-1: lease cleanup extracted to the pure, seam-backed
+  EnhancementLeaseCleanup (linked into both csprojs) and now verifies the
+  POLICY-EXPECTED FINAL VALUE (an OFF rod restored to OFF is CLEAN — the
+  old compare-against-the-decision misreported it), keeps consumed
+  one-shots consumed, restores nothing from unreadable consumption, and
+  verifies rod stops by reading IsRunning back.
+- C853-2: failed preparations carry the disposed lease's cleanup outcome
+  (Fail(cleanupFailure)); both executors report it as terminal unsettled
+  state without attempting the cast; the Animated finally captures and, on
+  disposal-only exits, reports the enhancement outcome itself.
+- C853-3: the capacity bound is REMOVED — Register always preserves,
+  teardown hands off like any transition, replacement owners recover. The
+  adoption regression's injected failure moved INSIDE
+  constructWithRecovery after verifying the received intent.
+- Protocol suite 384/384 at this commit. NOT yet done (next session, in
+  order): Build-Local refresh + the COMPLETE Test-SourceOnly gate (all
+  stages) in a quiet window at this exact HEAD; mutant replays for the
+  C853 repairs were not rerun (the OFF-rod regression fails against the
+  pre-repair algorithm by construction); then the authorized live
+  qualification batch (E18 Share alone AND Share+Powerful Change, both
+  modes, spending/effects/plain-cast isolation; E19; E03 smoke; scroll
+  frames; right-click), E01-E27 matrix, verified private delivery.
