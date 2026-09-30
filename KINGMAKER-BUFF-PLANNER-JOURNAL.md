@@ -2127,3 +2127,48 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
   (3) E01–E27 matrix completion, scroll-frame and right-click judging from
   presented frames; (4) verified private delivery with a unique everyday-use
   filename; prior beta package untouched.
+
+## Session 6 checkpoint — 2026-09-29 late — review R579-1/2/3 of 5795005 repaired (c8535b0)
+
+- Correction to the previous checkpoint's gate accounting (per review):
+  Test-SourceOnly.ps1 CONTINUES past Test-RuntimeLauncherFileWhatIf.ps1
+  with Test-FixtureInventoryEvidence.ps1, Test-RestoreInstallLocal.ps1 and
+  Test-PublishReleaseGate.ps1. The UMM-blocked runs did NOT establish those
+  three stages at the 4790768 candidate — they are NOT-ESTABLISHED-BY-THAT-
+  RUN (not failed, not passed). The next full quiet-window gate must run
+  the complete script end to end.
+- R579-1: the compiler resolves the complete executable enhancement
+  contract (modifier-backed Share enhancement via ExecutionEnhancementIds,
+  applicability-checked) BEFORE strategy freezes, through the existing
+  CastEnhancementExecutionPolicy; Share alone selects the verified
+  provider-direct route (native-command contract routes likewise); Share +
+  Powerful Change resolve one route with the shared reservoir charged
+  exactly once; no execution identity keeps the base route. Regression:
+  share-alone-selects-the-provider-direct-strategy (compiler + projected
+  step + cost).
+- R579-2: ActivationLease cleanup reports CleanupFailure (restore
+  exceptions, policy-aware postcondition mismatches; consumed one-shots not
+  resurrected; other states still cleaned); CastEnhancementPreparation
+  surfaces it; BOTH executors report it as ResidualStateUnsettled and halt
+  later casts; clean cleanup stays ordinary success. Probe restores after
+  every attempted mutation and verifies final state. Regression:
+  enhancement-cleanup-is-observable-and-halts-later-casts (true
+  runtime-adapter stubs, Animated + Instant).
+- R579-3: the recovery store REFUSES over-capacity registration (the
+  relinquishing transition is refused with ownership retained) instead of
+  evicting; Adopt is transactional (entry removed only after successful
+  construction). Regression: recovery-preservation-never-drops-intent
+  (nine recoveries, ninth refused with ownership, pad1 adopted exactly,
+  factory-failure window preserved).
+- Protocol suite 383/383 at c8535b0. Mutant replays for these three
+  repairs were NOT rerun this pass (the regressions assert the repaired
+  behaviors directly: base-strategy difference, observable-failure vs
+  clean, refusal vs preservation); the previous session's recorded mutant
+  evidence stands for its own repairs.
+- Honest open items: the complete Test-SourceOnly gate (all stages) at this
+  candidate in a quiet window; Build-Local refresh at c8535b0; the live
+  qualification batch (E18 Share-alone and Share+Powerful Change in both
+  execution modes with observed spending/effects and plain-cast isolation,
+  E19 combined reservoir, E03 route smoke, scroll frames, right-click) and
+  the E01-E27 matrix; verified private delivery. The owner's UMM window
+  was respected throughout.
