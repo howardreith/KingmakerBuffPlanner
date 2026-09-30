@@ -2085,3 +2085,45 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
   `rc3-published-install-1` (prior rc2 backed up; 0.0.19 original still
   archived under the rc2 transaction). Rollback chain documented in
   AUTONOMOUS-RESUME. PR #1 body/title updated to rc3.
+
+## Session 5 checkpoint — 2026-09-29 night — review F1–F5 + E1 of f0483fc repaired; §6 Share UI + execution bridge in
+
+- Branch `codex/kingmaker-buff-planner-everyday-use` pushed `f0483fc..4790768`
+  through the guarded helper. Commits: `7f62b18` (F3 immutable discovery +
+  isolated probe), `61af5f8` (F2/F4/F5 exact-source contract, legality vs
+  affordability, fail-closed ledger), `9eb983f` (F1 recovery owner + E1
+  boundary-projection assertions), `30a68c4` (plan record + .zcodeignore),
+  `4790768` (Share UI control + execution-only native bridge).
+- Protocol suite **380/380** at 4790768 (`artifacts/tests`, invoked with
+  KBP_TEST_GAME_PATH). Source validation 42/42, harness 38/38, package 4/4
+  (prior beta zip 214b795b…8b20564 byte-identical), deploy WhatIf 5/5,
+  Build-Local PASS sha256 e6b715e0d4ab50c00a310b9437cc41a86b8598894f47545a943ecda26fc50dd2
+  (package 50e9633e…df4b8420). Launcher -File WhatIf BLOCKED mid-gate by the
+  running-UMM guard while the owner's UnityModManager (PID 14008, opened
+  12:38) stays open — honest environment refusal, reruns when quiet; all
+  other gate stages green. Evidence: artifacts/gate-session5-final2.log,
+  artifacts/build-session5b.log.
+- Causal mutants all verified caught: unknown-pool skip (F5), zero-balance
+  Apply refusal (F4), dropped exact-source contract (F2), dropped recovery
+  registration (F1), removed unverified-modifier refusal (converter). F3's
+  IL scanner proves itself on the probe (positive control) and asserts zero
+  activatable mutation in every ordinary discovery method.
+- Share execution bridge (source-complete, native qualification pending):
+  converter executes a targeting modifier only through the verified
+  enhancement identity (session map modifier|caster → the integration's own
+  snapshot id); the step's proven enhancement lease arms the exact verified
+  toggle for the one cast and restores on every terminal path; the
+  projection hash covers modifier identity + reservoir cost; fail-closed
+  without the mapping, probe refuses, disabled selections arm nothing.
+- Rejected theories this session: "graph fixture zero casters was a
+  production identity bug" (it was the fixture; already resolved prior
+  session, re-verified). Uncertainty: E18/E19 native armed-cast behavior and
+  E03 route live smoke are unqualified until the unattended batch; UMM must
+  close first.
+- Exact next actions: (1) rerun `scripts/Test-SourceOnly.ps1` in a quiet
+  window (launcher -File WhatIf is the only unrun stage) at 4790768;
+  (2) combined Share+Powerful Change reservoir live proof (E19) and the
+  armed shared cast (E18) through the unattended dispatcher batch;
+  (3) E01–E27 matrix completion, scroll-frame and right-click judging from
+  presented frames; (4) verified private delivery with a unique everyday-use
+  filename; prior beta package untouched.
