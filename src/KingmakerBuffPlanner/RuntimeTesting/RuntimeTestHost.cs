@@ -3416,6 +3416,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _physicalPending;
         private string _physicalModeBefore;
         private bool _physicalPublished;
+        private int _physicalRunsBeforeMoon;
+        private int _physicalMenuCloseAttempts;
+        private int _physicalWheelBacks;
         private System.Diagnostics.Stopwatch _physicalClock;
         private System.Diagnostics.Stopwatch _physicalSettle;
 
@@ -3425,8 +3428,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // continuous parchment, a right-click opens the native spell
         // inspect with the document unchanged, and Escape closes the
         // inspect first and the workspace second.
-        private int _physicalRunsBeforeMoon;
-
         private bool UpdatePhysicalCastingFirst(CastingWorkspaceScreenView view, double settled)
         {
             if (_physicalStep == 0)
@@ -3447,6 +3448,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (BuffPlannerUiRoot.IsCastingWorkspaceOpen && settled < 5) return false;
                 if (BuffPlannerUiRoot.IsCastingWorkspaceOpen)
                     return FinishPhysical("workspace-not-closed-by-escape");
+                // A stale dismissal escape from the launcher can leave the
+                // native Escape menu open behind the workspace; it is a
+                // fullscreen veil that absorbs HUD clicks (beta-a5b9b0edr6:
+                // the moon click was delivered and acknowledged into that
+                // veil and no run started). It is closed PHYSICALLY, one
+                // escape at a time, only while it is actually open, so the
+                // sequence can never open it; a settle is awaited first so
+                // the veil's close animation is not mistaken for still-open.
+                if (_physicalRecord.MenuVeilOpenBeforeMoon == true && settled < 1.5) return false;
+                if (BuffPlannerUiRoot.NativeEscMenuOpenForRuntime)
+                {
+                    _physicalRecord.MenuVeilOpenBeforeMoon = true;
+                    _physicalRecord.MenuVeilClosedByEscape = false;
+                    if (++_physicalMenuCloseAttempts > 3)
+                        return FinishPhysical("esc-menu-veil-not-closed");
+                    return RequestPhysical("cf-menu-close-" + _physicalMenuCloseAttempts,
+                        "key-escape", Vector2.zero, null, 1);
+                }
+                if (_physicalRecord.MenuVeilOpenBeforeMoon == true)
+                {
+                    _physicalRecord.MenuVeilClosedByEscape = true;
+                    _physicalRecord.AddNote("menu-veil:closed-by-escape;attempts=" +
+                        _physicalMenuCloseAttempts);
+                }
                 // E12 is a COLD moon run: the durable plan pre-exists (a
                 // prior session's intent) and the EDITOR stays closed all
                 // session. If the fixture's plan is empty, one verified
@@ -3455,7 +3480,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 // run and the graph shows a chip to inspect.
                 UI.CastingWorkspaceSession session =
                     BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
-                if (session != null && session.Document.Castings.Count == 0)
+                if (session == null)
+                {
+                    _physicalRecord.AddNote("seed:no-session");
+                }
+                else if (session.Document.Castings.Count == 0)
                 {
                     // One plain verified-free casting by ANY single caster
                     // (the mixed recipe needs two casters of one buff; a
@@ -3466,7 +3495,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     Domain.Planning.ProviderPlanningOption option = seedInputs == null
                         ? null : CastingQualificationRecipe.EligibleOptions(seedInputs,
                             value => { }).FirstOrDefault();
-                    if (option == null)
+                    if (seedInputs == null)
+                    {
+                        _physicalRecord.AddNote("seed:no-inputs");
+                    }
+                    else if (option == null)
                     {
                         _physicalRecord.AddNote("seed:no-free-option");
                     }
@@ -3505,8 +3538,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             _physicalRecord.AddNote(seeded.Applied
                                 ? "seed:applied:" + option.Provider.Key.CasterUnitId + ">" + target
                                 : "seed:refused:" + seeded.Reason);
+                            if (seeded.Applied) session.Save();
                         }
                     }
+                }
+                else
+                {
+                    _physicalRecord.AddNote("seed:plan-already-held:" +
+                        session.Document.Castings.Count);
                 }
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
                     "physical-cf-moon-before.png"));
@@ -3546,8 +3585,24 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 if (settled < 1) return false;
                 if (view == null) return FinishPhysical("workspace-closed-early:wheel");
-                _physicalRecord.GraphScrollAfter = view.GraphScrollPositionForRuntime;
+                // Captured once, right after the forward wheel; the reverse
+                // recovery below must not overwrite the scroll evidence.
+                if (_physicalRecord.GraphScrollAfter == null)
+                    _physicalRecord.GraphScrollAfter = view.GraphScrollPositionForRuntime;
                 string chip = view.InspectTargetPartForRuntime;
+                if (chip == null && _physicalRecord.GraphOverflow && _physicalWheelBacks < 2)
+                {
+                    // The wheel may have scrolled the only casting chip out of
+                    // the viewport; bounded reverse scrolls bring it back
+                    // before the right-click (the scroll evidence was already
+                    // captured before this recovery).
+                    _physicalWheelBacks++;
+                    _physicalRecord.AddNote("chip-off-screen:wheel-back-" + _physicalWheelBacks);
+                    Vector2? graphPoint = view.ScreenPointForRuntime("graph");
+                    if (graphPoint != null)
+                        return RequestPhysical("cf-wheel-back-" + _physicalWheelBacks, "wheel",
+                            graphPoint.Value, ",\"delta\":360", 4);
+                }
                 if (chip == null)
                     return FinishPhysical("inspect-target-not-on-screen");
                 _physicalRecord.InspectChip = chip;
@@ -3800,10 +3855,29 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "isolation", "commands=" + record.PlayerCommands + "/" + record.MovementCommands + "/" +
                     record.AbilityCommands + ";events=" + record.SelectionEvents + "/" + record.AbilityTargetEvents +
                     ";selectionUnchanged=" + record.SelectionUnchanged + ";cameraUnchanged=" + record.CameraUnchanged },
+                { "castingFirst", record.CastingFirst },
+                { "menuVeilOpenBeforeMoon", record.MenuVeilOpenBeforeMoon.HasValue
+                    ? (JToken)record.MenuVeilOpenBeforeMoon.Value : JValue.CreateNull() },
+                { "menuVeilClosedByEscape", record.MenuVeilClosedByEscape },
+                { "moonRunStarted", record.MoonRunStarted },
+                { "moonWorkspaceStayedClosed", record.MoonWorkspaceStayedClosed },
+                { "graphOverflow", record.GraphOverflow },
+                { "graphScrollBefore", record.GraphScrollBefore.HasValue
+                    ? (JToken)record.GraphScrollBefore.Value : JValue.CreateNull() },
+                { "graphScrollAfter", record.GraphScrollAfter.HasValue
+                    ? (JToken)record.GraphScrollAfter.Value : JValue.CreateNull() },
+                { "graphWheelEvidence", record.GraphWheelEvidence },
+                { "inspectChip", record.InspectChip },
+                { "inspectOpened", record.InspectOpened },
+                { "inspectClosedByEscape", record.InspectClosedByEscape },
+                { "documentSignatureBeforeBrowse", record.DocumentSignatureBeforeBrowse },
+                { "documentSignatureAfterInspect", record.DocumentSignatureAfterInspect },
+                { "notes", new JArray(record.Notes.Cast<object>().ToArray()) },
                 { "failures", new JArray(record.Failures.Cast<object>().ToArray()) },
                 { "violations", new JArray(record.Violations().Cast<object>().ToArray()) }
             }.ToString(Formatting.Indented) + Environment.NewLine);
-            _log.Info("[KBP-PHYSICAL] published;violations=" + string.Join("|", record.Violations().ToArray()) + ".");
+            _log.Info("[KBP-PHYSICAL] published;violations=" + string.Join("|", record.Violations().ToArray()) +
+                ";notes=" + string.Join("|", record.Notes.ToArray()) + ".");
         }
 
         // Classic cast scenarios (mission batch 3, section 6). The casting-
