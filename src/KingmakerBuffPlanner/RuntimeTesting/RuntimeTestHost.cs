@@ -3541,9 +3541,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                                     Domain.Planning.ExistingEffectPolicy.SkipAlreadyActive,
                                     null, Domain.Authoring.CastingAuthoringState.Ready, null));
                             _physicalRecord.AddNote(seeded.Applied
-                                ? "seed:applied:" + option.Provider.Key.CasterUnitId + ">" + target
+                                ? "seed:applied:" + option.Provider.Key.CasterUnitId + ">" + target +
+                                    ";source=" + sourceId
                                 : "seed:refused:" + seeded.Reason);
-                            if (seeded.Applied) session.Save();
+                            if (seeded.Applied)
+                            {
+                                session.Save();
+                                // The graph shows the SELECTED source's
+                                // castings; without this the freshly seeded
+                                // chip stays off the graph (r8: no chip on
+                                // screen with the plan loaded). SelectBuff is
+                                // the production browsing command (pure).
+                                session.SelectBuff(sourceId);
+                            }
                         }
                     }
                 }
