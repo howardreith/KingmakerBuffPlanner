@@ -3460,6 +3460,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (_physicalRecord.MenuVeilOpenBeforeMoon == true && settled < 1.5) return false;
                 if (BuffPlannerUiRoot.NativeEscMenuOpenForRuntime)
                 {
+                    if (_physicalRecord.MenuVeilOpenBeforeMoon != true)
+                        CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
+                            "physical-cf-veil.png"));
                     _physicalRecord.MenuVeilOpenBeforeMoon = true;
                     _physicalRecord.MenuVeilClosedByEscape = false;
                     if (++_physicalMenuCloseAttempts > 3)

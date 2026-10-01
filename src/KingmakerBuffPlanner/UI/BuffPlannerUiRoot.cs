@@ -206,15 +206,18 @@ namespace KingmakerBuffPlanner.UI
         // Whether the native Escape menu (Save/Load/Options) is showing.
         // It is a fullscreen veil that absorbs HUD clicks, and a stale
         // dismissal escape can leave it open behind the workspace; the
-        // physical scenario probes it before the cold moon click.
+        // physical scenario probes it before the cold moon click. UIWindow
+        // keeps its GameObject active while hidden, so the logical show
+        // state is the only honest signal (beta-a4f78d6fr7: an
+        // activeInHierarchy probe false-positived on the hidden window and
+        // the recovery escapes oscillated the menu).
         internal static bool NativeEscMenuOpenForRuntime
         {
             get
             {
                 foreach (Kingmaker.UI.ServiceWindow.EscMenuWindow window in
                     Resources.FindObjectsOfTypeAll<Kingmaker.UI.ServiceWindow.EscMenuWindow>())
-                    if (window != null && window.gameObject != null &&
-                        window.gameObject.activeInHierarchy)
+                    if (window != null && window.IsShow)
                         return true;
                 return false;
             }
