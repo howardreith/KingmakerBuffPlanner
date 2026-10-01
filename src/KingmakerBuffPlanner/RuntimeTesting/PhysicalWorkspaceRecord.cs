@@ -117,6 +117,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool SelectionUnchanged { get; set; }
         public bool CameraUnchanged { get; set; }
         public List<string> Failures { get; } = new List<string>();
+        // Diagnostic notes (seed outcome, etc.) - evidence only, never a
+        // violation by themselves.
+        public List<string> Notes { get; } = new List<string>();
+
+        public void AddNote(string note)
+        {
+            if (!string.IsNullOrEmpty(note)) Notes.Add(note);
+        }
 
         // What the wheel proved: "scrolled", or "not-applicable:no-overflow"
         // when the grid's content fits (the wheel was delivered; there was
