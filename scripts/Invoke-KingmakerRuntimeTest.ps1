@@ -138,6 +138,9 @@ if ($Scenario -ceq 'live-cast-qual') {
 elseif (-not [string]::IsNullOrWhiteSpace($QualificationAllowancePath)) {
     throw '-QualificationAllowancePath is only valid with -Scenario live-cast-qual.'
 }
+if ($Scenario -ceq 'live-workspace-physical' -and $TimeoutSeconds -lt 900) {
+    throw "TimeoutSeconds must be at least 900 for $Scenario (boot/load plus the physical sequence); got $TimeoutSeconds."
+}
 $classicAllowanceJson = $null
 if ($Scenario -ceq 'live-classic-cast') {
     if ([string]::IsNullOrWhiteSpace($ClassicAllowancePath)) {
@@ -198,9 +201,6 @@ if ($DisplayMode -cne 'owner') {
     if (-not (Test-KbpDisplayModeSupported -Size $displaySize -DisplaySize $sessionDisplay)) {
         throw "DisplayMode $DisplayMode is unsupported on this session's display ($sessionDisplay); nothing was changed."
     }
-}
-if ($Scenario -ceq 'live-workspace-physical' -and $TimeoutSeconds -lt 900) {
-    throw "TimeoutSeconds must be at least 900 for $Scenario (boot/load plus the physical sequence); got $TimeoutSeconds."
 }
 if (($Scenario -ceq 'live-classic-cast' -or $Scenario -ceq 'live-classic-select') -and
     $TimeoutSeconds -lt 900) {
