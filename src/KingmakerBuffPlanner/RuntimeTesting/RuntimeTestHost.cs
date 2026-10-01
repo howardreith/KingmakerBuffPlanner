@@ -3447,6 +3447,24 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (BuffPlannerUiRoot.IsCastingWorkspaceOpen && settled < 5) return false;
                 if (BuffPlannerUiRoot.IsCastingWorkspaceOpen)
                     return FinishPhysical("workspace-not-closed-by-escape");
+                // E12 is a COLD moon run: the durable plan pre-exists (a
+                // prior session's intent) and the EDITOR stays closed all
+                // session. If the fixture's plan is empty, one verified
+                // free casting is seeded through the production session
+                // boundary (no editor, autosaved) so Long has something to
+                // run and the graph shows a chip to inspect.
+                UI.CastingWorkspaceSession session =
+                    BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                if (session != null && session.Document.Castings.Count == 0)
+                {
+                    CastingWorkspaceInputs seedInputs =
+                        BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+                    CastingQualificationSelection seed = seedInputs == null ? null
+                        : CastingQualificationRecipe.SelectZeroCostMixed(
+                            seedInputs, _request.ProfileId ?? string.Empty);
+                    if (seed != null && seed.Selected)
+                        session.AddCastingForRuntime(seed.Castings[0]);
+                }
                 _physicalRunsBeforeMoon = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
                 return RequestPhysical("cf-moon", "click",
                     BuffPlannerUiRoot.HudButtonCenterForRuntime("long"), null, 2);
