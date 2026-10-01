@@ -3419,6 +3419,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _physicalRunsBeforeMoon;
         private int _physicalMenuCloseAttempts;
         private int _physicalWheelBacks;
+        private Execution.CastingFirstCastGrant _physicalGrant;
         private System.Diagnostics.Stopwatch _physicalClock;
         private System.Diagnostics.Stopwatch _physicalSettle;
 
@@ -3551,6 +3552,54 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _physicalRecord.AddNote("seed:plan-already-held:" +
                         session.Document.Castings.Count);
                 }
+                // The approved-plan identity of this run's Long routine, as
+                // the allowance chain binds it: authored intent only, never
+                // live party state.
+                string moonDigest = null;
+                int moonCastings = 0;
+                try
+                {
+                    CastingWorkspaceInputs digestInputs =
+                        BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+                    if (digestInputs != null && session.Document.Castings.Count != 0)
+                    {
+                        Planning.ExplicitCastingPlan compiled =
+                            session.CompileForRuntime(digestInputs, "long");
+                        moonDigest = Execution.CastingFirstPlanDigest.Of("long", compiled);
+                        moonCastings = compiled.Castings.Count;
+                        AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
+                            "cf-plan-digest.json"), new JObject
+                            {
+                                { "runId", _request.RunId },
+                                { "routineId", "long" },
+                                { "planDigest", moonDigest },
+                                { "castings", moonCastings },
+                                { "executionMode", session.ExecutionSettings.Mode }
+                            }.ToString(Formatting.Indented) + Environment.NewLine);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    _physicalRecord.AddNote("digest-failed:" + exception.Message);
+                }
+                if (_physicalRecord.MoonExpectation != "select" && moonDigest == null)
+                    return FinishPhysical("moon-plan-digest-missing");
+                // The cast run's allowance binds this exact plan, build,
+                // fixture and save; the grant it arms is the ONLY submission
+                // the locked session will let through (selection runs arm
+                // nothing and must be refused by the lock).
+                if (_physicalRecord.MoonExpectation != "select")
+                {
+                    Execution.CastingFirstAllowance allowance = ReadCfAllowance(moonDigest, moonCastings);
+                    if (allowance == null)
+                        return FinishPhysical("cf-allowance:" + _physicalRecord.MoonAllowanceStatus);
+                    _physicalGrant = new Execution.CastingFirstCastGrant(_request.RunId,
+                        allowance.RoutineId, allowance.ApprovedPlanDigest,
+                        allowance.ExecutionMode, allowance.MaximumNativeSubmissions);
+                    if (!UI.NativeCastingSessionPolicy.ArmCastingFirstGrant(_physicalGrant))
+                        return FinishPhysical("cf-grant-not-armed");
+                    _log.Info("[KBP-PHYSICAL] cf grant armed;" + _physicalGrant.Describe() + ".");
+                }
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
                     "physical-cf-moon-before.png"));
                 _physicalRunsBeforeMoon = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
@@ -3567,6 +3616,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     BuffPlannerUiRoot.CastingRunsStartedForRuntime > _physicalRunsBeforeMoon;
                 _physicalRecord.MoonWorkspaceStayedClosed =
                     !BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                if (!_physicalRecord.MoonRunStarted)
+                {
+                    // The press produced a refusal: the boundary's own
+                    // machine reason (the lock) plus the player-facing
+                    // disposition and message are the evidence.
+                    UI.QuickExecutionResult refused = BuffPlannerUiRoot.QuickResultForRuntime("long");
+                    UI.CastingWorkspaceSession session =
+                        BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                    IReadOnlyList<string> dispatchRefusals = session == null
+                        ? new List<string>() : session.DispatchRefusalsForRuntime;
+                    string machine = dispatchRefusals.Count == 0
+                        ? "no-dispatch-refusal" : dispatchRefusals[dispatchRefusals.Count - 1];
+                    _physicalRecord.MoonRefusal = machine + ";" +
+                        (refused == null ? "no-result"
+                            : refused.Disposition + ":" + refused.Message);
+                    _physicalRecord.AddNote("moon-refused:" + _physicalRecord.MoonRefusal);
+                }
                 // Wait for the cold run to finish before the editor opens.
                 if (BuffPlannerUiRoot.IsCastingRunActive && settled < 60) return false;
                 return RequestPhysical("cf-open", "hotkey", Vector2.zero, null, 3);
@@ -3576,6 +3642,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (view == null) return FinishPhysical("workspace-not-opened");
                 _physicalRecord.DocumentSignatureBeforeBrowse =
                     BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                _physicalRecord.AddNote("graph-castings:" + view.GraphCastingCountForRuntime);
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "physical-cf-graph.png"));
                 float? before = view.GraphScrollPositionForRuntime;
                 if (before == null) return FinishPhysical("graph-scroll-absent");
                 _physicalRecord.GraphScrollBefore = before;
@@ -3662,6 +3731,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.OpenedPhysically = !_workspaceProgrammaticOpen;
                 _physicalModeBefore = GameModeName();
                 _physicalRecord.CastingFirst = BuffPlannerUiRoot.CastingFirstActiveForRuntime;
+                object expectation;
+                _physicalRecord.MoonExpectation =
+                    _request.Parameters.TryGetValue("physicalExpectation", out expectation) &&
+                        string.Equals(expectation as string, "select", StringComparison.Ordinal)
+                        ? "select" : "cast";
                 BuffPlannerUiRoot.BeginPhysicalInputProbe();
                 _log.Info("[KBP-PHYSICAL] started;screen=" + Screen.width + "x" + Screen.height +
                     ";fullScreen=" + Screen.fullScreen + ";mode=" + _physicalModeBefore +
@@ -3805,6 +3879,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private bool FinishPhysical(string failure)
         {
             if (failure != null) _physicalRecord.Failures.Add(failure);
+            // The single-use exception ends with this scenario, used or not.
+            if (_physicalGrant != null)
+            {
+                UI.NativeCastingSessionPolicy.DisarmCastingFirstGrant();
+                _physicalRecord.MoonGrantDescribe = _physicalGrant.Describe();
+                _physicalRecord.MoonGrantConsumed = _physicalGrant.Consumed;
+            }
             UiInputIsolationProbeResult isolation = BuffPlannerUiRoot.EndPhysicalInputProbe();
             if (isolation != null)
             {
@@ -3865,6 +3946,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "menuVeilClosedByEscape", record.MenuVeilClosedByEscape },
                 { "moonRunStarted", record.MoonRunStarted },
                 { "moonWorkspaceStayedClosed", record.MoonWorkspaceStayedClosed },
+                { "moonExpectation", record.MoonExpectation },
+                { "moonRefusal", record.MoonRefusal },
+                { "moonAllowanceStatus", record.MoonAllowanceStatus },
+                { "moonGrantDescribe", record.MoonGrantDescribe },
+                { "moonGrantConsumed", record.MoonGrantConsumed.HasValue
+                    ? (JToken)record.MoonGrantConsumed.Value : JValue.CreateNull() },
                 { "graphOverflow", record.GraphOverflow },
                 { "graphScrollBefore", record.GraphScrollBefore.HasValue
                     ? (JToken)record.GraphScrollBefore.Value : JValue.CreateNull() },
@@ -4062,6 +4149,45 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             object raw;
             return _request.Parameters.TryGetValue(name, out raw) ? raw as string : null;
+        }
+
+        // The run-bound casting-first allowance for the physical cold-moon
+        // cast run: this run, this build, this campaign, profile and WORKING
+        // save, this casting mode and routine, and exactly the plan digest
+        // this run's seed compiled to.
+        private Execution.CastingFirstAllowance ReadCfAllowance(string planDigest, int planCastings)
+        {
+            object raw;
+            string json = _request.Parameters.TryGetValue("cfAllowance", out raw) ? raw as string : null;
+            string refusal = "absent";
+            Execution.CastingFirstAllowance allowance = json == null ? null
+                : Execution.CastingFirstAllowance.Parse(json, _request.RunId, out refusal);
+            _physicalRecord.MoonAllowanceStatus = allowance == null ? refusal : "parsed";
+            if (allowance == null) return null;
+            SingleCastProbeRuntimeIdentity measured = MeasureProbeRuntimeIdentity();
+            string campaign = Kingmaker.Game.Instance == null || Kingmaker.Game.Instance.Player == null
+                ? null : Kingmaker.Game.Instance.Player.GameId;
+            UI.CastingWorkspaceSession session =
+                BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+            string mode = session == null ? null : session.ExecutionSettings.Mode;
+            string mismatch =
+                measured.SourceCommit != allowance.SourceCommit ? "identity-mismatch:commit"
+                : measured.PackageSha256 != allowance.PackageSha256 ? "identity-mismatch:package"
+                : measured.DllSha256 != allowance.DllSha256 ? "identity-mismatch:dll"
+                : measured.AssemblyMvid != allowance.AssemblyMvid ? "identity-mismatch:mvid"
+                : !string.Equals(campaign, allowance.FixtureGameId, StringComparison.Ordinal) ? "fixture-mismatch"
+                : AllowanceFixtureBinding.RequestMismatch(allowance.CompatibilityProfileId,
+                    allowance.WorkingSaveSha256, _request.ProfileId, RequestText("workingSha256")) ??
+                OptionalModMismatch() ??
+                (!string.Equals(mode, allowance.ExecutionMode, StringComparison.Ordinal)
+                    ? "execution-mode-mismatch"
+                : allowance.RoutineId != "long" ? "routine-mismatch"
+                : !string.Equals(planDigest, allowance.ApprovedPlanDigest, StringComparison.Ordinal)
+                    ? "plan-differs-from-approval"
+                : planCastings > allowance.MaximumNativeSubmissions ? "plan-over-budget"
+                : null);
+            _physicalRecord.MoonAllowanceStatus = mismatch ?? "valid";
+            return mismatch == null ? allowance : null;
         }
 
         // The run-bound classic allowance: this run, this build, this

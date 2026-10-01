@@ -1,4 +1,4 @@
-﻿[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
+[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
     [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136')][string]$CompatibilityProfileId = 'native-only',
@@ -40,6 +40,18 @@ param(
     # plan digest (from a live-classic-select run), the casting mode and a
     # 1..24 submission budget.
     [string]$ClassicAllowancePath,
+    # Physical cold-moon cast (live-workspace-physical only): the run-bound
+    # kbp-cf-physical-cast allowance under the lab approvals directory,
+    # naming the exact casting-first plan digest (from a physical select
+    # run's cf-plan-digest.json), the casting mode and a 1..24 submission
+    # budget. Without it the physical run is a selection run: the moon press
+    # must be refused by the session lock.
+    [string]$CfAllowancePath,
+    # What the physical scenario expects of the moon press: 'select' (no
+    # allowance; the press is refused by the lock and the plan digest is
+    # published) or 'cast' (the allowance arms a single-use grant and the
+    # press runs Long once). Only valid with -Scenario live-workspace-physical.
+    [ValidateSet('cast', 'select')][string]$PhysicalExpectation = 'cast',
     # Fixture family: the approved automation pair (default) or the
     # owner-designated advanced copy. The advanced copy is loaded only by
     # non-casting scenarios and only when it matches its guarded bootstrap
@@ -145,6 +157,36 @@ if ($Scenario -ceq 'live-classic-cast') {
 }
 elseif (-not [string]::IsNullOrWhiteSpace($ClassicAllowancePath)) {
     throw '-ClassicAllowancePath is only valid with -Scenario live-classic-cast.'
+}
+$cfAllowanceJson = $null
+if ($Scenario -ceq 'live-workspace-physical') {
+    if ($PhysicalExpectation -ceq 'cast') {
+        if ([string]::IsNullOrWhiteSpace($CfAllowancePath)) {
+            throw 'live-workspace-physical requires -CfAllowancePath when -PhysicalExpectation is cast (the run-bound allowance).'
+        }
+        if ([string]::IsNullOrWhiteSpace($RunId)) { throw 'live-workspace-physical requires an explicit -RunId matching the allowance.' }
+        $cfApprovals = [IO.Path]::GetFullPath((Join-Path $root '..\..\approvals')).TrimEnd('\') + '\'
+        $cfFull = [IO.Path]::GetFullPath($CfAllowancePath)
+        if (-not $cfFull.StartsWith($cfApprovals, [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Test-Path -LiteralPath $cfFull -PathType Leaf)) {
+            throw "The casting-first allowance must be an existing file under $cfApprovals"
+        }
+        $cfAllowanceJson = [IO.File]::ReadAllText($cfFull)
+        $cfRefusal = Get-KbpCfAllowanceBuildRefusal -AllowanceJson $cfAllowanceJson `
+            -RunId $RunId -BuildManifest $buildManifest -ExecutionMode $ExecutionMode
+        if ($null -ne $cfRefusal) { throw "The casting-first allowance was refused: $cfRefusal" }
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($CfAllowancePath)) {
+        throw '-CfAllowancePath is only valid with -PhysicalExpectation cast.'
+    }
+}
+else {
+    if (-not [string]::IsNullOrWhiteSpace($CfAllowancePath)) {
+        throw '-CfAllowancePath is only valid with -Scenario live-workspace-physical.'
+    }
+    if ($PhysicalExpectation -cne 'cast') {
+        throw '-PhysicalExpectation is only valid with -Scenario live-workspace-physical.'
+    }
 }
 $displaySize = $null
 if ($DisplayMode -cne 'owner') {
@@ -255,6 +297,12 @@ if ($null -ne $classicAllowanceJson) {
         -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile) `
         -WorkingSaveSha256 $allowanceWorkingSha256 -FixtureGameId $allowanceGameId
     if ($null -ne $bindingRefusal) { throw "The classic allowance was refused: $bindingRefusal" }
+}
+if ($null -ne $cfAllowanceJson) {
+    $bindingRefusal = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $cfAllowanceJson `
+        -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile) `
+        -WorkingSaveSha256 $allowanceWorkingSha256 -FixtureGameId $allowanceGameId
+    if ($null -ne $bindingRefusal) { throw "The casting-first allowance was refused: $bindingRefusal" }
 }
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
 & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
@@ -387,6 +435,15 @@ try {
     if ($null -ne $classicAllowanceJson) {
         # The host re-parses the classic allowance strictly against this run.
         $scenarioParameters.classicAllowance = $classicAllowanceJson
+    }
+    if ($null -ne $cfAllowanceJson) {
+        # The host re-parses the casting-first allowance strictly against this run.
+        $scenarioParameters.cfAllowance = $cfAllowanceJson
+    }
+    if ($Scenario -ceq 'live-workspace-physical') {
+        # What the physical scenario expects of the moon press (see
+        # -PhysicalExpectation): the host judges accordingly.
+        $scenarioParameters.physicalExpectation = $PhysicalExpectation
     }
     if ($null -ne $displaySize) {
         # The host judges the screen it actually got against this size.

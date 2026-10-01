@@ -1666,11 +1666,21 @@ namespace KingmakerBuffPlanner.UI
         }
 
         // Ordinary play submits through the production boundary; a
-        // runtime-test session is locked to an explicit refusal.
+        // runtime-test session is locked to an explicit refusal, with one
+        // allowance-bound exception (an armed single-use grant approves
+        // exactly its routine plan; NativeCastingSessionPolicy).
         private ICastingDispatchBoundary CreateDispatchBoundary()
         {
             if (NativeCastingSessionPolicy.Locked)
-                return new DisabledCastingDispatchBoundary(NativeCastingSessionPolicy.LockReason);
+                return new AllowanceBoundCastingDispatchBoundary(
+                    () => new NativeCastingDispatchBoundary(_castingHost,
+                        () => CastingSession == null
+                            ? ExecutionProfile.Default()
+                            : CastingSession.ExecutionSettings,
+                        message => _log.Info("[KBP-CF-RUN] " + message)),
+                    () => CastingSession == null
+                        ? ExecutionProfile.Default().Mode
+                        : CastingSession.ExecutionSettings.Mode);
             return new NativeCastingDispatchBoundary(_castingHost,
                 () => CastingSession == null
                     ? ExecutionProfile.Default()

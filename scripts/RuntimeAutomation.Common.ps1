@@ -1,4 +1,4 @@
-﻿Set-StrictMode -Version Latest
+Set-StrictMode -Version Latest
 
 . (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1')
 
@@ -880,13 +880,17 @@ function Get-KbpQualificationAllowanceBuildRefusal {
 # projection and its distinct caster, target and source.
 function Get-KbpAllowanceShapeRefusal {
     param([Parameter(Mandatory = $true)]$Allowance,
-        [Parameter(Mandatory = $true)][ValidateSet('qualification', 'classic', 'probe')][string]$Kind)
+        [Parameter(Mandatory = $true)][ValidateSet('qualification', 'classic', 'probe', 'cf')][string]$Kind)
     $members = @{
         qualification = @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
             'assemblyMvid', 'fixtureGameId', 'recipe', 'executionMode', 'approvedProjectionIds',
             'maximumNativeSubmissions', 'approvedBy', 'authority', 'compatibilityProfileId',
             'compatibilityIdentity', 'workingSaveSha256', 'purpose')
         classic = @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'fixtureGameId', 'executionMode', 'routineId', 'approvedPlanDigest',
+            'maximumNativeSubmissions', 'approvedBy', 'authority', 'compatibilityProfileId',
+            'compatibilityIdentity', 'workingSaveSha256', 'purpose')
+        cf = @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
             'assemblyMvid', 'fixtureGameId', 'executionMode', 'routineId', 'approvedPlanDigest',
             'maximumNativeSubmissions', 'approvedBy', 'authority', 'compatibilityProfileId',
             'compatibilityIdentity', 'workingSaveSha256', 'purpose')
@@ -1197,6 +1201,41 @@ function Get-KbpClassicAllowanceBuildRefusal {
     $bindingFormat = Get-KbpAllowanceBindingFormatRefusal -Allowance $allowance
     if ($null -ne $bindingFormat) { return $bindingFormat }
     return Get-KbpAllowanceShapeRefusal -Allowance $allowance -Kind classic
+}
+
+function Get-KbpCfAllowanceBuildRefusal {
+    param([string]$AllowanceJson, [string]$RunId, $BuildManifest, [string]$ExecutionMode)
+    try { $allowance = $AllowanceJson | ConvertFrom-Json }
+    catch { return 'unreadable' }
+    if ($null -eq $allowance) { return 'unreadable' }
+    $names = @($allowance.PSObject.Properties | ForEach-Object Name)
+    foreach ($required in @('schemaVersion', 'kind', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256',
+            'assemblyMvid', 'fixtureGameId', 'executionMode', 'routineId', 'approvedPlanDigest',
+            'maximumNativeSubmissions', 'approvedBy', 'authority', 'compatibilityProfileId',
+            'compatibilityIdentity', 'workingSaveSha256', 'purpose')) {
+        if ($names -cnotcontains $required) { return "missing:$required" }
+    }
+    if (-not ($allowance.schemaVersion -is [int] -or $allowance.schemaVersion -is [long]) -or
+        [int]$allowance.schemaVersion -ne 1) { return 'schema' }
+    if ([string]$allowance.kind -cne 'kbp-cf-physical-cast') { return 'kind' }
+    if ([string]$allowance.runId -cne $RunId) { return 'run-id' }
+    if ([string]$allowance.sourceCommit -cne [string]$BuildManifest.commit) { return 'commit' }
+    if ([string]$allowance.packageSha256 -cne [string]$BuildManifest.packageSha256) { return 'package' }
+    if ([string]$allowance.dllSha256 -cne [string]$BuildManifest.dllSha256) { return 'dll' }
+    if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
+    if (@('instant', 'animated') -cnotcontains [string]$allowance.executionMode) { return 'execution-mode' }
+    if (-not [string]::IsNullOrEmpty($ExecutionMode) -and [string]$allowance.executionMode -cne $ExecutionMode) {
+        return 'execution-mode-differs'
+    }
+    if (@('long', 'important', 'short') -cnotcontains [string]$allowance.routineId) { return 'routine' }
+    if ([string]$allowance.approvedPlanDigest -cnotmatch '^[0-9a-f]{64}$') { return 'plan-digest' }
+    if (-not ($allowance.maximumNativeSubmissions -is [int] -or $allowance.maximumNativeSubmissions -is [long]) -or
+        [int]$allowance.maximumNativeSubmissions -lt 1 -or [int]$allowance.maximumNativeSubmissions -gt 24) {
+        return 'submissions'
+    }
+    $bindingFormat = Get-KbpAllowanceBindingFormatRefusal -Allowance $allowance
+    if ($null -ne $bindingFormat) { return $bindingFormat }
+    return Get-KbpAllowanceShapeRefusal -Allowance $allowance -Kind cf
 }
 
 # Advanced-copy binding: the pair found by name must be exactly the pair the

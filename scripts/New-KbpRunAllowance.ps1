@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][ValidateSet('classic', 'qualification')][string]$Kind,
+    [Parameter(Mandatory = $true)][ValidateSet('classic', 'qualification', 'cf-physical')][string]$Kind,
     [Parameter(Mandatory = $true)][string]$RunId,
     [Parameter(Mandatory = $true)][string]$SelectionRunId,
     [Parameter(Mandatory = $true)][string]$ExpectedCommit,
@@ -107,6 +107,42 @@ if ($Kind -ceq 'classic') {
     foreach ($step in @($plan.steps)) {
         $details.Add("  - step $($step.index): provider $($step.provider); targets $(@($step.targets) -join ', '); pool $($step.pool); unlimited $($step.unlimited)")
     }
+}
+elseif ($Kind -ceq 'cf-physical') {
+    $outcome = Read-KbpJson (Join-Path $selectionDir 'physical-workspace.json')
+    if ([string]$request.scenario -cne 'live-workspace-physical' -or
+        [string]$request.parameters.physicalExpectation -cne 'select' -or
+        [string]$result.status -cne 'PASS' -or
+        @($outcome.violations).Count -ne 0) {
+        throw 'The selection run is not a clean physical selection; no allowance is written.'
+    }
+    if (-not (@($outcome.notes) | Where-Object { $_ -clike 'seed:applied:*' })) {
+        throw 'The physical selection did not seed a plan; no allowance is written.'
+    }
+    $digestRecord = Read-KbpJson (Join-Path $selectionDir 'cf-plan-digest.json')
+    $digest = [string]$digestRecord.planDigest
+    $steps = [int]$digestRecord.castings
+    $digestMode = [string]$digestRecord.executionMode
+    if ([string]$digestRecord.routineId -cne 'long' -or $digest -cnotmatch '^[0-9a-f]{64}$' -or
+        $steps -lt 1 -or $steps -gt 24) {
+        throw 'The physical selection did not record one Long plan digest with 1..24 castings; no allowance is written.'
+    }
+    if ($digestMode -cne $ExecutionMode) {
+        throw "The physical selection ran in $digestMode mode, not $ExecutionMode; no allowance is written."
+    }
+    $purpose = "Physical cold-moon Long run of the seeded plan in $ExecutionMode mode through the HUD moon button under a single-use grant"
+    $allowance = [ordered]@{
+        schemaVersion = 1; kind = 'kbp-cf-physical-cast'; runId = $RunId
+        sourceCommit = [string]$freeze.commit; packageSha256 = [string]$freeze.packageSha256
+        dllSha256 = [string]$freeze.dllSha256; assemblyMvid = [string]$freeze.assemblyMvid
+        fixtureGameId = $gameId; executionMode = $ExecutionMode; routineId = 'long'
+        approvedPlanDigest = $digest; maximumNativeSubmissions = $steps
+        approvedBy = $ApprovedBy; authority = $Authority
+        compatibilityProfileId = $profileId; compatibilityIdentity = $identity; workingSaveSha256 = $workingSha256
+        purpose = $purpose
+    }
+    $details.Add("Plan digest $digest ($steps casting(s)); selection notes: " +
+        (@($outcome.notes) -join ' | '))
 }
 else {
     $outcome = Read-KbpJson (Join-Path $selectionDir 'qual-outcome.json')

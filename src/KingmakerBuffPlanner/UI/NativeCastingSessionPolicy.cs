@@ -56,5 +56,36 @@ namespace KingmakerBuffPlanner.UI
             }
             return grant.TryConsume(routineId, planDigest, executionMode, plannedSteps, out refusal);
         }
+
+        // The parallel exception for the casting-first route (the physical
+        // cold-moon scenario): a single execution of exactly its approved
+        // routine plan, armed only inside a locked session from a validated
+        // allowance. Every other casting-first execution stays refused.
+        internal static Execution.CastingFirstCastGrant CastingFirstGrant { get; private set; }
+
+        internal static bool ArmCastingFirstGrant(Execution.CastingFirstCastGrant grant)
+        {
+            if (!Locked || grant == null || CastingFirstGrant != null) return false;
+            CastingFirstGrant = grant;
+            return true;
+        }
+
+        internal static void DisarmCastingFirstGrant()
+        {
+            Execution.CastingFirstCastGrant grant = CastingFirstGrant;
+            if (grant != null) grant.Disarm();
+        }
+
+        internal static bool TryConsumeCastingFirstGrant(string routineId, string planDigest,
+            string executionMode, int plannedSteps, out string refusal)
+        {
+            Execution.CastingFirstCastGrant grant = CastingFirstGrant;
+            if (grant == null)
+            {
+                refusal = "cf-grant-absent";
+                return false;
+            }
+            return grant.TryConsume(routineId, planDigest, executionMode, plannedSteps, out refusal);
+        }
     }
 }

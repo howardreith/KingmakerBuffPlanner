@@ -122,6 +122,7 @@ namespace KingmakerBuffPlanner.Tests
                 () => TestQualificationDriverRefusalsAndDeadline(root));
             Run("qualification-scenario-requests", () => TestQualificationScenarioRequests(root));
             Run("classic-cast-scenario-requests-and-host-order", () => TestClassicScenarioRequests(root));
+            Run("cf-physical-grant-digest-allowance-boundary-and-judgement", TestCfPhysicalGrantChain);
             // Last: it takes the process-wide runtime-test lock.
             Run("production-execution-wiring-and-session-lock", TestProductionExecutionWiring);
         }
@@ -2461,6 +2462,202 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Refusal explanations are wrong.");
         }
 
+        // The physical cold-moon chain (regression for beta-61ef4f24r8,
+        // where the moon press was delivered and refused by the session
+        // lock with no allowance route): the plan digest covers exactly the
+        // authored intent, the grant is single-use and exact, the allowance
+        // parses with the classic strictness, the locked boundary refuses
+        // everything without a grant and delegates exactly the approved
+        // submission to production, and the physical judgement knows both
+        // expectations (select: refused by the lock; cast: run once).
+        private static void TestCfPhysicalGrantChain()
+        {
+            List<ProviderPlanningOption> options;
+            List<CastEnhancementSnapshot> enhancements;
+            PartyProviderSnapshot party = ZeroCostParty("cleric", out options, out enhancements);
+            var effects = CastingEffects("source-bulls", "source-communal");
+            Func<string, string, ExplicitCastingPlan> planFor = (castingId, target) =>
+                new ExplicitCastingCompiler().Compile(CastingDocument(DirectCasting(
+                    castingId, "long", "unit-cleric", target, "source-bulls", CastingBuffAbility)),
+                    party, options, effects, enhancements);
+            ExplicitCastingPlan plan = planFor("seed-long-1", "unit-t1");
+            if (plan.Castings.Count != 1)
+                throw new InvalidOperationException("The fixture plan did not compile.");
+            string digest = CastingFirstPlanDigest.Of("long", plan);
+            if (digest == null || digest.Length != 64 ||
+                CastingFirstPlanDigest.Of("long", planFor("seed-long-1", "unit-t1")) != digest ||
+                // A different authored target, id, routine or caster must
+                // change the digest; live party state never enters it.
+                CastingFirstPlanDigest.Of("long", planFor("seed-long-1", "unit-t2")) == digest ||
+                CastingFirstPlanDigest.Of("long", planFor("seed-long-2", "unit-t1")) == digest ||
+                CastingFirstPlanDigest.Of("important", planFor("seed-long-1", "unit-t1")) == digest ||
+                CastingFirstPlanDigest.Of("long", new ExplicitCastingPlan(new ResolvedCasting[0],
+                    new string[0])) == digest)
+                throw new InvalidOperationException("The casting-first digest is not the authored identity.");
+            // The grant is exact and single-use (mirrors the classic grant).
+            var grant = new CastingFirstCastGrant("cf-run-1", "long", digest, "instant", 1);
+            string refusal;
+            if (grant.TryConsume("short", digest, "instant", 1, out refusal) ||
+                refusal != "cf-grant-routine:short" ||
+                grant.TryConsume("long", digest, "animated", 1, out refusal) ||
+                refusal != "cf-grant-mode:animated" ||
+                grant.TryConsume("long", new string('0', 64), "instant", 1, out refusal) ||
+                refusal != "cf-grant-plan-differs" ||
+                grant.TryConsume("long", digest, "instant", 2, out refusal) ||
+                refusal != "cf-grant-cap:2>1" ||
+                !grant.TryConsume("long", digest, "instant", 1, out refusal) || refusal != null ||
+                grant.TryConsume("long", digest, "instant", 1, out refusal) ||
+                refusal != "cf-grant-consumed" || !grant.Consumed)
+                throw new InvalidOperationException("The cf grant is not single-use and exact: " + refusal);
+            var disarmed = new CastingFirstCastGrant("cf-run-2", "long", digest, "instant", 1);
+            disarmed.Disarm();
+            if (disarmed.TryConsume("long", digest, "instant", 1, out refusal) ||
+                refusal != "cf-grant-disarmed" || disarmed.Consumed)
+                throw new InvalidOperationException("A disarmed cf grant executed: " + refusal);
+            // The allowance parses with the classic strictness.
+            Func<Action<JObject>, string> allowanceJson = mutate =>
+            {
+                var root = new JObject
+                {
+                    { "schemaVersion", 1 }, { "kind", "kbp-cf-physical-cast" }, { "runId", "cf-cast-1" },
+                    { "sourceCommit", new string('c', 40) }, { "packageSha256", new string('a', 64) },
+                    { "dllSha256", new string('b', 64) }, { "assemblyMvid", "11111111-2222-3333-4444-555555555555" },
+                    { "fixtureGameId", "fixture-game" }, { "executionMode", "instant" }, { "routineId", "long" },
+                    { "approvedPlanDigest", digest }, { "maximumNativeSubmissions", 1 },
+                    { "approvedBy", "Howie" }, { "authority", "owner standing scope 2026-09-28" },
+                    { "compatibilityProfileId", "full-user" }, { "compatibilityIdentity", new string('f', 64) },
+                    { "workingSaveSha256", new string('9', 64) },
+                    { "purpose", "physical cold-moon cast qualification fixture" }
+                };
+                if (mutate != null) mutate(root);
+                return root.ToString();
+            };
+            CastingFirstAllowance allowance = CastingFirstAllowance.Parse(allowanceJson(null),
+                "cf-cast-1", out refusal);
+            if (allowance == null || allowance.ApprovedPlanDigest != digest ||
+                allowance.ExecutionMode != "instant" || allowance.MaximumNativeSubmissions != 1)
+                throw new InvalidOperationException("A valid cf allowance was refused: " + refusal);
+            var allowanceCases = new Dictionary<string, Action<JObject>>
+            {
+                { "allowance-unknown-member:extra", o => o["extra"] = 1 },
+                { "allowance-missing-member:approvedPlanDigest", o => o.Remove("approvedPlanDigest") },
+                { "allowance-schema", o => o["schemaVersion"] = 2 },
+                { "allowance-kind", o => o["kind"] = "kbp-classic-cast" },
+                { "allowance-submissions-range", o => o["maximumNativeSubmissions"] = 25 },
+                { "allowance-artifact-identity", o => o["dllSha256"] = "short" },
+                { "allowance-execution-mode", o => o["executionMode"] = "hybrid" },
+                { "allowance-routine", o => o["routineId"] = "all" },
+                { "allowance-plan-digest", o => o["approvedPlanDigest"] = "XYZ" },
+                { "allowance-approval-missing", o => o["approvedBy"] = string.Empty }
+            };
+            foreach (KeyValuePair<string, Action<JObject>> item in allowanceCases)
+                if (CastingFirstAllowance.Parse(allowanceJson(item.Value), "cf-cast-1", out refusal) != null ||
+                    refusal != item.Key)
+                    throw new InvalidOperationException("CF allowance case " + item.Key + " returned " + refusal);
+            if (CastingFirstAllowance.Parse(allowanceJson(null), "other-run", out refusal) != null ||
+                refusal != "allowance-run-mismatch")
+                throw new InvalidOperationException("A cf allowance served another run.");
+            // The locked boundary: no grant refuses everything with the
+            // session lock reason; the armed grant lets exactly the approved
+            // submission through to production, once.
+            NativeCastingSessionPolicy.LockForRuntimeTest("cf-boundary-fixture");
+            int productionCalls = 0;
+            var boundary = new AllowanceBoundCastingDispatchBoundary(
+                () =>
+                {
+                    productionCalls++;
+                    return new AcceptingDispatchBoundary();
+                },
+                () => "instant");
+            var decision = new CastingApplyDecision(true, CastingApplyMode.Ordinary, "long",
+                new[] { "seed-long-1" }, new CastingOmission[0], new string[0]);
+            CastingDispatchOutcome refused = boundary.Submit(plan, decision, "long", null);
+            if (refused.Submitted || productionCalls != 0 ||
+                refused.Reason != NativeCastingSessionPolicy.LockReason + ":cf-grant-absent")
+                throw new InvalidOperationException("A grantless submission reached production: " +
+                    refused.Reason);
+            var armed = new CastingFirstCastGrant("cf-run-3", "long", digest, "instant", 1);
+            if (!NativeCastingSessionPolicy.ArmCastingFirstGrant(armed))
+                throw new InvalidOperationException("The cf grant could not be armed in a locked session.");
+            CastingDispatchOutcome approved = boundary.Submit(plan, decision, "long", null);
+            if (!approved.Submitted || productionCalls != 1 || !armed.Consumed)
+                throw new InvalidOperationException("The approved submission did not run: " + approved.Reason);
+            CastingDispatchOutcome second = boundary.Submit(plan, decision, "long", null);
+            if (second.Submitted || productionCalls != 1 ||
+                !second.Reason.EndsWith(":cf-grant-consumed", StringComparison.Ordinal))
+                throw new InvalidOperationException("A second submission ran through one grant: " +
+                    second.Reason);
+            NativeCastingSessionPolicy.DisarmCastingFirstGrant();
+            var otherRoutine = new CastingApplyDecision(true, CastingApplyMode.Ordinary, "short",
+                new[] { "seed-long-1" }, new CastingOmission[0], new string[0]);
+            CastingDispatchOutcome afterDisarm = boundary.Submit(plan, otherRoutine, "short", null);
+            if (afterDisarm.Submitted || productionCalls != 1)
+                throw new InvalidOperationException("A disarmed session still submitted.");
+            // The physical judgement knows both moon expectations.
+            Func<PhysicalWorkspaceRecord> selectGood = () =>
+            {
+                var record = NewCastingFirstPhysicalRecord();
+                record.MoonExpectation = "select";
+                record.MoonRunStarted = false;
+                record.MoonRefusal = "native-submission-disabled:runtime-test-session:" +
+                    "live-workspace-physical:cf-grant-absent;Refused:Long was not cast: native casting " +
+                    "is disabled in this automated test session.";
+                return record;
+            };
+            if (selectGood().Violations().Count != 0)
+                throw new InvalidOperationException("A clean selection run was refused: " +
+                    string.Join("|", selectGood().Violations().ToArray()));
+            PhysicalWorkspaceRecord ranWithoutGrant = selectGood();
+            ranWithoutGrant.MoonRunStarted = true;
+            if (!ranWithoutGrant.Violations().Contains("moon:run-without-grant"))
+                throw new InvalidOperationException("A grantless run passed the selection judgement.");
+            PhysicalWorkspaceRecord wrongRefusal = selectGood();
+            wrongRefusal.MoonRefusal = "no-dispatch-refusal;Refused:target unavailable";
+            if (!wrongRefusal.Violations().Contains(
+                    "moon:not-refused-by-lock:no-dispatch-refusal;Refused:target unavailable"))
+                throw new InvalidOperationException("An unexpected refusal passed the selection judgement.");
+            PhysicalWorkspaceRecord castMissingConsumption = NewCastingFirstPhysicalRecord();
+            castMissingConsumption.MoonGrantConsumed = false;
+            if (!castMissingConsumption.Violations().Contains("moon:grant-not-consumed"))
+                throw new InvalidOperationException("An unconsumed grant passed the cast judgement.");
+        }
+
+        // A production-boundary stand-in that accepts every submission; the
+        // grant check under test happens BEFORE it, in the boundary wrapper.
+        private sealed class AcceptingDispatchBoundary : ICastingDispatchBoundary
+        {
+            public string DispositionReason
+            {
+                get { return "accepting-fixture-boundary"; }
+            }
+
+            public CastingDispatchOutcome Submit(
+                ExplicitCastingPlan plan, CastingApplyDecision decision,
+                string scopeRoutineId, ExplicitStepConversion projection)
+            {
+                return new CastingDispatchOutcome(true, "submitted", decision.ExecutableCastingIds);
+            }
+        }
+
+        private static PhysicalWorkspaceRecord NewCastingFirstPhysicalRecord()
+        {
+            var record = new PhysicalWorkspaceRecord
+            {
+                ExpectedScreen = "1920x1080", ScreenWidth = 1920, ScreenHeight = 1080,
+                OpenedPhysically = true, CastingFirst = true,
+                MoonRunStarted = true, MoonWorkspaceStayedClosed = true,
+                GraphOverflow = true, GraphScrollBefore = 1f, GraphScrollAfter = 0.4f,
+                InspectChip = "chip:seed-long-1", InspectOpened = true,
+                InspectClosedByEscape = true,
+                DocumentSignatureBeforeBrowse = "castings=1;revision=3",
+                DocumentSignatureAfterInspect = "castings=1;revision=3",
+                ModeAfterClose = "Default", LeaseReleased = true,
+                MoonGrantConsumed = true
+            };
+            record.Acknowledged.AddRange(PhysicalWorkspaceRecord.CastingActions);
+            return record;
+        }
+
         // Unity-bound wiring, checked at source level: every routine route
         // reaches the casting-first pipeline when it is active (no legacy
         // bypass), the run host is pumped per frame and ended on disable,
@@ -2489,7 +2686,7 @@ namespace KingmakerBuffPlanner.Tests
                 "_castingHost.Cancel(\"area-unloading\");",
                 "_castingHost.Shutdown(\"root-teardown\");",
                 "_castingHost.Shutdown(\"ui-root-disabled\");",
-                "if (NativeCastingSessionPolicy.Locked)\r\n                return new DisabledCastingDispatchBoundary(NativeCastingSessionPolicy.LockReason);",
+                "if (NativeCastingSessionPolicy.Locked)\r\n                return new AllowanceBoundCastingDispatchBoundary(",
                 "try { inputs = BuildFreshCastingWorkspaceInputs(); }",
                 "_castingHost.RequestStop(CastingExecutionHost.PlayerStopReason);"
             };
@@ -2950,7 +3147,7 @@ namespace KingmakerBuffPlanner.Tests
                 !qualification.Contains("() => BuffPlannerUiRoot.OwnedTicksForRuntime,") ||
                 // Group casting reads: each expected recipient read natively.
                 !qualification.Contains("new KingmakerProbeObserver().ObserveRecipient(") ||
-                Occurrences(host, "OptionalModMismatch()") != 4)
+                Occurrences(host, "OptionalModMismatch()") != 5)
                 throw new InvalidOperationException("The hold or the pre-cast identity checks are not wired.");
             // The launcher's casting mode must be the allowance's, and the
             // acceptance counts the planner host's runs: none before the
