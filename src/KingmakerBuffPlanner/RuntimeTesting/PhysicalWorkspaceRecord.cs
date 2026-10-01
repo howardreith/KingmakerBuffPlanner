@@ -84,6 +84,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public string ModeAfterClose { get; set; }
         // Casting-first evidence (v1.2 E04/E05/E06/E12).
         public bool CastingFirst { get; set; }
+        // The native Escape-menu veil a stale launcher dismissal escape can
+        // leave open behind the workspace; it absorbs HUD clicks, so the
+        // scenario closes it physically before the cold moon. Diagnostics:
+        // whether it was open, and whether the escapes closed it. Never a
+        // violation by itself (the scenario fails outright when it cannot).
+        public bool? MenuVeilOpenBeforeMoon { get; set; }
+        public bool MenuVeilClosedByEscape { get; set; }
         // The moon click ran Long while the editor stayed closed.
         public bool MoonRunStarted { get; set; }
         public bool MoonWorkspaceStayedClosed { get; set; }

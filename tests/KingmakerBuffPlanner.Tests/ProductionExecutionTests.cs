@@ -7157,6 +7157,82 @@ namespace KingmakerBuffPlanner.Tests
             owner.ScreenHeight = 1200;
             if (owner.Violations().Count != 0)
                 throw new InvalidOperationException("The owner's own display was judged against a size.");
+            TestCastingFirstPhysicalJudgement();
+        }
+
+        // The casting-first physical judgement (v1.2 E04/E05/E06/E12): the
+        // cold moon ran with the editor closed, the graph scroll answered
+        // the wheel, the native inspect opened from a chip and closed by
+        // Escape with the document unchanged. Diagnostics (seed outcome,
+        // the native Escape-menu veil the scenario closes physically) are
+        // evidence only: never violations (regression for beta-a5b9b0edr5/
+        // r6, where the veil absorbed the moon click and the seed notes
+        // were invisible because the record was never serialized).
+        private static void TestCastingFirstPhysicalJudgement()
+        {
+            Func<PhysicalWorkspaceRecord> good = () =>
+            {
+                var record = new PhysicalWorkspaceRecord
+                {
+                    ExpectedScreen = "1920x1080", ScreenWidth = 1920, ScreenHeight = 1080,
+                    OpenedPhysically = true, CastingFirst = true,
+                    MenuVeilOpenBeforeMoon = true, MenuVeilClosedByEscape = true,
+                    MoonRunStarted = true, MoonWorkspaceStayedClosed = true,
+                    GraphOverflow = true, GraphScrollBefore = 1f, GraphScrollAfter = 0.4f,
+                    InspectChip = "chip:seed-long-1", InspectOpened = true,
+                    InspectClosedByEscape = true,
+                    DocumentSignatureBeforeBrowse = "castings=1;revision=3",
+                    DocumentSignatureAfterInspect = "castings=1;revision=3",
+                    ModeAfterClose = "Default", LeaseReleased = true
+                };
+                record.Acknowledged.AddRange(PhysicalWorkspaceRecord.CastingActions);
+                record.AddNote("seed:applied:unit-wiz>unit-t1");
+                record.AddNote("menu-veil:closed-by-escape;attempts=1");
+                return record;
+            };
+            PhysicalWorkspaceRecord clean = good();
+            if (clean.Violations().Count != 0 || clean.GraphWheelEvidence != "scrolled")
+                throw new InvalidOperationException("A clean casting-first run was refused: " +
+                    string.Join("|", clean.Violations().ToArray()));
+            // The veil-seen-but-unclosed diagnostic alone judges nothing:
+            // the scenario finishes with an explicit failure when the veil
+            // cannot be closed, so the record never speaks for it.
+            PhysicalWorkspaceRecord veilNoteOnly = good();
+            veilNoteOnly.MenuVeilClosedByEscape = false;
+            if (veilNoteOnly.Violations().Count != 0)
+                throw new InvalidOperationException("The menu veil diagnostic was judged as a violation.");
+            var shapes = new Dictionary<string, Action<PhysicalWorkspaceRecord>>
+            {
+                { "screen:1920x1200!=1920x1080", r => r.ScreenHeight = 1200 },
+                { "workspace-opened-programmatically", r => r.OpenedPhysically = false },
+                { "unacknowledged:cf-moon", r => r.Acknowledged.Remove("cf-moon") },
+                { "unacknowledged:cf-escape-close", r => r.Acknowledged.Remove("cf-escape-close") },
+                { "moon:no-run", r => r.MoonRunStarted = false },
+                { "moon:editor-opened", r => r.MoonWorkspaceStayedClosed = false },
+                { "graph-scroll:unread", r => r.GraphScrollAfter = null },
+                { "graph-scroll:no-scroll", r => r.GraphScrollAfter = 1f },
+                { "graph-scroll:moved-without-overflow", r => r.GraphOverflow = false },
+                { "inspect:not-opened", r => r.InspectOpened = false },
+                { "inspect:not-closed", r => r.InspectClosedByEscape = false },
+                { "inspect:document-mutated", r => r.DocumentSignatureAfterInspect = "castings=1;revision=4" }
+            };
+            foreach (KeyValuePair<string, Action<PhysicalWorkspaceRecord>> shape in shapes)
+            {
+                PhysicalWorkspaceRecord bad = good();
+                shape.Value(bad);
+                if (!bad.Violations().Contains(shape.Key))
+                    throw new InvalidOperationException("Casting-first judgement missed " + shape.Key + ": " +
+                        string.Join("|", bad.Violations().ToArray()));
+            }
+            PhysicalWorkspaceRecord unreadable = good();
+            unreadable.DocumentSignatureBeforeBrowse = null;
+            if (!unreadable.Violations().Contains("inspect:document-mutated"))
+                throw new InvalidOperationException("An unread document signature was accepted.");
+            PhysicalWorkspaceRecord fits = good();
+            fits.GraphOverflow = false;
+            fits.GraphScrollAfter = 1f;
+            if (fits.Violations().Count != 0 || fits.GraphWheelEvidence != "not-applicable:no-overflow")
+                throw new InvalidOperationException("A fitting graph was judged as a scroll claim.");
         }
 
         // The area and cantrip diagnostics only read: no transition is used,

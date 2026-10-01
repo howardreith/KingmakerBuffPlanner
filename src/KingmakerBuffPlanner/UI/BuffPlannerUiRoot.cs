@@ -203,6 +203,23 @@ namespace KingmakerBuffPlanner.UI
                 ? 0 : _instance._castingHost.StartedRuns; }
         }
 
+        // Whether the native Escape menu (Save/Load/Options) is showing.
+        // It is a fullscreen veil that absorbs HUD clicks, and a stale
+        // dismissal escape can leave it open behind the workspace; the
+        // physical scenario probes it before the cold moon click.
+        internal static bool NativeEscMenuOpenForRuntime
+        {
+            get
+            {
+                foreach (Kingmaker.UI.ServiceWindow.EscMenuWindow window in
+                    Resources.FindObjectsOfTypeAll<Kingmaker.UI.ServiceWindow.EscMenuWindow>())
+                    if (window != null && window.gameObject != null &&
+                        window.gameObject.activeInHierarchy)
+                        return true;
+                return false;
+            }
+        }
+
         // Reload evidence (mission section 8): live EventBus subscriptions,
         // lifecycle signals by name, whether the HUD is installed, and how
         // many HUD roots exist in the loaded scenes.
