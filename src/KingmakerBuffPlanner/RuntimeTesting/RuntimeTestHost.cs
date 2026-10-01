@@ -3457,14 +3457,59 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
                 if (session != null && session.Document.Castings.Count == 0)
                 {
+                    // One plain verified-free casting by ANY single caster
+                    // (the mixed recipe needs two casters of one buff; a
+                    // cold moon needs only one executable casting). The
+                    // seed outcome is recorded for the evidence.
                     CastingWorkspaceInputs seedInputs =
                         BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
-                    CastingQualificationSelection seed = seedInputs == null ? null
-                        : CastingQualificationRecipe.SelectZeroCostMixed(
-                            seedInputs, _request.ProfileId ?? string.Empty);
-                    if (seed != null && seed.Selected)
-                        session.AddCastingForRuntime(seed.Castings[0]);
+                    Domain.Planning.ProviderPlanningOption option = seedInputs == null
+                        ? null : CastingQualificationRecipe.EligibleOptions(seedInputs,
+                            value => { }).FirstOrDefault();
+                    if (option == null)
+                    {
+                        _physicalRecord.AddNote("seed:no-free-option");
+                    }
+                    else
+                    {
+                        string sourceId = SingleCastProbeSelector.SourceIdFor(
+                            seedInputs.EffectsBySource, option.Provider.Key.Ability);
+                        string target = seedInputs.Snapshot.Units
+                            .Where(unit => unit.TargetValidation.Alive &&
+                                unit.TargetValidation.Conscious &&
+                                unit.TargetValidation.Friendly &&
+                                unit.TargetValidation.Targetable &&
+                                !string.Equals(unit.UnitId, option.Provider.Key.CasterUnitId,
+                                    StringComparison.Ordinal) &&
+                                !CastingQualificationRecipe.EffectActive(
+                                    seedInputs.LiveEffects, unit.UnitId,
+                                    seedInputs.EffectsBySource[sourceId]))
+                            .Select(unit => unit.UnitId)
+                            .OrderBy(unitId => unitId, StringComparer.Ordinal)
+                            .FirstOrDefault();
+                        if (target == null)
+                        {
+                            _physicalRecord.AddNote("seed:no-fresh-target");
+                        }
+                        else
+                        {
+                            AuthoringEditResult seeded = session.AddCastingForRuntime(
+                                new Domain.Authoring.PlannedCasting("seed-long-1", "long", 0,
+                                    sourceId, option.Provider.Key.Ability,
+                                    option.Provider.Key.CasterUnitId,
+                                    option.Provider.Key.SpellbookGuid,
+                                    Domain.Authoring.CastingTargetMode.DirectTarget,
+                                    target, null, null, null, null,
+                                    Domain.Planning.ExistingEffectPolicy.SkipAlreadyActive,
+                                    null, Domain.Authoring.CastingAuthoringState.Ready, null));
+                            _physicalRecord.AddNote(seeded.Applied
+                                ? "seed:applied:" + option.Provider.Key.CasterUnitId + ">" + target
+                                : "seed:refused:" + seeded.Reason);
+                        }
+                    }
                 }
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "physical-cf-moon-before.png"));
                 _physicalRunsBeforeMoon = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
                 return RequestPhysical("cf-moon", "click",
                     BuffPlannerUiRoot.HudButtonCenterForRuntime("long"), null, 2);
