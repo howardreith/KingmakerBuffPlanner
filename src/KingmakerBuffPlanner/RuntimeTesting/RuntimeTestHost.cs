@@ -3435,13 +3435,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 // The launcher's early hotkey chord may have opened the
                 // workspace before this phase; the cold-moon proof needs it
                 // CLOSED, so it is closed PHYSICALLY first (the escape is
-                // part of the delivered ownership behavior).
+                // part of the delivered ownership behavior). Either way the
+                // moon is clicked only from step 1, after the native menu
+                // veil check and the plan seed.
                 if (BuffPlannerUiRoot.IsCastingWorkspaceOpen)
                     return RequestPhysical("cf-close-first", "key-escape",
                         Vector2.zero, null, 1);
-                _physicalRunsBeforeMoon = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
-                return RequestPhysical("cf-moon", "click",
-                    BuffPlannerUiRoot.HudButtonCenterForRuntime("long"), null, 2);
+                _physicalStep = 1;
+                return false;
             }
             if (_physicalStep == 1)
             {
