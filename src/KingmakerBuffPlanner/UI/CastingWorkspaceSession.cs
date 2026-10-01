@@ -131,6 +131,57 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
+    // A locked runtime-test session's casting-first boundary: every
+    // submission is refused with the session lock reason EXCEPT the one
+    // execution an armed, allowance-bound grant approves (exactly its
+    // routine, plan digest, execution mode and step budget; single use).
+    // The grant is consulted at SUBMIT time, so a session that existed
+    // before the harness armed the grant obeys it, and one created after a
+    // disarm refuses again. The approved submission itself goes through
+    // the production boundary built by the factory, never around it.
+    public sealed class AllowanceBoundCastingDispatchBoundary : ICastingDispatchBoundary
+    {
+        internal readonly List<string> RecordedRefusals = new List<string>();
+        private readonly Func<ICastingDispatchBoundary> _production;
+        private readonly Func<string> _executionMode;
+
+        public AllowanceBoundCastingDispatchBoundary(
+            Func<ICastingDispatchBoundary> production, Func<string> executionMode)
+        {
+            if (production == null)
+                throw new ArgumentNullException("production");
+            if (executionMode == null)
+                throw new ArgumentNullException("executionMode");
+            _production = production;
+            _executionMode = executionMode;
+        }
+
+        public string DispositionReason
+        {
+            get { return NativeCastingSessionPolicy.LockReason; }
+        }
+
+        public CastingDispatchOutcome Submit(
+            ExplicitCastingPlan plan,
+            CastingApplyDecision decision,
+            string scopeRoutineId,
+            ExplicitStepConversion projection)
+        {
+            string digest = Execution.CastingFirstPlanDigest.Of(scopeRoutineId, plan);
+            string refusal;
+            if (!NativeCastingSessionPolicy.TryConsumeCastingFirstGrant(scopeRoutineId, digest,
+                    _executionMode(), decision == null ? 0 : decision.ExecutableCastingIds.Count,
+                    out refusal))
+            {
+                string reason = NativeCastingSessionPolicy.LockReason + ":" + refusal;
+                RecordedRefusals.Add((scopeRoutineId ?? "one-pass") + "|" + refusal);
+                return new CastingDispatchOutcome(false, reason,
+                    decision == null ? new string[0] : decision.ExecutableCastingIds);
+            }
+            return _production().Submit(plan, decision, scopeRoutineId, projection);
+        }
+    }
+
     public sealed class WorkspaceApplyResult
     {
         internal WorkspaceApplyResult(
@@ -564,6 +615,25 @@ namespace KingmakerBuffPlanner.UI
         public string DispatchDisposition
         {
             get { return _dispatch.DispositionReason; }
+        }
+
+        // Runtime evidence: the refusal reasons a locked session's boundary
+        // itself recorded (machine reasons, not the player-facing text), so
+        // a scenario can prove a press was refused BY THE LOCK.
+        public IReadOnlyList<string> DispatchRefusalsForRuntime
+        {
+            get
+            {
+                var disabled = _dispatch as DisabledCastingDispatchBoundary;
+                if (disabled != null)
+                    return disabled.RecordedSubmissions
+                        .Select(value => _dispatch.DispositionReason).ToList();
+                var allowanceBound = _dispatch as AllowanceBoundCastingDispatchBoundary;
+                if (allowanceBound != null)
+                    return allowanceBound.RecordedRefusals
+                        .Select(value => _dispatch.DispositionReason + ":" + value).ToList();
+                return new List<string>();
+            }
         }
 
         // ------------------------------------------------------------------
@@ -2271,6 +2341,15 @@ namespace KingmakerBuffPlanner.UI
                 inputs.EffectsBySource, inputs.Enhancements,
                 routineScope, inputs.TargetingModifiers, projectEffects,
                 inputs.LiveEffects);
+        }
+
+        // Guarded-scenario seam: the same deterministic compile Apply uses
+        // (read-only; projectEffects=false), for evidence like the physical
+        // scenario's published plan digest.
+        internal ExplicitCastingPlan CompileForRuntime(
+            CastingWorkspaceInputs inputs, string routineScope)
+        {
+            return Compile(inputs, routineScope, false);
         }
 
         private WorkspaceApplyResult RefusedInFlight(CastingApplyDecision decision)

@@ -69,6 +69,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingCapabilityInventory.cs"><Link>Execution\CastingCapabilityInventory.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AtWillCantripChoice.cs"><Link>Execution\AtWillCantripChoice.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\ClassicCastQualification.cs"><Link>Execution\ClassicCastQualification.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingFirstGrant.cs"><Link>Execution\CastingFirstGrant.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\HaltingPlanRunner.cs"><Link>Execution\HaltingPlanRunner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\FactSourceChoice.cs"><Link>Execution\FactSourceChoice.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AvailableCountJudgement.cs"><Link>Execution\AvailableCountJudgement.cs</Link></Compile>

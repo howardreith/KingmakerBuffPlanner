@@ -351,6 +351,14 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        // How many castings the last built graph view holds (diagnostic for
+        // the physical scenario: distinguishes an empty plan from a chip
+        // that is merely off screen).
+        internal int GraphCastingCountForRuntime
+        {
+            get { return _lastView == null ? 0 : _lastView.Castings.Count; }
+        }
+
         internal string SelectedSourceIdForRuntime
         {
             get { return _lastView == null ? null : _lastView.SelectedSourceId; }

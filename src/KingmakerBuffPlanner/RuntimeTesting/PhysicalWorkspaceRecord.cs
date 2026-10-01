@@ -94,6 +94,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // The moon click ran Long while the editor stayed closed.
         public bool MoonRunStarted { get; set; }
         public bool MoonWorkspaceStayedClosed { get; set; }
+        // The moon-run contract of this run: "cast" (an allowance-bound
+        // grant must let the press run Long once) or "select" (no grant is
+        // armed; the press must be REFUSED by the session lock and the
+        // approved plan digest is published for the allowance).
+        public string MoonExpectation { get; set; }
+        // The refusal the moon press produced (selection runs), and the
+        // allowance/grant evidence (cast runs).
+        public string MoonRefusal { get; set; }
+        public string MoonAllowanceStatus { get; set; }
+        public string MoonGrantDescribe { get; set; }
+        public bool? MoonGrantConsumed { get; set; }
         // The continuous scroll answered the physical wheel.
         public bool GraphOverflow { get; set; }
         public float? GraphScrollBefore { get; set; }
@@ -159,7 +170,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 foreach (string action in CastingActions)
                     if (!Acknowledged.Contains(action))
                         violations.Add("unacknowledged:" + action);
-                if (!MoonRunStarted) violations.Add("moon:no-run");
+                if (MoonExpectation == "select")
+                {
+                    // Selection contract: no grant exists, so the press must
+                    // be refused BY THE LOCK (a run without an allowance
+                    // would be a native-casting lock failure, never a pass).
+                    if (MoonRunStarted) violations.Add("moon:run-without-grant");
+                    else if (string.IsNullOrEmpty(MoonRefusal) ||
+                        MoonRefusal.IndexOf("native-submission-disabled", StringComparison.Ordinal) < 0)
+                        violations.Add("moon:not-refused-by-lock:" + (MoonRefusal ?? "none"));
+                }
+                else
+                {
+                    if (!MoonRunStarted) violations.Add("moon:no-run");
+                    if (MoonGrantConsumed == false) violations.Add("moon:grant-not-consumed");
+                }
                 if (!MoonWorkspaceStayedClosed) violations.Add("moon:editor-opened");
                 if (GraphWheelEvidence == "unread") violations.Add("graph-scroll:unread");
                 else if (GraphWheelEvidence == "no-scroll") violations.Add("graph-scroll:no-scroll");

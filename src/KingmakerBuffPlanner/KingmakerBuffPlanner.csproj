@@ -126,6 +126,7 @@
     <Compile Include="Execution\SingleCastProbe.cs" />
     <Compile Include="Execution\AtWillCantripChoice.cs" />
     <Compile Include="Execution\ClassicCastQualification.cs" />
+    <Compile Include="Execution\CastingFirstGrant.cs" />
     <Compile Include="Execution\HaltingPlanRunner.cs" />
     <Compile Include="Execution\FactSourceChoice.cs" />
     <Compile Include="Execution\AvailableCountJudgement.cs" />
