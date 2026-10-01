@@ -3431,15 +3431,27 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             if (_physicalStep == 0)
             {
-                // COLD MOON: the editor is closed; one physical click on the
-                // HUD long-routine button runs Long with no editor detour.
+                // The launcher's early hotkey chord may have opened the
+                // workspace before this phase; the cold-moon proof needs it
+                // CLOSED, so it is closed PHYSICALLY first (the escape is
+                // part of the delivered ownership behavior).
                 if (BuffPlannerUiRoot.IsCastingWorkspaceOpen)
-                    return FinishPhysical("moon:editor-already-open");
-                Vector2 moon = BuffPlannerUiRoot.HudButtonCenterForRuntime("long");
+                    return RequestPhysical("cf-close-first", "key-escape",
+                        Vector2.zero, null, 1);
                 _physicalRunsBeforeMoon = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
-                return RequestPhysical("cf-moon", "click", moon, null, 1);
+                return RequestPhysical("cf-moon", "click",
+                    BuffPlannerUiRoot.HudButtonCenterForRuntime("long"), null, 2);
             }
             if (_physicalStep == 1)
+            {
+                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen && settled < 5) return false;
+                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen)
+                    return FinishPhysical("workspace-not-closed-by-escape");
+                _physicalRunsBeforeMoon = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
+                return RequestPhysical("cf-moon", "click",
+                    BuffPlannerUiRoot.HudButtonCenterForRuntime("long"), null, 2);
+            }
+            if (_physicalStep == 2)
             {
                 if (settled < 2) return false;
                 _physicalRecord.MoonRunStarted =
@@ -3451,9 +3463,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     !BuffPlannerUiRoot.IsCastingWorkspaceOpen;
                 // Wait for the cold run to finish before the editor opens.
                 if (BuffPlannerUiRoot.IsCastingRunActive && settled < 60) return false;
-                return RequestPhysical("cf-open", "hotkey", Vector2.zero, null, 2);
+                return RequestPhysical("cf-open", "hotkey", Vector2.zero, null, 3);
             }
-            if (_physicalStep == 2)
+            if (_physicalStep == 3)
             {
                 if (view == null) return FinishPhysical("workspace-not-opened");
                 _physicalRecord.DocumentSignatureBeforeBrowse =
@@ -3464,43 +3476,39 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.GraphOverflow = view.GraphScrollOverflowForRuntime;
                 Vector2? graphPoint = view.ScreenPointForRuntime("graph");
                 if (graphPoint == null) return FinishPhysical("graph-not-on-screen");
-                return RequestPhysical("cf-wheel", "wheel", graphPoint.Value, ",\"delta\":-360", 3);
+                return RequestPhysical("cf-wheel", "wheel", graphPoint.Value,
+                    ",\"delta\":-360", 4);
             }
-            if (_physicalStep == 3)
+            if (_physicalStep == 4)
             {
                 if (settled < 1) return false;
-                _physicalRecord.GraphScrollAfter = view == null
-                    ? null : view.GraphScrollPositionForRuntime;
                 if (view == null) return FinishPhysical("workspace-closed-early:wheel");
-                // The right-click target: the selected casting's chip (the
-                // inspector's own spell), else the first catalogue chip.
+                _physicalRecord.GraphScrollAfter = view.GraphScrollPositionForRuntime;
                 string chip = view.InspectTargetPartForRuntime;
                 if (chip == null)
                     return FinishPhysical("inspect-target-not-on-screen");
                 _physicalRecord.InspectChip = chip;
                 return RequestPhysical("cf-right-click", "rightclick",
-                    view.ScreenPointForRuntime(chip).Value, null, 4);
-            }
-            if (_physicalStep == 4)
-            {
-                if (settled < 1) return false;
-                _physicalRecord.InspectOpened = view != null && view.SpellInspectOpen;
-                if (!_physicalRecord.InspectOpened && settled < 4) return false;
-                _physicalRecord.InspectOpened = view != null && view.SpellInspectOpen;
-                if (view == null) return FinishPhysical("workspace-closed-early:inspect");
-                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
-                    "physical-cf-inspect.png"));
-                return RequestPhysical("cf-escape-inspect", "key-escape", Vector2.zero, null, 5);
+                    view.ScreenPointForRuntime(chip).Value, null, 5);
             }
             if (_physicalStep == 5)
+            {
+                if (view == null) return FinishPhysical("workspace-closed-early:inspect");
+                if (!view.SpellInspectOpen && settled < 4) return false;
+                _physicalRecord.InspectOpened = view.SpellInspectOpen;
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "physical-cf-inspect.png"));
+                return RequestPhysical("cf-escape-inspect", "key-escape", Vector2.zero, null, 6);
+            }
+            if (_physicalStep == 6)
             {
                 if (view != null && view.SpellInspectOpen && settled < 4) return false;
                 _physicalRecord.InspectClosedByEscape = view == null || !view.SpellInspectOpen;
                 _physicalRecord.DocumentSignatureAfterInspect =
                     BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
-                return RequestPhysical("cf-escape-close", "key-escape", Vector2.zero, null, 6);
+                return RequestPhysical("cf-escape-close", "key-escape", Vector2.zero, null, 7);
             }
-            if (_physicalStep == 6)
+            if (_physicalStep == 7)
             {
                 if (BuffPlannerUiRoot.IsCastingWorkspaceOpen && settled < 5) return false;
                 if (settled < 1) return false;
