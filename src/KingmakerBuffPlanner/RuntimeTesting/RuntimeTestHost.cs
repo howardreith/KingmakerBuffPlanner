@@ -2193,8 +2193,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // context. After a bounded wait (control frame already
                     // captured at the hotkey-request point), open through
                     // the production path without physical input.
-                    if (_uiSmokeUpdates > 300 && !_workspaceProgrammaticOpen &&
-                        _workspaceControlRequested)
+                    if (_uiSmokeUpdates - Math.Max(0, _hotkeyRequestedAtUpdate) > 300 &&
+                        !_workspaceProgrammaticOpen && _workspaceControlRequested)
                     {
                         _liveUiPhase = 22;
                         return false;
@@ -2226,6 +2226,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _liveUiPhase = 22;
                     return false;
                 }
+                if (RuntimeTestProtocol.IsPhysicalWorkspaceScenario(_request.Scenario) &&
+                    BuffPlannerUiRoot.CastingFirstActiveForRuntime)
+                {
+                    // E12: the cold moon press comes BEFORE any planner
+                    // hotkey is requested (phase 125); the hotkey follows it.
+                    _physicalStep = 100;
+                    _liveUiPhase = 125;
+                    return false;
+                }
                 // Automated qualification: the hotkey request marker is
                 // written and phase 0 resumes its armed/fallback flow.
                 AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
@@ -2234,6 +2243,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     (Main.HotkeyArmed ? "true" : "false") + ",\"binding\":\"Ctrl+Shift+B\",\"snapshot\":" +
                     JsonConvert.ToString(BuffPlannerUiRoot.GetSnapshot()) + "}" + Environment.NewLine);
                 _liveHotkeyMarkerWritten = true;
+                _hotkeyRequestedAtUpdate = _uiSmokeUpdates;
                 _log.Info("[KBP-BOOT] runtime requests physical planner hotkey;binding=Ctrl+Shift+B;marker=hotkey-ready.json;controlCapturedFirst=True.");
                 _liveUiPhase = 0;
                 return false;
@@ -2424,8 +2434,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 return UpdateClassicCast();
             }
-            if (_liveUiPhase == 120)
+            if (_liveUiPhase == 120 || _liveUiPhase == 125)
             {
+                // 125: the cold moon (before the hotkey); 120: the browse
+                // and inspect gestures after the physical open.
                 return UpdatePhysicalWorkspace();
             }
             if (_liveUiPhase == 40)
@@ -3410,7 +3422,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // window with the operating system's input, acknowledged in a file;
         // this host only locates targets and reads the view's own state
         // after each action. Nothing is authored, saved or cast.
-        private const double PhysicalDeadlineSeconds = 180;
+        // The cold moon (seed, press, run, settle) now precedes the hotkey
+        // open and the browse gestures in one sequence.
+        private const double PhysicalDeadlineSeconds = 240;
         private readonly PhysicalWorkspaceRecord _physicalRecord = new PhysicalWorkspaceRecord();
         private int _physicalStep;
         private string _physicalPending;
@@ -3420,187 +3434,197 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _physicalMenuCloseAttempts;
         private int _physicalWheelBacks;
         private Execution.CastingFirstCastGrant _physicalGrant;
+        // The cold moon's stored castings and its reads.
+        private PlannedCasting _physicalSeedLong;
+        private PlannedCasting _physicalSeedImportant;
+        private int _physicalLongAvailableBefore;
+        private bool _physicalMoonEditorSeen;
+        private double _physicalMoonFinishedAt = -1;
+        // The update on which the planner hotkey was requested (its
+        // programmatic fallback counts from there); -1 before.
+        private int _hotkeyRequestedAtUpdate = -1;
+
+        // One plain verified-free casting for the cold seed, by any caster,
+        // on a recipient it can reach that is not the caster, not already
+        // used and without the buff (deterministic: option, then unit order).
+        private static PlannedCasting ColdSeedCasting(CastingWorkspaceInputs inputs, string routineId,
+            ISet<string> usedTargets)
+        {
+            foreach (ProviderPlanningOption option in CastingQualificationRecipe.EligibleOptions(inputs, value => { }))
+            {
+                string sourceId = SingleCastProbeSelector.SourceIdFor(inputs.EffectsBySource, option.Provider.Key.Ability);
+                if (sourceId == null) continue;
+                var reachable = new HashSet<string>(option.ReachableTargetIds ?? new string[0], StringComparer.Ordinal);
+                string target = inputs.Snapshot.Units
+                    .Where(unit => unit.TargetValidation.Alive && unit.TargetValidation.Conscious &&
+                        unit.TargetValidation.Friendly && unit.TargetValidation.Targetable &&
+                        reachable.Contains(unit.UnitId) && !usedTargets.Contains(unit.UnitId) &&
+                        !string.Equals(unit.UnitId, option.Provider.Key.CasterUnitId, StringComparison.Ordinal) &&
+                        !CastingQualificationRecipe.EffectActive(inputs.LiveEffects, unit.UnitId,
+                            inputs.EffectsBySource[sourceId]))
+                    .Select(unit => unit.UnitId).OrderBy(id => id, StringComparer.Ordinal).FirstOrDefault();
+                if (target == null) continue;
+                return new PlannedCasting("seed-" + routineId + "-1", routineId, 0, sourceId,
+                    option.Provider.Key.Ability, option.Provider.Key.CasterUnitId, option.Provider.Key.SpellbookGuid,
+                    CastingTargetMode.DirectTarget, target, null, null, null, null,
+                    ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null);
+            }
+            return null;
+        }
+
+        private static bool SeedEffectActive(CastingWorkspaceInputs inputs, PlannedCasting casting)
+        {
+            Domain.Effects.EffectExpression expected;
+            return inputs.EffectsBySource.TryGetValue(casting.SourceId, out expected) &&
+                CastingQualificationRecipe.EffectActive(inputs.LiveEffects, casting.DirectTargetUnitId, expected);
+        }
+
+        private static ProviderSnapshot SeedProvider(CastingWorkspaceInputs inputs, PlannedCasting casting)
+        {
+            return inputs.ProviderOptions.Where(option => option != null && option.Provider != null)
+                .Select(option => option.Provider)
+                .FirstOrDefault(provider =>
+                    string.Equals(provider.Key.CasterUnitId, casting.CasterUnitId, StringComparison.Ordinal) &&
+                    string.Equals(provider.Key.Ability.Canonical, casting.Ability.Canonical, StringComparison.Ordinal) &&
+                    string.Equals(provider.Key.SpellbookGuid ?? string.Empty, casting.SpellbookGuid ?? string.Empty,
+                        StringComparison.Ordinal));
+        }
+
+        // Casts the casting's own source could fund now (capped at 99; a
+        // verified-free source always reads 99).
+        private static int SeedCastsAvailable(CastingWorkspaceInputs inputs, PlannedCasting casting)
+        {
+            ProviderSnapshot provider = SeedProvider(inputs, casting);
+            return provider == null ? -1 : CastingQualificationRecipe.CastsAvailable(inputs, provider, 99);
+        }
+
+        private static bool SeedSourceFree(CastingWorkspaceInputs inputs, PlannedCasting casting)
+        {
+            ProviderSnapshot provider = SeedProvider(inputs, casting);
+            ResourcePoolSnapshot pool = provider == null ? null : inputs.Snapshot.ResourcePools.FirstOrDefault(value =>
+                string.Equals(value.PoolKey, provider.ResourcePoolKey, StringComparison.Ordinal));
+            return pool != null && pool.Kind == ResourcePoolKind.Unlimited;
+        }
+
+        // The launcher's physical planner hotkey, requested after the cold
+        // moon press (the editor opens for the first time only now).
+        private void RequestPlannerHotkey()
+        {
+            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "hotkey-ready.json"),
+                "{\"runId\":\"" + _request.RunId + "\",\"armed\":" +
+                (Main.HotkeyArmed ? "true" : "false") + ",\"binding\":\"Ctrl+Shift+B\",\"snapshot\":" +
+                JsonConvert.ToString(BuffPlannerUiRoot.GetSnapshot()) + "}" + Environment.NewLine);
+            _liveHotkeyMarkerWritten = true;
+            _hotkeyRequestedAtUpdate = _uiSmokeUpdates;
+            _log.Info("[KBP-BOOT] runtime requests physical planner hotkey;binding=Ctrl+Shift+B;" +
+                "marker=hotkey-ready.json;afterColdMoon=True.");
+        }
         private System.Diagnostics.Stopwatch _physicalClock;
         private System.Diagnostics.Stopwatch _physicalSettle;
 
-        // The casting-first physical sequence (v1.2 E04/E05/E06/E12): the
-        // workspace is closed at the start of this phase, so the moon runs
-        // Long cold; the hotkey then opens the graph, the wheel scrolls the
-        // continuous parchment, a right-click opens the native spell
-        // inspect with the document unchanged, and Escape closes the
-        // inspect first and the workspace second.
+        // The casting-first physical sequence (v1.2 E04/E05/E06/E12). Steps
+        // 100-102 run BEFORE the launcher's planner hotkey is requested, so
+        // the moon click is TRULY cold: no planner session exists and the
+        // editor has never been opened in this game session. An earlier
+        // session's intent is stored first (Long AND Important castings,
+        // Important authored last) through a throwaway production session
+        // that the planner root never owns; the moon then runs Long - and
+        // only Long - from that stored plan. After the press the hotkey is
+        // requested (step 3 onward): the graph scrolls, a right-click opens
+        // the native spell inspect with the document unchanged, and Escape
+        // closes the inspect first and the workspace second.
         private bool UpdatePhysicalCastingFirst(CastingWorkspaceScreenView view, double settled)
         {
-            if (_physicalStep == 0)
+            if (_physicalStep == 100)
             {
-                // The launcher's early hotkey chord may have opened the
-                // workspace before this phase; the cold-moon proof needs it
-                // CLOSED, so it is closed PHYSICALLY first (the escape is
-                // part of the delivered ownership behavior). Either way the
-                // moon is clicked only from step 1, after the native menu
-                // veil check and the plan seed.
-                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen)
-                    return RequestPhysical("cf-close-first", "key-escape",
-                        Vector2.zero, null, 1);
-                _physicalStep = 1;
-                return false;
-            }
-            if (_physicalStep == 1)
-            {
-                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen && settled < 5) return false;
-                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen)
-                    return FinishPhysical("workspace-not-closed-by-escape");
                 // A stale dismissal escape from the launcher can leave the
-                // native Escape menu open behind the workspace; it is a
-                // fullscreen veil that absorbs HUD clicks (beta-a5b9b0edr6:
-                // the moon click was delivered and acknowledged into that
-                // veil and no run started). It is closed PHYSICALLY, one
-                // escape at a time, only while it is actually open, so the
-                // sequence can never open it; a settle is awaited first so
-                // the veil's close animation is not mistaken for still-open.
+                // native Escape menu open; it is a fullscreen veil that
+                // absorbs HUD clicks (beta-a5b9b0edr6). It is closed
+                // PHYSICALLY, one escape at a time, only while it is actually
+                // open; a settle is awaited first so its close animation is
+                // not mistaken for still-open.
                 if (_physicalRecord.MenuVeilOpenBeforeMoon == true && settled < 1.5) return false;
                 if (BuffPlannerUiRoot.NativeEscMenuOpenForRuntime)
                 {
                     if (_physicalRecord.MenuVeilOpenBeforeMoon != true)
-                        CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
-                            "physical-cf-veil.png"));
+                        CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "physical-cf-veil.png"));
                     _physicalRecord.MenuVeilOpenBeforeMoon = true;
                     _physicalRecord.MenuVeilClosedByEscape = false;
                     if (++_physicalMenuCloseAttempts > 3)
                         return FinishPhysical("esc-menu-veil-not-closed");
                     return RequestPhysical("cf-menu-close-" + _physicalMenuCloseAttempts,
-                        "key-escape", Vector2.zero, null, 1);
+                        "key-escape", Vector2.zero, null, 100);
                 }
                 if (_physicalRecord.MenuVeilOpenBeforeMoon == true)
                 {
                     _physicalRecord.MenuVeilClosedByEscape = true;
-                    _physicalRecord.AddNote("menu-veil:closed-by-escape;attempts=" +
-                        _physicalMenuCloseAttempts);
+                    _physicalRecord.AddNote("menu-veil:closed-by-escape;attempts=" + _physicalMenuCloseAttempts);
                 }
-                // E12 is a COLD moon run: the durable plan pre-exists (a
-                // prior session's intent) and the EDITOR stays closed all
-                // session. If the fixture's plan is empty, one verified
-                // free casting is seeded through the production session
-                // boundary (no editor, autosaved) so Long has something to
-                // run and the graph shows a chip to inspect.
-                UI.CastingWorkspaceSession session =
-                    BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
-                if (session == null)
+                _physicalStep = 101;
+                return false;
+            }
+            if (_physicalStep == 101)
+            {
+                // A veil that appeared since step 100 is closed first; the
+                // seed and the press then happen in this same update.
+                if (BuffPlannerUiRoot.NativeEscMenuOpenForRuntime) { _physicalStep = 100; return false; }
+                // Cold: the planner root owns no session and the editor was
+                // never opened (no hotkey requested, no programmatic open).
+                _physicalRecord.ColdSessionBeforeMoon =
+                    BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime() == null;
+                _physicalRecord.EditorNeverOpenedBeforeMoon = !BuffPlannerUiRoot.IsCastingWorkspaceOpen &&
+                    BuffPlannerUiRoot.CastingWorkspaceViewForRuntime == null && !_workspaceProgrammaticOpen &&
+                    !_liveHotkeyMarkerWritten;
+                string campaign = Kingmaker.Game.Instance == null || Kingmaker.Game.Instance.Player == null
+                    ? null : Kingmaker.Game.Instance.Player.GameId;
+                CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+                if (campaign == null || inputs == null) return FinishPhysical("cold-seed:no-campaign-or-inputs");
+                // The earlier session: a throwaway production session over
+                // the same stored plan (the root never sees it), authoring
+                // through the production boundary and autosaving.
+                var earlier = new UI.CastingWorkspaceSession(_modEntry.Path, campaign,
+                    new DisabledCastingDispatchBoundary());
+                if (earlier.Document.Castings.Count != 0)
+                    return FinishPhysical("cold-seed:plan-already-held:" + earlier.Document.Castings.Count);
+                var seeded = new List<Domain.Authoring.PlannedCasting>();
+                var used = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string routine in new[] { "long", "important" })
                 {
-                    _physicalRecord.AddNote("seed:no-session");
+                    Domain.Authoring.PlannedCasting casting = ColdSeedCasting(inputs, routine, used);
+                    if (casting == null) return FinishPhysical("cold-seed:no-free-option-or-target:" + routine);
+                    AuthoringEditResult added = earlier.AddCastingForRuntime(casting);
+                    if (!added.Applied) return FinishPhysical("cold-seed:refused:" + routine + ":" + added.Reason);
+                    used.Add(casting.DirectTargetUnitId);
+                    seeded.Add(casting);
+                    (routine == "long" ? _physicalRecord.SeedLongCastings : _physicalRecord.SeedImportantCastings)
+                        .Add(casting.CastingId);
+                    _physicalRecord.AddNote("cold-seed:" + routine + ":" + casting.CasterUnitId + ">" +
+                        casting.DirectTargetUnitId + ";source=" + casting.SourceId);
                 }
-                else if (session.Document.Castings.Count == 0)
-                {
-                    // One plain verified-free casting by ANY single caster
-                    // (the mixed recipe needs two casters of one buff; a
-                    // cold moon needs only one executable casting). The
-                    // seed outcome is recorded for the evidence.
-                    CastingWorkspaceInputs seedInputs =
-                        BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
-                    Domain.Planning.ProviderPlanningOption option = seedInputs == null
-                        ? null : CastingQualificationRecipe.EligibleOptions(seedInputs,
-                            value => { }).FirstOrDefault();
-                    if (seedInputs == null)
+                string storeStatus;
+                if (UI.CastingWorkspaceSession.SavedIntentSignature(_modEntry.Path, campaign, out storeStatus) == null)
+                    return FinishPhysical("cold-seed:not-durable:" + storeStatus);
+                // The approved-plan identity of Long, from the stored intent.
+                Planning.ExplicitCastingPlan compiled = earlier.CompileForRuntime(inputs, "long");
+                string moonDigest = Execution.CastingFirstPlanDigest.Of("long", compiled);
+                int moonCastings = compiled.Castings.Count;
+                string mode = earlier.ExecutionSettings.Mode;
+                AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "cf-plan-digest.json"), new JObject
                     {
-                        _physicalRecord.AddNote("seed:no-inputs");
-                    }
-                    else if (option == null)
-                    {
-                        _physicalRecord.AddNote("seed:no-free-option");
-                    }
-                    else
-                    {
-                        string sourceId = SingleCastProbeSelector.SourceIdFor(
-                            seedInputs.EffectsBySource, option.Provider.Key.Ability);
-                        string target = seedInputs.Snapshot.Units
-                            .Where(unit => unit.TargetValidation.Alive &&
-                                unit.TargetValidation.Conscious &&
-                                unit.TargetValidation.Friendly &&
-                                unit.TargetValidation.Targetable &&
-                                !string.Equals(unit.UnitId, option.Provider.Key.CasterUnitId,
-                                    StringComparison.Ordinal) &&
-                                !CastingQualificationRecipe.EffectActive(
-                                    seedInputs.LiveEffects, unit.UnitId,
-                                    seedInputs.EffectsBySource[sourceId]))
-                            .Select(unit => unit.UnitId)
-                            .OrderBy(unitId => unitId, StringComparer.Ordinal)
-                            .FirstOrDefault();
-                        if (target == null)
-                        {
-                            _physicalRecord.AddNote("seed:no-fresh-target");
-                        }
-                        else
-                        {
-                            AuthoringEditResult seeded = session.AddCastingForRuntime(
-                                new Domain.Authoring.PlannedCasting("seed-long-1", "long", 0,
-                                    sourceId, option.Provider.Key.Ability,
-                                    option.Provider.Key.CasterUnitId,
-                                    option.Provider.Key.SpellbookGuid,
-                                    Domain.Authoring.CastingTargetMode.DirectTarget,
-                                    target, null, null, null, null,
-                                    Domain.Planning.ExistingEffectPolicy.SkipAlreadyActive,
-                                    null, Domain.Authoring.CastingAuthoringState.Ready, null));
-                            _physicalRecord.AddNote(seeded.Applied
-                                ? "seed:applied:" + option.Provider.Key.CasterUnitId + ">" + target +
-                                    ";source=" + sourceId
-                                : "seed:refused:" + seeded.Reason);
-                            if (seeded.Applied)
-                            {
-                                session.Save();
-                                // The graph shows the SELECTED source's
-                                // castings; without this the freshly seeded
-                                // chip stays off the graph (r8: no chip on
-                                // screen with the plan loaded). SelectBuff is
-                                // the production browsing command (pure).
-                                session.SelectBuff(sourceId);
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    _physicalRecord.AddNote("seed:plan-already-held:" +
-                        session.Document.Castings.Count);
-                }
-                // The approved-plan identity of this run's Long routine, as
-                // the allowance chain binds it: authored intent only, never
-                // live party state.
-                string moonDigest = null;
-                int moonCastings = 0;
-                try
-                {
-                    CastingWorkspaceInputs digestInputs =
-                        BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
-                    if (digestInputs != null && session.Document.Castings.Count != 0)
-                    {
-                        Planning.ExplicitCastingPlan compiled =
-                            session.CompileForRuntime(digestInputs, "long");
-                        moonDigest = Execution.CastingFirstPlanDigest.Of("long", compiled);
-                        moonCastings = compiled.Castings.Count;
-                        AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
-                            "cf-plan-digest.json"), new JObject
-                            {
-                                { "runId", _request.RunId },
-                                { "routineId", "long" },
-                                { "planDigest", moonDigest },
-                                { "castings", moonCastings },
-                                { "executionMode", session.ExecutionSettings.Mode }
-                            }.ToString(Formatting.Indented) + Environment.NewLine);
-                    }
-                }
-                catch (Exception exception)
-                {
-                    _physicalRecord.AddNote("digest-failed:" + exception.Message);
-                }
-                if (_physicalRecord.MoonExpectation != "select" && moonDigest == null)
-                    return FinishPhysical("moon-plan-digest-missing");
-                // The cast run's allowance binds this exact plan, build,
-                // fixture and save; the grant it arms is the ONLY submission
-                // the locked session will let through (selection runs arm
-                // nothing and must be refused by the lock).
+                        { "runId", _request.RunId },
+                        { "routineId", "long" },
+                        { "planDigest", moonDigest },
+                        { "castings", moonCastings },
+                        { "executionMode", mode },
+                        { "longCastings", new JArray(_physicalRecord.SeedLongCastings.Cast<object>().ToArray()) },
+                        { "importantCastings", new JArray(_physicalRecord.SeedImportantCastings.Cast<object>().ToArray()) }
+                    }.ToString(Formatting.Indented) + Environment.NewLine);
                 if (_physicalRecord.MoonExpectation != "select")
                 {
-                    Execution.CastingFirstAllowance allowance = ReadCfAllowance(moonDigest, moonCastings);
+                    // The run-bound allowance binds this exact stored plan,
+                    // build, fixture and save; the grant it arms is the ONLY
+                    // submission the locked session will let through.
+                    Execution.CastingFirstAllowance allowance = ReadCfAllowance(moonDigest, moonCastings, mode);
                     if (allowance == null)
                         return FinishPhysical("cf-allowance:" + _physicalRecord.MoonAllowanceStatus);
                     _physicalGrant = new Execution.CastingFirstCastGrant(_request.RunId,
@@ -3610,46 +3634,97 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         return FinishPhysical("cf-grant-not-armed");
                     _log.Info("[KBP-PHYSICAL] cf grant armed;" + _physicalGrant.Describe() + ".");
                 }
-                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
-                    "physical-cf-moon-before.png"));
+                // Native reads before the press.
+                _physicalSeedLong = seeded[0];
+                _physicalSeedImportant = seeded[1];
+                _physicalRecord.LongEffectBefore = SeedEffectActive(inputs, _physicalSeedLong);
+                _physicalRecord.ImportantEffectBefore = SeedEffectActive(inputs, _physicalSeedImportant);
+                _physicalLongAvailableBefore = SeedCastsAvailable(inputs, _physicalSeedLong);
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "physical-cf-moon-before.png"));
                 _physicalRunsBeforeMoon = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
+                _physicalMoonEditorSeen = false;
                 return RequestPhysical("cf-moon", "click",
-                    BuffPlannerUiRoot.HudButtonCenterForRuntime("long"), null, 2);
+                    BuffPlannerUiRoot.HudButtonCenterForRuntime("long"), null, 102);
             }
-            if (_physicalStep == 2)
+            if (_physicalStep == 102)
             {
+                // Sampled on every update until the press is settled: the
+                // editor never opens on the moon's path.
+                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen) _physicalMoonEditorSeen = true;
                 if (settled < 2) return false;
-                _physicalRecord.MoonRunStarted =
-                    BuffPlannerUiRoot.CastingRunsStartedForRuntime > _physicalRunsBeforeMoon;
-                if (!_physicalRecord.MoonRunStarted && settled < 10) return false;
-                _physicalRecord.MoonRunStarted =
-                    BuffPlannerUiRoot.CastingRunsStartedForRuntime > _physicalRunsBeforeMoon;
-                _physicalRecord.MoonWorkspaceStayedClosed =
+                bool started = BuffPlannerUiRoot.CastingRunsStartedForRuntime > _physicalRunsBeforeMoon;
+                if (!started && settled < 10) return false;
+                // Wait for the run to finish, then a further settle in which
+                // no second run may start.
+                if (BuffPlannerUiRoot.IsCastingRunActive && settled < 60) return false;
+                if (started && _physicalMoonFinishedAt < 0) { _physicalMoonFinishedAt = settled; return false; }
+                if (started && settled - _physicalMoonFinishedAt < 3) return false;
+                _physicalRecord.MoonRunStarted = started;
+                _physicalRecord.MoonRunsStarted = BuffPlannerUiRoot.CastingRunsStartedForRuntime - _physicalRunsBeforeMoon;
+                _physicalRecord.MoonWorkspaceStayedClosed = !_physicalMoonEditorSeen &&
                     !BuffPlannerUiRoot.IsCastingWorkspaceOpen;
-                if (!_physicalRecord.MoonRunStarted)
+                if (!started)
                 {
-                    // The press produced a refusal: the boundary's own
-                    // machine reason (the lock) plus the player-facing
-                    // disposition and message are the evidence.
+                    // The press produced a refusal: the boundary's own machine
+                    // reason (the lock) plus the player-facing disposition and
+                    // message are the evidence.
                     UI.QuickExecutionResult refused = BuffPlannerUiRoot.QuickResultForRuntime("long");
-                    UI.CastingWorkspaceSession session =
-                        BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                    UI.CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
                     IReadOnlyList<string> dispatchRefusals = session == null
                         ? new List<string>() : session.DispatchRefusalsForRuntime;
                     string machine = dispatchRefusals.Count == 0
                         ? "no-dispatch-refusal" : dispatchRefusals[dispatchRefusals.Count - 1];
                     _physicalRecord.MoonRefusal = machine + ";" +
-                        (refused == null ? "no-result"
-                            : refused.Disposition + ":" + refused.Message);
+                        (refused == null ? "no-result" : refused.Disposition + ":" + refused.Message);
                     _physicalRecord.AddNote("moon-refused:" + _physicalRecord.MoonRefusal);
                 }
-                // Wait for the cold run to finish before the editor opens.
-                if (BuffPlannerUiRoot.IsCastingRunActive && settled < 60) return false;
-                return RequestPhysical("cf-open", "hotkey", Vector2.zero, null, 3);
+                else
+                {
+                    UI.CastingRunReport report = BuffPlannerUiRoot.CastingHostForRuntime.LastReport;
+                    if (report != null)
+                    {
+                        _physicalRecord.MoonRunRoutine = report.ScopeRoutineId;
+                        _physicalRecord.MoonRunTerminal = report.TerminalReason;
+                        _physicalRecord.MoonRunSubmitted = report.Submitted;
+                        _physicalRecord.MoonRunResourcesSpent = report.Entries.Count(entry =>
+                            entry.ResourceSpent && !entry.FreeCast);
+                        foreach (UI.CastingOutcomeEntry entry in report.Entries)
+                            _physicalRecord.MoonRunEntries.Add(entry.CastingId + "=" + entry.State);
+                    }
+                }
+                CastingWorkspaceInputs after = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+                if (after != null)
+                {
+                    _physicalRecord.LongEffectAfter = SeedEffectActive(after, _physicalSeedLong);
+                    _physicalRecord.ImportantEffectAfter = SeedEffectActive(after, _physicalSeedImportant);
+                    _physicalRecord.LongSourceFree = SeedSourceFree(after, _physicalSeedLong);
+                    _physicalRecord.LongSourceAvailability = _physicalLongAvailableBefore + ">" +
+                        SeedCastsAvailable(after, _physicalSeedLong);
+                }
+                // The single-use exception ends with the press, used or not.
+                if (_physicalGrant != null)
+                {
+                    UI.NativeCastingSessionPolicy.DisarmCastingFirstGrant();
+                    _physicalRecord.MoonGrantDescribe = _physicalGrant.Describe();
+                    _physicalRecord.MoonGrantConsumed = _physicalGrant.Consumed;
+                    _physicalRecord.MoonGrantAttempts = _physicalGrant.Attempts;
+                }
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "physical-cf-moon-after.png"));
+                // Now, and only now, the launcher's planner hotkey: the
+                // editor opens physically for the browse/inspect gestures.
+                _physicalRecord.ModeBeforeOpen = GameModeName();
+                _physicalStep = 3;
+                RequestPlannerHotkey();
+                _liveUiPhase = 0;
+                return false;
             }
             if (_physicalStep == 3)
             {
                 if (view == null) return FinishPhysical("workspace-not-opened");
+                // The open happened after the cold press: judged now; the
+                // isolation probe watches the planner gestures from here.
+                _physicalRecord.OpenedPhysically = !_workspaceProgrammaticOpen;
+                BuffPlannerUiRoot.BeginPhysicalInputProbe();
                 _physicalRecord.DocumentSignatureBeforeBrowse =
                     BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
                 _physicalRecord.AddNote("graph-castings:" + view.GraphCastingCountForRuntime);
@@ -3717,6 +3792,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.LeaseReleased =
                     !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
                 _physicalRecord.ModeAfterClose = GameModeName();
+                // The planner took that Escape: the game's own menu is not open.
+                _physicalRecord.EscMenuOpenAfterClose = BuffPlannerUiRoot.NativeEscMenuOpenForRuntime;
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
                     "physical-cf-closed.png"));
                 return FinishPhysical(null);
@@ -3746,7 +3823,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _request.Parameters.TryGetValue("physicalExpectation", out expectation) &&
                         string.Equals(expectation as string, "select", StringComparison.Ordinal)
                         ? "select" : "cast";
-                BuffPlannerUiRoot.BeginPhysicalInputProbe();
+                // Casting-first: the isolation probe covers the planner's own
+                // gestures (step 3 on), not the moon run's legitimate casts.
+                if (!_physicalRecord.CastingFirst) BuffPlannerUiRoot.BeginPhysicalInputProbe();
                 _log.Info("[KBP-PHYSICAL] started;screen=" + Screen.width + "x" + Screen.height +
                     ";fullScreen=" + Screen.fullScreen + ";mode=" + _physicalModeBefore +
                     ";openedPhysically=" + _physicalRecord.OpenedPhysically + ".");
@@ -3895,6 +3974,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 UI.NativeCastingSessionPolicy.DisarmCastingFirstGrant();
                 _physicalRecord.MoonGrantDescribe = _physicalGrant.Describe();
                 _physicalRecord.MoonGrantConsumed = _physicalGrant.Consumed;
+                _physicalRecord.MoonGrantAttempts = _physicalGrant.Attempts;
             }
             UiInputIsolationProbeResult isolation = BuffPlannerUiRoot.EndPhysicalInputProbe();
             if (isolation != null)
@@ -3911,6 +3991,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             PublishPhysicalRecord();
             _completed = true;
             return true;
+        }
+
+        private static JToken Nullable(bool? value)
+        {
+            return value.HasValue ? (JToken)value.Value : JValue.CreateNull();
+        }
+
+        private static JToken Nullable(int? value)
+        {
+            return value.HasValue ? (JToken)value.Value : JValue.CreateNull();
         }
 
         private void PublishPhysicalRecord()
@@ -3962,6 +4052,25 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "moonGrantDescribe", record.MoonGrantDescribe },
                 { "moonGrantConsumed", record.MoonGrantConsumed.HasValue
                     ? (JToken)record.MoonGrantConsumed.Value : JValue.CreateNull() },
+                { "moonGrantAttempts", Nullable(record.MoonGrantAttempts) },
+                { "coldSessionBeforeMoon", Nullable(record.ColdSessionBeforeMoon) },
+                { "editorNeverOpenedBeforeMoon", Nullable(record.EditorNeverOpenedBeforeMoon) },
+                { "seedLongCastings", new JArray(record.SeedLongCastings.Cast<object>().ToArray()) },
+                { "seedImportantCastings", new JArray(record.SeedImportantCastings.Cast<object>().ToArray()) },
+                { "moonRunsStarted", Nullable(record.MoonRunsStarted) },
+                { "moonRunRoutine", record.MoonRunRoutine },
+                { "moonRunTerminal", record.MoonRunTerminal },
+                { "moonRunSubmitted", Nullable(record.MoonRunSubmitted) },
+                { "moonRunResourcesSpent", Nullable(record.MoonRunResourcesSpent) },
+                { "moonRunEntries", new JArray(record.MoonRunEntries.Cast<object>().ToArray()) },
+                { "longEffectBefore", Nullable(record.LongEffectBefore) },
+                { "longEffectAfter", Nullable(record.LongEffectAfter) },
+                { "importantEffectBefore", Nullable(record.ImportantEffectBefore) },
+                { "importantEffectAfter", Nullable(record.ImportantEffectAfter) },
+                { "longSourceAvailability", record.LongSourceAvailability },
+                { "longSourceFree", record.LongSourceFree },
+                { "modeBeforeOpen", record.ModeBeforeOpen },
+                { "escMenuOpenAfterClose", Nullable(record.EscMenuOpenAfterClose) },
                 { "graphOverflow", record.GraphOverflow },
                 { "graphScrollBefore", record.GraphScrollBefore.HasValue
                     ? (JToken)record.GraphScrollBefore.Value : JValue.CreateNull() },
@@ -4165,7 +4274,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // cast run: this run, this build, this campaign, profile and WORKING
         // save, this casting mode and routine, and exactly the plan digest
         // this run's seed compiled to.
-        private Execution.CastingFirstAllowance ReadCfAllowance(string planDigest, int planCastings)
+        // mode: the stored plan's execution mode (the cold press loads it;
+        // no planner session exists yet to ask).
+        private Execution.CastingFirstAllowance ReadCfAllowance(string planDigest, int planCastings, string mode)
         {
             object raw;
             string json = _request.Parameters.TryGetValue("cfAllowance", out raw) ? raw as string : null;
@@ -4177,9 +4288,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             SingleCastProbeRuntimeIdentity measured = MeasureProbeRuntimeIdentity();
             string campaign = Kingmaker.Game.Instance == null || Kingmaker.Game.Instance.Player == null
                 ? null : Kingmaker.Game.Instance.Player.GameId;
-            UI.CastingWorkspaceSession session =
-                BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
-            string mode = session == null ? null : session.ExecutionSettings.Mode;
             string mismatch =
                 measured.SourceCommit != allowance.SourceCommit ? "identity-mismatch:commit"
                 : measured.PackageSha256 != allowance.PackageSha256 ? "identity-mismatch:package"
