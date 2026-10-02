@@ -430,6 +430,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunAutosaveLifecycleTests(root);
                 RunSharePlanningTests(root);
                 RunUndoHistoryTests(root);
+                RunEverydayUseWordingTests(root);
             }
             finally
             {

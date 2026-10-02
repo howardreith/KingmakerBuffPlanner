@@ -93,9 +93,15 @@ namespace KingmakerBuffPlanner.UI
             if (reason.StartsWith("nothing-to-cast", StringComparison.Ordinal))
                 text = "nothing to cast - every buff is already active, disabled or omitted";
             else if (reason == "nothing-presented" || reason == "not-accepted")
-                text = "open the planner, review this routine and press Accept Plan first";
+                // v1.2 §5: the Run press itself authorizes the plan, so
+                // these are internal faults, never a step for the player.
+                text = "the run could not be authorized (an internal check failed) - nothing was cast";
             else if (reason == "material-change-requires-review")
-                text = "the plan changed since you accepted it - open the planner to review it";
+                text = "the plan changed while the run was starting - nothing was cast; press again " +
+                    "to run the current plan";
+            else if (reason.StartsWith("persistence-failed", StringComparison.Ordinal))
+                text = "your latest edit is not saved yet, so nothing was cast - the planner footer " +
+                    "shows why and offers Retry save";
             else if (reason.StartsWith("apply-refused", StringComparison.Ordinal))
                 text = "some castings are blocked (" + (result.GateDecision == null ? 0
                     : result.GateDecision.BlockingReasons.Count) +
@@ -115,12 +121,32 @@ namespace KingmakerBuffPlanner.UI
             return routineName + " was not cast: " + text + ". (" + reason + ")";
         }
 
+        // v1.2 §5: a HUD routine button's tooltip in casting-first mode. A
+        // click runs that routine at once after a fresh check of the party;
+        // there is no acceptance state to describe. castings is null when
+        // no plan session is loaded yet (a cold click loads it).
+        internal static string RoutineTooltip(string routineName, int? castings,
+            string executionMode, string lastPress)
+        {
+            string text = castings == null
+                ? "Cast " + routineName + ": one click runs your saved " + routineName + " routine now"
+                : "Cast " + routineName + ": " + castings.Value +
+                    (castings.Value == 1 ? " casting" : " castings") + ", " + executionMode +
+                    " mode. One click runs " + (castings.Value == 1 ? "it" : "them") + " now";
+            text += " (the party is checked first; if a casting is blocked, nothing is cast and the " +
+                "reason is shown).";
+            if (string.IsNullOrEmpty(lastPress)) return text;
+            return text + " Last: " + (lastPress.Length <= 180 ? lastPress
+                : lastPress.Substring(0, 177) + "...");
+        }
+
         // An executor-contract limitation (the converter refusal) in words.
         internal static string DescribeLimitation(string limitation)
         {
             string value = limitation ?? string.Empty;
             if (value.Contains(":targeting-modifier:"))
-                return "a targeting modifier (such as Share Transmutation) is not executed yet";
+                return "a targeting modifier (such as Share Transmutation) that is not verified as " +
+                    "executable for this caster";
             if (value.Contains(":exact-enhancement-source:"))
                 return "an exact rod or item identity is not executed yet";
             if (value.Contains(":required-coverage-incomplete:"))

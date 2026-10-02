@@ -1015,14 +1015,19 @@ namespace KingmakerBuffPlanner.Tests
             Assert(newer.AcceptPresentedPlan(inputs));
             if (newer.ReviewStoreWarning.Length != 0 || PersistenceMessages.ForReviewWarning(newer.ReviewStoreWarning) != null)
                 throw new InvalidOperationException("A saved review kept a stale warning: " + newer.ReviewStoreWarning);
-            // The workspace tells the player: Save and Accept show the words.
+            // The workspace tells the player (v1.2 §4: no Save or Accept
+            // button any more): the footer's save status is refreshed with
+            // every view rebuild, names the problem and offers its
+            // exceptional recovery action (footer-save-status-is-honest-and-
+            // recoverable covers the behavior on real files).
             DirectoryInfo sourceRoot = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
             while (sourceRoot != null && !File.Exists(Path.Combine(sourceRoot.FullName, "KingmakerBuffPlanner.sln")))
                 sourceRoot = sourceRoot.Parent;
             string workspaceView = File.ReadAllText(Path.Combine(sourceRoot.FullName, "src", "KingmakerBuffPlanner",
                 "UI", "CastingWorkspaceScreenView.cs"));
-            if (!workspaceView.Contains("_footerResult.text = PersistenceMessages.ForSaveFailure(exception);") ||
-                !workspaceView.Contains("PersistenceMessages.ForReviewWarning(_session.ReviewStoreWarning)"))
+            if (!workspaceView.Contains("string problem = WorkspaceFooterText.SaveProblem(state);") ||
+                !workspaceView.Contains("private void RecoveryCommand()") ||
+                !workspaceView.Contains("_session.FooterSaveState"))
                 throw new InvalidOperationException("The workspace does not show persistence refusals.");
         }
 
@@ -2453,12 +2458,23 @@ namespace KingmakerBuffPlanner.Tests
             if (!CastingRunPresentation.DescribeRefusal("Long",
                     new WorkspaceApplyResult(false, "nothing-to-cast:2", null, null))
                     .Contains("nothing to cast") ||
+                // v1.2 §5: no refusal ever sends the player to an
+                // acceptance step - the Run press is the authorization.
+                CastingRunPresentation.DescribeRefusal("Long",
+                    new WorkspaceApplyResult(false, "not-accepted", null, null))
+                    .Contains("Accept") ||
                 !CastingRunPresentation.DescribeRefusal("Long",
                     new WorkspaceApplyResult(false, "not-accepted", null, null))
-                    .Contains("Accept Plan") ||
+                    .Contains("nothing was cast") ||
                 !CastingRunPresentation.DescribeRefusal("Long",
                     new WorkspaceApplyResult(false, "material-change-requires-review", null, null))
-                    .Contains("changed since you accepted"))
+                    .Contains("press again to run the current plan") ||
+                CastingRunPresentation.DescribeRefusal("Long",
+                    new WorkspaceApplyResult(false, "material-change-requires-review", null, null))
+                    .Contains("accepted") ||
+                !CastingRunPresentation.DescribeRefusal("Long",
+                    new WorkspaceApplyResult(false, "persistence-failed:save-failed:IOException", null, null))
+                    .Contains("Retry save"))
                 throw new InvalidOperationException("Refusal explanations are wrong.");
         }
 
@@ -5351,7 +5367,8 @@ namespace KingmakerBuffPlanner.Tests
             if (sharedCasting.IsExecutable ||
                 !sharedCasting.ReadinessReasons.Contains("enhancement-changes-targeting:" + EnhancedBuffWorld.ShareId) ||
                 WorkspaceReasonText.Describe("enhancement-changes-targeting:" + EnhancedBuffWorld.ShareId) !=
-                    "an enhancement that changes whom the spell reaches (such as Share Transmutation) is not executed yet")
+                    "an enhancement that changes whom the spell reaches (such as Share Transmutation) - " +
+                    "remove it and use \"Share with an ally\" before choosing the target")
                 throw new InvalidOperationException("Share Transmutation chosen as an enhancement was not refused: " +
                     sharedCasting.Readiness + " " + string.Join(",", sharedCasting.ReadinessReasons.ToArray()));
             // The draft editor offers what the compiler would accept for the

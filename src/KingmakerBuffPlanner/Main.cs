@@ -202,33 +202,21 @@ namespace KingmakerBuffPlanner
             }
         }
 
-        // The deliberate activation path for the casting-first planner. It
-        // is a saved player setting (UserSettings/planner-mode.json); the
-        // classic plan is imported once, never modified, and switching back
-        // returns to the classic planner with that plan.
+        // Everyday-use v1.2 §3: the mod settings page is a normal entry
+        // point, so it shows the casting-first planner as THE planner - no
+        // Classic choice, no "experimental", no acceptance step. A stored
+        // explicit classic choice from an earlier version gets one way
+        // forward (PlannerSettingsText decides; this only draws it).
         private static void DrawPlannerMode()
         {
-            GUILayout.Label("Planner mode");
-            bool castingFirst = BuffPlannerUiRoot.IsCastingFirstSelected;
-            GUILayout.BeginHorizontal();
-            bool classic = GUILayout.Toggle(!castingFirst, " Classic planner",
-                GUILayout.ExpandWidth(false));
-            GUILayout.Space(24f);
-            bool chosen = GUILayout.Toggle(castingFirst,
-                " Casting-first planner (experimental)", GUILayout.ExpandWidth(false));
-            GUILayout.EndHorizontal();
-            if (classic && castingFirst)
-                _modeMessage = BuffPlannerUiRoot.TrySetPlannerMode(
-                    KingmakerBuffPlanner.Persistence.PlannerMode.Classic) ??
-                    "Classic planner selected.";
-            else if (chosen && !castingFirst)
+            KingmakerBuffPlanner.Persistence.PlannerMode? mode = BuffPlannerUiRoot.SelectedPlannerMode;
+            GUILayout.Label(PlannerSettingsText.Heading);
+            GUILayout.Label(PlannerSettingsText.Describe(mode, PlannerHotkey.Binding));
+            if (PlannerSettingsText.OffersSwitch(mode) &&
+                GUILayout.Button(PlannerSettingsText.SwitchToCastingFirst, GUILayout.ExpandWidth(false)))
                 _modeMessage = BuffPlannerUiRoot.TrySetPlannerMode(
                     KingmakerBuffPlanner.Persistence.PlannerMode.CastingFirst) ??
-                    "Casting-first planner selected. Open the planner (HUD Setup button or " +
-                    PlannerHotkey.Binding + ") to review the imported plan and accept each routine.";
-            GUILayout.Label("Casting-first: each saved casting is exactly one cast - its own caster, " +
-                "spell source, target or group origin and enhancements. Your classic plan is imported " +
-                "once and kept unchanged; switching back returns to the classic planner.");
+                    PlannerSettingsText.Switched(PlannerHotkey.Binding);
             if (!string.IsNullOrEmpty(_modeMessage)) GUILayout.Label(_modeMessage);
         }
 
