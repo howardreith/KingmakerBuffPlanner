@@ -1083,7 +1083,8 @@ function Assert-KbpScenarioOutcome {
         # Escape-menu veil closes, reverse wheel recovery) are allowed beside
         # it and every requested action is still checked for its
         # acknowledgement below.
-        $expected = @('cf-moon', 'cf-wheel', 'cf-right-click', 'cf-escape-inspect', 'cf-escape-close')
+        $expected = @('cf-moon', 'cf-wheel', 'cf-right-click', 'cf-inspect-wheel', 'cf-long-wheel',
+            'cf-escape-inspect', 'cf-escape-close')
         $conditional = @('cf-menu-close-1', 'cf-menu-close-2', 'cf-menu-close-3',
             'cf-wheel-back-1', 'cf-wheel-back-2')
         $acknowledged = @($record.acknowledged | ForEach-Object { [string]$_ })
@@ -1111,6 +1112,41 @@ function Assert-KbpScenarioOutcome {
             -not [bool]$record.moonWorkspaceStayedClosed -or $null -eq $record.escMenuOpenAfterClose -or
             [bool]$record.escMenuOpenAfterClose) {
             throw "The physical run's moon press was not a cold, closed-editor press with a clean close: $path"
+        }
+        # E05/E06 re-read from the raw record. D11: the earlier record judged
+        # only that the description panel was active while it rendered at a
+        # negative size. Now: a panel of real size on screen, titled, showing
+        # exactly the chip's own native description; the physical wheel over
+        # it scrolled the long native text, never closed it and never moved
+        # the graph beneath.
+        $inspectKeys = @('screen', 'inspectPanelWidth', 'inspectPanelHeight', 'inspectTitle', 'inspectBodyChars',
+            'inspectExpectedChars', 'inspectBodyNative', 'inspectOverflow', 'inspectScrollBefore',
+            'inspectScrollAfter', 'longProbeChars', 'longProbeOverflow', 'longScrollBefore', 'longScrollAfter',
+            'inspectOpenAfterWheels', 'graphScrollUnderInspectBefore', 'graphScrollUnderInspectAfter')
+        $recordNames = @($record.PSObject.Properties | ForEach-Object Name)
+        $missingInspect = @($inspectKeys | Where-Object { $recordNames -cnotcontains $_ })
+        if ($missingInspect.Count -ne 0) {
+            throw "The physical run's description evidence is unread ($($missingInspect -join ', ')): $path"
+        }
+        $screenParts = ([string]$record.screen).Split('x')
+        if ($screenParts.Count -ne 2 -or $null -eq $record.inspectPanelWidth -or $null -eq $record.inspectPanelHeight -or
+            [double]$record.inspectPanelWidth -lt 0.25 * [double]$screenParts[0] -or
+            [double]$record.inspectPanelHeight -lt 0.25 * [double]$screenParts[1] -or
+            [string]::IsNullOrWhiteSpace([string]$record.inspectTitle) -or
+            $null -eq $record.inspectBodyNative -or -not [bool]$record.inspectBodyNative -or
+            [int]$record.inspectExpectedChars -le 0 -or [int]$record.inspectBodyChars -ne [int]$record.inspectExpectedChars) {
+            throw "The physical run's description was not visibly the chip's native text: $path"
+        }
+        if ([int]$record.longProbeChars -le 0 -or [double]$record.longProbeOverflow -le 1 -or
+            $null -eq $record.longScrollBefore -or $null -eq $record.longScrollAfter -or
+            [double]$record.longScrollAfter -ge [double]$record.longScrollBefore - 0.001 -or
+            ([double]$record.inspectOverflow -gt 1 -and ($null -eq $record.inspectScrollBefore -or
+                $null -eq $record.inspectScrollAfter -or
+                [double]$record.inspectScrollAfter -ge [double]$record.inspectScrollBefore - 0.001)) -or
+            $null -eq $record.inspectOpenAfterWheels -or -not [bool]$record.inspectOpenAfterWheels -or
+            $null -eq $record.graphScrollUnderInspectBefore -or $null -eq $record.graphScrollUnderInspectAfter -or
+            [Math]::Abs([double]$record.graphScrollUnderInspectAfter - [double]$record.graphScrollUnderInspectBefore) -ge 0.001) {
+            throw "The physical run's description did not scroll its own long content in isolation: $path"
         }
         if ($expectation -ceq 'select') {
             if ([bool]$record.moonRunStarted -or
@@ -1142,7 +1178,7 @@ function Assert-KbpScenarioOutcome {
         }
         # The launcher's own facts: it sent the planner hotkey, the host did
         # not fall back to its programmatic open, and every request of the
-        # run is one of the eight judged actions.
+        # run is one of the judged or conditional actions.
         $orchestration = Read-KbpJson (Join-Path $directory 'orchestration.json')
         $orchestrationNames = @($orchestration.PSObject.Properties | ForEach-Object Name)
         if ($orchestrationNames -cnotcontains 'plannerHotkeySentAtUtc' -or

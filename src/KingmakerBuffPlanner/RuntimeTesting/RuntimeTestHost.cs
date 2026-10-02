@@ -3556,6 +3556,46 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 CastingQualificationRecipe.EffectActive(inputs.LiveEffects, casting.DirectTargetUnitId, expected);
         }
 
+        // The right-clicked chip's native description, read independently of
+        // the view: the casting from the stored document, its source from a
+        // fresh snapshot (the adapter's localized blueprint description).
+        private string ChipNativeDescription(string chip)
+        {
+            if (chip == null || !chip.StartsWith("chip:", StringComparison.Ordinal)) return null;
+            string castingId = chip.Substring(5);
+            UI.CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+            CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+            if (session == null || session.Document == null || inputs == null) return null;
+            PlannedCasting casting = session.Document.Castings.FirstOrDefault(value => value != null &&
+                string.Equals(value.CastingId, castingId, StringComparison.Ordinal));
+            ProviderSnapshot provider = casting == null ? null : SeedProvider(inputs, casting);
+            return provider == null ? null : provider.Description;
+        }
+
+        // Every distinct native description in the fresh snapshot, joined
+        // (repeated, labelled, only when the fixture's total is too short to
+        // overflow the panel).
+        private static string LongNativeDescriptionText()
+        {
+            CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+            List<string> descriptions = inputs == null ? new List<string>() : inputs.ProviderOptions
+                .Where(option => option != null && option.Provider != null &&
+                    !string.IsNullOrWhiteSpace(option.Provider.Description))
+                .Select(option => option.Provider.Description.Trim())
+                .Distinct(StringComparer.Ordinal).ToList();
+            if (descriptions.Count == 0) return string.Empty;
+            var text = new System.Text.StringBuilder();
+            for (int pass = 0; text.Length < 6000 && pass < 20; pass++)
+                foreach (string description in descriptions)
+                {
+                    if (text.Length != 0) text.Append("\n\n");
+                    if (pass > 0 && text.Length != 0 && description == descriptions[0])
+                        text.Append("(repeated) ");
+                    text.Append(description);
+                }
+            return text.ToString();
+        }
+
         private static ProviderSnapshot SeedProvider(CastingWorkspaceInputs inputs, PlannedCasting casting)
         {
             return inputs.ProviderOptions.Where(option => option != null && option.Provider != null)
@@ -3848,9 +3888,76 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 if (view == null) return FinishPhysical("workspace-closed-early:inspect");
                 if (!view.SpellInspectOpen && settled < 4) return false;
+                // One layout pass settles before the presented panel is read.
+                if (view.SpellInspectOpen && settled < 0.75) return false;
                 _physicalRecord.InspectOpened = view.SpellInspectOpen;
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
                     "physical-cf-inspect.png"));
+                if (!view.SpellInspectOpen) return FinishPhysical("inspect-not-opened");
+                // What the player sees (D11): a panel of real size on screen,
+                // titled, showing the chip's own native description - read
+                // independently from the fresh snapshot of its source.
+                Vector2? size = view.SpellInspectPanelScreenSizeForRuntime;
+                _physicalRecord.InspectPanelWidth = size == null ? (float?)null : size.Value.x;
+                _physicalRecord.InspectPanelHeight = size == null ? (float?)null : size.Value.y;
+                _physicalRecord.InspectTitle = view.SpellInspectTitleForRuntime;
+                string body = view.SpellInspectBodyForRuntime;
+                string expected = ChipNativeDescription(_physicalRecord.InspectChip);
+                _physicalRecord.InspectBodyChars = body == null ? -1 : body.Length;
+                _physicalRecord.InspectExpectedChars = expected == null ? -1 : expected.Length;
+                _physicalRecord.InspectBodyNative = !string.IsNullOrWhiteSpace(expected) &&
+                    string.Equals(body, expected, StringComparison.Ordinal);
+                _physicalRecord.InspectOverflow = view.SpellInspectOverflowForRuntime;
+                _physicalRecord.InspectScrollBefore = view.SpellInspectScrollPositionForRuntime;
+                _physicalRecord.GraphScrollUnderInspectBefore = view.GraphScrollPositionForRuntime;
+                Vector2? centre = view.SpellInspectPanelCentreForRuntime;
+                if (centre == null) return FinishPhysical("inspect-panel-not-on-screen");
+                // The wheel over the open description belongs to it: the
+                // graph beneath must not move.
+                return RequestPhysical("cf-inspect-wheel", "wheel", centre.Value, ",\"delta\":-360", 50);
+            }
+            if (_physicalStep == 50)
+            {
+                if (settled < 1) return false;
+                if (view == null) return FinishPhysical("workspace-closed-early:inspect-wheel");
+                _physicalRecord.InspectScrollAfter = view.SpellInspectScrollPositionForRuntime;
+                _physicalRecord.InspectOpenAfterWheels = view.SpellInspectOpen;
+                if (!view.SpellInspectOpen) return FinishPhysical("inspect-closed-by-wheel");
+                // Long content (E06): the fixture's descriptions fit the
+                // panel, so the SAME open panel is given a long native text -
+                // every distinct description in the fresh snapshot, joined -
+                // programmatically (labelled as a probe in the title and the
+                // evidence); the physical wheel must then scroll it.
+                string longText = LongNativeDescriptionText();
+                _physicalRecord.LongProbeChars = longText.Length;
+                view.ShowSpellInspect("Layout probe: long native description text", longText,
+                    string.Empty, false);
+                _physicalSettle = System.Diagnostics.Stopwatch.StartNew();
+                _physicalStep = 51;
+                return false;
+            }
+            if (_physicalStep == 51)
+            {
+                if (settled < 0.75) return false;
+                if (view == null || !view.SpellInspectOpen) return FinishPhysical("inspect-closed-before-long-probe");
+                _physicalRecord.LongProbeOverflow = view.SpellInspectOverflowForRuntime;
+                _physicalRecord.LongScrollBefore = view.SpellInspectScrollPositionForRuntime;
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "physical-cf-inspect-long.png"));
+                Vector2? centre = view.SpellInspectPanelCentreForRuntime;
+                if (centre == null) return FinishPhysical("inspect-panel-not-on-screen:long");
+                return RequestPhysical("cf-long-wheel", "wheel", centre.Value, ",\"delta\":-360", 52);
+            }
+            if (_physicalStep == 52)
+            {
+                if (settled < 1) return false;
+                if (view == null) return FinishPhysical("workspace-closed-early:long-wheel");
+                _physicalRecord.LongScrollAfter = view.SpellInspectScrollPositionForRuntime;
+                _physicalRecord.InspectOpenAfterWheels = _physicalRecord.InspectOpenAfterWheels == true &&
+                    view.SpellInspectOpen;
+                _physicalRecord.GraphScrollUnderInspectAfter = view.GraphScrollPositionForRuntime;
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
+                    "physical-cf-inspect-long-scrolled.png"));
                 return RequestPhysical("cf-escape-inspect", "key-escape", Vector2.zero, null, 6);
             }
             if (_physicalStep == 6)
@@ -4080,6 +4187,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return value.HasValue ? (JToken)value.Value : JValue.CreateNull();
         }
 
+        private static JToken Nullable(float? value)
+        {
+            return value.HasValue ? (JToken)value.Value : JValue.CreateNull();
+        }
+
         private void PublishPhysicalRecord()
         {
             _physicalPublished = true;
@@ -4157,6 +4269,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "inspectChip", record.InspectChip },
                 { "inspectOpened", record.InspectOpened },
                 { "inspectClosedByEscape", record.InspectClosedByEscape },
+                { "inspectPanelWidth", Nullable(record.InspectPanelWidth) },
+                { "inspectPanelHeight", Nullable(record.InspectPanelHeight) },
+                { "inspectTitle", record.InspectTitle },
+                { "inspectBodyChars", record.InspectBodyChars },
+                { "inspectExpectedChars", record.InspectExpectedChars },
+                { "inspectBodyNative", Nullable(record.InspectBodyNative) },
+                { "inspectOverflow", record.InspectOverflow },
+                { "inspectScrollBefore", Nullable(record.InspectScrollBefore) },
+                { "inspectScrollAfter", Nullable(record.InspectScrollAfter) },
+                { "longProbeChars", record.LongProbeChars },
+                { "longProbeOverflow", record.LongProbeOverflow },
+                { "longScrollBefore", Nullable(record.LongScrollBefore) },
+                { "longScrollAfter", Nullable(record.LongScrollAfter) },
+                { "inspectOpenAfterWheels", Nullable(record.InspectOpenAfterWheels) },
+                { "graphScrollUnderInspectBefore", Nullable(record.GraphScrollUnderInspectBefore) },
+                { "graphScrollUnderInspectAfter", Nullable(record.GraphScrollUnderInspectAfter) },
                 { "documentSignatureBeforeBrowse", record.DocumentSignatureBeforeBrowse },
                 { "documentSignatureAfterInspect", record.DocumentSignatureAfterInspect },
                 { "notes", new JArray(record.Notes.Cast<object>().ToArray()) },

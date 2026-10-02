@@ -24,11 +24,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // session, with the plan a previous session stored - runs Long with
         // the editor closed; the workspace then opens through the launcher's
         // physical planner hotkey, the continuous scroll answers the wheel,
-        // a right-click opens the native spell inspect without any mutation,
-        // and Escape closes the inspect first and the workspace second.
+        // a right-click opens the native spell description - visibly, with
+        // the chip's own native text - without any mutation, the wheel over
+        // it scrolls the description and never the graph (proved on long
+        // native text too), and Escape closes the description first and the
+        // workspace second.
         public static readonly string[] CastingActions =
         {
-            "cf-moon", "cf-wheel", "cf-right-click", "cf-escape-inspect", "cf-escape-close"
+            "cf-moon", "cf-wheel", "cf-right-click", "cf-inspect-wheel", "cf-long-wheel",
+            "cf-escape-inspect", "cf-escape-close"
         };
 
         // The typed query comes from the label of a tile that was NOT
@@ -157,6 +161,58 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public string InspectChip { get; set; }
         public bool InspectOpened { get; set; }
         public bool InspectClosedByEscape { get; set; }
+        // What the player saw (D11): the panel's on-screen size in pixels
+        // (zero when it was partly off screen), its title, and whether its
+        // body is exactly the chip's native description read independently.
+        public float? InspectPanelWidth { get; set; }
+        public float? InspectPanelHeight { get; set; }
+        public string InspectTitle { get; set; }
+        public int InspectBodyChars { get; set; } = -1;
+        public int InspectExpectedChars { get; set; } = -1;
+        public bool? InspectBodyNative { get; set; }
+        // The chip's own description: overflow (content minus viewport) and
+        // the scroll position around the physical wheel over it.
+        public float InspectOverflow { get; set; }
+        public float? InspectScrollBefore { get; set; }
+        public float? InspectScrollAfter { get; set; }
+        // The labelled long-text probe in the same open panel: every distinct
+        // native description joined, then the physical wheel.
+        public int LongProbeChars { get; set; } = -1;
+        public float LongProbeOverflow { get; set; }
+        public float? LongScrollBefore { get; set; }
+        public float? LongScrollAfter { get; set; }
+        // Neither wheel closed the description or moved the graph beneath.
+        public bool? InspectOpenAfterWheels { get; set; }
+        public float? GraphScrollUnderInspectBefore { get; set; }
+        public float? GraphScrollUnderInspectAfter { get; set; }
+
+        // The description's own judgement (E05/E06), Unity-free.
+        public IList<string> InspectViolations()
+        {
+            var violations = new List<string>();
+            if (InspectPanelWidth == null || InspectPanelHeight == null ||
+                InspectPanelWidth.Value < 0.25f * ScreenWidth || InspectPanelHeight.Value < 0.25f * ScreenHeight)
+                violations.Add("inspect:panel-not-visible:" + (InspectPanelWidth == null ? "unread"
+                    : InspectPanelWidth.Value.ToString("0") + "x" + InspectPanelHeight.Value.ToString("0")));
+            if (string.IsNullOrWhiteSpace(InspectTitle)) violations.Add("inspect:title-empty");
+            if (InspectBodyNative != true)
+                violations.Add("inspect:body-not-native:" + InspectBodyChars + "/" + InspectExpectedChars);
+            if (InspectOverflow > 1f && (InspectScrollBefore == null || InspectScrollAfter == null ||
+                InspectScrollAfter.Value >= InspectScrollBefore.Value - 0.001f))
+                violations.Add("inspect:overflowing-description-not-scrolled");
+            if (LongProbeChars <= 0) violations.Add("inspect:long-probe-empty");
+            if (LongProbeOverflow <= 1f)
+                violations.Add("inspect:long-text-does-not-overflow:" + LongProbeOverflow.ToString("0.#"));
+            if (LongScrollBefore == null || LongScrollAfter == null ||
+                LongScrollAfter.Value >= LongScrollBefore.Value - 0.001f)
+                violations.Add("inspect:long-text-not-scrolled:" + LongScrollBefore + ">" + LongScrollAfter);
+            if (InspectOpenAfterWheels != true) violations.Add("inspect:closed-by-wheel");
+            if (GraphScrollUnderInspectBefore == null || GraphScrollUnderInspectAfter == null ||
+                Math.Abs(GraphScrollUnderInspectAfter.Value - GraphScrollUnderInspectBefore.Value) >= 0.001f)
+                violations.Add("inspect:wheel-moved-graph:" + GraphScrollUnderInspectBefore + ">" +
+                    GraphScrollUnderInspectAfter);
+            return violations;
+        }
         public string DocumentSignatureBeforeBrowse { get; set; }
         public string DocumentSignatureAfterInspect { get; set; }
         // The world-input isolation probe over the whole sequence.
@@ -273,6 +329,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 else if (GraphWheelEvidence == "moved-without-overflow")
                     violations.Add("graph-scroll:moved-without-overflow");
                 if (!InspectOpened) violations.Add("inspect:not-opened");
+                else violations.AddRange(InspectViolations());
                 if (!InspectClosedByEscape) violations.Add("inspect:not-closed");
                 if (DocumentSignatureBeforeBrowse == null ||
                     DocumentSignatureAfterInspect == null ||
