@@ -13,11 +13,16 @@ c727c5e2565adff320d9c53a313e815f57c479e9d198dcb6188542214462f7a3, MVID
 
 ## The exact next action
 
-1. Dispatch the already-built r13 evidence batch (41 jobs, run IDs
-   `beta-3c1c5d4ar13-*`, bound to the frozen candidate):
+1. The r13 batch (41 jobs, run IDs `beta-3c1c5d4ar13-*`) is bound to
+   commit 3c1c5d4, and the docs commit moved HEAD to a71f54d, so first
+   check out the candidate (clean, non-destructive, detached):
+   `git checkout 3c1c5d4a5193d3d84aa205e234c0a9b09b4face7`
+   then dispatch:
    `powershell -NoProfile -ExecutionPolicy Bypass -File
    C:\Dev\KingmakerBuffPlannerLab\dispatch\dispatcher.ps1`
-   (in `C:\Dev\KingmakerBuffPlannerLab\dispatch`). The dispatcher now
+   (in `C:\Dev\KingmakerBuffPlannerLab\dispatch`). After the batch,
+   `git checkout codex/kingmaker-buff-planner-everyday-use` and commit
+   the evidence documentation on top of a71f54d. The dispatcher now
    runs on any Active session of the owner account; it waits only for
    3 minutes of owner input-idle (self-clearing) and honors an
    `owner-pause` flag file in that directory. The launcher's foreground
