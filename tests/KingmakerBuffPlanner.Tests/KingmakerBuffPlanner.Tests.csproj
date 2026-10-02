@@ -34,6 +34,7 @@
     <Compile Include="AutosaveLifecycleTests.cs" />
     <Compile Include="SharePlanningTests.cs" />
     <Compile Include="UndoHistoryTests.cs" />
+    <Compile Include="EverydayUseWordingTests.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\ShareCastingModifierAdapter.cs"><Link>GameAdapters\ShareCastingModifierAdapter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\EnhancementLeaseCleanup.cs"><Link>GameAdapters\EnhancementLeaseCleanup.cs</Link></Compile>
     <Compile Include="TestBuildInfo.cs" />
@@ -114,6 +115,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingExecutionHost.cs"><Link>UI\CastingExecutionHost.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeCastingSessionPolicy.cs"><Link>UI\NativeCastingSessionPolicy.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingRunPresentation.cs"><Link>UI\CastingRunPresentation.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerSettingsText.cs"><Link>UI\PlannerSettingsText.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSessionBinding.cs"><Link>UI\CastingWorkspaceSessionBinding.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingSessionRecovery.cs"><Link>UI\CastingSessionRecovery.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceDevSelection.cs"><Link>UI\CastingWorkspaceDevSelection.cs</Link></Compile>

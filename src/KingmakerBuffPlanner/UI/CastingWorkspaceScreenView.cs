@@ -88,9 +88,12 @@ namespace KingmakerBuffPlanner.UI
         private Text _footerOnePass;
         private Text _footerResult;
         private Text _footerSave;
+        private Button _footerRecovery;
+        private string _shownSaveState;
         private Button _modeButton;
         private Button _readyOnlyButton;
         private Button _undoButton;
+        private Button _runButton;
         // Right-click spell description panel (everyday-use v1.2): a
         // read-only, scrollable presentation of the exact concrete
         // variant's native localized description. It never authors,
@@ -764,20 +767,34 @@ namespace KingmakerBuffPlanner.UI
             _footerOnePass = FooterLine(footer, "OnePassBudget", 0.34f, 0.67f);
             _footerResult = FooterLine(footer, "Result", 0f, 0.34f);
             _footerResult.color = Burgundy;
-            // Everyday-use v1.2 §2/§5: autosave replaced Save (a passive
-            // status shows it), the Run click authorizes the current
-            // revision (no Accept Plan / Review & Apply ceremony), and
-            // Reload moved out of everyday use (Recovery in the settings
-            // area keeps migration/repair tooling).
+            // Everyday-use v1.2 §2/§4/§5: autosave replaced Save (a passive
+            // status shows it, refreshed with the view), the Run click
+            // authorizes the current revision (no Accept Plan / Review &
+            // Apply ceremony), and Reload left everyday use: it appears -
+            // with Retry save - only as the exceptional recovery action
+            // when saving failed or is refused.
             string[] names = { "ExecutionMode", "Undo", "Run" };
-            string[] captions = { ModeCaption(), "Undo", "Run Long" };
+            string[] captions = { ModeCaption(), "Undo",
+                WorkspaceFooterText.RunCaption(_session.RoutineDisplayName(_session.SelectedRoutineId)) };
             Action[] actions =
             {
                 ToggleModeCommand, UndoCommand,
                 () => RunApply(CastingApplyMode.Ordinary)
             };
-            float[] widths = { 150f, 90f, 120f };
-            _footerSave = FooterLine(footer, "SaveStatus", 1f, 1f);
+            float[] widths = { 150f, 90f, 150f };
+            // The save column sits left of the three text lines (it used to
+            // overlap the first one: beta-3c1c5d4ar13-reload-01 frames).
+            const float SaveColumn = 104f;
+            _footerSave = FooterLine(footer, "SaveStatus", 0.55f, 1f);
+            _footerSave.alignment = TextAnchor.MiddleCenter;
+            _footerSave.rectTransform.anchorMax = new Vector2(0f, 1f);
+            _footerSave.rectTransform.offsetMin = new Vector2(0f, 0f);
+            _footerSave.rectTransform.offsetMax = new Vector2(SaveColumn - 8f, 0f);
+            _footerRecovery = KingmakerUiFactory.CreateButton("SaveRecovery", footer, _theme,
+                WorkspaceFooterText.RetrySaveAction, () => Command(RecoveryCommand));
+            KingmakerUiFactory.SetAnchors(RectOf(_footerRecovery), 0f, 0.06f, 0f, 0.52f);
+            RectOf(_footerRecovery).offsetMax = new Vector2(SaveColumn - 8f, RectOf(_footerRecovery).offsetMax.y);
+            _footerRecovery.gameObject.SetActive(false);
             float right = 0f;
             for (int index = names.Length - 1; index >= 0; index--)
             {
@@ -792,6 +809,7 @@ namespace KingmakerBuffPlanner.UI
                 right += widths[index] + 8f;
                 if (names[index] == "ExecutionMode") _modeButton = button;
                 if (names[index] == "Undo") _undoButton = button;
+                if (names[index] == "Run") _runButton = button;
             }
             _readyOnlyButton = KingmakerUiFactory.CreateButton("ReadyOnly", footer, _theme, "Ready Casts Only",
                 () => Command(() => RunApply(CastingApplyMode.ReadyCastsOnly)));
@@ -801,17 +819,14 @@ namespace KingmakerBuffPlanner.UI
             ready.sizeDelta = new Vector2(170f, 0f);
             ready.anchoredPosition = new Vector2(-right, 0f);
             _readyOnlyButton.gameObject.SetActive(false);
-            _footerSave.rectTransform.anchorMin = new Vector2(0f, 1f);
-            _footerSave.rectTransform.anchorMax = new Vector2(0.22f, 1f);
-            _footerSave.rectTransform.pivot = new Vector2(0f, 1f);
-            _footerSave.rectTransform.anchoredPosition = new Vector2(8f, -2f);
-            _footerSave.rectTransform.sizeDelta = new Vector2(0f, 16f);
-            _footerSave.text = "Saved";
-            _footerSave.color = _theme.MutedBrownText;
-            // The text lines end where the buttons begin.
+            // The text lines start after the save column and end where the
+            // buttons begin.
             float textRight = right + 180f;
             foreach (Text line in new[] { _footerSelectedRun, _footerOnePass, _footerResult })
+            {
+                line.rectTransform.offsetMin = new Vector2(SaveColumn, 0f);
                 line.rectTransform.offsetMax = new Vector2(-textRight, 0f);
+            }
             // The budget lines sit on the book's dark lower edge (seen in the
             // 1920x1200 frame): dark ink gets its own parchment ground.
             RectTransform ledger = KingmakerUiFactory.CreateRect("FooterLedger", footer);
@@ -820,9 +835,44 @@ namespace KingmakerBuffPlanner.UI
             ground.raycastTarget = false;
             ledger.SetAsFirstSibling();
             _footerResult.text = DescribeReadiness();
-            if (_footerSave != null)
-                _footerSave.text = string.IsNullOrEmpty(_session.AutosaveStatus)
-                    ? "Saved" : _session.AutosaveStatus;
+            ShowSaveState();
+        }
+
+        // The passive save status and its exceptional recovery action,
+        // refreshed with every view rebuild (v1.2 §4: never "Saved" before
+        // the current revision is durable). When the state turns into a
+        // problem, the explanation replaces the result line once.
+        private void ShowSaveState()
+        {
+            if (_footerSave == null) return;
+            string state = _session.FooterSaveState;
+            string problem = WorkspaceFooterText.SaveProblem(state);
+            _footerSave.text = WorkspaceFooterText.SaveStatus(state);
+            _footerSave.color = problem == null ? _theme.MutedBrownText : BlockedInk;
+            string action = WorkspaceFooterText.RecoveryAction(state);
+            if (_footerRecovery != null)
+            {
+                _footerRecovery.gameObject.SetActive(action != null);
+                if (action != null) KingmakerUiFactory.SetButtonLabel(_footerRecovery, action);
+            }
+            if (problem != null && !string.Equals(state, _shownSaveState, StringComparison.Ordinal) &&
+                _footerResult != null)
+                _footerResult.text = problem;
+            _shownSaveState = state;
+        }
+
+        private void RecoveryCommand()
+        {
+            string action = WorkspaceFooterText.RecoveryAction(_session.FooterSaveState);
+            if (action == WorkspaceFooterText.ReloadAction)
+            {
+                ReloadCommand();
+                return;
+            }
+            if (action == WorkspaceFooterText.RetrySaveAction)
+                _footerResult.text = _session.RetryFailedSave()
+                    ? "Saved: your latest edit is on disk."
+                    : WorkspaceFooterText.SaveProblem(_session.FooterSaveState);
         }
 
         private Text FooterLine(RectTransform footer, string name, float from, float to)
@@ -1433,15 +1483,15 @@ namespace KingmakerBuffPlanner.UI
                 "Instant mode: animate buffs that cannot be instant", () =>
             {
                 _session.SetAllowAnimatedFallback(!_session.AllowAnimatedFallback);
-                _footerResult.text = "Animated fallback " + (_session.AllowAnimatedFallback ? "on" : "off") +
-                    " (Save to keep it).";
+                _footerResult.text = WorkspaceFooterText.SettingChanged("Animated fallback",
+                    _session.AllowAnimatedFallback);
             });
             ActionButton("OutOfCombatOnly", (_session.OutOfCombatOnly ? "[x] " : "[  ] ") +
                 "Cast only out of combat", () =>
             {
                 _session.SetOutOfCombatOnly(!_session.OutOfCombatOnly);
-                _footerResult.text = "Out-of-combat only " + (_session.OutOfCombatOnly ? "on" : "off") +
-                    " (Save to keep it).";
+                _footerResult.text = WorkspaceFooterText.SettingChanged("Out-of-combat only",
+                    _session.OutOfCombatOnly);
             });
         }
 
@@ -1748,63 +1798,51 @@ namespace KingmakerBuffPlanner.UI
                 _footerResult.text = char.ToUpperInvariant(action[0]) + action.Substring(1) + ": " + result.Reason;
         }
 
-        private void SaveCommand()
-        {
-            try
-            {
-                _session.Save();
-                _footerResult.text = "Casting plan saved.";
-            }
-            catch (Exception exception)
-            {
-                _footerResult.text = PersistenceMessages.ForSaveFailure(exception);
-            }
-        }
-
+        // The exceptional recovery action for a refused save (offered only
+        // then - v1.2 §4): re-read the stored plan after the player moved
+        // the unreadable file aside or repaired the previous plan.
         private void ReloadCommand()
         {
-            // A reload that can replace unsaved changes asks for a second press.
+            // A reload that can replace edits not yet on disk asks for a second press.
             if (_session.IsDirty && Time.unscaledTime > _reloadArmedUntil)
             {
                 _reloadArmedUntil = Time.unscaledTime + 5f;
-                _footerResult.text = "Reload replaces this plan with the saved one, and unsaved changes can be " +
-                    "lost. Press Reload again to continue.";
+                _footerResult.text = "Reload replaces this plan with the stored one, and edits that are not " +
+                    "saved can be lost. Press Reload again to continue.";
                 return;
             }
             _reloadArmedUntil = 0f;
             CastingPlanLoadStatus status = _session.Reload();
+            // Castings kept across the reload are deliberate edits made
+            // while saving was blocked: now that it is not, they save like
+            // any other edit.
+            bool keptSaved = _session.LastReloadNote != "kept-unsaved" || _session.RetryFailedSave();
             _footerResult.text = _session.LegacyImportBlocked
                 ? DescribeImport(_session)
                 : PersistenceMessages.ForCastingLoad(status, _session.PrimaryPlanFileExists,
                     _session.LoadSourcePath, _session.LoadWarning) ??
                   (_session.LastReloadNote == "kept-unsaved"
-                      ? "No casting plan is saved yet; your castings were kept. Save writes them."
+                      ? (keptSaved
+                          ? "No casting plan was stored yet; the castings you added were kept and are now saved."
+                          : WorkspaceFooterText.SaveProblem(_session.FooterSaveState))
                       : _session.LastReloadNote == "imported-into-unsaved"
                           ? "Your classic plan was imported alongside your castings and saved."
                           : _session.ImportReport != null ? DescribeImport(_session)
                           : status == CastingPlanLoadStatus.Absent
-                              ? "No casting plan is saved yet; Save writes one."
-                              : "Reloaded the saved casting plan.");
+                              ? "No casting plan is stored yet; your first edit saves one."
+                              : "Reloaded the stored casting plan.");
         }
 
         private void ToggleModeCommand()
         {
             _session.SetExecutionMode(_session.ExecutionMode == "instant" ? "animated" : "instant");
             KingmakerUiFactory.SetButtonLabel(_modeButton, ModeCaption());
-            _footerResult.text = "Casting mode: " + _session.ExecutionMode + " (Save to keep it).";
+            _footerResult.text = WorkspaceFooterText.ModeChanged(_session.ExecutionMode);
         }
 
         private void UndoCommand()
         {
             if (!_session.Undo()) _footerResult.text = "Nothing to undo.";
-        }
-
-        private void AcceptCommand()
-        {
-            bool accepted = _session.AcceptPresentedPlan(_inputs());
-            string warning = PersistenceMessages.ForReviewWarning(_session.ReviewStoreWarning);
-            _footerResult.text = !accepted ? "Acceptance refused: the plan changed or was not shown."
-                : warning ?? "Plan accepted for " + _session.RoutineDisplayName(_session.SelectedRoutineId) + ".";
         }
 
         private string ModeCaption()
@@ -1820,12 +1858,8 @@ namespace KingmakerBuffPlanner.UI
             if (last != null)
                 return "Last run: " + CastingRunPresentation.Describe(last,
                     _session.RoutineDisplayName(last.ScopeRoutineId), _session.CastingLabel);
-            string disposition = _session.DispatchDisposition ?? string.Empty;
-            if (disposition == "native-casting-enabled")
-                return "Review the plan, press Accept Plan, then Review & Apply (or use the routine buttons).";
-            if (disposition == "native-casting-busy")
-                return "A routine is running; press its button again to stop it.";
-            return "Native casting is not available in this session (" + disposition + ").";
+            return WorkspaceFooterText.Readiness(_session.DispatchDisposition,
+                _session.RoutineDisplayName(_session.SelectedRoutineId));
         }
 
         private void RunApply(CastingApplyMode mode)
@@ -1846,8 +1880,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 int notReady = _lastView == null ? 0
                     : Math.Max(0, _lastView.RoutineCastingCount - _lastView.RoutineReadyCount);
-                _footerResult.text = "Apply blocked: " + (notReady == 1 ? "1 casting is" : notReady + " castings are") +
-                    " not ready (red lines and cards). Fix them, or use Ready Casts Only to run the ready ones.";
+                _footerResult.text = WorkspaceFooterText.RunBlocked(name, notReady);
                 _readyOnlyButton.gameObject.SetActive(true);
                 return;
             }
@@ -1876,13 +1909,18 @@ namespace KingmakerBuffPlanner.UI
                     ? "nothing spent yet" : string.Join("   ", view.OnePassBudget.ToArray()));
             _footerOnePass.color = view.OnePassShortCount > 0 ? BlockedInk : _theme.DarkBrownText;
             if (_undoButton != null) KingmakerUiFactory.SetInteractable(_undoButton, _session.CanUndo);
+            // Run runs the SELECTED routine, so it says which one.
+            if (_runButton != null)
+                KingmakerUiFactory.SetButtonLabel(_runButton, WorkspaceFooterText.RunCaption(
+                    _session.RoutineDisplayName(_session.SelectedRoutineId)));
+            ShowSaveState();
         }
 
         private static string DescribeImport(CastingWorkspaceSession session)
         {
             if (session.LegacyImportBlocked)
                 return "Your previous plan could not be imported (" + session.LegacyImportBlockReason +
-                    "). It was NOT replaced: saving and Apply are blocked. Repair or restore that file, then press " +
+                    "). It was NOT replaced: saving and runs are blocked. Repair or restore that file, then press " +
                     "Reload to retry.";
             CastingImportReport report = session.ImportReport;
             if (report == null) return null;

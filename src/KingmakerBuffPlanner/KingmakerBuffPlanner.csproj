@@ -223,6 +223,7 @@
     <Compile Include="UI\CastingExecutionHost.cs" />
     <Compile Include="UI\NativeCastingSessionPolicy.cs" />
     <Compile Include="UI\CastingRunPresentation.cs" />
+    <Compile Include="UI\PlannerSettingsText.cs" />
     <Compile Include="UI\CastingWorkspaceSessionBinding.cs" />
     <Compile Include="UI\CastingSessionRecovery.cs" />
     <Compile Include="UI\CastingWorkspaceScreenView.cs" />

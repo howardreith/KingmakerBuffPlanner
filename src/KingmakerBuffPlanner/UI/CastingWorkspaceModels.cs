@@ -557,6 +557,89 @@ namespace KingmakerBuffPlanner.UI
             return "Running every routine in one pass leaves " + shortCount +
                 (shortCount == 1 ? " casting" : " castings") + " of this routine short of a resource.";
         }
+
+        // Everyday-use v1.2 §2/§5: the footer's standing line. Edits save
+        // themselves and the Run click is the authorization - there is no
+        // Save, Accept Plan or Review & Apply step to point the player at.
+        public static string Readiness(string disposition, string routineName)
+        {
+            string value = disposition ?? string.Empty;
+            if (value == "native-casting-enabled")
+                return "Every edit is saved as you make it. Run " + routineName +
+                    " casts this routine now; the HUD moon button runs Long.";
+            if (value == "native-casting-busy")
+                return "A routine is running; press its HUD button again to stop it after the cast in progress.";
+            return "Native casting is not available in this session (" + value + ").";
+        }
+
+        // The Run button names the routine it runs: the selected one.
+        public static string RunCaption(string routineName)
+        {
+            return "Run " + routineName;
+        }
+
+        public static string RunBlocked(string routineName, int notReady)
+        {
+            return routineName + " was not cast: " +
+                (notReady == 1 ? "1 casting is" : notReady + " castings are") +
+                " not ready (red lines and cards). Fix them, or use Ready Casts Only to run the ready ones.";
+        }
+
+        // The mode change is an edit like any other: it saves itself, and
+        // the save status beside it says whether that worked.
+        public static string ModeChanged(string mode)
+        {
+            return "Casting mode: " + (mode == "instant" ? "Instant" : "Animated") +
+                " (for every routine of this plan).";
+        }
+
+        // A plan setting toggled: like every edit it saves itself.
+        public static string SettingChanged(string setting, bool on)
+        {
+            return setting + " " + (on ? "on" : "off") + " (for this plan).";
+        }
+
+        // v1.2 §4: the passive save status. "Saved" only while the current
+        // revision is durable; anything else is named, never hidden.
+        public const string RetrySaveAction = "Retry save";
+        public const string ReloadAction = "Reload";
+
+        public static string SaveStatus(string saveState)
+        {
+            string value = saveState ?? string.Empty;
+            if (value == "saved") return "Saved";
+            if (value == "saving") return "Saving...";
+            return "Not saved";
+        }
+
+        // Null while saved or saving; otherwise what happened and what the
+        // player can do (the footer's recovery action).
+        public static string SaveProblem(string saveState)
+        {
+            string value = saveState ?? string.Empty;
+            if (value == "saved" || value == "saving") return null;
+            if (value.StartsWith("save-failed:", StringComparison.Ordinal))
+                return "Your latest edit is NOT saved (" + value.Substring("save-failed:".Length) +
+                    "). It is kept here and the saved file is unchanged; runs refuse until it saves. " +
+                    "Retry save tries again (every new edit tries too).";
+            if (value == "save-refused:legacy-import")
+                return "Not saved: your previous plan could not be imported, and nothing is saved until " +
+                    "it is. Repair or restore that file, then press Reload.";
+            if (value.StartsWith("save-refused", StringComparison.Ordinal))
+                return "Not saved: the saved casting plan file could not be read or comes from a newer " +
+                    "planner, so it is protected from being overwritten. Move it and its backups " +
+                    "(.bak1 to .bak3) out of UserSettings, then press Reload.";
+            return "Not saved (" + value + ").";
+        }
+
+        // The exceptional recovery action for the save state, or null.
+        public static string RecoveryAction(string saveState)
+        {
+            string value = saveState ?? string.Empty;
+            if (value.StartsWith("save-failed:", StringComparison.Ordinal)) return RetrySaveAction;
+            if (value.StartsWith("save-refused", StringComparison.Ordinal)) return ReloadAction;
+            return null;
+        }
     }
 
     // Final review B2/B3: one exact way to cast the buff - who casts it,
@@ -671,7 +754,10 @@ namespace KingmakerBuffPlanner.UI
                 case "enhancements-unvalidated": return "an enhancement could not be checked";
                 case "enhancement-incompatible": return "an enhancement does not fit this casting";
                 case "enhancement-changes-targeting":
-                    return "an enhancement that changes whom the spell reaches (such as Share Transmutation) is not executed yet";
+                    // v1.2 §7: Share is a targeting choice made before the
+                    // target ("Share with an ally"), never an enhancement.
+                    return "an enhancement that changes whom the spell reaches (such as Share Transmutation) - " +
+                        "remove it and use \"Share with an ally\" before choosing the target";
                 case "import-review-unresolved": return "imported: needs your review";
                 case "already-active": return "already active";
                 case "present-effect-not-sufficient": return "the active effect is weaker or about to expire";

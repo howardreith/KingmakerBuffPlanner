@@ -476,6 +476,22 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        // What the footer shows, read on every refresh: a stored plan this
+        // session refuses to overwrite (unreadable, newer, unresolved
+        // import, a backup loaded over an unreadable primary) is "refused"
+        // from the moment it is opened - not "saved" until an edit happens
+        // to try a write - and an autosave failure shows as soon as it
+        // happens.
+        public string FooterSaveState
+        {
+            get
+            {
+                if (LegacyImportBlocked) return "save-refused:legacy-import";
+                if (SavesRefused) return "save-refused:stored-data-unresolved";
+                return AutosaveStatus;
+            }
+        }
+
         // Persisted review state problems (unreadable file, failed write);
         // review then simply requires a fresh acceptance.
         public string ReviewStoreWarning { get; private set; }

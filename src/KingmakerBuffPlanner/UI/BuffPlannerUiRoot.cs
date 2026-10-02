@@ -162,6 +162,13 @@ namespace KingmakerBuffPlanner.UI
             get { return _instance != null && _instance._plannerMode == PlannerMode.CastingFirst; }
         }
 
+        // The stored mode, or null before the root is constructed (the
+        // settings page can draw before the first update).
+        internal static PlannerMode? SelectedPlannerMode
+        {
+            get { return _instance == null ? (PlannerMode?)null : _instance._plannerMode; }
+        }
+
         // Qualification seams: fresh discovery exactly as Apply uses it, and
         // the production executor for given execution settings.
         internal static CastingWorkspaceInputs CastingWorkspaceFreshInputsForRuntime()
@@ -1743,8 +1750,8 @@ namespace KingmakerBuffPlanner.UI
         }
 
         // HUD routine tooltips in casting-first mode describe the casting
-        // plan (not the classic profile): castings in the routine, whether
-        // it is accepted, the run state, and the stop gesture.
+        // plan (not the classic profile): castings in the routine, the run
+        // state, the stop gesture, and the last press's result.
         private string CastingFirstRoutineTooltip(string routineId)
         {
             if (!CastingFirstActive) return null;
@@ -1765,38 +1772,16 @@ namespace KingmakerBuffPlanner.UI
             if (session != null && !string.Equals(session.CampaignId, loadedCampaignId,
                     StringComparison.Ordinal))
                 session = null;
+            // v1.2 §5: the click itself authorizes the routine; the tooltip
+            // never recomputes the plan and never describes an acceptance.
             if (session == null)
-                return "Cast " + name + " (casting-first planner). Open the planner to " +
-                    "review and accept the routine first.";
+                return CastingRunPresentation.RoutineTooltip(name, null, null, null);
             name = session.RoutineDisplayName(routineId);
             int castings = session.Document.Castings.Count(value => value != null &&
                 string.Equals(value.RoutineId, routineId, StringComparison.Ordinal));
-            // The tooltip never recomputes the plan: an acceptance on file
-            // is described as such, not as a promise that the press runs.
-            string acceptance;
-            switch (session.AcceptanceStandingFor(routineId))
-            {
-                case CastingAcceptanceStanding.Current:
-                    acceptance = ". Accepted.";
-                    break;
-                case CastingAcceptanceStanding.OnFile:
-                    acceptance = ". An accepted plan is on file; it runs only if nothing " +
-                        "changed since.";
-                    break;
-                case CastingAcceptanceStanding.Changed:
-                    acceptance = ". It differs from the accepted plan right now - open the " +
-                        "planner to see why.";
-                    break;
-                default:
-                    acceptance = ". Not yet accepted - open the planner to review it.";
-                    break;
-            }
             string last;
             _lastCastingPress.TryGetValue(PressKey(session, routineId), out last);
-            return "Cast " + name + ": " + castings + (castings == 1 ? " casting" : " castings") +
-                ", " + session.ExecutionMode + " mode" + acceptance +
-                (string.IsNullOrEmpty(last) ? string.Empty
-                    : " Last: " + (last.Length <= 180 ? last : last.Substring(0, 177) + "..."));
+            return CastingRunPresentation.RoutineTooltip(name, castings, session.ExecutionMode, last);
         }
 
         // A press result belongs to the campaign whose session produced it.
