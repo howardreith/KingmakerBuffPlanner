@@ -996,9 +996,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     bool imported = import.StartsWith("passed=True", StringComparison.Ordinal);
                     result.Assertions.Add(imported
                         ? RuntimeTestAssertion.Pass("workspace-first-open-import",
-                            "migrated;classic unchanged;archived;one casting per target;none Ready", import)
+                            "migrated;classic unchanged;archived once;one casting per target;none Ready;ambiguous casters kept as Drafts;fresh load equal", import)
                         : RuntimeTestAssertion.Fail("workspace-first-open-import",
-                            "migrated;classic unchanged;archived;one casting per target;none Ready", import));
+                            "migrated;classic unchanged;archived once;one casting per target;none Ready;ambiguous casters kept as Drafts;fresh load equal", import));
+                    string reconstructed = _importAfterClose ?? "missing";
+                    bool reloaded = reconstructed.StartsWith("passed=True", StringComparison.Ordinal);
+                    result.Assertions.Add(reloaded
+                        ? RuntimeTestAssertion.Pass("import-reconstructed-after-close",
+                            "fresh session from disk equals the imported intent;no re-import;classic unchanged;one archive", reconstructed)
+                        : RuntimeTestAssertion.Fail("import-reconstructed-after-close",
+                            "fresh session from disk equals the imported intent;no re-import;classic unchanged;one archive", reconstructed));
+                    imported = imported && reloaded;
                     result.Assertions.Add(_importWorkspaceClosed
                         ? RuntimeTestAssertion.Pass("import-workspace-closed",
                             "closed;lease released", "closed=True;lease=released")
@@ -3362,6 +3370,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             ProbeWorkspaceCloseResult closed = CloseProbeWorkspace();
             _importWorkspaceClosed = closed.Closed && closed.InputLeaseReleased &&
                 string.IsNullOrEmpty(closed.Failure);
+            _importAfterClose = VerifyImportAfterClose();
+            _log.Info("[KBP-IMPORT] after close;" + _importAfterClose + ".");
             _liveInitialCatalogEvidence = "import-scenario;workspaceRoot=active;legacyScreen=closed";
             _workspaceInteractionEvidence = "import;no-authoring";
             _workspaceReopenEvidence = "import;no-reopen-claim";
@@ -3391,8 +3401,38 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 report.ResultingCastingCount == _importExpectedCastings && castings == _importExpectedCastings;
             bool reviewed = report != null && report.ReadyCount == 0 && session.Document != null &&
                 session.Document.Castings.All(value => value != null && value.State != CastingAuthoringState.Ready);
-            bool passed = _importFailure == null && migrated && classicUnchanged && archived && imported && reviewed;
+            // Ambiguity stays visible (v1.2 §3: never resolved by guessing):
+            // every imported Automatic-caster casting is a Draft whose caster
+            // is still unresolved.
+            bool ambiguityKept = report != null && report.DraftCount == _importExpectedCastings &&
+                report.UnresolvedCasterCount == _importExpectedCastings && session.Document != null &&
+                session.Document.Castings.All(value => value != null &&
+                    value.State == CastingAuthoringState.Draft && string.IsNullOrEmpty(value.CasterUnitId));
+            // Restart-equivalent reconstruction: a FRESH production session
+            // over the same mod folder and campaign (what a restart
+            // constructs) loads the stored imported plan - it does not
+            // import again - and holds exactly the same intent; archive-first
+            // left exactly one byte-exact archive.
+            string freshStatus = "none";
+            bool freshEqual = false;
+            try
+            {
+                var fresh = new UI.CastingWorkspaceSession(_modEntry.Path, session.CampaignId,
+                    new DisabledCastingDispatchBoundary());
+                freshStatus = fresh.LoadStatus + "/" + fresh.MigrationStatus;
+                freshEqual = fresh.LoadStatus == KingmakerBuffPlanner.Persistence.CastingPlanLoadStatus.Loaded &&
+                    fresh.ImportReport == null && string.Equals(fresh.DocumentIntentSignature(),
+                        session.DocumentIntentSignature(), StringComparison.Ordinal);
+            }
+            catch (Exception exception) { freshStatus = "exception:" + exception.GetType().Name; }
+            _importCampaignId = session.CampaignId;
+            _importOpenSignature = session.DocumentIntentSignature();
+            bool singleArchive = archives.Length == 1;
+            bool passed = _importFailure == null && migrated && classicUnchanged && archived && imported && reviewed &&
+                ambiguityKept && freshEqual && singleArchive;
             return "passed=" + passed + ";migrated=" + migrated + ";status=" + session.MigrationStatus +
+                ";ambiguityKept=" + ambiguityKept + ";freshLoad=" + freshStatus + ";freshEqual=" + freshEqual +
+                ";archives=" + archives.Length +
                 ";classicUnchanged=" + classicUnchanged + ";archived=" + archived + ";castings=" + castings +
                 ";resulting=" + (report == null ? -1 : report.ResultingCastingCount) +
                 ";ready=" + (report == null ? -1 : report.ReadyCount) +
@@ -3402,6 +3442,43 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 (_importFailure == null ? string.Empty : ";failure=" + _importFailure);
         }
 
+        // After the planner is closed (no Save, no Accept), what a restart
+        // would construct from disk is still exactly the imported intent: a
+        // fresh production session loads it without importing again, the
+        // classic file is still byte-unchanged and there is still exactly one
+        // archive (the close neither re-imported nor re-archived).
+        private string VerifyImportAfterClose()
+        {
+            if (_importCampaignId == null || _importOpenSignature == null)
+                return "passed=False;no-open-identity";
+            string settings = Path.Combine(_modEntry.Path, "UserSettings");
+            bool classicUnchanged = _importClassicPath != null && File.Exists(_importClassicPath) &&
+                string.Equals(Hashing.Sha256(_importClassicPath), _importClassicSha256, StringComparison.Ordinal);
+            int archives = Directory.Exists(settings)
+                ? Directory.GetFiles(settings, "kbp-casting-*.orig").Length : 0;
+            string freshStatus;
+            bool freshEqual = false;
+            int freshDrafts = -1;
+            try
+            {
+                var fresh = new UI.CastingWorkspaceSession(_modEntry.Path, _importCampaignId,
+                    new DisabledCastingDispatchBoundary());
+                freshStatus = fresh.LoadStatus + "/" + fresh.MigrationStatus;
+                freshDrafts = fresh.Document == null ? -1 : fresh.Document.Castings.Count(value =>
+                    value != null && value.State == CastingAuthoringState.Draft && string.IsNullOrEmpty(value.CasterUnitId));
+                freshEqual = fresh.LoadStatus == KingmakerBuffPlanner.Persistence.CastingPlanLoadStatus.Loaded &&
+                    fresh.ImportReport == null && string.Equals(fresh.DocumentIntentSignature(),
+                        _importOpenSignature, StringComparison.Ordinal);
+            }
+            catch (Exception exception) { freshStatus = "exception:" + exception.GetType().Name; }
+            bool passed = freshEqual && classicUnchanged && archives == 1 && freshDrafts == _importExpectedCastings;
+            return "passed=" + passed + ";freshLoad=" + freshStatus + ";freshEqual=" + freshEqual +
+                ";unresolvedDrafts=" + freshDrafts + ";classicUnchanged=" + classicUnchanged + ";archives=" + archives;
+        }
+
+        private string _importCampaignId;
+        private string _importOpenSignature;
+        private string _importAfterClose;
         private string _importSeedEvidence;
         private string _importClassicPath;
         private string _importClassicSha256;

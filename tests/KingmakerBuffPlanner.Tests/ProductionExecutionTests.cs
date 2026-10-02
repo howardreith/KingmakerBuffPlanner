@@ -3616,10 +3616,31 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The import seed can overwrite a classic plan or is not built from discovery.");
             string verify = SourceBlock(host, "private string VerifyWorkspaceImport()");
             if (verify == null ||
-                !verify.Contains("bool passed = _importFailure == null && migrated && classicUnchanged && archived && imported && reviewed;") ||
+                !verify.Contains("bool passed = _importFailure == null && migrated && classicUnchanged && archived && imported && reviewed &&") ||
+                !verify.Contains("ambiguityKept && freshEqual && singleArchive;") ||
                 !verify.Contains("CastingMigrationStatus.Migrated") ||
-                !verify.Contains("report.ReadyCount == 0"))
+                !verify.Contains("report.ReadyCount == 0") ||
+                !verify.Contains("report.DraftCount == _importExpectedCastings") ||
+                !verify.Contains("report.UnresolvedCasterCount == _importExpectedCastings") ||
+                !verify.Contains("string.IsNullOrEmpty(value.CasterUnitId)") ||
+                !verify.Contains("fresh.ImportReport == null"))
                 throw new InvalidOperationException("The import verification is weaker than the scenario claims.");
+            // E14: after the planner closes (no Save, no Accept) a fresh
+            // production session from disk - what a restart constructs -
+            // holds exactly the imported intent, without importing again,
+            // and the classic file and the single archive are untouched.
+            string after = SourceBlock(host, "private string VerifyImportAfterClose()");
+            string update = SourceBlock(host, "private bool UpdateImport()");
+            if (after == null || update == null ||
+                !after.Contains("new UI.CastingWorkspaceSession(_modEntry.Path, _importCampaignId,") ||
+                !after.Contains("fresh.ImportReport == null") ||
+                !after.Contains("_importOpenSignature, StringComparison.Ordinal") ||
+                !after.Contains("bool passed = freshEqual && classicUnchanged && archives == 1 && freshDrafts == _importExpectedCastings;") ||
+                update.IndexOf("CloseProbeWorkspace();", StringComparison.Ordinal) < 0 ||
+                update.IndexOf("CloseProbeWorkspace();", StringComparison.Ordinal) >
+                    update.IndexOf("_importAfterClose = VerifyImportAfterClose();", StringComparison.Ordinal) ||
+                !host.Contains("imported = imported && reloaded;"))
+                throw new InvalidOperationException("The import is not reconstructed from disk after the planner closes.");
             int seedCall = host.IndexOf("if (RuntimeTestProtocol.IsImportScenario(_request.Scenario)) SeedClassicPlanForImport();",
                 StringComparison.Ordinal);
             int programmaticOpen = host.IndexOf("if (_liveUiPhase == 22)", StringComparison.Ordinal);
