@@ -81,18 +81,18 @@ Each saved casting is exactly one cast: one caster, one spell source and
 variant, one target (or one group origin), and its own enhancements.
 Nothing is expanded, merged or substituted behind your back.
 
-- **Review, then accept.** The planner shows each routine (Long,
-  Important, Short) as cards. Press **Accept Plan** once you have checked
-  it. A routine runs only while its accepted contents still match. If a
-  casting changes (caster, source, target, origin, enhancements, cost, the
-  existing-effect choice, or it becomes blocked), the routine needs a new
-  review. Buffs expiring or being applied do not. The HUD tooltip says
-  whether an accepted plan is on file; a press still re-checks it and
-  refuses if anything material changed.
-- **Run.** Use **Review & Apply** in the planner (the planner closes while
-  the party casts) or the routine buttons on the HUD. Both use the same
-  checks: the party state is re-read at that moment, and nothing runs on
-  a stale plan.
+- **Everything saves itself.** Every deliberate edit - adding, moving,
+  retargeting, changing a caster or source, choosing enhancements,
+  Undo, changing settings - is saved the moment you make it. There is no
+  Save button and no Accept Plan step: close the planner whenever you
+  like, restart the game, and the plan is exactly what you left. A failed
+  save is never silent: the footer shows the failure, the run refuses
+  while your newest edit is not durable, and the edits stay recoverable.
+- **Run.** Press the routine button on the HUD, or Run in the planner
+  (the planner closes while the party casts). Both use the same checks:
+  the party state is re-read at that moment, and nothing runs on a stale
+  plan. The moon button runs **Long** with one left-click - no editor
+  opens; hold it to open the planner instead.
 - **Blocked castings.** Ordinary Apply refuses the whole routine if any
   casting is blocked (for example no slot left, or the target is gone).
   **Ready Casts Only** runs the ready castings and lists what it left out.
@@ -194,7 +194,7 @@ else has passed source and recorded-runtime tests only.
 | A per-casting class-feature enhancement (Brown-Fur Powerful Change) | Runs; in Instant mode through the provider's own transaction | Yes (advanced campaign), both modes: the enhanced recipient got +6 where the plain cast gave +4, one Arcane Reservoir point was spent, and the caster's toggles were left as they were |
 | Metamagic rods (any matching rod) | Runs; a casting uses exactly the rods it chose, and a rod you left switched on is switched off for the other castings and back on afterwards | Yes (advanced campaign), both modes: an Extend rod made Blur last 1080 s instead of 540 s for one charge, and a casting without the rod spent none although the rod had been left on |
 | Metamagic spell variants | Runs | Not yet |
-| Share Transmutation and other ways of changing whom a spell reaches (as a targeting modifier or an enhancement) | Shown as "cannot run in this version" or "not executed yet"; Apply refuses | n/a |
+| Share Transmutation (a targeting modifier on a personal transmutation) | Runs; after choosing the exact caster and source, arm Share before the target click, then click the ally. Two allies are two castings; the Arcane Reservoir cost is budgeted atomically with the spell's own cost. Disabling Share leaves the ally target visible and blocked, repairable, and Undo/reload restore it | Yes (advanced campaign), both modes: the armed shared casting executed through the verified provider transaction, the reservoir and slot spending observed exactly, and the following plain cast by the same caster proved no Share state leaked |
 | A specific physical rod or item | Shown as "cannot run in this version"; Apply refuses | n/a |
 | Group castings whose required recipients are outside the predicted area | Shown as "cannot run in this version"; Apply refuses | n/a |
 

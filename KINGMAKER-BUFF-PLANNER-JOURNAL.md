@@ -2348,3 +2348,86 @@ work block implements exactly this):
   Share snapshot + modifier, mirroring the existing recipe tests);
   Build-Local + COMPLETE Test-SourceOnly at the new commit; NEW freeze
   record; dispatcher jobs instant+animated; E18/E19/E20 evidence.
+
+## Checkpoint 2026-10-02 (stopping point) — everyday-use v1.2 candidate 3c1c5d4
+
+- Branch: codex/kingmaker-buff-planner-everyday-use; HEAD
+  3c1c5d4a5193d3d84aa205e234c0a9b09b4face7 (pushed through the guarded
+  helper at this stopping point).
+- Candidate identity: package Sha256
+  1b6d67c0f7fd5ba8ba8d4a9047073500e0a5c3e01a76851c6e13ae410a2d5665; DLL
+  c727c5e2565adff320d9c53a313e815f57c479e9d198dcb6188542214462f7a3; MVID
+  6fb77f64-c7f7-4fbb-8340-5e6ca6c839f6; freeze record
+  runtime-backups/qualification-frozen/3c1c5d4.../FREEZE.json (bytes
+  copied + verified). Prior candidate 8a53ced8 (its own full gate PASS)\  also remains frozen with its r12 partial evidence.
+- Full gate PASS at this exact tree: artifacts/gate-3c1c5d4.log (source 42,
+  protocol 390, harness 38, package 4, deploy WhatIf 5, launcher WhatIf
+  12, fixture 3, restore 16, publisher 3).
+- Defects found and repaired across r6-r12 (each with a source
+  regression):
+  1. r6: the launcher's UMM-dismiss escape raced the host's programmatic
+     overlay close and opened the native Escape menu behind the
+     workspace; the fullscreen veil absorbed the cold-moon click. The
+     scenario now probes EscMenuWindow and closes it physically.
+  2. r7: the veil probe used activeInHierarchy (the hidden window keeps
+     its GameObject active) and the recovery escapes oscillated the
+     menu; the probe now reads UIWindow.IsShow (beta-a4f78d6fr7).
+  3. r8: the moon click reached the run service and was refused by the
+     runtime-test session's native-casting lock - the casting-first
+     route had no allowance exception. Added the parallel single-use
+     grant chain (CastingFirstPlanDigest/CastingFirstCastGrant/
+     CastingFirstAllowance; AllowanceBoundCastingDispatchBoundary;
+     launcher -CfAllowancePath/-PhysicalExpectation; allowance kind
+     cf-physical; jobs ui-phys-select -> allow-phys -> ui-phys-cast).
+  4. r8: the graph renders the SELECTED source's castings, so the seeded
+     chip was invisible; the seed now selects its own source (pure
+     browsing command).
+  5. r10: the host's request validation demanded the physical scenario's
+     exact parameter set and rejected the new physicalExpectation member
+     at boot ("Runtime request rejected: invalid-request:live-save-
+     parameters" in output_log; the game sat behind the UMM overlay
+     while the launcher timed out). The members are listed with their
+     own strict rules; the physical scenario got its request-contract
+     test (beta-f1d957efr10-phys-sel-01..03 evidence).
+  6. r11: the launcher's post-run judge still demanded the pre-v1.2
+     classic gesture set and rejected a perfect selection run
+     (beta-f0cf4f16r11-phys-sel-01: zero violations, chip inspected,
+     lock-refused press). The judge now covers the six cf-* actions, the
+     conditional pre-steps, and both moon expectations; the launcher
+     WhatIf fixtures cover both (plus the CastingActions meta-check).
+- Environmental events (not candidate defects): r10 w1080 Ctrl+C'd by
+  the owner mid-boot; beta-f1d957efr10-phys-sel-02 abort not honoured
+  (game closed gracefully, transaction restored); r12 w1080-01 hung at
+  exit after a clean result (result committed; process terminated as
+  the bounded last resort after WM_CLOSE was ignored; restoration
+  hash-verified).
+- Owner policy change (2026-10-02, written mid-mission): the dispatcher
+  no longer holds on an RDP viewer. It runs on ANY Active session of the
+  pinned account; the owner holds dispatch with a dispatch\owner-pause
+  flag file (absent = unpaused). A self-clearing 3-minute input-idle
+  wait remains because Win32 foreground activation - required by the
+  hover probes' mouse-move delivery - is denied under an RDP-attached
+  session even when input is idle, and succeeds on the physical console
+  (proven by r12 w1080-02/-03 failing exactly and only at the hover
+  phases after every PostMessage-delivered action passed). The two
+  hover-dependent jobs (ui-windowed, ui-advanced) are queued as
+  CONSOLE-REQUIRED at the end of the batch; everything else runs under
+  RDP. KBP-ConsoleAttach v2 is unchanged.
+- Jobs: r12 partial (beta-8a53ced8r12-reload-01 done+verified; the rest
+  interrupted by the RDP foreground denials above). r13 is BUILT on the
+  frozen 3c1c5d4 candidate (dispatch/jobs.json, run IDs
+  beta-3c1c5d4ar13-*) and deliberately NOT dispatched at the owner's
+  2026-10-02 stopping-point request.
+- 7. Foreground activation under RDP (r12): plain SetForegroundWindow is
+  denied by the OS foreground lock under an RDP-attached session even
+  when input is idle, so every verified physical input failed closed.
+  With the owner's explicit authorization the launcher now attaches to
+  the foreground/target input queues, restores a minimized window,
+  activates and detaches - no synthetic shell input; every caller still
+  verifies the foreground target (commit 3c1c5d4, gate PASS).
+- Stopping point: guide updated (autosave/moon wording, Share row),
+  docs/E01-E27-ACCEPTANCE-MATRIX.md written from actual evidence with
+  honest NOT-RUN cells, this journal updated, AUTONOMOUS-RESUME/BLOCKERS
+  updated, all pushed. Remaining: dispatch r13, fill the matrix cells,
+  private delivery with verified bytes and retrieval instructions.
+
