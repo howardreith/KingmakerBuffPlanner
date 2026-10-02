@@ -515,7 +515,8 @@ try {
         'cf-escape-inspect', 'cf-escape-close')
     $physicalKinds = @{ 'cf-moon' = 'click'; 'cf-open' = 'hotkey'; 'cf-wheel' = 'wheel'
         'cf-right-click' = 'rightclick'; 'cf-escape-inspect' = 'key-escape'; 'cf-escape-close' = 'key-escape' }
-    function New-PhysicalOutcomeCase([string]$Name, [string]$Expectation, [scriptblock]$Tamper) {
+    function New-PhysicalOutcomeCase([string]$Name, [string]$Expectation, [scriptblock]$Tamper,
+        [string]$ExpectedScreen = '1920x1080') {
         $directory = Join-Path $outcomeRoot $Name
         New-Item -ItemType Directory -Path $directory | Out-Null
         foreach ($id in $physicalActions) {
@@ -540,11 +541,19 @@ try {
         }
         Write-KbpJsonAtomic (Join-Path $directory 'physical-workspace.json') $record
         if ($null -ne $Tamper) { & $Tamper $directory }
+        # The launcher's own request shape: expectedScreen exists only for a
+        # windowed -DisplayMode (an owner-display run has no such member).
+        $parameters = [ordered]@{ physicalExpectation = $Expectation }
+        if (-not [string]::IsNullOrEmpty($ExpectedScreen)) { $parameters.expectedScreen = $ExpectedScreen }
         return [ordered]@{ runId = 'physical-run'; scenario = 'live-workspace-physical'; evidenceDirectory = $directory
-            parameters = @{ expectedScreen = '1920x1080'; physicalExpectation = $Expectation } }
+            parameters = $parameters }
     }
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-good' 'select' $null)
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-cast-good' 'cast' $null)
+    # Owner display (no -DisplayMode): beta-3c1c5d4ar13-phys-sel-01 passed
+    # in game and the judge threw reading the absent expectedScreen.
+    Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-owner-select' 'select' $null '')
+    Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-owner-cast' 'cast' $null '')
     $physicalOutcomeCases = [ordered]@{
         'missing-ack' = @('select', { param($d) Remove-Item -LiteralPath (Join-Path $d 'physical-input-cf-wheel.ack.json') })
         'failed-ack' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-moon.ack.json') ([ordered]@{
