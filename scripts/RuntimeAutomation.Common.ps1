@@ -1044,13 +1044,39 @@ function Assert-KbpScenarioOutcome {
         $path = Join-Path $directory 'physical-workspace.json'
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Physical workspace evidence is missing.' }
         $record = Read-KbpJson $path
-        $expected = @('ws-click-search', 'ws-wheel-grid', 'ws-type-query', 'ws-click-tile',
-            'ws-focus-cycle', 'ws-click-search-again', 'ws-type-more', 'ws-escape')
+        # v1.2 casting-first gesture set; the conditional pre-steps (a
+        # stale workspace close, native Escape-menu veil closes, reverse
+        # wheel recovery) are allowed beside it and every requested action
+        # is still checked for its acknowledgement below.
+        $expected = @('cf-moon', 'cf-open', 'cf-wheel', 'cf-right-click',
+            'cf-escape-inspect', 'cf-escape-close')
+        $conditional = @('cf-close-first', 'cf-menu-close-1', 'cf-menu-close-2', 'cf-menu-close-3',
+            'cf-wheel-back-1', 'cf-wheel-back-2')
         $acknowledged = @($record.acknowledged | ForEach-Object { [string]$_ })
         if ([string]$record.runId -cne [string]$Request.runId -or @($record.violations).Count -ne 0 -or
             @($record.failures).Count -ne 0 -or -not [bool]$record.openedPhysically -or
-            ($acknowledged -join ',') -cne ($expected -join ',')) {
+            -not [bool]$record.castingFirst -or
+            @($expected | Where-Object { $acknowledged -cnotcontains $_ }).Count -ne 0 -or
+            @($acknowledged | Where-Object { ($expected + $conditional) -cnotcontains $_ }).Count -ne 0) {
             throw "Physical workspace evidence is inconsistent with a PASS: $path"
+        }
+        # The moon-run contract: the record judges the expectation this
+        # request set; a selection run was refused BY THE LOCK and never
+        # ran, a cast run ran Long once under its consumed grant.
+        $expectation = [string]$Request.parameters.physicalExpectation
+        if ([string]::IsNullOrEmpty($expectation)) { $expectation = 'cast' }
+        if ([string]$record.moonExpectation -cne $expectation) {
+            throw "The physical run judged another moon expectation: $($record.moonExpectation) (expected $expectation)."
+        }
+        if ($expectation -ceq 'select') {
+            if ([bool]$record.moonRunStarted -or
+                -not ([string]$record.moonRefusal -like 'native-submission-disabled*')) {
+                throw "A physical selection run was not refused by the session lock: $path"
+            }
+        }
+        elseif (-not [bool]$record.moonRunStarted -or $null -eq $record.moonGrantConsumed -or
+            -not [bool]$record.moonGrantConsumed) {
+            throw "A physical cast run did not run Long under its consumed grant: $path"
         }
         $expectedScreen = [string]$Request.parameters.expectedScreen
         if (-not [string]::IsNullOrEmpty($expectedScreen) -and [string]$record.screen -cne $expectedScreen) {
@@ -1068,13 +1094,13 @@ function Assert-KbpScenarioOutcome {
             throw 'The physical run was not opened through the planner hotkey this launcher sent.'
         }
         $requestNames = @(Get-ChildItem -LiteralPath $directory -Filter 'physical-input-*.json' -File |
-            Where-Object { $_.Name -notlike '*.ack.json' } | ForEach-Object Name | Sort-Object)
-        $expectedNames = @($expected | ForEach-Object { 'physical-input-{0}.json' -f $_ } | Sort-Object)
-        if (($requestNames -join ',') -cne ($expectedNames -join ',')) {
-            throw "The physical run requested other actions than the judged eight: $($requestNames -join ',')"
+            Where-Object { $_.Name -notlike '*.ack.json' } |
+            ForEach-Object { $_.Name -replace '^physical-input-', '' -replace '\.json$', '' } | Sort-Object)
+        $allowed = @($expected + $conditional | Sort-Object)
+        if (@($requestNames | Where-Object { $allowed -cnotcontains $_ }).Count -ne 0) {
+            throw "The physical run requested actions outside the physical contract: $($requestNames -join ',')"
         }
-        $typed = @{ 'ws-type-query' = [string]$record.query; 'ws-type-more' = [string]$record.querySuffix }
-        foreach ($actionId in $expected) {
+        foreach ($actionId in $requestNames) {
             $requestPath = Join-Path $directory ('physical-input-{0}.json' -f $actionId)
             $ackPath = Join-Path $directory ('physical-input-{0}.ack.json' -f $actionId)
             if (-not (Test-Path -LiteralPath $requestPath -PathType Leaf) -or
@@ -1091,13 +1117,6 @@ function Assert-KbpScenarioOutcome {
             }
             if ([string]$ack.processId -cne [string]$orchestration.kingmakerProcessId) {
                 throw "Physical action $actionId was acknowledged for another process."
-            }
-            if ($typed.ContainsKey($actionId) -and
-                ([string]::IsNullOrEmpty($typed[$actionId]) -or
-                    @($sent.PSObject.Properties | ForEach-Object Name) -cnotcontains 'text' -or
-                    @($ack.PSObject.Properties | ForEach-Object Name) -cnotcontains 'text' -or
-                    [string]$sent.text -cne $typed[$actionId] -or [string]$ack.text -cne $typed[$actionId])) {
-                throw "Physical action $actionId typed text the host did not record."
             }
         }
         foreach ($ackFile in @(Get-ChildItem -LiteralPath $directory -Filter 'physical-input-*.ack.json' -File)) {

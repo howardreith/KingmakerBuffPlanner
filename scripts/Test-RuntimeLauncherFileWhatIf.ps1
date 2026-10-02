@@ -507,62 +507,80 @@ try {
             throw "Classic outcome case $case was not refused by the launcher's check: $refusal"
         }
     }
-    $physicalActions = @('ws-click-search', 'ws-wheel-grid', 'ws-type-query', 'ws-click-tile',
-        'ws-focus-cycle', 'ws-click-search-again', 'ws-type-more', 'ws-escape')
-    $physicalKinds = @{ 'ws-click-search' = 'click'; 'ws-wheel-grid' = 'wheel'; 'ws-type-query' = 'type'
-        'ws-click-tile' = 'click'; 'ws-focus-cycle' = 'focus-cycle'; 'ws-click-search-again' = 'click'
-        'ws-type-more' = 'type'; 'ws-escape' = 'key-escape' }
-    function New-PhysicalOutcomeCase([string]$Name, [scriptblock]$Tamper) {
+    # v1.2 casting-first physical contract: six judged actions, the
+    # conditional pre-steps allowed beside them, and the moon-run
+    # expectation (select refused by the lock; cast run once under its
+    # consumed grant).
+    $physicalActions = @('cf-moon', 'cf-open', 'cf-wheel', 'cf-right-click',
+        'cf-escape-inspect', 'cf-escape-close')
+    $physicalKinds = @{ 'cf-moon' = 'click'; 'cf-open' = 'hotkey'; 'cf-wheel' = 'wheel'
+        'cf-right-click' = 'rightclick'; 'cf-escape-inspect' = 'key-escape'; 'cf-escape-close' = 'key-escape' }
+    function New-PhysicalOutcomeCase([string]$Name, [string]$Expectation, [scriptblock]$Tamper) {
         $directory = Join-Path $outcomeRoot $Name
         New-Item -ItemType Directory -Path $directory | Out-Null
         foreach ($id in $physicalActions) {
             $sent = [ordered]@{ schemaVersion = 1; runId = 'physical-run'; actionId = $id; action = $physicalKinds[$id] }
-            if ($id -ceq 'ws-type-query') { $sent.text = 'resi' }
-            if ($id -ceq 'ws-type-more') { $sent.text = 's' }
             Write-KbpJsonAtomic (Join-Path $directory "physical-input-$id.json") $sent
             Write-KbpJsonAtomic (Join-Path $directory "physical-input-$id.ack.json") ([ordered]@{
                 schemaVersion = 1; runId = 'physical-run'; actionId = $id; action = $physicalKinds[$id]
-                processId = 4242; text = if ($sent.Contains('text')) { $sent.text } else { $null } })
+                processId = 4242; text = $null })
         }
         Write-KbpJsonAtomic (Join-Path $directory 'orchestration.json') ([ordered]@{
             runId = 'physical-run'; kingmakerProcessId = 4242; plannerHotkeySentAtUtc = '2026-09-24T00:00:00Z' })
         $record = [ordered]@{ schemaVersion = 1; runId = 'physical-run'; expectedScreen = '1920x1080'
-            screen = '1920x1080'; openedPhysically = $true; query = 'resi'; querySuffix = 's'
-            acknowledged = $physicalActions; failures = @(); violations = @() }
+            screen = '1920x1080'; openedPhysically = $true; castingFirst = $true
+            moonExpectation = $Expectation; acknowledged = $physicalActions; failures = @(); violations = @() }
+        if ($Expectation -ceq 'select') {
+            $record.moonRunStarted = $false
+            $record.moonRefusal = 'native-submission-disabled:runtime-test-session:live-workspace-physical:cf-grant-absent;Refused'
+        }
+        else {
+            $record.moonRunStarted = $true
+            $record.moonGrantConsumed = $true
+        }
         Write-KbpJsonAtomic (Join-Path $directory 'physical-workspace.json') $record
         if ($null -ne $Tamper) { & $Tamper $directory }
         return [ordered]@{ runId = 'physical-run'; scenario = 'live-workspace-physical'; evidenceDirectory = $directory
-            parameters = @{ expectedScreen = '1920x1080' } }
+            parameters = @{ expectedScreen = '1920x1080'; physicalExpectation = $Expectation } }
     }
-    Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-good' $null)
+    Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-good' 'select' $null)
+    Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-cast-good' 'cast' $null)
     $physicalOutcomeCases = [ordered]@{
-        'missing-ack' = { param($d) Remove-Item -LiteralPath (Join-Path $d 'physical-input-ws-wheel-grid.ack.json') }
-        'failed-ack' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-escape.ack.json') ([ordered]@{
-            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-escape'; action = 'key-escape'; deliveryFailed = $true }) }
-        'other-action' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-click-tile.ack.json') ([ordered]@{
-            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-click-tile'; action = 'hover' }) }
-        'other-text' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-type-query.json') ([ordered]@{
-            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-type-query'; action = 'type'; text = 'ligh' }) }
-        'unacknowledged' = { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
-            $r.acknowledged = @('ws-click-search'); Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r }
-        'other-screen' = { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
-            $r.screen = '1920x1200'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r }
-        'programmatic-open' = { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
-            $r.openedPhysically = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r }
-        'extra-failed-ack' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-other.ack.json') ([ordered]@{
-            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-other'; action = 'click'; deliveryFailed = $true }) }
-        'extra-request' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-extra.json') ([ordered]@{
-            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-extra'; action = 'click' }) }
-        'host-fallback-open' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'programmatic-open.json') ([ordered]@{ opened = $true }) }
-        'no-hotkey-sent' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'orchestration.json') ([ordered]@{
-            runId = 'physical-run'; kingmakerProcessId = 4242 }) }
-        'ack-other-process' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-click-search.ack.json') ([ordered]@{
-            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-click-search'; action = 'click'; processId = 7; text = $null }) }
-        'ack-other-text' = { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-type-more.ack.json') ([ordered]@{
-            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-type-more'; action = 'type'; processId = 4242; text = 'x' }) }
+        'missing-ack' = @('select', { param($d) Remove-Item -LiteralPath (Join-Path $d 'physical-input-cf-wheel.ack.json') })
+        'failed-ack' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-moon.ack.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'cf-moon'; action = 'click'; deliveryFailed = $true }) })
+        'other-action' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-right-click.ack.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'cf-right-click'; action = 'hover' }) })
+        'unacknowledged' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.acknowledged = @('cf-moon'); Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'not-casting-first' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.castingFirst = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'other-screen' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.screen = '1920x1200'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'programmatic-open' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.openedPhysically = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'select-ran-anyway' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.moonRunStarted = $true; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'select-wrong-refusal' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.moonRefusal = 'no-dispatch-refusal;Refused:target unavailable'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'cast-expectation-mismatch' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.moonExpectation = 'select'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'cast-did-not-run' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.moonRunStarted = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'cast-grant-not-consumed' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.moonGrantConsumed = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'extra-failed-ack' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-other.ack.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-other'; action = 'click'; deliveryFailed = $true }) })
+        'extra-request' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-extra.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'cf-extra'; action = 'click' }) })
+        'host-fallback-open' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'programmatic-open.json') ([ordered]@{ opened = $true }) })
+        'no-hotkey-sent' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'orchestration.json') ([ordered]@{
+            runId = 'physical-run'; kingmakerProcessId = 4242 }) })
+        'ack-other-process' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-moon.ack.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'cf-moon'; action = 'click'; processId = 7; text = $null }) })
     }
     foreach ($case in $physicalOutcomeCases.Keys) {
-        $caseRequest = New-PhysicalOutcomeCase $case $physicalOutcomeCases[$case]
+        $caseRequest = New-PhysicalOutcomeCase $case $physicalOutcomeCases[$case][0] $physicalOutcomeCases[$case][1]
         $refusal = $null
         try { Assert-KbpScenarioOutcome -Request $caseRequest }
         catch { $refusal = $_.Exception.Message }
