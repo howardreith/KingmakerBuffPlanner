@@ -1078,7 +1078,18 @@ function Assert-KbpScenarioOutcome {
             -not [bool]$record.moonGrantConsumed) {
             throw "A physical cast run did not run Long under its consumed grant: $path"
         }
-        $expectedScreen = [string]$Request.parameters.expectedScreen
+        # expectedScreen is OPTIONAL: the launcher sets it only for a
+        # windowed -DisplayMode, so an owner-display request has no such
+        # member and a plain read throws under strict mode
+        # (beta-3c1c5d4ar13-phys-sel-01: a PASS run failed here).
+        $parameters = $Request.parameters
+        $expectedScreen = if ($parameters -is [System.Collections.IDictionary]) {
+            if ($parameters.Contains('expectedScreen')) { [string]$parameters['expectedScreen'] } else { '' }
+        }
+        elseif ($null -ne $parameters -and $null -ne $parameters.PSObject.Properties['expectedScreen']) {
+            [string]$parameters.expectedScreen
+        }
+        else { '' }
         if (-not [string]::IsNullOrEmpty($expectedScreen) -and [string]$record.screen -cne $expectedScreen) {
             throw "The physical run judged another screen: $($record.screen) (expected $expectedScreen)."
         }

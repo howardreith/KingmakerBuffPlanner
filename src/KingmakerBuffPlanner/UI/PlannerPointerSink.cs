@@ -12,36 +12,15 @@ namespace KingmakerBuffPlanner.UI
         internal BuffPlannerUiLifecycleDiagnostics Diagnostics;
         internal string RoutineId;
         internal Action<bool> HoverChanged;
-        // Everyday-use v1.2 §5: a hold on the moon button opens the editor
-        // (its click runs Long). Set only on that button.
-        internal Action HoldAction;
-        internal float HoldSeconds = 0.55f;
-        private float _heldSince = -1f;
 
         public void OnPointerDown(PointerEventData eventData)
         {
             if (Diagnostics != null) Diagnostics.RecordPointer(RoutineId);
-            if (HoldAction != null) _heldSince = Time.unscaledTime;
             eventData.Use();
         }
 
-        public void OnPointerUp(PointerEventData eventData)
-        {
-            _heldSince = -1f;
-            eventData.Use();
-        }
-
+        public void OnPointerUp(PointerEventData eventData) { eventData.Use(); }
         public void OnPointerClick(PointerEventData eventData) { eventData.Use(); }
-
-        private void Update()
-        {
-            if (HoldAction == null || _heldSince < 0f) return;
-            if (Time.unscaledTime - _heldSince >= HoldSeconds)
-            {
-                _heldSince = -1f;
-                HoldAction();
-            }
-        }
         public void OnPointerEnter(PointerEventData eventData)
         {
             if (Diagnostics != null) Diagnostics.RecordPointerEnter(RoutineId);
