@@ -368,6 +368,8 @@ namespace KingmakerBuffPlanner.Tests
                     TestRuntimeManualScenarioValidation);
                 Run("runtime-manual-request-validation",
                     () => TestManualScenarioRequestValidation(root));
+                Run("physical-scenario-request-validation",
+                    () => TestPhysicalScenarioRequestValidation(root));
                 Run("probe-scenario-request-validation",
                     () => TestProbeScenarioRequestValidation(root));
                 // Review J1/J2 production producer/consumer regressions.
@@ -9809,6 +9811,101 @@ namespace KingmakerBuffPlanner.Tests
                 if (bad != null || string.IsNullOrEmpty(rejection))
                     throw new InvalidOperationException(
                         "An invalid manual request was accepted: " + item.Key);
+            }
+        }
+
+        // The physical scenario's exact live-save contract, through the real
+        // TryRead path (r10 defect: the launcher's new physicalExpectation
+        // parameter was not a listed member, so the host rejected every
+        // physical request at boot and the launcher timed out at the menu).
+        // The expectation is select or cast; only cast carries the
+        // run-bound casting-first allowance.
+        private static void TestPhysicalScenarioRequestValidation(string root)
+        {
+            Action<Dictionary<string, object>> saveSet = o =>
+            {
+                o["scenario"] = "live-workspace-physical";
+                o["parameters"] = new Dictionary<string, object>
+                {
+                    { "workingSaveName", "KBP_AUTOMATION_WORKING" },
+                    { "workingFileName", "Manual_305_KBP_AUTOMATION_WORKING.zks" },
+                    { "workingSha256", new string('a', 64) },
+                    { "baselineSaveName", "KBP_AUTOMATION_BASELINE" },
+                    { "baselineFileName", "Manual_304_KBP_AUTOMATION_BASELINE.zks" },
+                    { "baselineSha256", new string('b', 64) },
+                    { "expectedGameName", "Yadmila" },
+                    { "expectedGameId", "3d556254-8ba9-4e9f-8d11-755eecd0b661" },
+                    { "executionMode", "instant" },
+                    { "physicalExpectation", "select" }
+                };
+            };
+            string valid = WriteRequest(root, "physical-valid", saveSet);
+            string rejection;
+            RuntimeTestRequest request = ReadProtocol(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, valid },
+                out rejection);
+            if (request == null || rejection.Length != 0 || request.Parameters.Count != 10)
+                throw new InvalidOperationException("A valid physical selection request was rejected: " +
+                    rejection);
+            // The cast expectation carries the allowance string.
+            string castValid = WriteRequest(root, "physical-cast-valid", o =>
+            {
+                saveSet(o);
+                var parameters = (Dictionary<string, object>)o["parameters"];
+                parameters["physicalExpectation"] = "cast";
+                parameters["cfAllowance"] = "{\"schemaVersion\":1}";
+            });
+            RuntimeTestRequest cast = ReadProtocol(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, castValid },
+                out rejection);
+            if (cast == null || rejection.Length != 0 || cast.Parameters.Count != 11 ||
+                !(cast.Parameters["cfAllowance"] is string))
+                throw new InvalidOperationException("A valid physical cast request was rejected: " +
+                    rejection);
+            var cases = new List<KeyValuePair<string, Action<Dictionary<string, object>>>>
+            {
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "expectation-value", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])["physicalExpectation"] = "maybe";
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "allowance-without-cast-expectation", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])["cfAllowance"] = "{}";
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "allowance-not-a-string", o =>
+                    {
+                        saveSet(o);
+                        var parameters = (Dictionary<string, object>)o["parameters"];
+                        parameters["physicalExpectation"] = "cast";
+                        parameters["cfAllowance"] = 7;
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "expectation-on-another-scenario", o =>
+                    {
+                        saveSet(o);
+                        o["scenario"] = "live-workspace-qual";
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "unknown-extra", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])["surprise"] = true;
+                    })
+            };
+            foreach (KeyValuePair<string, Action<Dictionary<string, object>>> item in cases)
+            {
+                string path = WriteRequest(root, "physical-bad-" + item.Key, item.Value);
+                RuntimeTestRequest bad = ReadProtocol(
+                    new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path },
+                    out rejection);
+                if (bad != null || string.IsNullOrEmpty(rejection))
+                    throw new InvalidOperationException(
+                        "An invalid physical request was accepted: " + item.Key);
             }
         }
 
