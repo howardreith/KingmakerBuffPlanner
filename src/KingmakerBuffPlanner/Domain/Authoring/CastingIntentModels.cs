@@ -299,6 +299,15 @@ namespace KingmakerBuffPlanner.Domain.Authoring
                 IgnoredPresenceMarkers, State, Provenance);
         }
 
+        public PlannedCasting WithState(CastingAuthoringState state)
+        {
+            return new PlannedCasting(CastingId, RoutineId, Order, SourceId,
+                Ability, CasterUnitId, SpellbookGuid, TargetMode,
+                DirectTargetUnitId, Origin, RequiredCoverageUnitIds,
+                TargetingModifiers, Enhancements, ExistingEffectPolicy,
+                IgnoredPresenceMarkers, state, Provenance);
+        }
+
         public string CastingId { get; private set; }
         public string RoutineId { get; private set; }
         public int Order { get; private set; }

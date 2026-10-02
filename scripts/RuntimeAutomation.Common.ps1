@@ -858,7 +858,8 @@ function Get-KbpQualificationAllowanceBuildRefusal {
     if ([string]$allowance.packageSha256 -cne [string]$BuildManifest.packageSha256) { return 'package' }
     if ([string]$allowance.dllSha256 -cne [string]$BuildManifest.dllSha256) { return 'dll' }
     if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
-    if (@('zero-cost-mixed', 'finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct') -cnotcontains [string]$allowance.recipe) { return 'recipe' }
+    if (@('zero-cost-mixed', 'finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct',
+            'shared-personal', 'shared-powerful') -cnotcontains [string]$allowance.recipe) { return 'recipe' }
     if (-not [string]::IsNullOrEmpty($Recipe) -and [string]$allowance.recipe -cne $Recipe) { return 'recipe-differs' }
     if (@('instant', 'animated') -cnotcontains [string]$allowance.executionMode) { return 'execution-mode' }
     if (-not [string]::IsNullOrEmpty($ExecutionMode) -and [string]$allowance.executionMode -cne $ExecutionMode) {
@@ -964,6 +965,13 @@ function Assert-KbpScenarioOutcome {
             -not [bool]$outcome.selection.selected -or [string]$outcome.terminalReason -cne 'completed') {
             throw "Qualification outcome evidence is inconsistent with a PASS: $path"
         }
+        # The shared recipes (v1.2 E16-E20): the launcher re-reads the typed
+        # Share evidence itself rather than trusting the host's verdict
+        # alone.
+        $sharedRecipe = @('shared-personal', 'shared-powerful') -ccontains [string]$outcome.selection.recipe
+        if ($sharedRecipe -and -not $cast -and ($null -eq $outcome.share -or -not [bool]$outcome.share.persisted)) {
+            throw "Share qualification evidence does not show the per-casting Share intent persisted: $path"
+        }
         if (-not $cast) { return }
         $allowance = [string]$Request.parameters.qualificationAllowance | ConvertFrom-Json
         $forecastIds = @($outcome.forecast | ForEach-Object { [string]$_.projectionId })
@@ -973,6 +981,31 @@ function Assert-KbpScenarioOutcome {
             [int]$outcome.maximumSubmissions -ne [int]$allowance.maximumNativeSubmissions -or
             [int]$outcome.plannedSubmissions -gt [int]$allowance.maximumNativeSubmissions) {
             throw "Qualification evidence does not show exactly the approved projections within the budget: $path"
+        }
+        if ($sharedRecipe) {
+            # The exact, once-charged, isolated Share contract from the raw
+            # reads: the shared cast spent exactly the projection's demand,
+            # which equals the independently derived one; nothing changed
+            # from the post-shared read through the witness and the refused
+            # shortage; the intent was persisted, a draft disarm kept the
+            # casting, the baseline was unarmed, and all three steps ran.
+            $share = $outcome.share
+            $reads = @('reservoirBeforeShared', 'reservoirAfterShared', 'reservoirBeforeWitness',
+                'reservoirAfterWitness', 'reservoirBeforeShortage', 'reservoirAfterShortage')
+            $unread = $null -eq $share -or $null -eq $share.expectedSpend -or $null -eq $share.independentDemand -or
+                @($reads | Where-Object { $null -eq $share.$_ }).Count -ne 0
+            if ($unread -or [int]$share.expectedSpend -lt 1 -or
+                [int]$share.expectedSpend -ne [int]$share.independentDemand -or
+                ([int]$share.reservoirBeforeShared - [int]$share.reservoirAfterShared) -ne [int]$share.expectedSpend -or
+                [int]$share.reservoirAfterShared -ne [int]$share.reservoirBeforeWitness -or
+                [int]$share.reservoirBeforeWitness -ne [int]$share.reservoirAfterWitness -or
+                [int]$share.reservoirAfterWitness -ne [int]$share.reservoirBeforeShortage -or
+                [int]$share.reservoirBeforeShortage -ne [int]$share.reservoirAfterShortage -or
+                -not [bool]$share.persisted -or -not [bool]$share.draftDisarmKeptCasting -or
+                -not [string]::IsNullOrEmpty([string]$share.baselineArmed) -or [int]$share.shortageCastings -lt 1 -or
+                (@($outcome.steps | ForEach-Object { [string]$_.name }) -join ',') -cne 'shared,witness,shortage') {
+                throw "Share qualification evidence does not show the exact, once-charged, isolated Share contract: $path"
+            }
         }
         return
     }

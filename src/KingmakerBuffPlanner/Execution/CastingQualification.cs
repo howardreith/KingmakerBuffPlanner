@@ -277,7 +277,7 @@ namespace KingmakerBuffPlanner.Execution
         {
             return recipe == ZeroCostMixed || recipe == FiniteDirectMixed || recipe == GroupMixed ||
                 recipe == EnhancedDirect || recipe == AbilityPoolDirect || recipe == RodExtendDirect ||
-                recipe == SharedPersonal;
+                IsSharedRecipe(recipe);
         }
 
         public static bool IsSharedRecipe(string recipe)
@@ -305,7 +305,9 @@ namespace KingmakerBuffPlanner.Execution
         // sequence.
         public static bool IsTwoPhase(string recipe)
         {
-            if (recipe == SharedPersonal) return true;
+            // Both shared recipes (shared + witness); shared-powerful was
+            // missing, so its forecast count disagreed with its forecast.
+            if (IsSharedRecipe(recipe)) return true;
             return recipe == GroupMixed || IsEnhancedRecipe(recipe);
         }
 
@@ -422,10 +424,21 @@ namespace KingmakerBuffPlanner.Execution
                     { reject(provider.Key.Canonical + "|effect-shape:" +
                         CastingCapabilityInventory.Structure(
                             inputs.EffectsBySource[sourceId])); continue; }
+                    // The shared spell's own native source: a verified free
+                    // pool, or a finite spellbook pool (a spontaneous level
+                    // or prepared slots) with a cast available now; the
+                    // steps judge its exact spend from fresh native reads.
+                    // (A free-only rule never selected live: a Brown-Fur
+                    // arcanist's personal transmutations spend spell slots.)
                     ResourcePoolSnapshot native;
-                    if (!pools.TryGetValue(provider.ResourcePoolKey, out native) ||
-                        native.Kind != ResourcePoolKind.Unlimited)
-                    { reject(provider.Key.Canonical + "|native-not-verified-free"); continue; }
+                    if (!pools.TryGetValue(provider.ResourcePoolKey, out native))
+                    { reject(provider.Key.Canonical + "|native-pool-unknown"); continue; }
+                    bool sharedFree = native.Kind == ResourcePoolKind.Unlimited;
+                    if (!sharedFree && native.Kind != ResourcePoolKind.SpontaneousLevel &&
+                        native.Kind != ResourcePoolKind.PreparedSlots)
+                    { reject(provider.Key.Canonical + "|native-pool-kind:" + native.Kind); continue; }
+                    if (!sharedFree && CastsAvailable(inputs, provider, 1) < 1)
+                    { reject(provider.Key.Canonical + "|no-cast-available"); continue; }
                     selectedGuid = string.IsNullOrEmpty(provider.Key.Ability.VariantGuid)
                         ? provider.Key.Ability.BaseAbilityGuid
                         : provider.Key.Ability.VariantGuid;
@@ -438,30 +451,30 @@ namespace KingmakerBuffPlanner.Execution
                         .FirstOrDefault();
                     if (ally == null)
                     { reject(provider.Key.Canonical + "|no-fresh-ally"); continue; }
-                    // The isolation witness: a plain verified-free spell by
-                    // the SAME caster, a different ability, on a recipient
-                    // without ITS effect.
-                    var plain = EligibleOptions(inputs, reject)
-                        .Where(value => string.Equals(value.Provider.Key.CasterUnitId, caster,
-                            StringComparison.Ordinal) &&
-                            value.Provider.Key.Ability.Canonical != provider.Key.Ability.Canonical)
-                        .OrderBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal)
-                        .ToList();
+                    // The isolation witness: a plain spell by the SAME
+                    // caster, a different ability, on a recipient it can
+                    // reach that lacks ITS effect.
+                    List<ProviderPlanningOption> plain = WitnessOptions(inputs, caster, provider, reject);
                     PlannedCasting plainCasting = null;
                     string plainSourceId = null;
+                    string witnessPool = null;
                     foreach (ProviderPlanningOption candidate in plain)
                     {
                         string candidateSource = SingleCastProbeSelector.SourceIdFor(
                             inputs.EffectsBySource, candidate.Provider.Key.Ability);
                         if (candidateSource == null) continue;
                         EffectExpression candidateEffect = inputs.EffectsBySource[candidateSource];
+                        var witnessReach = new HashSet<string>(candidate.ReachableTargetIds ??
+                            new string[0], StringComparer.Ordinal);
                         string plainTarget = targetable
-                            .Where(unitId => !EffectActive(inputs.LiveEffects, unitId, candidateEffect))
+                            .Where(unitId => witnessReach.Contains(unitId) &&
+                                !EffectActive(inputs.LiveEffects, unitId, candidateEffect))
                             .OrderBy(unitId => unitId, StringComparer.Ordinal)
                             .FirstOrDefault();
                         if (plainTarget == null)
                         { reject(candidate.Provider.Key.Canonical + "|no-plain-target"); continue; }
                         plainSourceId = candidateSource;
+                        witnessPool = candidate.Provider.ResourcePoolKey;
                         plainCasting = new PlannedCasting(CastingIds[1], RoutineId, 1,
                             plainSourceId, candidate.Provider.Key.Ability, caster,
                             candidate.Provider.Key.SpellbookGuid, CastingTargetMode.DirectTarget,
@@ -510,7 +523,9 @@ namespace KingmakerBuffPlanner.Execution
                         coverage: new[] { "share:" + share.EnhancementId,
                             "reservoir:" + share.UsagePoolId,
                             "units:" + share.UsageUnitsPerCast,
-                            "toggle:" + share.SourceBlueprintGuid },
+                            "toggle:" + share.SourceBlueprintGuid,
+                            "shared-source:" + native.Kind,
+                            "witness-source:" + pools[witnessPool].Kind },
                         enhancement: combinedEnhancement);
                 }
                 if (selectedGuid == null)
@@ -518,6 +533,60 @@ namespace KingmakerBuffPlanner.Execution
             }
             return new CastingQualificationSelection("no-eligible-shared-recipe", null, null,
                 null, considered, rejections, CastingQualificationRecipe.SharedPersonal);
+        }
+
+        // The isolation witness's candidates (v1.2 E20): plain spellbook
+        // buffs by the SAME caster (another ability) that can be cast now -
+        // verified free sources first, then finite spellbook sources with a
+        // cast to spare (two when they share the shared spell's pool). A
+        // Brown-Fur arcanist's cantrips are class-ability facts, not
+        // spellbook spells, so a free-only witness never selected live.
+        internal static List<ProviderPlanningOption> WitnessOptions(CastingWorkspaceInputs inputs,
+            string caster, ProviderSnapshot shared, Action<string> reject)
+        {
+            var pools = inputs.Snapshot.ResourcePools.ToDictionary(
+                pool => pool.PoolKey, pool => pool, StringComparer.Ordinal);
+            var free = new List<ProviderPlanningOption>();
+            var finite = new List<ProviderPlanningOption>();
+            foreach (ProviderPlanningOption option in inputs.ProviderOptions
+                .Where(value => value != null && value.Provider != null &&
+                    string.Equals(value.Provider.Key.CasterUnitId, caster, StringComparison.Ordinal) &&
+                    value.Provider.Key.Ability.Canonical != shared.Key.Ability.Canonical)
+                .OrderBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal))
+            {
+                ProviderSnapshot provider = option.Provider;
+                AbilityKey ability = provider.Key.Ability;
+                ResourcePoolSnapshot pool;
+                string sourceId = SingleCastProbeSelector.SourceIdFor(inputs.EffectsBySource, ability);
+                if (ability.SourceKind != SourceKind.Spellbook || ability.MetamagicMask != 0 ||
+                    !string.IsNullOrEmpty(ability.SpecialSourceId))
+                    reject(provider.Key.Canonical + "|witness:not-plain-spellbook");
+                else if (option.ExecutionStrategy != CastExecutionStrategy.DirectRuleCast)
+                    reject(provider.Key.Canonical + "|witness:strategy:" + option.ExecutionStrategy);
+                else if (sourceId == null)
+                    reject(provider.Key.Canonical + "|witness:effect-shape:no-source");
+                else if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(
+                        inputs.EffectsBySource[sourceId], ability))
+                    reject(provider.Key.Canonical + "|witness:effect-shape:" +
+                        CastingCapabilityInventory.Structure(inputs.EffectsBySource[sourceId]));
+                else if (!pools.TryGetValue(provider.ResourcePoolKey, out pool))
+                    reject(provider.Key.Canonical + "|witness:pool-unknown");
+                else if (pool.Kind == ResourcePoolKind.Unlimited)
+                    free.Add(option);
+                else if (pool.Kind != ResourcePoolKind.SpontaneousLevel &&
+                    pool.Kind != ResourcePoolKind.PreparedSlots)
+                    reject(provider.Key.Canonical + "|witness:pool-kind:" + pool.Kind);
+                else
+                {
+                    int needed = string.Equals(provider.ResourcePoolKey, shared.ResourcePoolKey,
+                        StringComparison.Ordinal) ? 2 : 1;
+                    if (CastsAvailable(inputs, provider, needed) < needed)
+                        reject(provider.Key.Canonical + "|witness:no-cast-available");
+                    else
+                        finite.Add(option);
+                }
+            }
+            return free.Concat(finite).ToList();
         }
 
         // Plain spellbook buffs from verified free sources, cast by rule.
@@ -1484,6 +1553,11 @@ namespace KingmakerBuffPlanner.Execution
         // (the ordinary, unenhanced cast).
         public const string Shared = "shared";
         public const string Witness = "witness";
+        // The shared recipes' last step (E19, not forecast: nothing may be
+        // submitted): one more shared casting than the shared spell's native
+        // source can fund is refused WHOLE - no submission, no native spend,
+        // no Share/Powerful Change state touched.
+        public const string Shortage = "shortage";
 
         public static IReadOnlyList<CastingQualificationStepForecast> Forecast(
             CastingQualificationSelection selection, CastingWorkspaceInputs inputs,
@@ -1579,7 +1653,16 @@ namespace KingmakerBuffPlanner.Execution
             ProviderSnapshot provider = inputs.Snapshot.Providers.FirstOrDefault(value =>
                 value.Key.CasterUnitId == direct.CasterUnitId &&
                 value.Key.Ability.Canonical == direct.Ability.Canonical);
-            steps.Add(Project(secondName, BuildDocument(campaignId, selection.Castings), afterPrime,
+            // The shared recipes' witness phase runs with the shared casting
+            // DISABLED (the player's own "Disable (keep it, do not cast)"):
+            // with Powerful Change an existing shared effect's strength is
+            // unprovable, so "skip if active" would recast it - spending
+            // again exactly where the witness must show no spend at all.
+            IEnumerable<PlannedCasting> second = CastingQualificationRecipe.IsSharedRecipe(selection.Recipe)
+                ? new[] { direct.WithState(CastingAuthoringState.Disabled) }
+                    .Concat(selection.Castings.Skip(1))
+                : selection.Castings;
+            steps.Add(Project(secondName, BuildDocument(campaignId, second), afterPrime,
                 WithGranted(afterPrime, inputs.EffectsBySource[direct.SourceId], new[]
                 {
                     new EffectGrant(direct.DirectTargetUnitId,

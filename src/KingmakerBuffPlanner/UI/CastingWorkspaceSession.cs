@@ -2223,6 +2223,18 @@ namespace KingmakerBuffPlanner.UI
         // intent signature (a plain read: no import, no session), so the
         // in-game reload compares disk with what was saved, not the retained
         // session with itself (review of 1332ed8..542cd66, P2-1).
+        // One casting exactly as a FRESH read of the stored plan reports it
+        // (a new repository over this session's mod path: what a restart
+        // loads), or null with the load status.
+        internal PlannedCasting PersistedCastingForRuntime(string castingId, out string status)
+        {
+            CastingPlanLoadResult loaded = new CastingPlanRepository(_modPath).Load(CampaignId);
+            status = loaded.Status.ToString();
+            if (loaded.Status != CastingPlanLoadStatus.Loaded || loaded.Profile == null) return null;
+            return loaded.Profile.ToDocument().Castings.FirstOrDefault(value => value != null &&
+                string.Equals(value.CastingId, castingId, StringComparison.Ordinal));
+        }
+
         internal static string SavedIntentSignature(string modPath, string campaignId, out string status)
         {
             CastingPlanLoadResult loaded = new CastingPlanRepository(modPath).Load(campaignId);

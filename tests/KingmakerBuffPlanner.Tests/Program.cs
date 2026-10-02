@@ -431,6 +431,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunSharePlanningTests(root);
                 RunUndoHistoryTests(root);
                 RunEverydayUseWordingTests(root);
+                RunShareQualificationDriverTests(root);
             }
             finally
             {
