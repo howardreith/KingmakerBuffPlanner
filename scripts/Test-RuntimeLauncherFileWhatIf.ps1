@@ -508,13 +508,15 @@ try {
             throw "Classic outcome case $case was not refused by the launcher's check: $refusal"
         }
     }
-    # v1.2 casting-first physical contract: six judged actions, the
+    # v1.2 casting-first physical contract: seven judged actions, the
     # conditional pre-steps allowed beside them, and the moon-run
     # expectation (select refused by the lock; cast run once under its
     # consumed grant).
-    $physicalActions = @('cf-moon', 'cf-wheel', 'cf-right-click', 'cf-escape-inspect', 'cf-escape-close')
+    $physicalActions = @('cf-moon', 'cf-wheel', 'cf-right-click', 'cf-inspect-wheel', 'cf-long-wheel',
+        'cf-escape-inspect', 'cf-escape-close')
     $physicalKinds = @{ 'cf-moon' = 'click'; 'cf-wheel' = 'wheel'
-        'cf-right-click' = 'rightclick'; 'cf-escape-inspect' = 'key-escape'; 'cf-escape-close' = 'key-escape' }
+        'cf-right-click' = 'rightclick'; 'cf-inspect-wheel' = 'wheel'; 'cf-long-wheel' = 'wheel'
+        'cf-escape-inspect' = 'key-escape'; 'cf-escape-close' = 'key-escape' }
     function New-PhysicalOutcomeCase([string]$Name, [string]$Expectation, [scriptblock]$Tamper,
         [string]$ExpectedScreen = '1920x1080') {
         $directory = Join-Path $outcomeRoot $Name
@@ -533,7 +535,12 @@ try {
             moonExpectation = $Expectation; acknowledged = $physicalActions; failures = @(); violations = @()
             coldSessionBeforeMoon = $true; editorNeverOpenedBeforeMoon = $true
             seedLongCastings = @('seed-long-1'); seedImportantCastings = @('seed-important-1')
-            moonWorkspaceStayedClosed = $true; escMenuOpenAfterClose = $false }
+            moonWorkspaceStayedClosed = $true; escMenuOpenAfterClose = $false
+            inspectPanelWidth = 760; inspectPanelHeight = 520; inspectTitle = '#1 Resistance'
+            inspectBodyChars = 180; inspectExpectedChars = 180; inspectBodyNative = $true
+            inspectOverflow = -250; inspectScrollBefore = 1.0; inspectScrollAfter = 1.0
+            longProbeChars = 6100; longProbeOverflow = 2400; longScrollBefore = 1.0; longScrollAfter = 0.92
+            inspectOpenAfterWheels = $true; graphScrollUnderInspectBefore = 0.7; graphScrollUnderInspectAfter = 0.7 }
         if ($Expectation -ceq 'select') {
             $record.moonRunStarted = $false
             $record.moonRefusal = 'native-submission-disabled:runtime-test-session:live-workspace-physical:cf-grant-absent;Refused'
@@ -608,6 +615,28 @@ try {
             $r.importantEffectAfter = $true; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'cast-long-missing' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
             $r.longEffectAfter = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        # E05/E06 description evidence (D11: the panel rendered at a
+        # negative size while the old record still said 'opened').
+        'inspect-invisible' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.inspectPanelWidth = 0; $r.inspectPanelHeight = 0; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'inspect-unread' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.PSObject.Properties.Remove('longScrollAfter'); Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'inspect-untitled' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.inspectTitle = ''; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'inspect-not-native' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.inspectBodyNative = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'inspect-body-length' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.inspectBodyChars = 12; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'inspect-long-no-overflow' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.longProbeOverflow = 0; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'inspect-long-not-scrolled' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.longScrollAfter = 1.0; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'inspect-own-not-scrolled' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.inspectOverflow = 40; $r.inspectScrollAfter = 1.0; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'inspect-closed-by-wheel' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.inspectOpenAfterWheels = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'inspect-wheel-moved-graph' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.graphScrollUnderInspectAfter = 0.5; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'extra-failed-ack' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-other.ack.json') ([ordered]@{
             schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-other'; action = 'click'; deliveryFailed = $true }) })
         'extra-request' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-extra.json') ([ordered]@{
@@ -1081,4 +1110,47 @@ $ErrorActionPreference = 'Stop'
 if ($recipeExit -eq 0 -or -not (@($recipeOutput | Where-Object { "$_" -like '*only valid with -Scenario live-cast-qual-select*' }).Count -ge 1)) {
     throw "A qualification recipe on another scenario was not refused: $($recipeOutput -join ' ')"
 }
-Write-Host 'Launcher -File WhatIf purity: PASS=12 FAIL=0'
+# H1 (beta-3c1c5d4ar13-w1080-01): a 1920x1080 surface on a 1920x1200
+# desktop is letterboxed by 60 px bars, and Unity saw the cursor exactly a
+# bar away from the old stretched mapping. The launcher's OWN input helper is
+# compiled in a child process (its static constructor declares DPI
+# awareness, which must not leak into this one) and its mapping is checked
+# against the observed geometry, plus the unchanged equal-size and
+# uniform-scale cases.
+$inputSourceMatch = [regex]::Match($launcherText, "(?s)Add-Type @'\r?\n(using System;.*?public static class KbpPhysicalInput \{.*?)\r?\n'@")
+if (-not $inputSourceMatch.Success) { throw 'The launcher physical input helper source was not found.' }
+$mappingScript = Join-Path ([System.IO.Path]::GetTempPath()) ('kbp-mapping-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+try {
+    $mappingSource = Join-Path ([System.IO.Path]::GetTempPath()) ('kbp-mapping-' + [Guid]::NewGuid().ToString('N') + '.cs')
+    [System.IO.File]::WriteAllText($mappingSource, $inputSourceMatch.Groups[1].Value)
+    [System.IO.File]::WriteAllText($mappingScript, @"
+`$ErrorActionPreference = 'Stop'
+Add-Type -Path '$mappingSource'
+function M([double]`$x, [double]`$y, [int]`$uw, [int]`$uh, [int]`$cw, [int]`$ch) {
+    `$p = [KbpPhysicalInput]::MapToClient(`$x, `$y, `$uw, `$uh, `$cw, `$ch); "`$(`$p.X),`$(`$p.Y)"
+}
+@(
+    (M 1276 556.42 1920 1080 1920 1200),
+    (M 1791.99988 65.84394 1920 1080 1920 1200),
+    (M 197.776108 794.4199 1920 1080 1920 1200),
+    (M 960 540 1920 1080 1920 1080),
+    (M 1791.99988 65.84394 1920 1080 1920 1080),
+    (M 960 540 1920 1080 2560 1440),
+    (M 0 1080 1920 1080 1920 1200),
+    (M 960 540 1920 1080 2560 1080),
+    [KbpPhysicalInput]::DescribeMapping(1920, 1080, 1920, 1200)
+) -join '|'
+"@)
+    $mappingOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $mappingScript 2>&1)
+    $mapped = ($mappingOutput | ForEach-Object { "$_" }) -join ''
+    $expectedMapping = '1276,584|1792,1074|198,346|960,540|1792,1014|1280,720|0,60|1280,540|' +
+        'surface=1920x1080;clientSize=1920x1200;scale=1;bars=0,60'
+    if ($mapped -cne $expectedMapping) {
+        throw "The launcher's physical input mapping is wrong: $mapped (expected $expectedMapping)"
+    }
+}
+finally {
+    Remove-Item -LiteralPath $mappingScript -Force -ErrorAction SilentlyContinue
+    if ($mappingSource) { Remove-Item -LiteralPath $mappingSource -Force -ErrorAction SilentlyContinue }
+}
+Write-Host 'Launcher -File WhatIf purity: PASS=13 FAIL=0'

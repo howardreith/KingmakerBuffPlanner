@@ -547,15 +547,42 @@ public static class KbpPhysicalInput {
     lock (HeldKeys) { keys = HeldKeys.ToArray(); HeldKeys.Clear(); }
     foreach (byte key in keys) { keybd_event(key, 0, 2, UIntPtr.Zero); }
   }
-  public static void Move(IntPtr window, double x, double y, int unityWidth, int unityHeight) {
+  public static string Move(IntPtr window, double x, double y, int unityWidth, int unityHeight) {
     if (window == IntPtr.Zero || !Activate(window)) throw new InvalidOperationException("Kingmaker foreground activation failed.");
     Rect rect;
     if (!GetClientRect(window, out rect)) throw new InvalidOperationException("Kingmaker client bounds lookup failed.");
-    if (unityWidth <= 0 || unityHeight <= 0) throw new InvalidOperationException("Unity screen bounds are invalid.");
-    int scaledX = (int)Math.Round(x * rect.Right / unityWidth);
-    int scaledY = (int)Math.Round(y * rect.Bottom / unityHeight);
-    Point point = new Point { X = scaledX, Y = Math.Max(0, rect.Bottom - scaledY) };
+    Point point = MapToClient(x, y, unityWidth, unityHeight, rect.Right, rect.Bottom);
+    string mapping = DescribeMapping(unityWidth, unityHeight, rect.Right, rect.Bottom) +
+      ";client=" + point.X + "," + point.Y;
     if (!ClientToScreen(window, ref point) || !SetCursorPos(point.X, point.Y)) throw new InvalidOperationException("Kingmaker cursor movement failed.");
+    return mapping;
+  }
+  // Unity presents its surface aspect-preserved and centred in the client:
+  // when the client's aspect differs (a 1920x1080 fullscreen surface on a
+  // 1920x1200 desktop) the surface is letterboxed, not stretched -
+  // beta-3c1c5d4ar13-w1080-01 saw Unity's cursor exactly the 60 px bar away
+  // from a stretched mapping. Unity's y axis is bottom-up. Equal sizes and
+  // uniform scales map exactly as before.
+  public static Point MapToClient(double x, double y, int unityWidth, int unityHeight, int clientWidth, int clientHeight) {
+    if (unityWidth <= 0 || unityHeight <= 0) throw new InvalidOperationException("Unity screen bounds are invalid.");
+    if (clientWidth <= 0 || clientHeight <= 0) throw new InvalidOperationException("Kingmaker client bounds are invalid.");
+    double scale = Math.Min((double)clientWidth / unityWidth, (double)clientHeight / unityHeight);
+    double left = (clientWidth - unityWidth * scale) / 2.0;
+    double top = (clientHeight - unityHeight * scale) / 2.0;
+    int clientX = (int)Math.Round(left + x * scale);
+    int clientY = (int)Math.Round(top + (unityHeight - y) * scale);
+    return new Point {
+      X = Math.Max(0, Math.Min(clientWidth - 1, clientX)),
+      Y = Math.Max(0, Math.Min(clientHeight - 1, clientY))
+    };
+  }
+  public static string DescribeMapping(int unityWidth, int unityHeight, int clientWidth, int clientHeight) {
+    double scale = Math.Min((double)clientWidth / unityWidth, (double)clientHeight / unityHeight);
+    int left = (int)Math.Round((clientWidth - unityWidth * scale) / 2.0);
+    int top = (int)Math.Round((clientHeight - unityHeight * scale) / 2.0);
+    return "surface=" + unityWidth + "x" + unityHeight + ";clientSize=" + clientWidth + "x" + clientHeight +
+      ";scale=" + scale.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) +
+      ";bars=" + left + "," + top;
   }
   private static bool Activate(IntPtr window) {
     if (GetForegroundWindow() == window) return true;
@@ -869,7 +896,7 @@ public static class KbpPhysicalInput {
                         } elseif ([string]$physical.action -eq 'focus-cycle') {
                             $deliveryDetail = [KbpPhysicalInput]::FocusCycle($process.MainWindowHandle)
                         } else {
-                            [KbpPhysicalInput]::Move($process.MainWindowHandle,
+                            $deliveryDetail = [KbpPhysicalInput]::Move($process.MainWindowHandle,
                                 [double]$physical.x, [double]$physical.y,
                                 [int]$physical.unityScreenWidth, [int]$physical.unityScreenHeight)
                             Start-Sleep -Milliseconds 250
