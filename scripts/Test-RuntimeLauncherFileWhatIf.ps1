@@ -281,7 +281,8 @@ if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-Qua
     throw 'A matching qualification allowance was refused by the build binding.'
 }
 # Every recipe the host knows can be approved (the group recipe included).
-foreach ($knownRecipe in @('finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct')) {
+foreach ($knownRecipe in @('finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct',
+        'shared-personal', 'shared-powerful')) {
     if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-QualificationFixtureJson @{ recipe = $knownRecipe }) `
             -RunId 'qual-bind-test' -BuildManifest $manifestFixture -Recipe $knownRecipe)) {
         throw "A $knownRecipe qualification allowance was refused by the build binding."
@@ -630,6 +631,56 @@ try {
         'not-completed' = @('live-cast-qual', @{ terminalReason = 'failed:disable-wait' })
         'select-casting' = @('live-cast-qual-select', @{ castingScenario = $true })
         'select-unselected' = @('live-cast-qual-select', @{ selection = [ordered]@{ selected = $false } })
+    }
+    # The shared recipes' typed Share evidence (v1.2 E16-E20), re-read by
+    # the launcher: the clean contract passes; every tampered reading is
+    # refused even though the host reported no violation.
+    function New-ShareEvidence([hashtable]$Override) {
+        $share = [ordered]@{ expectedSpend = 2; independentDemand = 2; persisted = $true
+            persistedIntent = 'load=Loaded;casting=cast-1'; draftDisarmKeptCasting = $true; shortageCastings = 3
+            baselineArmed = $null; reservoirBeforeShared = 16; reservoirAfterShared = 14; reservoirBeforeWitness = 14
+            reservoirAfterWitness = 14; reservoirBeforeShortage = 14; reservoirAfterShortage = 14
+            previewBefore = 'resource=16'; previewAfter = 'resource=16' }
+        foreach ($key in $Override.Keys) { $share[$key] = $Override[$key] }
+        return $share
+    }
+    $sharedSteps = @([ordered]@{ name = 'shared' }, [ordered]@{ name = 'witness' }, [ordered]@{ name = 'shortage' })
+    $sharedSelection = [ordered]@{ selected = $true; recipe = 'shared-powerful' }
+    Assert-KbpScenarioOutcome -Request (New-QualOutcomeCase 'qual-share-cast-good' 'live-cast-qual' @{
+        selection = $sharedSelection; share = (New-ShareEvidence @{}); steps = $sharedSteps })
+    Assert-KbpScenarioOutcome -Request (New-QualOutcomeCase 'qual-share-select-good' 'live-cast-qual-select' @{
+        selection = $sharedSelection; share = (New-ShareEvidence @{}) })
+    $shareOutcomeCases = [ordered]@{
+            'share-double-charge' = @('live-cast-qual', @{ reservoirAfterShared = 13; reservoirBeforeWitness = 13
+                reservoirAfterWitness = 13; reservoirBeforeShortage = 13; reservoirAfterShortage = 13 })
+            'share-demand-mismatch' = @('live-cast-qual', @{ independentDemand = 1 })
+            'share-witness-spend' = @('live-cast-qual', @{ reservoirAfterWitness = 13; reservoirBeforeShortage = 13
+                reservoirAfterShortage = 13 })
+            'share-changed-between' = @('live-cast-qual', @{ reservoirBeforeWitness = 15 })
+            'share-shortage-spend' = @('live-cast-qual', @{ reservoirAfterShortage = 12 })
+            'share-unread' = @('live-cast-qual', @{ reservoirAfterShared = $null })
+            'share-not-persisted' = @('live-cast-qual', @{ persisted = $false })
+            'share-draft-changed' = @('live-cast-qual', @{ draftDisarmKeptCasting = $false })
+            'share-baseline-armed' = @('live-cast-qual', @{ baselineArmed = 'share-toggle' })
+            'share-no-shortage' = @('live-cast-qual', @{ shortageCastings = 0 })
+            'share-select-not-persisted' = @('live-cast-qual-select', @{ persisted = $false })
+        }
+    foreach ($shareCase in $shareOutcomeCases.GetEnumerator()) {
+        $override = @{ selection = $sharedSelection; share = (New-ShareEvidence $shareCase.Value[1]); steps = $sharedSteps }
+        $caseRequest = New-QualOutcomeCase ('qual-' + $shareCase.Key) $shareCase.Value[0] $override
+        $refusal = $null
+        try { Assert-KbpScenarioOutcome -Request $caseRequest }
+        catch { $refusal = $_.Exception.Message }
+        if ($null -eq $refusal -or $refusal -notlike '*Share qualification evidence*') {
+            throw "Share outcome case $($shareCase.Key) was not refused by the launcher's check: $refusal"
+        }
+    }
+    $missingStep = New-QualOutcomeCase 'qual-share-missing-shortage' 'live-cast-qual' @{ selection = $sharedSelection
+        share = (New-ShareEvidence @{}); steps = @([ordered]@{ name = 'shared' }, [ordered]@{ name = 'witness' }) }
+    $refusal = $null
+    try { Assert-KbpScenarioOutcome -Request $missingStep } catch { $refusal = $_.Exception.Message }
+    if ($null -eq $refusal -or $refusal -notlike '*Share qualification evidence*') {
+        throw "A Share outcome without its shortage step was not refused: $refusal"
     }
     # Final review C6: the launcher reads a probe PASS too.
     $probeAllowanceJson = New-AllowanceFixtureJson @{}

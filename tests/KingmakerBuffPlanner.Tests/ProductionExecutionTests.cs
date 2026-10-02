@@ -4222,50 +4222,53 @@ namespace KingmakerBuffPlanner.Tests
                     "Powerful Change selected the combined recipe.");
         }
 
-        // The isolation judge (E18): a Share state leak that the next
-        // preparation would clear, or reservoir spending on the witness, or
-        // unread REQUIRED evidence - each must FAIL the qualification even
-        // when every step otherwise succeeded; the clean boundary passes.
+        // The selection (preview) run's own Share rules (E16/E17/E20): the
+        // preview arms and spends nothing (caster read before and after),
+        // and the authored per-casting Share intent is in the stored plan.
+        // Each violation fails the selection - so no allowance is written -
+        // while the clean preview passes. (The casting run's rules are
+        // driven end to end in shared-recipes-fail-closed-on-leaks-and-
+        // mischarges.)
         private static void TestSharedIsolationJudge()
         {
+            var off = new Dictionary<string, bool> { { "share-toggle", false }, { "pc-toggle", false } };
             Func<CastingQualificationRecord> clean = () =>
             {
                 var record = new CastingQualificationRecord();
                 record.Selection = CastingQualificationRecipe.SelectSharedPersonal(
                     SharedQualificationInputs(), "fixture-campaign");
-                record.ShareReservoirBefore = 3;
-                record.ShareReservoirAfterShared = 2;
-                record.ShareReservoirAfterWitness = 2;
-                record.ShareToggleBeforeShared = "off";
-                record.ShareToggleAfterShared = "off";
-                record.ShareToggleBeforeWitness = "off";
+                record.PreviewCasterBefore = CasterEnhancementObservation.Read(3, off);
+                record.PreviewCasterAfter = CasterEnhancementObservation.Read(3, off);
+                record.SharePersisted = true;
+                record.SharePersistedIntent = "load=Loaded;casting=cast-1";
                 return record;
             };
-            if (clean().Violations().Any(value =>
-                    value.StartsWith("share-", StringComparison.Ordinal)))
-                throw new InvalidOperationException("the clean isolation boundary was " +
-                    "rejected.");
-            CastingQualificationRecord leak = clean();
-            leak.ShareToggleBeforeWitness = "on";
-            if (!leak.Violations().Any(value =>
-                    value.StartsWith("share-toggle-left-on", StringComparison.Ordinal)))
-                throw new InvalidOperationException("a leaked Share toggle passed the " +
-                    "judge.");
-            CastingQualificationRecord spend = clean();
-            spend.ShareReservoirAfterWitness = 1;
-            if (!spend.Violations().Any(value =>
-                    value.StartsWith("share-spent-on-witness", StringComparison.Ordinal)))
-                throw new InvalidOperationException("witness reservoir spending passed " +
-                    "the judge.");
+            Func<CastingQualificationRecord, List<string>> share = record => record.Violations()
+                .Where(value => value.StartsWith("share-", StringComparison.Ordinal)).ToList();
+            if (share(clean()).Count != 0)
+                throw new InvalidOperationException("the clean preview was rejected: " +
+                    string.Join("|", share(clean()).ToArray()));
+            CastingQualificationRecord armed = clean();
+            armed.PreviewCasterAfter = CasterEnhancementObservation.Read(3,
+                new Dictionary<string, bool> { { "share-toggle", true }, { "pc-toggle", false } });
+            if (!share(armed).Any(value => value.StartsWith("share-preview:cleanup:activatables-changed",
+                    StringComparison.Ordinal)))
+                throw new InvalidOperationException("a preview that armed Share passed the judge.");
+            CastingQualificationRecord spent = clean();
+            spent.PreviewCasterAfter = CasterEnhancementObservation.Read(2, off);
+            if (!share(spent).Any(value => value.StartsWith("share-preview:enhancement-resource",
+                    StringComparison.Ordinal)))
+                throw new InvalidOperationException("a preview that spent the reservoir passed the judge.");
             CastingQualificationRecord unread = clean();
-            unread.ShareReservoirAfterShared = null;
-            unread.ShareToggleBeforeWitness = string.Empty;
-            if (!unread.Violations().Any(value =>
-                    value.StartsWith("share-reservoir-unread", StringComparison.Ordinal)) ||
-                !unread.Violations().Any(value =>
-                    value.StartsWith("share-toggle-unread", StringComparison.Ordinal)))
-                throw new InvalidOperationException("unread required Share evidence " +
-                    "passed the judge.");
+            unread.PreviewCasterAfter = CasterEnhancementObservation.Failed("caster-not-in-party");
+            if (!share(unread).Any(value => value.StartsWith("share-preview:caster:unread",
+                    StringComparison.Ordinal)))
+                throw new InvalidOperationException("an unread preview passed the judge.");
+            CastingQualificationRecord lost = clean();
+            lost.SharePersisted = false;
+            if (!share(lost).Any(value => value.StartsWith("share-intent-not-persisted",
+                    StringComparison.Ordinal)))
+                throw new InvalidOperationException("an unpersisted Share intent passed the judge.");
         }
 
         // The recipe picks one free buff, two casters and fresh targets

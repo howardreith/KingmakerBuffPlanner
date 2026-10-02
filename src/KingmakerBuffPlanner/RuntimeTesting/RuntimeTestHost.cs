@@ -4391,49 +4391,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // Qualification scenario: the Unity-free driver runs the whole
         // sequence over the production path; this host only builds it with
         // the real adapters (fresh discovery, production executors, fresh
-        // The shared recipe's authoritative native readers (E18 isolation
-        // boundaries): the reservoir balance the CURRENT discovery reports
-        // for the verified Share snapshot, and the exact toggle state of
-        // the feature-owning caster.
-        private static int? ReadShareReservoirForRuntime()
-        {
-            try
-            {
-                CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
-                CastEnhancementSnapshot share = (inputs.Enhancements ?? new CastEnhancementSnapshot[0])
-                    .FirstOrDefault(value => value != null && value.AffectsTargeting &&
-                        value.EnhancementId.StartsWith("share-transmutation|",
-                            StringComparison.Ordinal));
-                return share == null ? null : share.RemainingUses;
-            }
-            catch (Exception) { return null; }
-        }
-
-        private static string ReadShareToggleForRuntime()
-        {
-            try
-            {
-                CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
-                CastEnhancementSnapshot share = (inputs.Enhancements ?? new CastEnhancementSnapshot[0])
-                    .FirstOrDefault(value => value != null && value.AffectsTargeting &&
-                        value.EnhancementId.StartsWith("share-transmutation|",
-                            StringComparison.Ordinal));
-                if (share == null) return string.Empty;
-                Kingmaker.EntitySystem.Entities.UnitEntityData caster =
-                    KingmakerAnimatedCastAdapter.CollectUnits()
-                    .Values.FirstOrDefault(unit => unit != null &&
-                        string.Equals(unit.UniqueId, share.CasterUnitId, StringComparison.Ordinal));
-                if (caster == null) return string.Empty;
-                Kingmaker.UnitLogic.ActivatableAbilities.ActivatableAbility toggle;
-                string reason;
-                if (!Compatibility.BrownFurShareTransmutationCompatibility.TryResolveToggle(
-                        caster, out toggle, out reason) || toggle == null)
-                    return string.Empty;
-                return toggle.IsOn ? "on" : "off";
-            }
-            catch (Exception) { return string.Empty; }
-        }
-
         // native reads), pumps it once per update and publishes the record.
         private bool UpdateQualification()
         {
@@ -4572,8 +4529,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     () => BuffPlannerUiRoot.OwnedTicksForRuntime,
                     (step, recipient, label) => new KingmakerProbeObserver().ObserveRecipient(
                         step, recipient, label, _probeClock),
-                    (caster, pool) => new KingmakerProbeObserver().ObserveCaster(caster, pool),
-                    ReadShareReservoirForRuntime, ReadShareToggleForRuntime);
+                    (caster, pool) => new KingmakerProbeObserver().ObserveCaster(caster, pool));
                 _log.Info("[KBP-QUAL] driver built;casting=" + _qualificationRecord.CastingScenario +
                     ";allowance=" + _qualificationRecord.AllowanceStatus + ";workspaceClosed=" +
                     closed.Closed + ";campaign=" + campaignId + ".");
@@ -4607,6 +4563,43 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private System.Diagnostics.Stopwatch _classicClock;
         private bool _qualificationWorkspaceClosed;
         private bool _qualificationPublished;
+
+        private static JToken Reservoir(CasterEnhancementObservation observation)
+        {
+            return observation == null || !observation.Succeeded || observation.Resource == null
+                ? JValue.CreateNull() : (JToken)observation.Resource.Value;
+        }
+
+        private static JObject ShareEvidence(CastingQualificationRecord record)
+        {
+            Func<string, CastingQualificationStepResult> step = name =>
+                record.Steps.FirstOrDefault(value => value.Name == name);
+            CastingQualificationStepResult shared = step(CastingQualificationForecast.Shared);
+            CastingQualificationStepResult witness = step(CastingQualificationForecast.Witness);
+            CastingQualificationStepResult shortage = step(CastingQualificationForecast.Shortage);
+            return new JObject
+            {
+                { "expectedSpend", record.ShareExpectedSpend.HasValue
+                    ? (JToken)record.ShareExpectedSpend.Value : JValue.CreateNull() },
+                { "independentDemand", record.ShareIndependentDemand.HasValue
+                    ? (JToken)record.ShareIndependentDemand.Value : JValue.CreateNull() },
+                { "persisted", record.SharePersisted.HasValue
+                    ? (JToken)record.SharePersisted.Value : JValue.CreateNull() },
+                { "persistedIntent", record.SharePersistedIntent },
+                { "draftDisarmKeptCasting", record.ShareDraftDisarmKeptCasting.HasValue
+                    ? (JToken)record.ShareDraftDisarmKeptCasting.Value : JValue.CreateNull() },
+                { "shortageCastings", record.ShareShortageCastings },
+                { "baselineArmed", record.ArmedShareToggles(shared == null ? null : shared.CasterBefore) },
+                { "reservoirBeforeShared", Reservoir(shared == null ? null : shared.CasterBefore) },
+                { "reservoirAfterShared", Reservoir(shared == null ? null : shared.CasterAfter) },
+                { "reservoirBeforeWitness", Reservoir(witness == null ? null : witness.CasterBefore) },
+                { "reservoirAfterWitness", Reservoir(witness == null ? null : witness.CasterAfter) },
+                { "reservoirBeforeShortage", Reservoir(shortage == null ? null : shortage.CasterBefore) },
+                { "reservoirAfterShortage", Reservoir(shortage == null ? null : shortage.CasterAfter) },
+                { "previewBefore", record.PreviewCasterBefore == null ? null : record.PreviewCasterBefore.Describe() },
+                { "previewAfter", record.PreviewCasterAfter == null ? null : record.PreviewCasterAfter.Describe() }
+            };
+        }
 
         private void PublishQualificationRecord()
         {
@@ -4673,6 +4666,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "terminalReason", record.TerminalReason },
                     { "exhaustedAccepted", record.ExhaustedAccepted.HasValue
                         ? (JToken)record.ExhaustedAccepted.Value : JValue.CreateNull() },
+                    // The shared recipes' typed evidence (E16-E20), for the
+                    // launcher's independent re-check.
+                    { "share", selection == null ||
+                        !CastingQualificationRecipe.IsSharedRecipe(selection.Recipe) ? null : ShareEvidence(record) },
                     { "selection", selection == null ? null : new JObject
                         {
                             { "selected", selection.Selected },
