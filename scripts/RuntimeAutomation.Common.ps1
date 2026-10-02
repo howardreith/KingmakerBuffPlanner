@@ -1077,13 +1077,14 @@ function Assert-KbpScenarioOutcome {
         $path = Join-Path $directory 'physical-workspace.json'
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Physical workspace evidence is missing.' }
         $record = Read-KbpJson $path
-        # v1.2 casting-first gesture set; the conditional pre-steps (a
-        # stale workspace close, native Escape-menu veil closes, reverse
-        # wheel recovery) are allowed beside it and every requested action
-        # is still checked for its acknowledgement below.
-        $expected = @('cf-moon', 'cf-open', 'cf-wheel', 'cf-right-click',
-            'cf-escape-inspect', 'cf-escape-close')
-        $conditional = @('cf-close-first', 'cf-menu-close-1', 'cf-menu-close-2', 'cf-menu-close-3',
+        # v1.2 casting-first gesture set: the cold moon press comes BEFORE
+        # the planner is ever opened (the open is this launcher's own
+        # planner hotkey, judged below); the conditional pre-steps (native
+        # Escape-menu veil closes, reverse wheel recovery) are allowed beside
+        # it and every requested action is still checked for its
+        # acknowledgement below.
+        $expected = @('cf-moon', 'cf-wheel', 'cf-right-click', 'cf-escape-inspect', 'cf-escape-close')
+        $conditional = @('cf-menu-close-1', 'cf-menu-close-2', 'cf-menu-close-3',
             'cf-wheel-back-1', 'cf-wheel-back-2')
         $acknowledged = @($record.acknowledged | ForEach-Object { [string]$_ })
         if ([string]$record.runId -cne [string]$Request.runId -or @($record.violations).Count -ne 0 -or
@@ -1101,6 +1102,16 @@ function Assert-KbpScenarioOutcome {
         if ([string]$record.moonExpectation -cne $expectation) {
             throw "The physical run judged another moon expectation: $($record.moonExpectation) (expected $expectation)."
         }
+        # E12 cold start, re-read from the raw record: no planner session and
+        # no editor open before the press, the stored plan held Long AND
+        # Important castings, the editor stayed closed, and the planner's
+        # closing Escape did not open the game's own menu.
+        if (-not [bool]$record.coldSessionBeforeMoon -or -not [bool]$record.editorNeverOpenedBeforeMoon -or
+            @($record.seedLongCastings).Count -lt 1 -or @($record.seedImportantCastings).Count -lt 1 -or
+            -not [bool]$record.moonWorkspaceStayedClosed -or $null -eq $record.escMenuOpenAfterClose -or
+            [bool]$record.escMenuOpenAfterClose) {
+            throw "The physical run's moon press was not a cold, closed-editor press with a clean close: $path"
+        }
         if ($expectation -ceq 'select') {
             if ([bool]$record.moonRunStarted -or
                 -not ([string]$record.moonRefusal -like 'native-submission-disabled*')) {
@@ -1108,8 +1119,11 @@ function Assert-KbpScenarioOutcome {
             }
         }
         elseif (-not [bool]$record.moonRunStarted -or $null -eq $record.moonGrantConsumed -or
-            -not [bool]$record.moonGrantConsumed) {
-            throw "A physical cast run did not run Long under its consumed grant: $path"
+            -not [bool]$record.moonGrantConsumed -or [int]$record.moonGrantAttempts -ne 1 -or
+            [int]$record.moonRunsStarted -ne 1 -or [string]$record.moonRunRoutine -cne 'long' -or
+            [string]$record.moonRunTerminal -cne 'completed' -or -not [bool]$record.longEffectAfter -or
+            $null -eq $record.importantEffectAfter -or [bool]$record.importantEffectAfter) {
+            throw "A physical cast run did not run Long - only Long, once - under its consumed grant: $path"
         }
         # expectedScreen is OPTIONAL: the launcher sets it only for a
         # windowed -DisplayMode, so an owner-display request has no such

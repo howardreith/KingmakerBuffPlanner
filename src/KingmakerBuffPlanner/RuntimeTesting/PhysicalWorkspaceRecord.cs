@@ -19,16 +19,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             "ws-focus-cycle", "ws-click-search-again", "ws-type-more", "ws-escape"
         };
 
-        // The casting-first (v1.2 default route) action set: one cold moon
-        // click runs Long with the editor closed; the workspace then opens
-        // through the physical hotkey, the continuous scroll answers the
-        // wheel, a right-click opens the native spell inspect without any
-        // mutation, and Escape closes the inspect first and the workspace
-        // second.
+        // The casting-first (v1.2 default route) action set: one TRULY cold
+        // moon click - before the planner was ever opened in this game
+        // session, with the plan a previous session stored - runs Long with
+        // the editor closed; the workspace then opens through the launcher's
+        // physical planner hotkey, the continuous scroll answers the wheel,
+        // a right-click opens the native spell inspect without any mutation,
+        // and Escape closes the inspect first and the workspace second.
         public static readonly string[] CastingActions =
         {
-            "cf-moon", "cf-open", "cf-wheel", "cf-right-click", "cf-escape-inspect",
-            "cf-escape-close"
+            "cf-moon", "cf-wheel", "cf-right-click", "cf-escape-inspect", "cf-escape-close"
         };
 
         // The typed query comes from the label of a tile that was NOT
@@ -105,6 +105,39 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public string MoonAllowanceStatus { get; set; }
         public string MoonGrantDescribe { get; set; }
         public bool? MoonGrantConsumed { get; set; }
+        public int? MoonGrantAttempts { get; set; }
+        // E12 cold start: before the moon click no planner session existed
+        // and the editor had never been opened in this game session; the
+        // plan was stored by an earlier session (Long AND Important
+        // castings, Important authored last).
+        public bool? ColdSessionBeforeMoon { get; set; }
+        public bool? EditorNeverOpenedBeforeMoon { get; set; }
+        public List<string> SeedLongCastings { get; } = new List<string>();
+        public List<string> SeedImportantCastings { get; } = new List<string>();
+        // The moon run itself (cast runs): runs started by the press after a
+        // settle (exactly one), the run's scope, terminal, submissions and
+        // per-casting outcomes ("<id>=<state>").
+        public int? MoonRunsStarted { get; set; }
+        public string MoonRunRoutine { get; set; }
+        public string MoonRunTerminal { get; set; }
+        public int? MoonRunSubmitted { get; set; }
+        public int? MoonRunResourcesSpent { get; set; }
+        public List<string> MoonRunEntries { get; } = new List<string>();
+        // Native reads around the press: the Long casting's target has its
+        // effect afterwards (it had none before); the Important casting's
+        // target still has none; the Long casting's own source availability
+        // ("<before>><after>") moved by exactly the run's spend.
+        public bool? LongEffectBefore { get; set; }
+        public bool? LongEffectAfter { get; set; }
+        public bool? ImportantEffectBefore { get; set; }
+        public bool? ImportantEffectAfter { get; set; }
+        public string LongSourceAvailability { get; set; }
+        public bool LongSourceFree { get; set; }
+        // After the final Escape: the game's own Escape menu must not be
+        // open (the planner took that Escape), and the game mode is the one
+        // before the planner opened.
+        public string ModeBeforeOpen { get; set; }
+        public bool? EscMenuOpenAfterClose { get; set; }
         // The continuous scroll answered the physical wheel.
         public bool GraphOverflow { get; set; }
         public float? GraphScrollBefore { get; set; }
@@ -158,6 +191,70 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
         }
 
+        // The cold moon press (v1.2 E12). Both expectations: it was truly
+        // cold (no planner session, the editor never opened this game
+        // session), the stored plan held Long AND Important castings, and
+        // the editor stayed closed. A selection run's press is refused BY
+        // THE LOCK (no grant) and changes nothing. A cast run's press ran
+        // exactly one run - Long, completed, its castings and only its
+        // castings, each confirmed - under its consumed single-use grant
+        // (one attempt); the Long target gained its effect, the Important
+        // target did not; the Long source moved by exactly the run's spend.
+        internal IList<string> MoonViolations()
+        {
+            var violations = new List<string>();
+            if (ColdSessionBeforeMoon != true)
+                violations.Add("moon:not-cold:session-" + (ColdSessionBeforeMoon == null ? "unread" : "existed"));
+            if (EditorNeverOpenedBeforeMoon != true)
+                violations.Add("moon:not-cold:editor-" + (EditorNeverOpenedBeforeMoon == null ? "unread" : "opened"));
+            if (SeedLongCastings.Count == 0 || SeedImportantCastings.Count == 0)
+                violations.Add("moon:seed:long=" + SeedLongCastings.Count + ";important=" + SeedImportantCastings.Count);
+            if (!MoonWorkspaceStayedClosed) violations.Add("moon:editor-opened");
+            if (LongEffectBefore != false || ImportantEffectBefore != false)
+                violations.Add("moon:effects-present-before:long=" + LongEffectBefore + ";important=" +
+                    ImportantEffectBefore);
+            if (MoonExpectation == "select")
+            {
+                // No grant exists, so the press must be refused BY THE LOCK
+                // (a run without an allowance would be a native-casting lock
+                // failure, never a pass) - and nothing may land.
+                if (MoonRunStarted) violations.Add("moon:run-without-grant");
+                else if (string.IsNullOrEmpty(MoonRefusal) ||
+                    MoonRefusal.IndexOf("native-submission-disabled", StringComparison.Ordinal) < 0)
+                    violations.Add("moon:not-refused-by-lock:" + (MoonRefusal ?? "none"));
+                if (LongEffectAfter != false || ImportantEffectAfter != false)
+                    violations.Add("moon:refused-press-landed:long=" + LongEffectAfter + ";important=" +
+                        ImportantEffectAfter);
+                return violations;
+            }
+            if (!MoonRunStarted) violations.Add("moon:no-run");
+            if (MoonRunsStarted != 1) violations.Add("moon:runs:" + (MoonRunsStarted == null ? "unread" : MoonRunsStarted.ToString()));
+            if (MoonGrantConsumed != true) violations.Add("moon:grant-not-consumed");
+            if (MoonGrantAttempts != 1) violations.Add("moon:grant-attempts:" + (MoonGrantAttempts == null ? "unread" : MoonGrantAttempts.ToString()));
+            if (MoonRunRoutine != "long") violations.Add("moon:routine:" + (MoonRunRoutine ?? "none"));
+            if (MoonRunTerminal != "completed") violations.Add("moon:terminal:" + (MoonRunTerminal ?? "none"));
+            if (MoonRunSubmitted != SeedLongCastings.Count)
+                violations.Add("moon:submitted:" + (MoonRunSubmitted == null ? "unread" : MoonRunSubmitted.ToString()) +
+                    "!=" + SeedLongCastings.Count);
+            foreach (string id in SeedLongCastings)
+                if (!MoonRunEntries.Contains(id + "=EffectConfirmed")) violations.Add("moon:long-not-confirmed:" + id);
+            foreach (string entry in MoonRunEntries)
+                if (SeedImportantCastings.Any(id => entry.StartsWith(id + "=", StringComparison.Ordinal)))
+                    violations.Add("moon:routine-crossover:" + entry);
+            if (LongEffectAfter != true) violations.Add("moon:long-effect-missing");
+            if (ImportantEffectAfter != false) violations.Add("moon:important-ran");
+            string[] availability = (LongSourceAvailability ?? string.Empty).Split('>');
+            int before;
+            int after;
+            int spent = MoonRunResourcesSpent ?? -1;
+            if (availability.Length != 2 || !int.TryParse(availability[0], out before) ||
+                !int.TryParse(availability[1], out after) || spent < 0 ||
+                before - after != (LongSourceFree ? 0 : spent) || (LongSourceFree && spent != 0))
+                violations.Add("moon:cost:" + (LongSourceAvailability ?? "unread") + ";spent=" + spent +
+                    ";free=" + LongSourceFree);
+            return violations;
+        }
+
         public IList<string> Violations()
         {
             var violations = new List<string>(Failures);
@@ -170,22 +267,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 foreach (string action in CastingActions)
                     if (!Acknowledged.Contains(action))
                         violations.Add("unacknowledged:" + action);
-                if (MoonExpectation == "select")
-                {
-                    // Selection contract: no grant exists, so the press must
-                    // be refused BY THE LOCK (a run without an allowance
-                    // would be a native-casting lock failure, never a pass).
-                    if (MoonRunStarted) violations.Add("moon:run-without-grant");
-                    else if (string.IsNullOrEmpty(MoonRefusal) ||
-                        MoonRefusal.IndexOf("native-submission-disabled", StringComparison.Ordinal) < 0)
-                        violations.Add("moon:not-refused-by-lock:" + (MoonRefusal ?? "none"));
-                }
-                else
-                {
-                    if (!MoonRunStarted) violations.Add("moon:no-run");
-                    if (MoonGrantConsumed == false) violations.Add("moon:grant-not-consumed");
-                }
-                if (!MoonWorkspaceStayedClosed) violations.Add("moon:editor-opened");
+                violations.AddRange(MoonViolations());
                 if (GraphWheelEvidence == "unread") violations.Add("graph-scroll:unread");
                 else if (GraphWheelEvidence == "no-scroll") violations.Add("graph-scroll:no-scroll");
                 else if (GraphWheelEvidence == "moved-without-overflow")
@@ -196,6 +278,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     DocumentSignatureAfterInspect == null ||
                     DocumentSignatureBeforeBrowse != DocumentSignatureAfterInspect)
                     violations.Add("inspect:document-mutated");
+                // The final state (E06/E12): the planner took its closing
+                // Escape (the game's menu is not open; the game is back in
+                // the mode it was in before the planner opened), its input
+                // lease is released, and nothing reached the world.
+                if (!ClosedByEscape) violations.Add("escape-did-not-close");
+                if (!LeaseReleased) violations.Add("lease-held-after-close");
+                if (EscMenuOpenAfterClose != false)
+                    violations.Add("escape:native-menu-opened:" + (EscMenuOpenAfterClose == null ? "unread" : "open"));
+                if (string.IsNullOrEmpty(ModeBeforeOpen) || ModeAfterClose != ModeBeforeOpen)
+                    violations.Add("mode-after-close:" + (ModeAfterClose ?? "none") + "!=" + (ModeBeforeOpen ?? "none"));
+                if (PlayerCommands != 0 || MovementCommands != 0 || AbilityCommands != 0 ||
+                    SelectionEvents != 0 || AbilityTargetEvents != 0 || !SelectionUnchanged)
+                    violations.Add("world-input-leaked:commands=" + PlayerCommands + "/" + MovementCommands + "/" +
+                        AbilityCommands + ";events=" + SelectionEvents + "/" + AbilityTargetEvents +
+                        ";selectionUnchanged=" + SelectionUnchanged);
                 return violations;
             }
             foreach (string action in Actions)

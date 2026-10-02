@@ -512,9 +512,8 @@ try {
     # conditional pre-steps allowed beside them, and the moon-run
     # expectation (select refused by the lock; cast run once under its
     # consumed grant).
-    $physicalActions = @('cf-moon', 'cf-open', 'cf-wheel', 'cf-right-click',
-        'cf-escape-inspect', 'cf-escape-close')
-    $physicalKinds = @{ 'cf-moon' = 'click'; 'cf-open' = 'hotkey'; 'cf-wheel' = 'wheel'
+    $physicalActions = @('cf-moon', 'cf-wheel', 'cf-right-click', 'cf-escape-inspect', 'cf-escape-close')
+    $physicalKinds = @{ 'cf-moon' = 'click'; 'cf-wheel' = 'wheel'
         'cf-right-click' = 'rightclick'; 'cf-escape-inspect' = 'key-escape'; 'cf-escape-close' = 'key-escape' }
     function New-PhysicalOutcomeCase([string]$Name, [string]$Expectation, [scriptblock]$Tamper,
         [string]$ExpectedScreen = '1920x1080') {
@@ -531,7 +530,10 @@ try {
             runId = 'physical-run'; kingmakerProcessId = 4242; plannerHotkeySentAtUtc = '2026-09-24T00:00:00Z' })
         $record = [ordered]@{ schemaVersion = 1; runId = 'physical-run'; expectedScreen = '1920x1080'
             screen = '1920x1080'; openedPhysically = $true; castingFirst = $true
-            moonExpectation = $Expectation; acknowledged = $physicalActions; failures = @(); violations = @() }
+            moonExpectation = $Expectation; acknowledged = $physicalActions; failures = @(); violations = @()
+            coldSessionBeforeMoon = $true; editorNeverOpenedBeforeMoon = $true
+            seedLongCastings = @('seed-long-1'); seedImportantCastings = @('seed-important-1')
+            moonWorkspaceStayedClosed = $true; escMenuOpenAfterClose = $false }
         if ($Expectation -ceq 'select') {
             $record.moonRunStarted = $false
             $record.moonRefusal = 'native-submission-disabled:runtime-test-session:live-workspace-physical:cf-grant-absent;Refused'
@@ -539,6 +541,12 @@ try {
         else {
             $record.moonRunStarted = $true
             $record.moonGrantConsumed = $true
+            $record.moonGrantAttempts = 1
+            $record.moonRunsStarted = 1
+            $record.moonRunRoutine = 'long'
+            $record.moonRunTerminal = 'completed'
+            $record.longEffectAfter = $true
+            $record.importantEffectAfter = $false
         }
         Write-KbpJsonAtomic (Join-Path $directory 'physical-workspace.json') $record
         if ($null -ne $Tamper) { & $Tamper $directory }
@@ -579,6 +587,27 @@ try {
             $r.moonRunStarted = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'cast-grant-not-consumed' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
             $r.moonGrantConsumed = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        # E12 cold-start and run-shape contract.
+        'not-cold-session' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.coldSessionBeforeMoon = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'editor-opened-before' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.editorNeverOpenedBeforeMoon = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'no-important-seed' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.seedImportantCastings = @(); Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'editor-opened-by-moon' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.moonWorkspaceStayedClosed = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'esc-menu-after-close' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.escMenuOpenAfterClose = $true; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'cast-two-runs' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.moonRunsStarted = 2; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'cast-grant-twice' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.moonGrantAttempts = 2; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'cast-other-routine' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.moonRunRoutine = 'important'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'cast-important-ran' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.importantEffectAfter = $true; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'cast-long-missing' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.longEffectAfter = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'extra-failed-ack' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-other.ack.json') ([ordered]@{
             schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-other'; action = 'click'; deliveryFailed = $true }) })
         'extra-request' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-extra.json') ([ordered]@{

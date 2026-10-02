@@ -2615,6 +2615,8 @@ namespace KingmakerBuffPlanner.Tests
                 var record = NewCastingFirstPhysicalRecord();
                 record.MoonExpectation = "select";
                 record.MoonRunStarted = false;
+                // A refused press lands nothing.
+                record.LongEffectAfter = false;
                 record.MoonRefusal = "native-submission-disabled:runtime-test-session:" +
                     "live-workspace-physical:cf-grant-absent;Refused:Long was not cast: native casting " +
                     "is disabled in this automated test session.";
@@ -2636,6 +2638,10 @@ namespace KingmakerBuffPlanner.Tests
             castMissingConsumption.MoonGrantConsumed = false;
             if (!castMissingConsumption.Violations().Contains("moon:grant-not-consumed"))
                 throw new InvalidOperationException("An unconsumed grant passed the cast judgement.");
+            PhysicalWorkspaceRecord refusedButLanded = selectGood();
+            refusedButLanded.LongEffectAfter = true;
+            if (!refusedButLanded.Violations().Contains("moon:refused-press-landed:long=True;important=False"))
+                throw new InvalidOperationException("A refused press that landed passed the selection judgement.");
         }
 
         // A production-boundary stand-in that accepts every submission; the
@@ -2667,9 +2673,18 @@ namespace KingmakerBuffPlanner.Tests
                 InspectClosedByEscape = true,
                 DocumentSignatureBeforeBrowse = "castings=1;revision=3",
                 DocumentSignatureAfterInspect = "castings=1;revision=3",
-                ModeAfterClose = "Default", LeaseReleased = true,
-                MoonGrantConsumed = true
+                ModeAfterClose = "Default", LeaseReleased = true, ClosedByEscape = true,
+                MoonGrantConsumed = true, MoonGrantAttempts = 1, MoonRunsStarted = 1,
+                ColdSessionBeforeMoon = true, EditorNeverOpenedBeforeMoon = true,
+                MoonRunRoutine = "long", MoonRunTerminal = "completed", MoonRunSubmitted = 1,
+                MoonRunResourcesSpent = 0, LongEffectBefore = false, LongEffectAfter = true,
+                ImportantEffectBefore = false, ImportantEffectAfter = false,
+                LongSourceAvailability = "99>99", LongSourceFree = true,
+                ModeBeforeOpen = "Default", EscMenuOpenAfterClose = false, SelectionUnchanged = true
             };
+            record.SeedLongCastings.Add("seed-long-1");
+            record.SeedImportantCastings.Add("seed-important-1");
+            record.MoonRunEntries.Add("seed-long-1=EffectConfirmed");
             record.Acknowledged.AddRange(PhysicalWorkspaceRecord.CastingActions);
             return record;
         }
@@ -7400,8 +7415,20 @@ namespace KingmakerBuffPlanner.Tests
                     InspectClosedByEscape = true,
                     DocumentSignatureBeforeBrowse = "castings=1;revision=3",
                     DocumentSignatureAfterInspect = "castings=1;revision=3",
-                    ModeAfterClose = "Default", LeaseReleased = true
+                    ModeAfterClose = "Default", LeaseReleased = true, ClosedByEscape = true,
+                    // E12 cold-moon cast contract (cast is the default expectation).
+                    ColdSessionBeforeMoon = true, EditorNeverOpenedBeforeMoon = true,
+                    MoonGrantConsumed = true, MoonGrantAttempts = 1, MoonRunsStarted = 1,
+                    MoonRunRoutine = "long", MoonRunTerminal = "completed", MoonRunSubmitted = 1,
+                    MoonRunResourcesSpent = 0, LongEffectBefore = false, LongEffectAfter = true,
+                    ImportantEffectBefore = false, ImportantEffectAfter = false,
+                    LongSourceAvailability = "99>99", LongSourceFree = true,
+                    ModeBeforeOpen = "Default", EscMenuOpenAfterClose = false,
+                    SelectionUnchanged = true
                 };
+                record.SeedLongCastings.Add("seed-long-1");
+                record.SeedImportantCastings.Add("seed-important-1");
+                record.MoonRunEntries.Add("seed-long-1=EffectConfirmed");
                 record.Acknowledged.AddRange(PhysicalWorkspaceRecord.CastingActions);
                 record.AddNote("seed:applied:unit-wiz>unit-t1");
                 record.AddNote("menu-veil:closed-by-escape;attempts=1");
@@ -7431,7 +7458,29 @@ namespace KingmakerBuffPlanner.Tests
                 { "graph-scroll:moved-without-overflow", r => r.GraphOverflow = false },
                 { "inspect:not-opened", r => r.InspectOpened = false },
                 { "inspect:not-closed", r => r.InspectClosedByEscape = false },
-                { "inspect:document-mutated", r => r.DocumentSignatureAfterInspect = "castings=1;revision=4" }
+                { "inspect:document-mutated", r => r.DocumentSignatureAfterInspect = "castings=1;revision=4" },
+                // E12 cold moon: truly cold, Long only, exactly once.
+                { "moon:not-cold:session-existed", r => r.ColdSessionBeforeMoon = false },
+                { "moon:not-cold:editor-opened", r => r.EditorNeverOpenedBeforeMoon = false },
+                { "moon:seed:long=1;important=0", r => r.SeedImportantCastings.Clear() },
+                { "moon:runs:2", r => r.MoonRunsStarted = 2 },
+                { "moon:grant-attempts:2", r => r.MoonGrantAttempts = 2 },
+                { "moon:routine:important", r => r.MoonRunRoutine = "important" },
+                { "moon:terminal:halted", r => r.MoonRunTerminal = "halted" },
+                { "moon:submitted:2!=1", r => r.MoonRunSubmitted = 2 },
+                { "moon:long-not-confirmed:seed-long-1", r => r.MoonRunEntries.Clear() },
+                { "moon:routine-crossover:seed-important-1=EffectConfirmed",
+                    r => r.MoonRunEntries.Add("seed-important-1=EffectConfirmed") },
+                { "moon:long-effect-missing", r => r.LongEffectAfter = false },
+                { "moon:important-ran", r => r.ImportantEffectAfter = true },
+                { "moon:cost:99>98;spent=0;free=True", r => r.LongSourceAvailability = "99>98" },
+                // E06 final state: the planner's closing Escape stays the
+                // planner's (beta-3c1c5d4ar13-phys-sel-01 ended in EscMode).
+                { "escape:native-menu-opened:open", r => r.EscMenuOpenAfterClose = true },
+                { "mode-after-close:EscMode!=Default", r => r.ModeAfterClose = "EscMode" },
+                { "lease-held-after-close", r => r.LeaseReleased = false },
+                { "world-input-leaked:commands=1/1/0;events=0/0;selectionUnchanged=True",
+                    r => { r.PlayerCommands = 1; r.MovementCommands = 1; } }
             };
             foreach (KeyValuePair<string, Action<PhysicalWorkspaceRecord>> shape in shapes)
             {
