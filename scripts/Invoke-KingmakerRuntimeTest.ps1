@@ -514,6 +514,9 @@ public static class KbpPhysicalInput {
   [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
   static KbpPhysicalInput() { try { SetProcessDPIAware(); } catch { } }
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+  [DllImport("user32.dll")] static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+  [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
   [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
   [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
   [DllImport("user32.dll")] static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
@@ -559,7 +562,29 @@ public static class KbpPhysicalInput {
     // Foreground activation ONLY: no synthetic shell input of any kind.
     // If the OS foreground lock refuses, delivery fails closed rather than
     // injecting keys into whichever window currently owns focus.
-    return SetForegroundWindow(window);
+    if (SetForegroundWindow(window)) return true;
+    // Owner-authorized (2026-10-02) activation under an RDP-attached
+    // session: the plain call is denied by the OS foreground lock even
+    // when the owner is input-idle. Attaching this thread to the
+    // foreground and target threads' input queues is the legitimate
+    // activation route - still no synthetic shell input, and every
+    // caller still verifies the foreground target before delivering.
+    IntPtr foreground = GetForegroundWindow();
+    if (foreground == IntPtr.Zero) return false;
+    uint pid;
+    uint foregroundThread = GetWindowThreadProcessId(foreground, out pid);
+    uint targetThread = GetWindowThreadProcessId(window, out pid);
+    uint ownThread = GetCurrentThreadId();
+    if (foregroundThread == 0 || targetThread == 0 || ownThread == 0) return false;
+    bool attachedForeground = AttachThreadInput(ownThread, foregroundThread, true);
+    bool attachedTarget = AttachThreadInput(ownThread, targetThread, true);
+    try {
+      if (IsIconic(window)) ShowWindow(window, 9);
+      return SetForegroundWindow(window);
+    } finally {
+      if (attachedForeground) AttachThreadInput(ownThread, foregroundThread, false);
+      if (attachedTarget) AttachThreadInput(ownThread, targetThread, false);
+    }
   }
   public static void RightClick(IntPtr window) {
     if (window == IntPtr.Zero || GetForegroundWindow() != window)
