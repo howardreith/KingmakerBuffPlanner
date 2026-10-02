@@ -103,6 +103,9 @@ namespace KingmakerBuffPlanner.UI
         private Text _inspectMeta;
         private Text _inspectBody;
         private ScrollRect _inspectScroll;
+        private RectTransform _inspectPanel;
+        private const float InspectPanelWidth = 760f;
+        private const float InspectPanelHeight = 520f;
 
         internal CastingWorkspaceScreenView(
             StaticCanvas nativeCanvas,
@@ -484,42 +487,107 @@ namespace KingmakerBuffPlanner.UI
             // The panel consumes every click over itself (a full-block
             // graphic is already the background) so a right-click can never
             // fall through to the graph beneath.
+            // A fixed-size panel centred on the dimmed overlay. SetAnchors'
+            // offsets are edge insets, not a size: the earlier point anchor
+            // with insets 760/520 gave the panel a negative width and no
+            // height, so the description never rendered (D11, visible in
+            // beta-f0cf4f16r11-phys-sel-01 and beta-3c1c5d4ar13-phys-sel-01
+            // physical-cf-inspect.png); the Close button had the same fault.
             RectTransform panel = KingmakerUiFactory.CreateRect("Panel", _inspectRoot);
             KingmakerUiFactory.AddFramedPanel(panel, _theme.ParchmentPanel, _theme.GoldAccent, 2f);
-            KingmakerUiFactory.SetAnchors(panel, 0.5f, 0.5f, 0.5f, 0.5f, 760f, 520f, 0f, 0f);
+            CentreFixed(panel, new Vector2(0.5f, 0.5f), new Vector2(InspectPanelWidth, InspectPanelHeight),
+                Vector2.zero);
+            _inspectPanel = panel;
             _inspectTitle = KingmakerUiFactory.CreateText("Title", panel, _theme, string.Empty, 20,
-                TextAnchor.UpperLeft);
+                TextAnchor.MiddleLeft);
             _inspectTitle.fontStyle = FontStyle.Bold;
-            KingmakerUiFactory.Stretch(_inspectTitle.rectTransform, 16, 4, 44, 40);
+            KingmakerUiFactory.SetAnchors(_inspectTitle.rectTransform, 0f, 1f, 1f, 1f, 16f, 132f, -44f, 10f);
             _inspectMeta = KingmakerUiFactory.CreateText("Meta", panel, _theme, string.Empty, 13,
-                TextAnchor.UpperLeft);
+                TextAnchor.MiddleLeft);
             _inspectMeta.color = _theme.MutedBrownText;
-            KingmakerUiFactory.Stretch(_inspectMeta.rectTransform, 16, 4, 64, 34);
+            KingmakerUiFactory.SetAnchors(_inspectMeta.rectTransform, 0f, 1f, 1f, 1f, 16f, 16f, -68f, 46f);
             Button close = KingmakerUiFactory.CreateButton("Close", panel, _theme, "Close",
                 CloseSpellInspect);
-            KingmakerUiFactory.SetAnchors(RectOf(close), 1f, 1f, 1f, 1f, 110f, 30f, -12f, -8f);
-            RectTransform viewport = KingmakerUiFactory.CreateRect("Viewport", panel);
-            KingmakerUiFactory.Stretch(viewport, 10, 10, 12, 90);
-            Image mask = viewport.gameObject.AddComponent<Image>();
-            mask.color = new Color(0.95f, 0.90f, 0.78f, 0.9f);
-            viewport.gameObject.AddComponent<RectMask2D>();
-            RectTransform content = KingmakerUiFactory.CreateRect("Content", viewport);
-            KingmakerUiFactory.SetAnchors(content, 0f, 1f, 1f, 1f);
-            content.pivot = new Vector2(0.5f, 1f);
+            CentreFixed(RectOf(close), new Vector2(1f, 1f), new Vector2(110f, 32f), new Vector2(-12f, -10f));
+            // The description scrolls inside the planner's standard scroll
+            // view: the content's height follows the wrapped text through the
+            // view's layout group, so long text can be wheeled through.
+            RectTransform content;
+            _inspectScroll = KingmakerUiFactory.CreateScrollView("Description", panel, _theme, out content);
+            KingmakerUiFactory.Stretch(RectOf(_inspectScroll), 12, 12, 12, 76);
             ContentSizeFitter fitter = content.gameObject.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             _inspectBody = KingmakerUiFactory.CreateText("Body", content, _theme, string.Empty, 15,
                 TextAnchor.UpperLeft);
             _inspectBody.horizontalOverflow = HorizontalWrapMode.Wrap;
             _inspectBody.verticalOverflow = VerticalWrapMode.Overflow;
-            KingmakerUiFactory.Stretch(_inspectBody.rectTransform, 8, 8, 8, 8);
-            _inspectScroll = panel.gameObject.AddComponent<ScrollRect>();
-            _inspectScroll.viewport = viewport;
-            _inspectScroll.content = content;
-            _inspectScroll.horizontal = false;
-            _inspectScroll.vertical = true;
-            _inspectScroll.scrollSensitivity = 24f;
             _inspectRoot.gameObject.SetActive(false);
+        }
+
+        // Fixed size at an anchor point: the pivot is the anchor, so the
+        // offset is measured from that point inward.
+        private static void CentreFixed(RectTransform rect, Vector2 anchor, Vector2 size, Vector2 offset)
+        {
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = anchor;
+            rect.sizeDelta = size;
+            rect.anchoredPosition = offset;
+        }
+
+        // The open description's presentation, for the physical judgement:
+        // the panel's on-screen size in pixels (zero when any corner is off
+        // screen), its title and body text, how far the wrapped text
+        // overflows the viewport, and the scroll position (1 = top).
+        internal Vector2? SpellInspectPanelScreenSizeForRuntime
+        {
+            get
+            {
+                if (!SpellInspectOpen || _inspectPanel == null) return null;
+                Canvas canvas = _inspectPanel.GetComponentInParent<Canvas>();
+                Camera camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay
+                    ? null : canvas.worldCamera;
+                var corners = new Vector3[4];
+                _inspectPanel.GetWorldCorners(corners);
+                Vector2 low = RectTransformUtility.WorldToScreenPoint(camera, corners[0]);
+                Vector2 high = RectTransformUtility.WorldToScreenPoint(camera, corners[2]);
+                if (low.x < 0f || low.y < 0f || high.x > Screen.width || high.y > Screen.height) return Vector2.zero;
+                return high - low;
+            }
+        }
+
+        internal Vector2? SpellInspectPanelCentreForRuntime
+        {
+            get { return SpellInspectOpen ? ScreenCentre(_inspectPanel) : null; }
+        }
+
+        internal string SpellInspectTitleForRuntime
+        {
+            get { return SpellInspectOpen && _inspectTitle != null ? _inspectTitle.text : null; }
+        }
+
+        internal string SpellInspectBodyForRuntime
+        {
+            get { return SpellInspectOpen && _inspectBody != null ? _inspectBody.text : null; }
+        }
+
+        internal float SpellInspectOverflowForRuntime
+        {
+            get
+            {
+                if (!SpellInspectOpen || _inspectScroll == null || _inspectScroll.content == null ||
+                    _inspectScroll.viewport == null) return 0f;
+                return _inspectScroll.content.rect.height - _inspectScroll.viewport.rect.height;
+            }
+        }
+
+        internal float? SpellInspectScrollPositionForRuntime
+        {
+            get
+            {
+                return SpellInspectOpen && _inspectScroll != null
+                    ? _inspectScroll.verticalNormalizedPosition : (float?)null;
+            }
         }
 
         // Wires right-click on one control to show the exact spell's
@@ -547,7 +615,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void BuildHeader(RectTransform frame)
         {
-            // Row 1, on the dark margin above the book: mode, title, status.
+            // Row 1, on the continuous parchment: mode, title, status.
             RectTransform header = KingmakerUiFactory.CreateRect("Header", frame);
             KingmakerUiFactory.SetAnchors(header, 0f, 1f, 1f, 1f);
             header.pivot = new Vector2(0.5f, 1f);
@@ -556,16 +624,17 @@ namespace KingmakerBuffPlanner.UI
             Text mode = KingmakerUiFactory.CreateText("PlannerMode", header, _theme, ModeLabel, 16,
                 TextAnchor.MiddleLeft);
             mode.fontStyle = FontStyle.Bold;
-            mode.color = new Color(0.95f, 0.78f, 0.55f, 1f);
+            // Legible on the parchment (the light ink was chosen for the
+            // retired dark book margin and read as a faint smear, r11/r13).
+            mode.color = _theme.MutedBrownText;
             KingmakerUiFactory.SetAnchors(mode.rectTransform, 0f, 0f, 0f, 1f);
             mode.rectTransform.pivot = new Vector2(0f, 0.5f);
             mode.rectTransform.sizeDelta = new Vector2(230f, 0f);
             mode.rectTransform.anchoredPosition = new Vector2(16f, 0f);
             // Everyday-use v1.2: the graph is the only normal authoring
             // route; the prominent in-planner Classic switch is retired.
-            // Classic recovery remains available through the mod settings
-            // toggle and the retained importer/rollback during the bounded
-            // retirement.
+            // Classic recovery is the retained importer, the byte-exact
+            // archive of the prior plan and reinstalling the prior package.
             _title = KingmakerUiFactory.CreateText("Title", header, _theme, "Buff Planner — casting plan", 22,
                 TextAnchor.MiddleLeft);
             _title.fontStyle = FontStyle.Bold;

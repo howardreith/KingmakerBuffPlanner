@@ -2686,7 +2686,31 @@ namespace KingmakerBuffPlanner.Tests
             record.SeedImportantCastings.Add("seed-important-1");
             record.MoonRunEntries.Add("seed-long-1=EffectConfirmed");
             record.Acknowledged.AddRange(PhysicalWorkspaceRecord.CastingActions);
+            WithVisibleDescription(record);
             return record;
+        }
+
+        // The description the player saw (D11): a real panel on screen, the
+        // chip's native text, the long native text scrolled by the wheel,
+        // the graph beneath unmoved.
+        private static void WithVisibleDescription(PhysicalWorkspaceRecord record)
+        {
+            record.InspectPanelWidth = 760f;
+            record.InspectPanelHeight = 520f;
+            record.InspectTitle = "#1 Resistance";
+            record.InspectBodyChars = 180;
+            record.InspectExpectedChars = 180;
+            record.InspectBodyNative = true;
+            record.InspectOverflow = -250f;
+            record.InspectScrollBefore = 1f;
+            record.InspectScrollAfter = 1f;
+            record.LongProbeChars = 6100;
+            record.LongProbeOverflow = 2400f;
+            record.LongScrollBefore = 1f;
+            record.LongScrollAfter = 0.92f;
+            record.InspectOpenAfterWheels = true;
+            record.GraphScrollUnderInspectBefore = 0.7f;
+            record.GraphScrollUnderInspectAfter = 0.7f;
         }
 
         // Unity-bound wiring, checked at source level: every routine route
@@ -7451,6 +7475,7 @@ namespace KingmakerBuffPlanner.Tests
                 record.SeedImportantCastings.Add("seed-important-1");
                 record.MoonRunEntries.Add("seed-long-1=EffectConfirmed");
                 record.Acknowledged.AddRange(PhysicalWorkspaceRecord.CastingActions);
+                WithVisibleDescription(record);
                 record.AddNote("seed:applied:unit-wiz>unit-t1");
                 record.AddNote("menu-veil:closed-by-escape;attempts=1");
                 return record;
@@ -7480,6 +7505,20 @@ namespace KingmakerBuffPlanner.Tests
                 { "inspect:not-opened", r => r.InspectOpened = false },
                 { "inspect:not-closed", r => r.InspectClosedByEscape = false },
                 { "inspect:document-mutated", r => r.DocumentSignatureAfterInspect = "castings=1;revision=4" },
+                // E05/E06 description (D11: r11/r13 opened a panel of
+                // negative width and no height and still said "opened").
+                { "inspect:panel-not-visible:0x0", r => { r.InspectPanelWidth = 0f; r.InspectPanelHeight = 0f; } },
+                { "inspect:panel-not-visible:unread", r => r.InspectPanelWidth = null },
+                { "inspect:title-empty", r => r.InspectTitle = " " },
+                { "inspect:body-not-native:12/180", r => { r.InspectBodyNative = false; r.InspectBodyChars = 12; } },
+                { "inspect:overflowing-description-not-scrolled",
+                    r => { r.InspectOverflow = 40f; r.InspectScrollAfter = 1f; } },
+                { "inspect:long-probe-empty", r => r.LongProbeChars = 0 },
+                { "inspect:long-text-does-not-overflow:0", r => r.LongProbeOverflow = 0f },
+                { "inspect:long-text-not-scrolled:1>1", r => r.LongScrollAfter = 1f },
+                { "inspect:closed-by-wheel", r => r.InspectOpenAfterWheels = false },
+                { "inspect:wheel-moved-graph:0.7>0.5", r => r.GraphScrollUnderInspectAfter = 0.5f },
+                { "unacknowledged:cf-long-wheel", r => r.Acknowledged.Remove("cf-long-wheel") },
                 // E12 cold moon: truly cold, Long only, exactly once.
                 { "moon:not-cold:session-existed", r => r.ColdSessionBeforeMoon = false },
                 { "moon:not-cold:editor-opened", r => r.EditorNeverOpenedBeforeMoon = false },
