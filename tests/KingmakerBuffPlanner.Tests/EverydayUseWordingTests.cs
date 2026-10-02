@@ -20,6 +20,70 @@ namespace KingmakerBuffPlanner.Tests
             Run("footer-names-the-run-and-no-ceremony", TestFooterWordingHasNoCeremony);
             Run("footer-save-status-is-honest-and-recoverable", () => TestFooterSaveStatus(root));
             Run("hud-routine-buttons-describe-the-click", TestHudRoutineButtons);
+            Run("planner-escape-never-reaches-the-native-menu", TestPlannerEscapeIsolation);
+        }
+
+        // D10 (beta-3c1c5d4ar13-phys-sel-01: the Escape that closed the
+        // planner also opened the game's Save/Load/Options menu): while a
+        // planner window owns the keyboard, and on the frame its Escape
+        // closed it, the game's own "EscPressed" binding is suppressed
+        // through the existing exact binding prefix; with no planner open,
+        // Escape stays the game's. The binding identity is read from the
+        // INSTALLED Assembly-CSharp (the inspected 2.1.7b contract).
+        private static void TestPlannerEscapeIsolation()
+        {
+            if (!PlannerHotkeyBinding.ShouldSuppressNativeEscape("EscPressed", true) ||
+                PlannerHotkeyBinding.ShouldSuppressNativeEscape("EscPressed", false) ||
+                PlannerHotkeyBinding.ShouldSuppressNativeEscape("OpenInventory", true))
+                throw new InvalidOperationException("The native Escape suppression rule is wrong.");
+            string hotkey = ProductionSource("UI", "PlannerHotkey.cs");
+            string prefix = WithoutComments(MemberBody(hotkey, "private static bool InputMatchedPrefix("));
+            int escape = prefix.IndexOf("PlannerHotkeyBinding.ShouldSuppressNativeEscape(name, PlannerOwnsEscape())",
+                StringComparison.Ordinal);
+            int binding = prefix.IndexOf("ShouldSuppressNativeBinding(", StringComparison.Ordinal);
+            string owns = WithoutComments(MemberBody(hotkey, "private static bool PlannerOwnsEscape()"));
+            if (escape < 0 || binding < 0 || escape > binding ||
+                !owns.Contains("_escapeTakenFrame == Time.frameCount") ||
+                !owns.Contains("BuffPlannerUiRoot.IsCastingWorkspaceOpen") ||
+                !owns.Contains("BuffPlannerUiRoot.IsScreenOpen"))
+                throw new InvalidOperationException("The native Escape is not suppressed while the planner owns it.");
+            string root = WithoutComments(ProductionSource("UI", "BuffPlannerUiRoot.cs"));
+            int workspaceEscape = root.IndexOf("if (_castingWorkspace != null && Input.GetKeyDown(KeyCode.Escape))",
+                StringComparison.Ordinal);
+            int marked = root.IndexOf("PlannerHotkey.MarkEscapeTaken();", workspaceEscape, StringComparison.Ordinal);
+            int handled = root.IndexOf("_castingWorkspace.HandleEscape()", workspaceEscape, StringComparison.Ordinal);
+            if (workspaceEscape < 0 || marked < 0 || handled < 0 || marked > handled)
+                throw new InvalidOperationException("The workspace's Escape is not marked as taken before it is handled.");
+            // The installed game's own binding: KeyboardAccess registers
+            // "EscPressed" on KeyCode 27, and the prefix's target exists.
+            string game = Environment.GetEnvironmentVariable("KBP_TEST_GAME_PATH");
+            if (string.IsNullOrWhiteSpace(game)) throw new InvalidOperationException("KBP_TEST_GAME_PATH is missing.");
+            System.Reflection.Assembly assembly = System.Reflection.Assembly.LoadFrom(
+                Path.Combine(game, "Kingmaker_Data", "Managed", "Assembly-CSharp.dll"));
+            if (assembly.ManifestModule.ModuleVersionId.ToString("D") != "07fa1e4d-8618-41b3-9b8d-faa17d3b26f7")
+                throw new InvalidOperationException("Installed Assembly-CSharp is not the inspected 2.1.7b contract.");
+            Type keyboard = assembly.GetType("Kingmaker.UI.KeyboardAccess", true);
+            const System.Reflection.BindingFlags all = System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic;
+            Type bindingType = keyboard.GetNestedType("Binding", all);
+            if (bindingType == null || bindingType.GetMethod("InputMatched", all, null, Type.EmptyTypes, null) == null ||
+                bindingType.GetProperty("Name", all) == null)
+                throw new InvalidOperationException("KeyboardAccess.Binding.InputMatched/Name is not the inspected contract.");
+            System.Reflection.MethodInfo register = keyboard.GetMethod("RegisterBuiltinBindings", all);
+            byte[] il = register == null ? null : register.GetMethodBody().GetILAsByteArray();
+            bool escOn27 = false;
+            for (int index = 0; il != null && index + 6 < il.Length && !escOn27; index++)
+            {
+                if (il[index] != 0x72) continue;
+                string literal;
+                try { literal = register.Module.ResolveString(BitConverter.ToInt32(il, index + 1)); }
+                catch (ArgumentException) { continue; }
+                escOn27 = literal == PlannerHotkeyBinding.NativeEscapeBinding && il[index + 5] == 0x1F &&
+                    il[index + 6] == 27;
+            }
+            if (!escOn27)
+                throw new InvalidOperationException("The installed game does not register \"EscPressed\" on KeyCode 27.");
         }
 
         private static string ProductionSource(params string[] relative)

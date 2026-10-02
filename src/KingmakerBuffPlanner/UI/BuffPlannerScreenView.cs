@@ -1260,7 +1260,11 @@ namespace KingmakerBuffPlanner.UI
         internal Action Close;
         private void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Escape) && Close != null) Close();
+            if (Input.GetKeyDown(KeyCode.Escape) && Close != null)
+            {
+                PlannerHotkey.MarkEscapeTaken();
+                Close();
+            }
         }
     }
 

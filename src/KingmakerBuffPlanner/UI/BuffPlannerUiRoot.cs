@@ -1880,7 +1880,9 @@ namespace KingmakerBuffPlanner.UI
                     // Escape first leaves the workspace's own focused casting
                     // (its inspector); only then does it close the workspace,
                     // before the legacy screen is consulted (never open
-                    // together).
+                    // together). Either way the planner took this Escape: the
+                    // game's own Escape binding must not also open its menu.
+                    PlannerHotkey.MarkEscapeTaken();
                     if (!_castingWorkspace.HandleEscape())
                     {
                         CloseCastingWorkspace();
@@ -1888,7 +1890,11 @@ namespace KingmakerBuffPlanner.UI
                     }
                 }
                 if (_screen.LifecycleState != PlannerScreenLifecycleState.Closed &&
-                    Input.GetKeyDown(KeyCode.Escape)) _screen.Close();
+                    Input.GetKeyDown(KeyCode.Escape))
+                {
+                    PlannerHotkey.MarkEscapeTaken();
+                    _screen.Close();
+                }
                 // The close an accepted Classic run asked for, one frame after
                 // the press (never inside the button's own callback).
                 if (_closeScreenForClassicRun)

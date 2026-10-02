@@ -14,8 +14,24 @@ namespace KingmakerBuffPlanner.UI
         private static HarmonyInstance _harmony;
         private static MethodInfo _inputMatched;
         private static string _binding = PlannerHotkeyBinding.Default;
+        // The frame on which a planner window took an Escape (closing its
+        // inspect or itself); -1 for none.
+        private static int _escapeTakenFrame = -1;
 
         internal static string Binding { get { return _binding; } }
+
+        // A planner window took this frame's Escape: the game's own Escape
+        // binding must not also act on it (see ShouldSuppressNativeEscape).
+        internal static void MarkEscapeTaken()
+        {
+            _escapeTakenFrame = Time.frameCount;
+        }
+
+        private static bool PlannerOwnsEscape()
+        {
+            return _escapeTakenFrame == Time.frameCount ||
+                BuffPlannerUiRoot.IsCastingWorkspaceOpen || BuffPlannerUiRoot.IsScreenOpen;
+        }
         internal static bool IsInstalled { get { return _harmony != null; } }
 
         internal static void Install(ModLog log)
@@ -77,6 +93,11 @@ namespace KingmakerBuffPlanner.UI
                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 string name = nameProperty == null ? string.Empty :
                     Convert.ToString(nameProperty.GetValue(__instance, null));
+                if (PlannerHotkeyBinding.ShouldSuppressNativeEscape(name, PlannerOwnsEscape()))
+                {
+                    __result = false;
+                    return false;
+                }
                 if (!ShouldSuppressNativeBinding((KeyCode)keyProperty.GetValue(__instance, null),
                         name, ctrl, shift, alt)) return true;
                 __result = false;
