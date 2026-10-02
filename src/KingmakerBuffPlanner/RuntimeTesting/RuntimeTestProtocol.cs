@@ -511,7 +511,34 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 if (hasScreen && !IsScreenSize(request.Parameters["expectedScreen"] as string))
                     throw new InvalidDataException("expected-screen");
-                ValidateLiveSaveParameters(request, 9 + (hasScreen ? 1 : 0));
+                // The moon-run expectation exists only on the physical
+                // scenario; the cast expectation carries the run-bound
+                // casting-first allowance (r10 defect: an unlisted parameter
+                // made the host reject every physical request at boot and
+                // the launcher time out at the menu).
+                bool hasExpectation = request.Parameters.ContainsKey("physicalExpectation");
+                if (hasExpectation)
+                {
+                    if (!IsPhysicalWorkspaceScenario(request.Scenario))
+                        throw new InvalidDataException("physical-expectation-only-with-physical");
+                    string expectation = request.Parameters["physicalExpectation"] as string;
+                    if (expectation != "select" && expectation != "cast")
+                        throw new InvalidDataException("physical-expectation");
+                }
+                bool hasCfAllowance = request.Parameters.ContainsKey("cfAllowance");
+                if (hasCfAllowance)
+                {
+                    if (!IsPhysicalWorkspaceScenario(request.Scenario))
+                        throw new InvalidDataException("cf-allowance-only-with-physical");
+                    if (!(request.Parameters["cfAllowance"] is string))
+                        throw new InvalidDataException("cf-allowance-type");
+                    if (!hasExpectation || !string.Equals(
+                            request.Parameters["physicalExpectation"] as string, "cast",
+                            StringComparison.Ordinal))
+                        throw new InvalidDataException("cf-allowance-only-with-cast-expectation");
+                }
+                ValidateLiveSaveParameters(request, 9 + (hasScreen ? 1 : 0) +
+                    (hasExpectation ? 1 : 0) + (hasCfAllowance ? 1 : 0));
                 return;
             }
             // The classic allowance exists only on the classic cast scenario,
