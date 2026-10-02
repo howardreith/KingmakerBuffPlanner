@@ -768,3 +768,36 @@ repository metadata: 0.0.19 to 0.1.0.
   deployment WhatIf 5/5, deterministic Release build PASS. Live runtime,
   visual, and spellbook lanes are BLOCKED on the absent `KBP_AUTOMATION`
   fixture pair and are not claimed anywhere.
+
+## Everyday-use v1.2 (2026-10-02 stopping point)
+
+Implemented and source-qualified (protocol suite 390/390 at commit
+3c1c5d4, full gate PASS): casting-first default with autosave-only
+persistence, one-click HUD runs, continuous parchment scroll, native
+right-click spell inspect, the allowance-bound single-use grant chain
+for the physical cold-moon run (CastingFirstPlanDigest /
+CastingFirstCastGrant / CastingFirstAllowance /
+AllowanceBoundCastingDispatchBoundary, launcher -CfAllowancePath and
+-PhysicalExpectation, allowance kind cf-physical, jobs
+ui-phys-select -> allow-phys -> ui-phys-cast), Share Transmutation end
+to end with isolation judges, meaningful-enhancement relevance, and the
+v1.2 physical launcher judge (six cf-* actions, conditional pre-steps,
+both moon expectations).
+
+Seven defects were found and repaired across the r6-r12 qualification
+cycles, each with a source regression: the stale-dismissal Escape veil
+(physical close loop), the UIWindow activeInHierarchy false-positive
+(IsShow probe), the missing allowance route for the moon press (grant
+chain), the invisible seeded chip (source selection at seed time), the
+unlisted request member that rejected every physical boot
+(live-save-parameters), the stale pre-v1.2 launcher judge, and the
+RDP-denied foreground activation (owner-authorized AttachThreadInput
+route; every caller still verifies the foreground target).
+
+Live evidence so far: the full windowed/advanced/reload UI
+qualifications, the physical selection contract run
+(beta-f0cf4f16r11-phys-sel-01, zero violations: veil closed, seed
+applied and durable, chip inspected, press refused BY THE LOCK), and
+the reload reconstruction on the r12 candidate. The r13 batch on the
+frozen 3c1c5d4 candidate completes the remaining native cells of
+docs/E01-E27-ACCEPTANCE-MATRIX.md before private delivery.
