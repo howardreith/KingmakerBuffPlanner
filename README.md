@@ -98,8 +98,10 @@ uploads release assets:
   -AllowPrivateRepositoryRelease
 ```
 
-The final switch acknowledges that this repository is currently private. A
-private-repository release is downloadable only by authorized GitHub users.
+The final switch is required only while the repository is private. This
+repository is currently PUBLIC, so a published release is downloadable by
+anyone; only a DRAFT release (never published) stays visible to the
+repository's collaborators alone, which is how private previews are shared.
 
 Runtime qualification may be launched only through the project-owned guarded
 harness documented in
