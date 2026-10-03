@@ -2594,6 +2594,11 @@ every run). Highlights:
   (size, package, DLL in ZIP, MVID, embedded commit/version, entries); the
   prior beta asset (214b795b..., 661250 bytes) re-downloaded identical before
   and after. Receipt: `docs/evidence/everyday-use-v1.2-delivery-receipt.md`.
+- Draft notes and title updated. A REST PATCH of title/body without
+  `tag_name` reset the draft's planned tag name to an `untagged-...`
+  placeholder; restored at once to `v0.2.0-rc6-casting-graph-preview`
+  (target main, still a draft, no git tag, nothing published). Retrieval by
+  that tag name re-checked afterwards (701341 bytes, package hash equal).
 - The matrix is rebuilt on the ORIGINAL E01-E27 rows; every native verdict
   cites r15 runs on the delivered candidate.
 - Final lab state: no Kingmaker, dispatcher stopped (no live claim), all

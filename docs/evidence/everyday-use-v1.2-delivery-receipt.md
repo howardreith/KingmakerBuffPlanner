@@ -1,9 +1,24 @@
 # Everyday-use v1.2 private preview — delivery receipt (2026-10-03)
 
 Private draft release (never published, no tag created, not merged):
-GitHub release id `399014941`, draft tag name `v0.2.0-rc6-casting-graph-preview`,
-retrieval page `https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/untagged-14005ddb537782c296f6`
-(visible only to the repository's collaborators while it stays a draft).
+GitHub release id `399014941`, titled "Private previews: everyday-use v1.2
+(8d7681d0) and casting-graph beta (ec34705c)", planned tag name
+`v0.2.0-rc6-casting-graph-preview`, target `main`. It is visible only to the
+repository's collaborators while it stays a draft.
+
+Retrieval: the repository's Releases page,
+`https://github.com/howardreith/KingmakerBuffPlanner/releases` (the draft is
+listed there; its own `untagged-...` link changes whenever the draft is
+edited), or
+`gh release download v0.2.0-rc6-casting-graph-preview --repo howardreith/KingmakerBuffPlanner --pattern "KingmakerBuffPlanner-0.2.0-rc6-everyday-use-v1.2+8d7681d0.zip"`
+(checked after the last edit: 701341 bytes, the package hash below).
+
+Note: updating the draft's title and notes through the REST API without
+re-sending `tag_name` reset the draft's planned tag name to an `untagged-...`
+placeholder. It was restored immediately to `v0.2.0-rc6-casting-graph-preview`
+(target `main`, still a draft, `published_at` null); no git tag exists and
+nothing was published. Later edits re-send `tag_name`, `target_commitish` and
+`draft=true` together.
 
 ## Delivered asset
 
