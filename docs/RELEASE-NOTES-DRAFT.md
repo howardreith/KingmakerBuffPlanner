@@ -1,6 +1,12 @@
-# Kingmaker Buff Planner 0.2.0 — the casting-first planner
+# Kingmaker Buff Planner 0.3.0 — the casting-first planner
 
-0.2.0 replaces the classic buff planner with the **casting-first planner**:
+**0.3.0 is the 0.2.0 release renumbered so Unity Mod Manager recognizes it as
+the newest version.** UMM compares versions by stripping every non-digit
+from each part, so the earlier `0.2.0-rc6` preview read as 0.2.6 and looked
+newer than 0.2.0. The planner code is the same as 0.2.0; only the version
+number changed.
+
+0.3.0 replaces the classic buff planner with the **casting-first planner**:
 you plan every cast explicitly — who casts it, from which spell source, on
 whom, with which enhancements — and run whole routines with one click.
 
@@ -46,7 +52,7 @@ whom, with which enhancements — and run whole routines with one click.
   modified and a byte-exact copy is archived beside it
   (`kbp-casting-<hash>.orig`). A classic casting that let the planner choose
   "any caster" becomes a Draft with no caster — pick one; the planner never
-  guesses. A casting-first plan saved by a 0.2.0 preview is loaded as it is.
+  guesses. A casting-first plan saved by 0.2.0 or a 0.2.0 preview is loaded as it is.
 - A game that explicitly chose the Classic planner in an earlier preview
   keeps it until you use "Switch to the casting-first planner" on the mod's
   settings page (one way).
@@ -70,12 +76,12 @@ whom, with which enhancements — and run whole routines with one click.
 - Share Transmutation is supported for the Brown-Fur Transmuter only.
 - Metamagic spell variants, pets, ability pools with more than one use, and
   an area change during a run have not been checked in the game.
-- 0.2.0 is the first release of the casting-first planner; feedback is
+- 0.3.0 (like 0.2.0) is the first release of the casting-first planner; feedback is
   welcome and adjustments are planned.
 
 ## Qualification
 
-The 0.2.0 code was qualified as candidate `8d7681d03752f3f7170f25f7d45029f71c46a884`:
+The 0.3.0 code (identical to 0.2.0) was qualified as candidate `8d7681d03752f3f7170f25f7d45029f71c46a884`:
 the full source-only gate (source validation, 398 protocol tests, runtime
 harness, package, deployment, launcher, fixture, rollback and publisher
 checks) and 41 of 41 guarded in-game runs on disposable test campaigns —
@@ -84,7 +90,7 @@ the continuous scroll, autosave with reopen and save reload, classic-plan
 import, Share Transmutation and Share + Powerful Change (Instant and
 Animated), paid spell slots with Stop / repeat / recast, group spells,
 Powerful Change, an Extend rod, ability pools and plan-wide resource
-accounting. The 0.2.0 release commit adds only the version number and
+accounting. The 0.2.0 and 0.3.0 release commits add only the version number and
 documentation to that candidate, and its build was checked again in the
 game before publication. The row-by-row record is
 `docs/E01-E27-ACCEPTANCE-MATRIX.md`; the player guide is
