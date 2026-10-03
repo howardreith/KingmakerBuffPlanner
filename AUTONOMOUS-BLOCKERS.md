@@ -1,16 +1,16 @@
-# AUTONOMOUS BLOCKERS — updated 2026-10-02
+# AUTONOMOUS BLOCKERS — updated 2026-10-03
 
-None blocking the code path. Open items, none of which need a decision:
+None. The everyday-use v1.2 private preview is delivered (draft release
+399014941, asset `KingmakerBuffPlanner-0.2.0-rc6-everyday-use-v1.2+8d7681d0.zip`,
+downloaded back and verified). Open items, none blocking:
 
-1. r13 evidence batch built but not dispatched (owner-requested stopping
-   point). One command to resume; see AUTONOMOUS-RESUME.md.
-2. E12's cast half (the allowance-armed cold-moon run) is implemented,
-   source-tested and built as ui-phys-cast; its native evidence comes
-   from the r13 batch. The selection half is already proven live
-   (beta-f0cf4f16r11-phys-sel-01, zero violations).
-3. Hover-probe jobs may need the physical console even after the
-   owner-authorized activation change; if so they are last in the queue
-   by design and the concrete reason is recorded in the dispatcher and
-   the journal.
-4. Private delivery not yet sent; the prior beta draft-release asset
-   (214b795b...8b20564) is untouched and must stay so.
+1. Owner acceptance: the preview is for the owner's self-paced trial
+   (`docs/MANUAL-ACCEPTANCE.md`, everyday-use section). Nothing is merged,
+   tagged, published or promoted.
+2. Not qualified in this round (named in the guide, the matrix and the
+   release notes): windowed display (H2 - every 1920x1080 run is fullscreen),
+   physical clicks on the Important/Short HUD buttons, a full
+   quit-and-restart of the game, an induced save failure in game, metamagic
+   spell variants, pets, multi-use ability pools, area change during a run.
+3. H1's letterbox mapping is regression-tested against the r13 geometry; the
+   r15 desktop was 1920x1080, so it was not exercised live.

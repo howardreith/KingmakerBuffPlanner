@@ -49,6 +49,17 @@ targeting, profile protection, protected saves, or native safeguards.
 
 ## Status (updated as slices complete)
 
+### 2026-10-03 — private preview delivered (Claude takeover)
+
+Delivered candidate 8d7681d0 (full gate PASS, r15 41/41 native jobs done and
+verified on it), uploaded to the private draft release as
+`KingmakerBuffPlanner-0.2.0-rc6-everyday-use-v1.2+8d7681d0.zip` and verified
+after download; prior beta asset untouched. Defects D1-D13 and harness
+findings H1-H5 found and repaired along the way (journal checkpoint
+2026-10-03). Row verdicts: `docs/E01-E27-ACCEPTANCE-MATRIX.md` (original row
+definitions). Owner acceptance of the everyday-use changes is pending the
+self-paced trial.
+
 ### Session 5 (2026-09-29 night) — review F1–F5 + E1 of f0483fc repaired
 
 Source: `KBP_Z_Review_f0483fc_2026-09-29.md` (request changes; §1–§5 of

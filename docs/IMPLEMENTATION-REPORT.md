@@ -801,3 +801,43 @@ applied and durable, chip inspected, press refused BY THE LOCK), and
 the reload reconstruction on the r12 candidate. The r13 batch on the
 frozen 3c1c5d4 candidate completes the remaining native cells of
 docs/E01-E27-ACCEPTANCE-MATRIX.md before private delivery.
+
+## Everyday-use v1.2 completion (2026-10-03, Claude takeover)
+
+Delivered candidate `8d7681d03752f3f7170f25f7d45029f71c46a884` (records
+commits follow, documentation only). Changes since the 3c1c5d4 stopping point,
+each with a regression test:
+
+- Everyday-use surfaces (e185cc4): the mod settings page offers only a
+  one-way switch from a stored Classic choice; footer, HUD tooltips and
+  refusal messages describe autosave and one-click runs with no Save/Accept
+  ceremony; a live save status (Saved / Saving... / Not saved) with Retry save
+  or Reload as the exceptional recovery; the gear opens the planner; the Run
+  caption names the selected routine.
+- Escape (d49f15a): the Escape that closes the planner or its description is
+  suppressed from the game's own EscPressed binding.
+- Share qualification chain (45c46c6): the shared recipes can be selected,
+  allowed and cast by the existing harness with typed Share evidence
+  (preview, persistence, exact spend, witness, shortage).
+- Cold moon (0ee5fa0): the physical run presses the moon before any planner
+  session exists, from a plan stored by an earlier session.
+- Import (fe82855): ambiguity is judged and the import is reconstructed from
+  disk by a fresh session, at open and after close.
+- Right-click description (268e291): the panel had never rendered (point
+  anchor with edge insets); rebuilt on the standard scroll view and judged as
+  seen (size, native text, long-text scroll, graph isolation).
+- Physical input (9b788e8): aspect-preserving cursor mapping for a
+  letterboxed surface.
+- Physical run evidence (648608f): native spell title; the graph is seeded to
+  overflow and must scroll under the physical wheel; the cf-physical
+  allowance reads the cold-seed evidence; the single-use grant cap is exactly
+  Long's castings.
+- Allowance purposes (8d7681d): the shared-personal purpose fits the
+  launcher's 400-character bound, guarded at writing time.
+
+Lab tooling outside the repository: `dispatch\build-jobs.ps1` now gives
+allowance jobs batch-unique run ids (H5) and labels the 1920x1080 job as
+fullscreen.
+
+Native evidence: batch r15, 41/41 jobs done and verified on the delivered
+candidate (see `docs/QUALIFICATION.md` and `docs/E01-E27-ACCEPTANCE-MATRIX.md`).
