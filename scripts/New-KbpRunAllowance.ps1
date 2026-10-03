@@ -166,7 +166,7 @@ else {
         'ability-pool-direct' = "ability-pool-direct casting-first qualification in $ExecutionMode mode (one plain buff from an ability whose pool holds a single use: cast once, a repeat casts nothing, and Always recast is refused for want of the resource)"
         'rod-extend-direct' = "rod-extend-direct casting-first qualification in $ExecutionMode mode (one direct buff cast plain, then again on another recipient with an Extend metamagic rod chosen through the workspace; the rod's charges, the buff's duration and the caster's toggles are read natively)"
         'enhanced-direct' = "enhanced-direct casting-first qualification in $ExecutionMode mode (one direct buff cast plain, then again on another recipient with a per-casting class-feature enhancement chosen through the workspace; the enhancement's resource, the stat modifier it raises and the caster's toggles are read natively)"
-        'shared-personal' = "shared-personal casting-first qualification in $ExecutionMode mode (a verified personal transmutation cast once on a legal ally with Share Transmutation armed before the target click; then a plain witness cast by the same caster with the shared casting disabled; then one shared casting more than its source can fund, refused whole; the spell slots, the Arcane Reservoir and every Share / Powerful Change toggle are read natively at each boundary)"
+        'shared-personal' = "shared-personal casting-first qualification in $ExecutionMode mode (a personal transmutation cast once on a legal ally with Share armed before the target; a plain witness cast by the same caster; one shared casting more than its source can fund, refused whole; slots, Arcane Reservoir and Share / Powerful Change toggles read natively at each boundary)"
         'shared-powerful' = "shared-powerful casting-first qualification in $ExecutionMode mode (as shared-personal, with Powerful Change chosen on the shared casting: the combined Share + Powerful Change reservoir demand is charged exactly once; the spell slots, the Arcane Reservoir and every Share / Powerful Change toggle are read natively at each boundary)"
     }
     if ([string]$request.scenario -cne 'live-cast-qual-select' -or [bool]$outcome.castingScenario -or
@@ -189,6 +189,12 @@ else {
         throw 'The forecast does not name 1..8 projection ids with a 1..24 submission budget; no allowance is written.'
     }
     $purpose = $purposes[$recipe]
+    # H4 (beta-bff840a2r14 cast-shared-personal-instant): the launcher bounds
+    # a purpose at 400 characters; a longer one is refused here, at writing
+    # time, never at launch.
+    if ($purpose.Length -gt 400) {
+        throw "The $recipe purpose is $($purpose.Length) characters (the launcher accepts at most 400); no allowance is written."
+    }
     $allowance = [ordered]@{
         schemaVersion = 5; kind = 'kbp-casting-qualification'; runId = $RunId
         sourceCommit = [string]$freeze.commit; packageSha256 = [string]$freeze.packageSha256
