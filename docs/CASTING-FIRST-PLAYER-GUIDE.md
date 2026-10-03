@@ -1,7 +1,7 @@
-# Buff Planner: player guide (everyday-use v1.2 preview)
+# Buff Planner: player guide (0.2.0)
 
-This guide describes the casting-first planner as delivered in the
-everyday-use v1.2 private preview. It is the only normal planner: there is
+This guide describes the casting-first planner as released in 0.2.0. It is
+the only normal planner: there is
 no Save button, no Accept Plan step and no Classic switch in the planner.
 "What has been checked in the game" at the end says exactly which parts a
 guarded in-game run has observed at this build, and which have not.
@@ -129,19 +129,20 @@ it is resolved.
 
 ## Installing and rolling back
 
-Install this preview archive-first: back up the whole
-`Mods\KingmakerBuffPlanner` folder (including `UserSettings`) outside the
-`Mods` folder before replacing it, then confirm the Unity Mod Manager log
-line `[KBP-BOOT] Main.Load exited;version=0.2.0-rc6;commit=<commit>` names
-this build's commit. To roll back, archive the preview's `UserSettings`
-outside `Mods`, delete the preview folder and copy your backup back. The
-draft release notes give the exact steps and identity.
+Install archive-first: back up the whole `Mods\KingmakerBuffPlanner` folder
+(including `UserSettings`) outside the `Mods` folder before replacing it,
+then confirm Unity Mod Manager lists version 0.2.0 (its log line
+`[KBP-BOOT] Main.Load exited;version=0.2.0;commit=<commit>` names the
+release commit). To roll back, copy the new `UserSettings` outside `Mods`,
+delete the new folder and copy your backup back. The release notes give the
+exact steps and the package checksum.
 
 ## What has been checked in the game
 
-Every row below was observed by a guarded run of this exact build (source
-commit `8d7681d0`, batch r15, 2026-10-03) on disposable test campaigns,
-never an ordinary save; the full record with run ids is
+Every row below was observed by a guarded run of the qualified candidate
+(source commit `8d7681d0`, batch r15, 2026-10-03) on disposable test
+campaigns, never an ordinary save; the 0.2.0 release commit adds only the
+version number and documentation to it. The full record with run ids is
 `docs/E01-E27-ACCEPTANCE-MATRIX.md`.
 
 | What | Checked in the game |
