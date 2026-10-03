@@ -13,16 +13,18 @@ namespace KingmakerBuffPlanner.Execution
         private readonly Func<CastStep, bool> _requiresNativeCommand;
         private readonly bool _allowAnimatedFallback;
         private readonly bool _outOfCombatOnly;
+        private readonly Action<int, CastStep, bool, string> _routeSelected;
 
         public HybridCastExecutor(
             IInstantCastRuntimeAdapter instantRuntime,
             ICastRuntimeAdapter animatedRuntime,
             bool allowAnimatedFallback,
             bool outOfCombatOnly,
-            Func<CastStep, bool> requiresNativeCommand = null)
+            Func<CastStep, bool> requiresNativeCommand = null,
+            Action<int, CastStep, bool, string> routeSelected = null)
             : this(instantRuntime, animatedRuntime, null,
                 allowAnimatedFallback, outOfCombatOnly,
-                requiresNativeCommand)
+                requiresNativeCommand, routeSelected)
         {
         }
 
@@ -32,7 +34,8 @@ namespace KingmakerBuffPlanner.Execution
             Func<CastStep, bool> requiresAnimated,
             bool allowAnimatedFallback,
             bool outOfCombatOnly,
-            Func<CastStep, bool> requiresNativeCommand = null)
+            Func<CastStep, bool> requiresNativeCommand = null,
+            Action<int, CastStep, bool, string> routeSelected = null)
         {
             _instantRuntime = instantRuntime ?? throw new ArgumentNullException("instantRuntime");
             _animatedRuntime = animatedRuntime ?? throw new ArgumentNullException("animatedRuntime");
@@ -40,6 +43,7 @@ namespace KingmakerBuffPlanner.Execution
             _requiresNativeCommand = requiresNativeCommand ?? (step => false);
             _allowAnimatedFallback = allowAnimatedFallback;
             _outOfCombatOnly = outOfCombatOnly;
+            _routeSelected = routeSelected;
         }
 
         public IEnumerator Execute(CastPlan plan, ExecutionReport report)
@@ -62,16 +66,31 @@ namespace KingmakerBuffPlanner.Execution
                         "prior-hybrid-transaction-unsettled");
                     continue;
                 }
-                bool mandatoryNativeCommand = _requiresNativeCommand(step) ||
-                    step.ExecutionStrategy ==
-                        CastExecutionStrategy.NativeCommandRequired;
-                bool animatedFallback = step.ExecutionStrategy ==
-                        CastExecutionStrategy.AnimatedFallback ||
-                    (_legacyRequiresAnimated != null &&
-                        _legacyRequiresAnimated(step));
+                bool nativeCallback = _requiresNativeCommand(step);
+                bool nativeStrategy = step.ExecutionStrategy ==
+                    CastExecutionStrategy.NativeCommandRequired;
+                bool fallbackStrategy = step.ExecutionStrategy ==
+                    CastExecutionStrategy.AnimatedFallback;
+                bool legacyCallback = !fallbackStrategy &&
+                    _legacyRequiresAnimated != null && _legacyRequiresAnimated(step);
+                bool mandatoryNativeCommand = nativeCallback || nativeStrategy;
+                bool animatedFallback = fallbackStrategy || legacyCallback;
                 bool useAnimated = mandatoryNativeCommand || animatedFallback;
-                if (animatedFallback && !mandatoryNativeCommand &&
-                    !_allowAnimatedFallback)
+                bool refused = animatedFallback && !mandatoryNativeCommand &&
+                    !_allowAnimatedFallback;
+                string route = "configured-mode:instant;planned-strategy:" +
+                    step.ExecutionStrategy + ";actual-executor:" +
+                    (refused ? "Refused" : useAnimated ? "Animated" : "Instant") +
+                    ";native-callback:" + nativeCallback +
+                    ";native-strategy:" + nativeStrategy +
+                    ";legacy-callback:" + legacyCallback +
+                    ";fallback-strategy:" + fallbackStrategy +
+                    ";allow-animated-fallback:" + _allowAnimatedFallback +
+                    ";reason:" + step.ExecutionStrategyReason;
+                report.Add(index, step, CastExecutionStatus.ExecutorSelected, route);
+                if (_routeSelected != null)
+                    _routeSelected(index, step, useAnimated && !refused, route);
+                if (refused)
                 {
                     report.Add(index, step,
                         CastExecutionStatus.StrategySelected,

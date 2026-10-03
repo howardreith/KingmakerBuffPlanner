@@ -1,57 +1,91 @@
-# Kingmaker Buff Planner 0.0.19
+# Kingmaker Buff Planner 0.2.0 — the casting-first planner
 
-This release fixes Share Transmutation ignoring Instant mode. Resinous Skin
-is the reported reproduction spell, but neither its name nor its GUID, Felix,
-or any party position appears in production routing.
+0.2.0 replaces the classic buff planner with the **casting-first planner**:
+you plan every cast explicitly — who casts it, from which spell source, on
+whom, with which enhancements — and run whole routines with one click.
 
-## Provider-owned direct transaction
+## Highlights
 
-When the installed Brown-Fur provider exposes the exact version-1 direct-cast
-contract, Share Transmutation and eligible Share-plus-Powerful Change casts use
-the provider's existing transaction without a queued animated command. The
-provider validates the real caster, exact spell source and selected variant,
-recipient, native Share legality, live selections, qualified effect adapters,
-and available Arcane Reservoir before Buff Planner submits `RuleCastSpell`.
+- **One planner, no ceremony.** Every edit saves itself; there is no Save
+  button and no Accept Plan step. The footer shows Saved / Saving... /
+  Not saved; if a save ever fails your edits stay in the planner, runs wait
+  until the newest edit is saved, and the footer offers Retry save (or
+  Reload).
+- **One-click routines.** On the HUD the moon runs **Long**, the diamond
+  **Important**, the sun **Short** — the planner stays closed while the
+  party casts. The gear button or Ctrl+Shift+B opens the planner. Press a
+  running routine's button again to stop after the cast in progress.
+- **Exact castings.** Each casting is one cast: one caster, one spell source
+  (spellbook level, prepared slot, item or ability), one target or group
+  origin, and its own enhancements. Nothing is substituted behind your
+  back; a blocked casting is refused with its reason.
+- **A continuous casting graph.** Casters and their sources on the left, one
+  line and card per casting, recipients on the right, on one scrolling
+  parchment; the inspector edits the selected casting.
+- **Right-click any buff, header or casting card** for the game's own full
+  description of that exact spell. Escape closes the description, then the
+  planner — never the game's menu.
+- **Share Transmutation** (Brown-Fur Transmuter, from the KingmakerGunslinger
+  mod): choose the caster and source, then "Share with an ally" before the
+  target. The spell slot and the Arcane Reservoir are budgeted together; a
+  shortage blocks the whole casting. Powerful Change combines with it.
+- **Meaningful enhancements only:** metamagic rods and class features are
+  offered when they make sense for that spell and caster; an older choice
+  that no longer applies stays visible and removable.
+- **Shared resources are accounted across the whole plan** (spontaneous
+  slots, rod uses, the reservoir), and reservations are all-or-nothing.
+- **Instant casting by default**, with Animated available; an explicit
+  Animated choice from an earlier version is kept.
 
-The transaction is attached to the exact `AbilityData`, target, rule, context,
-and execution process. Provider targeting, modifier adjustment, passive
-Transmutation Supremacy, one-shot consumption, debit, rollback, and scoped
-cleanup remain provider-owned. Buff Planner invokes `Spend()` once on the exact
-planned spell source after provider commit; it never debits Arcane Reservoir.
+## Upgrading
 
-Provider rejection cannot fall through to an ordinary unenhanced cast or
-consume the spell source. A delayed effect process remains tracked until it is
-terminal. Cleanup failure is reported as failure and unresolved state blocks
-the next planned cast.
+- **Back up first:** copy your whole `Mods\KingmakerBuffPlanner` folder,
+  including `UserSettings`, to a folder outside `Mods` before installing.
+- The first time a campaign opens, its classic plan (0.0.19 or 0.1.x) is
+  imported once into the casting-first plan. The classic plan file is never
+  modified and a byte-exact copy is archived beside it
+  (`kbp-casting-<hash>.orig`). A classic casting that let the planner choose
+  "any caster" becomes a Draft with no caster — pick one; the planner never
+  guesses. A casting-first plan saved by a 0.2.0 preview is loaded as it is.
+- A game that explicitly chose the Classic planner in an earlier preview
+  keeps it until you use "Switch to the casting-first planner" on the mod's
+  settings page (one way).
+- To roll back, restore your backup folder (it contains its own
+  `UserSettings`).
 
-## Capability-aware fallback
+## Requirements and compatibility
 
-Both Share's targeting strategy and the complete selected-enhancement set use
-the same provider capability. Explicit Animated mode and ordinary native/manual
-casting retain the existing `UnitUseAbility` path. If the provider is absent,
-older, duplicated, or signature-incompatible, Share remains on the safe legacy
-Animated route with a structured reason; it is never silently made free or
-reported as instant.
+- Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b with Unity Mod Manager.
+- Checked alongside BagOfTricks, BetterVendors, CallOfTheWild, CheatMenu,
+  CraftMagicItems, EddicKingmakerRespec, KingmakerBugfixes,
+  KingmakerDiceRoller, KingmakerGunslinger (0.0.133 and 0.0.136),
+  KingmakerLastAzlantiPreserver, ProperFlanking2, RacesUnleashed, SkipIntro,
+  TweakOrTreat and ZFavoredClass. None of them is required; Share
+  Transmutation needs KingmakerGunslinger's Brown-Fur Transmuter.
 
-## Validation boundary
+## Known limitations
 
-Focused deterministic coverage exercises four sequential Share recipients,
-the third and fourth cast, a subsequent ordinary instant buff, exact source and
-reservoir ownership, combined Share plus Powerful Change, self-casting,
-explicit Animated behavior, provider reservation/commit failure, delayed
-completion, iterator cancellation, and cleanup failure. Exact final build and
-package identities are recorded in `docs/QUALIFICATION.md` after the clean
-release build.
+- Windowed display mode has not been qualified (tested at 1920x1080
+  fullscreen and the owner's own display settings).
+- Share Transmutation is supported for the Brown-Fur Transmuter only.
+- Metamagic spell variants, pets, ability pools with more than one use, and
+  an area change during a run have not been checked in the game.
+- 0.2.0 is the first release of the casting-first planner; feedback is
+  welcome and adjustments are planned.
 
-The owner authorized committing, merging, pushing, and publishing both mods.
-Save-backed gameplay: NOT RUN. The required protected automation save pair is
-unavailable; no ordinary campaign save was substituted and no live mod staging
-or game launch occurred. Mechanical evidence is not live gameplay evidence.
+## Qualification
 
-Install the paired Kingmaker Gunslinger 0.0.115 update for Instant Share support.
-Older providers safely retain animated Share casting with a diagnostic reason.
-On an approved disposable working save, cast Felix's Resinous Skin with Share
-on four different allies out of combat, checking the effect, one normal spell
-use and one reservoir point per cast, including casts three and four. Follow
-with an ordinary buff. Separately check eligible Share plus Powerful Change
-(two reservoir points), applicable Supremacy, and Animated/manual controls.
+The 0.2.0 code was qualified as candidate `8d7681d03752f3f7170f25f7d45029f71c46a884`:
+the full source-only gate (source validation, 398 protocol tests, runtime
+harness, package, deployment, launcher, fixture, rollback and publisher
+checks) and 41 of 41 guarded in-game runs on disposable test campaigns —
+the one-click Long routine from a cold start, the right-click description,
+the continuous scroll, autosave with reopen and save reload, classic-plan
+import, Share Transmutation and Share + Powerful Change (Instant and
+Animated), paid spell slots with Stop / repeat / recast, group spells,
+Powerful Change, an Extend rod, ability pools and plan-wide resource
+accounting. The 0.2.0 release commit adds only the version number and
+documentation to that candidate, and its build was checked again in the
+game before publication. The row-by-row record is
+`docs/E01-E27-ACCEPTANCE-MATRIX.md`; the player guide is
+`docs/CASTING-FIRST-PLAYER-GUIDE.md`.

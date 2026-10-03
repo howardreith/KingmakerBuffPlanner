@@ -174,10 +174,16 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         internal static AbilityData Resolve(AbilityData source, AbilityKey requested)
         {
-            if (source == null || requested == null) return null;
-            KingmakerAbilitySelection match = Expand(new[] { source })
-                .FirstOrDefault(value => Matches(value, requested));
+            KingmakerAbilitySelection match = ResolveSelection(source, requested);
             return match == null ? null : match.Concrete;
+        }
+
+        // The selection (source, concrete variant, source blueprint) the
+        // requested ability is, for pricing it exactly as discovery does.
+        internal static KingmakerAbilitySelection ResolveSelection(AbilityData source, AbilityKey requested)
+        {
+            if (source == null || requested == null) return null;
+            return Expand(new[] { source }).FirstOrDefault(value => Matches(value, requested));
         }
 
         internal static AbilityKey ToAbilityKey(

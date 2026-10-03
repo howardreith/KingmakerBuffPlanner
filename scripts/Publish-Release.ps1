@@ -6,7 +6,13 @@ param(
 
     [switch] $ConfirmHumanAcceptance,
 
-    [switch] $AllowPrivateRepositoryRelease
+    [switch] $AllowPrivateRepositoryRelease,
+
+    # Preview releases only: permit publishing a prerelease (version with a
+    # '-' suffix) from a pushed non-default branch. Stable releases must
+    # still come from the default branch; this switch never relaxes that,
+    # the clean-tree/pushed-HEAD checks, or any build gate.
+    [switch] $AllowFeatureBranchPrerelease
 )
 
 Set-StrictMode -Version Latest
@@ -97,22 +103,28 @@ try {
     $currentBranch = Get-NativeCommandOutput -FilePath 'git' -Arguments @(
         'rev-parse', '--abbrev-ref', 'HEAD'
     )
-    if ($currentBranch -ne $defaultBranch) {
-        throw "Release publishing must run from the default branch '$defaultBranch'; current branch is '$currentBranch'."
+
+    $versionForBranchGate = Get-KbpVersion
+    $isPrereleaseVersion = $versionForBranchGate -match '-'
+    $onDefaultBranch = $currentBranch -ceq $defaultBranch
+
+    if (-not $onDefaultBranch -and
+        -not ($AllowFeatureBranchPrerelease -and $isPrereleaseVersion)) {
+        throw "Release publishing must run from the default branch '$defaultBranch'; current branch is '$currentBranch'. Only prerelease versions (with a '-' suffix) may publish from another branch, and only with -AllowFeatureBranchPrerelease."
     }
 
     Invoke-NativeCommand -FilePath 'git' -Arguments @(
-        'fetch', '--prune', '--tags', 'origin', $defaultBranch
+        'fetch', '--prune', '--tags', 'origin', $currentBranch
     )
 
     $head = Get-NativeCommandOutput -FilePath 'git' -Arguments @(
         'rev-parse', 'HEAD'
     )
     $remoteHead = Get-NativeCommandOutput -FilePath 'git' -Arguments @(
-        'rev-parse', "origin/$defaultBranch"
+        'rev-parse', "origin/$currentBranch"
     )
     if ($head -ne $remoteHead) {
-        throw "HEAD ($head) must exactly match origin/$defaultBranch ($remoteHead) before publishing."
+        throw "HEAD ($head) must exactly match origin/$currentBranch ($remoteHead) before publishing."
     }
 
     $origin = Get-NativeCommandOutput -FilePath 'git' -Arguments @(

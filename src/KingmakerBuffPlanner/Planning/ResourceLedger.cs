@@ -8,12 +8,25 @@ namespace KingmakerBuffPlanner.Planning
 {
     public sealed class ResourceReservation
     {
-        internal ResourceReservation(string poolKey, int units, IEnumerable<string> tokenIds)
+        internal ResourceReservation(string poolKey, int units, IEnumerable<string> tokenIds,
+            bool unlimited = false)
         {
             PoolKey = poolKey;
             Units = units;
             TokenIds = new ReadOnlyCollection<string>(tokenIds.OrderBy(v => v, StringComparer.Ordinal).ToList());
+            if (unlimited && (units != 0 || TokenIds.Count != 0))
+                throw new ArgumentException("An unlimited reservation spends no units or tokens.", "unlimited");
+            Unlimited = unlimited;
         }
+
+        // Review M1: true ONLY when the ledger reserved from a pool the
+        // snapshot verified as Unlimited (e.g. cantrips/at-will). A zero
+        // unit count without this flag is never proof that casting is free.
+        public bool Unlimited { get; private set; }
+
+        // A reservation whose cost is known: finite units/tokens, or the
+        // verified Unlimited zero. An unflagged zero is unknown.
+        public bool CostKnown { get { return Unlimited || Units > 0; } }
 
         public string PoolKey { get; private set; }
         public int Units { get; private set; }
@@ -30,6 +43,25 @@ namespace KingmakerBuffPlanner.Planning
                 .ToDictionary(p => p.PoolKey, p => new PoolState(p), StringComparer.Ordinal);
         }
 
+        private ResourceLedger(Dictionary<string, PoolState> pools)
+        {
+            _pools = pools;
+        }
+
+        // An independent copy of the current balances and token states. A
+        // capacity question is answered by reserving on a copy, so asking it
+        // never changes the plan it is asked about.
+        internal ResourceLedger Clone()
+        {
+            return new ResourceLedger(_pools.ToDictionary(
+                pair => pair.Key, pair => pair.Value.Copy(), StringComparer.Ordinal));
+        }
+
+        internal bool Knows(string poolKey)
+        {
+            return poolKey != null && _pools.ContainsKey(poolKey);
+        }
+
         public bool TryReserve(
             ProviderSnapshot provider,
             out ResourceReservation reservation,
@@ -41,12 +73,16 @@ namespace KingmakerBuffPlanner.Planning
                 throw new ArgumentException("Provider pool is absent from the ledger.", "provider");
             if (pool.Kind == ResourcePoolKind.Unlimited)
             {
-                reservation = new ResourceReservation(pool.Key, 0, new string[0]);
+                reservation = new ResourceReservation(pool.Key, 0, new string[0], true);
                 reason = string.Empty;
                 return true;
             }
             if (pool.Kind != ResourcePoolKind.PreparedSlots)
             {
+                // Review M1 (kept after the focused re-review): an unverified
+                // zero cost on a finite pool reserves nothing and stays an
+                // unknown cost, which the executors and the step converter
+                // refuse before any cast; the budget shows it short by one.
                 if (pool.Remaining < provider.UnitsPerCast)
                     return Fail("insufficient-shared-resource", out reservation, out reason);
                 pool.Remaining -= provider.UnitsPerCast;
@@ -109,6 +145,22 @@ namespace KingmakerBuffPlanner.Planning
                 Tokens = snapshot.Tokens.ToDictionary(t => t.TokenId, t => new TokenState(t), StringComparer.Ordinal);
             }
 
+            private PoolState()
+            {
+            }
+
+            internal PoolState Copy()
+            {
+                return new PoolState
+                {
+                    Key = Key,
+                    Kind = Kind,
+                    Remaining = Remaining,
+                    Tokens = Tokens.ToDictionary(pair => pair.Key, pair => pair.Value.Copy(),
+                        StringComparer.Ordinal)
+                };
+            }
+
             internal string Key;
             internal ResourcePoolKind Kind;
             internal int Remaining;
@@ -121,6 +173,15 @@ namespace KingmakerBuffPlanner.Planning
             {
                 Available = snapshot.Available;
                 LinkedTokenIds = snapshot.LinkedTokenIds;
+            }
+
+            private TokenState()
+            {
+            }
+
+            internal TokenState Copy()
+            {
+                return new TokenState { Available = Available, LinkedTokenIds = LinkedTokenIds };
             }
 
             internal bool Available;

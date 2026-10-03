@@ -15,6 +15,7 @@ using Kingmaker.Utility;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Planning;
+using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
 using KingmakerBuffPlanner.Planning;
 
@@ -82,7 +83,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (resolved.Caster.Descriptor == null || resolved.Caster.Descriptor.State == null ||
                 resolved.Caster.Descriptor.State.IsDead || !resolved.Caster.Descriptor.State.IsConscious)
                 return CastRuntimeValidation.Fail("caster-incapacitated");
-            if (!resolved.Ability.IsAvailableForCast) return CastRuntimeValidation.Fail("ability-unavailable");
+            // The cast command's own guard (IsAvailable: the spellbook can
+            // spend it and the caster can cast it); IsAvailableForCast alone
+            // passed a spellbook cantrip the command then failed.
+            if (!resolved.Ability.IsAvailable) return CastRuntimeValidation.Fail("ability-unavailable");
             if (!MaterialComponentAvailability.IsSatisfied(
                 resolved.Ability.RequireMaterialComponent,
                 () => resolved.Ability.HasEnoughMaterialComponent))
@@ -115,12 +119,18 @@ namespace KingmakerBuffPlanner.GameAdapters
                     "sticky-touch-held-charge-already-active");
             UnitCommand command = UnitUseAbility.CreateCastCommand(resolved.Ability, resolved.Target);
             if (command == null) throw new InvalidOperationException("Kingmaker returned no cast command.");
-            int availableBefore = SafeAvailableCount(resolved.Ability);
+            // Final review A3: the read before submission that confirmation
+            // is judged against; without it nothing is queued.
+            string baselineFailure;
+            EffectBaseline baseline = KingmakerEffectInstanceReader.ReadBaseline(step, out baselineFailure);
+            if (baseline == null)
+                throw new InvalidOperationException("effect-baseline-unreadable:" + baselineFailure);
+            int? availableBefore = SafeAvailableCount(resolved.Ability);
             UnitCommand previousCommand = resolved.Caster.Commands.PreviousCommand;
             resolved.Caster.Commands.AddToQueue(command);
             return new KingmakerAnimatedOperation(command, step,
                 resolved.Caster, resolved.Target, resolved.Ability,
-                delivery, previousCommand, availableBefore);
+                delivery, previousCommand, availableBefore, resolved.Resolution, baseline);
         }
 
         internal static bool TryResolve(CastStep step, out ResolvedCast resolved, out string reason)
@@ -139,27 +149,47 @@ namespace KingmakerBuffPlanner.GameAdapters
             UnitEntityData target;
             if (string.IsNullOrEmpty(targetId) || !units.TryGetValue(targetId, out target))
                 return Fail("target-not-in-party", out reason);
-            AbilityData ability = ResolveAbility(caster, step);
-            if (ability == null) return Fail("provider-ability-not-found", out reason);
-            resolved = new ResolvedCast(caster, ability, new TargetWrapper(target));
+            string resolution;
+            string refusal;
+            AbilityData ability = ResolveAbility(caster, step.Provider, step.Reservation,
+                out resolution, out refusal);
+            if (ability == null) return Fail(refusal ?? "provider-ability-not-found", out reason);
+            resolved = new ResolvedCast(caster, ability, new TargetWrapper(target)) { Resolution = resolution };
             return true;
-        }
-
-        private static AbilityData ResolveAbility(UnitEntityData caster, CastStep step)
-        {
-            return ResolveAbility(caster, step.Provider, step.Reservation.TokenIds);
         }
 
         internal static AbilityData ResolveAbility(UnitEntityData caster, ProviderKey provider)
         {
-            return ResolveAbility(caster, provider, null);
+            string resolution;
+            string refusal;
+            return ResolveAbility(caster, provider, null, out resolution, out refusal);
         }
 
+        // The step's own source, by its reservation (review A2): what a probe
+        // observes is what the step casts. Observation reads a reserved
+        // prepared slot even after the cast consumed it (review N3: a
+        // consumed slot is still the source); execution needs it available.
+        internal static AbilityData ResolveAbility(UnitEntityData caster, CastStep step)
+        {
+            string resolution;
+            string refusal;
+            return ResolveAbility(caster, step.Provider, step.Reservation, out resolution, out refusal, true);
+        }
+
+        // resolution: how the authored provider became the ability data the
+        // game casts (provenance for the evidence); refusal: why it cannot,
+        // when that is more than "not found".
         private static AbilityData ResolveAbility(
             UnitEntityData caster,
             ProviderKey provider,
-            IReadOnlyList<string> reservedTokenIds)
+            ResourceReservation reservation,
+            out string resolution,
+            out string refusal,
+            bool forObservation = false)
         {
+            resolution = null;
+            refusal = null;
+            IReadOnlyList<string> reservedTokenIds = reservation == null ? null : reservation.TokenIds;
             if (provider.Ability.SourceKind == SourceKind.Spellbook)
             {
                 List<Spellbook> ownedBooks = caster.Descriptor.Spellbooks.Where(b => b != null &&
@@ -168,15 +198,56 @@ namespace KingmakerBuffPlanner.GameAdapters
                     b.Blueprint != null && b.Blueprint.AssetGuid == provider.SpellbookGuid);
                 if (book == null || !new KingmakerSpellbookRoleAdapter().IsIncluded(book, ownedBooks))
                     return null;
+                // A level-0 entry is cast at will through the cantrip ability
+                // the class grants, exactly as the game's action bar casts
+                // it; the entry itself needs a level-0 slot the book lacks.
+                // The step's reservation decides the route (review A2): a
+                // free casting is never paid from a slot, and a paid one never
+                // turns free.
+                CantripRoute route = AtWillCantripChoice.Route(provider.SourceInstanceId == AtWillSourceInstance,
+                    reservation == null ? (bool?)null : reservation.Unlimited);
+                if (route == CantripRoute.Refused)
+                {
+                    refusal = AtWillCantripChoice.FreeReservationRefusal;
+                    return null;
+                }
+                if (route == CantripRoute.AtWillOnly || route == CantripRoute.AtWillThenSlot)
+                {
+                    string atWillProvenance;
+                    AbilityData atWill = KingmakerAtWillCantrips.Resolve(caster, provider.Ability,
+                        book.CasterLevel, out refusal, out atWillProvenance);
+                    if (atWill != null)
+                    {
+                        // Provenance (re-review): the chosen class ability, its
+                        // caster level, how many at-will abilities qualified and
+                        // the pool the plan reserved.
+                        resolution = "at-will-cantrip-ability;authored=spellbook:" + provider.SpellbookGuid +
+                            "/level-0;cast=" + KingmakerStickyTouchCastAdapter.Identity(atWill) + ";" +
+                            atWillProvenance + ";pool=" + (reservation == null ? "unreserved" : reservation.PoolKey);
+                        return atWill;
+                    }
+                    // Ambiguous at-will abilities are refused, never guessed
+                    // and never replaced by the slot-bound spellbook entry.
+                    if (refusal != null) return null;
+                    if (route == CantripRoute.AtWillOnly)
+                    {
+                        refusal = AtWillCantripChoice.MissingRefusal;
+                        return null;
+                    }
+                }
                 if (reservedTokenIds != null && reservedTokenIds.Count != 0)
                 {
                     foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null &&
-                        s.Spell != null && s.Available && s.IsMainSlot &&
+                        s.Spell != null && (forObservation || s.Available) && s.IsMainSlot &&
                         reservedTokenIds.Contains(SlotId(s))))
                     {
                         AbilityData match = KingmakerAbilityVariants.Resolve(
                             slot.Spell, provider.Ability);
-                        if (match != null) return match;
+                        if (match != null)
+                        {
+                            resolution = "reserved-memorized-slot:" + SlotId(slot);
+                            return match;
+                        }
                     }
                     return null;
                 }
@@ -185,32 +256,89 @@ namespace KingmakerBuffPlanner.GameAdapters
                 {
                     AbilityData match = KingmakerAbilityVariants.Resolve(
                         slot.Spell, provider.Ability);
-                    if (match != null) return match;
+                    if (match != null)
+                    {
+                        resolution = "memorized-slot:" + SlotId(slot);
+                        return match;
+                    }
                 }
                 AbilityData known = ResolveSource(
                     book.GetAllKnownSpells(), provider);
-                if (known != null) return known;
+                if (known != null)
+                {
+                    resolution = "known-spell:spellbook:" + provider.SpellbookGuid;
+                    return known;
+                }
                 for (int level = 0; level <= book.MaxSpellLevel; level++)
                 {
                     AbilityData custom = ResolveSource(
                         book.GetCustomSpells(level), provider);
-                    if (custom != null) return custom;
+                    if (custom != null)
+                    {
+                        resolution = "custom-spell:spellbook:" + provider.SpellbookGuid;
+                        return custom;
+                    }
                 }
                 return null;
             }
             if (provider.Ability.SourceKind == SourceKind.AbilityResource ||
                 provider.Ability.SourceKind == SourceKind.Fact)
             {
+                // Review A3: an owned ability of the provider's own kind (free
+                // or resource-bound) and, for a step, exactly its reserved
+                // pool, priced as discovery prices it; never one of another
+                // cost. Equivalent sources are counted in the provenance.
+                var candidates = new List<KeyValuePair<FactSourceCandidate, AbilityData>>();
+                int index = 0;
+                // In discovery's own order (by blueprint, stable), so the
+                // first of equivalent sources is the one discovery priced.
                 foreach (Ability fact in caster.Descriptor.Abilities.Enumerable
-                    .Where(value => value != null && value.Data != null))
+                    .Where(value => value != null && value.Data != null && value.Data.Blueprint != null)
+                    .OrderBy(value => value.Blueprint.AssetGuid, StringComparer.Ordinal))
                 {
-                    AbilityData match = KingmakerAbilityVariants.Resolve(
+                    index++;
+                    // Cheap filter first: only the authored ability or its
+                    // parent can match (re-review: no variant expansion of
+                    // unrelated abilities).
+                    BlueprintAbility blueprint = fact.Data.Blueprint;
+                    if (blueprint.AssetGuid != provider.Ability.BaseAbilityGuid &&
+                        (blueprint.Parent == null || blueprint.Parent.AssetGuid != provider.Ability.BaseAbilityGuid))
+                        continue;
+                    KingmakerAbilitySelection selection = KingmakerAbilityVariants.ResolveSelection(
                         fact.Data, provider.Ability);
-                    if (match != null) return match;
+                    if (selection == null) continue;
+                    SourceKind kind;
+                    string poolKey = KingmakerPartySnapshotBuilder.FactPoolKey(caster.UniqueId, selection, out kind);
+                    candidates.Add(new KeyValuePair<FactSourceCandidate, AbilityData>(
+                        new FactSourceCandidate(blueprint.AssetGuid + "#" + index,
+                            SafeSpellbookBound(fact.Data), kind == SourceKind.AbilityResource, poolKey,
+                            SafeCasterLevel(selection.Concrete)),
+                        selection.Concrete));
                 }
-                return null;
+                int equivalents;
+                FactSourceCandidate chosen = FactSourceChoice.Choose(candidates.Select(pair => pair.Key),
+                    provider.Ability.SourceKind == SourceKind.AbilityResource,
+                    reservation == null ? null : reservation.PoolKey, out equivalents, out refusal);
+                if (chosen == null) return null;
+                resolution = "ability:" + provider.Ability.SourceKind + ";pool=" + chosen.PoolKey +
+                    ";fact=" + chosen.Identity + ";cl=" + chosen.CasterLevel + ";equivalent-sources=" + equivalents;
+                return candidates.First(pair => ReferenceEquals(pair.Key, chosen)).Value;
             }
             return null;
+        }
+
+        internal const string AtWillSourceInstance = "level-0|heighten-0";
+
+        private static bool SafeSpellbookBound(AbilityData data)
+        {
+            try { return data.Spellbook != null; }
+            catch (Exception) { return true; }
+        }
+
+        private static int SafeCasterLevel(AbilityData data)
+        {
+            try { return data.CalculateParams().CasterLevel; }
+            catch (Exception) { return -1; }
         }
 
         private static bool SourceInstanceMatches(AbilityData data, string sourceInstance)
@@ -246,9 +374,26 @@ namespace KingmakerBuffPlanner.GameAdapters
             return units;
         }
 
+        // Review N3: every memorized main slot of the provider's spellbook as
+        // an observation view - including consumed (unavailable) slots -
+        // for reading EXACTLY the reserved source after a cast.
+        internal static List<ProbeSlotView> ObserveSpellbookSlots(UnitEntityData caster, ProviderKey provider)
+        {
+            var views = new List<ProbeSlotView>();
+            if (provider.Ability.SourceKind != SourceKind.Spellbook) return views;
+            Spellbook book = caster.Descriptor.Spellbooks.FirstOrDefault(b => b != null &&
+                b.Blueprint != null && b.Blueprint.AssetGuid == provider.SpellbookGuid);
+            if (book == null) return views;
+            foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null))
+                views.Add(new ProbeSlotView(SlotId(slot), slot.Available, slot.IsMainSlot,
+                    slot.Spell != null &&
+                    KingmakerAbilityVariants.Resolve(slot.Spell, provider.Ability) != null));
+            return views;
+        }
+
         private static string SlotId(SpellSlot slot)
         {
-            return "level-" + slot.SpellLevel + "|type-" + (int)slot.Type + "|index-" + slot.Index;
+            return PreparedSlotIds.Format(slot.SpellLevel, (int)slot.Type, slot.Index);
         }
 
         private static bool Fail(string value, out string reason)
@@ -257,10 +402,11 @@ namespace KingmakerBuffPlanner.GameAdapters
             return false;
         }
 
-        internal static int SafeAvailableCount(AbilityData ability)
+        // Null when unread (review A7); the game's own -1 means unlimited.
+        internal static int? SafeAvailableCount(AbilityData ability)
         {
-            try { return ability == null ? -1 : ability.GetAvailableForCastCount(); }
-            catch (Exception) { return -1; }
+            try { return ability == null ? (int?)null : ability.GetAvailableForCastCount(); }
+            catch (Exception) { return null; }
         }
 
         internal static bool CanTarget(AbilityData ability, TargetWrapper target)
@@ -310,6 +456,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             internal UnitEntityData Caster;
             internal AbilityData Ability;
             internal TargetWrapper Target;
+            // How the authored provider became this ability (provenance).
+            internal string Resolution;
         }
 
         private sealed class KingmakerAnimatedOperation : IAnimatedCastOperation
@@ -321,7 +469,9 @@ namespace KingmakerBuffPlanner.GameAdapters
             private readonly AbilityData _sourceAbility;
             private readonly BlueprintAbility _deliveryBlueprint;
             private readonly UnitCommand _previousCommandAtStart;
-            private readonly int _availableBefore;
+            private readonly int? _availableBefore;
+            private readonly string _resolution;
+            private readonly EffectBaseline _baseline;
             private readonly AnimatedStickyTouchLifecycle _stickyLifecycle;
             private int _postCompletionFrames;
             private int _pollFrames;
@@ -335,8 +485,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                 UnitEntityData caster, TargetWrapper target,
                 AbilityData sourceAbility,
                 BlueprintAbility deliveryBlueprint,
-                UnitCommand previousCommandAtStart, int availableBefore)
+                UnitCommand previousCommandAtStart, int? availableBefore, string resolution,
+                EffectBaseline baseline)
             {
+                _resolution = resolution ?? "unrecorded";
+                _baseline = baseline;
                 _carrierCommand = command;
                 _step = step;
                 _caster = caster;
@@ -390,29 +543,30 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
             public bool ResourceSpent
             {
+                get { return AvailableCountJudgement.Spent(_availableBefore, SafeAvailableCount(_sourceAbility)); }
+            }
+            // Review A7: a free casting must read unlimited and unchanged; a
+            // finite one must read both of its counts (re-review).
+            public string ResourceCountViolation
+            {
                 get
                 {
-                    int after = SafeAvailableCount(_sourceAbility);
-                    return _availableBefore >= 0 && after >= 0 && after < _availableBefore;
+                    return AvailableCountJudgement.Violation(_step.Reservation, _availableBefore,
+                        SafeAvailableCount(_sourceAbility));
                 }
             }
+            // Final review A3: only an instance this attempt put there
+            // confirms, judged against the read taken before the command was
+            // queued; presence alone never does, and an empty recipient set
+            // confirms nothing (A2).
             public bool EffectsObserved
             {
                 get
                 {
                     if (_observed == true) return true;
-                    try
-                    {
-                        var active = new KingmakerActiveEffectSnapshotBuilder().Build();
-                        var evaluator = new EffectPresenceEvaluator();
-                        bool observed = _step.ExpectedRecipientUnitIds.All(
-                            targetId =>
-                            evaluator.EvaluateTyped(_step.ExpectedEffects, active.GetEffects(targetId), null).Kind ==
-                                EffectPresenceKind.Complete);
-                        if (observed) _observed = true;
-                        return observed;
-                    }
-                    catch (Exception) { return false; }
+                    bool observed = KingmakerEffectInstanceReader.AppliedByThisAttempt(_step, _baseline);
+                    if (observed) _observed = true;
+                    return observed;
                 }
             }
             public bool HasResidualDeliveryState
@@ -459,14 +613,15 @@ namespace KingmakerBuffPlanner.GameAdapters
                             ? "ordinary-or-pending" :
                                 _stickyDecision.Detail) +
                         ";timed-out:" + _timedOut +
-                        ";available-before:" + _availableBefore +
+                        ";available-before:" + AvailableCountJudgement.Format(_availableBefore) +
                         ";available-after:" +
-                        SafeAvailableCount(_sourceAbility) +
+                        AvailableCountJudgement.Format(SafeAvailableCount(_sourceAbility)) +
                         ";carrier-guid:" + (_sourceAbility.Blueprint == null
                             ? "none" : _sourceAbility.Blueprint.AssetGuid) +
                         ";delivery-guid:" + (_deliveryBlueprint == null
                             ? "none" : _deliveryBlueprint.AssetGuid) +
                         ";expected-effects:" + ExpectedEffectIds(_step.ExpectedEffects) +
+                        ";resolution:" + _resolution +
                         ";targets:" + string.Join(",",
                             _step.ExpectedRecipientUnitIds.ToArray()) +
                         ";effects-observed:" + EffectsObserved;

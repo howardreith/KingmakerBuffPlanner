@@ -1,0 +1,794 @@
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using Kingmaker;
+using KingmakerBuffPlanner.Infrastructure;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+namespace KingmakerBuffPlanner.RuntimeTesting
+{
+    // Launch/menu diagnostic scenario runner. It answers two questions with
+    // in-game evidence and never loads a save: (1) does the automated session
+    // actually present a rendered main-menu frame (game-generated screenshot
+    // captured after the frame finished, with luma statistics), and (2) for
+    // the menu-input scenario, does one real physical click on the visible
+    // Load Game button open the native save/load window. The UMM ShowOnStart
+    // overlay is dismissed first with the proven physical Escape sequence,
+    // and each Escape is verified against a captured frame diff.
+    internal sealed class MenuRenderDiagnostic
+    {
+        private const string SaveLoadWindowTypeName = "Kingmaker.UI.SaveLoadWindow.SaveLoadWindow";
+        private const string SaveSlotTypeName = "Kingmaker.UI.SaveLoadWindow.SaveSlot";
+        private const string MainMenuBoardTypeName = "Kingmaker.UI.MainMenuUI.MainMenuBoard";
+        // Wall-clock budgets: an unfocused Unity player can spin far above
+        // 60 fps, so frame counts must never govern timeouts or settles.
+        private const int MaxElapsedSeconds = 420;
+        private const int MenuStabilityMilliseconds = 5000;
+        private const int BlackFrameRecaptureMilliseconds = 1000;
+        private const int BlackFrameRecaptureMaxAttempts = 30;
+        private const int EscapeSettleMilliseconds = 1500;
+        private const int WindowSettleMilliseconds = 2000;
+        private const int EngineCaptureWaitMilliseconds = 10000;
+
+        private readonly RuntimeTestRequest _request;
+        private readonly ModLog _log;
+        private readonly bool _requireWindowProof;
+        private readonly Action<string, string, Vector2> _writePhysicalInput;
+        private readonly System.Diagnostics.Stopwatch _elapsed =
+            System.Diagnostics.Stopwatch.StartNew();
+        private long _stabilityStartedMillis = -1;
+        private long _settleStartedMillis = -1;
+        private long _engineWaitStartedMillis = -1;
+        private int _blackFrameAttempts;
+        private int _state;
+        private MenuFrameCapture _lastCapture;
+        private MenuFrameCapture _menuCapture;
+        private int _firstUpdateFrameCount = -1;
+        private float _firstUpdateRealtime;
+        private int _lastFrameCount = -1;
+
+        internal MenuRenderDiagnostic(
+            RuntimeTestRequest request,
+            ModLog log,
+            bool requireWindowProof,
+            Action<string, string, Vector2> writePhysicalInput)
+        {
+            _request = request ?? throw new ArgumentNullException("request");
+            _log = log ?? throw new ArgumentNullException("log");
+            _requireWindowProof = requireWindowProof;
+            _writePhysicalInput = writePhysicalInput;
+        }
+
+        internal bool IsComplete { get; private set; }
+        internal string Stage { get; private set; } = "waiting-for-main-menu";
+        internal string MenuFrameScreenshotSha256 { get; private set; }
+        internal string MenuFrameEngineScreenshotSha256 { get; private set; }
+        internal int MenuFrameWidth { get; private set; }
+        internal int MenuFrameHeight { get; private set; }
+        internal MenuFrameLumaSummary MenuFrameLuma
+        {
+            get { return _menuCapture == null ? null : _menuCapture.Summary; }
+        }
+        internal string MenuFrameCaptureError
+        {
+            get { return _menuCapture == null || _menuCapture.Failure == null
+                ? null : _menuCapture.Failure.GetType().Name + ": " + _menuCapture.Failure.Message; }
+        }
+        internal string MenuEscape1ScreenshotSha256 { get; private set; }
+        internal float MenuEscape1ChangedFraction { get; private set; }
+        internal bool MenuEscape1Acknowledged { get; private set; }
+        internal string MenuEscape2ScreenshotSha256 { get; private set; }
+        internal float MenuEscape2ChangedFraction { get; private set; }
+        internal bool MenuEscape2Acknowledged { get; private set; }
+        internal string MenuWindowScreenshotSha256 { get; private set; }
+        internal string MenuWindowCaptureError { get; private set; }
+        internal bool MenuWindowOpened { get; private set; }
+        internal string MenuWindowDescriptor { get; private set; }
+        internal string MenuButtonInventory { get; private set; }
+        internal string MenuClickTarget { get; private set; }
+        internal bool MenuClickAcknowledged { get; private set; }
+        internal string FrameProgressSummary { get; private set; }
+
+        internal void Update()
+        {
+            if (IsComplete) return;
+            // UMM may dispatch OnUpdate several times per rendered frame; the
+            // diagnostic advances once per frame and budgets by wall clock.
+            if (Time.frameCount == _lastFrameCount) return;
+            _lastFrameCount = Time.frameCount;
+            if (_elapsed.Elapsed.TotalSeconds > MaxElapsedSeconds)
+                throw new TimeoutException("Menu diagnostic timed out at " + Stage +
+                    ";elapsedSeconds=" + _elapsed.Elapsed.TotalSeconds.ToString(
+                        "F1", CultureInfo.InvariantCulture) + ".");
+            if (_firstUpdateFrameCount < 0)
+            {
+                _firstUpdateFrameCount = Time.frameCount;
+                _firstUpdateRealtime = Time.realtimeSinceStartup;
+            }
+            if (_state == 0)
+            {
+                if ((_elapsed.ElapsedMilliseconds % 5000) < 17) LogEnvironmentSample();
+                if (FindActiveMainMenuBoard() == null)
+                {
+                    _stabilityStartedMillis = -1;
+                    return;
+                }
+                if (_stabilityStartedMillis < 0)
+                {
+                    _stabilityStartedMillis = _elapsed.ElapsedMilliseconds;
+                    return;
+                }
+                if (_elapsed.ElapsedMilliseconds - _stabilityStartedMillis <
+                    MenuStabilityMilliseconds) return;
+                float elapsed = Math.Max(0.01f, Time.realtimeSinceStartup - _firstUpdateRealtime);
+                int frameDelta = Math.Max(0, Time.frameCount - _firstUpdateFrameCount);
+                FrameProgressSummary = "frames=" + frameDelta.ToString(CultureInfo.InvariantCulture) +
+                    ";elapsedSeconds=" + elapsed.ToString("F2", CultureInfo.InvariantCulture) +
+                    ";averageFps=" + (frameDelta / elapsed).ToString("F2", CultureInfo.InvariantCulture);
+                _log.Info("[KBP-MENU-DIAG] main menu board active and stable;" + FrameProgressSummary +
+                    ";" + EnvironmentSample() + ".");
+                MenuFrameWidth = Screen.width;
+                MenuFrameHeight = Screen.height;
+                _blackFrameAttempts = 0;
+                BeginCapture("menu-frame.png");
+                CaptureScreenshotThroughEngine(Path.Combine(
+                    _request.EvidenceDirectory, "menu-frame-engine.png"));
+                _log.Info("[KBP-MENU-DIAG] menu frame capture requested;resolution=" +
+                    MenuFrameWidth + "x" + MenuFrameHeight + ";attempt=1.");
+                _state = 1;
+                Stage = "capturing-menu-frame";
+                return;
+            }
+            if (_state == 1)
+            {
+                if (!ConsumeCapture("menu-frame.png")) return;
+                _menuCapture = _lastCapture;
+                if (_menuCapture.Summary != null && !_menuCapture.Summary.IsNonBlack &&
+                    _blackFrameAttempts < BlackFrameRecaptureMaxAttempts)
+                {
+                    // The main menu fades in from black; an early capture can
+                    // legitimately be black. Wait and recapture the same file.
+                    _blackFrameAttempts++;
+                    _log.Info("[KBP-MENU-DIAG] menu frame black;recapture scheduled;attempt=" +
+                        (_blackFrameAttempts + 1) + ".");
+                    System.Threading.Thread.Sleep(BlackFrameRecaptureMilliseconds);
+                    BeginCapture("menu-frame.png");
+                    return;
+                }
+                MenuFrameScreenshotSha256 = Hashing.Sha256(_menuCapture.FullPath);
+                _state = 2;
+                Stage = "waiting-for-engine-capture";
+                return;
+            }
+            if (_state == 2)
+            {
+                // The engine capture is written asynchronously by Unity; wait
+                // briefly, then record whatever the engine produced.
+                if (_engineWaitStartedMillis < 0) _engineWaitStartedMillis = _elapsed.ElapsedMilliseconds;
+                string enginePng = Path.Combine(_request.EvidenceDirectory, "menu-frame-engine.png");
+                if (File.Exists(enginePng) && new FileInfo(enginePng).Length >= 1000)
+                    MenuFrameEngineScreenshotSha256 = Hashing.Sha256(enginePng);
+                else if (_elapsed.ElapsedMilliseconds - _engineWaitStartedMillis <
+                    EngineCaptureWaitMilliseconds) return;
+                WriteMenuRenderMarker();
+                _log.Info("[KBP-MENU-DIAG] menu frame captured;readPixelsSha256=" +
+                    MenuFrameScreenshotSha256 + ";engineSha256=" +
+                    (MenuFrameEngineScreenshotSha256 ?? "missing") + ";blackRecaptures=" +
+                    _blackFrameAttempts + ";luma=" +
+                    (_menuCapture.Summary == null ? "missing" : _menuCapture.Summary.Describe()) + ".");
+                if (!_requireWindowProof)
+                {
+                    IsComplete = true;
+                    Stage = "menu-render-observed";
+                    return;
+                }
+                _settleStartedMillis = -1;
+                _state = 3;
+                Stage = "umm-dismiss-escape-1";
+                return;
+            }
+            if (_state == 3)
+            {
+                // UMM's ShowOnStart overlay covers the menu and would swallow
+                // the click; dismiss it with the proven physical Escape path.
+                _writePhysicalInput("menu-umm-dismiss-1", "key-escape", Vector2.zero);
+                _state = 4;
+                return;
+            }
+            if (_state == 4)
+            {
+                MenuEscape1Acknowledged = Acknowledged("menu-umm-dismiss-1");
+                if (!MenuEscape1Acknowledged) return;
+                if (_settleStartedMillis < 0)
+                {
+                    _settleStartedMillis = _elapsed.ElapsedMilliseconds;
+                    return;
+                }
+                if (_elapsed.ElapsedMilliseconds - _settleStartedMillis <
+                    EscapeSettleMilliseconds) return;
+                _blackFrameAttempts = 0;
+                BeginCapture("menu-after-escape-1.png");
+                _state = 5;
+                Stage = "capturing-after-escape-1";
+                return;
+            }
+            if (_state == 5)
+            {
+                if (!ConsumeCapture("menu-after-escape-1.png")) return;
+                MenuFrameCapture escape1 = _lastCapture;
+                MenuEscape1ScreenshotSha256 = Hashing.Sha256(escape1.FullPath);
+                MenuEscape1ChangedFraction = ComputeDiff(escape1);
+                _log.Info("[KBP-MENU-DIAG] escape-1 frame captured;sha256=" +
+                    MenuEscape1ScreenshotSha256 + ";changedFraction=" +
+                    MenuEscape1ChangedFraction.ToString("F5", CultureInfo.InvariantCulture) +
+                    ";luma=" + (escape1.Summary == null ? "missing" : escape1.Summary.Describe()) + ".");
+                _settleStartedMillis = -1;
+                _writePhysicalInput("menu-umm-dismiss-2", "key-escape", Vector2.zero);
+                _state = 6;
+                Stage = "umm-dismiss-escape-2";
+                return;
+            }
+            if (_state == 6)
+            {
+                MenuEscape2Acknowledged = Acknowledged("menu-umm-dismiss-2");
+                if (!MenuEscape2Acknowledged) return;
+                if (_settleStartedMillis < 0)
+                {
+                    _settleStartedMillis = _elapsed.ElapsedMilliseconds;
+                    return;
+                }
+                if (_elapsed.ElapsedMilliseconds - _settleStartedMillis <
+                    EscapeSettleMilliseconds) return;
+                BeginCapture("menu-after-escape-2.png");
+                _state = 7;
+                Stage = "capturing-after-escape-2";
+                return;
+            }
+            if (_state == 7)
+            {
+                if (!ConsumeCapture("menu-after-escape-2.png")) return;
+                MenuFrameCapture escape2 = _lastCapture;
+                MenuEscape2ScreenshotSha256 = Hashing.Sha256(escape2.FullPath);
+                MenuEscape2ChangedFraction = ComputeDiff(escape2);
+                WriteEscapeMarker();
+                _log.Info("[KBP-MENU-DIAG] escape-2 frame captured;sha256=" +
+                    MenuEscape2ScreenshotSha256 + ";changedFraction=" +
+                    MenuEscape2ChangedFraction.ToString("F5", CultureInfo.InvariantCulture) +
+                    ";luma=" + (escape2.Summary == null ? "missing" : escape2.Summary.Describe()) + ".");
+                _state = 8;
+                Stage = "resolving-load-button";
+                return;
+            }
+            if (_state == 8)
+            {
+                // Resolve the exact Load Game button with the proven contract
+                // (hierarchy, sibling, components, TMP label, wired listeners);
+                // display-text search cannot match Kingmaker's TextMeshPro menu.
+                MainMenuLoadContracts.LoadButtonEvidence evidence;
+                Button target = MainMenuLoadContracts.ResolveExactLoadButton(out evidence);
+                if (target == null)
+                    throw new InvalidOperationException("The exact Load Game button could not be resolved;inventory=" +
+                        DescribeInventory(InventoryActiveButtons()));
+                MenuButtonInventory = "path=" + evidence.HierarchyPath +
+                    ";siblings=" + evidence.SiblingIndex + "/" + evidence.SiblingCount +
+                    ";labels=" + string.Join("|", evidence.LabelIdentities.ToArray()) +
+                    ";listeners=" + string.Join("|", evidence.ListenerIdentities.ToArray());
+                Vector2 center = ComputeScreenCenter(target);
+                MenuClickTarget = evidence.HierarchyPath + ";center=" +
+                    center.x.ToString("F1", CultureInfo.InvariantCulture) + "," +
+                    center.y.ToString("F1", CultureInfo.InvariantCulture);
+                _log.Info("[KBP-MENU-DIAG] requesting physical Load Game click;" + MenuClickTarget + ".");
+                _writePhysicalInput("menu-loadgame", "click", center);
+                _state = 9;
+                Stage = "waiting-for-saveload-window";
+                return;
+            }
+            if (_state == 9)
+            {
+                if ((_elapsed.ElapsedMilliseconds % 5000) < 17)
+                    _log.Info("[KBP-MENU-DIAG] waiting for save/load window;" +
+                        "elapsedSeconds=" + _elapsed.Elapsed.TotalSeconds.ToString(
+                            "F1", CultureInfo.InvariantCulture) + ".");
+                MenuClickAcknowledged = Acknowledged("menu-loadgame");
+                Component window = FindActiveSaveLoadWindow();
+                if (window == null) return;
+                MenuWindowOpened = true;
+                MenuWindowDescriptor = DescribeWindow(window);
+                _log.Info("[KBP-MENU-DIAG] save/load window is active after physical click;" +
+                    MenuWindowDescriptor + ";clickAcknowledged=" + MenuClickAcknowledged + ".");
+                _settleStartedMillis = -1;
+                _state = 10;
+                Stage = "capturing-saveload-window";
+                return;
+            }
+            if (_state == 10)
+            {
+                if (_settleStartedMillis < 0)
+                {
+                    _settleStartedMillis = _elapsed.ElapsedMilliseconds;
+                    return;
+                }
+                if (_elapsed.ElapsedMilliseconds - _settleStartedMillis <
+                    WindowSettleMilliseconds) return;
+                _blackFrameAttempts = 0;
+                BeginCapture("menu-saveload-window.png");
+                _state = 11;
+                Stage = "awaiting-window-capture";
+                return;
+            }
+            if (_state == 11)
+            {
+                if (!ConsumeCapture("menu-saveload-window.png")) return;
+                MenuWindowScreenshotSha256 = Hashing.Sha256(_lastCapture.FullPath);
+                WriteWindowOpenedMarker();
+                _log.Info("[KBP-MENU-DIAG] save/load window captured;sha256=" +
+                    MenuWindowScreenshotSha256 + ";luma=" +
+                    (_lastCapture.Summary == null ? "missing" : _lastCapture.Summary.Describe()) + ".");
+                IsComplete = true;
+                Stage = "menu-window-opened";
+            }
+        }
+
+        private void BeginCapture(string fileName)
+        {
+            MenuDiagnosticCaptureHost.CaptureMenuFrame(
+                Path.Combine(_request.EvidenceDirectory, fileName),
+                delegate(MenuFrameCapture capture, Exception failure)
+                {
+                    capture.Failure = failure;
+                    _lastCapture = capture;
+                });
+        }
+
+        private bool ConsumeCapture(string fileName)
+        {
+            if (_lastCapture == null ||
+                !string.Equals(_lastCapture.FileName, fileName, StringComparison.OrdinalIgnoreCase) ||
+                _lastCapture.Handled) return false;
+            _lastCapture.Handled = true;
+            if (_lastCapture.Failure != null)
+                throw new InvalidOperationException("Frame capture failed for " + fileName + ": " +
+                    _lastCapture.Failure.GetType().Name + ": " + _lastCapture.Failure.Message);
+            return true;
+        }
+
+        private float ComputeDiff(MenuFrameCapture capture)
+        {
+            if (_menuCapture == null || _menuCapture.Samples == null || capture.Samples == null ||
+                _menuCapture.Samples.Length != capture.Samples.Length) return -1f;
+            return MenuFrameStats.ComputeChangedFraction(_menuCapture.Samples, capture.Samples);
+        }
+
+        private bool Acknowledged(string actionId)
+        {
+            return File.Exists(Path.Combine(
+                _request.EvidenceDirectory, "physical-input-" + actionId + ".ack.json"));
+        }
+
+        private static Component FindActiveMainMenuBoard()
+        {
+            Type boardType = typeof(Game).Assembly.GetType(MainMenuBoardTypeName, true);
+            return UnityEngine.Object.FindObjectOfType(boardType) as Component;
+        }
+
+        private static Component FindActiveSaveLoadWindow()
+        {
+            Type windowType = typeof(Game).Assembly.GetType(SaveLoadWindowTypeName, true);
+            return Resources.FindObjectsOfTypeAll(windowType).OfType<Component>()
+                .FirstOrDefault(component => component != null && component.gameObject != null &&
+                    component.gameObject.activeInHierarchy);
+        }
+
+        private static List<string> InventoryActiveButtons()
+        {
+            var candidates = new List<string>();
+            foreach (Button button in UnityEngine.Object.FindObjectsOfType<Button>())
+            {
+                if (button == null || !button.gameObject.activeInHierarchy ||
+                    !button.gameObject.scene.isLoaded) continue;
+                candidates.Add(MainMenuLoadContracts.HierarchyPath(button.transform));
+                if (candidates.Count >= 40) break;
+            }
+            return candidates;
+        }
+
+        private static string DescribeInventory(List<string> inventory)
+        {
+            return string.Join("|", inventory.ToArray());
+        }
+
+        private static Vector2 ComputeScreenCenter(Button button)
+        {
+            RectTransform rect = button.GetComponent<RectTransform>();
+            Canvas canvas = button.GetComponentInParent<Canvas>();
+            if (rect == null) return Vector2.zero;
+            Vector3[] corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            {
+                Camera camera = canvas.worldCamera != null ? canvas.worldCamera : Camera.main;
+                if (camera == null) return Vector2.zero;
+                for (int i = 0; i < corners.Length; i++)
+                    corners[i] = camera.WorldToScreenPoint(corners[i]);
+            }
+            return new Vector2(
+                (corners[0].x + corners[2].x) * 0.5f,
+                (corners[0].y + corners[2].y) * 0.5f);
+        }
+
+        private static string DescribeWindow(Component window)
+        {
+            Type slotType = typeof(Game).Assembly.GetType(SaveSlotTypeName, false);
+            int activeSlots = 0;
+            if (slotType != null)
+                activeSlots = Resources.FindObjectsOfTypeAll(slotType).OfType<Component>()
+                    .Count(slot => slot != null && slot.gameObject != null &&
+                        slot.gameObject.activeInHierarchy);
+            return "type=" + window.GetType().FullName + ";activeSlots=" + activeSlots;
+        }
+
+        private static void CaptureScreenshotThroughEngine(string path)
+        {
+            Type screenCapture = Type.GetType(
+                "UnityEngine.ScreenCapture, UnityEngine.ScreenCaptureModule", false);
+            MethodInfo capture = screenCapture == null ? null : screenCapture.GetMethod(
+                "CaptureScreenshot", BindingFlags.Static | BindingFlags.Public, null,
+                new[] { typeof(string) }, null);
+            if (capture == null)
+                throw new MissingMethodException("Unity screenshot capture API is unavailable.");
+            capture.Invoke(null, new object[] { path });
+        }
+
+        internal static string EnvironmentSample()
+        {
+            return "scene=" + SceneManager.GetActiveScene().name +
+                ";resolution=" + Screen.width + "x" + Screen.height +
+                ";fullscreen=" + Screen.fullScreen +
+                ";focused=" + Application.isFocused +
+                ";runInBackground=" + Application.runInBackground +
+                ";vSync=" + QualitySettings.vSyncCount;
+        }
+
+        private void LogEnvironmentSample()
+        {
+            _log.Info("[KBP-MENU-DIAG] waiting for main menu;elapsedSeconds=" +
+                _elapsed.Elapsed.TotalSeconds.ToString("F1",
+                    CultureInfo.InvariantCulture) + ";frameCount=" +
+                Time.frameCount + ";" + EnvironmentSample() + ".");
+        }
+
+        private void WriteMenuRenderMarker()
+        {
+            string path = Path.Combine(_request.EvidenceDirectory, "menu-render.json");
+            string json = "{\"schemaVersion\":1,\"runId\":" + JsonString(_request.RunId) +
+                ",\"scenario\":" + JsonString(_request.Scenario) +
+                ",\"stage\":\"menu-frame-captured\"" +
+                ",\"frameProgress\":" + JsonString(FrameProgressSummary ?? string.Empty) +
+                ",\"environment\":" + JsonString(EnvironmentSample()) +
+                ",\"readPixelsSha256\":" + JsonString(MenuFrameScreenshotSha256 ?? string.Empty) +
+                ",\"engineSha256\":" + JsonString(MenuFrameEngineScreenshotSha256 ?? string.Empty) +
+                ",\"luma\":" + JsonString(
+                    _menuCapture == null || _menuCapture.Summary == null
+                        ? string.Empty : _menuCapture.Summary.Describe()) + "}";
+            AtomicFile.WriteUtf8(path, json + Environment.NewLine);
+        }
+
+        private void WriteEscapeMarker()
+        {
+            string path = Path.Combine(_request.EvidenceDirectory, "menu-escape-evidence.json");
+            string json = "{\"schemaVersion\":1,\"runId\":" + JsonString(_request.RunId) +
+                ",\"stage\":\"umm-dismiss-escapes-delivered\"" +
+                ",\"escape1\":{\"acknowledged\":" + (MenuEscape1Acknowledged ? "true" : "false") +
+                ",\"sha256\":" + JsonString(MenuEscape1ScreenshotSha256 ?? string.Empty) +
+                ",\"changedFraction\":" + MenuEscape1ChangedFraction.ToString("F5", CultureInfo.InvariantCulture) + "}" +
+                ",\"escape2\":{\"acknowledged\":" + (MenuEscape2Acknowledged ? "true" : "false") +
+                ",\"sha256\":" + JsonString(MenuEscape2ScreenshotSha256 ?? string.Empty) +
+                ",\"changedFraction\":" + MenuEscape2ChangedFraction.ToString("F5", CultureInfo.InvariantCulture) + "}}" ;
+            AtomicFile.WriteUtf8(path, json + Environment.NewLine);
+        }
+
+        private void WriteWindowOpenedMarker()
+        {
+            string path = Path.Combine(_request.EvidenceDirectory, "menu-window-opened.json");
+            string json = "{\"schemaVersion\":1,\"runId\":" + JsonString(_request.RunId) +
+                ",\"stage\":\"save-load-window-opened\"" +
+                ",\"clickTarget\":" + JsonString(MenuClickTarget ?? string.Empty) +
+                ",\"clickAcknowledged\":" + (MenuClickAcknowledged ? "true" : "false") +
+                ",\"window\":" + JsonString(MenuWindowDescriptor ?? string.Empty) +
+                ",\"screenshotSha256\":" + JsonString(MenuWindowScreenshotSha256 ?? string.Empty) + "}";
+            AtomicFile.WriteUtf8(path, json + Environment.NewLine);
+        }
+
+        private static string JsonString(string value)
+        {
+            return Newtonsoft.Json.JsonConvert.ToString(value ?? string.Empty);
+        }
+    }
+
+    internal sealed class MenuFrameCapture
+    {
+        internal string FileName { get; set; }
+        internal string FullPath { get; set; }
+        internal MenuFrameLumaSummary Summary { get; set; }
+        internal float[] Samples { get; set; }
+        internal Exception Failure { get; set; }
+        internal bool Handled { get; set; }
+        // Camera-path captures only: the self-verified restoration verdict
+        // is recorded for EVERY completion (clean or not) so consumers can
+        // tell "restored" from "never reported" (review J2).
+        internal string RestorationVerdict { get; set; }
+        internal bool? RestorationClean { get; set; }
+    }
+
+    // Dedicated DontDestroyOnLoad host so the diagnostic's readback runs at
+    // WaitForEndOfFrame: capturing after the frame finished presenting, which
+    // is the timing Unity documents as required to include UI.
+    internal sealed class MenuDiagnosticCaptureHost : MonoBehaviour
+    {
+        private static MenuDiagnosticCaptureHost _instance;
+
+        internal static void CaptureMenuFrame(string path,
+            Action<MenuFrameCapture, Exception> completion)
+        {
+            EnsureInstance();
+            _instance.StartCoroutine(CaptureRoutine(path, completion));
+        }
+
+        // Display-independent capture: render every active camera into a
+        // temporary RenderTexture and read THAT, bypassing the presented
+        // backbuffer entirely. When a session's display path presents
+        // nothing (observed: fully-black backbuffer while game logic and
+        // canvases demonstrably run), camera rendering may still produce
+        // the frame. The canvas inventory is recorded so the render-mode
+        // limits of this path (screen-space-overlay UI does not render
+        // into camera targets) are explicit evidence, not surprises.
+        internal static void CaptureMenuFrameThroughCameras(string path,
+            Action<MenuFrameCapture, Exception> completion, ModLog log)
+        {
+            EnsureInstance();
+            _instance.StartCoroutine(CameraCaptureRoutine(path, completion, log));
+        }
+
+        private static void EnsureInstance()
+        {
+            if (_instance != null) return;
+            GameObject host = new GameObject("KBP-MenuDiagnosticCaptureHost");
+            _instance = host.AddComponent<MenuDiagnosticCaptureHost>();
+            DontDestroyOnLoad(host);
+        }
+
+        // Failure-injection seam for the restoration contract (review R4):
+        // the runtime scenario sets a mode before a capture; the routine
+        // throws at that point exactly once, and the restoration
+        // self-verification must still report clean.
+        internal enum CameraCaptureFailureMode
+        {
+            None,
+            AfterTargetAssignment,
+            DuringRender,
+            DuringReadback
+        }
+
+        internal static volatile CameraCaptureFailureMode InjectFailureMode =
+            CameraCaptureFailureMode.None;
+
+        private static IEnumerator CameraCaptureRoutine(string path,
+            Action<MenuFrameCapture, Exception> completion, ModLog log)
+        {
+            yield return new WaitForEndOfFrame();
+            MenuFrameCapture capture = new MenuFrameCapture
+            {
+                FileName = Path.GetFileName(path),
+                FullPath = path
+            };
+            Exception failure = null;
+            RenderTexture previousActive = RenderTexture.active;
+            List<KeyValuePair<Camera, RenderTexture>> restore = null;
+            RenderTexture temporary = null;
+            Texture2D read = null;
+            var cleanupFailures = new List<string>();
+            try
+            {
+                // Screen-targeting cameras only: cameras already rendering
+                // to their own offscreen targets keep those targets, so the
+                // diagnostic composition cannot disturb them (review R4).
+                Camera[] cameras = UnityEngine.Object.FindObjectsOfType<Camera>()
+                    .Where(camera => camera != null && camera.enabled &&
+                        camera.gameObject.activeInHierarchy &&
+                        camera.targetTexture == null)
+                    .OrderBy(camera => camera.depth)
+                    .ToArray();
+                var inventory = new StringBuilder();
+                foreach (Camera camera in cameras)
+                {
+                    if (inventory.Length > 0) inventory.Append('|');
+                    inventory.Append(camera.name).Append("/depth=")
+                        .Append(camera.depth.ToString("F1",
+                            CultureInfo.InvariantCulture))
+                        .Append("/rect=")
+                        .Append(camera.pixelWidth.ToString(
+                            CultureInfo.InvariantCulture)).Append("x")
+                        .Append(camera.pixelHeight.ToString(
+                            CultureInfo.InvariantCulture));
+                }
+                var canvases = new StringBuilder();
+                foreach (Canvas canvas in UnityEngine.Object
+                    .FindObjectsOfType<Canvas>()
+                    .Where(canvas => canvas != null && canvas.isActiveAndEnabled &&
+                        canvas.transform.parent == null)
+                    .Take(24))
+                {
+                    if (canvases.Length > 0) canvases.Append('|');
+                    canvases.Append(canvas.name)
+                        .Append("/mode=").Append(canvas.renderMode)
+                        .Append("/camera=").Append(canvas.worldCamera == null
+                            ? "none" : canvas.worldCamera.name)
+                        .Append("/order=").Append(canvas.sortingOrder);
+                }
+                if (log != null)
+                    log.Info("[KBP-CAPTURE] camera-path inventory;screenCameras=" +
+                        inventory + ";canvases=" + canvases + ".");
+                int width = Screen.width;
+                int height = Screen.height;
+                temporary = RenderTexture.GetTemporary(
+                    width, height, 24, RenderTextureFormat.ARGB32);
+                restore = new List<KeyValuePair<Camera, RenderTexture>>();
+                foreach (Camera camera in cameras)
+                {
+                    restore.Add(new KeyValuePair<Camera, RenderTexture>(
+                        camera, camera.targetTexture));
+                    camera.targetTexture = temporary;
+                }
+                CameraCaptureFailureMode injected = InjectFailureMode;
+                InjectFailureMode = CameraCaptureFailureMode.None;
+                if (injected == CameraCaptureFailureMode.AfterTargetAssignment)
+                    throw new InvalidOperationException(
+                        "injected:after-target-assignment");
+                for (int cameraIndex = 0; cameraIndex < cameras.Length; cameraIndex++)
+                {
+                    if (injected == CameraCaptureFailureMode.DuringRender &&
+                        cameraIndex == cameras.Length - 1)
+                        throw new InvalidOperationException("injected:during-render");
+                    cameras[cameraIndex].Render();
+                }
+                RenderTexture.active = temporary;
+                if (injected == CameraCaptureFailureMode.DuringReadback)
+                    throw new InvalidOperationException("injected:during-readback");
+                read = new Texture2D(width, height, TextureFormat.RGB24, false);
+                read.ReadPixels(new Rect(0, 0, width, height), 0, 0, false);
+                read.Apply(false, false);
+                Color[] pixels = read.GetPixels();
+                byte[] png = read.EncodeToPNG();
+                UnityEngine.Object.Destroy(read);
+                read = null;
+                File.WriteAllBytes(path, png);
+                int stride = Math.Max(1, pixels.Length / 120000);
+                var luma = new List<float>();
+                for (int i = 0; i < pixels.Length; i += stride)
+                {
+                    Color color = pixels[i];
+                    luma.Add(color.r * 0.2126f + color.g * 0.7152f +
+                        color.b * 0.0722f);
+                }
+                capture.Samples = luma.ToArray();
+                capture.Summary = MenuFrameStats.Summarize(capture.Samples);
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+            finally
+            {
+                // Restoration runs for every owned change even when another
+                // cleanup step fails; the primary error is preserved and
+                // secondary failures are recorded (review R4).
+                if (restore != null)
+                {
+                    foreach (KeyValuePair<Camera, RenderTexture> pair in restore)
+                    {
+                        try { pair.Key.targetTexture = pair.Value; }
+                        catch (Exception cleanup)
+                        {
+                            cleanupFailures.Add("target:" + pair.Key.name + ":" +
+                                cleanup.Message);
+                        }
+                    }
+                }
+                try { RenderTexture.active = previousActive; }
+                catch (Exception cleanup)
+                {
+                    cleanupFailures.Add("active:" + cleanup.Message);
+                }
+                if (temporary != null)
+                {
+                    try { RenderTexture.ReleaseTemporary(temporary); }
+                    catch (Exception cleanup)
+                    {
+                        cleanupFailures.Add("temporary:" + cleanup.Message);
+                    }
+                }
+                if (read != null)
+                {
+                    try { UnityEngine.Object.Destroy(read); }
+                    catch (Exception cleanup)
+                    {
+                        cleanupFailures.Add("read:" + cleanup.Message);
+                    }
+                }
+                // Self-verification: an unclean restoration is a reported
+                // failure, never silent state leakage.
+                bool targetsRestored = true;
+                if (restore != null)
+                {
+                    foreach (KeyValuePair<Camera, RenderTexture> pair in restore)
+                        if (pair.Key != null && pair.Key.targetTexture != pair.Value)
+                            targetsRestored = false;
+                }
+                bool activeRestored = RenderTexture.active == previousActive;
+                string verdict = "targetsRestored=" + targetsRestored +
+                    ";activeRestored=" + activeRestored +
+                    ";cleanupFailures=" + cleanupFailures.Count;
+                bool restorationClean = targetsRestored && activeRestored &&
+                    cleanupFailures.Count == 0;
+                capture.RestorationVerdict = verdict;
+                capture.RestorationClean = restorationClean;
+                if (log != null)
+                    log.Info("[KBP-CAPTURE] camera-path restoration;" + verdict +
+                        (cleanupFailures.Count == 0 ? string.Empty
+                            : ";detail=" + string.Join("|", cleanupFailures.ToArray())) + ".");
+                if (!restorationClean)
+                {
+                    if (failure == null)
+                        failure = new InvalidOperationException(
+                            "camera capture restoration unclean;" + verdict);
+                }
+            }
+            completion(capture, failure);
+        }
+
+        private static IEnumerator CaptureRoutine(string path,
+            Action<MenuFrameCapture, Exception> completion)
+        {
+            yield return new WaitForEndOfFrame();
+            MenuFrameCapture capture = new MenuFrameCapture
+            {
+                FileName = Path.GetFileName(path),
+                FullPath = path
+            };
+            Exception failure = null;
+            try
+            {
+                int width = Screen.width;
+                int height = Screen.height;
+                Texture2D texture = new Texture2D(width, height, TextureFormat.RGB24, false);
+                texture.ReadPixels(new Rect(0, 0, width, height), 0, 0, false);
+                texture.Apply(false, false);
+                Color[] pixels = texture.GetPixels();
+                int stride = Math.Max(1, pixels.Length / 120000);
+                var luma = new List<float>();
+                for (int i = 0; i < pixels.Length; i += stride)
+                {
+                    Color color = pixels[i];
+                    luma.Add(color.r * 0.2126f + color.g * 0.7152f + color.b * 0.0722f);
+                }
+                byte[] png = texture.EncodeToPNG();
+                UnityEngine.Object.Destroy(texture);
+                File.WriteAllBytes(path, png);
+                capture.Samples = luma.ToArray();
+                capture.Summary = MenuFrameStats.Summarize(capture.Samples);
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+            completion(capture, failure);
+        }
+    }
+}

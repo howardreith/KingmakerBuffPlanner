@@ -148,7 +148,9 @@ namespace KingmakerBuffPlanner.Discovery
                     effects.Any(e => e.Target == "AmbiguousAreaRecipients")
                         ? "ambiguous-area-recipient" :
                     effects.Any(e => e.Harmful == true)
-                        ? "harmful-only" : "no-persistent-beneficial-party-effect",
+                        ? "harmful-only" :
+                    string.Equals(facts.EffectOnAlly, "Harmful", StringComparison.Ordinal)
+                        ? "harmful-ally-disposition" : "no-persistent-beneficial-party-effect",
                     "No persistent beneficial payload has deterministic controllable-party targeting.");
 
             List<NativeCandidateEffectFacts> payloads = safe.Where(e => !IsMarker(e)).ToList();
@@ -220,6 +222,12 @@ namespace KingmakerBuffPlanner.Discovery
             NativeCandidateEffectFacts effect, NativeCandidateAuditFacts facts)
         {
             if (effect == null) return false;
+            // The game's own ally-disposition data is authoritative: an
+            // ability marked harmful to allies is never a beneficial party
+            // buff even when the buff blueprint itself forgets m_Harmful
+            // (everyday-use v1.2: the owner's Irresistible Dance report).
+            if (string.Equals(facts.EffectOnAlly, "Harmful", StringComparison.Ordinal))
+                return false;
             return effect.Target == "Caster" || effect.Target == "Pet" ||
                 effect.Target == "Party" || effect.Target == "AlliedAreaRecipients" ||
                 (effect.Target == "CurrentTarget" &&

@@ -28,6 +28,31 @@ namespace KingmakerBuffPlanner.GameAdapters
         private readonly Dictionary<CastStep, BrownFurDirectCastLease>
             _providerTransactions =
                 new Dictionary<CastStep, BrownFurDirectCastLease>();
+        // Final review A3: each fired step's read of its recipients' expected
+        // effects, taken before submission.
+        private readonly Dictionary<CastStep, EffectBaseline> _baselines =
+            new Dictionary<CastStep, EffectBaseline>();
+
+        private readonly Action<string> _diagnostic;
+
+        internal KingmakerInstantCastAdapter(Action<string> diagnostic = null)
+        {
+            _diagnostic = diagnostic;
+        }
+
+        private void TraceProvider(CastStep step, string phase, string detail = "")
+        {
+            if (_diagnostic == null) return;
+            try
+            {
+                _diagnostic("[KBP-PROVIDER-DIRECT] phase=" + phase +
+                    ";utc=" + DateTime.UtcNow.ToString("O") +
+                    ";source=" + step.SourceId + ";provider=" + step.Provider.Canonical +
+                    ";targets=" + string.Join(",", step.TargetUnitIds.ToArray()) +
+                    ";detail=" + detail);
+            }
+            catch (Exception) { /* Diagnostics must not change source or provider spending. */ }
+        }
 
         public bool IsInCombat
         {
@@ -108,6 +133,8 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         public InstantCastResult Fire(CastStep step)
         {
+            if (step.ExecutionStrategy == CastExecutionStrategy.ProviderDirectRuleCast)
+                TraceProvider(step, "Fire-enter");
             CastRuntimeValidation finalValidation = Validate(step);
             if (!finalValidation.Valid)
                 return new InstantCastResult(false, false, false, false, false,
@@ -117,6 +144,15 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (!KingmakerAnimatedCastAdapter.TryResolve(step, out resolved, out reason))
                 return new InstantCastResult(false, false, false, false, false,
                     "final-resolution:" + reason);
+            // Final review A3: each expected recipient's instances of the
+            // expected effects, read before anything is submitted; without
+            // that read no confirmation is possible, so nothing is cast.
+            string baselineFailure;
+            EffectBaseline baseline = KingmakerEffectInstanceReader.ReadBaseline(step, out baselineFailure);
+            if (baseline == null)
+                return new InstantCastResult(false, false, false, false, false,
+                    "effect-baseline-unreadable:" + baselineFailure);
+            _baselines[step] = baseline;
             AbilityData sourceAbility = resolved.Ability;
             AbilityData executionAbility = sourceAbility;
             StickyTouchCastResolution stickyResolution = null;
@@ -146,6 +182,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 if (_providerTransactions.ContainsKey(step))
                     return new InstantCastResult(false, false, false, false,
                         false, "provider-direct-step-already-active");
+                TraceProvider(step, "Begin-enter");
                 if (!BrownFurDirectCastCompatibility.TryBegin(sourceAbility,
                         resolved.Target, out providerTransaction,
                         out providerStatus, out reason))
@@ -171,13 +208,15 @@ namespace KingmakerBuffPlanner.GameAdapters
                         rejected);
                 }
                 _providerTransactions.Add(step, providerTransaction);
+                TraceProvider(step, "Begin-accepted", providerStatus.Describe());
             }
 
-            int availableBefore = KingmakerAnimatedCastAdapter.SafeAvailableCount(
+            int? availableBefore = KingmakerAnimatedCastAdapter.SafeAvailableCount(
                 sourceAbility);
             RuleCastSpell rule;
             try
             {
+                if (providerDirect) TraceProvider(step, "RuleCastSpell-enter");
                 rule = Rulebook.Trigger(new RuleCastSpell(
                     executionAbility, resolved.Target));
             }
@@ -195,6 +234,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 try
                 {
                     providerStatus = providerTransaction.CompleteRule(rule);
+                    TraceProvider(step, "CompleteRule-returned", providerStatus.Describe());
                 }
                 catch (Exception exception)
                 {
@@ -215,9 +255,12 @@ namespace KingmakerBuffPlanner.GameAdapters
                 try { sourceAbility.Spend(); }
                 catch (Exception exception) { spendFailure = exception; }
             }
-            int availableAfter = KingmakerAnimatedCastAdapter.SafeAvailableCount(
+            int? availableAfter = KingmakerAnimatedCastAdapter.SafeAvailableCount(
                 sourceAbility);
-            bool spent = availableBefore >= 0 && availableAfter >= 0 && availableAfter < availableBefore;
+            bool spent = AvailableCountJudgement.Spent(availableBefore, availableAfter);
+            // Review A7: a free casting must read unlimited and unchanged; a
+            // finite one must read both of its counts (re-review).
+            string countViolation = AvailableCountJudgement.Violation(step.Reservation, availableBefore, availableAfter);
             bool providerSucceeded = !providerDirect ||
                 (providerStatus != null && providerStatus.Accepted &&
                     providerStatus.Committed &&
@@ -246,12 +289,13 @@ namespace KingmakerBuffPlanner.GameAdapters
                         providerCompletionFailure.GetType().FullName + ":" +
                         providerCompletionFailure.Message) +
                 ";spend-owner:source-ability-data" +
-                ";available-before:" + availableBefore +
-                ";available-after:" + availableAfter +
+                ";available-before:" + AvailableCountJudgement.Format(availableBefore) +
+                ";available-after:" + AvailableCountJudgement.Format(availableAfter) +
                 ";strategy:" + step.ExecutionStrategy +
                 ";strategy-reason:" + step.ExecutionStrategyReason +
                 ";carrier-guid:" + carrierGuid +
                 ";delivery-guid:" + deliveryGuid +
+                ";resolution:" + (resolved.Resolution ?? "unrecorded") +
                 ";source-ability-data:" +
                 KingmakerStickyTouchCastAdapter.Identity(sourceAbility) +
                 ";execution-ability-data:" +
@@ -260,20 +304,21 @@ namespace KingmakerBuffPlanner.GameAdapters
                 KingmakerAnimatedCastAdapter.ExpectedEffectIds(step.ExpectedEffects) + ";targets:" +
                 string.Join(",", step.ExpectedRecipientUnitIds.ToArray()) +
                 ";carrier-command-created:false;delivery-command-created:false" +
-                ";effects-observed:" + observed);
+                // Read in the frame of submission: the rule's buff lands on
+                // a later tick, so false here is normal; the executor's own
+                // later confirmation decides EffectConfirmed.
+                ";effects-observed-at-submit:" + observed, countViolation);
         }
 
+        // Final review A3: only an instance this attempt put there - new, or
+        // refreshed to a later end, and not suppressed - confirms, judged
+        // against the read taken before submission; presence alone never
+        // does, and an empty recipient set confirms nothing (A2).
         public bool EffectsObserved(CastStep step)
         {
-            try
-            {
-                var active = new KingmakerActiveEffectSnapshotBuilder().Build();
-                var evaluator = new EffectPresenceEvaluator();
-                return step.ExpectedRecipientUnitIds.All(targetId =>
-                    evaluator.EvaluateTyped(step.ExpectedEffects, active.GetEffects(targetId), null).Kind ==
-                        EffectPresenceKind.Complete);
-            }
-            catch (Exception) { return false; }
+            EffectBaseline baseline;
+            if (step == null || !_baselines.TryGetValue(step, out baseline)) return false;
+            return KingmakerEffectInstanceReader.AppliedByThisAttempt(step, baseline);
         }
 
         public InstantCastCompletion InspectCompletion(CastStep step)

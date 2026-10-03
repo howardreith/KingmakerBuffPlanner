@@ -1,5 +1,416 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-09-27 autonomous session: windowed-input repair, live budget proof, unattended desktop, preview package
+
+- The owner's standing authorization: own the work through a usable private
+  preview. Sequence: reconciled at `1c78237`; bounded review of PR #3 had
+  found no defect; doc corrections pushed; the four-run sequence started.
+- Live `casting-graph-qual-1200-03`: interaction/reopen/frames PASS; the
+  shipped hover clean (single-owner, aligned); the rc6 reproduction took the
+  selection but drew NO second highlight — the sticky-selection mechanism is
+  real, the visible ghost is not explained by it; root cause stays unproved.
+- Live `casting-graph-qual-1080-01`: product hover clean, but three sweep
+  aims landed off-control — the delivered cursor drifted ±~53 px from the
+  requested Unity point in windowed mode only (fullscreen within 2 px).
+  Diagnosis: the launcher's injected input lived in a DPI-virtualized pixel
+  space while the game window is DPI-aware. Repair `f115632`:
+  `SetProcessDPIAware()` in the input helper's static constructor +
+  text-contract regression; live re-verification pending.
+- Live `casting-graph-qual-adv-1200-01` (Advanced): interaction PASS; every
+  physical move refused after the owner disconnected mid-run (foreground
+  activation fails closed without a display) — the trigger for the unattended
+  desktop work.
+- `8b387dc`: the live-workspace-qual scenario now proves the global budget
+  across TWO buffs (one shared spontaneous pool, exact unit deltas, restore
+  on removal) and TWO castings (one shared enhancement pool, atomic refusal
+  when unfundable — a blocked casting reserves nothing), all through
+  production session commands and BuildGraph read models with honest
+  unsupported/scan-cap notes; new `workspace-budget-evidence` assertion;
+  judging regression in the graph suite (protocol 364/364). Full gate PASS
+  at `8b387dc`; preview package built deterministically ×2
+  (`8412ac10…304fea2`, DLL `bfdefd57…`, MVID `b8e3e120-…`, local-only;
+  guide `docs/PREVIEW-0.2.0-rc6-casting-graph.md`).
+- Unattended desktop: "RDP must be Active" exists only in operator
+  documents (no executable session gate). Session-to-console transfer proven
+  (twice, `tscon exit=0`, `console howard 3 Active`, no viewer) through a
+  one-shot self-removing SYSTEM task firing on viewer disconnect; each
+  arming costs one UAC click while the owner is connected. Two operator
+  lessons paid for: the task's session-row parse must not assume the
+  interactive `>` marker (first fire failed and self-deleted), and operator
+  helper logs must not live under `runtime-state` (the deployment WhatIf
+  purity check correctly failed the gate until they moved).
+- The unattended proof run and the windowed/Advanced/reload re-runs at
+  `8b387dc` remain pending on the owner's next connection (one UAC click
+  re-arms the transfer; the desktop then stays usable unattended).
+
+## 2026-09-25 casting-graph UI correction: review repairs and the first live run
+
+- An independent review found the disabled button state unobservable: the
+  installed Unity UI applies Disabled at transition time and never stores
+  it. Rejected fix: reading `Disabled` from another private member (there is
+  none). Chosen: interactability plus the drawn tint.
+- The review also showed the rc6 reproduction proved the mechanism by
+  construction. It now replays the owner's words: hover a portrait with the
+  real cursor, click a buff card, hover again, and record where any second
+  highlight sits relative to the cursor.
+- First live run (`casting-graph-qual-1200-01`, 1920x1200): the graph
+  interaction, reopen and frames passed; all 30 judged hover readings were
+  single-owner and aligned to the real cursor within 2 px. It failed only
+  because the harness looked for Classic cards by their pool name; a bound
+  card is named `Source.<sourceId>`.
+- The same run showed that the camera capture lane washes out planner text
+  and cannot see the Classic screen at all (a screen-space overlay). The
+  presented frame is legible. Hover and button frames now use the
+  presented frame. Rejected theory: "the graph's text is too pale" — true
+  only of the camera lane.
+- Real product defect seen in the presented frame: the footer budget lines
+  sat on the book's dark lower edge; they now have a parchment ground.
+
+## 2026-09-25 casting-graph UI correction: graph workspace and hover diagnostic in source
+
+- Built the addendum's graph workspace on the preserved services: a
+  per-source capacity query simulated on a clone of the plan's own budget
+  ledger (never a view counter, never summed across shared pools), a graph
+  read model and graph commands on `CastingWorkspaceSession`, and a view
+  with catalogue → caster/source lane → castings → targets, wide line
+  corridors and a per-casting inspector.
+- A new test found a real ledger defect: a material component at zero did
+  not block a casting (the first observed count was kept). Fixed with a
+  regression test. Rejected shortcut: asserting the forecast text instead
+  of the refusal.
+- The guarded `live-workspace-qual`/`-reload` interaction now drives the
+  graph's own controls (caster, exact source row, target click). The old
+  target-then-Add sequence no longer exists in the view.
+- Hover: the installed UnityEngine.UI (read from its metadata) keeps a
+  clicked control Highlighted through `hasSelection` when its navigation is
+  not None. The fix (navigation None on planner controls) is in source; the
+  live scenario first reproduces the ghost with only the rc6 switch on the
+  Classic screen, then measures the fix, a real-cursor sweep, five button
+  states and one owner after close/reopen. Not run yet: the Gunslinger lab
+  holds the game.
+- Counts: source validation 42/42, protocol tests 360/360 at `757fc6b`.
+
+## 2026-09-25 casting-graph UI correction: Phase 0 identity
+
+- The owner rejected the planner screen they saw at 1920x1200. Before
+  touching code, proved which screen it was: every reported label is
+  rendered only by Classic view classes in both candidate binaries
+  (`git grep` on the frozen rc6 and 0.1.1-rc3 trees), and the casting-first
+  workspace renders none of them.
+- DATA's installation is 0.1.1-rc3 (hash and MVID read from the file) and
+  saw no argument-free game launch on the day (Steam's process log), so the
+  owner's session ran on another machine, most likely the published rc6
+  alpha in its default Classic mode.
+- Rejected theory: "the casting-first workspace regressed into the grid".
+  The label-to-class mapping rules it out.
+- Rejected theory for the ghost hover: a second camera rendering the
+  planner canvas. An rc6 camera frame shows thickened text, but panels and
+  portraits are not doubled, so that artifact is text-material, not a
+  second render. The hover cause stays open until reproduced live.
+- The rc6 casting-first composition (in-game frames from the rc6 reload
+  run) also misses the addendum, so the graph workspace is built regardless.
+
+## 2026-09-22 J-review repair (Claude takeover)
+
+- Took over from Z at `19ecbe8`; reconciled git, processes, locks and
+  the latest restoration receipt before editing (all clean). Rehearsal-6
+  raw records re-verified and its package archived outside the repo.
+- J1 root cause: the producer emitted `castN=controls:…;stateN=…;castNExact=…`
+  while the consumer required `controls:…;castNExact` adjacency, so a
+  correct automatic run could never pass. Rejected fix: re-ordering the
+  string (still a substring coincidence). Chosen: a structured record
+  with a field-based predicate shared by producer and consumer.
+- J2 root cause: phase 32 advanced on `FileName == manual-final.png`,
+  which the camera routine sets even on failure; the restoration
+  verdict was only stored when unclean and never read. Chosen: a
+  bounded terminal coordinator that consumes the callback outcome and
+  always records the cleanup postcondition.
+- Mutation checks surfaced one masked test (a failure with a written png
+  was only caught via the missing hash); added the written-then-failed
+  case.
+
+## 2026-09-20 campaign-load repair (Gunslinger-reference adaptation)
+
+- Followed the review-directed reframe: prove launch/render/menu-input
+  before touching the loader, then repair by comparison against the
+  qualified KingmakerGunslinger working-save-smoke autonomous route
+  (11/11 on 2026-08-28, run 20260828T1304368014092Z-working-save-smoke).
+- New guarded diagnostic scenarios (launch-render-diagnostic,
+  menu-input-diagnostic) capture the presented frame after the frame
+  finishes (WaitForEndOfFrame ReadPixels) plus an engine ScreenCapture
+  cross-check with luma statistics, record the actual game command line,
+  session id, and sampled window state, and request physical input
+  through the existing channel.
+- launchdiag-1: the automated session RENDERS the main menu (identical
+  read-pixels and engine hashes, 1.67 MB, blackFraction 0.05) with the
+  UMM ShowOnStart overlay over it; game command line is exactly
+  Kingmaker.exe -kbpRuntimeTestRequest <file>; session 2; 1920x1200
+  fullscreen; runInBackground=True. The owner's remote black screen is
+  therefore not "the game does not render" — and menuinput-4/5 later
+  captured genuinely black frames from both in-game paths with focus
+  present, so the black presentation is intermittent and unclassified.
+- Three harness defects found by the new diagnostics and fixed with
+  reproduced evidence: the PowerShell 5.1 List array-subexpression crash
+  that killed every wait loop (0c4d81b), update-count budgets expiring
+  in seconds at the unfocused player's ~800+ dispatches/s (524107e,
+  1449b1f), and physical-input delivery aborting runs on foreground-lock
+  failures (now retried and recorded). Optional-assembly "mismatches"
+  were proven to be Mono image sidecars; hashing resolves the canonical
+  file and the profile pins were verified byte-exact.
+- LiveCampaignSaveLoader rewritten as the observed native chain adapted
+  from the reference (c114940): exact button identity, onClick.Invoke
+  with handler-count proof, catalog capture, descriptor identity,
+  receiver-bound slot/window/list resolution by object references,
+  slot-action invocation, downstream handler/load-entry/callback
+  observation with strict sequencing, read-only native saver, save-write
+  sentinels, per-stage wall-clock budgets, and a stable fingerprint.
+- RESULT: liveui-chain-1 and liveui-chain-2 (consecutive fresh guarded
+  full-user runs) each loaded the exact WORKING campaign through the
+  complete observed chain to a stable fingerprint (gameId
+  df33d1ff-4ec8-4707-bfa0-5e059bf9a049, party 3) with zero save writes.
+  Evidence: runtime-evidence/liveui-chain-*/saveload-chain-events.json
+  and the [KBP-SAVE-LOAD] log lines. liveui-chain-3 was refused by the
+  running-game guard (owner session); liveui-chain-2 was restored and
+  verified after that session closed.
+- Gates at each step: source 42/42, protocol 217/217, harness 27/27,
+  package 4/4, WhatIf 5/5, fixture 3/3, rollback 4/4, publisher 3/3.
+
+## 2026-09-20 casting-first migration: checkpoint 9 (qualification continuation)
+
+Reconciled at `9a2e5738...` (clean). Bundle applicability proven
+mechanically (git-am onto c182061 reproduces tree 119c24f1; SHA256SUMS;
+still local). Narrow integration checks carried as tests, both clean:
+sibling authored intent preserved while derived budget changes are
+legitimate and disclosed order renumbering is necessary-only, with
+byte-exact Undo; the disabled dispatch boundary records attempt identity
+only, releases in-flight state across failures, and a new guard refuses
+legacy quick-execution entry points while the workspace is selected.
+Prospective per-file seal functions + gate tests (3/3) added without
+changing any existing check; the aggregate-only August mismatch stays
+blocked and the records no longer characterize the unidentified 182-byte
+difference. Owner-approval packet prepared (planning/
+BAGOFTRICKS-FIXTURE-APPROVAL-PACKET.md) — NOT granted; bootstrap not
+repeated. A06 inspected read-only: ItemEntity exposes no per-instance
+identity member (planning/EXACT-ROD-IDENTITY-INSPECTION.md). Campaign UI
+qualification remains blocked on the owner fixture decision. Gates:
+source 42/42; protocol 210/210; harness 27/27; package 4/4; WhatIf 5/5;
+fixture-inventory 3/3; rollback 4/4; publisher 3/3.
+
+## 2026-09-19 casting-first migration: Phase 4 checkpoint 8 (workspace)
+
+Reconciled at `81c46486...` (checkpoints 1-7 preserved). Fixture drift
+diagnosed read-only under the manifest's own rules: the live BagOfTricks
+directory is byte-identical to both September guarded-install transaction
+manifests; the stale Aug-23 aggregate is short exactly one unrecoverable
+182-byte mutable file; bootstrap stays blocked with the owner-rebind or
+per-file-evidence prerequisite named. The connected workspace was then
+delivered: CastingWorkspaceSession binding the real authoring/compiler/
+gate/forecast/persistence/review services with an explicitly disabled
+native-dispatch boundary; the Unity CastingWorkspaceScreenView behind a
+session-scoped dev selection consuming the same discovery data as the
+legacy screen. Integration tests cover the mixed-caster three-card flow,
+group coverage honesty, review/apply policy, and save/reopen protection
+(protocol 208/208; full gate green). The view is compiled but not
+visually qualified; native lanes remain blocked as diagnosed.
+
+## 2026-09-19 casting-first migration: Phase 2 checkpoint 7 (A13 + live lanes)
+
+On top of `29f1ac8`. Implemented the A13 isolated migration boundary
+(CastingPlanMigrationService: per-boundary exact-original archive,
+candidate-only writes with reopen-validation, refuse-to-bury preserved,
+newer-candidate refusal) and exercised the guarded live lanes with the
+current source: the native-contract probe transaction deployed,
+launched, and restored verified, failing honestly because the scenario
+needs campaign UI that a main-menu run never has; live-ui-bootstrap was
+refused pre-deployment by the BagOfTricks fixture manifest mismatch
+(read-only diagnosis recorded: only the directory manifest drifted).
+Gates: source 42/42; protocol 205/205; harness 27/27; package 4/4;
+WhatIf 5/5; rollback 4/4; publisher 3/3.
+
+## 2026-09-19 casting-first migration: Phase 2 checkpoint 6 (C1-C5)
+
+Reconciled at `061968d4b7ec3b7c1247feab72c065b4a7fd4d41` (clean, single
+worktree, checkpoints 1-5 preserved). The continuation's C1-C5 were
+verification questions; inspection against the production services found
+one reproduced defect (C1: an absent modifier registry left the casting
+executable as a silent unmodified downgrade), one repaired gap (C2: saved
+drafts never blocked Ordinary Apply and no explicit-disabled state
+existed; gate also gained routine scoping), and three missing layers now
+implemented (C3 CastingReviewCoordinator presented-plan signatures; C4
+modifier UsageDemands inside the atomic cost vector; C5 structural
+effect projection with AlreadySatisfied and conservative equivalence).
+Tests casting-c1..c5 added through the compiler/gate/forecast path;
+A11/A05 updated to the repaired contracts.
+
+Verification: `scripts/Test-SourceOnly.ps1` — source 42/42; protocol
+204/204; harness 27/27; package 4/4; WhatIf 5/5; rollback 4/4;
+publisher 3/3 (`artifacts/casting-first-checkpoint6-gate.log`).
+Reviewable patch bundle with manifest at
+`artifacts/review-bundles/casting-first-checkpoints-1-6/`. Deterministic
+layer only; view/executor wiring of the review coordinator and the
+native donor/workspace milestone remain open.
+
+## 2026-09-19 casting-first migration: Phase 2 checkpoint 5 (modifiers)
+
+On top of checkpoint 4 (`f9cc4fe`). Implemented the A05 domain half:
+`ICastingTargetingModifier` for the new casting model plus compiler
+wiring — enabled modifiers transform the proven option's targeting
+only; unavailable modifiers block as repairable intent (fixing the
+selection restores the casting); unknown ids block against a provided
+registry; a missing registry keeps selections as unvalidated
+diagnostics; disabled selections change nothing; application is pure
+across compilations.
+
+Verification: `scripts/Test-SourceOnly.ps1` — source 42/42; protocol
+199/199; harness 27/27; package 4/4; WhatIf 5/5; rollback 4/4;
+publisher 3/3 (`artifacts/casting-first-checkpoint5-gate.log`).
+Domain layer only; one-shot native state restoration belongs to the
+execution phase. Live lane checked read-only this session: no
+Kingmaker process, automation save trio present, clean tree — the
+Phase 3 donor inventory (Build-Local + guarded ui-native-contract-probe
+/ live-ui-bootstrap with restore-after-each) is the recorded critical
+path. A06 and A14 remain open Phase 2 items.
+
+## 2026-09-19 casting-first migration: Phase 2 checkpoint 4 (forecast + gate)
+
+On top of checkpoint 3 (`3d1bc0b`). Implemented A09 forecast views
+(`Planning/CastingForecast.cs`: per-routine previews with fresh
+ledgers, one-pass sequence with a single carried-forward shared ledger,
+visible assumptions; `Compile` gained `budgetRoutineScope`) and the
+section 5.2 apply gate (`Planning/CastingExecutionGate.cs`: ordinary
+Apply refuses blocked requests, drafts disclosed as omissions,
+explicit Ready-Casts-Only with full omission disclosure, pure
+deterministic evaluation).
+
+Verification: `scripts/Test-SourceOnly.ps1` — source 42/42; protocol
+198/198 (A09/A10/A11 new); harness 27/27; package 4/4; WhatIf 5/5;
+rollback 4/4; publisher 3/3
+(`artifacts/casting-first-checkpoint4-gate.log`). Domain layer only.
+
+Next: Phase 3 native donor inventory (fixture available) or A05
+modifier-resolution modeling offline.
+
+## 2026-09-19 casting-first migration: Phase 2 checkpoint 3 (budgets)
+
+On top of checkpoint 2 (`df6d04b`). Implemented the charter 5.1 shared
+atomic budget reservation: `Planning/CastingBudget.cs` normalizes native
+slots (linked prepared pairs), enhancement usage reservoirs
+(minimum-of-reported-balances; unknown stays null), and materials into
+one compile-local ledger. `ExplicitCastingCompiler` reserves each Ready
+casting's complete cost vector atomically in persisted order; failures
+block with have<need reasons and reserve nothing. `ResolvedCasting.Cost`
+plus per-pool `CastingBudgetLine`s with casting traces form the
+authoritative budget read model.
+
+Verification: `scripts/Test-SourceOnly.ps1` — source 42/42; protocol
+195/195 (A07 shared-reservoir atomicity and A08 linked-tokens/material/
+rod no-leakage are new); harness 27/27; package 4/4; WhatIf 5/5;
+rollback 4/4; publisher 3/3
+(`artifacts/casting-first-checkpoint3-gate.log`). Domain layer only;
+live native charge spending remains a separate untested lane.
+
+Next: exact-source identity plumbing, routine forecast views (A09), and
+the Phase 3 native donor inventory.
+
+## 2026-09-19 casting-first migration: Phase 2 checkpoint 2 (import)
+
+On top of Phase 1 (`4398588`). Implemented the charter 7.2 schema-5 to
+schema-6 converter: `Persistence/CastingPlanImporter.cs` with
+provenance-derived deterministic IDs (`m5:<assignment>:<recipient|group>`),
+pinned per-recipient splits preserving order/enhancements/policy,
+automatic-to-review-draft conversion, group coverage preserved with
+origin/count pending review, idempotent re-import (reuse, never
+duplicate), routine-major persisted-order maintenance on merge, and
+unresolved-no-recipient mappings for target-less children. Import
+report counts originals/results/reviews/notices with per-child
+dispositions.
+
+Verification: `scripts/Test-SourceOnly.ps1` — source 42/42; protocol
+193/193 (5 new import tests); harness 27/27; package 4/4; WhatIf 5/5;
+rollback 4/4; publisher 3/3
+(`artifacts/casting-first-checkpoint2-gate.log`). Domain-layer evidence
+only; no live profile was read or converted. Defects fixed pre-commit:
+import orders initially all zero (document invariant caught it) and a
+phantom DirectTarget casting for target-less children (domain invariant
+caught it); invariants were kept and the converter redesigned.
+
+Next: shared atomic budget reservation (A07/A08), then exact-source
+identity plumbing.
+
+## 2026-09-19 casting-first migration: Phase 1 checkpoint 1
+
+Branch `codex/kingmaker-buff-planner-casting-first`, created clean from
+`c182061354e9e761c09648ca779ab334588ba379` (the exact charter-reviewed
+commit). Version 0.1.1-rc3; shipped schema 5 untouched. The adopted
+casting-first charter supersedes conflicting UI assumptions of earlier
+missions; compatible safety/regression rules remain in force.
+
+Baseline before edits: source 42/42; protocol 181/181; harness 27/27;
+package 4/4; WhatIf 5/5; rollback 4/4; publisher 3/3
+(`artifacts/baseline-source-gate.log`); zero pre-existing failures. The
+authorized automation save trio now exists (SEED 303 / BASELINE 304 /
+WORKING 305, read-only verification only).
+
+Implementation: `Domain/Authoring/CastingIntentModels.cs`,
+`Planning/CastingAuthoringService.cs`,
+`Planning/ExplicitCastingCompiler.cs`,
+`Persistence/CastingPlanProfileModels.cs`,
+`Persistence/CastingPlanRepository.cs` — the canonical per-casting
+record with explicit caster/origin/coverage/enhancement/provenance, a
+single mutation authority with disclosed edit scopes and bounded Undo,
+a compiler proving one-record-one-invocation with honest coverage gaps
+and distinct readiness reasons, and schema-6 candidate storage with the
+charter's distinct load states.
+
+Verification: `scripts/Test-SourceOnly.ps1` at this checkpoint — source
+42/42; protocol 188/188 (7 new, incl. charter A01–A04); harness 27/27;
+package 4/4; WhatIf 5/5; rollback 4/4; publisher 3/3
+(`artifacts/casting-first-checkpoint1-gate.log`). A01–A04 pass at the
+deterministic domain layer only; no runtime, visual, or migration claim.
+Rejected theories: first test round assumed a single provider option per
+caster was implicit (the exact-source ambiguity guard correctly refused
+duplicated candidates — fixtures now build exactly one option per
+ability/caster, and the guard itself is the intended product behavior).
+Defects fixed pre-commit: MoveCasting changed list position without
+rewriting routine membership. Uncertainty: none open in this layer;
+Phase 2 shared budgets, exact rod identity, and import conversion are
+unimplemented by design at this checkpoint.
+
+Next: Phase 2 shared atomic budget reservation, then the schema-5→6
+import converter with import-report tests.
+
+## 2026-09-06 failed human validation: routing diagnosis
+
+Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.
+Final candidate ZIP/DLL/MVID and exact command counts are recorded in the
+investigation report's delivery checkpoint. The package remains diagnostic-only;
+final bridge 21/21, exact metadata 87/87, deterministic builds 2/2, candidate
+deployment purity 5/5 and release installer purity 5/5 all pass. No gameplay
+coverage is promoted. The reproducing-machine cast log remains the next action.
+
+Instant Share remains unresolved; gameplay **NOT VERIFIED**. On local machine
+DATA the installed Planner 0.0.19 / Gunslinger 0.0.115 DLLs match both released
+hashes and MVIDs. Executing the real production bridge accepts that pair and
+rejects the actual older 0.0.114 provider. No affected casting log or running
+game is available; the exact Kingmaker save root is absent.
+
+Active branch: `codex/kingmaker-buff-planner-instant-share-routing-diagnosis`;
+starting/audited HEAD: `fd0e6dc1c32dfc929a56dbc575163e641b150746`;
+version remains 0.0.19. Diagnostic-only source adds pre-cast routing evidence,
+loaded-pair identity, provider-direct phase records and visible fallback
+outcomes. The native transaction and resource policies are unchanged.
+Focused gates: source 42/42, behavior 150/150, harness 8/8, package 4/4,
+deployment WhatIf 5/5; candidate production bridge 21/21 assertions in 3/3
+processes. No failed checks are counted as passes.
+
+Commands, exact identity tables, evidence under
+`artifacts/instant-share-diagnosis/`, rejected theories, and limits are in
+[the investigation report](docs/INSTANT-SHARE-FAILED-VALIDATION.md). This supersedes any interpretation of the historical public
+release records below as proof that Instant Share worked in Howie's game.
+Exact next action: capture one affected cast from the reproducing machine and
+identify its capability/selected-executor/Fire discriminator. A diagnostic
+candidate is not a gameplay fix or authorization trigger for a new public release.
+
 ## 2026-09-06 paired public release complete
 
 Owner-authorized releases are public and independently download-verified:
@@ -1535,3 +1946,662 @@ Status: ROOT CAUSE PROVEN; 0.0.4 SOURCE PASS; LIVE QUALIFICATION PENDING
 - Rejected: reverting scoped discovery, restoring a global search, deleting deferred validation, or attributing the defect to non-UI systems.
 - Uncertainty: fresh campaign qualification depends on an exact authorized `KBP_AUTOMATION_BASELINE` / `KBP_AUTOMATION_WORKING` pair; fixture availability will be re-audited after deterministic repair.
 - Exact next action: implement explicit install/candidate outcomes, suspended unload state, bounded retry, and hosting-chain liveness; then add deterministic tests.
+
+# 2026-09-18 - Z native-assignments mission (0.1.0 candidate)
+
+- Branch `codex/kingmaker-buff-planner-z-native-assignments` from pushed
+  diagnosis HEAD `164737e`; `main` at anchor `fd0e6dc`; baseline suite green
+  (42/42, 150/150, 8/8, 4/4, 5/5).
+- A: chooser overflow repaired (single height owner + optional scrollbar +
+  refresh-stable offsets); kept separately reviewable in `a588538`.
+- B: native theme capability layer with bounded donors, partial fallback,
+  full-state-only sprite borrowing, one click-sound route; UNQUALIFIED-LIVE.
+  A Kingmaker process started mid-qualification; the deployment guard stopped
+  the run correctly and was not bypassed.
+- C: schema-5 child assignments (identity/order/pins/targets/enhancement
+  policy), explicit-order allocation, one per-pool accounting with traces,
+  lossless archived migration, no silent pruning; canonical fixtures proven
+  (four-cast mixed example, 9/3/3/6, pin refusal, legacy order).
+- D: PartialExecutionGate shared by Apply and HUD quick-run plus explicit
+  Apply Ready Casts Only; Casting Order & Resources view with competing
+  demand and one-run-per-routine forecast.
+- E: owned spellbook button with bounded guarded handoff through the native
+  close affordance; pure state machine proven; all live spellbook lanes
+  BLOCKED on the absent `KBP_AUTOMATION` fixture.
+- F: version 0.1.0 from actual metadata; docs updated; candidate package
+  built deterministically (see QUALIFICATION for hashes).
+- Final gates: source 42/42, protocol 159/159, harness 8/8, package 4/4,
+  WhatIf 5/5, Release PASS. No merge, tag, push, or publication.
+
+# 2026-09-19 - 0.1.1-rc1 testing preview published
+
+- Owner authorized push/tag/publish. One focused pass confirmed the five
+  product surfaces are wired to production callers (theme surface applied
+  at planner root + rebuilt rows; chooser/order scroll contracts; full
+  assignment editor; planner-authoritative accounting + sequential
+  forecast; spellbook opener lifecycle with disclosed one-way return).
+  Runtime-test host verified inert without the explicit launch flag and
+  validated request file under the lab evidence root.
+- Release engineering: prerelease versioning with validator support;
+  guarded publisher feature-branch prerelease switch (narrow, tested);
+  honest preview notes. All gates green; guarded push; published; asset
+  re-downloaded, hash-matched, package-validated.
+- Machine state at handoff: Kingmaker closed; live Mods = owner original
+  (0.0.19, 16 mods); zero unresolved transactions/locks; fixture pair
+  304/305 + seed intact for future lanes.
+
+# 2026-09-19 - RC1 owner acceptance failed; RC2 product recovery
+
+- Owner installed v0.1.1-rc1 and reported: native appearance absent,
+  spellbook entry absent, chooser appeared to permit unlimited rod
+  allocation across spells, and rows showed numeric metamagic labels
+  (`268435456 Spell`, `524288 Spell`, `33554432 Spell`, `8192 Spell`).
+  Treated as failed owner acceptance; live Mods folder found at 0.0.19
+  (owner rolled back).
+- Source review at `5da102f` confirmed five production defects (P1-P5)
+  and they were repaired on `codex/kingmaker-buff-planner-z-native-assignments`
+  (fix `ab155c2`, version `5d94502`, install guard `3625534`):
+  native donor lookup now StaticCanvas-scoped with owned-scope
+  application; explicit owned paper-surface registry reaching nested
+  modal frames and rebuilt rows; bounded retry for missing donors;
+  tolerant/refusing spellbook window locator with a corner-anchored
+  caption-fitted natively-styled button; plan-derived chooser/card
+  enhancement budgets (native now/requested/allocated/unmet/projected,
+  affected casts, this-assignment coverage, reorder behavior, no second
+  counter); `Assignments & Resources` caption + selected-spell
+  `Edit Assignments`; CallOfTheWild `MetamagicExtender` fail-soft
+  display-name contract (offline-verified: 268435456=Persistent,
+  524288=Piercing, 33554432=Selective, 8192=ThrenodicSpell) with
+  item-derived fallback and digit-sanitizing `EffectName`.
+- Six released-failure regressions added; suite now protocol 178/178,
+  source 42/42, harness 27/27, package 4/4, WhatIf 5/5, publisher gate
+  3/3; deterministic Release build 2/2 produced
+  `KingmakerBuffPlanner-0.1.1-rc2.zip` SHA-256
+  `f6aa4de188b08392acecdb04759ca0cebf2ad329732a5d8a014e0ea863981a00`.
+- Runtime lane (bounded, one attempt): guarded install over the observed
+  prior 0.0.19 first exposed a prerelease CLR-version parsing defect in
+  the install identity guard (transaction rolled back exactly; fixed per
+  the source gate's derivation rule), then the corrected install and
+  `live-ui-bootstrap` were refused because an owner-controlled Kingmaker
+  process was running (PID 1896). Zero mutations; no game interaction.
+  Rendered appearance, visible spellbook button, and in-game budgets are
+  disclosed as source-verified only in the rc2 notes with a five-minute
+  owner check; A7 actual charge spending remains untested.
+
+# 2026-09-19 - v0.1.1-rc2 published
+
+- Guarded publisher (prerelease, feature-branch switch): source 42/42,
+  protocol 178/178, harness 27/27, WhatIf 5/5, publisher gate 3/3,
+  deterministic Release build 2/2 at final HEAD `a30c07e`. Tag
+  `v0.1.1-rc2` == HEAD == origin branch head; v0.0.19 keeps Latest; main
+  unmerged. Two earlier publisher attempts aborted at the running-game
+  guard while the owner played; the third ran in a closed window.
+- Asset `KingmakerBuffPlanner-0.1.1-rc2.zip` SHA-256
+  `c5f888b91252bfa0dcf4f286a934772c6d15b692e8632b6c30b5db4e85ff649e`
+  re-downloaded from the release page; hash matches; package validation
+  4/4 on the downloaded copy. Release notes disclose the unverified
+  rendered/live lanes and carry the five-minute owner check.
+- Local machine: guarded install transaction `rc2fix-liveui-3` holds rc2
+  (f6aa build of the same fixes) over the prior 0.0.19 with an exact
+  backup; PR #1 body/title updated to the corrected preview.
+
+# 2026-09-19 - RC2 review corrections (rc3 candidate)
+
+- Review of published rc2 confirmed: "this spell" notes aggregated the
+  routine (C1), the assignment chooser built choices from the Automatic
+  child and could not remove unavailable selections with honest policy
+  captions (C2), budget detail could overflow its fixed areas (C3), and
+  the documented rollback command targeted the deployment-transaction
+  state instead of the installation record (C4). All repaired.
+- C1: SpellCoverage with canonical+aggregate identity matching and
+  unit-aware notes (targets funded/skipped, communal casts, charges).
+- C2: assignment-scoped Create (selections, policies, per-assignment
+  applicability via GetAssignmentProviderOptions), CanSelect/CanDeselect
+  on choices, removal-without-availability in SetEnhancement, honest
+  REQUIRED/OPTIONAL vs REQUIRED (targeting) captions wired to the view.
+- C3: bounded sticky summary (<=300) and row notes (<=160); full pool
+  detail on tooltips and in Assignments & Resources.
+- C4: guarded Restore-InstallLocal.ps1 preserving post-install profiles;
+  isolated-state tests 4/4 added to the suite; records corrected.
+- Observations: rebuild-boundary theme retry, complete native button
+  states on the spellbook entry, plan-summary/Edit-Assignments rect
+  separation.
+- Gates: source 42/42, protocol 181/181, harness 27/27, rollback 4/4,
+  package 4/4, WhatIf 5/5, publisher gate 3/3. Version 0.1.1-rc3.
+
+# 2026-09-19 - v0.1.1-rc3 published
+
+- Guarded publisher (prerelease, feature-branch switch) at final HEAD
+  `2aad5d4`: source 42/42, protocol 181/181, harness 27/27,
+  Restore-InstallLocal 4/4, WhatIf 5/5, publisher gate 3/3,
+  deterministic Release build 2/2. Tag `v0.1.1-rc3` == HEAD == origin
+  branch head; v0.0.19 keeps Latest; main unmerged.
+- Asset `KingmakerBuffPlanner-0.1.1-rc3.zip` SHA-256
+  `52ab5d94b77c559ce90bb9742cc4efd05355b6d3ea50ebcbaa42bc5b35bf0313`
+  re-downloaded; hash matches; package validation 4/4 on the downloaded
+  copy. One publisher attempt aborted at the running-game guard while
+  the owner played; the retry ran in a closed window.
+- Local Mods now hold the EXACT published rc3 via guarded transaction
+  `rc3-published-install-1` (prior rc2 backed up; 0.0.19 original still
+  archived under the rc2 transaction). Rollback chain documented in
+  AUTONOMOUS-RESUME. PR #1 body/title updated to rc3.
+
+## Session 5 checkpoint — 2026-09-29 night — review F1–F5 + E1 of f0483fc repaired; §6 Share UI + execution bridge in
+
+- Branch `codex/kingmaker-buff-planner-everyday-use` pushed `f0483fc..4790768`
+  through the guarded helper. Commits: `7f62b18` (F3 immutable discovery +
+  isolated probe), `61af5f8` (F2/F4/F5 exact-source contract, legality vs
+  affordability, fail-closed ledger), `9eb983f` (F1 recovery owner + E1
+  boundary-projection assertions), `30a68c4` (plan record + .zcodeignore),
+  `4790768` (Share UI control + execution-only native bridge).
+- Protocol suite **380/380** at 4790768 (`artifacts/tests`, invoked with
+  KBP_TEST_GAME_PATH). Source validation 42/42, harness 38/38, package 4/4
+  (prior beta zip 214b795b…8b20564 byte-identical), deploy WhatIf 5/5,
+  Build-Local PASS sha256 e6b715e0d4ab50c00a310b9437cc41a86b8598894f47545a943ecda26fc50dd2
+  (package 50e9633e…df4b8420). Launcher -File WhatIf BLOCKED mid-gate by the
+  running-UMM guard while the owner's UnityModManager (PID 14008, opened
+  12:38) stays open — honest environment refusal, reruns when quiet; all
+  other gate stages green. Evidence: artifacts/gate-session5-final2.log,
+  artifacts/build-session5b.log.
+- Causal mutants all verified caught: unknown-pool skip (F5), zero-balance
+  Apply refusal (F4), dropped exact-source contract (F2), dropped recovery
+  registration (F1), removed unverified-modifier refusal (converter). F3's
+  IL scanner proves itself on the probe (positive control) and asserts zero
+  activatable mutation in every ordinary discovery method.
+- Share execution bridge (source-complete, native qualification pending):
+  converter executes a targeting modifier only through the verified
+  enhancement identity (session map modifier|caster → the integration's own
+  snapshot id); the step's proven enhancement lease arms the exact verified
+  toggle for the one cast and restores on every terminal path; the
+  projection hash covers modifier identity + reservoir cost; fail-closed
+  without the mapping, probe refuses, disabled selections arm nothing.
+- Rejected theories this session: "graph fixture zero casters was a
+  production identity bug" (it was the fixture; already resolved prior
+  session, re-verified). Uncertainty: E18/E19 native armed-cast behavior and
+  E03 route live smoke are unqualified until the unattended batch; UMM must
+  close first.
+- Exact next actions: (1) rerun `scripts/Test-SourceOnly.ps1` in a quiet
+  window (launcher -File WhatIf is the only unrun stage) at 4790768;
+  (2) combined Share+Powerful Change reservoir live proof (E19) and the
+  armed shared cast (E18) through the unattended dispatcher batch;
+  (3) E01–E27 matrix completion, scroll-frame and right-click judging from
+  presented frames; (4) verified private delivery with a unique everyday-use
+  filename; prior beta package untouched.
+
+## Session 6 checkpoint — 2026-09-29 late — review R579-1/2/3 of 5795005 repaired (c8535b0)
+
+- Correction to the previous checkpoint's gate accounting (per review):
+  Test-SourceOnly.ps1 CONTINUES past Test-RuntimeLauncherFileWhatIf.ps1
+  with Test-FixtureInventoryEvidence.ps1, Test-RestoreInstallLocal.ps1 and
+  Test-PublishReleaseGate.ps1. The UMM-blocked runs did NOT establish those
+  three stages at the 4790768 candidate — they are NOT-ESTABLISHED-BY-THAT-
+  RUN (not failed, not passed). The next full quiet-window gate must run
+  the complete script end to end.
+- R579-1: the compiler resolves the complete executable enhancement
+  contract (modifier-backed Share enhancement via ExecutionEnhancementIds,
+  applicability-checked) BEFORE strategy freezes, through the existing
+  CastEnhancementExecutionPolicy; Share alone selects the verified
+  provider-direct route (native-command contract routes likewise); Share +
+  Powerful Change resolve one route with the shared reservoir charged
+  exactly once; no execution identity keeps the base route. Regression:
+  share-alone-selects-the-provider-direct-strategy (compiler + projected
+  step + cost).
+- R579-2: ActivationLease cleanup reports CleanupFailure (restore
+  exceptions, policy-aware postcondition mismatches; consumed one-shots not
+  resurrected; other states still cleaned); CastEnhancementPreparation
+  surfaces it; BOTH executors report it as ResidualStateUnsettled and halt
+  later casts; clean cleanup stays ordinary success. Probe restores after
+  every attempted mutation and verifies final state. Regression:
+  enhancement-cleanup-is-observable-and-halts-later-casts (true
+  runtime-adapter stubs, Animated + Instant).
+- R579-3: the recovery store REFUSES over-capacity registration (the
+  relinquishing transition is refused with ownership retained) instead of
+  evicting; Adopt is transactional (entry removed only after successful
+  construction). Regression: recovery-preservation-never-drops-intent
+  (nine recoveries, ninth refused with ownership, pad1 adopted exactly,
+  factory-failure window preserved).
+- Protocol suite 383/383 at c8535b0. Mutant replays for these three
+  repairs were NOT rerun this pass (the regressions assert the repaired
+  behaviors directly: base-strategy difference, observable-failure vs
+  clean, refusal vs preservation); the previous session's recorded mutant
+  evidence stands for its own repairs.
+- Honest open items: the complete Test-SourceOnly gate (all stages) at this
+  candidate in a quiet window; Build-Local refresh at c8535b0; the live
+  qualification batch (E18 Share-alone and Share+Powerful Change in both
+  execution modes with observed spending/effects and plain-cast isolation,
+  E19 combined reservoir, E03 route smoke, scroll frames, right-click) and
+  the E01-E27 matrix; verified private delivery. The owner's UMM window
+  was respected throughout.
+
+## Session 7 checkpoint — 2026-09-29 latest — review C853-1/2/3 of c8535b0 repaired
+
+- C853-1: lease cleanup extracted to the pure, seam-backed
+  EnhancementLeaseCleanup (linked into both csprojs) and now verifies the
+  POLICY-EXPECTED FINAL VALUE (an OFF rod restored to OFF is CLEAN — the
+  old compare-against-the-decision misreported it), keeps consumed
+  one-shots consumed, restores nothing from unreadable consumption, and
+  verifies rod stops by reading IsRunning back.
+- C853-2: failed preparations carry the disposed lease's cleanup outcome
+  (Fail(cleanupFailure)); both executors report it as terminal unsettled
+  state without attempting the cast; the Animated finally captures and, on
+  disposal-only exits, reports the enhancement outcome itself.
+- C853-3: the capacity bound is REMOVED — Register always preserves,
+  teardown hands off like any transition, replacement owners recover. The
+  adoption regression's injected failure moved INSIDE
+  constructWithRecovery after verifying the received intent.
+- Protocol suite 384/384 at this commit. NOT yet done (next session, in
+  order): Build-Local refresh + the COMPLETE Test-SourceOnly gate (all
+  stages) in a quiet window at this exact HEAD; mutant replays for the
+  C853 repairs were not rerun (the OFF-rod regression fails against the
+  pre-repair algorithm by construction); then the authorized live
+  qualification batch (E18 Share alone AND Share+Powerful Change, both
+  modes, spending/effects/plain-cast isolation; E19; E03 smoke; scroll
+  frames; right-click), E01-E27 matrix, verified private delivery.
+
+## Session 8 checkpoint — 2026-09-29 latest — review R736-1/2 of 736e248 repaired
+
+- R736-1: one shared IActivatableStateAccess (duplicate removed from the
+  adapter); the source validator's consumed-group guard now spans the
+  extracted cleanup file as well. PRODUCTION BUILD EVIDENCE: Build-Local
+  PASS — source 42/42, Release sha256
+  6fd7e91eadc1bcd3c09daa67a54b9f47a4722ecd38af1da5397ff21fd140106d,
+  package sha256
+  ccd8159ffb935c70b4caea1e96eb8287b21adb40390d3c3c2dbd47126fc36dca
+  (artifacts/build-session7.log).
+- R736-2: the Animated finalizer REPORTS the enhancement cleanup outcome
+  on disposal-only exits (deduped on normal completion). Regression
+  disposes a suspended in-flight iterator with a failing lease: exactly
+  one unsettled record with the original detail beside the abandonment
+  record; no later cast; clean cancellation invents nothing.
+- Focused corrections: rejected-preparation regression (both details
+  reach the report; no StartAnimated; later casts halt); the lying setter
+  genuinely lies (postcondition mismatch asserted); unreadable
+  consumption proves no positive one-shot write (write-counted stub) and
+  still restores an independent ordinary state.
+- Protocol suite 384/384. Still outstanding, unchanged: the COMPLETE
+  Test-SourceOnly gate (all stages, launcher WhatIf included) on this
+  frozen candidate in a quiet window; then the authorized live batch
+  (E18 Share alone AND Share+Powerful Change, both modes, observed
+  spending/effects, plain-cast isolation; E19; E03; scroll frames;
+  right-click), E01-E27 matrix, verified private delivery.
+
+## Session 9 checkpoint — 2026-09-30 — downstream gate receipts; launcher stage alone pending
+
+- R736 disposition received (both findings closed; no new source repair
+  requested). Proceeding to the complete mandatory gate, then the
+  authorized native qualification.
+- Downstream stages run INDIVIDUALLY at HEAD ee00ec1 (none touches the
+  game, UMM, or the build manifest - verified by script inspection):
+  Test-FixtureInventoryEvidence 3/3, Test-RestoreInstallLocal 16/16
+  (rollback evidence recorded), Test-PublishReleaseGate 3/3. Logs:
+  artifacts/gate-stage-*.log. Per the disposition these are their own
+  receipts; the complete end-to-end Test-SourceOnly run still happens in
+  the quiet window.
+- Manifest note: a Build-Local at ee00ec1 produced a different DLL hash
+  (ee189893...) than the reviewed 6eb58ff build (6fd7e91e...) - the build
+  is not byte-reproducible across commits. Per the disposition, that
+  rebuild is NOT the qualification candidate. The launcher stage's
+  manifest check (manifest.commit == HEAD) is satisfied only by the
+  final-HEAD procedure: when the owner's UMM window closes, the sequence
+  is final HEAD -> Build-Local -> complete Test-SourceOnly end to end,
+  and THAT build (with its hashes/MVID) is the qualified candidate.
+- The owner's UMM process (PID 14008, opened 2026-09-29 12:38) remains
+  running; the launcher guard is respected, polling continues.
+
+## Session 10 checkpoint — 2026-09-30 — COMPLETE mandatory gate PASS on the frozen candidate
+
+- The owner closed UMM; the recorded quiet-window procedure ran exactly:
+  final HEAD d3e515c -> Build-Local (manifest commit == HEAD, validated)
+  -> complete Test-SourceOnly.ps1 END TO END, first time with the launcher
+  stage included.
+- Candidate identity: HEAD d3e515c2cdcff5ea7c49dfd19b385df45824ab28;
+  DLL sha256 2ad99629542526453071b3f29a7d238fd3fb9cd8ef86b01db810eeb160401fb6;
+  package sha256 4f522eb4a0f4ac9a5ba4d25bfb92cd86d2b2391a6b1c1adf401772f95bca5820.
+- ALL stages PASS (artifacts/gate-final-complete.log): source validation
+  42/42; protocol 384/384; runtime harness 38/38; package validation 4/4
+  (candidate hash); deployment WhatIf purity 5/5; LAUNCHER -File WhatIf
+  purity 12/12; fixture inventory 3/3; Restore-InstallLocal 16/16;
+  guarded publisher gate 3/3; Source-only suite PASS=1 FAIL=0.
+- Exact next action: the authorized live qualification batch on this
+  frozen candidate through the dispatcher (E18 Share alone AND
+  Share+Powerful Change in both execution modes with observed native
+  spending, target effects and plain-cast isolation; E19 combined
+  reservoir; E03 route smoke; scroll-frame and right-click judgment from
+  presented frames), then the E01-E27 matrix and verified private
+  delivery. Prior beta package 214b795b...8b20564 remains untouched.
+
+## Session 10 addendum — freeze record + live-batch implementation map
+
+- FREEZE RECORD for the gate-passed candidate:
+  runtime-backups/qualification-frozen/d3e515c2cdcff5ea7c49dfd19b385df45824ab28/
+  (commit d3e515c, package 4f522eb4... lowercase, dll 2ad99629...,
+  MVID 722e3a6a-29b3-4269-a1f5-f40f585769e7, package bytes copied and
+  re-hashed to match). All later E-batch runs pin this identity.
+- Live-batch implementation map (next work block; new scenario source is
+  REQUIRED - the existing drivers have no Share gesture):
+  1. Scenario pair `live-share-qual-select` / `live-share-qual` in
+     RuntimeTestProtocol.IsQualificationScenario + launcher ValidateSet.
+     The select run drives PRODUCTION commands on the Advanced fixture:
+     SelectGraphBuff/Caster/Source -> ToggleDraftTargetingModifier(Share)
+     -> AddGraphCasting(ally); records the compiled projection (strategy
+     ProviderDirectRuleCast or NativeCommandRequired per the installed
+     contract), the reservoir demand, and the target identity; submits
+     nothing. E19 variant additionally selects Powerful Change on the
+     casting (ToggleFocusedEnhancement) for combined-demand accounting.
+  2. The qual run is allowance-bound (schema-5 pattern from
+     New-KbpRunAllowance): binds the select run's ordered projections +
+     working save + frozen identity; armed submission through the
+     production Apply path; observes the ally effect, the Arcane Reservoir
+     AND native-slot spending from a fresh discovery read, then performs
+     one plain ordinary cast to prove toggle-state isolation (no residual
+     arming) - in BOTH instant and animated modes.
+  3. Protocol tests for the new contracts in the source-only suite; then
+     Build-Local + COMPLETE Test-SourceOnly at the new commit; a NEW
+     freeze record for that commit; dispatcher jobs (instant + animated)
+     through dispatch/build-jobs.ps1 with the new hashes; unattended runs;
+     evidence to the E01-E27 matrix (E16-E20 rows) plus the E03 route
+     smoke, scroll-frame and right-click judging runs.
+  4. Then the verified private delivery (unique everyday-use filename;
+     prior beta 214b795b...8b20564 untouched).
+- Tree remains clean at the gate-passed candidate; no source work started.
+
+## Session 10 addendum 2 — SharedPersonal recipe design (pinned, not yet implemented)
+
+Concrete design established by reading the recipe/driver framework (next
+work block implements exactly this):
+
+- Recipe id `shared-personal` in CastingQualificationRecipe: IsKnown true;
+  ForecastSteps 2; MinimumCastings 2; NOT group, NOT two-phase, NO disable
+  step (sequences like zero-cost-mixed's plain flow, two castings).
+- SelectSharedPersonal(inputs, campaignId):
+  1. Share snapshot = first inputs.Enhancements with AffectsTargeting and
+     EnhancementId prefix "share-transmutation|" (rejection reason
+     otherwise: no-share-snapshot). Caster/whitelists/reservoir pool from
+     it; recipients from the registered Share modifier's capability (find
+     inputs.TargetingModifiers ShareCastingModifier instance - expose a
+     read accessor if needed) or structurally (targetable, friendly, alive,
+     conscious, != caster, without the effect).
+  2. Provider option: caster + selected ability guid in the snapshot's
+     AbilityWhiteList + spellbook in SpellbookWhiteList + personal
+     (ReachableTargetIds == [caster]) + DirectRuleCast base strategy.
+  3. qual-cast-1 = shared casting: that option, ally target,
+     TargetingModifiers [share-transmutation enabled];
+     qual-cast-2 = plain isolation casting: a verified-free plain buff from
+     EligibleOptions (zero-cost-mixed rules) on a fresh recipient.
+  4. Forecast both (CastingQualificationForecast.Project); require step 1
+     Ready with the share enhancement id among applied ids, an
+     EnhancementPool line on the reservoir pool, and the strategy the
+     installed contract selected (ProviderDirectRuleCast when the direct
+     provider id is present, else NativeCommandRequired); step 2 plain.
+- Driver: author step 1 through the PRODUCTION graph commands
+  (SelectGraphBuff/SelectGraphCaster/SelectGraphSource ->
+  ToggleDraftTargetingModifier(share) -> AddGraphCasting(ally); verify the
+  persisted record carries the per-casting modifier selection), step 2 via
+  the driver's ordinary add path; judge: ally effect present, Arcane
+  Reservoir pool AND the native slot decremented exactly the reserved
+  amounts (fresh discovery read), plain step 2 executes normally (lease
+  restored - no share arming on the plain cast), toggle ends in its
+  pre-run state.
+- Launcher: add the recipe to the -Recipe ValidateSet; allowance schema-5
+  binds the ordered forecast projections generically (verify only).
+- Then: protocol tests for SelectSharedPersonal (synthetic inputs with a
+  Share snapshot + modifier, mirroring the existing recipe tests);
+  Build-Local + COMPLETE Test-SourceOnly at the new commit; NEW freeze
+  record; dispatcher jobs instant+animated; E18/E19/E20 evidence.
+
+## Checkpoint 2026-10-02 (stopping point) — everyday-use v1.2 candidate 3c1c5d4
+
+- Branch: codex/kingmaker-buff-planner-everyday-use; HEAD
+  3c1c5d4a5193d3d84aa205e234c0a9b09b4face7 (pushed through the guarded
+  helper at this stopping point).
+- Candidate identity: package Sha256
+  1b6d67c0f7fd5ba8ba8d4a9047073500e0a5c3e01a76851c6e13ae410a2d5665; DLL
+  c727c5e2565adff320d9c53a313e815f57c479e9d198dcb6188542214462f7a3; MVID
+  6fb77f64-c7f7-4fbb-8340-5e6ca6c839f6; freeze record
+  runtime-backups/qualification-frozen/3c1c5d4.../FREEZE.json (bytes
+  copied + verified). Prior candidate 8a53ced8 (its own full gate PASS)\  also remains frozen with its r12 partial evidence.
+- Full gate PASS at this exact tree: artifacts/gate-3c1c5d4.log (source 42,
+  protocol 390, harness 38, package 4, deploy WhatIf 5, launcher WhatIf
+  12, fixture 3, restore 16, publisher 3).
+- Defects found and repaired across r6-r12 (each with a source
+  regression):
+  1. r6: the launcher's UMM-dismiss escape raced the host's programmatic
+     overlay close and opened the native Escape menu behind the
+     workspace; the fullscreen veil absorbed the cold-moon click. The
+     scenario now probes EscMenuWindow and closes it physically.
+  2. r7: the veil probe used activeInHierarchy (the hidden window keeps
+     its GameObject active) and the recovery escapes oscillated the
+     menu; the probe now reads UIWindow.IsShow (beta-a4f78d6fr7).
+  3. r8: the moon click reached the run service and was refused by the
+     runtime-test session's native-casting lock - the casting-first
+     route had no allowance exception. Added the parallel single-use
+     grant chain (CastingFirstPlanDigest/CastingFirstCastGrant/
+     CastingFirstAllowance; AllowanceBoundCastingDispatchBoundary;
+     launcher -CfAllowancePath/-PhysicalExpectation; allowance kind
+     cf-physical; jobs ui-phys-select -> allow-phys -> ui-phys-cast).
+  4. r8: the graph renders the SELECTED source's castings, so the seeded
+     chip was invisible; the seed now selects its own source (pure
+     browsing command).
+  5. r10: the host's request validation demanded the physical scenario's
+     exact parameter set and rejected the new physicalExpectation member
+     at boot ("Runtime request rejected: invalid-request:live-save-
+     parameters" in output_log; the game sat behind the UMM overlay
+     while the launcher timed out). The members are listed with their
+     own strict rules; the physical scenario got its request-contract
+     test (beta-f1d957efr10-phys-sel-01..03 evidence).
+  6. r11: the launcher's post-run judge still demanded the pre-v1.2
+     classic gesture set and rejected a perfect selection run
+     (beta-f0cf4f16r11-phys-sel-01: zero violations, chip inspected,
+     lock-refused press). The judge now covers the six cf-* actions, the
+     conditional pre-steps, and both moon expectations; the launcher
+     WhatIf fixtures cover both (plus the CastingActions meta-check).
+- Environmental events (not candidate defects): r10 w1080 Ctrl+C'd by
+  the owner mid-boot; beta-f1d957efr10-phys-sel-02 abort not honoured
+  (game closed gracefully, transaction restored); r12 w1080-01 hung at
+  exit after a clean result (result committed; process terminated as
+  the bounded last resort after WM_CLOSE was ignored; restoration
+  hash-verified).
+- Owner policy change (2026-10-02, written mid-mission): the dispatcher
+  no longer holds on an RDP viewer. It runs on ANY Active session of the
+  pinned account; the owner holds dispatch with a dispatch\owner-pause
+  flag file (absent = unpaused). A self-clearing 3-minute input-idle
+  wait remains because Win32 foreground activation - required by the
+  hover probes' mouse-move delivery - is denied under an RDP-attached
+  session even when input is idle, and succeeds on the physical console
+  (proven by r12 w1080-02/-03 failing exactly and only at the hover
+  phases after every PostMessage-delivered action passed). The two
+  hover-dependent jobs (ui-windowed, ui-advanced) are queued as
+  CONSOLE-REQUIRED at the end of the batch; everything else runs under
+  RDP. KBP-ConsoleAttach v2 is unchanged.
+- Jobs: r12 partial (beta-8a53ced8r12-reload-01 done+verified; the rest
+  interrupted by the RDP foreground denials above). r13 is BUILT on the
+  frozen 3c1c5d4 candidate (dispatch/jobs.json, run IDs
+  beta-3c1c5d4ar13-*) and deliberately NOT dispatched at the owner's
+  2026-10-02 stopping-point request.
+- 7. Foreground activation under RDP (r12): plain SetForegroundWindow is
+  denied by the OS foreground lock under an RDP-attached session even
+  when input is idle, so every verified physical input failed closed.
+  With the owner's explicit authorization the launcher now attaches to
+  the foreground/target input queues, restores a minimized window,
+  activates and detaches - no synthetic shell input; every caller still
+  verifies the foreground target (commit 3c1c5d4, gate PASS).
+- Stopping point: guide updated (autosave/moon wording, Share row),
+  docs/E01-E27-ACCEPTANCE-MATRIX.md written from actual evidence with
+  honest NOT-RUN cells, this journal updated, AUTONOMOUS-RESUME/BLOCKERS
+  updated, all pushed. Remaining: dispatch r13, fill the matrix cells,
+  private delivery with verified bytes and retrieval instructions.
+
+## Checkpoint 2026-10-03 — Claude takeover: r13-r15, D1-D13 + H1-H5, delivered candidate 8d7681d
+
+- Branch `codex/kingmaker-buff-planner-everyday-use`; delivered (tested) source
+  commit `8d7681d03752f3f7170f25f7d45029f71c46a884`, pushed through the guarded
+  helper. Version string 0.2.0-rc6 (unchanged development convention; builds
+  are told apart by commit, hash and MVID). Records commits follow on top
+  (documentation only; no code change after the tested commit).
+- Candidate identity (Build-Local at 8d7681d, `artifacts/build-local-8d7681d.log`):
+  package `5b24e2eafee69b18898894b6e9a5cfb9b2c8e625a561494cb2234766097d8d17`,
+  DLL `deee7b1de54daee9e890f6680c8e0d4db09674b12c394e2d2d6c2d3e460cf65b`,
+  MVID `1e762004-8200-430e-853e-d61456a627ae`; frozen with byte-verified copies
+  under `runtime-backups/qualification-frozen/8d7681d0.../FREEZE.json`.
+- Full mandatory gate at that exact tree, `artifacts/gate-8d7681d.log`: source
+  validation 42/42, protocol 398/398, runtime harness 38/38, package 4/4,
+  deployment WhatIf 5/5, launcher WhatIf 13/13, fixture 3/3,
+  Restore-InstallLocal 16/16, guarded publisher 3/3. Earlier gates:
+  `gate-9b788e8.log` FAILED (launcher WhatIf meta-check still pinned six
+  gestures); `gate-bff840a.log` PASS.
+- Gate timing: ~4 h, almost all in four lab-wide purity windows (deployment 1,
+  launcher 3). Before each full gate the launcher WhatIf logic was validated
+  in ~150 s with a temporary, uncommitted copy whose purity windows run their
+  action directly (hidden via .git/info/exclude, deleted afterwards).
+
+### r13 (bound to 3c1c5d4, dispatched at the start of this session)
+
+- 24 jobs done and verified: reload-01, imp-01, the finite (instant,
+  animated), group, enhanced, rod-extend and ability-pool chains with their
+  inspections and selections. This is PRIOR-BUILD evidence (3c1c5d4).
+- `ui-phys-select` (beta-3c1c5d4ar13-phys-sel-01): in-game PASS; the
+  launcher's own judge threw reading the absent `expectedScreen` of an
+  owner-display request under strict mode. Reconciled (failed-reconciled),
+  repaired in a6c8b95 with WhatIf owner-display cases (a mutation run of the
+  old judge reproduced the throw).
+- Share chains (12 jobs) deferred: the r13 harness could not express the
+  shared recipes (B1-B6 in 45c46c6).
+- `ui-windowed` (beta-3c1c5d4ar13-w1080-01): every product assertion PASS;
+  hover sweeps 8-10 hit nothing. H1 (below). Reconciled; `ui-advanced`
+  deferred to r14 (same input path, changed UI). Restoration verified after
+  every run (transactions 344/344 Restored, no KBP/Gunslinger locks, no
+  Kingmaker, protected saves clean).
+
+### Defects found and repaired (each with a regression)
+
+- D1 settings page offered a Classic/casting-first toggle calling casting-first
+  "experimental" and asking for acceptance -> PlannerSettingsText (one-way
+  switch only from a stored Classic choice). e185cc4.
+- D2-D5 Accept/Save ceremony wording in the footer readiness line, mode
+  toggle, HUD tooltips and refusal messages. e185cc4.
+- D6/D7 footer save status was set once at construction (stale "saved",
+  raw machine strings, overlapping the budget line) and no recovery action
+  existed -> live Saved/Saving.../Not saved with Retry save / Reload. e185cc4.
+- D8 the HUD gear ran Long; D9 Run caption. e185cc4.
+- D10 the Escape that closed the planner also reached the native
+  `EscPressed` binding (the game menu opened under the closing planner;
+  phys-sel-01 ended in EscMode) -> the planner marks Escape taken and the
+  InputMatched prefix suppresses EscPressed (assembly-backed IL check of
+  binding 27/EscPressed). d49f15a.
+- Share harness B1-B6 + finite slots + shortage step + preview/persistence/
+  draft-disarm checks (the shared recipes could not run). 45c46c6.
+- E12 cold moon: the physical run now presses the moon BEFORE any planner
+  session exists, from a plan an earlier (throwaway) session stored with
+  Long AND Important castings; judged: Long only, once, under a consumed
+  single-use grant, effects and costs observed, editor never opened, clean
+  close. 0ee5fa0.
+- E02/E26 import: ambiguity kept (every Automatic-caster casting a Draft with
+  no caster), a fresh session from disk equals the imported intent with no
+  re-import, exactly one byte-exact archive, repeated after close. fe82855.
+- D11 the right-click description panel NEVER rendered (SetAnchors edge
+  insets on a point anchor: width -1280, height 0; Close button the same;
+  content had no layout height). r11 and r13 physical-cf-inspect.png show
+  only the dim overlay; the old record judged activeSelf, so the old matrix
+  marked E05/E06 PASS wrongly. Rebuilt on the standard scroll view; the
+  physical run now judges on-screen size, native text equality, a physical
+  wheel over the description that must not move the graph, and a labelled
+  long-native-text probe the wheel must scroll; the launcher re-reads it.
+  268e291 (with a legible header mode label).
+- H1 (harness) the launcher stretched Unity coordinates over the client; on
+  the owner's new 1920x1200 RDP desktop Unity letterboxes a 1920x1080
+  surface (60 px bars; every sample: unityCursor = 1200 - clientY - 61) ->
+  aspect-preserving mapping + mapping in each ack; WhatIf compiles the
+  launcher's own helper and checks the observed geometry. 9b788e8.
+- H2 (harness, NOT repaired) the "windowed" transaction writes Unity
+  FullScreenMode 0 = ExclusiveFullScreen; every w1080 run (r10-r13) reported
+  fullScreen=True. Evidence is labelled 1920x1080 fullscreen; windowed is not
+  claimed (consistent with checkpoint 5).
+
+### Rejected theories
+
+- "Hover under RDP fails because foreground activation is denied": not this
+  time - every hover action was delivered and acknowledged; the misses were
+  geometric (H1).
+- "The w1080 run is windowed": Unity says fullscreen in every run (H2).
+- "E05 passed in r11": the frame shows no panel (D11).
+
+### r14 (bound to bff840a, gate PASS artifacts/gate-bff840a.log, pushed)
+
+- done and verified: beta-bff840a2r14-reload-01, -phys-sel-01 (cold moon
+  refused by the lock; the description panel now visible: 760x520, body equal
+  to the native Resistance text, long-text probe scrolled 1.0>0.975, graph
+  unmoved, Escape closed description then planner, game menu stayed closed),
+  -imp-01 (ambiguity kept, fresh-session reconstruction equal, one archive),
+  -insp-shared-personal, -sel-shared-personal (Brown-Fur Transmuter -> ally,
+  Share intent persisted, preview left the caster unchanged), -insp-finite.
+- failed-reconciled (no game launched in either, nothing staged):
+  allow-phys - H3, the cf-physical writer still demanded the pre-v1.2
+  seed note; cast-shared-personal-instant - H4, the shared-personal purpose
+  was 441 characters against the launcher's 400 bound.
+- Found in the r14 frames/records: D12 (description titled "#1 heighten-0",
+  the provider key's last segment) and D13 (graphWheelEvidence
+  not-applicable:no-overflow in r11, r13 and r14 - the graph never overflowed,
+  so physical graph scrolling had never been demonstrated). Also the digest
+  record counted every routine's castings, so the grant cap was looser than
+  Long.
+- r14 stopped between jobs with the dispatcher's owner-pause hold (set and
+  removed by me, the running job finished first); the remaining 32 jobs
+  deferred so every native result is produced on the repaired candidate.
+- Repairs: 648608f (D12 native spell title; D13 Short routine seeded with 14
+  parallel castings, Short tab clicked physically, only a real scroll passes,
+  frames before/after; H3 typed cold-seed evidence; exact Long grant cap) and
+  8d7681d (H4 shorter purpose, writer-side 400 guard, WhatIf writer cases for
+  both shared recipes in both modes - the old writer fails them). Protocol
+  398/398; fast launcher WhatIf 13/13 at 8d7681d before the full gate.
+
+### r15
+
+All 41 jobs done and verified on 8d7681d (`dispatch\jobs.r15-final.json`;
+run ids `beta-8d7681d0r15-*`; transactions 380/380 Restored afterwards, no
+locks, no Kingmaker, Gunslinger ended/restored, protected saves clean in
+every run). Highlights:
+
+- phys-cast-01 (E12): cold session, editor never opened, allowance valid with
+  a cap of exactly 1, grant consumed after 1 attempt, exactly one Long run
+  (completed, 1 submission, seed-long-1 EffectConfirmed), Long effect landed,
+  Important and the 14 Short castings untouched, editor stayed closed; then
+  the Short tab, the graph wheel (1.0 -> 0.771), the right-click description
+  ("#1 Resistance", native text), its long-text wheel and the two Escapes.
+- Share (E16-E20), Instant and Animated: the personal transmutation landed on
+  the ally through the Brown-Fur provider transaction once; spontaneous-4
+  slot 4 -> 3; reservoir 16 -> 15 (Share) or 16 -> 14 (Share + Powerful
+  Change, Str +6 instead of +4); the plain witness cast spent a slot and no
+  reservoir; the shortage step refused the routine whole with nothing spent;
+  caster toggles identical before and after every step.
+- Finite (both modes): in-flight Stop honest, repeat harmless, recast exact;
+  group, enhanced, rod-extend and ability-pool chains PASS; reload-01 and
+  imp-01 PASS; w1080-01 (fullscreen, H2) and adv-01 PASS including hover
+  ownership and the Advanced global-accounting proof (6-5-6, rod 3-2-2-3,
+  atomic refusal observed).
+- Dispatch note H5: allowance jobs reused the same run id in every batch, so
+  r13/r14 claim files blocked r15's claims; the stale `allow-*` claims were
+  archived (not deleted) to `dispatch\claims-archive\allowance-claims-before-r15`
+  after a graceful `stop`, and `dispatch\build-jobs.ps1` now makes allowance
+  run ids batch-unique (dry-built; jobs.json untouched).
+- r15 desktop was 1920x1080 (acknowledgements record bars=0,0), so H1's
+  letterbox mapping was not exercised live; its WhatIf regression covers it.
+
+### Delivery (2026-10-03)
+
+- Private draft release 399014941 (draft, no tag created, not merged): asset
+  `KingmakerBuffPlanner-0.2.0-rc6-everyday-use-v1.2+8d7681d0.zip` (id
+  607817987) uploaded from the frozen bytes, downloaded back and verified
+  (size, package, DLL in ZIP, MVID, embedded commit/version, entries); the
+  prior beta asset (214b795b..., 661250 bytes) re-downloaded identical before
+  and after. Receipt: `docs/evidence/everyday-use-v1.2-delivery-receipt.md`.
+- Draft notes and title updated. A REST PATCH of title/body without
+  `tag_name` reset the draft's planned tag name to an `untagged-...`
+  placeholder; restored at once to `v0.2.0-rc6-casting-graph-preview`
+  (target main, still a draft, no git tag, nothing published). Retrieval by
+  that tag name re-checked afterwards (701341 bytes, package hash equal).
+- The matrix is rebuilt on the ORIGINAL E01-E27 rows; every native verdict
+  cites r15 runs on the delivered candidate.
+- Final lab state: no Kingmaker, dispatcher stopped (no live claim), all
+  transactions Restored, no KBP/Gunslinger locks, Mods restored by each run's
+  transaction, protected saves clean, owner-pause/stop flags absent.
+

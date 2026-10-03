@@ -108,8 +108,13 @@ namespace KingmakerBuffPlanner.UI
             Profile = profile ?? throw new ArgumentNullException("profile");
             foreach (SourceAssignmentProfile assignment in Profile.Routines
                 .SelectMany(routine => routine.Assignments))
-                if (assignment.SelectedEnhancementIds == null)
-                    assignment.SelectedEnhancementIds = new List<string>();
+            {
+                if (assignment.CastingAssignments == null)
+                    assignment.CastingAssignments = new List<CastingAssignmentProfile>();
+                foreach (CastingAssignmentProfile casting in assignment.CastingAssignments)
+                    if (casting.Enhancements == null)
+                        casting.Enhancements = new List<EnhancementSelectionProfile>();
+            }
             Snapshot = snapshot ?? throw new ArgumentNullException("snapshot");
             _activeEffects = activeEffects ?? throw new ArgumentNullException("activeEffects");
             var effects = new Dictionary<string, EffectExpression>(effectsByAbilityKey ??
@@ -148,7 +153,20 @@ namespace KingmakerBuffPlanner.UI
 
         public BuffPlannerProfile Profile { get; private set; }
         public PartyProviderSnapshot Snapshot { get; private set; }
+        // Source-keyed effect expressions for consumers that compile plans
+        // from the same discovery data (the casting-first workspace).
+        public IReadOnlyDictionary<string, EffectExpression> EffectsBySource
+        {
+            get { return _effects; }
+        }
         public IReadOnlyList<SetupSourceRow> Sources { get; private set; }
+        // The full discovered enhancement catalog (not only the currently
+        // applicable subset): shared-pool budget lines must see every caster
+        // and rod that consumes the same native charges.
+        public IReadOnlyList<CastEnhancementSnapshot> Enhancements
+        {
+            get { return _enhancements; }
+        }
         public bool AssignmentMigrationApplied { get; private set; }
         public IReadOnlyList<VariantReselectionNotice> VariantReselectionNotices { get; private set; }
         public string SelectedSourceId { get; private set; }
@@ -186,15 +204,38 @@ namespace KingmakerBuffPlanner.UI
             RoutineProfile routine = FindRoutine(routineId);
             SourceAssignmentProfile assignment = routine.Assignments
                 .FirstOrDefault(item => item.SourceId == source.SourceId);
+            CastingAssignmentProfile casting = AutomaticChild(routine, assignment, source);
+            if (casting == null) return;
             if (assignment == null)
             {
-                assignment = CreateAssignment(source);
-                routine.Assignments.Add(assignment);
+                // AutomaticChild created the parent; track it locally.
+                assignment = routine.Assignments.First(item =>
+                    item.SourceId == source.SourceId);
             }
-            if (assignment.WantedTargetUnitIds.Contains(unitId))
-                assignment.WantedTargetUnitIds.Remove(unitId);
-            else assignment.WantedTargetUnitIds.Add(unitId);
-            if (assignment.WantedTargetUnitIds.Count == 0 && assignment.SelectedEnhancementIds.Count == 0) routine.Assignments.Remove(assignment);
+            // Portrait state shows wanted regardless of which child holds a
+            // target. Deselect removes it from whichever child owns it
+            // (pinned routing is only removed explicitly, never converted);
+            // select adds to the Automatic child only when no sibling
+            // already owns it, so pinned routing is never silently moved.
+            SourceAssignmentProfile owner = routine.Assignments
+                .FirstOrDefault(item => item.SourceId == source.SourceId);
+            CastingAssignmentProfile owningChild = owner == null ? null :
+                owner.CastingAssignments.FirstOrDefault(child =>
+                    child.TargetUnitIds.Contains(unitId));
+            if (owningChild != null)
+            {
+                // A pinned row owns this target: the simple portrait strip
+                // never edits pinned routing. The explicit assignment editor
+                // or the per-assignment target picker moves or removes it.
+                if (!owningChild.IsAutomatic) return;
+                owningChild.TargetUnitIds.Remove(unitId);
+            }
+            else
+            {
+                // No child owns the target: add it to the Automatic child.
+                casting.TargetUnitIds.Add(unitId);
+            }
+            PruneEmptyAssignment(routine, assignment);
             _save(Profile);
         }
 
@@ -262,25 +303,49 @@ namespace KingmakerBuffPlanner.UI
             RoutineProfile routine = FindRoutine(routineId);
             SourceAssignmentProfile assignment = routine.Assignments
                 .FirstOrDefault(item => item.SourceId == source.SourceId);
+            SourceAssignmentProfile parent = routine.Assignments
+                .FirstOrDefault(item => item.SourceId == source.SourceId);
+            HashSet<string> pinnedOwned = parent == null ? null : new HashSet<string>(
+                parent.CastingAssignments.Where(child => !child.IsAutomatic)
+                    .SelectMany(child => child.TargetUnitIds), StringComparer.Ordinal);
             List<string> next = selected ? Snapshot.Units
                 .Where(unit => IsTargetLegal(source, routineId, unit.UnitId))
-                .Select(unit => unit.UnitId).Distinct(StringComparer.Ordinal)
+                .Select(unit => unit.UnitId)
+                .Where(id => pinnedOwned == null || !pinnedOwned.Contains(id))
+                .Distinct(StringComparer.Ordinal)
                 .OrderBy(id => id, StringComparer.Ordinal).ToList() : new List<string>();
             if (next.Count == 0)
             {
                 if (assignment == null) return;
-                assignment.WantedTargetUnitIds = next;
-                if (assignment.SelectedEnhancementIds.Count == 0) routine.Assignments.Remove(assignment);
+                // Clearing targets clears only the Automatic child's targets:
+                // pinned routing and all enhancement intent survive.
+                foreach (CastingAssignmentProfile casting in assignment.CastingAssignments)
+                    if (casting.IsAutomatic)
+                        casting.TargetUnitIds = new List<string>();
+                PruneEmptyAssignment(routine, assignment);
                 _save(Profile);
                 return;
             }
-            if (assignment == null)
+            if (assignment != null)
             {
-                assignment = CreateAssignment(source);
-                routine.Assignments.Add(assignment);
+                // Select-all reconciles with pinned rows instead of
+                // duplicating their targets into the Automatic child.
+                CastingAssignmentProfile reconciledChild = AutomaticChild(routine, assignment, source);
+                if (reconciledChild != null)
+                {
+                    var reconciled = new List<string>(reconciledChild.TargetUnitIds
+                        .Where(id => pinnedOwned == null || !pinnedOwned.Contains(id)));
+                    foreach (string added in next.Where(id => !reconciled.Contains(id)))
+                        reconciled.Add(added);
+                    reconciledChild.TargetUnitIds = reconciled;
+                    _save(Profile);
+                    return;
+                }
             }
-            if (assignment.WantedTargetUnitIds.SequenceEqual(next, StringComparer.Ordinal)) return;
-            assignment.WantedTargetUnitIds = next;
+            CastingAssignmentProfile automatic = AutomaticChild(routine, assignment, source);
+            if (automatic == null) return;
+            if (automatic.TargetUnitIds.SequenceEqual(next, StringComparer.Ordinal)) return;
+            automatic.TargetUnitIds = next;
             _save(Profile);
         }
 
@@ -304,9 +369,11 @@ namespace KingmakerBuffPlanner.UI
         {
             SourceAssignmentProfile assignment = FindRoutine(routineId).Assignments
                 .FirstOrDefault(value => value.SourceId == SelectedSourceId);
-            return new ReadOnlyCollection<string>((assignment == null ||
-                    assignment.SelectedEnhancementIds == null ? (IEnumerable<string>)new string[0] :
-                    assignment.SelectedEnhancementIds)
+            CastingAssignmentProfile automatic = assignment == null
+                ? null : assignment.AutomaticAssignment;
+            return new ReadOnlyCollection<string>((automatic == null
+                    ? (IEnumerable<string>)new string[0]
+                    : automatic.Enhancements.Select(selection => selection.EnhancementId))
                 .OrderBy(value => value, StringComparer.Ordinal).ToList());
         }
 
@@ -367,17 +434,21 @@ namespace KingmakerBuffPlanner.UI
             RoutineProfile routine = FindRoutine(routineId);
             SourceAssignmentProfile assignment = routine.Assignments
                 .FirstOrDefault(value => value.SourceId == source.SourceId);
-            if (!string.IsNullOrWhiteSpace(enhancementId) && !GetApplicableEnhancements()
-                .Any(value => value.EnhancementId == enhancementId))
+            // Removal never requires the enhancement to be available again —
+            // an exhausted or vanished selection must stay individually
+            // removable; only adding a new selection checks applicability.
+            bool isRemoval = assignment != null && assignment.AutomaticAssignment != null &&
+                assignment.AutomaticAssignment.Enhancements.Any(selection =>
+                    selection.EnhancementId == enhancementId);
+            if (!isRemoval && !string.IsNullOrWhiteSpace(enhancementId) &&
+                !GetApplicableEnhancements()
+                    .Any(value => value.EnhancementId == enhancementId))
                 throw new InvalidOperationException("The enhancement is not currently applicable and available.");
-            if (assignment == null)
-            {
-                if (string.IsNullOrWhiteSpace(enhancementId)) return;
-                assignment = CreateAssignment(source);
-                routine.Assignments.Add(assignment);
-            }
-            var selected = new List<string>(assignment.SelectedEnhancementIds ??
-                new List<string>());
+            if (assignment == null && string.IsNullOrWhiteSpace(enhancementId)) return;
+            CastingAssignmentProfile casting = AutomaticChild(routine, assignment, source);
+            if (casting == null) return;
+            var selected = new List<string>(casting.Enhancements
+                .Select(selection => selection.EnhancementId));
             if (string.IsNullOrWhiteSpace(enhancementId)) selected.Clear();
             else if (selected.Contains(enhancementId))
                 selected.Remove(enhancementId);
@@ -396,15 +467,19 @@ namespace KingmakerBuffPlanner.UI
                     throw new InvalidOperationException(
                         "The selected enhancement combination is incompatible.");
             }
-            assignment.SelectedEnhancementIds = selected.Distinct(
-                    StringComparer.Ordinal).OrderBy(value => value,
-                        StringComparer.Ordinal).ToList();
-            assignment.WantedTargetUnitIds = assignment.WantedTargetUnitIds
-                .Where(unitId => IsTargetLegal(source, routineId, unitId))
-                .Distinct(StringComparer.Ordinal).OrderBy(value => value,
-                    StringComparer.Ordinal).ToList();
-            if (assignment.SelectedEnhancementIds.Count == 0 &&
-                assignment.WantedTargetUnitIds.Count == 0) routine.Assignments.Remove(assignment);
+            // Targets are never pruned here: an enhancement change can make a
+            // target illegal, but that intent stays configured, visible, and
+            // repairable instead of being silently dropped.
+            casting.Enhancements = selected.Distinct(StringComparer.Ordinal)
+                .Select(id => new EnhancementSelectionProfile
+                {
+                    EnhancementId = id,
+                    Required = casting.Enhancements
+                        .Where(existing => existing.EnhancementId == id)
+                        .Select(existing => existing.Required)
+                        .DefaultIfEmpty(true).First()
+                }).ToList();
+            PruneEmptyAssignment(routine, assignment);
             _save(Profile);
         }
 
@@ -421,7 +496,16 @@ namespace KingmakerBuffPlanner.UI
         internal static string EffectName(CastEnhancementSnapshot enhancement)
         {
             string value = enhancement == null ? string.Empty : enhancement.EffectDisplayName;
-            if (string.IsNullOrWhiteSpace(value) || value == "Metamagic") return "Metamagic";
+            // Defense in depth for the released numeric-label defect: a raw
+            // mask (or any digit-carrying string) never reaches player UI;
+            // the item's own name yields the descriptor instead.
+            if (!GameAdapters.CastEnhancementNaming.IsReadableName(value))
+                value = GameAdapters.CastEnhancementNaming.DeriveFromItemName(
+                    enhancement == null ? null : enhancement.DisplayName)
+                    ?? "Metamagic";
+            if (value == "Metamagic" || string.IsNullOrWhiteSpace(value) ||
+                string.Equals(value.Trim(), "Spell", StringComparison.OrdinalIgnoreCase))
+                return "Metamagic";
             if (enhancement.Category == CastEnhancementCategory.ClassFeature)
                 return value;
             return value.EndsWith(" Spell", StringComparison.OrdinalIgnoreCase)
@@ -435,35 +519,102 @@ namespace KingmakerBuffPlanner.UI
                 (enhancement.RemainingUses.Value == 1 ? " use" : " uses");
         }
 
+        // Resolves one request per child assignment so each child's pins,
+        // targets, and enhancement selections reach the resolver as that
+        // child's own cast constraints. Results keep assignment identity: a
+        // provider under two assignments appears twice with each
+        // assignment's effective targeting, never collapsed to the first.
+        // Assignment-scoped presentation (chooser availability for one
+        // child) reads this; it never mutates state.
+        // Grouping kind per discovered source (per-target vs. mass), used by
+        // the legacy importer to recognize group assignments instead of
+        // splitting them as pinned single-target children.
+        internal IDictionary<string, CastGroupingKind> SourceGroupings()
+        {
+            var result = new Dictionary<string, CastGroupingKind>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, EffectExpression> pair in _effects)
+            {
+                CastGroupingKind grouping;
+                if (pair.Value != null &&
+                    EffectExpressionTargetAnalysis.TryGetGrouping(pair.Value, out grouping))
+                    result[pair.Key] = grouping;
+            }
+            return result;
+        }
+
+        internal IReadOnlyList<AssignmentProviderOption> GetAssignmentProviderOptions(
+            SetupSourceRow source, string routineId)
+        {
+            EffectExpression expression;
+            if (!_effects.TryGetValue(source.SourceId, out expression))
+                return new ReadOnlyCollection<AssignmentProviderOption>(
+                    new List<AssignmentProviderOption>());
+            CastGroupingKind grouping;
+            if (!EffectExpressionTargetAnalysis.TryGetGrouping(expression, out grouping))
+                return new ReadOnlyCollection<AssignmentProviderOption>(
+                    new List<AssignmentProviderOption>());
+            SourceAssignmentProfile assignment = FindRoutine(routineId)
+                .Assignments.FirstOrDefault(value => value.SourceId == source.SourceId);
+            var children = new List<CastingAssignmentChild>();
+            if (assignment != null)
+            {
+                foreach (CastingAssignmentProfile child in assignment.CastingAssignments)
+                    children.Add(new CastingAssignmentChild(child.AssignmentId,
+                        child.Order, child.CasterUnitId, child.SpellbookGuid,
+                        child.ProviderKey, child.TargetUnitIds.ToList(),
+                        child.Enhancements.Select(selection =>
+                            new EnhancementRequest(selection.EnhancementId,
+                                selection.IsRequired)).ToList()));
+            }
+            else
+            {
+                // Unconfigured source: one unconstrained child so a fresh
+                // source stays legal to plan.
+                children.Add(new CastingAssignmentChild("unconfigured", 0,
+                    null, null, null, new string[0], new EnhancementRequest[0]));
+            }
+            return AssignmentEligibility.ResolveChildren(
+                new BuffSourceDefinition(source.SourceId, source.Abilities,
+                    expression, grouping),
+                assignment == null ? ExistingEffectPolicy.SkipAlreadyActive :
+                    assignment.ExistingEffectPolicy,
+                assignment == null ? (IReadOnlyCollection<string>)new string[0] :
+                    assignment.IgnoredPresenceMarkers.ToList(),
+                children, _targeting, Snapshot, _providerOptions, _enhancements);
+        }
+
+        // Source-level legality summary: a unit is legal when ANY child's own
+        // effective targeting reaches it. The first option for a provider
+        // never suppresses a later assignment's different targeting.
         public IReadOnlyList<ProviderPlanningOption> GetEffectiveProviderOptions(
             SetupSourceRow source, string routineId)
         {
             if (source == null) return new ReadOnlyCollection<ProviderPlanningOption>(
                 new List<ProviderPlanningOption>());
-            EffectExpression expression;
-            if (!_effects.TryGetValue(source.SourceId, out expression))
-                return new ReadOnlyCollection<ProviderPlanningOption>(
-                    new List<ProviderPlanningOption>());
-            SourceAssignmentProfile assignment = FindRoutine(routineId)
-                .Assignments.FirstOrDefault(value => value.SourceId ==
-                    source.SourceId);
-            CastGroupingKind grouping;
-            if (!EffectExpressionTargetAnalysis.TryGetGrouping(expression,
-                    out grouping))
-                return new ReadOnlyCollection<ProviderPlanningOption>(
-                    new List<ProviderPlanningOption>());
-            var request = new BuffCastRequest(new BuffSourceDefinition(
-                    source.SourceId, source.Abilities, expression, grouping),
-                assignment == null ? (IEnumerable<string>)new string[0] :
-                    assignment.WantedTargetUnitIds,
-                assignment == null ? ExistingEffectPolicy.SkipAlreadyActive :
-                    assignment.ExistingEffectPolicy,
-                assignment == null ? (IEnumerable<string>)new string[0] :
-                    assignment.IgnoredPresenceMarkers,
-                assignment == null ? (IEnumerable<string>)new string[0] :
-                    assignment.SelectedEnhancementIds);
-            return _targeting.Resolve(Snapshot, request, _providerOptions,
-                _enhancements);
+            var aggregated = new List<ProviderPlanningOption>();
+            var seenReach = new HashSet<string>(StringComparer.Ordinal);
+            foreach (AssignmentProviderOption candidate in GetAssignmentProviderOptions(
+                    source, routineId))
+            {
+                // Aggregate presentation reach, not executable options: two
+                // entries for one provider contribute their distinct reach
+                // sets, and neither replaces the other.
+                foreach (string unitId in candidate.Option.ReachableTargetIds)
+                    seenReach.Add(unitId);
+                aggregated.Add(candidate.Option);
+            }
+            return new ReadOnlyCollection<ProviderPlanningOption>(aggregated);
+        }
+
+        // Assignment-specific legality for the target picker: only the
+        // selected child's own resolved options decide.
+        public bool IsTargetLegalForAssignment(SetupSourceRow source,
+            string routineId, string assignmentId, string unitId)
+        {
+            if (source == null) return false;
+            return AssignmentEligibility.IsTargetLegalForAssignment(
+                GetAssignmentProviderOptions(source, routineId),
+                assignmentId, unitId);
         }
 
         private static string AggregateUsageSuffix(
@@ -605,6 +756,376 @@ namespace KingmakerBuffPlanner.UI
             _save(Profile);
         }
 
+        public IReadOnlyList<CastingAssignmentProfile> GetRoutineCastingOrder(string routineId)
+        {
+            RoutineProfile routine = FindRoutine(routineId);
+            return new ReadOnlyCollection<CastingAssignmentProfile>(routine.Assignments
+                .SelectMany(assignment => assignment.CastingAssignments)
+                .OrderBy(child => child.Order)
+                .ThenBy(child => child.AssignmentId, StringComparer.Ordinal).ToList());
+        }
+
+        public IReadOnlyList<CastingAssignmentProfile> GetCastingAssignments(
+            string routineId, string sourceId)
+        {
+            SourceAssignmentProfile assignment = FindRoutine(routineId).Assignments
+                .FirstOrDefault(value => value.SourceId == sourceId);
+            return new ReadOnlyCollection<CastingAssignmentProfile>(assignment == null
+                ? new List<CastingAssignmentProfile>()
+                : assignment.CastingAssignments
+                    .OrderBy(child => child.Order)
+                    .ThenBy(child => child.AssignmentId, StringComparer.Ordinal).ToList());
+        }
+
+        public CastingAssignmentProfile FindCastingAssignment(string routineId,
+            string sourceId, string assignmentId)
+        {
+            SourceAssignmentProfile assignment = FindRoutine(routineId).Assignments
+                .FirstOrDefault(value => value.SourceId == sourceId);
+            CastingAssignmentProfile casting = assignment == null ? null :
+                assignment.CastingAssignments.FirstOrDefault(child =>
+                    child.AssignmentId == assignmentId);
+            if (casting == null)
+                throw new ArgumentException("Unknown casting assignment.", "assignmentId");
+            return casting;
+        }
+
+        public CastingAssignmentProfile AddCastingAssignment(string routineId, string sourceId)
+        {
+            SetupSourceRow source = Sources.FirstOrDefault(value => value.SourceId == sourceId);
+            if (source == null) throw new ArgumentException("Unknown source.", "sourceId");
+            RoutineProfile routine = FindRoutine(routineId);
+            SourceAssignmentProfile assignment = routine.Assignments
+                .FirstOrDefault(value => value.SourceId == sourceId);
+            if (assignment == null)
+            {
+                assignment = CreateAssignment(source);
+                routine.Assignments.Add(assignment);
+            }
+            var casting = new CastingAssignmentProfile
+            {
+                AssignmentId = NextManualAssignmentId(routine),
+                Order = NextOrder(routine),
+                CasterUnitId = null,
+                SpellbookGuid = null,
+                ProviderKey = null,
+                TargetUnitIds = new List<string>(),
+                Enhancements = new List<EnhancementSelectionProfile>()
+            };
+            assignment.CastingAssignments.Add(casting);
+            _save(Profile);
+            return casting;
+        }
+
+        // Splits one target out of an assignment into its own Automatic
+        // child in one mutation; pins and enhancements of the original stay
+        // on the original so nothing is silently duplicated or reinterpreted.
+        public CastingAssignmentProfile SplitCastingAssignment(string routineId,
+            string sourceId, string assignmentId, string unitId)
+        {
+            RoutineProfile routine = FindRoutine(routineId);
+            SetupSourceRow source = Sources.FirstOrDefault(value => value.SourceId == sourceId);
+            if (source == null) throw new ArgumentException("Unknown source.", "sourceId");
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            if (!casting.TargetUnitIds.Contains(unitId))
+                throw new ArgumentException("Target is not configured on this assignment.", "unitId");
+            SourceAssignmentProfile parent = routine.Assignments
+                .First(value => value.SourceId == sourceId);
+            var split = new CastingAssignmentProfile
+            {
+                AssignmentId = NextManualAssignmentId(routine),
+                Order = casting.Order,
+                // Splitting divides the target list, not the configuration:
+                // pins and enhancement selections carry to the new row.
+                CasterUnitId = casting.CasterUnitId,
+                SpellbookGuid = casting.SpellbookGuid,
+                ProviderKey = casting.ProviderKey,
+                TargetUnitIds = new List<string> { unitId },
+                Enhancements = casting.Enhancements
+                    .Select(selection => new EnhancementSelectionProfile
+                    {
+                        EnhancementId = selection.EnhancementId,
+                        Required = selection.Required
+                    }).ToList()
+            };
+            casting.TargetUnitIds.Remove(unitId);
+            // The split child allocates immediately after its origin so the
+            // routine-wide order stays explicit; renumbering keeps it total.
+            parent.CastingAssignments.Insert(
+                parent.CastingAssignments.IndexOf(casting) + 1, split);
+            RenumberAssignmentOrders(routine);
+            _save(Profile);
+            return split;
+        }
+
+        // An explicit move is atomic: one save, no duplicate target left
+        // behind on the source assignment, and no silent removal when the
+        // move is refused.
+        public void MoveTargetToAssignment(string routineId, string sourceId,
+            string fromAssignmentId, string toAssignmentId, string unitId)
+        {
+            FindRoutine(routineId);
+            CastingAssignmentProfile from = FindCastingAssignment(
+                routineId, sourceId, fromAssignmentId);
+            CastingAssignmentProfile to = FindCastingAssignment(
+                routineId, sourceId, toAssignmentId);
+            if (!from.TargetUnitIds.Contains(unitId))
+                throw new ArgumentException("Target is not configured on the source assignment.", "unitId");
+            if (to.TargetUnitIds.Contains(unitId))
+                throw new ArgumentException(
+                    "Target is already explicitly assigned there; refusing to duplicate it.", "unitId");
+            from.TargetUnitIds.Remove(unitId);
+            to.TargetUnitIds.Add(unitId);
+            _save(Profile);
+        }
+
+        // Invalid or vanished targets must always be removable; removal never
+        // touches other targets, pins, or enhancements.
+        public void RemoveTargetFromAssignment(string routineId, string sourceId,
+            string assignmentId, string unitId)
+        {
+            RoutineProfile routine = FindRoutine(routineId);
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            if (!casting.TargetUnitIds.Remove(unitId)) return;
+            SourceAssignmentProfile parent = routine.Assignments
+                .First(value => value.SourceId == sourceId);
+            if (casting.IsAutomatic && casting.TargetUnitIds.Count == 0 &&
+                casting.Enhancements.Count == 0)
+                parent.CastingAssignments.Remove(casting);
+            if (parent.CastingAssignments.Count == 0)
+                routine.Assignments.Remove(parent);
+            _save(Profile);
+        }
+
+        // A pin is a hard eligibility constraint stored verbatim; setting it
+        // never rewrites targets or enhancements even when the pinned caster
+        // is currently missing, unconscious, or otherwise unavailable.
+        public void SetCastingAssignmentCaster(string routineId, string sourceId,
+            string assignmentId, string casterUnitId, string spellbookGuid)
+        {
+            FindRoutine(routineId);
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            casting.CasterUnitId = string.IsNullOrWhiteSpace(casterUnitId)
+                ? null : casterUnitId;
+            casting.SpellbookGuid = string.IsNullOrWhiteSpace(spellbookGuid)
+                ? null : spellbookGuid;
+            casting.ProviderKey = null;
+            _save(Profile);
+        }
+
+        public void SetCastingAssignmentProvider(string routineId, string sourceId,
+            string assignmentId, string providerKey)
+        {
+            FindRoutine(routineId);
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            casting.ProviderKey = string.IsNullOrWhiteSpace(providerKey)
+                ? null : providerKey;
+            casting.CasterUnitId = null;
+            casting.SpellbookGuid = null;
+            _save(Profile);
+        }
+
+        public void SetCastingAssignmentEnhancementPolicy(string routineId,
+            string sourceId, string assignmentId, string enhancementId, bool required)
+        {
+            FindRoutine(routineId);
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            EnhancementSelectionProfile selection = casting.Enhancements.FirstOrDefault(
+                value => value.EnhancementId == enhancementId);
+            if (selection == null)
+                throw new ArgumentException(
+                    "Enhancement is not configured on this assignment.", "enhancementId");
+            selection.Required = required;
+            _save(Profile);
+        }
+
+        // Assignment-scoped enhancement selection: the same exclusivity and
+        // applicability rules as the simple workflow, applied to one child
+        // assignment instead of the source's Automatic child.
+        public void SetAssignmentEnhancement(string routineId, string sourceId,
+            string assignmentId, string enhancementId)
+        {
+            SetupSourceRow source = Sources.FirstOrDefault(value => value.SourceId == sourceId);
+            if (source == null) throw new ArgumentException("Unknown source.", "sourceId");
+            FindRoutine(routineId);
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            // Removal never requires the enhancement to be available again;
+            // only adding a new selection checks current applicability.
+            bool isRemoval = casting.Enhancements.Any(selection =>
+                selection.EnhancementId == enhancementId);
+            if (!isRemoval && !string.IsNullOrWhiteSpace(enhancementId) &&
+                !GetApplicableEnhancements()
+                    .Any(value => value.EnhancementId == enhancementId))
+                throw new InvalidOperationException(
+                    "The enhancement is not currently applicable and available.");
+            var selected = new List<string>(casting.Enhancements
+                .Select(selection => selection.EnhancementId));
+            if (string.IsNullOrWhiteSpace(enhancementId)) selected.Clear();
+            else if (selected.Contains(enhancementId)) selected.Remove(enhancementId);
+            else
+            {
+                CastEnhancementSnapshot next = GetEnhancement(enhancementId);
+                selected.RemoveAll(id =>
+                {
+                    CastEnhancementSnapshot current = GetEnhancement(id);
+                    return current != null && current.ExclusiveGroupId == next.ExclusiveGroupId;
+                });
+                selected.Add(enhancementId);
+                if (!CastEnhancementSnapshot.AreCompatible(selected.Select(GetEnhancement)))
+                    throw new InvalidOperationException(
+                        "The selected enhancement combination is incompatible.");
+            }
+            casting.Enhancements = selected.Distinct(StringComparer.Ordinal)
+                .Select(id => new EnhancementSelectionProfile
+                {
+                    EnhancementId = id,
+                    Required = casting.Enhancements
+                        .Where(existing => existing.EnhancementId == id)
+                        .Select(existing => existing.Required)
+                        .DefaultIfEmpty(true).First()
+                }).ToList();
+            _save(Profile);
+        }
+
+        // Editor-side target addition/removal for one child assignment.
+        // Deselect removes from the SELECTED child only; adding a legal
+        // unassigned target assigns it to that child; a target owned by a
+        // sibling refuses with the owner named — the explicit move operation
+        // transfers it atomically. Coverage never silently disappears.
+        public void ToggleAssignmentTarget(string routineId, string sourceId,
+            string assignmentId, string unitId)
+        {
+            SetupSourceRow source = Sources.FirstOrDefault(value => value.SourceId == sourceId);
+            if (source == null) throw new ArgumentException("Unknown source.", "sourceId");
+            RoutineProfile routine = FindRoutine(routineId);
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            if (casting.TargetUnitIds.Contains(unitId))
+            {
+                casting.TargetUnitIds.Remove(unitId);
+            }
+            else
+            {
+                if (!Snapshot.Units.Any(unit => unit.UnitId == unitId))
+                    throw new ArgumentException("Unknown unit.", "unitId");
+                SourceAssignmentProfile parent = routine.Assignments
+                    .First(value => value.SourceId == sourceId);
+                CastingAssignmentProfile owner = parent.CastingAssignments
+                    .FirstOrDefault(child => child != casting &&
+                        child.TargetUnitIds.Contains(unitId));
+                if (owner != null)
+                    throw new InvalidOperationException(
+                        "Target is already assigned to " + owner.AssignmentId +
+                        ". Use Move to transfer it explicitly.");
+                if (!IsTargetLegalForAssignment(source, routineId,
+                        assignmentId, unitId))
+                    throw new InvalidOperationException(
+                        "This assignment cannot target that character.");
+                casting.TargetUnitIds.Add(unitId);
+            }
+            PruneEmptyAssignment(routine, routine.Assignments
+                .First(value => value.SourceId == sourceId));
+            _save(Profile);
+        }
+
+        public IReadOnlyList<string> GetAssignmentEnhancementIds(string routineId,
+            string sourceId, string assignmentId)
+        {
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            return new ReadOnlyCollection<string>(casting.Enhancements
+                .Select(selection => selection.EnhancementId)
+                .OrderBy(value => value, StringComparer.Ordinal).ToList());
+        }
+
+        // Cycles Automatic -> each party candidate -> Automatic. Pinning never
+        // rewrites targets or enhancements; an unavailable pin stays visible
+        // and unresolved.
+        public void CycleCastingAssignmentCaster(string routineId, string sourceId,
+            string assignmentId)
+        {
+            RoutineProfile routine = FindRoutine(routineId);
+            SetupSourceRow source = Sources.FirstOrDefault(value => value.SourceId == sourceId);
+            if (source == null) throw new ArgumentException("Unknown source.", "sourceId");
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            List<string> candidates = Snapshot.Units
+                .Where(unit => source.Providers.Any(provider =>
+                    provider.Key.CasterUnitId == unit.UnitId))
+                .Select(unit => unit.UnitId)
+                .OrderBy(unitId => unitId, StringComparer.Ordinal).ToList();
+            string current = casting.CasterUnitId;
+            string next = null;
+            if (current == null) next = candidates.Count == 0 ? null : candidates[0];
+            else
+            {
+                int index = candidates.IndexOf(current);
+                next = index < 0 || index + 1 >= candidates.Count ? null : candidates[index + 1];
+            }
+            casting.CasterUnitId = next;
+            casting.SpellbookGuid = null;
+            casting.ProviderKey = null;
+            _save(Profile);
+        }
+
+        public void RemoveCastingAssignment(string routineId, string sourceId,
+            string assignmentId)
+        {
+            RoutineProfile routine = FindRoutine(routineId);
+            SourceAssignmentProfile parent = routine.Assignments
+                .FirstOrDefault(value => value.SourceId == sourceId);
+            CastingAssignmentProfile casting = FindCastingAssignment(
+                routineId, sourceId, assignmentId);
+            parent.CastingAssignments.Remove(casting);
+            if (parent.CastingAssignments.Count == 0)
+                routine.Assignments.Remove(parent);
+            _save(Profile);
+        }
+
+        // Reordering swaps explicit order values; catalog sorting, filtering,
+        // and reopening cannot influence these numbers.
+        public void MoveCastingAssignmentEarlier(string routineId, string assignmentId)
+        {
+            MoveCastingAssignment(routineId, assignmentId, -1);
+        }
+
+        public void MoveCastingAssignmentLater(string routineId, string assignmentId)
+        {
+            MoveCastingAssignment(routineId, assignmentId, 1);
+        }
+
+        private void MoveCastingAssignment(string routineId, string assignmentId, int delta)
+        {
+            RoutineProfile routine = FindRoutine(routineId);
+            List<CastingAssignmentProfile> ordered = GetRoutineCastingOrder(routineId).ToList();
+            int index = ordered.FindIndex(child => child.AssignmentId == assignmentId);
+            if (index < 0) throw new ArgumentException("Unknown casting assignment.", "assignmentId");
+            int target = index + delta;
+            if (target < 0 || target >= ordered.Count) return;
+            CastingAssignmentProfile moved = ordered[index];
+            ordered.RemoveAt(index);
+            ordered.Insert(target, moved);
+            int order = 0;
+            foreach (CastingAssignmentProfile child in ordered) child.Order = order++;
+            _save(Profile);
+        }
+
+        private static string NextManualAssignmentId(RoutineProfile routine)
+        {
+            var used = new HashSet<string>(routine.Assignments.SelectMany(
+                assignment => assignment.CastingAssignments.Select(child => child.AssignmentId)),
+                StringComparer.Ordinal);
+            int index = 1;
+            while (used.Contains("cast-" + index)) index++;
+            return "cast-" + index;
+        }
+
         public string GetCasterDisplayName(ProviderSnapshot provider)
         {
             UnitSnapshot unit = Snapshot.Units.FirstOrDefault(u => u.UnitId == provider.Key.CasterUnitId);
@@ -733,12 +1254,70 @@ namespace KingmakerBuffPlanner.UI
             {
                 SourceId = source.SourceId,
                 Ability = AbilityKeyProfile.FromKey(source.Ability),
-                WantedTargetUnitIds = new List<string>(),
                 ExistingEffectPolicy = Profile.Execution.RecastExisting
                     ? ExistingEffectPolicy.Overwrite : ExistingEffectPolicy.SkipAlreadyActive,
                 IgnoredPresenceMarkers = new List<string>(),
-                SelectedEnhancementIds = new List<string>()
+                CastingAssignments = new List<CastingAssignmentProfile>()
             };
+        }
+
+        // The simple workflow's single Automatic child. This is the only
+        // writable copy of the simple interface's state; the source-level
+        // summaries read from the same children.
+        private CastingAssignmentProfile AutomaticChild(RoutineProfile routine,
+            SourceAssignmentProfile assignment, SetupSourceRow source)
+        {
+            if (assignment == null)
+            {
+                assignment = CreateAssignment(source);
+                routine.Assignments.Add(assignment);
+            }
+            CastingAssignmentProfile automatic = assignment.AutomaticAssignment;
+            if (automatic == null)
+            {
+                automatic = CastingAssignmentProfile.CreateAutomatic(
+                    NextAssignmentId(routine, source.SourceId), NextOrder(routine));
+                assignment.CastingAssignments.Add(automatic);
+            }
+            return automatic;
+        }
+
+        private static string NextAssignmentId(RoutineProfile routine, string sourceId)
+        {
+            // The original automatic child keeps the plain id; if it was
+            // pinned or another child already claimed it, later automatic
+            // children get a stable numeric suffix so ids stay unique.
+            var used = new HashSet<string>(routine.Assignments.SelectMany(
+                assignment => assignment.CastingAssignments.Select(child => child.AssignmentId)),
+                StringComparer.Ordinal);
+            string candidate = "auto-" + sourceId;
+            int suffix = 2;
+            while (used.Contains(candidate)) candidate = "auto-" + sourceId + "-" + suffix++;
+            return candidate;
+        }
+
+        private static int NextOrder(RoutineProfile routine)
+        {
+            int max = -1;
+            foreach (int order in routine.Assignments.SelectMany(
+                assignment => assignment.CastingAssignments.Select(child => child.Order)))
+                if (order > max) max = order;
+            return max + 1;
+        }
+
+        // An assignment with no configured intent is removed; a parent source
+        // with no children goes with it. Nothing with targets, pins, or
+        // enhancements is ever removed automatically.
+        private static void PruneEmptyAssignment(RoutineProfile routine,
+            SourceAssignmentProfile assignment)
+        {
+            if (assignment == null) return;
+            foreach (CastingAssignmentProfile child in assignment.CastingAssignments
+                .Where(value => value.IsAutomatic && value.TargetUnitIds.Count == 0 &&
+                    value.Enhancements.Count == 0).ToList())
+                assignment.CastingAssignments.Remove(child);
+            if (assignment.CastingAssignments.Count == 0)
+                routine.Assignments.Remove(assignment);
         }
 
         private static string AggregateId(AbilityKey ability,
@@ -802,23 +1381,37 @@ namespace KingmakerBuffPlanner.UI
                         rebound.Add(assignment);
                         continue;
                     }
-                    existing.WantedTargetUnitIds = existing.WantedTargetUnitIds
-                        .Concat(assignment.WantedTargetUnitIds).Distinct(StringComparer.Ordinal)
-                        .OrderBy(item => item, StringComparer.Ordinal).ToList();
+                    // Duplicate sources consolidate by merging their child
+                    // casting assignments; child identities and relative
+                    // orders survive so no configured cast is regenerated.
+                    existing.CastingAssignments.AddRange(assignment.CastingAssignments);
                     existing.IgnoredPresenceMarkers = existing.IgnoredPresenceMarkers
                         .Concat(assignment.IgnoredPresenceMarkers).Distinct(StringComparer.Ordinal)
                         .OrderBy(item => item, StringComparer.Ordinal).ToList();
-                    existing.SelectedEnhancementIds = (existing.SelectedEnhancementIds ?? new List<string>())
-                        .Concat(assignment.SelectedEnhancementIds ?? new List<string>())
-                        .Distinct(StringComparer.Ordinal).OrderBy(item => item, StringComparer.Ordinal).ToList();
                     if (assignment.ExistingEffectPolicy == ExistingEffectPolicy.Overwrite)
                         existing.ExistingEffectPolicy = ExistingEffectPolicy.Overwrite;
                     changed = true;
                     routineChanged = true;
                 }
-                if (routineChanged) routine.Assignments = rebound;
+                if (routineChanged)
+                {
+                    RenumberAssignmentOrders(routine);
+                    routine.Assignments = rebound;
+                }
             }
             return changed;
+        }
+
+        // Re-establishes a unique routine-wide total order after merges while
+        // preserving the previous relative order wherever it was unambiguous.
+        private static void RenumberAssignmentOrders(RoutineProfile routine)
+        {
+            int order = 0;
+            foreach (CastingAssignmentProfile casting in routine.Assignments
+                .SelectMany(assignment => assignment.CastingAssignments)
+                .OrderBy(child => child.Order)
+                .ThenBy(child => child.AssignmentId, StringComparer.Ordinal))
+                casting.Order = order++;
         }
 
         private SetupSourceRow ResolveUnambiguousVariant(SourceAssignmentProfile assignment)

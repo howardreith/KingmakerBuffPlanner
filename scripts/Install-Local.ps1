@@ -28,11 +28,14 @@ function Assert-KbpPlannerPrimaryIdentity([string]$Path, [string]$ExpectedVersio
     }
     $info = Read-KbpJson $infoPath
     $assemblyName = [Reflection.AssemblyName]::GetAssemblyName($dllPath)
+    # Same derivation the source gate enforces: a prerelease like 0.1.1-rc2
+    # carries CLR assembly version 0.1.1.0 (numeric base + .0).
+    $numericExpected = ($ExpectedVersion -split '-')[0] + '.0'
     if ($info.Id -cne 'KingmakerBuffPlanner' -or
         $info.AssemblyName -cne 'KingmakerBuffPlanner.dll' -or
         $info.Version -cne $ExpectedVersion -or
         $assemblyName.Name -cne 'KingmakerBuffPlanner' -or
-        $assemblyName.Version.ToString() -cne ($ExpectedVersion + '.0')) {
+        $assemblyName.Version.ToString() -cne $numericExpected) {
         throw "Planner installation identity/version is invalid at $Path."
     }
 }
@@ -57,6 +60,7 @@ if ((Get-KbpSha256 $package) -cne [string]$release.packageSha256) {
 if (-not $KingmakerInstallDir) { $KingmakerInstallDir = Get-KbpGamePath }
 $game = (Resolve-Path -LiteralPath $KingmakerInstallDir).Path
 Assert-KbpNotRunning
+Assert-KbpNoForeignRuntimeLease
 if (@(Get-Process -Name UnityModManager -ErrorAction SilentlyContinue).Count -ne 0) {
     throw 'Unity Mod Manager is running.'
 }
@@ -84,6 +88,7 @@ foreach ($path in @($stateRoot, $stageRoot, $backupRoot, $evidenceRoot)) {
     if (Test-Path -LiteralPath $path) { throw "Install-owned path already exists: $path" }
 }
 New-KbpOwnedLock $lockPath $InstallId $token
+Confirm-KbpLockedWithoutForeignLease -LockPath $lockPath -RunId $InstallId -Token $token
 New-Item -ItemType Directory -Path $stateRoot, $backupRoot, $evidenceRoot | Out-Null
 $statePath = Join-Path $stateRoot 'install.json'
 $backupPlanner = Join-Path $backupRoot 'KingmakerBuffPlanner.prior'
