@@ -1,47 +1,40 @@
 # Kingmaker Buff Planner
 
-**Release:** `0.1.1-rc1` (testing preview) adds precise casting assignments (pinned casters, explicit
-targets and enhancements per assignment), one authoritative resource
-allocation result with a Casting Order view, explicit partial-apply control,
-a spellbook entry button, and an overflow-free enhancement chooser. Profiles
-migrate automatically from older versions.
+**Release:** `0.2.0` — the casting-first planner: plan every cast explicitly
+(caster, exact spell source, target, enhancements), with autosave and
+one-click Long / Important / Short routines from the HUD. See the
+[0.2.0 release notes](docs/RELEASE-NOTES-DRAFT.md) and the
+[player guide](docs/CASTING-FIRST-PLAYER-GUIDE.md).
 
 Kingmaker Buff Planner is a standalone Unity Mod Manager mod for **Pathfinder:
 Kingmaker Enhanced Plus Edition 2.1.7b**.
 
-It provides a BubbleBuffs-style workflow for discovering, configuring,
-planning, and applying party buffs while preserving Kingmaker targeting,
+It plans and applies party buffs while preserving Kingmaker targeting,
 spell-slot, resource, duration, material-component, and metamagic semantics. It
 is an independent product with assembly, namespace, UMM ID, profiles,
 packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.0.16.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.2.0.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
-Install the ZIP through Unity Mod Manager, or extract its single
-`KingmakerBuffPlanner` directory into Kingmaker's `Mods` directory so the final
-layout includes:
+Back up your existing `Mods\KingmakerBuffPlanner` folder (including
+`UserSettings`) outside `Mods` first. Then install the ZIP through Unity Mod
+Manager, or extract its single `KingmakerBuffPlanner` directory into
+Kingmaker's `Mods` directory so the final layout includes:
 
 ```text
 Mods\KingmakerBuffPlanner\Info.json
 Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll
 ```
 
-Load a campaign, then use Ctrl+Shift+B, the lower-left planner controls, or
-the Buff Planner button in the spellbook window. Existing profiles migrate
-automatically the first time they load; the exact pre-migration original is
-archived beside the profile as `kbp-pre-schema-<id>.orig`.
-
-The simple workflow is unchanged: pick a buff, click portraits, Apply. For
-finer control use the header's Order button to open Casting Order & Resources:
-numbered assignments with Earlier/Later controls, per-pool resource
-accounting, and a combined forecast across selected routines. When a routine
-cannot cover every requested target, Apply explains the gap and offers Apply
-Ready Casts Only as the explicit way to run the ready subset.
-Configure Long, Important, and Short routines in the setup window and preview
-resource and target diagnostics before running them.
+Load a campaign, then open the planner with the HUD's gear button or
+Ctrl+Shift+B. Pick a buff, a caster and its exact source, then click the
+recipient: each line is one cast, and every edit saves itself. The HUD's
+moon, diamond and sun buttons run the Long, Important and Short routines
+with one click. A classic plan from an earlier version is imported once on
+first open; the original file is kept unchanged and archived beside it.
 
 Detailed instructions and qualification boundaries are in
 [Installation and Use](docs/INSTALLATION-AND-USE.md),
@@ -51,18 +44,20 @@ Detailed instructions and qualification boundaries are in
 ## Features
 
 - Structural native and optional-mod buff discovery.
-- Long, Important, and Short routine configuration.
-- Direct portrait assignment and deterministic resource-aware planning.
-- Animated and Instant execution engines.
-- Provider consolidation with automatic caster/resource selection.
-- Metamagic-rod and fail-soft Brown-Fur Powerful Change / Share Transmutation
-  discovery with a visible enhancement chooser. A compatible provider's
-  versioned direct-cast contract supports Instant Share; older providers retain
-  safe Animated execution.
-- Four-column vertical catalog with real blueprint icons, search, categories,
-  and routine-local **Selected only**.
-- Player-facing selected, covered, unavailable, invalid, and neutral target
-  states.
+- Casting-first planning: each casting is one cast with its own caster, exact
+  spell source, target or group origin, and enhancements, shown as a
+  continuous caster -> casting -> recipient graph.
+- Autosave persistence (no Save or Accept step) with explained recovery when a
+  save cannot be written.
+- One-click Long, Important, and Short routines from the HUD, with Stop.
+- Plan-wide resource accounting (spell slots, rod uses, class-feature pools)
+  with all-or-nothing reservation.
+- Instant (default) and Animated execution engines.
+- Metamagic rods and Brown-Fur Powerful Change / Share Transmutation (via the
+  KingmakerGunslinger mod, fail-soft when absent), offered only where they are
+  meaningful.
+- Right-click the game's own full spell descriptions.
+- One-time import of classic plans, with the original archived.
 - External profile persistence with no save-owned mod content.
 - Optional, read-only Call of the Wild and gameplay-mod compatibility inputs.
 
