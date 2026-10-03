@@ -30,3 +30,22 @@ Published on the owner's instruction ("make this a full official release").
   release were created directly from the in-game-checked build.
 
 The private draft release 399014941 (preview assets) is unchanged.
+
+## 0.3.0 (same day): renumbered for Unity Mod Manager
+
+Unity Mod Manager 0.33.0 parses a version by removing every non-digit from
+each dot-separated part (regex `\D`, read from its UnityModManager.dll), so
+`0.2.0-rc6` reads as 0.2.6 and outranked 0.2.0. 0.3.0 outranks every earlier
+release.
+
+| Item | Value |
+| --- | --- |
+| Release | https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.3.0 (Latest, not a prerelease) |
+| Tag | `v0.3.0` (annotated) -> `b707c1f47859f2ecae517b2cd162d20ca18c7583` (main) |
+| Asset | `KingmakerBuffPlanner-0.3.0.zip`, SHA-256 `c66b355d3b0520af5ed31acbb3059ed04bd4f712b21e8f2a5d63ba2824b583c2`; Info.json Version 0.3.0 |
+| DLL SHA-256 / MVID | `df6853a0d6b5c3553f09c6491ceddd230e31621933eb0a8373d045fe16189a6d` / `d2d57f6c-eda7-4679-90f9-56416816d00b` |
+| Checks | Build-Local at b707c1f (source validation 42/42, Release build, package validation 4/4); downloaded back and checksum-verified |
+
+Code is identical to 0.2.0 apart from the version surfaces (KbpVersion,
+assembly/file version 0.3.0.0, Info.json) and docs. At the owner's request no
+further gate or in-game run was made for the renumbering.
