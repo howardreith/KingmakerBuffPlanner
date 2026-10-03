@@ -1,63 +1,56 @@
-# AUTONOMOUS RESUME — updated 2026-10-02 evening (Claude takeover, r14 batch)
+# AUTONOMOUS RESUME — updated 2026-10-03 early morning (Claude takeover, r15 next)
 
 ## Where the work stands
 
-- Tested source candidate: branch `codex/kingmaker-buff-planner-everyday-use`,
-  commit `bff840a220e561016a8ee9ffbfdfc34b47554e42` (9 commits on top of the
-  pushed `49c8917`). Full mandatory gate at that exact tree:
-  `artifacts/gate-bff840a.log`. (The gate at 9b788e8,
-  `artifacts/gate-9b788e8.log`, FAILED at the launcher WhatIf meta-check that
-  still pinned six gestures; bff840a pins seven. Every stage was then run
-  standalone at bff840a before the full gate reran.)
-- Candidate package (Build-Local at bff840a, `artifacts/build-local-bff840a.log`):
-  package `24f404ea25faf959569463dbbfbcacd65227e4a39bf38ff82bcf2d5502dacf41`,
-  DLL `75b3ac48d4a95014cca2ae611cb1a894d5c7b1966512df176c771a3c445a99e7`,
-  MVID `de7526c7-4f5c-4cd6-b1db-ff7567161628`; frozen with verified bytes
-  under `runtime-backups/qualification-frozen/bff840a2.../FREEZE.json`.
-- The main checkout (`C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner`)
-  MUST stay at bff840a and clean while the r14 batch runs (the dispatcher
-  refuses any other HEAD).
-- Records are written on the local branch
-  `codex/kingmaker-buff-planner-everyday-use-records` in the scratch worktree
-  (`...\scratchpad\records-wt`) and are fast-forwarded onto the main branch
-  only after the batch: `git merge --ff-only codex/kingmaker-buff-planner-everyday-use-records`
-  in the main checkout, then push through the guarded helper
-  `C:\Dev\KingmakerBuffPlannerLab\codex-policy\Push-KingmakerBuffPlanner.ps1`
-  (fast-forward only; `scripts/Test-GuardedPush.ps1` is its WhatIf test).
+- Candidate under the gate: branch `codex/kingmaker-buff-planner-everyday-use`,
+  commit `8d7681d03752f3f7170f25f7d45029f71c46a884` (pushed head is `bff840a`;
+  648608f and 8d7681d are local until their gate passes). Full gate log:
+  `artifacts/gate-8d7681d.log` (~4 h: four lab-wide purity windows).
+- Build-Local at 8d7681d (`artifacts/build-local-8d7681d.log`): package
+  `5b24e2eafee69b18898894b6e9a5cfb9b2c8e625a561494cb2234766097d8d17`, DLL
+  `deee7b1de54daee9e890f6680c8e0d4db09674b12c394e2d2d6c2d3e460cf65b`, MVID
+  `1e762004-8200-430e-853e-d61456a627ae`. Freeze it after the gate passes
+  (scratchpad `freeze-candidate.ps1 -Commit <sha> -Purpose ...`).
+- Records are on the local branch `codex/kingmaker-buff-planner-everyday-use-records`
+  in the scratch worktree `...\scratchpad\records-wt`; fast-forward the main
+  branch onto it only when no batch is running.
 
-## r13 (prior build 3c1c5d4, evidence labelled prior-build)
+## Batches so far
 
-24 done + verified, 2 failed-reconciled, 15 deferred (dispatch/jobs.r13-final.json):
-- `ui-phys-select` (beta-3c1c5d4ar13-phys-sel-01): in-game PASS, launcher judge
-  threw on the absent `expectedScreen` (repaired a6c8b95).
-- `ui-windowed` (beta-3c1c5d4ar13-w1080-01): every product assertion PASS,
-  hover sweeps 8-10 missed - harness H1 (letterboxed 1920x1080 surface on
-  the owner's new 1920x1200 RDP desktop; repaired 9b788e8). Also H2: every
-  "windowed" run reports fullScreen=True (labelled fullscreen; not repaired).
-- Share chains deferred: the r13 harness could not run them (repaired 45c46c6).
-- Defects found by source/evidence reading and repaired before r14: D1-D11
-  (see the journal checkpoint; D11 = the right-click description panel never
-  rendered - E05/E06 were wrongly marked PASS before).
+- r13 (3c1c5d4): 24 done (prior-build), phys-sel and w1080 failed-reconciled
+  (launcher judge expectedScreen; H1 letterbox mapping), 15 deferred.
+- r14 (bff840a, gate PASS `artifacts/gate-bff840a.log`, pushed): done and
+  verified - reload-01, phys-sel-01, imp-01, insp-shared-personal,
+  sel-shared-personal, insp-finite. Failed-reconciled - allow-phys (H3: the
+  cf-physical writer demanded the pre-v1.2 seed note), cast-shared-personal-
+  instant (H4: the shared-personal purpose was 441 chars, the launcher bound
+  is 400; refused in preflight, nothing staged). The phys-sel frames showed
+  D12 (description titled "heighten-0") and D13 (the graph never overflowed,
+  so physical graph scrolling was never demonstrated in any run). r14 was
+  stopped between jobs (owner-pause hold, removed) and its remaining 32 jobs
+  deferred so every native result is produced on the repaired candidate.
+- Repairs since bff840a: 648608f (D12, D13, H3, exact Long grant cap),
+  8d7681d (H4). Each has regressions; protocol 398, the WhatIf writer section
+  now covers cf-physical and both shared recipes.
 
 ## The exact next action
 
-1. Watch the r14 batch (`dispatch/jobs.json`, run IDs `beta-bff840a2r14-*`):
-   `powershell -NoProfile -ExecutionPolicy Bypass -File
-   C:\Dev\KingmakerBuffPlannerLab\dispatch\dispatcher.ps1` in the dispatch
-   folder (waits for 3 min owner idle, honours `dispatch\owner-pause`).
-2. On a failure: preserve evidence, confirm restoration (tx Restored, no
-   locks, no Kingmaker, protected saves clean), diagnose from the record,
-   smallest repair + regression, full gate, Build-Local, freeze, rebuild jobs
-   with a fresh suffix, rerun affected chains only.
-3. After the batch: fill docs/E01-E27-ACCEPTANCE-MATRIX.md (ORIGINAL row
-   definitions from the v1.2 handoff 03_ACCEPTANCE_MATRIX.md), the guide,
-   journal, QUALIFICATION/IMPLEMENTATION-REPORT/MANUAL-ACCEPTANCE, then
-   fast-forward and push through the guarded helper.
-4. Private delivery: draft release 399014941 (tag
-   v0.2.0-rc6-casting-graph-preview, stays a draft). Re-verify the prior
-   asset `KingmakerBuffPlanner-0.2.0-rc6-casting-graph+ec34705c.zip`
-   (214b795b...8b20564) unchanged; upload the frozen bytes as
-   `KingmakerBuffPlanner-0.2.0-rc6-everyday-use-v1.2+bff840a2.zip`; download
-   back and verify size, package SHA-256, DLL SHA-256 inside, MVID,
-   manifest commit; update the draft notes (template in the scratchpad:
-   release-notes-v12.template.md).
+1. When `artifacts/gate-8d7681d.log` ends with `gate exit=0`: push through the
+   guarded helper, freeze 8d7681d, build r15 with
+   `dispatch\build-jobs.ps1 -Commit <sha> -PackageHash <PKG upper> -Suffix r15`
+   (scratchpad `build-r14.ps1` shows the checks; copy it with the new suffix),
+   and start `dispatch\dispatcher.ps1` (operator stop = a `stop` file in the
+   dispatch folder; `owner-pause` is the owner's hold).
+2. On a failure: preserve evidence, confirm restoration (tx Restored, no locks,
+   no Kingmaker, protected saves clean), diagnose, smallest repair +
+   regression, full gate, freeze, rebuild with a fresh suffix.
+3. After r15: matrix on the ORIGINAL E01-E27 rows (handoff
+   03_ACCEPTANCE_MATRIX.md), guide (draft in records-wt), journal (draft in the
+   scratchpad), QUALIFICATION / IMPLEMENTATION-REPORT / MANUAL-ACCEPTANCE,
+   fast-forward and push.
+4. Private delivery to draft release 399014941 (stays a draft): re-verify the
+   prior asset `KingmakerBuffPlanner-0.2.0-rc6-casting-graph+ec34705c.zip`
+   (sha256 214b795b...8b20564), upload the frozen bytes as
+   `KingmakerBuffPlanner-0.2.0-rc6-everyday-use-v1.2+<commit8>.zip`, download
+   back, verify with scratchpad `verify-zip.ps1`, update the draft notes
+   (template `release-notes-v12.template.md`).
