@@ -637,3 +637,39 @@ The no-save native-only and exact Call of the Wild load/catalog/Harmony portions
    opens, and HUD/hotkey still working.
 7. Load a pre-0.1.0 profile: configuration survives verbatim; the original is
    archived as `kbp-pre-schema-<id>.orig`; reloading does not regenerate IDs.
+
+## Everyday-use v1.2 private preview — self-paced owner trial (pending)
+
+Build: source commit `8d7681d03752f3f7170f25f7d45029f71c46a884`, package
+`5b24e2eafee69b18898894b6e9a5cfb9b2c8e625a561494cb2234766097d8d17`, DLL
+`deee7b1de54daee9e890f6680c8e0d4db09674b12c394e2d2d6c2d3e460cf65b`, MVID
+`1e762004-8200-430e-853e-d61456a627ae`. Nothing below has been performed by
+the owner yet; the guarded runs that cover each step are listed in
+`docs/E01-E27-ACCEPTANCE-MATRIX.md`.
+
+1. Archive the current `Mods\KingmakerBuffPlanner` (with `UserSettings`)
+   outside `Mods`, install the preview ZIP, copy `UserSettings` back, and
+   confirm the UMM log's `[KBP-BOOT]` line names commit `8d7681d0`.
+2. Open the planner (gear button or Ctrl+Shift+B) in the default Instant
+   mode and scroll the casting area: one continuous parchment, no fold.
+3. Right-click a buff (list row, header or casting card): the full game
+   description of that exact spell opens; the wheel scrolls it; Escape
+   closes it, then Escape closes the planner without opening the game menu.
+4. With the Brown-Fur Transmuter: pick the exact caster and source, choose
+   "Share with an ally" before the target, then click an ally.
+5. Add an enhanced personal transmutation for that ally (for example
+   Powerful Change) and read the combined cost in the footer.
+6. Change a setting or a casting, then close the planner. There is no Save
+   or Accept step; the footer said "Saved".
+7. Restart the game (or reload the save) and reopen: the plan is exactly as
+   left.
+8. Close the planner and click the moon once: Long runs - only Long, once -
+   with the planner closed; check the effects and the spent resources
+   against the footer's numbers; nothing else changes afterwards.
+9. Repeat the moon: castings whose buff is still active are skipped.
+10. Roll back by restoring the archived folder; the earlier plans return,
+    and the preview's plans remain recoverable from its archived
+    `UserSettings`.
+
+Report anything that feels like a ceremony step, any wrong cost, any
+effect on the wrong unit, or any leftover Share state as a defect.
