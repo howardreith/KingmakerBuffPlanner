@@ -23,7 +23,8 @@ namespace KingmakerBuffPlanner.Execution
         FailedSubmission,
         FailedExecution,
         TimedOutUnconfirmed,
-        ResidualStateUnsettled
+        ResidualStateUnsettled,
+        ExecutorSelected
     }
 
     public sealed class CastExecutionRecord
@@ -32,16 +33,21 @@ namespace KingmakerBuffPlanner.Execution
         {
             StepIndex = stepIndex;
             SourceId = step.SourceId;
+            AssignmentId = step.AssignmentId;
             ProviderKey = step.Provider.Canonical;
             AbilityKey = step.Provider.Ability.Canonical;
             CasterUnitId = step.Provider.CasterUnitId;
             TargetUnitIds = new ReadOnlyCollection<string>(step.TargetUnitIds.ToList());
             ExpectedRecipientUnitIds = new ReadOnlyCollection<string>(
                 step.ExpectedRecipientUnitIds.ToList());
+            PreCoveredRecipientUnitIds = new ReadOnlyCollection<string>(
+                step.PreCoveredRecipientUnitIds.ToList());
             ResourcePoolKey = step.Reservation == null ? string.Empty : step.Reservation.PoolKey;
             ResourceTokenIds = new ReadOnlyCollection<string>(step.Reservation == null
                 ? new List<string>() : step.Reservation.TokenIds.ToList());
             EnhancementIds = new ReadOnlyCollection<string>(step.EnhancementIds.ToList());
+            OmittedEnhancementIds = new ReadOnlyCollection<string>(
+                step.OmittedEnhancementIds.ToList());
             ExecutionStrategy = step.ExecutionStrategy;
             ExecutionStrategyReason = step.ExecutionStrategyReason;
             Status = status;
@@ -50,14 +56,17 @@ namespace KingmakerBuffPlanner.Execution
 
         public int StepIndex { get; private set; }
         public string SourceId { get; private set; }
+        public string AssignmentId { get; private set; }
         public string ProviderKey { get; private set; }
         public string AbilityKey { get; private set; }
         public string CasterUnitId { get; private set; }
         public IReadOnlyList<string> TargetUnitIds { get; private set; }
         public IReadOnlyList<string> ExpectedRecipientUnitIds { get; private set; }
+        public IReadOnlyList<string> PreCoveredRecipientUnitIds { get; private set; }
         public string ResourcePoolKey { get; private set; }
         public IReadOnlyList<string> ResourceTokenIds { get; private set; }
         public IReadOnlyList<string> EnhancementIds { get; private set; }
+        public IReadOnlyList<string> OmittedEnhancementIds { get; private set; }
         public CastExecutionStrategy ExecutionStrategy { get; private set; }
         public string ExecutionStrategyReason { get; private set; }
         public CastExecutionStatus Status { get; private set; }
@@ -90,6 +99,19 @@ namespace KingmakerBuffPlanner.Execution
         public int Confirmed { get { return _records.Count(r => r.Status == CastExecutionStatus.EffectConfirmed); } }
         public int SuccessfullyObserved { get { return Confirmed; } }
         public int ResourcesSpent { get { return _records.Count(r => r.Status == CastExecutionStatus.ResourceSpent); } }
+        // Whether any cast was put to the game (queued, submitted, started,
+        // spent or confirmed) - the animated executor queues and starts,
+        // the instant one submits.
+        public bool AnyCastAttempted
+        {
+            get
+            {
+                return _records.Any(r => r.Status == CastExecutionStatus.Queued ||
+                    r.Status == CastExecutionStatus.Submitted || r.Status == CastExecutionStatus.CastStarted ||
+                    r.Status == CastExecutionStatus.SpendInvoked || r.Status == CastExecutionStatus.ResourceSpent ||
+                    r.Status == CastExecutionStatus.EffectConfirmed);
+            }
+        }
         public int Failed
         {
             get
@@ -132,6 +154,10 @@ namespace KingmakerBuffPlanner.Execution
         bool Succeeded { get; }
         bool EffectsObserved { get; }
         bool ResourceSpent { get; }
+        // Null when the game's counts are what the reservation needs (a free
+        // one unlimited and unchanged, a finite one read on both sides),
+        // else why they are not (review A7 and its re-review).
+        string ResourceCountViolation { get; }
         bool HasResidualDeliveryState { get; }
         string Detail { get; }
     }
@@ -143,26 +169,55 @@ namespace KingmakerBuffPlanner.Execution
         IAnimatedCastOperation StartAnimated(CastStep step);
     }
 
+    // R579-2: what a native enhancement lease reports after its cleanup ran:
+    // empty when every owned native state was verified restored to its
+    // policy-expected value. Reading it AFTER Dispose is the contract.
+    public interface IEnhancementCleanupOutcome
+    {
+        string CleanupFailure { get; }
+    }
+
     public sealed class CastEnhancementPreparation : IDisposable
     {
-        private CastEnhancementPreparation(bool valid, string reason, IDisposable lease)
+        private CastEnhancementPreparation(bool valid, string reason, IDisposable lease,
+            string cleanupFailure)
         {
             Valid = valid;
             Reason = reason ?? string.Empty;
             _lease = lease;
+            _cleanupFailure = cleanupFailure ?? string.Empty;
         }
 
         private readonly IDisposable _lease;
+        private readonly string _cleanupFailure;
         public bool Valid { get; private set; }
         public string Reason { get; private set; }
         public static CastEnhancementPreparation Pass(IDisposable lease)
         {
-            return new CastEnhancementPreparation(true, string.Empty, lease);
+            return new CastEnhancementPreparation(true, string.Empty, lease, null);
         }
-        public static CastEnhancementPreparation Fail(string reason)
+
+        // C853-2A: a FAILED preparation also carries the observable cleanup
+        // outcome of the native lease it already disposed - partial setup is
+        // cleaned up, and that cleanup's own result must not vanish.
+        public static CastEnhancementPreparation Fail(string reason,
+            string cleanupFailure = null)
         {
-            return new CastEnhancementPreparation(false, reason, null);
+            return new CastEnhancementPreparation(false, reason, null, cleanupFailure);
         }
+        // R579-2: the observable cleanup outcome of the disposed lease
+        // (empty when the lease is absent or verified everything clean).
+        public string CleanupFailure
+        {
+            get
+            {
+                if (_cleanupFailure.Length != 0) return _cleanupFailure;
+                IEnhancementCleanupOutcome outcome = _lease as
+                    IEnhancementCleanupOutcome;
+                return outcome == null ? string.Empty : outcome.CleanupFailure;
+            }
+        }
+
         public void Dispose()
         {
             if (_lease != null) _lease.Dispose();
@@ -189,7 +244,7 @@ namespace KingmakerBuffPlanner.Execution
 
         public InstantCastResult(bool submitted, bool succeeded,
             bool effectsObserved, bool resourceSpent, bool spendInvoked,
-            string detail)
+            string detail, string resourceCountViolation = null)
         {
             Submitted = submitted;
             Succeeded = succeeded;
@@ -197,6 +252,7 @@ namespace KingmakerBuffPlanner.Execution
             ResourceSpent = resourceSpent;
             SpendInvoked = spendInvoked;
             Detail = detail ?? string.Empty;
+            ResourceCountViolation = resourceCountViolation;
         }
         public bool Submitted { get; private set; }
         public bool Succeeded { get; private set; }
@@ -204,6 +260,8 @@ namespace KingmakerBuffPlanner.Execution
         public bool ResourceSpent { get; private set; }
         public bool SpendInvoked { get; private set; }
         public string Detail { get; private set; }
+        // As IAnimatedCastOperation.ResourceCountViolation (review A7).
+        public string ResourceCountViolation { get; private set; }
     }
 
     public sealed class InstantCastCompletion

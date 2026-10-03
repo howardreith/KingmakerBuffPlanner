@@ -42,9 +42,26 @@ namespace KingmakerBuffPlanner.Execution
                     report.Add(index, step, CastExecutionStatus.FailedValidation, "combat-policy");
                     continue;
                 }
+                if (step.Reservation == null || !step.Reservation.CostKnown)
+                {
+                    // Review M1: an unknown cost is never treated as free.
+                    report.Add(index, step, CastExecutionStatus.FailedValidation,
+                        "reservation-cost-unknown");
+                    continue;
+                }
                 CastEnhancementPreparation enhancement = Prepare(step);
                 if (!enhancement.Valid)
                 {
+                    // C853-2A: the rejected cast is never attempted, and a
+                    // partially-set-up native state's own cleanup outcome
+                    // stays observable: residual state halts later casts.
+                    if (enhancement.CleanupFailure.Length != 0)
+                    {
+                        priorTransactionUnsettled = true;
+                        report.Add(index, step,
+                            CastExecutionStatus.ResidualStateUnsettled,
+                            "enhancement-cleanup-failed:" + enhancement.CleanupFailure);
+                    }
                     report.Add(index, step, CastExecutionStatus.FailedValidation,
                         "enhancement-unavailable:" + enhancement.Reason);
                     continue;
@@ -60,6 +77,14 @@ namespace KingmakerBuffPlanner.Execution
                 if (!validation.Valid)
                 {
                     enhancement.Dispose();
+                    if (enhancement.CleanupFailure.Length != 0)
+                    {
+                        priorTransactionUnsettled = true;
+                        report.Add(index, step,
+                            CastExecutionStatus.ResidualStateUnsettled,
+                            "enhancement-cleanup-failed:" +
+                            enhancement.CleanupFailure);
+                    }
                     report.Add(index, step, CastExecutionStatus.FailedValidation,
                         validation.Reason);
                     continue;
@@ -69,6 +94,14 @@ namespace KingmakerBuffPlanner.Execution
                 catch (Exception exception)
                 {
                     enhancement.Dispose();
+                    if (enhancement.CleanupFailure.Length != 0)
+                    {
+                        priorTransactionUnsettled = true;
+                        report.Add(index, step,
+                            CastExecutionStatus.ResidualStateUnsettled,
+                            "enhancement-cleanup-failed:" +
+                            enhancement.CleanupFailure);
+                    }
                     report.Add(index, step, CastExecutionStatus.FailedSubmission,
                         "start-exception:" + exception.GetType().FullName + ":" + exception.Message);
                     continue;
@@ -76,11 +109,21 @@ namespace KingmakerBuffPlanner.Execution
                 if (operation == null)
                 {
                     enhancement.Dispose();
+                    if (enhancement.CleanupFailure.Length != 0)
+                    {
+                        priorTransactionUnsettled = true;
+                        report.Add(index, step,
+                            CastExecutionStatus.ResidualStateUnsettled,
+                            "enhancement-cleanup-failed:" +
+                            enhancement.CleanupFailure);
+                    }
                     report.Add(index, step, CastExecutionStatus.FailedSubmission, "operation-null");
                     continue;
                 }
                 Exception cleanupFailure = null;
                 Exception operationFailure = null;
+                bool operationBodyCompleted = false;
+                string enhancementCleanupDetail = null;
                 try
                 {
                     report.Add(index, step, CastExecutionStatus.Queued, "animated-command-queued");
@@ -135,6 +178,20 @@ namespace KingmakerBuffPlanner.Execution
                                 report.Add(index, step,
                                     CastExecutionStatus.ResourceSpent,
                                     "native-command-spend-completed");
+                            if (operation.ResourceSpent && step.Reservation.Unlimited)
+                                report.Add(index, step,
+                                    CastExecutionStatus.FailedExecution,
+                                    "unexpected-resource-spent-on-unlimited-source;" +
+                                    operation.Detail);
+                            else if (operation.ResourceCountViolation != null)
+                                // Review A7: counts that do not show what the
+                                // reservation needs are uncertainty, never
+                                // success.
+                                report.Add(index, step,
+                                    CastExecutionStatus.FailedExecution,
+                                    AvailableCountJudgement.PrefixFor(step.Reservation) +
+                                    operation.ResourceCountViolation + ";" +
+                                    operation.Detail);
                         }
                         catch (Exception exception)
                         { operationFailure = exception; }
@@ -145,6 +202,7 @@ namespace KingmakerBuffPlanner.Execution
                             "animated-operation-exception:" +
                             operationFailure.GetType().FullName + ":" +
                             operationFailure.Message);
+                    operationBodyCompleted = true;
                 }
                 finally
                 {
@@ -153,10 +211,63 @@ namespace KingmakerBuffPlanner.Execution
                     {
                         cleanupFailure = exception;
                     }
-                    finally { enhancement.Dispose(); }
+                    finally
+                    {
+                        enhancement.Dispose();
+                        // R736-2: on a disposal-only exit (cancellation,
+                        // deadline, teardown - the code after this block
+                        // never runs) the enhancement outcome is REPORTED
+                        // here, never merely captured: the unsettled native
+                        // state detail survives the iterator's death next
+                        // to the interruption record. Clearing the detail
+                        // after reporting keeps normal completion from
+                        // double-reporting in the post-block.
+                        enhancementCleanupDetail =
+                            enhancement.CleanupFailure.Length == 0
+                                ? null : enhancement.CleanupFailure;
+                        if (!operationBodyCompleted && enhancementCleanupDetail != null)
+                        {
+                            report.Add(index, step,
+                                CastExecutionStatus.ResidualStateUnsettled,
+                                "enhancement-cleanup-failed:" + enhancementCleanupDetail);
+                            enhancementCleanupDetail = null;
+                        }
+                    }
+                    // Review L2: when the iterator is disposed while the
+                    // operation is in flight (owner cancellation), the code
+                    // after this block never runs; report the abandonment
+                    // and the cleanup outcome here instead of losing them.
+                    if (!operationBodyCompleted)
+                    {
+                        report.Add(index, step, CastExecutionStatus.FailedExecution,
+                            "animated-operation-abandoned-in-flight");
+                        bool residual;
+                        try { residual = operation.HasResidualDeliveryState; }
+                        catch (Exception) { residual = true; }
+                        if (cleanupFailure != null || residual)
+                            report.Add(index, step,
+                                CastExecutionStatus.ResidualStateUnsettled,
+                                cleanupFailure == null
+                                    ? "animated-delivery-state-remained-after-cancel-cleanup;" +
+                                        SafeDetail(operation)
+                                    : "animated-cancel-cleanup-exception:" +
+                                        cleanupFailure.GetType().FullName + ":" +
+                                        cleanupFailure.Message);
+                    }
                 }
                 try
                 {
+                    // R579-2/C853-2B: an enhancement lease that could not
+                    // verify its native restoration is unsettled state
+                    // exactly like a delivery residue: reported, and no
+                    // later cast runs until the state is re-established.
+                    if (enhancementCleanupDetail != null)
+                    {
+                        priorTransactionUnsettled = true;
+                        report.Add(index, step,
+                            CastExecutionStatus.ResidualStateUnsettled,
+                            "enhancement-cleanup-failed:" + enhancementCleanupDetail);
+                    }
                     if (cleanupFailure != null ||
                         operation.HasResidualDeliveryState)
                     {
@@ -184,11 +295,22 @@ namespace KingmakerBuffPlanner.Execution
             }
         }
 
+        private static string SafeDetail(IAnimatedCastOperation operation)
+        {
+            try { return operation.Detail; }
+            catch (Exception exception) { return "detail-exception:" + exception.GetType().Name; }
+        }
+
         private CastEnhancementPreparation Prepare(CastStep step)
         {
-            if (step.EnhancementIds.Count == 0) return CastEnhancementPreparation.Pass(null);
+            // A casting-first step is prepared even with no enhancement, so
+            // nothing the casting did not choose stays switched on for it.
+            if (step.EnhancementIds.Count == 0 && !step.ExactEnhancements)
+                return CastEnhancementPreparation.Pass(null);
             var runtime = _runtime as ICastEnhancementRuntimeAdapter;
-            if (runtime == null) return CastEnhancementPreparation.Fail("runtime-adapter-unsupported");
+            if (runtime == null)
+                return step.EnhancementIds.Count == 0 ? CastEnhancementPreparation.Pass(null)
+                    : CastEnhancementPreparation.Fail("runtime-adapter-unsupported");
             try
             {
                 return runtime.PrepareEnhancements(step) ??

@@ -25,6 +25,10 @@ namespace KingmakerBuffPlanner.UI
         private readonly ModLog _log;
         private readonly Action _openSetup;
         private readonly Action<string> _quickExecute;
+        // Whether casting-first is the active planner (Setup tooltip only:
+        // the Setup button always opens the planner, the moon/Long button
+        // always runs Long).
+        private readonly Func<bool> _castingFirst;
         private readonly List<Sprite> _ownedSprites = new List<Sprite>();
         private readonly List<Texture2D> _ownedTextures = new List<Texture2D>();
         private RectTransform _root;
@@ -57,14 +61,22 @@ namespace KingmakerBuffPlanner.UI
             BuffPlannerUiLifecycleDiagnostics diagnostics,
             ModLog log,
             Action openSetup,
-            Action<string> quickExecute)
+            Action<string> quickExecute,
+            Func<string, string> routineTooltipOverride = null,
+            Func<bool> castingFirstForMoon = null)
         {
             _session = session ?? throw new ArgumentNullException("session");
             _diagnostics = diagnostics ?? throw new ArgumentNullException("diagnostics");
             _log = log ?? throw new ArgumentNullException("log");
             _openSetup = openSetup ?? throw new ArgumentNullException("openSetup");
             _quickExecute = quickExecute ?? throw new ArgumentNullException("quickExecute");
+            _routineTooltipOverride = routineTooltipOverride;
+            _castingFirst = castingFirstForMoon;
         }
+
+        // Casting-first mode describes its own plan; null keeps the classic
+        // tooltip.
+        private readonly Func<string, string> _routineTooltipOverride;
 
         internal bool IsInstalled
         {
@@ -286,7 +298,7 @@ namespace KingmakerBuffPlanner.UI
             _buttons = new[]
             {
                 CreatePlannerButton("Setup", "setup", width, height, _openSetup,
-                    () => "Open Buff Planner setup. Shortcut: " + PlannerHotkey.Binding + "."),
+                    () => SetupTooltip()),
                 CreatePlannerButton("Long", "long", width, height,
                     () => _quickExecute("long"), () => RoutineTooltip("long")),
                 CreatePlannerButton("Important", "important", width, height,
@@ -299,7 +311,7 @@ namespace KingmakerBuffPlanner.UI
             foreach (Button button in _buttons) button.interactable = false;
             _tooltips = new Func<string>[]
             {
-                () => "Open Buff Planner setup. Shortcut: " + PlannerHotkey.Binding + ".",
+                SetupTooltip,
                 () => RoutineTooltip("long"),
                 () => RoutineTooltip("important"),
                 () => RoutineTooltip("short")
@@ -622,6 +634,18 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        // v1.2 §5: the Setup (gear) button is the HUD's clearly labelled
+        // editor entry - a click opens the planner. The owner's "moon" is
+        // the Long button (its glyph is the crescent), whose click runs
+        // Long with no editor detour.
+        private string SetupTooltip()
+        {
+            return _castingFirst != null && _castingFirst()
+                ? "Open the Buff Planner. Shortcut: " + PlannerHotkey.Binding +
+                    ". The moon button runs your Long routine with one click."
+                : "Open Buff Planner setup. Shortcut: " + PlannerHotkey.Binding + ".";
+        }
+
         private Button CreatePlannerButton(
             string displayName,
             string iconKind,
@@ -883,9 +907,22 @@ namespace KingmakerBuffPlanner.UI
 
         private string RoutineTooltip(string routineId)
         {
+            if (_routineTooltipOverride != null)
+            {
+                string casting = null;
+                try { casting = _routineTooltipOverride(routineId); }
+                catch (Exception exception)
+                {
+                    _log.Error("[KBP-HUD] casting-first tooltip failed.", exception);
+                }
+                if (casting != null) return casting;
+            }
             string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
             if (_session.Model == null) return "Load a campaign to run " + name + ".";
-            if (_session.IsExecuting) return "A buff routine is already executing.";
+            if (_session.IsExecuting)
+                return _session.ClassicRunHeld
+                    ? "A buff routine is waiting to cast: it continues once the game runs and no planner window is open."
+                    : "A buff routine is already executing.";
             RoutineProfile routine = _session.Model.Profile.Routines
                 .FirstOrDefault(item => item.RoutineId == routineId);
             if (routine == null || routine.Assignments.Count == 0)

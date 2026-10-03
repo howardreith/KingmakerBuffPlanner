@@ -8,24 +8,18 @@
 
 ## Install
 
-1. Exit Kingmaker.
+1. Exit Kingmaker and back up the whole `Mods\KingmakerBuffPlanner` folder (including `UserSettings`) outside `Mods`.
 2. Extract the release ZIP into Kingmaker's `Mods` directory. The resulting path must be `Mods\KingmakerBuffPlanner\Info.json`.
-3. Start Kingmaker through Steam in the normal way and confirm Unity Mod Manager lists `KingmakerBuffPlanner` version 0.0.16 once.
-4. Load a campaign. Use the lower-left setup icon; Ctrl+Shift+B is the fallback open/close shortcut.
+3. Start Kingmaker through Steam in the normal way and confirm Unity Mod Manager lists `KingmakerBuffPlanner` once, with the version of the ZIP you installed (0.2.0).
+4. Load a campaign. Open the planner with the HUD's gear button or Ctrl+Shift+B.
 
 Do not copy game DLLs, Harmony, Unity Mod Manager, Call of the Wild, or another mod into the Kingmaker Buff Planner folder.
 
-## Configure routines
+## Plan and run
 
-The setup window exposes Long, Important, and Short routines. Search, filter, and sort discovered sources; choose stable party or pet targets; then set provider priority, bans, and per-routine cast caps. Preview shows planned casts, remaining resources, rejected providers, skipped active effects, unsupported saved sources, and unfulfilled targets before execution.
+0.2.0's planner is the casting-first planner; [the player guide](CASTING-FIRST-PLAYER-GUIDE.md) describes it in full. Each casting is one cast with its own caster, exact spell source, target and enhancements; every edit saves itself. The HUD's moon, diamond and sun buttons run the Long, Important and Short routines with one click, and every run reports what it cast, skipped or refused and why. The first open imports a classic plan from an earlier version once and archives the original.
 
-Profiles are external JSON under `Mods\KingmakerBuffPlanner\UserSettings`. They are keyed to the current campaign and are not written into Kingmaker saves. The repository keeps up to three prior valid backups and recovers conservatively from malformed data.
-
-## Execute
-
-Use the adjacent Long, Important, or Short HUD icon after configuration. Every quick action displays a result or an exact unavailable reason. Animated mode queues native Kingmaker cast commands. Instant mode uses native cast rules and native spend semantics in bounded batches; sticky-touch sources use animated fallback when enabled or fail before submission when fallback is disabled. Queued or submitted is not success: the result panel reports success only after expected effects are confirmed on intended targets, alongside command, resource, component, and exact failure outcomes.
-
-The default combat policy is conservative. Review preview diagnostics and save normally before using any gameplay mod.
+Profiles are external JSON under `Mods\KingmakerBuffPlanner\UserSettings`. They are keyed to the current campaign and are not written into Kingmaker saves. The repository keeps up to three prior valid backups and never overwrites a plan file it cannot read.
 
 ## Update or uninstall
 
@@ -33,4 +27,4 @@ Exit the game before replacing the mod folder. To preserve settings across a man
 
 ## Qualification boundary
 
-The standalone UI, native and Call of the Wild catalogs, structural planning, persistence, and executor logic have automated evidence. This desktop had no project-owned `KBP_` save, so real campaign resource/effect equivalence remains deferred. See `docs/QUALIFICATION.md` and `docs/MANUAL-ACCEPTANCE.md` for exact scope.
+0.2.0 was qualified by the full source-only gate and guarded in-game runs on disposable test campaigns; see `docs/E01-E27-ACCEPTANCE-MATRIX.md` and `docs/QUALIFICATION.md` for the exact scope and the known limitations (windowed display is not qualified).

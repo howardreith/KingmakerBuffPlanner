@@ -1,24 +1,24 @@
 {
-  "schemaVersion": 1,
-  "profileId": "call-of-the-wild",
-  "status": "available",
-  "mods": [
-    {
-      "ummId": "CallOfTheWild",
-      "directoryName": "CallOfTheWild",
-      "version": "1.14.4c-2.1",
-      "assemblyName": "CallOfTheWild.dll",
-      "infoSha256": "32c0bc48c26eb22787e99fb1eb86d074df2cd7dcfe4804ce8eb381a3a589d44d",
-      "assemblySha256": "4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915",
-      "directoryManifestSha256": "3f1758b235820f3f64671cf4da5490afc5319ab40fce3a0e07d175b0d67a7a9c",
-      "fileCount": 266,
-      "totalBytes": 66186003
-    }
-  ],
-  "expectedBlueprints": [
-    "0027cbfe0a484380ab76df1ad3d7326a",
-    "03963bcf8dd64abea3757311c1e8a79c",
-    "151b1f365c4217e5062a1fe50f7a63d3",
-    "4421fff35fed4afb9ea20cbd6e6a7c0d"
-  ]
+    "schemaVersion":  1,
+    "profileId":  "call-of-the-wild",
+    "status":  "available",
+    "mods":  [
+                 {
+                     "ummId":  "CallOfTheWild",
+                     "directoryName":  "CallOfTheWild",
+                     "version":  "1.14.4c-2.1",
+                     "assemblyName":  "CallOfTheWild.dll",
+                     "infoSha256":  "32c0bc48c26eb22787e99fb1eb86d074df2cd7dcfe4804ce8eb381a3a589d44d",
+                     "assemblySha256":  "4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915",
+                     "directoryManifestSha256":  "988e6130e4d60bdda1be400f2c055f40ae6e91a44b75f456eb4822c77b31dc15",
+                     "fileCount":  266,
+                     "totalBytes":  66186003
+                 }
+             ],
+    "expectedBlueprints":  [
+                               "0027cbfe0a484380ab76df1ad3d7326a",
+                               "03963bcf8dd64abea3757311c1e8a79c",
+                               "151b1f365c4217e5062a1fe50f7a63d3",
+                               "4421fff35fed4afb9ea20cbd6e6a7c0d"
+                           ]
 }

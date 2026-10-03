@@ -13,14 +13,21 @@ namespace KingmakerBuffPlanner.Persistence
 {
     public sealed class ProfileLoadResult
     {
-        internal ProfileLoadResult(BuffPlannerProfile profile, bool recovered, bool migrated, string sourcePath, string warning)
+        internal ProfileLoadResult(BuffPlannerProfile profile, bool recovered, bool migrated, string sourcePath, string warning,
+            string primarySha256 = null)
         {
             Profile = profile;
             RecoveredFromBackup = recovered;
             Migrated = migrated;
             SourcePath = sourcePath ?? string.Empty;
             Warning = warning ?? string.Empty;
+            PrimarySha256 = primarySha256;
         }
+
+        // Re-review (focused): the SHA-256 of the primary file's bytes this
+        // profile was read from; null when it came from a backup or is a new
+        // default (the casting-first import binds the in-memory plan to it).
+        public string PrimarySha256 { get; private set; }
 
         public BuffPlannerProfile Profile { get; private set; }
         public bool RecoveredFromBackup { get; private set; }
@@ -55,8 +62,14 @@ namespace KingmakerBuffPlanner.Persistence
                 try
                 {
                     bool migrated;
-                    BuffPlannerProfile profile = Deserialize(File.ReadAllText(path), campaignId, out migrated);
-                    return new ProfileLoadResult(profile, i != 0, migrated, path, warning);
+                    // Focused re-review: the hash is of the very bytes parsed.
+                    byte[] raw = File.ReadAllBytes(path);
+                    string original = DecodeFileText(raw);
+                    BuffPlannerProfile profile = Deserialize(original, campaignId, out migrated);
+                    if (migrated)
+                        ArchivePreMigrationOriginal(path, raw);
+                    return new ProfileLoadResult(profile, i != 0, migrated, path, warning,
+                        i == 0 ? Hashing.Sha256Bytes(raw) : null);
                 }
                 catch (Exception exception)
                 {
@@ -65,6 +78,35 @@ namespace KingmakerBuffPlanner.Persistence
             }
             return new ProfileLoadResult(BuffPlannerProfile.CreateDefault(campaignId), false, false,
                 string.Empty, warning);
+        }
+
+        // The rotating .bak chain is overwritten by ordinary saves; a schema
+        // migration preserves the exact original bytes once, outside that
+        // chain, so a failed migration always leaves a recoverable
+        // pre-migration file. An archive already at the name is reused only
+        // when it holds exactly these bytes (review of rc4). The short name
+        // keeps the full path far below MAX_PATH even under deep settings
+        // directories.
+        private void ArchivePreMigrationOriginal(string primary, byte[] original)
+        {
+            AtomicFile.WriteExactArchive(Path.GetDirectoryName(primary),
+                "kbp-pre-schema-" + Path.GetFileName(primary)
+                    .Replace("kingmaker-buff-planner-", string.Empty)
+                    .Replace(".json", string.Empty), original);
+        }
+
+        // The text of a settings file exactly as File.ReadAllText reads it
+        // (UTF-8, byte-order mark detected), from bytes already read.
+        internal static string DecodeFileText(byte[] raw)
+        {
+            using (var reader = new StreamReader(new MemoryStream(raw), Encoding.UTF8, true))
+                return reader.ReadToEnd();
+        }
+
+        internal static string TryHash(string path)
+        {
+            try { return Hashing.Sha256(path); }
+            catch (Exception) { return null; }
         }
 
         public void Save(BuffPlannerProfile profile)
@@ -82,12 +124,51 @@ namespace KingmakerBuffPlanner.Persistence
                     Deserialize(previous, profile.CampaignId, out migrated);
                     RotateBackups(path, previous);
                 }
-                catch (Exception)
+                catch (Exception exception)
                 {
-                    // A malformed primary is never promoted over a known-good backup.
+                    // Review K1 / charter §7.1: an unresolved (corrupt or
+                    // newer-schema) primary is NEVER replaced by an ordinary
+                    // save — not even by a recovered default. Its exact bytes
+                    // are quarantined as evidence and the save is refused
+                    // (recorded, not thrown: UI callbacks keep working).
+                    // Replacement requires the explicit recovery operation
+                    // ReplaceUnresolvedPrimary.
+                    QuarantineUnreadablePrimary(path);
+                    LastSaveRefusal = "legacy-primary-unresolved:" + exception.Message;
+                    return;
                 }
             }
+            LastSaveRefusal = null;
             AtomicFile.WriteUtf8(path, json);
+        }
+
+        // Null after a successful save; the refusal reason otherwise.
+        public string LastSaveRefusal { get; private set; }
+
+        // Explicit, owner-directed recovery: quarantine the unresolved
+        // primary's exact bytes, then replace it. Never called implicitly.
+        public string ReplaceUnresolvedPrimary(BuffPlannerProfile profile)
+        {
+            Validate(profile, profile == null ? null : profile.CampaignId);
+            string path = GetProfilePath(profile.CampaignId);
+            string archive = File.Exists(path) ? QuarantineUnreadablePrimary(path) : null;
+            Directory.CreateDirectory(_settingsDirectory);
+            AtomicFile.WriteUtf8(path, Serialize(profile));
+            LastSaveRefusal = null;
+            return archive;
+        }
+
+        internal string QuarantineUnreadablePrimary(string primary)
+        {
+            byte[] bytes = File.ReadAllBytes(primary);
+            string hash;
+            using (SHA256 sha = SHA256.Create())
+                hash = BitConverter.ToString(sha.ComputeHash(bytes))
+                    .Replace("-", string.Empty).ToLowerInvariant();
+            return AtomicFile.WriteExactArchive(Path.GetDirectoryName(primary),
+                "kbp-unreadable-" + Path.GetFileName(primary)
+                    .Replace("kingmaker-buff-planner-", string.Empty)
+                    .Replace(".json", string.Empty) + "-" + hash.Substring(0, 16), bytes);
         }
 
         internal string GetProfilePath(string campaignId)
@@ -95,6 +176,15 @@ namespace KingmakerBuffPlanner.Persistence
             RequireCampaign(campaignId);
             return Path.Combine(_settingsDirectory,
                 "kingmaker-buff-planner-" + CampaignHash(campaignId) + ".json");
+        }
+
+        // The Classic loader's own strict reading of a Classic file, for the
+        // casting-first import (final review B1): an older schema is migrated
+        // in memory exactly as Load migrates it, and nothing is written.
+        internal static BuffPlannerProfile ReadForImport(string json, string campaignId)
+        {
+            bool migrated;
+            return Deserialize(json, campaignId, out migrated);
         }
 
         private static BuffPlannerProfile Deserialize(string json, string campaignId, out bool migrated)
@@ -149,14 +239,36 @@ namespace KingmakerBuffPlanner.Persistence
                 if (string.IsNullOrWhiteSpace(routine.Name) || routine.Assignments == null)
                     throw new InvalidDataException("invalid-routine");
                 RequireUnique(routine.Assignments.Select(a => a == null ? null : a.SourceId), "source-id");
+                var assignmentIds = new List<string>();
+                var assignmentOrders = new List<int>();
                 foreach (SourceAssignmentProfile assignment in routine.Assignments)
                 {
-                    if (assignment.Ability == null || assignment.WantedTargetUnitIds == null ||
-                        assignment.IgnoredPresenceMarkers == null || assignment.SelectedEnhancementIds == null)
+                    if (assignment.Ability == null || assignment.IgnoredPresenceMarkers == null ||
+                        assignment.CastingAssignments == null)
                         throw new InvalidDataException("invalid-assignment");
-                    RequireUnique(assignment.SelectedEnhancementIds, "enhancement-id");
                     assignment.Ability.ToKey();
+                    foreach (CastingAssignmentProfile casting in assignment.CastingAssignments)
+                    {
+                        if (casting == null || string.IsNullOrWhiteSpace(casting.AssignmentId) ||
+                            casting.TargetUnitIds == null || casting.Enhancements == null)
+                            throw new InvalidDataException("invalid-casting-assignment");
+                        assignmentIds.Add(casting.AssignmentId);
+                        assignmentOrders.Add(casting.Order);
+                        RequireUnique(casting.TargetUnitIds, "assignment-target-unit-id");
+                        RequireUnique(casting.Enhancements.Select(e =>
+                            e == null ? null : e.EnhancementId), "assignment-enhancement-id");
+                        foreach (EnhancementSelectionProfile selection in casting.Enhancements)
+                            if (selection == null ||
+                                string.IsNullOrWhiteSpace(selection.EnhancementId))
+                                throw new InvalidDataException("invalid-enhancement-selection");
+                    }
                 }
+                RequireUnique(assignmentIds, "assignment-id");
+                // The routine-wide allocation order must be an explicit total
+                // order: duplicates would make allocation depend on iteration
+                // details instead of configuration.
+                if (assignmentOrders.Distinct().Count() != assignmentOrders.Count)
+                    throw new InvalidDataException("duplicate-assignment-order");
             }
             if (profile.Ui.Scale < 0.5f || profile.Ui.Scale > 3.0f)
                 throw new InvalidDataException("ui-scale");
@@ -279,6 +391,50 @@ namespace KingmakerBuffPlanner.Persistence
                 }
                 document["schemaVersion"] = 4;
                 version = 4;
+                migrated = true;
+            }
+            if (version == 4)
+            {
+                JArray routines = document["routines"] as JArray;
+                if (routines == null) throw new InvalidDataException("routines-missing");
+                foreach (JObject routine in routines.OfType<JObject>())
+                {
+                    JArray assignments = routine["assignments"] as JArray;
+                    if (assignments == null) throw new InvalidDataException("assignments-missing");
+                    // Legacy planning allocated sources in source-ID order;
+                    // migration makes exactly that order explicit per child so
+                    // v5 allocation reproduces v4 results without guessing.
+                    int order = 0;
+                    foreach (JObject assignment in assignments.OfType<JObject>()
+                        .OrderBy(item => (string)item["sourceId"], StringComparer.Ordinal))
+                    {
+                        JArray targets = assignment["wantedTargetUnitIds"] as JArray;
+                        JArray enhancements = assignment["selectedEnhancementIds"] as JArray;
+                        var children = new JArray();
+                        var child = new JObject
+                        {
+                            ["assignmentId"] = "legacy-" + (string)assignment["sourceId"],
+                            ["order"] = order++,
+                            ["casterUnitId"] = null,
+                            ["spellbookGuid"] = null,
+                            ["providerKey"] = null,
+                            ["targetUnitIds"] = targets ?? new JArray(),
+                            ["enhancements"] = new JArray(
+                                (enhancements ?? new JArray()).OfType<JValue>()
+                                .Select(value => new JObject
+                                {
+                                    ["enhancementId"] = value,
+                                    ["required"] = true
+                                }))
+                        };
+                        children.Add(child);
+                        assignment["castingAssignments"] = children;
+                        assignment.Remove("wantedTargetUnitIds");
+                        assignment.Remove("selectedEnhancementIds");
+                    }
+                }
+                document["schemaVersion"] = 5;
+                version = 5;
                 migrated = true;
             }
             if (version != BuffPlannerProfile.CurrentSchemaVersion)

@@ -1,5 +1,37 @@
 # Architecture
 
+## 2026-09-06 failed human validation: routing diagnosis
+
+Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.
+Final candidate ZIP/DLL/MVID and exact command counts are recorded in the
+investigation report's delivery checkpoint. The package remains diagnostic-only;
+final bridge 21/21, exact metadata 87/87, deterministic builds 2/2, candidate
+deployment purity 5/5 and release installer purity 5/5 all pass. No gameplay
+coverage is promoted. The reproducing-machine cast log remains the next action.
+
+Instant Share remains unresolved; gameplay **NOT VERIFIED**. On local machine
+DATA the installed Planner 0.0.19 / Gunslinger 0.0.115 DLLs match both released
+hashes and MVIDs. Executing the real production bridge accepts that pair and
+rejects the actual older 0.0.114 provider. No affected casting log or running
+game is available; the exact Kingmaker save root is absent.
+
+Active branch: `codex/kingmaker-buff-planner-instant-share-routing-diagnosis`;
+starting/audited HEAD: `fd0e6dc1c32dfc929a56dbc575163e641b150746`;
+version remains 0.0.19. Diagnostic-only source adds pre-cast routing evidence,
+loaded-pair identity, provider-direct phase records and visible fallback
+outcomes. The native transaction and resource policies are unchanged.
+Focused gates: source 42/42, behavior 150/150, harness 8/8, package 4/4,
+deployment WhatIf 5/5; candidate production bridge 21/21 assertions in 3/3
+processes. No failed checks are counted as passes.
+
+Commands, exact identity tables, evidence under
+`artifacts/instant-share-diagnosis/`, rejected theories, and limits are in
+[the investigation report](INSTANT-SHARE-FAILED-VALIDATION.md). This supersedes any interpretation of the historical public
+release records below as proof that Instant Share worked in Howie's game.
+Exact next action: capture one affected cast from the reproducing machine and
+identify its capability/selected-executor/Fire discriminator. A diagnostic
+candidate is not a gameplay fix or authorization trigger for a new public release.
+
 ## 0.0.19 provider-direct enhancement execution
 
 `CastEnhancementSnapshot.DirectCastProviderId` is the domain capability marker;

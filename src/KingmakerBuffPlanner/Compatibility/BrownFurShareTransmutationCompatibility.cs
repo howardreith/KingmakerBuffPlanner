@@ -88,8 +88,9 @@ namespace KingmakerBuffPlanner.Compatibility
                 {
                     AbilityData data = KingmakerAnimatedCastAdapter.ResolveAbility(
                         unit, provider.Key);
-                    if (!IsSupportedSpell(data, provider.Key, toggle,
-                            out reason))
+                    // Review F3: ordinary discovery uses the IMMUTABLE
+                    // support decision only — no live toggle arming here.
+                    if (!IsSupportedSpell(data, provider.Key, out reason))
                     {
                         _diagnostics.Add("caster=" + unit.UniqueId +
                             ";provider=" + provider.Key.Canonical +
@@ -125,7 +126,9 @@ namespace KingmakerBuffPlanner.Compatibility
             ActivatableAbility toggle;
             string reason;
             if (!TryResolveToggle(unit, out toggle, out reason) ||
-                !IsSupportedSpell(ability, provider, toggle, out reason))
+                // Review F3: the immutable support decision only; the
+                // native probe never runs on this path.
+                !IsSupportedSpell(ability, provider, out reason))
                 return new ShareTransmutationRuntimeEntry[0];
             return new[] { new ShareTransmutationRuntimeEntry(toggle,
                 Snapshot(unit.UniqueId, toggle.Blueprint,
@@ -229,9 +232,14 @@ namespace KingmakerBuffPlanner.Compatibility
             }
         }
 
+        // Review F3: the ordinary support decision is IMMUTABLE — exact
+        // source facts from the ability's own blueprint data (a genuine
+        // spellbook spell, personal range, transmutation school). It never
+        // touches the live toggle, never arms or disarms anything, and is
+        // the only support decision the ordinary discovery/refresh/render
+        // paths (Discover below) make.
         internal static bool IsSupportedSpell(AbilityData ability,
-            ProviderKey provider, ActivatableAbility toggle,
-            out string reason)
+            ProviderKey provider, out string reason)
         {
             reason = string.Empty;
             if (ability == null || ability.Blueprint == null)
@@ -244,27 +252,72 @@ namespace KingmakerBuffPlanner.Compatibility
                 return Fail("range-not-personal", out reason);
             if (ability.Blueprint.School != SpellSchool.Transmutation)
                 return Fail("school-not-transmutation", out reason);
-            bool original = toggle.IsOn;
+            return true;
+        }
+
+        // Review F3/R579-2: the NATIVE contract probe - does the installed
+        // provider's targeting patch actually augment this spell while the
+        // exact Share toggle is armed? This temporarily arms the toggle.
+        // Restoration is attempted after EVERY attempted mutation,
+        // including one whose setter changed state and then threw - never
+        // conditional on an "armed" flag - and the expected final state
+        // (the ORIGINAL value) is verified by reading it back. A restore
+        // that cannot be established IS probe failure (a leak is never
+        // swallowed) and overrides a passing observation. Deliberately NOT
+        // part of ordinary discovery: only an explicitly authorized caller
+        // (execution-time setup with its own verified cleanup, or a guarded
+        // qualification probe) may invoke it - never a refresh, render, or
+        // authoring path.
+        internal static bool TryProbeShareTargeting(AbilityData ability,
+            ActivatableAbility toggle, out string reason)
+        {
+            reason = string.Empty;
+            if (ability == null || toggle == null)
+                return Fail("probe-inputs-unresolved", out reason);
+            bool original;
+            try { original = toggle.IsOn; }
+            catch (Exception exception)
+            {
+                return Fail("share-probe-unreadable-original:" +
+                    exception.GetType().Name, out reason);
+            }
+            bool outcome = false;
+            string outcomeReason = string.Empty;
+            string restoreFailure = null;
             try
             {
                 toggle.IsOn = true;
-                if (!toggle.IsOn)
-                    return Fail("native-share-activation-refused", out reason);
                 if (ability.TargetAnchor != AbilityTargetAnchor.Unit)
-                    return Fail("native-share-target-anchor-not-augmented",
-                        out reason);
-                return true;
+                    outcomeReason = "native-share-target-anchor-not-augmented";
+                else
+                    outcome = true;
             }
             catch (Exception exception)
             {
-                return Fail("native-share-probe-exception:" +
-                    exception.GetType().Name, out reason);
+                outcomeReason = "native-share-probe-exception:" +
+                    exception.GetType().Name;
             }
             finally
             {
-                try { toggle.IsOn = original; }
-                catch (Exception) { }
+                try
+                {
+                    toggle.IsOn = original;
+                    if (toggle.IsOn != original)
+                        restoreFailure = "share-probe-restore-failed:state-mismatch";
+                }
+                catch (Exception exception)
+                {
+                    restoreFailure = "share-probe-restore-failed:" +
+                        exception.GetType().Name;
+                }
             }
+            if (restoreFailure != null)
+            {
+                reason = restoreFailure;
+                return false;
+            }
+            reason = outcomeReason;
+            return outcome;
         }
 
         private static bool ValidToggleBlueprint(
@@ -494,6 +547,18 @@ namespace KingmakerBuffPlanner.Compatibility
             "KingmakerGunslinger.BrownFur.BrownFurDirectCastHandle";
         private const string StatusTypeName =
             "KingmakerGunslinger.BrownFur.BrownFurDirectCastStatus";
+
+        internal static Assembly[] LoadedProviderAssemblies()
+        {
+            return AppDomain.CurrentDomain.GetAssemblies().Where(value =>
+                value.GetName().Name == ProviderAssemblyName).ToArray();
+        }
+
+        internal static IEnumerable<Type> DiagnosticContractTypes(Assembly assembly)
+        {
+            return new[] { assembly.GetType(ApiTypeName, false),
+                assembly.GetType(HandleTypeName, false) }.Where(value => value != null);
+        }
 
         internal static bool TryValidateContract(out string reason)
         {

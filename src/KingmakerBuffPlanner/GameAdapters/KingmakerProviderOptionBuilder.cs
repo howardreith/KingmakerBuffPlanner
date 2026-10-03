@@ -87,11 +87,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                     reachable = units.Where(u => u.UnitId == provider.Key.CasterUnitId);
                     anchors = reachable.Select(u => u.UnitId).ToArray();
                 }
-                else if (EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Pet))
-                {
-                    reachable = units.Where(u => u.IsPet && u.MasterUnitId == provider.Key.CasterUnitId);
-                    anchors = reachable.Select(u => u.UnitId).ToArray();
-                }
+                // Re-review: a party effect that also reaches pets is planned as
+                // a party effect (every unit, pets included, from a legal
+                // origin); only a pet-only effect is limited to the pet.
                 else if (party)
                 {
                     reachable = units;
@@ -102,6 +100,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                     foreach (string anchor in anchors)
                         recipientIdsByAnchor.Add(anchor,
                             units.Select(unit => unit.UnitId).ToArray());
+                }
+                else if (EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Pet))
+                {
+                    reachable = units.Where(u => u.IsPet && u.MasterUnitId == provider.Key.CasterUnitId);
+                    anchors = reachable.Select(u => u.UnitId).ToArray();
                 }
                 else if (areaRecipients && areaCoverage != null && caster != null)
                 {
