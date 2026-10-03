@@ -928,6 +928,21 @@ try {
         castingScenario = $false; violations = @()
         selection = [ordered]@{ selected = $true; recipe = 'finite-direct-mixed'; castings = @('qual-cast-1', 'qual-cast-2') }
         forecast = @([ordered]@{ name = 'stop'; projectionId = $finiteIds[0]; castingIds = @('qual-cast-1', 'qual-cast-2') }) } }
+    # H4: both shared recipes write allowances the launcher accepts (the
+    # shared-personal purpose was 441 characters; the launcher's bound is
+    # 400), with a budget that is the sum of their shared and witness phases.
+    foreach ($sharedRecipe in @('shared-personal', 'shared-powerful')) {
+        New-WriterSelection "$sharedRecipe-select" 'live-cast-qual-select' 'instant' @{ 'qual-outcome.json' = [ordered]@{
+            castingScenario = $false; violations = @()
+            selection = [ordered]@{ selected = $true; recipe = $sharedRecipe; castings = @('cast-1', 'qual-cast-2') }
+            forecast = @(
+                [ordered]@{ name = 'shared'; projectionId = ('7' * 64); castingIds = @('cast-1') },
+                [ordered]@{ name = 'witness'; projectionId = ('8' * 64); castingIds = @('qual-cast-2') }) } }
+        $sharedRequestPath = Join-Path $writerEvidence "$sharedRecipe-select\runtime-request.json"
+        $sharedRequest = Read-KbpJson $sharedRequestPath
+        $sharedRequest.parameters | Add-Member -NotePropertyName qualificationRecipe -NotePropertyValue $sharedRecipe
+        Write-KbpJsonAtomic $sharedRequestPath $sharedRequest
+    }
     # H3: a cold-moon physical selection (typed seed evidence, digest record
     # whose cap is exactly its Long castings) gets a cf-physical allowance
     # the launcher accepts; an unseeded selection or a whole-plan cap is
@@ -990,6 +1005,19 @@ try {
             -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64) -FixtureGameId 'game') -or
         [string]($classicJson | ConvertFrom-Json).approvedPlanDigest -cne ('d' * 64)) {
         throw 'The written Classic allowance is not what the launcher accepts.'
+    }
+    foreach ($sharedRecipe in @('shared-personal', 'shared-powerful')) {
+        foreach ($sharedMode in @('instant', 'animated')) {
+            $sharedPath = & $writerScript -Kind qualification -RunId "$sharedRecipe-$sharedMode-run" `
+                -SelectionRunId "$sharedRecipe-select" -ExecutionMode $sharedMode @writerCommon | Select-Object -Last 1
+            $sharedJson = [IO.File]::ReadAllText($sharedPath)
+            $sharedWritten = $sharedJson | ConvertFrom-Json
+            if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $sharedJson -RunId "$sharedRecipe-$sharedMode-run" `
+                    -BuildManifest $writerManifest -Recipe $sharedRecipe -ExecutionMode $sharedMode) -or
+                [int]$sharedWritten.maximumNativeSubmissions -ne 2 -or [string]$sharedWritten.recipe -cne $sharedRecipe) {
+                throw "The written $sharedRecipe ($sharedMode) allowance is not what the launcher accepts."
+            }
+        }
     }
     $physPath = & $writerScript -Kind cf-physical -RunId 'phys-run' -SelectionRunId 'phys-select' -ExecutionMode instant @writerCommon |
         Select-Object -Last 1
