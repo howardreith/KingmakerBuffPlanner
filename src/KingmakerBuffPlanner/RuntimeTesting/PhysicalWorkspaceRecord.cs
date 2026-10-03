@@ -29,11 +29,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // it scrolls the description and never the graph (proved on long
         // native text too), and Escape closes the description first and the
         // workspace second.
+        // D13: the Short routine's tab is clicked first - it holds enough
+        // castings that the continuous scroll overflows, so the wheel's
+        // scroll is real (every earlier run's graph fitted: no-overflow).
         public static readonly string[] CastingActions =
         {
-            "cf-moon", "cf-wheel", "cf-right-click", "cf-inspect-wheel", "cf-long-wheel",
+            "cf-moon", "cf-routine-short", "cf-wheel", "cf-right-click", "cf-inspect-wheel", "cf-long-wheel",
             "cf-escape-inspect", "cf-escape-close"
         };
+
+        // Parallel Short castings the run seeds so the graph overflows
+        // (chips are 56 px apart; the graph viewport is ~705 px at 1080p).
+        public const int GraphOverflowCastings = 14;
 
         // The typed query comes from the label of a tile that was NOT
         // selected (review B5): the first four letters of its first word,
@@ -118,6 +125,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool? EditorNeverOpenedBeforeMoon { get; set; }
         public List<string> SeedLongCastings { get; } = new List<string>();
         public List<string> SeedImportantCastings { get; } = new List<string>();
+        // D13: the Short routine's seeded castings (never run by the moon).
+        public List<string> SeedShortCastings { get; } = new List<string>();
+        // The Short tab was selected by the physical click (browsing only).
+        public bool? RoutineSelected { get; set; }
+        public int GraphCastingsShown { get; set; } = -1;
         // The moon run itself (cast runs): runs started by the press after a
         // settle (exactly one), the run's scope, terminal, submissions and
         // per-casting outcomes ("<id>=<state>").
@@ -170,6 +182,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public int InspectBodyChars { get; set; } = -1;
         public int InspectExpectedChars { get; set; } = -1;
         public bool? InspectBodyNative { get; set; }
+        // D12: the title names the spell as the game does (it showed the
+        // provider key's last segment, "heighten-0", in r14).
+        public bool? InspectTitleNative { get; set; }
         // The chip's own description: overflow (content minus viewport) and
         // the scroll position around the physical wheel over it.
         public float InspectOverflow { get; set; }
@@ -195,6 +210,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 violations.Add("inspect:panel-not-visible:" + (InspectPanelWidth == null ? "unread"
                     : InspectPanelWidth.Value.ToString("0") + "x" + InspectPanelHeight.Value.ToString("0")));
             if (string.IsNullOrWhiteSpace(InspectTitle)) violations.Add("inspect:title-empty");
+            else if (InspectTitleNative != true) violations.Add("inspect:title-not-spell-name:" + InspectTitle);
             if (InspectBodyNative != true)
                 violations.Add("inspect:body-not-native:" + InspectBodyChars + "/" + InspectExpectedChars);
             if (InspectOverflow > 1f && (InspectScrollBefore == null || InspectScrollAfter == null ||
@@ -295,7 +311,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             foreach (string id in SeedLongCastings)
                 if (!MoonRunEntries.Contains(id + "=EffectConfirmed")) violations.Add("moon:long-not-confirmed:" + id);
             foreach (string entry in MoonRunEntries)
-                if (SeedImportantCastings.Any(id => entry.StartsWith(id + "=", StringComparison.Ordinal)))
+                if (SeedImportantCastings.Concat(SeedShortCastings)
+                        .Any(id => entry.StartsWith(id + "=", StringComparison.Ordinal)))
                     violations.Add("moon:routine-crossover:" + entry);
             if (LongEffectAfter != true) violations.Add("moon:long-effect-missing");
             if (ImportantEffectAfter != false) violations.Add("moon:important-ran");
@@ -324,10 +341,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (!Acknowledged.Contains(action))
                         violations.Add("unacknowledged:" + action);
                 violations.AddRange(MoonViolations());
-                if (GraphWheelEvidence == "unread") violations.Add("graph-scroll:unread");
-                else if (GraphWheelEvidence == "no-scroll") violations.Add("graph-scroll:no-scroll");
-                else if (GraphWheelEvidence == "moved-without-overflow")
-                    violations.Add("graph-scroll:moved-without-overflow");
+                // D13: the continuous scroll must really scroll - a graph
+                // that fits is no longer an acceptable outcome here.
+                if (SeedShortCastings.Count < GraphOverflowCastings)
+                    violations.Add("graph-seed:short=" + SeedShortCastings.Count);
+                if (RoutineSelected != true) violations.Add("routine-tab:not-selected");
+                if (GraphWheelEvidence != "scrolled") violations.Add("graph-scroll:" + GraphWheelEvidence);
                 if (!InspectOpened) violations.Add("inspect:not-opened");
                 else violations.AddRange(InspectViolations());
                 if (!InspectClosedByEscape) violations.Add("inspect:not-closed");

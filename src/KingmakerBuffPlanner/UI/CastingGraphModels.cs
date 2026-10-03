@@ -213,11 +213,12 @@ namespace KingmakerBuffPlanner.UI
             string statusLabel, string reasonText, IEnumerable<string> enhancementBadges,
             string costText, bool selected, CastingAuthoringState state, bool needsReview,
             bool shortInOnePass, bool redundantInOnePass = false,
-            string spellDescription = "", string spellDurationText = "")
+            string spellDescription = "", string spellDurationText = "", string spellTitle = "")
         {
             RedundantInOnePass = redundantInOnePass;
             SpellDescription = spellDescription ?? string.Empty;
             SpellDurationText = spellDurationText ?? string.Empty;
+            SpellTitle = spellTitle ?? string.Empty;
             CastingId = castingId ?? string.Empty;
             RoutineId = routineId ?? string.Empty;
             Order = order;
@@ -265,6 +266,10 @@ namespace KingmakerBuffPlanner.UI
         // read-only right-click inspect on its chip).
         public string SpellDescription { get; private set; }
         public string SpellDurationText { get; private set; }
+        // The casting's spell as the game names it (the source's localized
+        // display name), for the right-click description's title (D12: the
+        // title was the provider key's last segment, e.g. "heighten-0").
+        public string SpellTitle { get; private set; }
         public IReadOnlyList<string> EnhancementBadges { get; private set; }
         public string CostText { get; private set; }
         public bool Selected { get; private set; }
