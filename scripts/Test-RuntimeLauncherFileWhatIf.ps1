@@ -839,13 +839,15 @@ foreach ($key in $pinnedKeys) {
 }
 $recordSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\src\KingmakerBuffPlanner\RuntimeTesting\PhysicalWorkspaceRecord.cs') -Raw
 # v1.2: the judged gesture set is the record's CastingActions (the classic
-# Actions array stays for the pre-v1.2 judgement path).
+# Actions array stays for the pre-v1.2 judgement path): the cold moon, the
+# graph wheel, the right-click, the wheel over the open description and
+# over its long-text probe (D11), and the two Escapes - seven in order.
 $actionsBlock = [regex]::Match($recordSource, 'public static readonly string\[\] CastingActions =\s*\{([^}]*)\}').Groups[1].Value
 $recordActions = @([regex]::Matches($actionsBlock, '"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
 $launcherActionsBlock = [regex]::Match((Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1') -Raw),
     "expected = @\(([^)]*)\)").Groups[1].Value
 $launcherActions = @([regex]::Matches($launcherActionsBlock, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
-if ($recordActions.Count -ne 6 -or ($recordActions -join ',') -cne ($launcherActions -join ',')) {
+if ($recordActions.Count -ne 7 -or ($recordActions -join ',') -cne ($launcherActions -join ',')) {
     throw "The launcher's judged physical actions differ from the record's: $($launcherActions -join ',')"
 }
 # The allowance writer (review C5): what it writes from recorded selection
