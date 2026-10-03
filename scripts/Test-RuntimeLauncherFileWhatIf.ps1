@@ -512,9 +512,9 @@ try {
     # conditional pre-steps allowed beside them, and the moon-run
     # expectation (select refused by the lock; cast run once under its
     # consumed grant).
-    $physicalActions = @('cf-moon', 'cf-wheel', 'cf-right-click', 'cf-inspect-wheel', 'cf-long-wheel',
+    $physicalActions = @('cf-moon', 'cf-routine-short', 'cf-wheel', 'cf-right-click', 'cf-inspect-wheel', 'cf-long-wheel',
         'cf-escape-inspect', 'cf-escape-close')
-    $physicalKinds = @{ 'cf-moon' = 'click'; 'cf-wheel' = 'wheel'
+    $physicalKinds = @{ 'cf-moon' = 'click'; 'cf-routine-short' = 'click'; 'cf-wheel' = 'wheel'
         'cf-right-click' = 'rightclick'; 'cf-inspect-wheel' = 'wheel'; 'cf-long-wheel' = 'wheel'
         'cf-escape-inspect' = 'key-escape'; 'cf-escape-close' = 'key-escape' }
     function New-PhysicalOutcomeCase([string]$Name, [string]$Expectation, [scriptblock]$Tamper,
@@ -536,6 +536,8 @@ try {
             coldSessionBeforeMoon = $true; editorNeverOpenedBeforeMoon = $true
             seedLongCastings = @('seed-long-1'); seedImportantCastings = @('seed-important-1')
             moonWorkspaceStayedClosed = $true; escMenuOpenAfterClose = $false
+            seedShortCastings = @(1..14 | ForEach-Object { "seed-short-$_" }); routineSelected = $true
+            graphOverflow = $true; graphWheelEvidence = 'scrolled'; inspectTitleNative = $true
             inspectPanelWidth = 760; inspectPanelHeight = 520; inspectTitle = '#1 Resistance'
             inspectBodyChars = 180; inspectExpectedChars = 180; inspectBodyNative = $true
             inspectOverflow = -250; inspectScrollBefore = 1.0; inspectScrollAfter = 1.0
@@ -637,6 +639,18 @@ try {
             $r.inspectOpenAfterWheels = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'inspect-wheel-moved-graph' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
             $r.graphScrollUnderInspectAfter = 0.5; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        # D12/D13: the description is titled with the spell's name; the
+        # Short tab was selected physically and the overflowing graph scrolled.
+        'inspect-title-not-native' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.inspectTitleNative = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'graph-fitted' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.graphOverflow = $false; $r.graphWheelEvidence = 'not-applicable:no-overflow'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'graph-not-scrolled' = @('cast', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.graphWheelEvidence = 'no-scroll'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'routine-not-selected' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.routineSelected = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'short-seed-missing' = @('select', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.seedShortCastings = @('seed-short-1'); Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'extra-failed-ack' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-ws-other.ack.json') ([ordered]@{
             schemaVersion = 1; runId = 'physical-run'; actionId = 'ws-other'; action = 'click'; deliveryFailed = $true }) })
         'extra-request' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-extra.json') ([ordered]@{
@@ -840,14 +854,15 @@ foreach ($key in $pinnedKeys) {
 $recordSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\src\KingmakerBuffPlanner\RuntimeTesting\PhysicalWorkspaceRecord.cs') -Raw
 # v1.2: the judged gesture set is the record's CastingActions (the classic
 # Actions array stays for the pre-v1.2 judgement path): the cold moon, the
-# graph wheel, the right-click, the wheel over the open description and
-# over its long-text probe (D11), and the two Escapes - seven in order.
+# Short tab (D13), the graph wheel, the right-click, the wheel over the open
+# description and over its long-text probe (D11), and the two Escapes -
+# eight in order.
 $actionsBlock = [regex]::Match($recordSource, 'public static readonly string\[\] CastingActions =\s*\{([^}]*)\}').Groups[1].Value
 $recordActions = @([regex]::Matches($actionsBlock, '"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
 $launcherActionsBlock = [regex]::Match((Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1') -Raw),
     "expected = @\(([^)]*)\)").Groups[1].Value
 $launcherActions = @([regex]::Matches($launcherActionsBlock, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
-if ($recordActions.Count -ne 7 -or ($recordActions -join ',') -cne ($launcherActions -join ',')) {
+if ($recordActions.Count -ne 8 -or ($recordActions -join ',') -cne ($launcherActions -join ',')) {
     throw "The launcher's judged physical actions differ from the record's: $($launcherActions -join ',')"
 }
 # The allowance writer (review C5): what it writes from recorded selection
@@ -913,6 +928,24 @@ try {
         castingScenario = $false; violations = @()
         selection = [ordered]@{ selected = $true; recipe = 'finite-direct-mixed'; castings = @('qual-cast-1', 'qual-cast-2') }
         forecast = @([ordered]@{ name = 'stop'; projectionId = $finiteIds[0]; castingIds = @('qual-cast-1', 'qual-cast-2') }) } }
+    # H3: a cold-moon physical selection (typed seed evidence, digest record
+    # whose cap is exactly its Long castings) gets a cf-physical allowance
+    # the launcher accepts; an unseeded selection or a whole-plan cap is
+    # refused.
+    foreach ($physCase in @('phys-select', 'phys-unseeded', 'phys-whole-plan-cap')) {
+        $outcomeCase = [ordered]@{ violations = @(); notes = @('cold-seed:long:caster>target;source=s')
+            coldSessionBeforeMoon = $true; seedLongCastings = @('seed-long-1'); seedImportantCastings = @('seed-important-1') }
+        $digestCase = [ordered]@{ runId = $physCase; routineId = 'long'; planDigest = ('f' * 64); castings = 1
+            planCastings = 16; executionMode = 'instant'; longCastings = @('seed-long-1') }
+        if ($physCase -ceq 'phys-unseeded') { $outcomeCase.seedLongCastings = @() }
+        if ($physCase -ceq 'phys-whole-plan-cap') { $digestCase.castings = 16 }
+        New-WriterSelection $physCase 'live-workspace-physical' 'instant' @{
+            'physical-workspace.json' = $outcomeCase; 'cf-plan-digest.json' = $digestCase }
+        $physRequestPath = Join-Path $writerEvidence "$physCase\runtime-request.json"
+        $physRequest = Read-KbpJson $physRequestPath
+        $physRequest.parameters | Add-Member -NotePropertyName physicalExpectation -NotePropertyValue 'select'
+        Write-KbpJsonAtomic $physRequestPath $physRequest
+    }
     $classicPlan = [ordered]@{ executionMode = 'animated'; planDigest = ('d' * 64)
         steps = @([ordered]@{ index = 0; provider = 'p'; targets = @('t'); pool = 'x|unlimited'; unlimited = $true }) }
     $classicSelection = [ordered]@{ castingScenario = $false; planDigest = ('d' * 64); planSteps = 1; violations = @() }
@@ -958,6 +991,18 @@ try {
         [string]($classicJson | ConvertFrom-Json).approvedPlanDigest -cne ('d' * 64)) {
         throw 'The written Classic allowance is not what the launcher accepts.'
     }
+    $physPath = & $writerScript -Kind cf-physical -RunId 'phys-run' -SelectionRunId 'phys-select' -ExecutionMode instant @writerCommon |
+        Select-Object -Last 1
+    $physJson = [IO.File]::ReadAllText($physPath)
+    $physWritten = $physJson | ConvertFrom-Json
+    if ($null -ne (Get-KbpCfAllowanceBuildRefusal -AllowanceJson $physJson -RunId 'phys-run' `
+            -BuildManifest $writerManifest -ExecutionMode 'instant') -or
+        $null -ne (Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $physJson -ProfileId 'full-user' `
+            -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64) -FixtureGameId 'game') -or
+        [string]$physWritten.approvedPlanDigest -cne ('f' * 64) -or [int]$physWritten.maximumNativeSubmissions -ne 1 -or
+        [string]$physWritten.routineId -cne 'long') {
+        throw 'The written cf-physical allowance is not exactly the seeded Long plan the launcher accepts.'
+    }
     $classicBytes = [IO.File]::ReadAllBytes($classicPath)
     $writerRefusals = [ordered]@{
         'existing-allowance' = @{ Kind = 'classic'; RunId = 'classic-run'; SelectionRunId = 'classic-select'; ExecutionMode = 'animated' }
@@ -966,6 +1011,8 @@ try {
         'other-kind-evidence' = @{ Kind = 'qualification'; RunId = 'qual-run-2'; SelectionRunId = 'classic-select'; ExecutionMode = 'animated' }
         'reused-run-id' = @{ Kind = 'classic'; RunId = 'classic-select'; SelectionRunId = 'classic-select'; ExecutionMode = 'animated' }
         'recipe-not-asked-for' = @{ Kind = 'qualification'; RunId = 'finite-run-2'; SelectionRunId = 'finite-unasked'; ExecutionMode = 'instant' }
+        'phys-unseeded' = @{ Kind = 'cf-physical'; RunId = 'phys-run-2'; SelectionRunId = 'phys-unseeded'; ExecutionMode = 'instant' }
+        'phys-whole-plan-cap' = @{ Kind = 'cf-physical'; RunId = 'phys-run-3'; SelectionRunId = 'phys-whole-plan-cap'; ExecutionMode = 'instant' }
     }
     foreach ($case in $writerRefusals.Keys) {
         $arguments = $writerRefusals[$case]

@@ -468,6 +468,8 @@ namespace KingmakerBuffPlanner.UI
                     ? string.Empty : chipOption.Provider.Description;
                 string chipDuration = chipOption == null
                     ? string.Empty : chipOption.Provider.DurationText;
+                string chipTitle = chipOption == null
+                    ? string.Empty : chipOption.Provider.DisplayName;
                 chips.Add(new CastingGraphCasting(casting.CastingId, casting.RoutineId,
                     casting.Order, casting.CasterUnitId,
                     casting.Provider == null ? null : casting.Provider.Canonical,
@@ -486,7 +488,7 @@ namespace KingmakerBuffPlanner.UI
                         whole.Readiness == ResolvedCastingReadiness.Blocked,
                     casting.IsExecutable && whole != null &&
                         whole.Readiness == ResolvedCastingReadiness.AlreadySatisfied,
-                    chipDescription, chipDuration));
+                    chipDescription, chipDuration, chipTitle));
             }
             // Parallel castings (same caster, source and target) stay distinct.
             foreach (IGrouping<string, CastingGraphCasting> same in chips.GroupBy(value =>

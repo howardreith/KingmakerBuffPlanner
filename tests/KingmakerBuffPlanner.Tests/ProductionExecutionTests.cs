@@ -123,6 +123,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("qualification-scenario-requests", () => TestQualificationScenarioRequests(root));
             Run("classic-cast-scenario-requests-and-host-order", () => TestClassicScenarioRequests(root));
             Run("cf-physical-grant-digest-allowance-boundary-and-judgement", TestCfPhysicalGrantChain);
+            Run("cold-moon-grant-cap-is-exactly-long-and-graph-overflows", TestColdMoonGrantCapAndOverflowSeed);
             // Last: it takes the process-wide runtime-test lock.
             Run("production-execution-wiring-and-session-lock", TestProductionExecutionWiring);
         }
@@ -2486,6 +2487,39 @@ namespace KingmakerBuffPlanner.Tests
         // everything without a grant and delegates exactly the approved
         // submission to production, and the physical judgement knows both
         // expectations (select: refused by the lock; cast: run once).
+        // r14 (beta-bff840a2r14 allow-phys): the digest record counted every
+        // routine's castings (the compiled plan always holds all of them),
+        // so the single-use grant's cap was looser than Long; and the
+        // allowance writer still demanded the pre-v1.2 seed note (H3). The
+        // cap is now exactly the seeded Long castings, cross-checked by the
+        // writer from typed evidence; the Short routine is seeded to
+        // overflow the graph so the physical wheel really scrolls (D13).
+        private static void TestColdMoonGrantCapAndOverflowSeed()
+        {
+            DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+            while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                directory = directory.Parent;
+            if (directory == null) throw new InvalidOperationException("Repository root was not discoverable.");
+            string host = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
+                "RuntimeTesting", "RuntimeTestHost.cs"));
+            string writer = File.ReadAllText(Path.Combine(directory.FullName, "scripts", "New-KbpRunAllowance.ps1"));
+            if (!host.Contains("int moonCastings = compiled.Castings.Count(value => value != null && value.RoutineId == \"long\");") ||
+                !host.Contains("{ \"castings\", moonCastings },") ||
+                host.Contains("int moonCastings = compiled.Castings.Count;"))
+                throw new InvalidOperationException("The cold-moon grant cap is not exactly Long's castings.");
+            if (writer.Contains("seed:applied:*") ||
+                !writer.Contains("@($outcome.seedLongCastings).Count -lt 1") ||
+                !writer.Contains("@($digestRecord.longCastings).Count -ne $steps"))
+                throw new InvalidOperationException("The cf-physical allowance writer does not read the cold-seed evidence.");
+            int shortSeed = host.IndexOf("index < PhysicalWorkspaceRecord.GraphOverflowCastings", StringComparison.Ordinal);
+            int durable = host.IndexOf("cold-seed:not-durable:", StringComparison.Ordinal);
+            int routineClick = host.IndexOf("RequestPhysical(\"cf-routine-short\", \"click\"", StringComparison.Ordinal);
+            int wheel = host.IndexOf("RequestPhysical(\"cf-wheel\", \"wheel\"", StringComparison.Ordinal);
+            if (shortSeed < 0 || durable < 0 || shortSeed > durable || routineClick < 0 || wheel < 0 || routineClick > wheel ||
+                PhysicalWorkspaceRecord.GraphOverflowCastings * 56 < 705)
+                throw new InvalidOperationException("The Short routine is not seeded to overflow before the wheel.");
+        }
+
         private static void TestCfPhysicalGrantChain()
         {
             List<ProviderPlanningOption> options;
@@ -2695,6 +2729,11 @@ namespace KingmakerBuffPlanner.Tests
         // the graph beneath unmoved.
         private static void WithVisibleDescription(PhysicalWorkspaceRecord record)
         {
+            // D13: the Short tab, seeded to overflow, was selected physically.
+            for (int index = 1; index <= PhysicalWorkspaceRecord.GraphOverflowCastings; index++)
+                record.SeedShortCastings.Add("seed-short-" + index);
+            record.RoutineSelected = true;
+            record.InspectTitleNative = true;
             record.InspectPanelWidth = 760f;
             record.InspectPanelHeight = 520f;
             record.InspectTitle = "#1 Resistance";
@@ -7519,6 +7558,16 @@ namespace KingmakerBuffPlanner.Tests
                 { "inspect:closed-by-wheel", r => r.InspectOpenAfterWheels = false },
                 { "inspect:wheel-moved-graph:0.7>0.5", r => r.GraphScrollUnderInspectAfter = 0.5f },
                 { "unacknowledged:cf-long-wheel", r => r.Acknowledged.Remove("cf-long-wheel") },
+                // D12: titled "#1 heighten-0" in r14 instead of the spell name.
+                { "inspect:title-not-spell-name:#1 Resistance", r => r.InspectTitleNative = false },
+                // D13: the graph must overflow and scroll under the physical
+                // wheel after the Short tab was clicked.
+                { "unacknowledged:cf-routine-short", r => r.Acknowledged.Remove("cf-routine-short") },
+                { "routine-tab:not-selected", r => r.RoutineSelected = false },
+                { "graph-seed:short=0", r => r.SeedShortCastings.Clear() },
+                { "graph-scroll:not-applicable:no-overflow", r => { r.GraphOverflow = false; r.GraphScrollAfter = 1f; } },
+                { "moon:routine-crossover:seed-short-3=EffectConfirmed",
+                    r => r.MoonRunEntries.Add("seed-short-3=EffectConfirmed") },
                 // E12 cold moon: truly cold, Long only, exactly once.
                 { "moon:not-cold:session-existed", r => r.ColdSessionBeforeMoon = false },
                 { "moon:not-cold:editor-opened", r => r.EditorNeverOpenedBeforeMoon = false },
@@ -7554,11 +7603,14 @@ namespace KingmakerBuffPlanner.Tests
             unreadable.DocumentSignatureBeforeBrowse = null;
             if (!unreadable.Violations().Contains("inspect:document-mutated"))
                 throw new InvalidOperationException("An unread document signature was accepted.");
+            // D13: a graph that fits proves no scrolling; in the casting-first
+            // run (seeded to overflow) it is a violation, never a pass.
             PhysicalWorkspaceRecord fits = good();
             fits.GraphOverflow = false;
             fits.GraphScrollAfter = 1f;
-            if (fits.Violations().Count != 0 || fits.GraphWheelEvidence != "not-applicable:no-overflow")
-                throw new InvalidOperationException("A fitting graph was judged as a scroll claim.");
+            if (fits.GraphWheelEvidence != "not-applicable:no-overflow" ||
+                !fits.Violations().Contains("graph-scroll:not-applicable:no-overflow"))
+                throw new InvalidOperationException("A fitting graph passed the casting-first scroll judgement.");
         }
 
         // The area and cantrip diagnostics only read: no transition is used,

@@ -3556,10 +3556,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 CastingQualificationRecipe.EffectActive(inputs.LiveEffects, casting.DirectTargetUnitId, expected);
         }
 
-        // The right-clicked chip's native description, read independently of
-        // the view: the casting from the stored document, its source from a
-        // fresh snapshot (the adapter's localized blueprint description).
-        private string ChipNativeDescription(string chip)
+        // The right-clicked chip's source, read independently of the view:
+        // the casting from the stored document, its source from a fresh
+        // snapshot (the adapter's localized blueprint name and description).
+        private ProviderSnapshot ChipProvider(string chip)
         {
             if (chip == null || !chip.StartsWith("chip:", StringComparison.Ordinal)) return null;
             string castingId = chip.Substring(5);
@@ -3568,8 +3568,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (session == null || session.Document == null || inputs == null) return null;
             PlannedCasting casting = session.Document.Castings.FirstOrDefault(value => value != null &&
                 string.Equals(value.CastingId, castingId, StringComparison.Ordinal));
-            ProviderSnapshot provider = casting == null ? null : SeedProvider(inputs, casting);
-            return provider == null ? null : provider.Description;
+            return casting == null ? null : SeedProvider(inputs, casting);
         }
 
         // Every distinct native description in the fresh snapshot, joined
@@ -3718,13 +3717,35 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _physicalRecord.AddNote("cold-seed:" + routine + ":" + casting.CasterUnitId + ">" +
                         casting.DirectTargetUnitId + ";source=" + casting.SourceId);
                 }
+                // D13: the Short routine (never run by the moon) holds
+                // parallel castings of the Long seed's exact source, cycling
+                // over the Long and Important targets, so the continuous
+                // scroll overflows when its tab is shown.
+                Domain.Authoring.PlannedCasting longSeed = seeded[0];
+                string[] shortTargets = { seeded[0].DirectTargetUnitId, seeded[1].DirectTargetUnitId };
+                for (int index = 0; index < PhysicalWorkspaceRecord.GraphOverflowCastings; index++)
+                {
+                    var shortSeed = new Domain.Authoring.PlannedCasting("seed-short-" + (index + 1), "short", 0,
+                        longSeed.SourceId, longSeed.Ability, longSeed.CasterUnitId, longSeed.SpellbookGuid,
+                        CastingTargetMode.DirectTarget, shortTargets[index % 2], null, null, null, null,
+                        ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null);
+                    AuthoringEditResult addedShort = earlier.AddCastingForRuntime(shortSeed);
+                    if (!addedShort.Applied)
+                        return FinishPhysical("cold-seed:refused:short:" + addedShort.Reason);
+                    _physicalRecord.SeedShortCastings.Add(shortSeed.CastingId);
+                }
+                _physicalRecord.AddNote("cold-seed:short:" + _physicalRecord.SeedShortCastings.Count +
+                    " parallel castings of " + longSeed.SourceId);
                 string storeStatus;
                 if (UI.CastingWorkspaceSession.SavedIntentSignature(_modEntry.Path, campaign, out storeStatus) == null)
                     return FinishPhysical("cold-seed:not-durable:" + storeStatus);
                 // The approved-plan identity of Long, from the stored intent.
                 Planning.ExplicitCastingPlan compiled = earlier.CompileForRuntime(inputs, "long");
                 string moonDigest = Execution.CastingFirstPlanDigest.Of("long", compiled);
-                int moonCastings = compiled.Castings.Count;
+                // The digest covers the whole stored plan; the single-use
+                // grant's submission cap is exactly Long's castings (the
+                // compiled plan always holds every routine's castings).
+                int moonCastings = compiled.Castings.Count(value => value != null && value.RoutineId == "long");
                 string mode = earlier.ExecutionSettings.Mode;
                 AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "cf-plan-digest.json"), new JObject
                     {
@@ -3732,9 +3753,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         { "routineId", "long" },
                         { "planDigest", moonDigest },
                         { "castings", moonCastings },
+                        { "planCastings", compiled.Castings.Count },
                         { "executionMode", mode },
                         { "longCastings", new JArray(_physicalRecord.SeedLongCastings.Cast<object>().ToArray()) },
-                        { "importantCastings", new JArray(_physicalRecord.SeedImportantCastings.Cast<object>().ToArray()) }
+                        { "importantCastings", new JArray(_physicalRecord.SeedImportantCastings.Cast<object>().ToArray()) },
+                        { "shortCastings", new JArray(_physicalRecord.SeedShortCastings.Cast<object>().ToArray()) }
                     }.ToString(Formatting.Indented) + Environment.NewLine);
                 if (_physicalRecord.MoonExpectation != "select")
                 {
@@ -3844,6 +3867,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 BuffPlannerUiRoot.BeginPhysicalInputProbe();
                 _physicalRecord.DocumentSignatureBeforeBrowse =
                     BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                // D13: the Short tab (its castings overflow the graph) is
+                // clicked physically; selecting a routine is browsing only.
+                Vector2? tab = view.ScreenPointForRuntime("routine:short");
+                if (tab == null) return FinishPhysical("routine-tab-not-on-screen");
+                return RequestPhysical("cf-routine-short", "click", tab.Value, null, 30);
+            }
+            if (_physicalStep == 30)
+            {
+                if (settled < 1) return false;
+                if (view == null) return FinishPhysical("workspace-closed-early:routine");
+                UI.CastingWorkspaceSession shown = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                _physicalRecord.RoutineSelected = shown != null &&
+                    string.Equals(shown.SelectedRoutineId, "short", StringComparison.Ordinal);
+                _physicalRecord.GraphCastingsShown = view.GraphCastingCountForRuntime;
                 _physicalRecord.AddNote("graph-castings:" + view.GraphCastingCountForRuntime);
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
                     "physical-cf-graph.png"));
@@ -3863,7 +3900,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 // Captured once, right after the forward wheel; the reverse
                 // recovery below must not overwrite the scroll evidence.
                 if (_physicalRecord.GraphScrollAfter == null)
+                {
                     _physicalRecord.GraphScrollAfter = view.GraphScrollPositionForRuntime;
+                    CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
+                        "physical-cf-graph-scrolled.png"));
+                }
                 string chip = view.InspectTargetPartForRuntime;
                 if (chip == null && _physicalRecord.GraphOverflow && _physicalWheelBacks < 2)
                 {
@@ -3902,7 +3943,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.InspectPanelHeight = size == null ? (float?)null : size.Value.y;
                 _physicalRecord.InspectTitle = view.SpellInspectTitleForRuntime;
                 string body = view.SpellInspectBodyForRuntime;
-                string expected = ChipNativeDescription(_physicalRecord.InspectChip);
+                ProviderSnapshot chipProvider = ChipProvider(_physicalRecord.InspectChip);
+                string expected = chipProvider == null ? null : chipProvider.Description;
+                _physicalRecord.InspectTitleNative = chipProvider != null &&
+                    !string.IsNullOrWhiteSpace(chipProvider.DisplayName) && _physicalRecord.InspectTitle != null &&
+                    _physicalRecord.InspectTitle.EndsWith(" " + chipProvider.DisplayName, StringComparison.Ordinal);
                 _physicalRecord.InspectBodyChars = body == null ? -1 : body.Length;
                 _physicalRecord.InspectExpectedChars = expected == null ? -1 : expected.Length;
                 _physicalRecord.InspectBodyNative = !string.IsNullOrWhiteSpace(expected) &&
@@ -4246,6 +4291,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "editorNeverOpenedBeforeMoon", Nullable(record.EditorNeverOpenedBeforeMoon) },
                 { "seedLongCastings", new JArray(record.SeedLongCastings.Cast<object>().ToArray()) },
                 { "seedImportantCastings", new JArray(record.SeedImportantCastings.Cast<object>().ToArray()) },
+                { "seedShortCastings", new JArray(record.SeedShortCastings.Cast<object>().ToArray()) },
+                { "routineSelected", Nullable(record.RoutineSelected) },
+                { "graphCastingsShown", record.GraphCastingsShown },
                 { "moonRunsStarted", Nullable(record.MoonRunsStarted) },
                 { "moonRunRoutine", record.MoonRunRoutine },
                 { "moonRunTerminal", record.MoonRunTerminal },
@@ -4275,6 +4323,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "inspectBodyChars", record.InspectBodyChars },
                 { "inspectExpectedChars", record.InspectExpectedChars },
                 { "inspectBodyNative", Nullable(record.InspectBodyNative) },
+                { "inspectTitleNative", Nullable(record.InspectTitleNative) },
                 { "inspectOverflow", record.InspectOverflow },
                 { "inspectScrollBefore", Nullable(record.InspectScrollBefore) },
                 { "inspectScrollAfter", Nullable(record.InspectScrollAfter) },

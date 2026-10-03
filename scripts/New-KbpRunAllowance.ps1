@@ -116,16 +116,25 @@ elseif ($Kind -ceq 'cf-physical') {
         @($outcome.violations).Count -ne 0) {
         throw 'The selection run is not a clean physical selection; no allowance is written.'
     }
-    if (-not (@($outcome.notes) | Where-Object { $_ -clike 'seed:applied:*' })) {
-        throw 'The physical selection did not seed a plan; no allowance is written.'
+    # v1.2 cold moon (H3, beta-bff840a2r14 allow-phys): the selection seeds
+    # the plan through an earlier, throwaway session BEFORE any planner
+    # session exists and records the seeded castings as typed evidence (the
+    # pre-v1.2 "seed applied" note no longer exists).
+    $outcomeNames = @($outcome.PSObject.Properties | ForEach-Object Name)
+    if ($outcomeNames -cnotcontains 'seedLongCastings' -or $outcomeNames -cnotcontains 'coldSessionBeforeMoon' -or
+        @($outcome.seedLongCastings).Count -lt 1 -or -not [bool]$outcome.coldSessionBeforeMoon) {
+        throw 'The physical selection did not seed a cold Long plan; no allowance is written.'
     }
     $digestRecord = Read-KbpJson (Join-Path $selectionDir 'cf-plan-digest.json')
     $digest = [string]$digestRecord.planDigest
     $steps = [int]$digestRecord.castings
     $digestMode = [string]$digestRecord.executionMode
+    # The digest covers the whole stored plan; the grant's submission cap is
+    # exactly Long's castings - the same ones the selection seeded.
     if ([string]$digestRecord.routineId -cne 'long' -or $digest -cnotmatch '^[0-9a-f]{64}$' -or
-        $steps -lt 1 -or $steps -gt 24) {
-        throw 'The physical selection did not record one Long plan digest with 1..24 castings; no allowance is written.'
+        $steps -lt 1 -or $steps -gt 24 -or @($digestRecord.longCastings).Count -ne $steps -or
+        (@($digestRecord.longCastings) -join ',') -cne (@($outcome.seedLongCastings) -join ',')) {
+        throw 'The physical selection did not record one Long plan digest whose cap is exactly its seeded Long castings; no allowance is written.'
     }
     if ($digestMode -cne $ExecutionMode) {
         throw "The physical selection ran in $digestMode mode, not $ExecutionMode; no allowance is written."

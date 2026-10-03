@@ -1083,7 +1083,7 @@ function Assert-KbpScenarioOutcome {
         # Escape-menu veil closes, reverse wheel recovery) are allowed beside
         # it and every requested action is still checked for its
         # acknowledgement below.
-        $expected = @('cf-moon', 'cf-wheel', 'cf-right-click', 'cf-inspect-wheel', 'cf-long-wheel',
+        $expected = @('cf-moon', 'cf-routine-short', 'cf-wheel', 'cf-right-click', 'cf-inspect-wheel', 'cf-long-wheel',
             'cf-escape-inspect', 'cf-escape-close')
         $conditional = @('cf-menu-close-1', 'cf-menu-close-2', 'cf-menu-close-3',
             'cf-wheel-back-1', 'cf-wheel-back-2')
@@ -1119,7 +1119,8 @@ function Assert-KbpScenarioOutcome {
         # exactly the chip's own native description; the physical wheel over
         # it scrolled the long native text, never closed it and never moved
         # the graph beneath.
-        $inspectKeys = @('screen', 'inspectPanelWidth', 'inspectPanelHeight', 'inspectTitle', 'inspectBodyChars',
+        $inspectKeys = @('screen', 'inspectPanelWidth', 'inspectPanelHeight', 'inspectTitle', 'inspectTitleNative',
+            'inspectBodyChars', 'seedShortCastings', 'routineSelected', 'graphOverflow', 'graphWheelEvidence',
             'inspectExpectedChars', 'inspectBodyNative', 'inspectOverflow', 'inspectScrollBefore',
             'inspectScrollAfter', 'longProbeChars', 'longProbeOverflow', 'longScrollBefore', 'longScrollAfter',
             'inspectOpenAfterWheels', 'graphScrollUnderInspectBefore', 'graphScrollUnderInspectAfter')
@@ -1133,6 +1134,7 @@ function Assert-KbpScenarioOutcome {
             [double]$record.inspectPanelWidth -lt 0.25 * [double]$screenParts[0] -or
             [double]$record.inspectPanelHeight -lt 0.25 * [double]$screenParts[1] -or
             [string]::IsNullOrWhiteSpace([string]$record.inspectTitle) -or
+            $null -eq $record.inspectTitleNative -or -not [bool]$record.inspectTitleNative -or
             $null -eq $record.inspectBodyNative -or -not [bool]$record.inspectBodyNative -or
             [int]$record.inspectExpectedChars -le 0 -or [int]$record.inspectBodyChars -ne [int]$record.inspectExpectedChars) {
             throw "The physical run's description was not visibly the chip's native text: $path"
@@ -1147,6 +1149,14 @@ function Assert-KbpScenarioOutcome {
             $null -eq $record.graphScrollUnderInspectBefore -or $null -eq $record.graphScrollUnderInspectAfter -or
             [Math]::Abs([double]$record.graphScrollUnderInspectAfter - [double]$record.graphScrollUnderInspectBefore) -ge 0.001) {
             throw "The physical run's description did not scroll its own long content in isolation: $path"
+        }
+        # D13: the continuous scroll REALLY scrolled - the Short tab (seeded
+        # to overflow) was selected by the physical click and the wheel moved
+        # the overflowing graph (every earlier run's graph fitted).
+        if (@($record.seedShortCastings).Count -lt 14 -or $null -eq $record.routineSelected -or
+            -not [bool]$record.routineSelected -or -not [bool]$record.graphOverflow -or
+            [string]$record.graphWheelEvidence -cne 'scrolled') {
+            throw "The physical run's continuous scroll did not overflow and scroll under the physical wheel: $path"
         }
         if ($expectation -ceq 'select') {
             if ([bool]$record.moonRunStarted -or

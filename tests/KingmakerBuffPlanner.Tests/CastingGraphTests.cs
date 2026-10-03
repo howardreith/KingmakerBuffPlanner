@@ -1066,6 +1066,14 @@ namespace KingmakerBuffPlanner.Tests
                 view.Castings[0].TargetUnitId == "unit-t1" && view.Castings[0].Selected &&
                 view.Inspector != null && view.Inspector.CastingId == casting.CastingId,
                 "the graph does not show one selected connection with its inspector");
+            // D12: the right-click description is titled with the spell as the
+            // game names it (the source's display name), never the provider
+            // key's last segment ("level-2" here; "heighten-0" in game).
+            string displayName = inputs.ProviderOptions.First(option =>
+                option.Provider.Key.Canonical == key).Provider.DisplayName;
+            Expect(!string.IsNullOrWhiteSpace(displayName) && view.Castings[0].SpellTitle == displayName &&
+                !key.EndsWith("|" + view.Castings[0].SpellTitle, StringComparison.Ordinal),
+                "the casting's description title is not the spell's display name: " + view.Castings[0].SpellTitle);
             GraphLayoutResult layout = CastingGraphLayout.Compute(view, new GraphLayoutMetrics());
             GraphConnection connection = layout.ConnectionFor(casting.CastingId);
             GraphLayoutMetrics m = new GraphLayoutMetrics();

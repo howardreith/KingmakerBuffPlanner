@@ -227,6 +227,8 @@ namespace KingmakerBuffPlanner.UI
             }
             else if (part != null && part.StartsWith("tile:", StringComparison.Ordinal) && _catalogueContent != null)
                 rect = _catalogueContent.Find("Source." + part.Substring(5)) as RectTransform;
+            else if (part != null && part.StartsWith("routine:", StringComparison.Ordinal) && _routineBar != null)
+                rect = _routineBar.Find("Routine." + part.Substring(8)) as RectTransform;
             else if (part != null && _graphContent != null)
             {
                 if (part.StartsWith("caster:", StringComparison.Ordinal))
@@ -1307,7 +1309,7 @@ namespace KingmakerBuffPlanner.UI
             ApplyRowHover(button, casting.Selected);
             button.onClick.AddListener(() => Command(() => _session.FocusGraphCasting(captured)));
             AddSpellInspect(button, () => _session.BuildGraph(_freshInputs()),
-                casting.OrderLabel + " " + ChipSpellTitle(casting),
+                ChipInspectTitle(casting, _lastView),
                 casting.SpellDescription, casting.SpellDurationText, true);
             string status = casting.StatusLabel +
                 (casting.ShortInOnePass ? " · short in one pass" : string.Empty) +
@@ -1339,11 +1341,16 @@ namespace KingmakerBuffPlanner.UI
 
         // The chip's spell title for the inspect: the provider key's tail
         // (book/level context lives in the inspector), or the order label.
-        private static string ChipSpellTitle(CastingGraphCasting casting)
+        // "#2 Resistance": the casting's order and the spell as the game names
+        // it; when the source is gone from the party snapshot, the buff shown
+        // in the banner (the graph only shows that buff's castings) - never
+        // a provider-key fragment (D12).
+        internal static string ChipInspectTitle(CastingGraphCasting casting, CastingGraphView view)
         {
-            string key = casting.SourceProviderKey ?? string.Empty;
-            int bar = key.LastIndexOf('|');
-            return bar >= 0 && bar + 1 < key.Length ? key.Substring(bar + 1) : key;
+            string name = !string.IsNullOrWhiteSpace(casting.SpellTitle) ? casting.SpellTitle
+                : view != null && !string.IsNullOrWhiteSpace(view.SelectedSourceCaption)
+                    ? view.SelectedSourceCaption : "Spell";
+            return (casting.OrderLabel + " " + name).Trim();
         }
 
         // A straight ink segment: one rotated Image (graph y points down,
