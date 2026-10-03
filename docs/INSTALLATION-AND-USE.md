@@ -10,14 +10,14 @@
 
 1. Exit Kingmaker and back up the whole `Mods\KingmakerBuffPlanner` folder (including `UserSettings`) outside `Mods`.
 2. Extract the release ZIP into Kingmaker's `Mods` directory. The resulting path must be `Mods\KingmakerBuffPlanner\Info.json`.
-3. Start Kingmaker through Steam in the normal way and confirm Unity Mod Manager lists `KingmakerBuffPlanner` once, with the version of the ZIP you installed (0.2.0).
+3. Start Kingmaker through Steam in the normal way and confirm Unity Mod Manager lists `KingmakerBuffPlanner` once, with the version of the ZIP you installed (0.3.0).
 4. Load a campaign. Open the planner with the HUD's gear button or Ctrl+Shift+B.
 
 Do not copy game DLLs, Harmony, Unity Mod Manager, Call of the Wild, or another mod into the Kingmaker Buff Planner folder.
 
 ## Plan and run
 
-0.2.0's planner is the casting-first planner; [the player guide](CASTING-FIRST-PLAYER-GUIDE.md) describes it in full. Each casting is one cast with its own caster, exact spell source, target and enhancements; every edit saves itself. The HUD's moon, diamond and sun buttons run the Long, Important and Short routines with one click, and every run reports what it cast, skipped or refused and why. The first open imports a classic plan from an earlier version once and archives the original.
+0.3.0's planner is the casting-first planner; [the player guide](CASTING-FIRST-PLAYER-GUIDE.md) describes it in full. Each casting is one cast with its own caster, exact spell source, target and enhancements; every edit saves itself. The HUD's moon, diamond and sun buttons run the Long, Important and Short routines with one click, and every run reports what it cast, skipped or refused and why. The first open imports a classic plan from an earlier version once and archives the original.
 
 Profiles are external JSON under `Mods\KingmakerBuffPlanner\UserSettings`. They are keyed to the current campaign and are not written into Kingmaker saves. The repository keeps up to three prior valid backups and never overwrites a plan file it cannot read.
 
@@ -27,4 +27,4 @@ Exit the game before replacing the mod folder. To preserve settings across a man
 
 ## Qualification boundary
 
-0.2.0 was qualified by the full source-only gate and guarded in-game runs on disposable test campaigns; see `docs/E01-E27-ACCEPTANCE-MATRIX.md` and `docs/QUALIFICATION.md` for the exact scope and the known limitations (windowed display is not qualified).
+0.3.0 (the same code as 0.2.0) was qualified by the full source-only gate and guarded in-game runs on disposable test campaigns; see `docs/E01-E27-ACCEPTANCE-MATRIX.md` and `docs/QUALIFICATION.md` for the exact scope and the known limitations (windowed display is not qualified).
