@@ -1213,3 +1213,46 @@ harness 27/27, package 4/4, WhatIf 5/5, publisher gate 3/3. The published
 asset was re-downloaded and its hash and package structure verified.
 Live gameplay acceptance remains UNVERIFIED and is disclosed in the
 release notes; manual owner testing is the acceptance path.
+
+## Everyday-use v1.2 private preview qualification — 2026-10-03
+
+Delivered candidate: source commit `8d7681d03752f3f7170f25f7d45029f71c46a884`,
+package `5b24e2eafee69b18898894b6e9a5cfb9b2c8e625a561494cb2234766097d8d17`,
+DLL `deee7b1de54daee9e890f6680c8e0d4db09674b12c394e2d2d6c2d3e460cf65b`,
+MVID `1e762004-8200-430e-853e-d61456a627ae`.
+
+Deterministic gate at that exact tree (`artifacts/gate-8d7681d.log`): source
+validation 42/42, protocol 398/398, runtime harness filesystem 38/38, package
+validation 4/4, deployment WhatIf purity 5/5, launcher -File WhatIf purity
+13/13, fixture inventory 3/3, Restore-InstallLocal 16/16, guarded publisher
+3/3.
+
+Native qualification, batch r15 (41/41 jobs done and verified, run ids
+`beta-8d7681d0r15-*`, every run restored with protected saves clean):
+
+- Physical-input casting-first run (phys-sel-01, allowance, phys-cast-01):
+  cold moon click runs Long exactly once under a single-use grant capped at
+  Long's castings, editor closed, effect observed; routine tab, overflowing
+  graph scrolled by the physical wheel, right-click native description with
+  native title, long-text scroll, Escape order, no game menu.
+- Save reload (reload-01) and first-open import (imp-01) with fresh-session
+  reconstruction from disk.
+- Share Transmutation and Share + Powerful Change (inspect, select,
+  allowance, cast) in Instant and Animated: ally effect, exact slot and
+  Arcane Reservoir charges, plain witness cast, whole-routine shortage
+  refusal, toggles unchanged.
+- Paid spell slots with Stop/complete/repeat/recast (Instant and Animated),
+  group, class-feature enhancement, Extend rod and single-use ability pool
+  chains.
+- 1920x1080 fullscreen workspace qualification (w1080-01) and the Advanced
+  graph qualification (adv-01) with required global-accounting phases and
+  physical hover ownership.
+
+Not qualified: windowed display (every 1920x1080 run is fullscreen; H2);
+physical clicks on the Important/Short HUD buttons; a full quit-and-restart
+of the game; an induced save failure in game; metamagic spell variants,
+pets, multi-use ability pools, area change during a run. The owner has not
+accepted this preview; it is delivered for the owner's self-paced trial.
+
+The row-by-row verdicts on the original E01–E27 definitions are in
+`docs/E01-E27-ACCEPTANCE-MATRIX.md`.

@@ -2431,3 +2431,172 @@ work block implements exactly this):
   updated, all pushed. Remaining: dispatch r13, fill the matrix cells,
   private delivery with verified bytes and retrieval instructions.
 
+## Checkpoint 2026-10-03 — Claude takeover: r13-r15, D1-D13 + H1-H5, delivered candidate 8d7681d
+
+- Branch `codex/kingmaker-buff-planner-everyday-use`; delivered (tested) source
+  commit `8d7681d03752f3f7170f25f7d45029f71c46a884`, pushed through the guarded
+  helper. Version string 0.2.0-rc6 (unchanged development convention; builds
+  are told apart by commit, hash and MVID). Records commits follow on top
+  (documentation only; no code change after the tested commit).
+- Candidate identity (Build-Local at 8d7681d, `artifacts/build-local-8d7681d.log`):
+  package `5b24e2eafee69b18898894b6e9a5cfb9b2c8e625a561494cb2234766097d8d17`,
+  DLL `deee7b1de54daee9e890f6680c8e0d4db09674b12c394e2d2d6c2d3e460cf65b`,
+  MVID `1e762004-8200-430e-853e-d61456a627ae`; frozen with byte-verified copies
+  under `runtime-backups/qualification-frozen/8d7681d0.../FREEZE.json`.
+- Full mandatory gate at that exact tree, `artifacts/gate-8d7681d.log`: source
+  validation 42/42, protocol 398/398, runtime harness 38/38, package 4/4,
+  deployment WhatIf 5/5, launcher WhatIf 13/13, fixture 3/3,
+  Restore-InstallLocal 16/16, guarded publisher 3/3. Earlier gates:
+  `gate-9b788e8.log` FAILED (launcher WhatIf meta-check still pinned six
+  gestures); `gate-bff840a.log` PASS.
+- Gate timing: ~4 h, almost all in four lab-wide purity windows (deployment 1,
+  launcher 3). Before each full gate the launcher WhatIf logic was validated
+  in ~150 s with a temporary, uncommitted copy whose purity windows run their
+  action directly (hidden via .git/info/exclude, deleted afterwards).
+
+### r13 (bound to 3c1c5d4, dispatched at the start of this session)
+
+- 24 jobs done and verified: reload-01, imp-01, the finite (instant,
+  animated), group, enhanced, rod-extend and ability-pool chains with their
+  inspections and selections. This is PRIOR-BUILD evidence (3c1c5d4).
+- `ui-phys-select` (beta-3c1c5d4ar13-phys-sel-01): in-game PASS; the
+  launcher's own judge threw reading the absent `expectedScreen` of an
+  owner-display request under strict mode. Reconciled (failed-reconciled),
+  repaired in a6c8b95 with WhatIf owner-display cases (a mutation run of the
+  old judge reproduced the throw).
+- Share chains (12 jobs) deferred: the r13 harness could not express the
+  shared recipes (B1-B6 in 45c46c6).
+- `ui-windowed` (beta-3c1c5d4ar13-w1080-01): every product assertion PASS;
+  hover sweeps 8-10 hit nothing. H1 (below). Reconciled; `ui-advanced`
+  deferred to r14 (same input path, changed UI). Restoration verified after
+  every run (transactions 344/344 Restored, no KBP/Gunslinger locks, no
+  Kingmaker, protected saves clean).
+
+### Defects found and repaired (each with a regression)
+
+- D1 settings page offered a Classic/casting-first toggle calling casting-first
+  "experimental" and asking for acceptance -> PlannerSettingsText (one-way
+  switch only from a stored Classic choice). e185cc4.
+- D2-D5 Accept/Save ceremony wording in the footer readiness line, mode
+  toggle, HUD tooltips and refusal messages. e185cc4.
+- D6/D7 footer save status was set once at construction (stale "saved",
+  raw machine strings, overlapping the budget line) and no recovery action
+  existed -> live Saved/Saving.../Not saved with Retry save / Reload. e185cc4.
+- D8 the HUD gear ran Long; D9 Run caption. e185cc4.
+- D10 the Escape that closed the planner also reached the native
+  `EscPressed` binding (the game menu opened under the closing planner;
+  phys-sel-01 ended in EscMode) -> the planner marks Escape taken and the
+  InputMatched prefix suppresses EscPressed (assembly-backed IL check of
+  binding 27/EscPressed). d49f15a.
+- Share harness B1-B6 + finite slots + shortage step + preview/persistence/
+  draft-disarm checks (the shared recipes could not run). 45c46c6.
+- E12 cold moon: the physical run now presses the moon BEFORE any planner
+  session exists, from a plan an earlier (throwaway) session stored with
+  Long AND Important castings; judged: Long only, once, under a consumed
+  single-use grant, effects and costs observed, editor never opened, clean
+  close. 0ee5fa0.
+- E02/E26 import: ambiguity kept (every Automatic-caster casting a Draft with
+  no caster), a fresh session from disk equals the imported intent with no
+  re-import, exactly one byte-exact archive, repeated after close. fe82855.
+- D11 the right-click description panel NEVER rendered (SetAnchors edge
+  insets on a point anchor: width -1280, height 0; Close button the same;
+  content had no layout height). r11 and r13 physical-cf-inspect.png show
+  only the dim overlay; the old record judged activeSelf, so the old matrix
+  marked E05/E06 PASS wrongly. Rebuilt on the standard scroll view; the
+  physical run now judges on-screen size, native text equality, a physical
+  wheel over the description that must not move the graph, and a labelled
+  long-native-text probe the wheel must scroll; the launcher re-reads it.
+  268e291 (with a legible header mode label).
+- H1 (harness) the launcher stretched Unity coordinates over the client; on
+  the owner's new 1920x1200 RDP desktop Unity letterboxes a 1920x1080
+  surface (60 px bars; every sample: unityCursor = 1200 - clientY - 61) ->
+  aspect-preserving mapping + mapping in each ack; WhatIf compiles the
+  launcher's own helper and checks the observed geometry. 9b788e8.
+- H2 (harness, NOT repaired) the "windowed" transaction writes Unity
+  FullScreenMode 0 = ExclusiveFullScreen; every w1080 run (r10-r13) reported
+  fullScreen=True. Evidence is labelled 1920x1080 fullscreen; windowed is not
+  claimed (consistent with checkpoint 5).
+
+### Rejected theories
+
+- "Hover under RDP fails because foreground activation is denied": not this
+  time - every hover action was delivered and acknowledged; the misses were
+  geometric (H1).
+- "The w1080 run is windowed": Unity says fullscreen in every run (H2).
+- "E05 passed in r11": the frame shows no panel (D11).
+
+### r14 (bound to bff840a, gate PASS artifacts/gate-bff840a.log, pushed)
+
+- done and verified: beta-bff840a2r14-reload-01, -phys-sel-01 (cold moon
+  refused by the lock; the description panel now visible: 760x520, body equal
+  to the native Resistance text, long-text probe scrolled 1.0>0.975, graph
+  unmoved, Escape closed description then planner, game menu stayed closed),
+  -imp-01 (ambiguity kept, fresh-session reconstruction equal, one archive),
+  -insp-shared-personal, -sel-shared-personal (Brown-Fur Transmuter -> ally,
+  Share intent persisted, preview left the caster unchanged), -insp-finite.
+- failed-reconciled (no game launched in either, nothing staged):
+  allow-phys - H3, the cf-physical writer still demanded the pre-v1.2
+  seed note; cast-shared-personal-instant - H4, the shared-personal purpose
+  was 441 characters against the launcher's 400 bound.
+- Found in the r14 frames/records: D12 (description titled "#1 heighten-0",
+  the provider key's last segment) and D13 (graphWheelEvidence
+  not-applicable:no-overflow in r11, r13 and r14 - the graph never overflowed,
+  so physical graph scrolling had never been demonstrated). Also the digest
+  record counted every routine's castings, so the grant cap was looser than
+  Long.
+- r14 stopped between jobs with the dispatcher's owner-pause hold (set and
+  removed by me, the running job finished first); the remaining 32 jobs
+  deferred so every native result is produced on the repaired candidate.
+- Repairs: 648608f (D12 native spell title; D13 Short routine seeded with 14
+  parallel castings, Short tab clicked physically, only a real scroll passes,
+  frames before/after; H3 typed cold-seed evidence; exact Long grant cap) and
+  8d7681d (H4 shorter purpose, writer-side 400 guard, WhatIf writer cases for
+  both shared recipes in both modes - the old writer fails them). Protocol
+  398/398; fast launcher WhatIf 13/13 at 8d7681d before the full gate.
+
+### r15
+
+All 41 jobs done and verified on 8d7681d (`dispatch\jobs.r15-final.json`;
+run ids `beta-8d7681d0r15-*`; transactions 380/380 Restored afterwards, no
+locks, no Kingmaker, Gunslinger ended/restored, protected saves clean in
+every run). Highlights:
+
+- phys-cast-01 (E12): cold session, editor never opened, allowance valid with
+  a cap of exactly 1, grant consumed after 1 attempt, exactly one Long run
+  (completed, 1 submission, seed-long-1 EffectConfirmed), Long effect landed,
+  Important and the 14 Short castings untouched, editor stayed closed; then
+  the Short tab, the graph wheel (1.0 -> 0.771), the right-click description
+  ("#1 Resistance", native text), its long-text wheel and the two Escapes.
+- Share (E16-E20), Instant and Animated: the personal transmutation landed on
+  the ally through the Brown-Fur provider transaction once; spontaneous-4
+  slot 4 -> 3; reservoir 16 -> 15 (Share) or 16 -> 14 (Share + Powerful
+  Change, Str +6 instead of +4); the plain witness cast spent a slot and no
+  reservoir; the shortage step refused the routine whole with nothing spent;
+  caster toggles identical before and after every step.
+- Finite (both modes): in-flight Stop honest, repeat harmless, recast exact;
+  group, enhanced, rod-extend and ability-pool chains PASS; reload-01 and
+  imp-01 PASS; w1080-01 (fullscreen, H2) and adv-01 PASS including hover
+  ownership and the Advanced global-accounting proof (6-5-6, rod 3-2-2-3,
+  atomic refusal observed).
+- Dispatch note H5: allowance jobs reused the same run id in every batch, so
+  r13/r14 claim files blocked r15's claims; the stale `allow-*` claims were
+  archived (not deleted) to `dispatch\claims-archive\allowance-claims-before-r15`
+  after a graceful `stop`, and `dispatch\build-jobs.ps1` now makes allowance
+  run ids batch-unique (dry-built; jobs.json untouched).
+- r15 desktop was 1920x1080 (acknowledgements record bars=0,0), so H1's
+  letterbox mapping was not exercised live; its WhatIf regression covers it.
+
+### Delivery (2026-10-03)
+
+- Private draft release 399014941 (draft, no tag created, not merged): asset
+  `KingmakerBuffPlanner-0.2.0-rc6-everyday-use-v1.2+8d7681d0.zip` (id
+  607817987) uploaded from the frozen bytes, downloaded back and verified
+  (size, package, DLL in ZIP, MVID, embedded commit/version, entries); the
+  prior beta asset (214b795b..., 661250 bytes) re-downloaded identical before
+  and after. Receipt: `docs/evidence/everyday-use-v1.2-delivery-receipt.md`.
+- The matrix is rebuilt on the ORIGINAL E01-E27 rows; every native verdict
+  cites r15 runs on the delivered candidate.
+- Final lab state: no Kingmaker, dispatcher stopped (no live claim), all
+  transactions Restored, no KBP/Gunslinger locks, Mods restored by each run's
+  transaction, protected saves clean, owner-pause/stop flags absent.
+
