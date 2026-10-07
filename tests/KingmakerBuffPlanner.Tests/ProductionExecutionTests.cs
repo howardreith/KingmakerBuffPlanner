@@ -65,6 +65,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("recovery-player-entry-stop-reload", () => TestStopReloadRecoveryDriver(root, true, false, true));
             Run("recovery-player-entry-in-flight-reload", () => TestStopReloadRecoveryDriver(root, true, true, true));
             Run("recovery-uncertain-native-cleanup-no-second-run", () => TestStopReloadRecoveryDriver(root, true, true, false, true));
+            Run("animated-reload-owned-cancellation-terminal", () => TestAnimatedReloadRecovery(root, false));
+            Run("animated-reload-later-cleanup-failure-retained", () => TestAnimatedReloadRecovery(root, true));
             Run("production-apply-end-to-end-through-host",
                 () => TestProductionApplyEndToEnd(root));
             Run("run-presentation-separates-effects-and-spending", TestRunPresentation);
@@ -6268,6 +6270,117 @@ namespace KingmakerBuffPlanner.Tests
                         new[] { wizard, sorcerer }, pools), options,
                     CastingEffectsWithAbilityAlias("source-bulls", "source-communal", Ability),
                     new CastEnhancementSnapshot[0], null, Live());
+            }
+        }
+
+        private static void TestAnimatedReloadRecovery(string root, bool uncertain)
+        {
+            var original = new FiniteBuffWorld { UncertainCleanup = uncertain };
+            FiniteBuffWorld world = original;
+            var originalAdapter = new RecoveryAnimatedAdapter(original);
+            RecoveryAnimatedAdapter adapter = originalAdapter;
+            var initial = original.Inputs();
+            var selection = CastingQualificationRecipe.Select(CastingQualificationRecipe.CancelReload,
+                initial, "fixture-campaign");
+            var forecast = CastingQualificationForecast.Forecast(selection, initial, "fixture-campaign");
+            string refusal;
+            var allowance = CastingQualificationAllowance.Parse(QualificationAllowanceJson(value =>
+            {
+                value["recipe"] = selection.Recipe;
+                value["executionMode"] = "animated";
+                value["fixtureGameId"] = "fixture-campaign";
+                value["approvedProjectionIds"] = new JArray(forecast.Select(item => item.ProjectionId));
+                value["maximumNativeSubmissions"] = forecast.Sum(item => item.CastingIds.Count);
+            }), "qual-run-1", out refusal);
+            if (allowance == null) throw new InvalidOperationException(refusal);
+            long now = 0;
+            var host = new CastingExecutionHost(settings => new AnimatedCastExecutor(adapter, true), () => now);
+            int reports = 0;
+            int reloads = 0;
+            host.RunCompleted = report => reports++;
+            var record = new CastingQualificationRecord { CastingScenario = true };
+            string directory = Path.Combine(root, "animated-reload-" + uncertain);
+            var driver = new CastingQualificationDriver(record, allowance, "fixture-campaign",
+                () => world.Inputs(), boundary => new CastingWorkspaceSession(directory, "fixture-campaign", boundary),
+                host, (step, label) => world.Observe(step, label), () => now, 240000, selection.Recipe,
+                guardedReload: () =>
+                {
+                    reloads++;
+                    host.Cancel("area-unloading");
+                    host.Cancel("area-unloading");
+                    if (host.IsRunning || reports != 1 || originalAdapter.Starts != 1 ||
+                        originalAdapter.Disposals != 1 || original.Fired.Count != 0 || original.Active.Count != 0)
+                        throw new InvalidOperationException("Animated cancellation did not dispose its unspent native operation once.");
+                    world = new FiniteBuffWorld();
+                    adapter = new RecoveryAnimatedAdapter(world);
+                    return "passed=True;fresh-world";
+                });
+            for (int tick = 0; tick < 100 && !driver.Completed; tick++) { now += 16; driver.Update(); }
+            if (!driver.Completed || reloads != 1 || host.IsRunning || originalAdapter.Disposals != 1)
+                throw new InvalidOperationException("Animated recovery did not terminate once.");
+            string detail = record.Steps[0].Report.Entries[0].Detail;
+            if (detail.IndexOf("animated-operation-abandoned-in-flight", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException("The real Animated executor's cancellation record was not exercised.");
+            if (uncertain)
+            {
+                if (host.StartedRuns != 1 || reports != 1 || adapter.Starts != 0 ||
+                    world.Fired.Count != 0 || record.TerminalReason != "failed:stop-wait" ||
+                    detail.IndexOf("|also:ResidualStateUnsettled:", StringComparison.Ordinal) < 0)
+                    throw new InvalidOperationException("Later cleanup uncertainty was hidden by expected Animated abandonment.");
+                return;
+            }
+            if (record.Violations().Count != 0 || host.StartedRuns != 2 || reports != 2 || !host.Accepting ||
+                adapter.Starts != 1 || adapter.Disposals != 1 || world.Fired.Count != 1 || world.Active.Count != 1 ||
+                world.SpontaneousRemaining != 0 || original.Tokens.Values.Any(value => !value) ||
+                record.Steps[0].Report.RunId == record.Steps[1].Report.RunId || !record.Steps[1].Report.Succeeded ||
+                record.RunsStarted != 2 || record.RunsReported != 2 || record.CallbackFailure != null)
+                throw new InvalidOperationException("Expected Animated cancellation prevented the fresh second cast: " +
+                    string.Join("|", record.Violations()) + ";counts=" + record.RunsStarted + "/" + record.RunsReported);
+        }
+
+        // Only native queuing, spending/effects and residual state are simulated.
+        // The Animated iterator, coordinator, host, gate and repository are real.
+        private sealed class RecoveryAnimatedAdapter : ICastRuntimeAdapter
+        {
+            private readonly FiniteBuffWorld _world;
+            internal int Starts;
+            internal int Disposals;
+            internal RecoveryAnimatedAdapter(FiniteBuffWorld world) { _world = world; }
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
+            public IAnimatedCastOperation StartAnimated(CastStep step)
+            { Starts++; return new Operation(this, step); }
+            private sealed class Operation : IAnimatedCastOperation
+            {
+                private readonly RecoveryAnimatedAdapter _owner;
+                private readonly CastStep _step;
+                private int _polls;
+                private bool _landed;
+                private bool _disposed;
+                internal Operation(RecoveryAnimatedAdapter owner, CastStep step) { _owner = owner; _step = step; }
+                public bool IsCompleted
+                {
+                    get
+                    {
+                        if (++_polls < 2) return false;
+                        if (!_landed) { _owner._world.Fire(_step); _landed = true; }
+                        return true;
+                    }
+                }
+                public bool IsStarted { get { return true; } }
+                public bool TimedOut { get { return false; } }
+                public bool Succeeded { get { return _landed; } }
+                public bool EffectsObserved { get { return _landed && _owner._world.EffectsObserved(_step); } }
+                public bool ResourceSpent { get { return _landed; } }
+                public string ResourceCountViolation { get { return null; } }
+                public bool HasResidualDeliveryState { get { return _owner._world.UncertainCleanup; } }
+                public string Detail { get { return "native-operation-seam"; } }
+                public void Dispose()
+                {
+                    if (_disposed) throw new InvalidOperationException("Native operation disposed twice.");
+                    _disposed = true;
+                    _owner.Disposals++;
+                }
             }
         }
 
