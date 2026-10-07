@@ -64,6 +64,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("same-process-in-flight-unload-driver-uses-new-world", () => TestStopReloadRecoveryDriver(root, true, true));
             Run("recovery-player-entry-stop-reload", () => TestStopReloadRecoveryDriver(root, true, false, true));
             Run("recovery-player-entry-in-flight-reload", () => TestStopReloadRecoveryDriver(root, true, true, true));
+            Run("recovery-uncertain-native-cleanup-no-second-run", () => TestStopReloadRecoveryDriver(root, true, true, false, true));
             Run("production-apply-end-to-end-through-host",
                 () => TestProductionApplyEndToEnd(root));
             Run("run-presentation-separates-effects-and-spending", TestRunPresentation);
@@ -6145,6 +6146,7 @@ namespace KingmakerBuffPlanner.Tests
             internal string WrongTokenCasting;
             internal string PartialCasting;
             internal bool NoSpend;
+            internal bool UncertainCleanup;
             internal bool MissingAfterTokens;
             internal bool MissingBeforeTokens;
             private int _instances;
@@ -6207,9 +6209,11 @@ namespace KingmakerBuffPlanner.Tests
             }
             public bool EffectsObserved(CastStep step) { return Active.ContainsKey(step.TargetUnitIds[0]); }
             public InstantCastCompletion InspectCompletion(CastStep step)
-            { return InstantCastCompletion.Settled("simulated-settled"); }
+            { return UncertainCleanup ? InstantCastCompletion.Pending("simulated-still-owned")
+                : InstantCastCompletion.Settled("simulated-settled"); }
             public InstantCastCompletion Cleanup(CastStep step)
-            { return InstantCastCompletion.Settled("simulated-clean"); }
+            { return UncertainCleanup ? InstantCastCompletion.Pending("simulated-cleanup-uncertain")
+                : InstantCastCompletion.Settled("simulated-clean"); }
 
             internal ActiveEffectSnapshot Live()
             {
@@ -6268,16 +6272,16 @@ namespace KingmakerBuffPlanner.Tests
         }
 
         private static void TestStopReloadRecoveryDriver(string root, bool cleanReload = true,
-            bool immediate = false, bool playerRoute = false)
+            bool immediate = false, bool playerRoute = false, bool uncertainCleanup = false)
         {
-            try { TestStopReloadRecoveryDriverCore(root, cleanReload, immediate, playerRoute); }
+            try { TestStopReloadRecoveryDriverCore(root, cleanReload, immediate, playerRoute, uncertainCleanup); }
             finally { if (playerRoute) NativeCastingSessionPolicy.DisarmRecoveryBoundary(); }
         }
 
         private static void TestStopReloadRecoveryDriverCore(string root, bool cleanReload,
-            bool immediate, bool playerRoute)
+            bool immediate, bool playerRoute, bool uncertainCleanup)
         {
-            var original = new FiniteBuffWorld();
+            var original = new FiniteBuffWorld { UncertainCleanup = uncertainCleanup };
             FiniteBuffWorld world = original;
             CastingWorkspaceInputs initial = original.Inputs();
             CastingQualificationSelection selection = CastingQualificationRecipe.Select(
@@ -6300,7 +6304,7 @@ namespace KingmakerBuffPlanner.Tests
             var record = new CastingQualificationRecord { CastingScenario = true };
             int reports = 0;
             int reloads = 0;
-            string directory = Path.Combine(root, "stop-reload-" + cleanReload + immediate + playerRoute);
+            string directory = Path.Combine(root, "stop-reload-" + cleanReload + immediate + playerRoute + uncertainCleanup);
             CastingSessionOwner owner = null;
             RecoveryRoutineRunner runner = null;
             BuffPlannerQuickExecuteController quick = null;
@@ -6359,6 +6363,18 @@ namespace KingmakerBuffPlanner.Tests
             for (int tick = 0; tick < 100 && !driver.Completed; tick++) { now += 16; driver.Update(); }
             if (!driver.Completed || reloads != 1 || host.IsRunning)
                 throw new InvalidOperationException("The recovery scenario did not reach one terminal: " + driver.Phase + ";reloads=" + reloads + ";reports=" + reports + ";" + string.Join("|", record.Violations()));
+            if (uncertainCleanup)
+            {
+                if (host.StartedRuns != 1 || reports != 1 || world.Fired.Count != 0 ||
+                    record.TerminalReason != "failed:stop-wait" ||
+                    !record.Failures.Any(value => value.StartsWith("stop-wait:step:cancel-cleanup:", StringComparison.Ordinal)) ||
+                    record.Steps[0].Report.Entries[0].Detail.IndexOf(
+                        CastExecutionStatus.ResidualStateUnsettled.ToString(), StringComparison.Ordinal) < 0 ||
+                    original.Fired.Count != 1 || original.Active.Count != 1)
+                    throw new InvalidOperationException("Uncertain cleanup was hidden by a cancelled report or a later cast: " +
+                        record.TerminalReason + ";runs=" + host.StartedRuns);
+                return;
+            }
             if (!cleanReload)
             {
                 if (host.StartedRuns != 1 || reports != 1 || record.Violations().Count == 0)
