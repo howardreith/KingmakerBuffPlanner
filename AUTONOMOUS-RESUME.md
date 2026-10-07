@@ -1,5 +1,9 @@
 # AUTONOMOUS RESUME — updated 2026-10-03 (Claude takeover: v1.2 preview delivered)
 
+## 2026-10-07 WP1 closed at owner request
+
+WP1 is CLOSED at owner request; do not resume it or move into WP2. Owner retested and no longer sees the problem. Focused branch `codex/kbp-interrupted-run-reload-recovery-2026-10-07`, tested/checkpoint HEAD `4480e1529532321f82e639349e40a4145da75a34`, version 0.3.0. Diagnostic-only source; protocol 406/0, four affected native chains passed, complete current gate interrupted by closeout. Original 0.1.1-rc3 installation restored, no game/unresolved transaction/foreign lease. Exact next action: records-only commit and guarded push, then concise owner handoff; no further investigation unless a new report reopens it. [Closeout](docs/INTERRUPTED-RUN-RELOAD-RECOVERY.md). Historical instructions below do not authorize a release of this candidate.
+
 ## Where the work stands
 
 - Delivered (tested) source commit: `8d7681d03752f3f7170f25f7d45029f71c46a884`

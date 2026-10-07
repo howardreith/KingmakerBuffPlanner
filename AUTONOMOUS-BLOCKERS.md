@@ -1,5 +1,9 @@
 # AUTONOMOUS BLOCKERS — updated 2026-10-03
 
+## 2026-10-07 WP1 closed at owner request
+
+No operational blocker remains. Owner reports the issue no longer occurs and closed WP1. No new product defect was demonstrated; no production repair is pending under current authority. Physical quickload/armed Share and rods were not native-tested, and the final full source gate was intentionally interrupted. Record these as limits, not claims of failure or permission to continue. [Closeout](docs/INTERRUPTED-RUN-RELOAD-RECOVERY.md).
+
 None. The everyday-use v1.2 private preview is delivered (draft release
 399014941, asset `KingmakerBuffPlanner-0.2.0-rc6-everyday-use-v1.2+8d7681d0.zip`,
 downloaded back and verified). Open items, none blocking:

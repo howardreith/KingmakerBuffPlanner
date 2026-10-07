@@ -1,5 +1,9 @@
 # Qualification
 
+## 2026-10-07 WP1 closed at owner request
+
+Owner retested and reports the interrupted-run issue no longer appears; investigation closed. Diagnostic candidate `4480e1529532321f82e639349e40a4145da75a34` passed focused protocol 406/0 and four same-process Stop/cancel -> reload -> second paid cast chains (Instant/Animated). No new product defect or production recovery repair was demonstrated. Final full source gate was interrupted at owner closeout; complete current source qualification is not claimed. Prior installation restored, no release or candidate owner acceptance. [Evidence and limits](INTERRUPTED-RUN-RELOAD-RECOVERY.md). Historical qualification below remains unchanged.
+
 ## 2026-09-06 failed human validation: routing diagnosis
 
 Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.

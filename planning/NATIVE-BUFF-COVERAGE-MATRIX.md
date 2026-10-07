@@ -1,5 +1,9 @@
 # Native Buff Coverage Matrix
 
+## 2026-10-07 WP1 closed at owner request
+
+WP1 diagnostic `4480e1529532321f82e639349e40a4145da75a34` passed four ordinary finite mixed-caster recovery chains, with same-process second effect/resource evidence. Owner closed the issue after a successful personal test. No physical quickload, armed enhancement interruption, cross-campaign or distinct area-transition coverage is promoted, and historical rows remain unchanged. [Candidate-specific evidence](../docs/INTERRUPTED-RUN-RELOAD-RECOVERY.md).
+
 ## 2026-09-06 failed human validation: routing diagnosis
 
 Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.

@@ -1,5 +1,9 @@
 # Execution Semantics
 
+## 2026-10-07 WP1 closed at owner request
+
+WP1 did not change ordinary execution. Running-routine Stop waits for its current owned terminal, then reports/disposes once and leaves admission open. Area/save unloading uses immediate Cancel; applied effects/spent resources and cleanup uncertainty are retained, pending/UI ownership released, and later activation supplies fresh world/session/HUD inputs. Mod/root disable uses Shutdown and requires the existing explicit enable/Resume; teardown also owns session flush/recovery. An interrupted casting is never automatically resubmitted. Exact expected Animated abandonment is distinct from additional disposal/residual/enhancement cleanup failures, which remain explicit. [Candidate-specific observations and unproved lifecycle paths](INTERRUPTED-RUN-RELOAD-RECOVERY.md).
+
 ## 0.0.18 sticky-touch transaction boundary
 
 Provider capability and configured mode are now separate. Every `CastStep`

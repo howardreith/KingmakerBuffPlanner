@@ -2605,3 +2605,9 @@ every run). Highlights:
   transactions Restored, no KBP/Gunslinger locks, Mods restored by each run's
   transaction, protected saves clean, owner-pause/stop flags absent.
 
+
+## WP1 owner closeout — 2026-10-07
+
+Branch `codex/kbp-interrupted-run-reload-recovery-2026-10-07`; checkpoint/tested HEAD `4480e1529532321f82e639349e40a4145da75a34`; version 0.3.0. Owner retested and reports the issue no longer present; no new product defect demonstrated, so investigation stopped. Clarification: both modes, quickload during casting, probably Share Transmutation and rods. Ordinary production lifecycle unchanged. Focused protocol 406/0; Build-Local source/build/package/local passes 42/1/4/1, zero failures/warnings; current core 87/0, selections and four affected native chains 85/0 each. Full final Test-SourceOnly was interrupted at owner closeout during purity hashing (owned PID 10504, no children/live operation); completed stages Source validation 42/0; Protocol tests 406/0; Runtime harness filesystem tests 38/0; no full current PASS claim. Earlier full safety proof is separate.
+
+ZIP `8c593e082f24acc4d4441b8d76dec4766f9135f35e4b0980450afbab3b55b168`, DLL `4b0e26229e62c340089bec76bf30c20f1d468dfaed06b76cf44d846eaf80491c`, MVID `1b767261-afa8-4f3e-9022-3166fe884a08`; exact immutable freeze/manifest, commands, logs, hashes, rejected blind reset/Resume theories, native observations and NOT RUN paths are in [closeout](docs/INTERRUPTED-RUN-RELOAD-RECOVERY.md) and its JSON snapshot. Prior installation 0.1.1-rc3 restored; protected saves clean, no foreign lease/unresolved transaction/game remains; historical claims retained. Root cause/restart mechanism unknown; harness regressions are not a product fix. Exact next action: records-only commit and guarded branch push, then stop. No PR/merge/tag/release/permanent install/WP2.
