@@ -2646,3 +2646,14 @@ regression passes; focused suite 15/15, no compiler warnings.
 Prior full gate's completed components: 413/413, 38/38, 18/18; archival
 comparison stopped to qualify the final committed contract.
 Evidence and exact next action: docs/WP2A-NOT-READY-NAVIGATION.md.
+### WP2A last-problem lifecycle checkpoint, 2026-10-07
+
+Branch codex/kbp-not-ready-deep-linking-2026-10-07; pre-commit HEAD
+7a63d6b6794f7259a7d123be4ab9936ec33073c0; version 0.3.0.
+Real-service changing-resource regression reproduced an incorrect middle
+selection after repairing the last problem: 14 pass / 1 expected failure.
+Navigation now selects the new last even when new blockers appear.
+Focused retest 15/15, no compiler warnings. No runtime mutation.
+Checkpoint, rejected assumption and exact next action:
+docs/WP2A-NOT-READY-NAVIGATION.md. Complete source/runtime qualification
+remain pending on the newly committed candidate.
