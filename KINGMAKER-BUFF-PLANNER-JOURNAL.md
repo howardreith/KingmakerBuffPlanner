@@ -2636,3 +2636,13 @@ production validation 42/42 and build 1/1, no compiler warnings.
 Evidence, development hash, rejected theory and exact next action:
 docs/WP2A-NOT-READY-NAVIGATION.md. Full gate restarted for the new candidate;
 runtime visibility and restoration qualification remain pending.
+### WP2A structured-open checkpoint, 2026-10-07
+
+Branch codex/kbp-not-ready-deep-linking-2026-10-07; pre-commit HEAD
+c7c3600fde5bb0b25a7f2b580dc9ea76eb095817; version 0.3.0.
+HUD auto-opening now consumes structured casting blockers directly;
+global opening policy is preserved. Real-gate/presentation-independence
+regression passes; focused suite 15/15, no compiler warnings.
+Prior full gate's completed components: 413/413, 38/38, 18/18; archival
+comparison stopped to qualify the final committed contract.
+Evidence and exact next action: docs/WP2A-NOT-READY-NAVIGATION.md.

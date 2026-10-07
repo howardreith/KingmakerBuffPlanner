@@ -104,6 +104,11 @@ namespace KingmakerBuffPlanner.Tests
             Expect(result.BlockingCastings.SequenceEqual(result.GateDecision.BlockingCastings),
                 "workspace result lost structured identities");
             Expect(result.GateDecision.BlockingReasons.Count == 3, "text diagnostic contract changed");
+            Expect(CastingRunPresentation.OpensPlanner(new WorkspaceApplyResult(false,
+                "unclassified-presentation", ordinary, null)),
+                "structured HUD opening depended on refusal text");
+            Expect(!CastingRunPresentation.OpensPlanner(new WorkspaceApplyResult(false,
+                "party-state-unavailable", null, null)), "an unknown global refusal opened the planner");
         }
 
         private static void TestProblemNavigation(string root)
@@ -279,7 +284,7 @@ namespace KingmakerBuffPlanner.Tests
                 planner.Apply(CastingApplyMode.Ordinary, planner.SelectedRoutineId, GraphInputs());
                 WorkspaceApplyResult hudResult = hud.Apply(CastingApplyMode.Ordinary, routine, GraphInputs());
                 CastingGraphView opened = hud.BuildGraph(GraphInputs());
-                Expect(CastingRunPresentation.OpensPlanner(hudResult.ReviewReason) &&
+                Expect(CastingRunPresentation.OpensPlanner(hudResult) &&
                     opened.SelectedRoutineId == routine && opened.FocusedCastingId == planner.EditingFocusCastingId &&
                     opened.SelectedSourceId == planner.SelectedSourceId &&
                     hud.ProblemNavigation.PendingRevealCastingId == planner.ProblemNavigation.PendingRevealCastingId &&
