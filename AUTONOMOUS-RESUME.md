@@ -2,8 +2,8 @@
 
 Active mission: find blocked castings immediately. Branch
 codex/kbp-not-ready-deep-linking-2026-10-07, worktree private/worktrees/WP2A.
-Base b707c1f47859f2ecae517b2cd162d20ca18c7583; HEAD before structured-open checkpoint
-c7c3600fde5bb0b25a7f2b580dc9ea76eb095817. Version remains 0.3.0.
+Base b707c1f47859f2ecae517b2cd162d20ca18c7583; HEAD before last-problem checkpoint
+7a63d6b6794f7259a7d123be4ab9936ec33073c0. Version remains 0.3.0.
 No Work Package 1 changes inherited. No other work package is in scope.
 
 Implemented and regressed: ordered structured blockers; shared run focus;

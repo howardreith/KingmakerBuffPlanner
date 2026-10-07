@@ -160,3 +160,31 @@ Test-SourceOnly, rebuild final clean candidate, then physical blocked-only
 HUD qualification and exact installation/save restoration. Runtime
 visibility remains unqualified. Earlier prerequisite identities are not
 the final candidate.
+## Checkpoint: last-problem repair under changing resources
+
+Branch unchanged; exact pre-commit HEAD
+7a63d6b6794f7259a7d123be4ab9936ec33073c0; version 0.3.0; dirty with this
+focused lifecycle repair. The real compiler/authoring regression begins
+with two Draft blockers and two ready castings. Explicitly disabling the
+last Draft repairs it; refreshed depleted resources make the later ready
+castings block. The old nearest-index fallback selected the middle of the
+new three-problem list instead of its last problem.
+
+Affected MSBuild rebuild / --blocked-navigation before repair:
+PASS=14 FAIL=1 (artifacts/wp2a-last-refresh-red.log). Reconciliation now
+remembers whether the repaired problem was last and selects the new last.
+After repair: PASS=15 FAIL=0 (artifacts/wp2a-focused-final.log), no compiler
+warnings. The complete gate at the preceding commit passed its 413 C#,
+38 filesystem and 18 evidence checks, then was stopped during archival
+purity hashing to qualify this strengthened lifecycle contract.
+
+Rejected assumption: repairing one blocker always shrinks the collection.
+A refreshed resource state may introduce other blockers; execution order
+and the explicit last-problem rule still apply. No readiness predicate or
+authoring operation was added to navigation.
+
+Exact next action: commit this regression/repair, build the prerequisite
+ZIP, finish the complete unchanged source/mechanical gate, rebuild the
+clean candidate, and physically qualify blocked HUD navigation with exact
+installation/save restoration. No live action has occurred; actual screen
+visibility remains uncertain until that scenario passes.

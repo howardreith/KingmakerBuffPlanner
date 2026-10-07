@@ -36,6 +36,7 @@ namespace KingmakerBuffPlanner.UI
         {
             if (!Active) return false;
             string currentId = Current.CastingId;
+            bool wasLast = _index + 1 == _blockers.Count;
             IReadOnlyList<CastingBlocker> next = decision == null
                 ? new CastingBlocker[0] : decision.BlockingCastings;
             if (next.Count == 0)
@@ -53,7 +54,8 @@ namespace KingmakerBuffPlanner.UI
             int replacement = -1;
             for (int index = _index + 1; index < _blockers.Count && replacement < 0; index++)
                 replacement = IndexOf(next, _blockers[index].CastingId);
-            _index = replacement >= 0 ? replacement : Math.Min(_index, next.Count - 1);
+            _index = replacement >= 0 ? replacement
+                : wasLast ? next.Count - 1 : Math.Min(_index, next.Count - 1);
             _blockers = next;
             RequestReveal();
             return true;

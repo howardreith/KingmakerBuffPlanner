@@ -227,6 +227,23 @@ namespace KingmakerBuffPlanner.Tests
             session.BuildGraph(GraphInputs());
             Expect(session.EditingFocusCastingId == "first" && session.ProblemNavigation.Position == 1 &&
                 session.ProblemNavigation.Count == 1, "repairing the last problem did not select the new last");
+
+            // Resource changes can introduce new blockers during the repair.
+            // The former last problem must still move to the new last.
+            session = ProblemSession(root, "last-with-new-blockers", new[] {
+                ProblemCasting("first", 0), ProblemCasting("last", 1),
+                ProblemCasting("new-middle", 2, state: CastingAuthoringState.Ready, target: "unit-t2"),
+                ProblemCasting("new-last", 3, state: CastingAuthoringState.Ready, target: "unit-t3")
+            }, out dir);
+            session.Apply(CastingApplyMode.Ordinary, "long", GraphInputs());
+            Expect(session.ProblemNavigation.Count == 2 && session.NavigateProblem(1),
+                "changing-resource fixture did not start at the last of two problems");
+            Expect(session.SetFocusedCastingState(CastingAuthoringState.Disabled).Applied,
+                "explicit last-problem repair was refused");
+            session.BuildGraph(GraphInputs(bardLevel2: 0));
+            Expect(session.EditingFocusCastingId == "new-last" &&
+                session.ProblemNavigation.Position == 3 && session.ProblemNavigation.Count == 3,
+                "repairing the last problem with newly blocked castings did not select the new last");
         }
 
         private static void TestProblemManualExit(string root)
