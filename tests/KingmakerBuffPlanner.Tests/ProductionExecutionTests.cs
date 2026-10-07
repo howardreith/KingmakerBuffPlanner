@@ -62,6 +62,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("same-process-stop-reload-driver-uses-new-world", () => TestStopReloadRecoveryDriver(root));
             Run("reload-driver-refuses-an-unobserved-load", () => TestStopReloadRecoveryDriver(root, false));
             Run("same-process-in-flight-unload-driver-uses-new-world", () => TestStopReloadRecoveryDriver(root, true, true));
+            Run("recovery-player-entry-stop-reload", () => TestStopReloadRecoveryDriver(root, true, false, true));
+            Run("recovery-player-entry-in-flight-reload", () => TestStopReloadRecoveryDriver(root, true, true, true));
             Run("production-apply-end-to-end-through-host",
                 () => TestProductionApplyEndToEnd(root));
             Run("run-presentation-separates-effects-and-spending", TestRunPresentation);
@@ -3208,7 +3210,7 @@ namespace KingmakerBuffPlanner.Tests
             if (qualification == null ||
                 !qualification.Contains("_qualificationHost = BuffPlannerUiRoot.CastingHostForRuntime;") ||
                 !qualification.Replace("\r\n", "\n").Contains(
-                    "() => BuffPlannerUiRoot.WorldRunsForCasting, true,\n                    BuffPlannerUiRoot.PressRoutineForRuntime, Main.SetEnabledForRuntime,\n                    () => \"subscriptions=\" + BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime +") ||
+                    "() => BuffPlannerUiRoot.WorldRunsForCasting, true,\n                    routine => CastingQualificationRecipe.IsRecoveryRecipe(\n                        _qualificationRecord.Selection == null ? null : _qualificationRecord.Selection.Recipe)\n                            ? BuffPlannerUiRoot.PressHudRoutineForRuntime(routine)\n                            : BuffPlannerUiRoot.PressRoutineForRuntime(routine), Main.SetEnabledForRuntime,\n                    () => \"subscriptions=\" + BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime +") ||
                 qualification.Contains("new CastingExecutionHost(") || host.Contains("_qualificationHost.Pump(") ||
                 host.Contains("_qualificationWorldClock") || press == null ||
                 !press.Contains("_instance.ExecuteRoutineRequest(routineId)") ||
@@ -6265,7 +6267,15 @@ namespace KingmakerBuffPlanner.Tests
             }
         }
 
-        private static void TestStopReloadRecoveryDriver(string root, bool cleanReload = true, bool immediate = false)
+        private static void TestStopReloadRecoveryDriver(string root, bool cleanReload = true,
+            bool immediate = false, bool playerRoute = false)
+        {
+            try { TestStopReloadRecoveryDriverCore(root, cleanReload, immediate, playerRoute); }
+            finally { if (playerRoute) NativeCastingSessionPolicy.DisarmRecoveryBoundary(); }
+        }
+
+        private static void TestStopReloadRecoveryDriverCore(string root, bool cleanReload,
+            bool immediate, bool playerRoute)
         {
             var original = new FiniteBuffWorld();
             FiniteBuffWorld world = original;
@@ -6290,12 +6300,49 @@ namespace KingmakerBuffPlanner.Tests
             var record = new CastingQualificationRecord { CastingScenario = true };
             int reports = 0;
             int reloads = 0;
-            host.RunCompleted = report => reports++;
+            string directory = Path.Combine(root, "stop-reload-" + cleanReload + immediate + playerRoute);
+            CastingSessionOwner owner = null;
+            RecoveryRoutineRunner runner = null;
+            BuffPlannerQuickExecuteController quick = null;
+            var diagnostics = new BuffPlannerUiLifecycleDiagnostics();
+            if (playerRoute)
+            {
+                owner = new CastingSessionOwner(campaign => new CastingWorkspaceSession(directory, campaign,
+                    new AllowanceBoundCastingDispatchBoundary(
+                        () => new NativeCastingDispatchBoundary(host, () => owner.Current.ExecutionSettings),
+                        () => owner.Current.ExecutionMode)), new CastingWorkspaceRecoveryStore(), message => { });
+                CastingWorkspaceSession current;
+                if (owner.Ensure("fixture-campaign", out current) != null)
+                    throw new InvalidOperationException("The player session did not bind.");
+                runner = new RecoveryRoutineRunner(host, () => owner.Current, () => world.Inputs());
+                quick = new BuffPlannerQuickExecuteController(runner, diagnostics, result => { });
+            }
+            host.RunCompleted = report => { reports++; if (runner != null) runner.Completed(report); };
             var driver = new CastingQualificationDriver(record, allowance, "fixture-campaign",
-                () => world.Inputs(), boundary => new CastingWorkspaceSession(
-                    Path.Combine(root, "stop-reload-" + cleanReload + immediate), "fixture-campaign", boundary),
+                () => world.Inputs(), boundary =>
+                {
+                    if (!playerRoute) return new CastingWorkspaceSession(directory, "fixture-campaign", boundary);
+                    var qualification = (CastingQualificationBoundary)boundary;
+                    NativeCastingSessionPolicy.LockForRuntimeTest("live-workspace-physical");
+                    if (NativeCastingSessionPolicy.ArmRecoveryBoundary(qualification))
+                        throw new InvalidOperationException("Another scenario armed a recovery exception.");
+                    NativeCastingSessionPolicy.LockForRuntimeTest("live-cast-qual");
+                    string rejected;
+                    var other = CastingQualificationAllowance.Parse(QualificationAllowanceJson(value =>
+                    {
+                        value["recipe"] = CastingQualificationRecipe.FiniteDirectMixed;
+                    }), "qual-run-1", out rejected);
+                    if (other == null || NativeCastingSessionPolicy.ArmRecoveryBoundary(
+                            new CastingQualificationBoundary(other, host, () => owner.Current.ExecutionSettings)))
+                        throw new InvalidOperationException("An unrelated recipe armed the player exception.");
+                    if (!NativeCastingSessionPolicy.ArmRecoveryBoundary(qualification) ||
+                        NativeCastingSessionPolicy.ArmRecoveryBoundary(qualification))
+                        throw new InvalidOperationException("Recovery boundary ownership was not exclusive.");
+                    return owner.Current;
+                },
                 host, (step, label) => world.Observe(step, label), () => now, 240000,
-                selection.Recipe, guardedReload: () =>
+                selection.Recipe, pressRoutine: playerRoute ? (Func<string, bool>)(routine => quick.Execute(routine)) : null,
+                guardedReload: () =>
                 {
                     reloads++;
                     if (immediate) { host.Cancel("area-unloading"); host.Cancel("area-unloading"); }
@@ -6303,9 +6350,12 @@ namespace KingmakerBuffPlanner.Tests
                     if (host.IsRunning || reports != 1 || original.Fired.Count != 1 ||
                         original.Active.Count != 1 || original.Tokens.Values.Count(value => !value) != 1)
                         throw new InvalidOperationException("Stop did not finish and spend the first casting exactly once.");
+                    if (playerRoute && (runner.Pending != null || owner.Current.LastRunReport == null ||
+                        owner.Current.LastRunReport.RunId != host.LastReport.RunId))
+                        throw new InvalidOperationException("The outgoing run retained a completion or reported to another session.");
                     world = new FiniteBuffWorld();
                     return "passed=True;fixture-world-replaced";
-                });
+                }, routineApply: playerRoute ? (Func<WorkspaceApplyResult>)(() => runner.LastApply) : null);
             for (int tick = 0; tick < 100 && !driver.Completed; tick++) { now += 16; driver.Update(); }
             if (!driver.Completed || reloads != 1 || host.IsRunning)
                 throw new InvalidOperationException("The recovery scenario did not reach one terminal: " + driver.Phase + ";reloads=" + reloads + ";reports=" + reports + ";" + string.Join("|", record.Violations()));
@@ -6320,6 +6370,54 @@ namespace KingmakerBuffPlanner.Tests
                 world.SpontaneousRemaining != 0 || original.Fired.Count != 1 || original.Active.Count != 1 ||
                 record.Steps[0].Report.RunId == record.Steps[1].Report.RunId || !record.Steps[1].Report.Succeeded)
                 throw new InvalidOperationException("Second real execution failed: " + string.Join("|", record.Violations()));
+            if (playerRoute && (runner.Pending != null || runner.RunCallbacks != 2 ||
+                owner.Current.LastRunReport.RunId != record.Steps[1].Report.RunId ||
+                diagnostics.GetFlow("long").Listeners != (immediate ? 2 : 3)))
+                throw new InvalidOperationException("Player entry or completion ownership was duplicated or stranded.");
+        }
+
+        // Only the Unity routine-entry boundary is simulated. The controller,
+        // campaign session owner, durability/compiler/gate/projection, exact
+        // allowance, host, coordinator and executor are production objects.
+        private sealed class RecoveryRoutineRunner : IPlannerRoutineRunner
+        {
+            private readonly CastingExecutionHost _host;
+            private readonly Func<CastingWorkspaceSession> _session;
+            private readonly Func<CastingWorkspaceInputs> _inputs;
+            internal WorkspaceApplyResult LastApply;
+            internal Action<QuickExecutionResult> Pending;
+            internal int RunCallbacks;
+
+            internal RecoveryRoutineRunner(CastingExecutionHost host,
+                Func<CastingWorkspaceSession> session, Func<CastingWorkspaceInputs> inputs)
+            { _host = host; _session = session; _inputs = inputs; }
+
+            public bool TryStart(string routineId, Action<QuickExecutionResult> completed)
+            {
+                if (_host.IsRunning)
+                {
+                    _host.RequestStop(CastingExecutionHost.PlayerStopReason);
+                    completed(new QuickExecutionResult(routineId, "Long", QuickExecutionDisposition.Refused,
+                        "Stopping after the current cast.", 0, 0, 0));
+                    return true;
+                }
+                LastApply = _session().Apply(CastingApplyMode.Ordinary, routineId, _inputs());
+                if (LastApply.Allowed) Pending = completed;
+                return true;
+            }
+
+            public bool TryStartReadyOnly(string routineId, Action<QuickExecutionResult> completed)
+            { throw new InvalidOperationException("Recovery never bypasses the ordinary gate."); }
+
+            internal void Completed(CastingRunReport report)
+            {
+                _session().RecordRunReport(report);
+                Action<QuickExecutionResult> pending = Pending;
+                Pending = null;
+                if (pending == null) throw new InvalidOperationException("No owned completion.");
+                RunCallbacks++;
+                pending(CastingRunPresentation.ToQuickResult(report, "Long", _session().CastingLabel));
+            }
         }
 
         private static CastingQualificationAllowance FiniteAllowance(FiniteBuffWorld world, int maximum = 4)

@@ -4873,7 +4873,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _qualificationRunsBefore = _qualificationHost.StartedRuns;
                 _qualificationDriver = new CastingQualificationDriver(_qualificationRecord, allowance,
                     campaignId, BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime,
-                    boundary => new CastingWorkspaceSession(modPath, campaignId, boundary),
+                    boundary =>
+                    {
+                        var qualification = boundary as CastingQualificationBoundary;
+                        if (qualification == null || !CastingQualificationRecipe.IsRecoveryRecipe(qualification.Recipe))
+                            return new CastingWorkspaceSession(modPath, campaignId, boundary);
+                        CastingWorkspaceSession owned = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                        if (owned == null || owned.CampaignId != campaignId ||
+                            !UI.NativeCastingSessionPolicy.ArmRecoveryBoundary(qualification))
+                            throw new InvalidOperationException("Recovery cannot bind the root-owned session and exact allowance.");
+                        return owned;
+                    },
                     _qualificationHost,
                     (step, label) => new KingmakerProbeObserver().Observe(step, label, _probeClock),
                     () => clock.ElapsedMilliseconds,
@@ -4881,7 +4891,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _request.Parameters.TryGetValue("qualificationRecipe", out recipeRaw)
                         ? recipeRaw as string : null,
                     () => BuffPlannerUiRoot.WorldRunsForCasting, true,
-                    BuffPlannerUiRoot.PressRoutineForRuntime, Main.SetEnabledForRuntime,
+                    routine => CastingQualificationRecipe.IsRecoveryRecipe(
+                        _qualificationRecord.Selection == null ? null : _qualificationRecord.Selection.Recipe)
+                            ? BuffPlannerUiRoot.PressHudRoutineForRuntime(routine)
+                            : BuffPlannerUiRoot.PressRoutineForRuntime(routine), Main.SetEnabledForRuntime,
                     () => "subscriptions=" + BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime +
                         ";hudRoots=" + BuffPlannerUiRoot.HudRootCountForRuntime +
                         ";hudInstalled=" + BuffPlannerUiRoot.IsHudInstalledForRuntime +
@@ -4892,7 +4905,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     (step, recipient, label) => new KingmakerProbeObserver().ObserveRecipient(
                         step, recipient, label, _probeClock),
                     (caster, pool) => new KingmakerProbeObserver().ObserveCaster(caster, pool),
-                    GuardedRecoveryReload);
+                    GuardedRecoveryReload, () => BuffPlannerUiRoot.LastCastingApplyForRuntime);
                 _log.Info("[KBP-QUAL] driver built;casting=" + _qualificationRecord.CastingScenario +
                     ";allowance=" + _qualificationRecord.AllowanceStatus + ";workspaceClosed=" +
                     closed.Closed + ";campaign=" + campaignId + ".");
@@ -4900,6 +4913,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             _qualificationDriver.Update();
             if (!_qualificationDriver.Completed) return false;
+            UI.NativeCastingSessionPolicy.DisarmRecoveryBoundary();
             PublishQualificationRecord();
             _liveInitialCatalogEvidence = "qualification-scenario;workspaceRoot=active;legacyScreen=closed";
             _workspaceInteractionEvidence = "qualification;recipe-authoring";
@@ -4934,6 +4948,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     ";run=" + owner.ActiveRunId + ";routine=" + owner.ActiveScopeRoutineId +
                     ";inFlight=" + owner.ActiveCastingInFlight + ";running=" + owner.IsRunning + ";accepting=" + owner.Accepting +
                     ";shutdown=" + owner.ShutdownReason + ";reported=" + owner.ReportedRuns +
+                    ";pendingCompletion=" + BuffPlannerUiRoot.PendingCastingCompletionForRuntime +
                     ";campaign=" + Kingmaker.Game.Instance.Player.GameId + ".");
                 _liveSaveLoader.BeginGuardedReload();
                 return null;
@@ -4948,11 +4963,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             bool passed = !owner.IsRunning && owner.Accepting && owner.StartedRuns == owner.ReportedRuns &&
                 owner.LastCallbackFailure == null && !ReferenceEquals(_recoveryPlayerBefore, Kingmaker.Game.Instance.Player) &&
                 session != null && session.CampaignId == Kingmaker.Game.Instance.Player.GameId &&
+                session.LastRunReport != null && session.LastRunReport.RunId == owner.LastReport.RunId &&
+                !BuffPlannerUiRoot.PendingCastingCompletionForRuntime &&
+                owner.RunCompleted != null && owner.RunCompleted.GetInvocationList().Length == 1 &&
                 BuffPlannerUiRoot.HudRootCountForRuntime == 1 && BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime == 1 &&
                 UnityEngine.Object.FindObjectsOfType<BuffPlannerUiRoot>().Length == 1;
             string evidence = "passed=" + passed + ";pid=" + System.Diagnostics.Process.GetCurrentProcess().Id +
                 ";running=" + owner.IsRunning + ";accepting=" + owner.Accepting +
                 ";shutdown=" + owner.ShutdownReason + ";runs=" + owner.StartedRuns + "/" + owner.ReportedRuns +
+                ";pendingCompletion=" + BuffPlannerUiRoot.PendingCastingCompletionForRuntime +
+                ";completionOwners=" + (owner.RunCompleted == null ? 0 : owner.RunCompleted.GetInvocationList().Length) +
+                ";sessionReport=" + (session == null || session.LastRunReport == null ? "none" : session.LastRunReport.RunId) +
                 ";campaign=" + Kingmaker.Game.Instance.Player.GameId + ";sessionReused=" + ReferenceEquals(session, _recoverySessionBefore) +
                 ";hudRoots=" + BuffPlannerUiRoot.HudRootCountForRuntime + ";subscriptions=" +
                 BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime + ";loaded=" + loaded;
@@ -5360,6 +5381,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             // The qualification run ends through the same host terminal (the
             // in-flight executor restores temporary native state).
             if (_qualificationDriver != null) _qualificationDriver.Terminate(reason);
+            UI.NativeCastingSessionPolicy.DisarmRecoveryBoundary();
             if (_qualificationHost != null) _qualificationHost.Shutdown(reason);
             if (RuntimeTestProtocol.IsPhysicalWorkspaceScenario(_request.Scenario) && _physicalClock != null &&
                 !_physicalPublished)

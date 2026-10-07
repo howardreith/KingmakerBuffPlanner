@@ -1035,6 +1035,7 @@ namespace KingmakerBuffPlanner.Execution
         // How often the planner's owner has ticked it (null: unobservable).
         private readonly Func<long> _ownerTicks;
         private readonly Func<string> _guardedReload;
+        private readonly Func<WorkspaceApplyResult> _routineApply;
         private bool _loadRequested;
         private bool _cancelObserved;
         private long? _ownerTicksAtDisable;
@@ -1062,9 +1063,10 @@ namespace KingmakerBuffPlanner.Execution
             Func<string> lifecycleProbe = null, Func<long> ownerTicks = null,
             Func<CastStep, string, string, ProbeObservation> observeRecipient = null,
             Func<string, string, CasterEnhancementObservation> observeCaster = null,
-            Func<string> guardedReload = null)
+            Func<string> guardedReload = null, Func<WorkspaceApplyResult> routineApply = null)
         {
             _guardedReload = guardedReload;
+            _routineApply = routineApply;
             _observeRecipient = observeRecipient;
             _observeCaster = observeCaster;
             _lifecycleProbe = lifecycleProbe;
@@ -1845,7 +1847,15 @@ namespace KingmakerBuffPlanner.Execution
                 Fail("before-read:" + beforeFailure);
                 return;
             }
-            WorkspaceApplyResult result = _session.Apply(CastingApplyMode.Ordinary,
+            WorkspaceApplyResult result;
+            if (CastingQualificationRecipe.IsRecoveryRecipe(Recipe) && _routineApply != null)
+            {
+                if (_pressRoutine == null || !_pressRoutine(CastingQualificationRecipe.RoutineId))
+                { Fail("routine-entry-refused:" + name); return; }
+                result = _routineApply();
+                if (result == null) { Fail("routine-apply-not-observed:" + name); return; }
+            }
+            else result = _session.Apply(CastingApplyMode.Ordinary,
                 CastingQualificationRecipe.RoutineId, _freshInputs());
             step.ApplyAllowed = result.Allowed;
             step.ApplyReason = result.Allowed && result.Dispatch != null

@@ -1898,6 +1898,8 @@ namespace KingmakerBuffPlanner.Execution
             _settings = settings ?? throw new ArgumentNullException("settings");
         }
 
+        public string Recipe { get { return _allowance.Recipe; } }
+
         public readonly List<string> Submissions = new List<string>();
         public int PlannedSubmissions { get; private set; }
 

@@ -84,6 +84,7 @@ namespace KingmakerBuffPlanner.UI
         private PlannerMode _plannerMode = PlannerMode.Classic;
         private string _plannerModeWarning = string.Empty;
         private Action<QuickExecutionResult> _pendingCastingCompletion;
+        private WorkspaceApplyResult _lastCastingApplyForRuntime;
         // The last casting-first outcome per routine (refusal or run
         // result), shown on demand in that routine HUD tooltip.
         private readonly Dictionary<string, string> _lastCastingPress =
@@ -200,6 +201,24 @@ namespace KingmakerBuffPlanner.UI
         internal static bool PressRoutineForRuntime(string routineId)
         {
             return _instance != null && _instance.ExecuteRoutineRequest(routineId);
+        }
+
+        // Uses the installed HUD's raycast and pointer-event path; this is a
+        // programmatic HUD event, never a physical mouse-input claim.
+        internal static bool PressHudRoutineForRuntime(string routineId)
+        {
+            return _instance != null && _instance._hud != null &&
+                _instance._hud.DispatchRuntimeClick(routineId);
+        }
+
+        internal static WorkspaceApplyResult LastCastingApplyForRuntime
+        {
+            get { return _instance == null ? null : _instance._lastCastingApplyForRuntime; }
+        }
+
+        internal static bool PendingCastingCompletionForRuntime
+        {
+            get { return _instance != null && _instance._pendingCastingCompletion != null; }
         }
 
         // Runtime evidence: how many production casting runs started in
@@ -1113,6 +1132,7 @@ namespace KingmakerBuffPlanner.UI
         private bool StartCastingFirstRoutine(string routineId,
             Action<QuickExecutionResult> completed, CastingApplyMode mode)
         {
+            _lastCastingApplyForRuntime = null;
             if (!_enabled || _session == null) return false;
             if (_session.IsExecuting || _quickStartPending) return false;
             string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
@@ -1165,6 +1185,7 @@ namespace KingmakerBuffPlanner.UI
                     0, 0, 0));
                 return true;
             }
+            _lastCastingApplyForRuntime = result;
             if (!result.Allowed)
             {
                 string refusal = CastingRunPresentation.DescribeRefusal(name, result);
