@@ -2085,8 +2085,10 @@ namespace KingmakerBuffPlanner.UI
             catch (Exception exception)
             {
                 // Without fresh discovery nothing is submitted.
-                _footerResult.text = name + " was not cast: the party state could not be refreshed (" +
+                string refreshRefusal = name + " was not cast: the party state could not be refreshed (" +
                     exception.Message + ").";
+                _session.RecordGlobalRefusal(refreshRefusal);
+                _footerResult.text = refreshRefusal;
                 return;
             }
             WorkspaceApplyResult result = _session.Apply(mode, _session.SelectedRoutineId, inputs);

@@ -59,3 +59,43 @@ with a blocked-only expectation; qualify the complete source gate, commit
 and build a clean identity-bound candidate, then physically exercise the
 HUD/Previous/Next/Escape paths with zero native submissions and exact
 installation/save restoration.
+
+## Checkpoint: guarded scenario, before complete source gate
+
+Branch unchanged; exact HEAD d339811c44c6a8ae74c0d76ece8642f84b68d104,
+version 0.3.0, dirty with the scenario/lifecycle changes. No runtime mutation.
+Focused C# regression command now PASS=14 FAIL=0. The complete C# runner
+at the preceding scenario revision passed 411/411. Production validation
+42/42 and compilation 1/1 pass with no compiler warnings. Independent
+scripts/Test-ProblemNavigationEvidence.ps1 under the absolute Windows
+PowerShell 5.1 host: PASS=18 FAIL=0. Actual complete source gate remains next.
+
+The existing live-workspace-physical launcher now accepts only the additional
+physicalExpectation "problems", with no allowance permitted. The scenario
+authors a disposable Long plan in the transactional mod directory, with
+twenty early castings and two later Drafts. It requests physical moon,
+Next, Previous and two Escape presses. Read-only seams measure masked
+chip visibility before reveal, actual screen points and visible card
+fraction afterward, catalogue/routine points, visible inspector text and
+boundary controls. An independent record judge and launcher verifier
+require unchanged document/profile/native state, zero dispatch/run,
+unchanged Undo and no authorization, and a clean nested Escape close.
+Existing cast/select expectations and allowance guards remain intact.
+
+Supporting lifecycle repair: a global party-refresh refusal after problem
+inspection clears stale problem focus and remains a global explanation.
+Regression proves no document, profile or Undo change.
+
+Push helper's authorized branch set was extended only for the owner's exact
+requested branch; repository, payload, clean-tree and fast-forward guards
+remain mandatory. Helper SHA-256:
+55b7d87057655e61881b7acfcac0858789fdce198343ceab955433c2bbb9e3e2.
+scripts/Test-GuardedPush.ps1 now validates the actual focused worktree.
+
+Uncertainty: no physical claim yet. A charter annotation was rejected by
+the authoritative-copy validator and removed; both mission copies remain
+byte-identical. Development C# scope/string-literal defects were corrected,
+then the affected tests/build rerun. Exact next action: commit this coherent
+scenario checkpoint, execute scripts/Test-SourceOnly.ps1 to zero failures,
+Build-Local on the clean commit, then bind the guarded physical run to the
+resulting ZIP/DLL hashes and MVID.

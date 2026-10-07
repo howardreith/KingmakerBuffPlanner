@@ -2610,3 +2610,17 @@ every run). Highlights:
 ## 2026-10-07 — WP2A implementation checkpoint
 
 Focused branch codex/kbp-not-ready-deep-linking-2026-10-07 starts at current origin/main b707c1f47859f2ecae517b2cd162d20ca18c7583; version remains 0.3.0. Original checkout/WP1 preserved. Shared structured blockers, canonical focus, transient navigation, repair recomputation and measured one-shot reveal implemented. Focused regressions PASS=11 FAIL=0; source validation PASS=42 FAIL=0; production build PASS=1 FAIL=0, no warnings. Candidate/runtime identity is not yet frozen. Commands, development DLL hash, rejected approaches, ownership audit and exact next action are in docs/WP2A-NOT-READY-NAVIGATION.md. Discovery/casting contracts and native coverage remain unchanged. Next: blocked-only physical scenario, complete mechanical gate, clean candidate and guarded HUD reveal qualification.
+
+## 2026-10-07 — WP2A guarded scenario checkpoint
+
+Branch codex/kbp-not-ready-deep-linking-2026-10-07, HEAD before checkpoint
+d339811c44c6a8ae74c0d76ece8642f84b68d104, version 0.3.0, focused worktree
+dirty. Focused C# PASS=14 FAIL=0; prior complete C# PASS=411 FAIL=0;
+independent physical evidence gate PASS=18 FAIL=0; source validation
+PASS=42 FAIL=0 and production build PASS=1 FAIL=0, no compiler warnings.
+The blocked-only physical fixture extends the guarded existing scenario
+and cannot carry a casting allowance. Exact commands, push helper hash,
+rejected charter annotation and next action are in
+docs/WP2A-NOT-READY-NAVIGATION.md. No runtime, install or save mutation.
+Next: complete source/mechanical gate on committed clean tree, clean
+candidate identity, guarded physical HUD/viewport qualification.

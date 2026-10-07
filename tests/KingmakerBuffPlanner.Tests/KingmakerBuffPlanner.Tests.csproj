@@ -82,6 +82,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\LegacyProfileFixture.cs"><Link>RuntimeTesting\LegacyProfileFixture.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\PersistenceMessages.cs"><Link>Persistence\PersistenceMessages.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\PhysicalWorkspaceRecord.cs"><Link>RuntimeTesting\PhysicalWorkspaceRecord.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\ProblemNavigationRecord.cs"><Link>RuntimeTesting\ProblemNavigationRecord.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingQualificationDriver.cs"><Link>Execution\CastingQualificationDriver.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\SingleCastProbeObservation.cs"><Link>Execution\SingleCastProbeObservation.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\MaterialComponentAvailability.cs"><Link>Execution\MaterialComponentAvailability.cs</Link></Compile>

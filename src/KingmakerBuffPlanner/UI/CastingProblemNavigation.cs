@@ -108,6 +108,15 @@ namespace KingmakerBuffPlanner.UI
             ProblemNavigation.Clear();
         }
 
+        // External refresh failures remain global even after an earlier
+        // casting-specific refusal. No stale problem may overwrite them.
+        public void RecordGlobalRefusal(string message)
+        {
+            if (ProblemNavigation.Active) ClearGraphFocus();
+            else LeaveProblemNavigation();
+            RecordAttempt(message);
+        }
+
         public bool NavigateProblem(int delta)
         {
             if (!ProblemNavigation.Move(delta)) return false;

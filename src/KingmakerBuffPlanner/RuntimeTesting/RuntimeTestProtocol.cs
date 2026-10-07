@@ -522,7 +522,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (!IsPhysicalWorkspaceScenario(request.Scenario))
                         throw new InvalidDataException("physical-expectation-only-with-physical");
                     string expectation = request.Parameters["physicalExpectation"] as string;
-                    if (expectation != "select" && expectation != "cast")
+                    if (expectation != "select" && expectation != "cast" && expectation != "problems")
                         throw new InvalidDataException("physical-expectation");
                 }
                 bool hasCfAllowance = request.Parameters.ContainsKey("cfAllowance");
