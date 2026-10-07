@@ -4891,7 +4891,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     () => BuffPlannerUiRoot.OwnedTicksForRuntime,
                     (step, recipient, label) => new KingmakerProbeObserver().ObserveRecipient(
                         step, recipient, label, _probeClock),
-                    (caster, pool) => new KingmakerProbeObserver().ObserveCaster(caster, pool));
+                    (caster, pool) => new KingmakerProbeObserver().ObserveCaster(caster, pool),
+                    GuardedRecoveryReload);
                 _log.Info("[KBP-QUAL] driver built;casting=" + _qualificationRecord.CastingScenario +
                     ";allowance=" + _qualificationRecord.AllowanceStatus + ";workspaceClosed=" +
                     closed.Closed + ";campaign=" + campaignId + ".");
@@ -4905,6 +4906,57 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             _workspaceReopenEvidence = "qualification;session-reopened-from-disk";
             _completed = true;
             return true;
+        }
+
+        private bool _recoveryReloadStarted;
+        private int _recoveryUnloadBefore;
+        private int _recoveryLoadBefore;
+        private int _recoverySettleFrame = -1;
+        private object _recoveryPlayerBefore;
+        private object _recoverySessionBefore;
+
+        private string GuardedRecoveryReload()
+        {
+            if (!RuntimeTestProtocol.IsCastingQualificationScenario(_request.Scenario) ||
+                _qualificationRecord.Selection == null ||
+                _qualificationRecord.Selection.Recipe != CastingQualificationRecipe.StopReload ||
+                !_qualificationWorkspaceClosed || BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime)
+                throw new InvalidOperationException("The recovery reload is not authorized with the planner open or outside its recipe.");
+            CastingExecutionHost owner = BuffPlannerUiRoot.CastingHostForRuntime;
+            if (!_recoveryReloadStarted)
+            {
+                _recoveryReloadStarted = true;
+                _recoveryUnloadBefore = BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaBeginUnloading");
+                _recoveryLoadBefore = BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaLoadingComplete");
+                _recoveryPlayerBefore = Kingmaker.Game.Instance.Player;
+                _recoverySessionBefore = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                _log.Info("[KBP-RECOVERY] before reload;pid=" + System.Diagnostics.Process.GetCurrentProcess().Id +
+                    ";running=" + owner.IsRunning + ";accepting=" + owner.Accepting +
+                    ";shutdown=" + owner.ShutdownReason + ";reported=" + owner.ReportedRuns +
+                    ";campaign=" + Kingmaker.Game.Instance.Player.GameId + ".");
+                _liveSaveLoader.BeginGuardedReload();
+                return null;
+            }
+            bool cycled = BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaBeginUnloading") > _recoveryUnloadBefore &&
+                BuffPlannerUiRoot.LifecycleSignalsForRuntime("OnAreaLoadingComplete") > _recoveryLoadBefore;
+            string loaded = _liveSaveLoader.UpdateReload(cycled);
+            if (loaded == null) return null;
+            if (_recoverySettleFrame < 0) _recoverySettleFrame = Time.frameCount;
+            if (Time.frameCount - _recoverySettleFrame < 60 || !BuffPlannerUiRoot.IsHudInstalledForRuntime) return null;
+            var session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+            bool passed = !owner.IsRunning && owner.Accepting && owner.StartedRuns == owner.ReportedRuns &&
+                owner.LastCallbackFailure == null && !ReferenceEquals(_recoveryPlayerBefore, Kingmaker.Game.Instance.Player) &&
+                session != null && session.CampaignId == Kingmaker.Game.Instance.Player.GameId &&
+                BuffPlannerUiRoot.HudRootCountForRuntime == 1 && BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime == 1 &&
+                UnityEngine.Object.FindObjectsOfType<BuffPlannerUiRoot>().Length == 1;
+            string evidence = "passed=" + passed + ";pid=" + System.Diagnostics.Process.GetCurrentProcess().Id +
+                ";running=" + owner.IsRunning + ";accepting=" + owner.Accepting +
+                ";shutdown=" + owner.ShutdownReason + ";runs=" + owner.StartedRuns + "/" + owner.ReportedRuns +
+                ";campaign=" + Kingmaker.Game.Instance.Player.GameId + ";sessionReused=" + ReferenceEquals(session, _recoverySessionBefore) +
+                ";hudRoots=" + BuffPlannerUiRoot.HudRootCountForRuntime + ";subscriptions=" +
+                BuffPlannerUiRoot.ActiveEventSubscriptionsForRuntime + ";loaded=" + loaded;
+            _log.Info("[KBP-RECOVERY] " + evidence + ".");
+            return evidence;
         }
 
         private readonly CastingQualificationRecord _qualificationRecord = new CastingQualificationRecord();
@@ -5080,6 +5132,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "plannedSubmissions", record.PlannedSubmissions },
                     { "maximumSubmissions", record.MaximumSubmissions },
                     { "executionMode", record.ExecutionMode },
+                    { "recoveryReload", record.RecoveryReload },
                     { "stopPress", record.StopPress },
                     { "stopPressHandled", record.StopPressHandled },
                     { "stopPressedInFlight", record.StopPressedInFlight.HasValue

@@ -160,6 +160,7 @@ else {
     # the forecast castings, exactly as the host's boundary counts them.
     $recipe = [string]$outcome.selection.recipe
     $purposes = @{
+        'stop-reload' = "stop-reload casting-first qualification in $ExecutionMode mode (player Stop, same-process guarded WORKING reload, fresh second projection, effect and resource observations; no native retry)"
         'zero-cost-mixed' = "zero-cost-mixed casting-first qualification in $ExecutionMode mode (stop, complete, repeat, recast, held disable, recover)"
         'finite-direct-mixed' = "finite-direct-mixed casting-first qualification in $ExecutionMode mode (paid spell slots: stop, complete, repeat, recast)"
         'group-mixed' = "group-mixed casting-first qualification in $ExecutionMode mode (a direct casting primes one recipient; the caster-centred group casting then covers the others in one invocation with that recipient pre-covered, with a target-anchored group casting where one exists)"

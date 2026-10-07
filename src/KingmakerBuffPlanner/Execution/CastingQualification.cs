@@ -256,6 +256,10 @@ namespace KingmakerBuffPlanner.Execution
     {
         public const string ZeroCostMixed = "zero-cost-mixed";
         public const string FiniteDirectMixed = "finite-direct-mixed";
+        // WP1: the first routine stops, the guarded WORKING save is reloaded
+        // in the same process, then a distinct projection casts the remaining
+        // authored targets using the loaded world's resources.
+        public const string StopReload = "stop-reload";
         public const string GroupMixed = "group-mixed";
         public const string EnhancedDirect = "enhanced-direct";
         public const string AbilityPoolDirect = "ability-pool-direct";
@@ -276,7 +280,7 @@ namespace KingmakerBuffPlanner.Execution
         public static bool IsKnown(string recipe)
         {
             return recipe == ZeroCostMixed || recipe == FiniteDirectMixed || recipe == GroupMixed ||
-                recipe == EnhancedDirect || recipe == AbilityPoolDirect || recipe == RodExtendDirect ||
+                recipe == EnhancedDirect || recipe == AbilityPoolDirect || recipe == RodExtendDirect || recipe == StopReload ||
                 IsSharedRecipe(recipe);
         }
 
@@ -329,6 +333,7 @@ namespace KingmakerBuffPlanner.Execution
 
         public static int ForecastSteps(string recipe)
         {
+            if (recipe == StopReload) return 2;
             if (recipe == AbilityPoolDirect) return 1;
             if (IsTwoPhase(recipe)) return 2;
             return HasDisableStep(recipe) ? 5 : 3;
@@ -337,6 +342,13 @@ namespace KingmakerBuffPlanner.Execution
         public static CastingQualificationSelection Select(string recipe,
             CastingWorkspaceInputs inputs, string campaignId)
         {
+            if (recipe == StopReload)
+            {
+                CastingQualificationSelection selected = SelectFiniteDirectMixed(inputs, campaignId);
+                return new CastingQualificationSelection(selected.Refusal, selected.SourceId,
+                    selected.Ability, selected.Castings.ToList(), selected.CandidatesConsidered,
+                    selected.Rejections.ToList(), recipe, selected.Coverage);
+            }
             if (recipe == FiniteDirectMixed) return SelectFiniteDirectMixed(inputs, campaignId);
             if (recipe == ZeroCostMixed) return SelectZeroCostMixed(inputs, campaignId);
             if (recipe == GroupMixed) return SelectGroupMixed(inputs, campaignId);
@@ -1596,6 +1608,17 @@ namespace KingmakerBuffPlanner.Execution
             // stop: every casting planned; only the first executes.
             CastingQualificationStepForecast stop = Project(Stop, document, inputs, inputs.LiveEffects);
             steps.Add(stop);
+            if (selection.Recipe == CastingQualificationRecipe.StopReload)
+            {
+                // Loading the sealed WORKING bytes is a world replacement,
+                // never an undo of the interrupted attempt. Forecast the
+                // second explicit request against those original save inputs.
+                CastingPlanDocument second = new CastingPlanDocument(document.CampaignId,
+                    document.Routines, document.Castings.Select((casting, index) =>
+                        index == 0 ? casting.WithState(CastingAuthoringState.Disabled) : casting).ToList());
+                steps.Add(Project(Complete, second, inputs, inputs.LiveEffects));
+                return new ReadOnlyCollection<CastingQualificationStepForecast>(steps);
+            }
             var spent = new List<ResourceReservation>();
             if (stop.Projection != null) spent.Add(stop.Projection.Plan.Steps[0].Reservation);
             CastingWorkspaceInputs afterStop = WithSpent(inputs, spent);
