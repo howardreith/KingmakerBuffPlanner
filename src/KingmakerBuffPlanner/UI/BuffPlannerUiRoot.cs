@@ -1137,6 +1137,10 @@ namespace KingmakerBuffPlanner.UI
             {
                 _log.Error("[KBP-CF-RUN] fresh preflight inputs unavailable;routine=" +
                     routineId + ".", exception);
+                string refusal = name + " was not cast: the party state could not be refreshed (" +
+                    exception.Message + ").";
+                if (CastingSession != null) CastingSession.RecordGlobalRefusal(refusal);
+                if (_castingWorkspace != null) _castingWorkspace.ShowNotice(refusal);
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Refused,
                     name + " was not cast: the party state could not be refreshed (" +

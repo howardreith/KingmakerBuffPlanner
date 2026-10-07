@@ -23,7 +23,7 @@ using UnityModManagerNet;
 
 namespace KingmakerBuffPlanner.RuntimeTesting
 {
-    internal sealed class RuntimeTestHost
+    internal sealed partial class RuntimeTestHost
     {
         // Wall-clock budgets for the workspace frame capture, matching the
         // menu diagnostic: unfocused players spin far above 60 fps, and the
@@ -969,16 +969,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // Physical-input acceptance (Unity-free rules in
                     // PhysicalWorkspaceRecord): every action delivered by the
                     // OS and acknowledged, and the view's own state after it.
-                    IList<string> violations = _physicalRecord.Violations();
+                    IList<string> violations = PhysicalProblemsRequested ? _problemRecord.Violations() : _physicalRecord.Violations();
                     result.Assertions.Add(violations.Count == 0
                         ? RuntimeTestAssertion.Pass("physical-workspace",
-                            "search typing, wheel, press target, focus loss, Escape (OS input)",
+                            PhysicalProblemsRequested ? "blocked HUD focus, visible card, reasons, Previous/Next, Escape (OS input)"
+                                : "search typing, wheel, press target, focus loss, Escape (OS input)",
                             "screen=" + _physicalRecord.ScreenWidth + "x" + _physicalRecord.ScreenHeight +
                                 ";text=" + _physicalRecord.SearchTextAfterFocus + ";selected=" +
                                 _physicalRecord.SelectedBeforeClick + ">" + _physicalRecord.SelectedAfterClick +
                                 ";wheel=" + _physicalRecord.WheelEvidence)
                         : RuntimeTestAssertion.Fail("physical-workspace",
-                            "search typing, wheel, press target, focus loss, Escape (OS input)",
+                            PhysicalProblemsRequested ? "blocked HUD focus, visible card, reasons, Previous/Next, Escape (OS input)"
+                                : "search typing, wheel, press target, focus loss, Escape (OS input)",
                             string.Join("|", violations.ToArray())));
                     if (violations.Count != 0)
                     {
@@ -2239,7 +2241,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     // E12: the cold moon press comes BEFORE any planner
                     // hotkey is requested (phase 125); the hotkey follows it.
-                    _physicalStep = 100;
+                    _physicalStep = PhysicalProblemsRequested ? 0 : 100;
                     _liveUiPhase = 125;
                     return false;
                 }
@@ -4075,6 +4077,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalSettle = System.Diagnostics.Stopwatch.StartNew();
             }
             double settled = _physicalSettle == null ? 0 : _physicalSettle.Elapsed.TotalSeconds;
+            if (PhysicalProblemsRequested)
+                return UpdateProblemNavigation(view, settled);
             if (_physicalRecord.CastingFirst)
                 return UpdatePhysicalCastingFirst(view, settled);
             if (view == null && _physicalStep >= 1 && _physicalStep <= 7)
@@ -4196,6 +4200,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private bool FinishPhysical(string failure)
         {
+            if (PhysicalProblemsRequested) return FinishProblemNavigation(failure);
             if (failure != null) _physicalRecord.Failures.Add(failure);
             // The single-use exception ends with this scenario, used or not.
             if (_physicalGrant != null)
@@ -5311,7 +5316,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 !_physicalPublished)
             {
                 _physicalRecord.Failures.Add("shutdown:" + reason);
-                try { PublishPhysicalRecord(); }
+                try
+                {
+                    if (PhysicalProblemsRequested)
+                    {
+                        _problemRecord.Failures.Add("shutdown:" + reason);
+                        PublishProblemRecord();
+                    }
+                    else PublishPhysicalRecord();
+                }
                 catch (Exception exception)
                 {
                     _log.Error("[KBP-PHYSICAL] record not published at shutdown.", exception);

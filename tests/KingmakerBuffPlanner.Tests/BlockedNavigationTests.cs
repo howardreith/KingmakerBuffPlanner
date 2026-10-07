@@ -24,6 +24,9 @@ namespace KingmakerBuffPlanner.Tests
             Run("blocked-navigation-ready-only-and-success-clear-pending", () => TestProblemReadyOnly(root));
             Run("blocked-navigation-reveal-is-consumed-once", () => TestProblemOneShot(root));
             Run("blocked-navigation-scroll-offset-uses-viewport-bounds", TestProblemRevealGeometry);
+            Run("blocked-navigation-physical-judgment-requires-visible-points", TestProblemPhysicalJudgment);
+            Run("blocked-navigation-preserves-existing-undo-entry", () => TestProblemExistingUndo(root));
+            Run("blocked-navigation-global-refresh-failure-clears-stale-focus", () => TestProblemGlobalRefresh(root));
         }
 
         private static PlannedCasting ProblemCasting(string id, int order,
@@ -300,6 +303,97 @@ namespace KingmakerBuffPlanner.Tests
             Expect(session.ProblemNavigation.PendingRevealCastingId == null, "next reveal was not one-shot");
             session.Apply(CastingApplyMode.Ordinary, "long", GraphInputs());
             Expect(session.ProblemNavigation.PendingRevealCastingId == "first", "new attempt did not reset to first");
+        }
+
+        private static void TestProblemGlobalRefresh(string root)
+        {
+            string dir;
+            CastingWorkspaceSession session = ProblemSession(root, "global-refresh",
+                new[] { ProblemCasting("draft", 0) }, out dir);
+            session.Apply(CastingApplyMode.Ordinary, "long", GraphInputs());
+            string signature = session.DocumentIntentSignature();
+            string files = ProblemFiles(dir);
+            session.RecordGlobalRefusal("Long was not cast: the party state could not be refreshed (fixture failure).");
+            session.BuildGraph(GraphInputs());
+            Expect(!session.ProblemNavigation.Active && session.EditingFocusCastingId == null &&
+                session.ProblemNavigation.PendingRevealCastingId == null &&
+                session.LastAttemptMessage.Contains("fixture failure") &&
+                session.DocumentIntentSignature() == signature && ProblemFiles(dir) == files && !session.CanUndo,
+                "stale problem focus replaced a global refresh failure or authored state");
+        }
+
+        private static void TestProblemExistingUndo(string root)
+        {
+            string dir;
+            CastingWorkspaceSession session = ProblemSession(root, "undo",
+                new[] { ProblemCasting("first", 0) }, out dir);
+            Expect(session.AddCastingForRuntime(ProblemCasting("second", 1)).Applied && session.CanUndo,
+                "fixture did not create an authored Undo entry");
+            session.Apply(CastingApplyMode.Ordinary, "long", GraphInputs());
+            session.NavigateProblem(1);
+            session.NavigateProblem(-1);
+            session.BuildGraph(GraphInputs());
+            Expect(session.CanUndo && session.Undo() &&
+                session.Document.Castings.Select(casting => casting.CastingId).SequenceEqual(new[] { "first" }) &&
+                !session.CanUndo, "problem navigation changed the existing Undo stack");
+        }
+
+        private static RuntimeTesting.ProblemNavigationRecord ValidProblemPhysicalRecord()
+        {
+            var record = new RuntimeTesting.ProblemNavigationRecord {
+                PlannerClosedBeforeHud = true, ColdSessionBeforeHud = true, PlannerOpenedByHud = true,
+                GraphOverflow = true, GraphScrollBefore = 1, GraphScrollAfter = 0.2f,
+                SourceId = "buff", FirstCastingId = "first", SecondCastingId = "last",
+                DocumentBefore = "intent", DocumentAfter = "intent",
+                ProfileBeforeSha256 = "stored", ProfileAfterSha256 = "stored",
+                ResourcesBefore = "pools", ResourcesAfter = "pools", EffectsBefore = "effects", EffectsAfter = "effects",
+                EscapeLeftFocus = true, PlannerClosedAfterEscape = true, InputLeaseReleased = true,
+                ScreenWidth = 1920, ScreenHeight = 1080
+            };
+            record.Acknowledged.AddRange(RuntimeTesting.ProblemNavigationRecord.Actions);
+            for (int index = 0; index < 3; index++)
+            {
+                int position = index == 1 ? 2 : 1;
+                var observation = new RuntimeTesting.ProblemScreenObservation {
+                    CastingId = index == 1 ? "last" : "first", RoutineId = "long", SourceId = "buff",
+                    Position = position, Count = 2, ChipX = 600, ChipY = 400, ChipVisibleFraction = 1,
+                    CatalogueX = 100, CatalogueY = 500, RoutineX = 500, RoutineY = 800,
+                    InspectorScroll = 1, PreviousEnabled = position > 1, NextEnabled = position < 2,
+                    InspectorText = "Problem " + position + " of 2. " + WorkspaceReasonText.Describe("caster-unresolved"),
+                    FooterText = "Problem " + position + " of 2", DocumentSignature = "intent"
+                };
+                observation.MachineReasons.Add("caster-unresolved");
+                record.Observations.Add(observation);
+            }
+            return record;
+        }
+
+        private static void TestProblemPhysicalJudgment()
+        {
+            Expect(ValidProblemPhysicalRecord().Violations().Count == 0, "valid physical record failed");
+            Action<RuntimeTesting.ProblemNavigationRecord>[] invalid = {
+                record => record.Observations[0].ChipX = null,
+                record => record.Observations[1].ChipVisibleFraction = 0.02f,
+                record => record.FirstChipVisibleBeforeReveal = true,
+                record => record.GraphScrollAfter = record.GraphScrollBefore,
+                record => record.Observations[0].InspectorText = "generic planner",
+                record => record.DocumentAfter = "changed",
+                record => record.ProfileAfterSha256 = "written",
+                record => record.DispatchAttempts = 1,
+                record => record.RunsStarted = 1,
+                record => record.ResourcesAfter = "spent",
+                record => record.EffectsAfter = "new effect",
+                record => record.AcceptedDigestAfter = "approved",
+                record => record.Acknowledged.Remove("problem-moon"),
+                record => record.Observations[2].Position = 2,
+                record => record.InputLeaseReleased = false
+            };
+            foreach (Action<RuntimeTesting.ProblemNavigationRecord> corrupt in invalid)
+            {
+                RuntimeTesting.ProblemNavigationRecord record = ValidProblemPhysicalRecord();
+                corrupt(record);
+                Expect(record.Violations().Count != 0, "incomplete or side-effecting physical evidence passed");
+            }
         }
 
         private static void TestProblemRevealGeometry()

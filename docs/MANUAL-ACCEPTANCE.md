@@ -675,3 +675,22 @@ the owner yet; the guarded runs that cover each step are listed in
 
 Report anything that feels like a ceremony step, any wrong cost, any
 effect on the wrong unit, or any leftover Share state as a defect.
+
+## Unreleased WP2A candidate trial
+
+Use only the candidate named in docs/WP2A-NOT-READY-NAVIGATION.md.
+
+1. Deliberately leave a casting Not Ready, for example a saved Draft.
+2. Close the planner.
+3. Press that routine's moon/diamond/sun HUD button.
+4. Verify the planner opens at the blocked casting, with its buff, visible
+   card, actionable reason and Problem 1 of N.
+5. If several problems exist, use Next Problem and Previous Problem.
+6. Repair the focused casting; verify it disappears from the problem list
+   and the next current problem is revealed. After the last repair the
+   navigator disappears and the routine reports ready.
+
+Problem navigation itself edits and saves nothing. Global explanations stay
+global. Ready Casts Only remains an explicit fallback; required choices and
+enhancements retain their existing policy. This trial is owner acceptance
+pending, separate from historical 0.3.0 qualification below/above.

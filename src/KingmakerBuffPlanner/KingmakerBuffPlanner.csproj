@@ -136,6 +136,8 @@
     <Compile Include="RuntimeTesting\LegacyProfileFixture.cs" />
     <Compile Include="Persistence\PersistenceMessages.cs" />
     <Compile Include="RuntimeTesting\PhysicalWorkspaceRecord.cs" />
+    <Compile Include="RuntimeTesting\ProblemNavigationRecord.cs" />
+    <Compile Include="RuntimeTesting\RuntimeProblemNavigationHost.cs" />
     <Compile Include="Execution\CastingCapabilityInventory.cs" />
     <Compile Include="Execution\CastingQualification.cs" />
     <Compile Include="Execution\CastingQualificationDriver.cs" />

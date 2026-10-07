@@ -9856,6 +9856,29 @@ namespace KingmakerBuffPlanner.Tests
             if (request == null || rejection.Length != 0 || request.Parameters.Count != 10)
                 throw new InvalidOperationException("A valid physical selection request was rejected: " +
                     rejection);
+            // A blocked-only expectation is a non-casting request and
+            // accepts no allowance or additional parameter.
+            string problemValid = WriteRequest(root, "physical-problems-valid", o =>
+            {
+                saveSet(o);
+                ((Dictionary<string, object>)o["parameters"])["physicalExpectation"] = "problems";
+            });
+            RuntimeTestRequest problems = ReadProtocol(
+                new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, problemValid }, out rejection);
+            if (problems == null || rejection.Length != 0 || problems.Parameters.Count != 10)
+                throw new InvalidOperationException("A valid blocked-only physical request was rejected: " + rejection);
+            string problemAllowance = WriteRequest(root, "physical-problems-allowance", o =>
+            {
+                saveSet(o);
+                var parameters = (Dictionary<string, object>)o["parameters"];
+                parameters["physicalExpectation"] = "problems";
+                parameters["cfAllowance"] = "{}";
+            });
+            if (ReadProtocol(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, problemAllowance },
+                    out rejection) != null || rejection.IndexOf("cf-allowance-only-with-cast-expectation",
+                    StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException("Blocked-only physical request accepted a casting allowance.");
+
             // The cast expectation carries the allowance string.
             string castValid = WriteRequest(root, "physical-cast-valid", o =>
             {

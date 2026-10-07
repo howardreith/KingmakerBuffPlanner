@@ -1,13 +1,13 @@
 # Autonomous blockers — WP2A, 2026-10-07
 
-No product blocker established. Complete source and physical qualification
-are pending; no runtime or native qualification is claimed.
-The sandbox denies writes in the linked worktree; authorized changes use
-reviewed escalated command calls. The exact requested branch is outside the
-old lab push helper's naming pattern; before handoff, extend its authorized
-branch scope only for this expressly authorized mission and test the helper.
-No runtime ownership or allowance bypass is permitted.
+No product blocker established. Complete source gate and physical
+qualification remain pending; no runtime/native qualification is claimed.
+Linked-worktree writes use authorized reviewed escalated calls.
+The owned guarded push helper now permits only the explicitly authorized
+WP2A branch in addition to its existing scope. All other guards remain
+mandatory; its focused-worktree WhatIf test is still due at a clean commit.
 
-Base/HEAD before implementation checkpoint:
-b707c1f47859f2ecae517b2cd162d20ca18c7583; version 0.3.0.
-See docs/WP2A-NOT-READY-NAVIGATION.md for current evidence and next action.
+HEAD before scenario checkpoint:
+d339811c44c6a8ae74c0d76ece8642f84b68d104; version 0.3.0.
+Commands, hashes, uncertainty and exact next action:
+docs/WP2A-NOT-READY-NAVIGATION.md.
