@@ -147,6 +147,7 @@ namespace KingmakerBuffPlanner.Execution
         public int RunsStarted { get; set; }
         public int RunsReported { get; set; }
         public string CallbackFailure { get; set; }
+        public string RecoveryReload { get; set; }
         // The enhanced recipe: the enhancement options the workspace offered
         // for the focused enhanced casting before the edit and after it ("*"
         // marks a selected one).
@@ -220,6 +221,7 @@ namespace KingmakerBuffPlanner.Execution
         {
             get
             {
+                if (Selection != null && Selection.Recipe == CastingQualificationRecipe.StopReload) return RecoveryStepNames;
                 if (IsGroup) return GroupStepNames;
                 if (IsEnhanced) return EnhancedStepNames;
                 if (IsAbilityPool) return AbilityPoolStepNames;
@@ -242,6 +244,9 @@ namespace KingmakerBuffPlanner.Execution
         public IList<string> Violations()
         {
             var violations = new List<string>(Failures);
+            if (CastingScenario && Selection != null && Selection.Recipe == CastingQualificationRecipe.StopReload &&
+                (RecoveryReload == null || !RecoveryReload.StartsWith("passed=True;", StringComparison.Ordinal)))
+                violations.Add("recovery-reload:" + (RecoveryReload ?? "missing"));
             if (Selection == null || !Selection.Selected)
                 violations.Add("selection:" + (Selection == null ? "missing" : Selection.Refusal));
             if (Forecast == null || Selection == null ||
@@ -310,6 +315,7 @@ namespace KingmakerBuffPlanner.Execution
             return violations;
         }
 
+        public static readonly string[] RecoveryStepNames = { "stop", "complete" };
         public static readonly string[] StepNames = { "stop", "complete", "repeat", "recast" };
         // The group recipe ends after its mixed step: a repeat is not a
         // no-op there, because the game replaces a covered recipient's
@@ -441,10 +447,12 @@ namespace KingmakerBuffPlanner.Execution
             {
                 if (step.Report.TerminalReason != "completed")
                     failure = "report:" + step.Report.TerminalReason;
-                else if (step.StateOf(first) != CastingOutcomeState.Skipped ||
+                else if (step.StateOf(first) != (Selection.Recipe == CastingQualificationRecipe.StopReload
+                        ? CastingOutcomeState.Omitted : CastingOutcomeState.Skipped) ||
                     rest.Any(id => step.StateOf(id) != CastingOutcomeState.EffectConfirmed))
                     failure = "states:" + States(step);
-                else if (step.TransitionOf(first) != "unchanged" ||
+                else if (step.TransitionOf(first) != (Selection.Recipe == CastingQualificationRecipe.StopReload
+                        ? "absent" : "unchanged") ||
                     rest.Any(id => step.TransitionOf(id) != "new-instance"))
                     failure = "effects:" + string.Join(",", step.Transitions.ToArray());
             }
@@ -1001,6 +1009,7 @@ namespace KingmakerBuffPlanner.Execution
         private readonly Func<string> _lifecycleProbe;
         // How often the planner's owner has ticked it (null: unobservable).
         private readonly Func<long> _ownerTicks;
+        private readonly Func<string> _guardedReload;
         private long? _ownerTicksAtDisable;
         private int _runsAtDisable;
         private bool _stopPressed;
@@ -1025,8 +1034,10 @@ namespace KingmakerBuffPlanner.Execution
             Func<string, bool> pressRoutine = null, Action<bool> setPlannerEnabled = null,
             Func<string> lifecycleProbe = null, Func<long> ownerTicks = null,
             Func<CastStep, string, string, ProbeObservation> observeRecipient = null,
-            Func<string, string, CasterEnhancementObservation> observeCaster = null)
+            Func<string, string, CasterEnhancementObservation> observeCaster = null,
+            Func<string> guardedReload = null)
         {
+            _guardedReload = guardedReload;
             _observeRecipient = observeRecipient;
             _observeCaster = observeCaster;
             _lifecycleProbe = lifecycleProbe;
@@ -1141,9 +1152,10 @@ namespace KingmakerBuffPlanner.Execution
                 case "select": Select(); return;
                 case "author": Author(); return;
                 case "stop": Begin(CastingQualificationForecast.Stop); return;
-                case "stop-wait": Wait(true, "complete"); return;
+                case "stop-wait": Wait(true, Recipe == CastingQualificationRecipe.StopReload ? "reload" : "complete"); return;
+                case "reload": Reload(); return;
                 case "complete": Begin(CastingQualificationForecast.Complete); return;
-                case "complete-wait": Wait(false, "repeat"); return;
+                case "complete-wait": Wait(false, Recipe == CastingQualificationRecipe.StopReload ? "done" : "repeat"); return;
                 case "repeat": Repeat(); return;
                 case "recast-edit": RecastEdit(); return;
                 case "recast": Begin(CastingQualificationForecast.Recast); return;
@@ -1904,6 +1916,25 @@ namespace KingmakerBuffPlanner.Execution
         // Waits on the run (pumping it unless its owner does); the stop step
         // presses the player's stop once the first casting is in progress
         // or has finished.
+        private void Reload()
+        {
+            if (_guardedReload == null) { Fail("guarded-reload-unavailable"); return; }
+            string evidence = _guardedReload();
+            if (evidence == null) return;
+            Record.RecoveryReload = evidence;
+            if (!evidence.StartsWith("passed=True;", StringComparison.Ordinal))
+            { Fail("guarded-reload:" + evidence); return; }
+            if (!_host.Accepting || _host.IsRunning)
+            { Fail("host-after-reload:accepting=" + _host.Accepting + ";shutdown=" + _host.ShutdownReason); return; }
+            _session.FocusGraphCasting(Record.Selection.Castings[0].CastingId);
+            AuthoringEditResult edit = _session.SetFocusedCastingState(CastingAuthoringState.Disabled);
+            if (!edit.Applied) { Fail("second-author-refused:" + edit.Reason); return; }
+            CastingWorkspaceInputs inputs = _freshInputs();
+            _session.PresentForReview(inputs);
+            if (!_session.AcceptPresentedPlan(inputs)) { Fail("second-accept-refused"); return; }
+            _phase = "complete";
+        }
+
         private void Wait(bool stopAfterFirst, string next)
         {
             if (_host.IsRunning && stopAfterFirst && !_stopPressed &&

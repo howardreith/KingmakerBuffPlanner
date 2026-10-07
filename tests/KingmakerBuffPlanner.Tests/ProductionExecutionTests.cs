@@ -59,6 +59,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("native-boundary-refuses-non-standard-or-tampered", TestNativeBoundaryRefusals);
             Run("execution-host-runs-reports-and-halts", TestExecutionHostRunsAndHalts);
             Run("execution-host-cancel-deadline-shutdown", TestExecutionHostCancelDeadlineShutdown);
+            Run("same-process-stop-reload-driver-uses-new-world", () => TestStopReloadRecoveryDriver(root));
+            Run("reload-driver-refuses-an-unobserved-load", () => TestStopReloadRecoveryDriver(root, false));
             Run("production-apply-end-to-end-through-host",
                 () => TestProductionApplyEndToEnd(root));
             Run("run-presentation-separates-effects-and-spending", TestRunPresentation);
@@ -3570,8 +3572,16 @@ namespace KingmakerBuffPlanner.Tests
                 closed < 0 || started < 0 || closed > started ||
                 !host.Contains("_liveUiPhase = RuntimeTestProtocol.IsReloadScenario(_request.Scenario) && reloadable ? 80 : 21;") ||
                 !host.Contains("_workspaceReloadEvidence = \"passed=False;skipped:interaction-or-reopen-failed\";") ||
-                Occurrences(host, "BeginGuardedReload()") != 1)
+                Occurrences(host, "BeginGuardedReload()") != 2)
                 throw new InvalidOperationException("The host can reload with the planner open, or outside the reload scenario.");
+            string recovery = SourceBlock(host, "private string GuardedRecoveryReload()");
+            if (recovery == null || !recovery.Contains("IsCastingQualificationScenario(_request.Scenario)") ||
+                !recovery.Contains("_qualificationRecord.Selection.Recipe != CastingQualificationRecipe.StopReload") ||
+                !recovery.Contains("!_qualificationWorkspaceClosed || BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime") ||
+                recovery.IndexOf("throw new InvalidOperationException", StringComparison.Ordinal) >
+                    recovery.IndexOf("_liveSaveLoader.BeginGuardedReload();", StringComparison.Ordinal) ||
+                Occurrences(recovery, "BeginGuardedReload()") != 1)
+                throw new InvalidOperationException("The added recovery load lacks its exact recipe and closed-planner guards.");
             string verify = SourceBlock(host, "private string VerifyWorkspaceReload()");
             if (verify == null || !verify.Contains("bool passed = preserved && diskPreserved && campaign && _reloadSubscriptionsBefore == 1 &&") ||
                 !verify.Contains("subscriptions == 1 && _reloadHudRootsBefore == 1 && hudRoots == 1 &&") ||
@@ -6252,6 +6262,62 @@ namespace KingmakerBuffPlanner.Tests
                     CastingEffectsWithAbilityAlias("source-bulls", "source-communal", Ability),
                     new CastEnhancementSnapshot[0], null, Live());
             }
+        }
+
+        private static void TestStopReloadRecoveryDriver(string root, bool cleanReload = true)
+        {
+            var original = new FiniteBuffWorld();
+            FiniteBuffWorld world = original;
+            CastingWorkspaceInputs initial = original.Inputs();
+            CastingQualificationSelection selection = CastingQualificationRecipe.Select(
+                CastingQualificationRecipe.StopReload, initial, "fixture-campaign");
+            var forecast = CastingQualificationForecast.Forecast(selection, initial, "fixture-campaign");
+            if (forecast.Count != 2 || forecast.Any(value => value.ProjectionId == null) ||
+                forecast[0].ProjectionId == forecast[1].ProjectionId)
+                throw new InvalidOperationException("Recovery must approve two distinct exact projections.");
+            string refusal;
+            var allowance = CastingQualificationAllowance.Parse(QualificationAllowanceJson(value =>
+            {
+                value["recipe"] = CastingQualificationRecipe.StopReload;
+                value["fixtureGameId"] = "fixture-campaign";
+                value["approvedProjectionIds"] = new JArray(forecast.Select(item => item.ProjectionId));
+                value["maximumNativeSubmissions"] = forecast.Sum(item => item.CastingIds.Count);
+            }), "qual-run-1", out refusal);
+            if (allowance == null) throw new InvalidOperationException(refusal);
+            long now = 0;
+            var host = new CastingExecutionHost(settings => new InstantCastExecutor(world, true), () => now);
+            var record = new CastingQualificationRecord { CastingScenario = true };
+            int reports = 0;
+            int reloads = 0;
+            host.RunCompleted = report => reports++;
+            var driver = new CastingQualificationDriver(record, allowance, "fixture-campaign",
+                () => world.Inputs(), boundary => new CastingWorkspaceSession(
+                    Path.Combine(root, "stop-reload-" + cleanReload), "fixture-campaign", boundary),
+                host, (step, label) => world.Observe(step, label), () => now, 240000,
+                CastingQualificationRecipe.StopReload, guardedReload: () =>
+                {
+                    reloads++;
+                    if (!cleanReload) return "passed=False;world-unobserved";
+                    if (host.IsRunning || reports != 1 || original.Fired.Count != 1 ||
+                        original.Active.Count != 1 || original.Tokens.Values.Count(value => !value) != 1)
+                        throw new InvalidOperationException("Stop did not finish and spend the first casting exactly once.");
+                    world = new FiniteBuffWorld();
+                    return "passed=True;fixture-world-replaced";
+                });
+            for (int tick = 0; tick < 100 && !driver.Completed; tick++) { now += 16; driver.Update(); }
+            if (!driver.Completed || reloads != 1 || host.IsRunning)
+                throw new InvalidOperationException("The recovery scenario did not reach one terminal.");
+            if (!cleanReload)
+            {
+                if (host.StartedRuns != 1 || reports != 1 || record.Violations().Count == 0)
+                    throw new InvalidOperationException("An unobserved reload allowed another submission.");
+                return;
+            }
+            if (record.Violations().Count != 0 || !host.Accepting || host.StartedRuns != 2 || reports != 2 ||
+                world.Fired.Count != selection.Castings.Count - 1 || world.Active.Count != world.Fired.Count ||
+                world.SpontaneousRemaining != 0 || original.Fired.Count != 1 || original.Active.Count != 1 ||
+                record.Steps[0].Report.RunId == record.Steps[1].Report.RunId || !record.Steps[1].Report.Succeeded)
+                throw new InvalidOperationException("Second real execution failed: " + string.Join("|", record.Violations()));
         }
 
         private static CastingQualificationAllowance FiniteAllowance(FiniteBuffWorld world, int maximum = 4)
