@@ -247,6 +247,10 @@ namespace KingmakerBuffPlanner.Execution
             if (CastingScenario && Selection != null && CastingQualificationRecipe.IsRecoveryRecipe(Selection.Recipe) &&
                 (RecoveryReload == null || !RecoveryReload.StartsWith("passed=True;", StringComparison.Ordinal)))
                 violations.Add("recovery-reload:" + (RecoveryReload ?? "missing"));
+            if (CastingScenario && Selection != null && CastingQualificationRecipe.IsRecoveryRecipe(Selection.Recipe) &&
+                TerminalReason == "completed" && (RunsStarted != 2 || RunsReported != 2 || CallbackFailure != null))
+                violations.Add("recovery-run-ownership:" + RunsStarted + "/" + RunsReported +
+                    ";callback=" + (CallbackFailure ?? "none"));
             if (Selection == null || !Selection.Selected)
                 violations.Add("selection:" + (Selection == null ? "missing" : Selection.Refusal));
             if (Forecast == null || Selection == null ||
@@ -443,7 +447,14 @@ namespace KingmakerBuffPlanner.Execution
                 var stopping = new[] { CastExecutionStatus.ResidualStateUnsettled,
                     CastExecutionStatus.FailedValidation, CastExecutionStatus.FailedSubmission,
                     CastExecutionStatus.FailedExecution, CastExecutionStatus.TimedOutUnconfirmed };
+                // The real Animated iterator always records this exact
+                // abandonment on owner disposal. It reports any failed
+                // disposal, residual delivery or enhancement restoration
+                // separately; the coordinator retains those later records.
+                // Only the exact cancellation-only record is expected here.
+                const string animatedCancellation = "Cancelled:cancelled-in-flight;last:FailedExecution:animated-operation-abandoned-in-flight";
                 CastingOutcomeEntry uncertain = step.Report.Entries.FirstOrDefault(entry =>
+                    (ExecutionMode != "animated" || entry.Detail != animatedCancellation) &&
                     stopping.Any(status => entry.Detail.IndexOf(status + ":", StringComparison.Ordinal) >= 0));
                 if (uncertain != null) return "cancel-cleanup:" + uncertain.CastingId + ":" + uncertain.Detail;
                 if (step.Transitions.Count != castings.Count || step.Availability.Count != castings.Count ||
@@ -1151,6 +1162,13 @@ namespace KingmakerBuffPlanner.Execution
                 {
                     Record.Failures.Add("enable-at-finish:" + exception.GetType().Name + ":" + exception.Message);
                 }
+            }
+            if (CastingQualificationRecipe.IsRecoveryRecipe(Recipe))
+            {
+                Record.RunsStarted = _host.StartedRuns;
+                Record.RunsReported = _host.ReportedRuns;
+                Record.CallbackFailure = _host.LastCallbackFailure;
+                Record.LifecycleAfter = Probe();
             }
             Completed = true;
             Record.TerminalReason = reason;
