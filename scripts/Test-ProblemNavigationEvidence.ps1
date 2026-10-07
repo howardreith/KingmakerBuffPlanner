@@ -9,6 +9,9 @@ $boundary = Join-Path ([IO.Path]::GetTempPath()) ('kbp-problem-evidence-' + [Gui
 New-Item -ItemType Directory -Path $boundary | Out-Null
 $commit = 'c' * 40
 $hash = 'a' * 64
+# Match ProfileIntentSignature: campaign + U+0002 + normalized profile JSON.
+# A successful physical acknowledgement has no deliveryFailed field.
+$intent = 'fixture-campaign' + [char]2 + '{"schemaVersion":0,"campaignId":"fixture-campaign","routines":[{"routineId":"long"}],"castings":[{"castingId":"wp2a-blocked-late"},{"castingId":"wp2a-blocked-last"}],"ui":{},"execution":{}}'
 $actions = @('problem-moon', 'problem-next', 'problem-previous', 'problem-escape-focus', 'problem-escape-close')
 $passed = 0
 function New-ProblemEvidence {
@@ -23,16 +26,16 @@ function New-ProblemEvidence {
             catalogueX = 100; catalogueY = 500; routineX = 500; routineY = 800
             inspectorScroll = 1; previousEnabled = ($position -gt 1); nextEnabled = ($position -lt 2)
             inspectorText = "Long Problem $position of 2. Not ready: this casting is a Draft; finish its choices and mark it Ready"
-            footerText = "Showing Problem $position of 2"; documentSignature = $hash
+            footerText = "Showing Problem $position of 2"; documentSignature = $intent
             machineReasons = @('unresolved-saved-request')
         }
         Write-KbpJsonAtomic (Join-Path $Directory ('physical-input-' + $actions[$index] + '.ack.json')) ([ordered]@{
-            runId = 'problems-test'; actionId = $actions[$index]; action = 'click'; deliveryFailed = $false })
+            runId = 'problems-test'; actionId = $actions[$index]; action = 'click' })
         [IO.File]::WriteAllBytes((Join-Path $Directory ('problem-' + ($index + 1) + '.png')), (New-Object byte[] 2048))
     }
     foreach ($action in $actions[3..4]) {
         Write-KbpJsonAtomic (Join-Path $Directory ('physical-input-' + $action + '.ack.json')) ([ordered]@{
-            runId = 'problems-test'; actionId = $action; action = 'key-escape'; deliveryFailed = $false })
+            runId = 'problems-test'; actionId = $action; action = 'key-escape' })
     }
     return [ordered]@{
         schemaVersion = 1; runId = 'problems-test'; sourceCommit = $commit; packageSha256 = $hash; dllSha256 = $hash
@@ -40,7 +43,7 @@ function New-ProblemEvidence {
         plannerClosedBeforeHud = $true; coldSessionBeforeHud = $true; plannerOpenedByHud = $true
         graphOverflow = $true; firstChipVisibleBeforeReveal = $false; graphScrollBefore = 1; graphScrollAfter = 0.2
         sourceId = 'buff'; firstCastingId = 'wp2a-blocked-late'; secondCastingId = 'wp2a-blocked-last'
-        documentBefore = $hash; documentAfter = $hash; profileBeforeSha256 = $hash; profileAfterSha256 = $hash
+        documentBefore = $intent; documentAfter = $intent; profileBeforeSha256 = $hash; profileAfterSha256 = $hash
         resourcesBefore = 'pools'; resourcesAfter = 'pools'; effectsBefore = 'effects'; effectsAfter = 'effects'
         runsStarted = 0; dispatchAttempts = 0; undoBefore = $false; undoAfter = $false; acceptedDigestAfter = $null
         escapeLeftFocus = $true; plannerClosedAfterEscape = $true; inputLeaseReleased = $true
@@ -49,6 +52,22 @@ function New-ProblemEvidence {
 }
 $cases = [ordered]@{
     'valid' = $null
+    'valid-explicit-delivery-success' = { param($r, $d)
+        $ackPath = Join-Path $d 'physical-input-problem-moon.ack.json'
+        $ack = Read-KbpJson $ackPath
+        $ack | Add-Member -NotePropertyName deliveryFailed -NotePropertyValue $false
+        Write-KbpJsonAtomic $ackPath $ack }
+    'failed-physical-delivery' = { param($r, $d)
+        $ackPath = Join-Path $d 'physical-input-problem-moon.ack.json'
+        $ack = Read-KbpJson $ackPath
+        $ack | Add-Member -NotePropertyName deliveryFailed -NotePropertyValue $true
+        Write-KbpJsonAtomic $ackPath $ack }
+    'hash-instead-of-authored-intent' = { param($r, $d)
+        $r.documentBefore = $hash; $r.documentAfter = $hash }
+    'empty-authored-intent' = { param($r, $d)
+        $r.documentBefore = ''; $r.documentAfter = '' }
+    'unstructured-authored-json' = { param($r, $d)
+        $r.documentBefore = '{"message":"not authored intent"}'; $r.documentAfter = $r.documentBefore }
     'wrong-candidate' = { param($r, $d) $r.sourceCommit = 'd' * 40 }
     'generic-open' = { param($r, $d) $r.plannerOpenedByHud = $false }
     'hierarchy-without-screen-point' = { param($r, $d) $r.observations[0].chipX = $null }
@@ -83,7 +102,7 @@ try {
         }
         $rejected = $false
         try { Assert-KbpScenarioOutcome $request } catch { $rejected = $true }
-        if ($rejected -ne ($case.Key -ne 'valid')) { throw "Problem evidence case failed: $($case.Key)" }
+        if ($rejected -ne ($case.Key -notlike 'valid*')) { throw "Problem evidence case failed: $($case.Key)" }
         $passed++
     }
 }

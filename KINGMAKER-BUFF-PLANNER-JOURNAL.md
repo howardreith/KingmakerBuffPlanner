@@ -2657,3 +2657,69 @@ Focused retest 15/15, no compiler warnings. No runtime mutation.
 Checkpoint, rejected assumption and exact next action:
 docs/WP2A-NOT-READY-NAVIGATION.md. Complete source/runtime qualification
 remain pending on the newly committed candidate.
+## Checkpoint: first physical run and verifier contract repair
+
+Branch codex/kbp-not-ready-deep-linking-2026-10-07; exact HEAD
+783af83684146cbbd9abda13e5ac62dd3818fdf8; version 0.3.0.
+The clean candidate completed scripts/Test-SourceOnly.ps1 with zero failures:
+42 source / 413 C# / 38 filesystem / 18 problem evidence / 4 package /
+5 deployment purity / 13 launcher purity / 3 fixture inventory /
+16 rollback / 3 publisher-gate checks; suite PASS=1 FAIL=0.
+No compiler warnings. Evidence: artifacts/wp2a-source-gate-5.log.
+The archive comparisons read eight snapshots totalling about 322 GiB;
+their assertions and targets were unchanged.
+
+Build-Local after the full gate reproduced ZIP
+d843cab807272c9702d8d4f86bc62827c525f15e13aa0b90f2b491121eb068b9,
+DLL 8358d91b7d5839ef9d159a785ded467c58ee7c0865eaa4ea151946ac65f829d0,
+MVID 89113394-8e2d-42d3-bd33-eac7eb9701e5. Clean build log:
+artifacts/wp2a-final-build-783af83.log; manifest under artifacts/local-runtime/0.3.0.
+This identity is preserved under artifacts/qualified-wp2a-783af83.
+
+Exact scenario WhatIf passed, with no mutation. After the lab's measured
+180-second input-idle guard and the owner's "Use the next idle window"
+instruction, the owned launcher ran live-workspace-physical,
+PhysicalExpectation problems, full-user, Automation, DisplayMode owner,
+instant, timeout 1200, run wp2a-783af83-problems-01. No allowance was supplied.
+
+Game result PASS; physical record violations empty. Physical moon opened a
+cold closed planner at Long / Resistance / Linzi -> Hedwirg. The first late
+Draft wp2a-blocked-late began masked offscreen; measured graph scroll moved
+1.0 -> 0.115682006. Chip point (937.504,147.660172) on a 1920x1080 surface;
+visible fraction approximately 1.0. The catalogue row and Long tab were
+onscreen, inspector was at top, and the visible reason was:
+"Not ready: this casting is a Draft; finish its choices and mark it Ready".
+Actual Next and Previous clicks showed 1 of 2 -> 2 of 2 -> 1 of 2, with
+correct boundary controls. Screenshots problem-1/2/3.png were visually
+inspected (first at this checkpoint). Nested Escape cleared inspection,
+then closed the planner and released the input lease. Document/profile,
+all resource/effect signatures, Undo and review authorization stayed
+unchanged; dispatch attempts and runs started both zero.
+
+Outer orchestration FAILED solely at independent verifier schema handling:
+successful OS acknowledgements omit deliveryFailed; the session intent
+signature is campaign + U+0002 + normalized profile JSON, not SHA-256.
+The original failed completion is retained and is not reported complete.
+Restoration verified, game exited, protected saves compared clean, allowed
+changed saves empty, transaction Restored. Evidence:
+C:/Dev/KingmakerBuffPlannerLab/runtime-evidence/wp2a-783af83-problems-01/.
+
+File-backed regression reproduced rejection of the actual valid contracts.
+After repair, Test-ProblemNavigationEvidence PASS=23 FAIL=0 and independent
+recheck of the original physical record PASS=1 FAIL=0
+(artifacts/wp2a-actual-evidence-schema-green.log). Invalid/empty/unstructured
+signatures and failed physical deliveries remain rejected. Exact string
+equality and every visibility/native/save assertion remain mandatory.
+Production C# is unchanged by this verifier repair.
+
+Rejected assumptions: successful acknowledgements contain a false failure
+flag; intent signatures are hashes; a profile signature is unprefixed JSON.
+The verified ProfileIntentSignature implementation defines the representation.
+
+Uncertainty: a fresh complete outer orchestration on the corrected verifier
+is still required. Exact next action: commit the harness regression/repair,
+build its prerequisite package, run the unchanged complete source gate to
+zero failures, rebuild the clean candidate, repeat the physical blocked-only
+scenario at the next measured eligible idle window, verify all restoration
+and protected saves, then record/push the final evidence. No other package,
+PR, merge, tag, release or permanent installation.

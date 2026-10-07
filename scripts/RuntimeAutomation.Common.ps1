@@ -987,7 +987,9 @@ function Assert-KbpProblemNavigationOutcome {
         $expectedAction = if ($action -like '*escape*' -or $action -like 'problem-menu-close-*') {
             'key-escape'
         } else { 'click' }
-        if ([bool]$ack.deliveryFailed -or [string]$ack.runId -cne [string]$Request.runId -or
+        $failureProperty = $ack.PSObject.Properties['deliveryFailed']
+        $deliveryFailed = $null -ne $failureProperty -and [bool]$failureProperty.Value
+        if ($deliveryFailed -or [string]$ack.runId -cne [string]$Request.runId -or
             [string]$ack.actionId -cne [string]$action -or [string]$ack.action -cne $expectedAction) {
             throw "Physical action was not delivered with the expected identity: $action"
         }
@@ -997,8 +999,24 @@ function Assert-KbpProblemNavigationOutcome {
         [bool]$record.firstChipVisibleBeforeReveal -or [double]$record.graphScrollAfter -ge [double]$record.graphScrollBefore -or
         -not [bool]$record.escapeLeftFocus -or -not [bool]$record.plannerClosedAfterEscape -or
         -not [bool]$record.inputLeaseReleased) { throw 'HUD reveal or nested Escape evidence failed.' }
-    if ([string]$record.documentBefore -cnotmatch '^[0-9a-f]{64}$' -or
-        [string]$record.documentBefore -cne [string]$record.documentAfter -or
+    # ProfileIntentSignature is campaign + U+0002 + normalized profile JSON.
+    # Check that machine contract; preserve exact equality at every step.
+    $signature = [string]$record.documentBefore
+    $separator = $signature.IndexOf([char]2)
+    if ($separator -le 0) { throw 'Physical problem evidence has no campaign-bound authored intent.' }
+    $campaign = $signature.Substring(0, $separator)
+    try { $intent = $signature.Substring($separator + 1) | ConvertFrom-Json }
+    catch { throw 'Physical problem evidence has no readable authored intent.' }
+    foreach ($key in @('schemaVersion', 'campaignId', 'routines', 'castings', 'ui', 'execution')) {
+        if ($null -eq $intent -or $null -eq $intent.PSObject.Properties[$key]) {
+            throw 'Physical problem evidence has no structured authored intent.'
+        }
+    }
+    if ([int]$intent.schemaVersion -ne 0 -or [string]$intent.campaignId -cne $campaign -or
+        @($intent.routines).Count -eq 0 -or @($intent.castings).Count -eq 0) {
+        throw 'Physical problem evidence has unbound or empty authored intent.'
+    }
+    if ([string]$record.documentBefore -cne [string]$record.documentAfter -or
         [string]$record.profileBeforeSha256 -cnotmatch '^[0-9a-f]{64}$' -or
         [string]$record.profileBeforeSha256 -cne [string]$record.profileAfterSha256 -or
         [string]::IsNullOrEmpty([string]$record.resourcesBefore) -or
