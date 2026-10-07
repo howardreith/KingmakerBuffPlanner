@@ -2624,3 +2624,15 @@ rejected charter annotation and next action are in
 docs/WP2A-NOT-READY-NAVIGATION.md. No runtime, install or save mutation.
 Next: complete source/mechanical gate on committed clean tree, clean
 candidate identity, guarded physical HUD/viewport qualification.
+### WP2A reachability checkpoint, 2026-10-07
+
+Branch codex/kbp-not-ready-deep-linking-2026-10-07; pre-commit HEAD
+8ec8cbf00c2030e4b86b8b0424795a8f816a37ce; version 0.3.0.
+Real compiler/session regression proved a missing catalogue reveal target
+when a saved blocked buff disappears from discovery (14 pass / 1 expected
+failure). Focused repair: unavailable selected row and atomic geometry
+preflight, with no authoring/readiness change. Retest 15 pass / 0 fail;
+production validation 42/42 and build 1/1, no compiler warnings.
+Evidence, development hash, rejected theory and exact next action:
+docs/WP2A-NOT-READY-NAVIGATION.md. Full gate restarted for the new candidate;
+runtime visibility and restoration qualification remain pending.

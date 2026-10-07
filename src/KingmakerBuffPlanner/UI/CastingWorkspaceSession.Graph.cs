@@ -350,6 +350,13 @@ namespace KingmakerBuffPlanner.UI
                 FocusedCastingId = EditingFocusCastingId
             };
             List<WorkspaceSourceOption> sources = BuildSourceOptions(inputs, source);
+            // A casting-specific refusal remains inspectable when discovery
+            // no longer supplies its buff. Keep a selected reveal target;
+            // this placeholder provides no provider or readiness judgment.
+            if (ProblemNavigation.Active && !sources.Any(value =>
+                    string.Equals(value.SourceId, source, StringComparison.Ordinal)))
+                sources.Add(new WorkspaceSourceOption(source, "Unavailable saved buff", true,
+                    iconAbility: FocusedCasting()?.Ability));
             WorkspaceSourceOption selected = sources.FirstOrDefault(value => value.Selected);
             view.SelectedSourceCaption = selected == null ? (source.Length == 0 ? "no buff selected"
                 : "unnamed buff source") : selected.Label;
