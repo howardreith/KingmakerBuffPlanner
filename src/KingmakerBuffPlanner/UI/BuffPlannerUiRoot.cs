@@ -1167,10 +1167,15 @@ namespace KingmakerBuffPlanner.UI
             }
             if (!result.Allowed)
             {
-                string refusal = CastingRunPresentation.DescribeRefusal(name, result);
+                string refusal = CastingRunPresentation.DescribeRefusal(name, result, session);
                 _log.Info("[KBP-CF-RUN] refused;routine=" + routineId + ";mode=" + mode +
                     ";reason=" + result.ReviewReason + ".");
                 session.RecordAttempt(refusal);
+                if (_castingWorkspace != null)
+                {
+                    _castingWorkspace.RefreshView();
+                    _castingWorkspace.ShowNotice(refusal);
+                }
                 _lastCastingPress[PressKey(session, routineId)] = refusal;
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Refused, refusal,
@@ -1184,7 +1189,7 @@ namespace KingmakerBuffPlanner.UI
                 {
                     try
                     {
-                        session.SelectRoutine(routineId);
+                        if (!session.ProblemNavigation.Active) session.SelectRoutine(routineId);
                         OpenSetup();
                     }
                     catch (Exception exception)
@@ -1505,6 +1510,8 @@ namespace KingmakerBuffPlanner.UI
             // authoring edits; the next open reloads the last explicitly
             // saved document. The session is never silently reconstructed
             // while open.
+            if (CastingSession != null && CastingSession.ProblemNavigation.Active)
+                CastingSession.ClearGraphFocus();
             _castingWorkspace.Dispose();
             _castingWorkspace = null;
             // Unsaved intent is PRESERVED across an ordinary close/reopen
@@ -1875,6 +1882,7 @@ namespace KingmakerBuffPlanner.UI
             try
             {
                 if (_spellbookEntry != null) _spellbookEntry.Tick();
+                if (_castingWorkspace != null) _castingWorkspace.TickGeometry();
                 if (_castingWorkspace != null && Input.GetKeyDown(KeyCode.Escape))
                 {
                     // Escape first leaves the workspace's own focused casting

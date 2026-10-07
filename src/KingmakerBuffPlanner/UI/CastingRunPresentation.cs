@@ -84,6 +84,24 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        internal static string DescribeProblem(CastingWorkspaceSession session)
+        {
+            CastingProblemNavigation problems = session.ProblemNavigation;
+            if (!problems.Active) return string.Empty;
+            return session.RoutineDisplayName(problems.RoutineId) + " was not cast. Showing Problem " +
+                problems.Position + " of " + problems.Count + ": " +
+                session.CastingLabel(problems.Current.CastingId) + ". Not ready: " +
+                string.Join("; ", problems.Current.Reasons.Select(WorkspaceReasonText.Describe).ToArray()) + ".";
+        }
+
+        internal static string DescribeRefusal(string routineName, WorkspaceApplyResult result,
+            CastingWorkspaceSession session)
+        {
+            return result != null && result.BlockingCastings.Count != 0 &&
+                session != null && session.ProblemNavigation.Active
+                    ? DescribeProblem(session) : DescribeRefusal(routineName, result);
+        }
+
         // Refusals are explained in terms the player can act on; the exact
         // machine reason stays appended for the log and bug reports.
         internal static string DescribeRefusal(string routineName, WorkspaceApplyResult result)

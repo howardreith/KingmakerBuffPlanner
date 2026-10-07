@@ -1,33 +1,18 @@
-# AUTONOMOUS RESUME — updated 2026-10-03 (Claude takeover: v1.2 preview delivered)
+# Autonomous resume — WP2A, 2026-10-07
 
-## Where the work stands
+Active mission: find blocked castings immediately. Branch
+codex/kbp-not-ready-deep-linking-2026-10-07, worktree private/worktrees/WP2A.
+Base/HEAD before implementation checkpoint:
+b707c1f47859f2ecae517b2cd162d20ca18c7583. Version remains 0.3.0.
+No Work Package 1 changes inherited. No other work package is in scope.
 
-- Delivered (tested) source commit: `8d7681d03752f3f7170f25f7d45029f71c46a884`
-  on `codex/kingmaker-buff-planner-everyday-use` (pushed through the guarded
-  helper). Records commits on top of it are documentation only.
-- Package `5b24e2eafee69b18898894b6e9a5cfb9b2c8e625a561494cb2234766097d8d17`,
-  DLL `deee7b1de54daee9e890f6680c8e0d4db09674b12c394e2d2d6c2d3e460cf65b`,
-  MVID `1e762004-8200-430e-853e-d61456a627ae`; frozen under
-  `runtime-backups/qualification-frozen/8d7681d03752f3f7170f25f7d45029f71c46a884/`.
-- Full gate PASS at that tree: `artifacts/gate-8d7681d.log` (42 / 398 / 38 /
-  4 / 5 / 13 / 3 / 16 / 3).
-- r15: 41/41 jobs done and verified on the delivered candidate
-  (`dispatch\jobs.r15-final.json`, run ids `beta-8d7681d0r15-*`).
-- Delivery: private draft release 399014941 (still a draft), asset
-  `KingmakerBuffPlanner-0.2.0-rc6-everyday-use-v1.2+8d7681d0.zip` (id
-  607817987), downloaded back and verified; the prior beta asset
-  (214b795b...8b20564) unchanged. Receipt:
-  `docs/evidence/everyday-use-v1.2-delivery-receipt.md`.
-- Lab: dispatcher stopped, no claims in state `claimed`, transactions all
-  Restored, no locks, no Kingmaker; `owner-pause` and `stop` flags absent.
+Shared structured navigation implemented and regressed: focused tests 11/11;
+development source validation 42/42 and production compilation passed with
+no warnings. Complete gate and physical qualification remain outstanding.
+Exact evidence, commands and uncertainties:
+docs/WP2A-NOT-READY-NAVIGATION.md.
 
-## The exact next action
-
-Wait for the owner's self-paced trial (`docs/MANUAL-ACCEPTANCE.md`,
-everyday-use section). Do not merge, tag, publish or promote without the
-owner's explicit authorization. If the owner reports a defect: reproduce from
-the report, smallest repair + regression, full gate (~4 h; validate the
-launcher WhatIf logic first with the fast copy described in the journal),
-Build-Local, freeze, rebuild jobs with a fresh suffix (allowance run ids are
-batch-unique since H5), rerun the affected chains, and add a NEW uniquely
-named asset to the same draft (never replace an existing asset).
+Next: add blocked-only physical expectation to the guarded existing harness;
+run the complete source gate, commit/build a clean candidate, physically
+qualify HUD focus and viewport reveal, reconcile restoration, then stop at a
+clean branch pushed through the guarded helper. No PR/merge/tag/release.

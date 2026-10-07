@@ -24,13 +24,17 @@ namespace KingmakerBuffPlanner.Tests
     internal static partial class Program
     {
         private static int _passed;
+        private static bool _blockedNavigationOnly;
         private static readonly List<string> Failures = new List<string>();
         private static string _protocolEvidenceRoot;
 
-        private static int Main()
+        private static int Main(string[] args)
         {
             try
             {
+                _blockedNavigationOnly = args.SequenceEqual(new[] { "--blocked-navigation" });
+                if (args.Length != 0 && !_blockedNavigationOnly)
+                    throw new ArgumentException("Unknown test suite.");
                 return RunAll();
             }
             catch (Exception exception)
@@ -427,6 +431,7 @@ namespace KingmakerBuffPlanner.Tests
                 Run("prepared-slot-observation-reads-exact-source", TestPreparedSlotObservationReadsExactSource);
                 RunProductionExecutionTests(root);
                 RunCastingGraphTests(root);
+                RunBlockedNavigationTests(root);
                 RunAutosaveLifecycleTests(root);
                 RunSharePlanningTests(root);
                 RunUndoHistoryTests(root);
@@ -9526,6 +9531,8 @@ namespace KingmakerBuffPlanner.Tests
 
         private static void Run(string name, Action action)
         {
+            if (_blockedNavigationOnly && !name.StartsWith("blocked-navigation-", StringComparison.Ordinal))
+                return;
             try
             {
                 action();

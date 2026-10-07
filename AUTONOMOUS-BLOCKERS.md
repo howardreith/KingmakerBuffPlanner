@@ -1,16 +1,13 @@
-# AUTONOMOUS BLOCKERS — updated 2026-10-03
+# Autonomous blockers — WP2A, 2026-10-07
 
-None. The everyday-use v1.2 private preview is delivered (draft release
-399014941, asset `KingmakerBuffPlanner-0.2.0-rc6-everyday-use-v1.2+8d7681d0.zip`,
-downloaded back and verified). Open items, none blocking:
+No product blocker established. Complete source and physical qualification
+are pending; no runtime or native qualification is claimed.
+The sandbox denies writes in the linked worktree; authorized changes use
+reviewed escalated command calls. The exact requested branch is outside the
+old lab push helper's naming pattern; before handoff, extend its authorized
+branch scope only for this expressly authorized mission and test the helper.
+No runtime ownership or allowance bypass is permitted.
 
-1. Owner acceptance: the preview is for the owner's self-paced trial
-   (`docs/MANUAL-ACCEPTANCE.md`, everyday-use section). Nothing is merged,
-   tagged, published or promoted.
-2. Not qualified in this round (named in the guide, the matrix and the
-   release notes): windowed display (H2 - every 1920x1080 run is fullscreen),
-   physical clicks on the Important/Short HUD buttons, a full
-   quit-and-restart of the game, an induced save failure in game, metamagic
-   spell variants, pets, multi-use ability pools, area change during a run.
-3. H1's letterbox mapping is regression-tested against the r13 geometry; the
-   r15 desktop was 1920x1080, so it was not exercised live.
+Base/HEAD before implementation checkpoint:
+b707c1f47859f2ecae517b2cd162d20ca18c7583; version 0.3.0.
+See docs/WP2A-NOT-READY-NAVIGATION.md for current evidence and next action.

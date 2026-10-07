@@ -31,6 +31,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="ProductionExecutionTests.cs" />
     <Compile Include="CastingGraphTests.cs" />
+    <Compile Include="BlockedNavigationTests.cs" />
     <Compile Include="AutosaveLifecycleTests.cs" />
     <Compile Include="SharePlanningTests.cs" />
     <Compile Include="UndoHistoryTests.cs" />
@@ -111,6 +112,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceModels.cs"><Link>UI\CastingWorkspaceModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.cs"><Link>UI\CastingWorkspaceSession.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.Graph.cs"><Link>UI\CastingWorkspaceSession.Graph.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingProblemNavigation.cs"><Link>UI\CastingProblemNavigation.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingGraphModels.cs"><Link>UI\CastingGraphModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerButtonPalette.cs"><Link>UI\PlannerButtonPalette.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingExecutionHost.cs"><Link>UI\CastingExecutionHost.cs</Link></Compile>

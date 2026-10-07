@@ -1,3 +1,5 @@
+> Unreleased WP2A candidate: ordinary blocked runs focus the first blocking casting; HUD refusals open directly to it. Previous/Next navigate current blockers without editing or saving. Repairs recompute through the compiler/gate. Global refusals stay global; Ready Casts Only remains an explicit fallback. Candidate qualification is tracked in [WP2A evidence](../docs/WP2A-NOT-READY-NAVIGATION.md); historical 0.3.0 evidence below is unchanged.
+
 # Manual Acceptance
 
 ## 2026-09-06 failed human validation: routing diagnosis
