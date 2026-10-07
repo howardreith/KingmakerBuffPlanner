@@ -236,23 +236,32 @@ namespace KingmakerBuffPlanner.UI
             RectTransform chip = FindGraphPart("Casting." + id);
             RectTransform tile = _catalogueContent == null ? null
                 : _catalogueContent.Find("Source." + _lastView.SelectedSourceId) as RectTransform;
-            if (chip != null && !string.Equals(ProblemRevealCastingIdForRuntime, id, StringComparison.Ordinal))
+            // Wait for every required rectangle before moving any scroll.
+            // A partial layout must not repeatedly reclaim graph scrolling.
+            if (!CanRevealInScroll(_graphScroll, chip) || !CanRevealInScroll(CatalogueScroll(), tile) ||
+                _inspectorScroll == null || _inspectorScroll.viewport == null ||
+                _inspectorScroll.viewport.rect.height <= 0) return;
+            if (!string.Equals(ProblemRevealCastingIdForRuntime, id, StringComparison.Ordinal))
             {
                 ProblemRevealCastingIdForRuntime = id;
                 ProblemChipVisibleBeforeRevealForRuntime = ScreenCentre(chip) != null;
                 ProblemGraphScrollBeforeRevealForRuntime = _graphScroll.verticalNormalizedPosition;
             }
-            if (!RevealInScroll(_graphScroll, chip) || !RevealInScroll(CatalogueScroll(), tile) ||
-                _inspectorScroll == null || _inspectorScroll.viewport.rect.height <= 0) return;
+            RevealInScroll(_graphScroll, chip);
+            RevealInScroll(CatalogueScroll(), tile);
             _inspectorScroll.StopMovement();
             _inspectorScroll.verticalNormalizedPosition = 1f;
             _session.ProblemNavigation.CompleteReveal(id);
         }
 
-        private static bool RevealInScroll(ScrollRect scroll, RectTransform target)
+        private static bool CanRevealInScroll(ScrollRect scroll, RectTransform target)
         {
-            if (scroll == null || target == null || scroll.content == null || scroll.viewport == null ||
-                scroll.viewport.rect.height <= 0) return false;
+            return scroll != null && target != null && scroll.content != null && scroll.viewport != null &&
+                scroll.viewport.rect.height > 0;
+        }
+
+        private static void RevealInScroll(ScrollRect scroll, RectTransform target)
+        {
             Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(scroll.viewport, target);
             float offset = CastingProblemScrollReveal.VerticalOffset(scroll.viewport.rect.yMin,
                 scroll.viewport.rect.yMax, bounds.min.y, bounds.max.y, 12f);
@@ -261,7 +270,6 @@ namespace KingmakerBuffPlanner.UI
             if (overflow > 0)
                 scroll.verticalNormalizedPosition = Mathf.Clamp01(
                     scroll.verticalNormalizedPosition - offset / overflow);
-            return true;
         }
 
         // ------------------------------------------------------------------

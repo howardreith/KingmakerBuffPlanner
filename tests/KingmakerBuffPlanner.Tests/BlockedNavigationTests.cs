@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Planning;
+using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.UI;
@@ -27,6 +28,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("blocked-navigation-physical-judgment-requires-visible-points", TestProblemPhysicalJudgment);
             Run("blocked-navigation-preserves-existing-undo-entry", () => TestProblemExistingUndo(root));
             Run("blocked-navigation-global-refresh-failure-clears-stale-focus", () => TestProblemGlobalRefresh(root));
+            Run("blocked-navigation-unavailable-source-keeps-reveal-targets", () => TestProblemUnavailableSource(root));
         }
 
         private static PlannedCasting ProblemCasting(string id, int order,
@@ -140,10 +142,43 @@ namespace KingmakerBuffPlanner.Tests
                 dispatch.RecordedSubmissions.Count == 0, "inspection authored, saved, authorized or dispatched");
         }
 
+        private static void TestProblemUnavailableSource(string root)
+        {
+            string dir;
+            CastingWorkspaceSession session = ProblemSession(root, "unavailable",
+                new[] { ProblemCasting("missing", 0, state: CastingAuthoringState.Ready) }, out dir);
+            CastingWorkspaceInputs baseline = GraphInputs();
+            var options = baseline.ProviderOptions.Where(option =>
+                !option.Provider.Key.Ability.Equals(GraphAbilityA)).ToList();
+            var effects = baseline.EffectsBySource.Where(pair =>
+                pair.Key != GraphSourceA && pair.Key != GraphAbilityA.Canonical)
+                .ToDictionary(pair => pair.Key, pair => pair.Value);
+            var snapshot = new PartyProviderSnapshot(baseline.Snapshot.Units,
+                options.Select(option => option.Provider), baseline.Snapshot.ResourcePools);
+            var inputs = new CastingWorkspaceInputs(snapshot, options, effects, baseline.Enhancements);
+            string signature = session.DocumentIntentSignature();
+            string files = ProblemFiles(dir);
+            WorkspaceApplyResult result = session.Apply(CastingApplyMode.Ordinary, "long", inputs);
+            CastingGraphView view = session.BuildGraph(inputs);
+            Expect(result.BlockingCastings.Single().CastingId == "missing" &&
+                session.EditingFocusCastingId == "missing", "missing source did not produce casting focus");
+            CastingGraphCatalogueEntry selected = view.Catalogue.SingleOrDefault(entry => entry.Selected);
+            Expect(selected != null && selected.SourceId == GraphSourceA &&
+                selected.Label == "Unavailable saved buff" &&
+                CastingGraphLayout.Compute(view, null).Chips.Any(chip => chip.CastingId == "missing"),
+                "unavailable blocked source has no catalogue/card reveal targets");
+            Expect(session.DocumentIntentSignature() == signature && ProblemFiles(dir) == files &&
+                !session.CanUndo, "the missing-source reveal fallback authored or saved intent");
+        }
+
         private static void TestProblemUnresolved(string root)
         {
             string dir;
-            PlannedCasting imported = ProblemCasting("imported-draft", 0, caster: null);
+            PlannedCasting imported = new PlannedCasting("imported-draft", "long", 0,
+                GraphSourceA, GraphAbilityA, null, null, CastingTargetMode.DirectTarget, "unit-t1",
+                null, null, null, null, ExistingEffectPolicy.SkipAlreadyActive, null,
+                CastingAuthoringState.Draft, new MigrationProvenance("legacy", 5, "long",
+                    "imported", "unit-t1", new[] { "automatic-caster-pending-review" }));
             CastingWorkspaceSession session = ProblemSession(root, "unresolved", new[] { imported }, out dir);
             string signature = session.DocumentIntentSignature();
             WorkspaceApplyResult result = session.Apply(CastingApplyMode.Ordinary, "long", GraphInputs());

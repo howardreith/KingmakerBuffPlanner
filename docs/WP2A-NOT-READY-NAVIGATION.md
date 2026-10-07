@@ -99,3 +99,40 @@ then the affected tests/build rerun. Exact next action: commit this coherent
 scenario checkpoint, execute scripts/Test-SourceOnly.ps1 to zero failures,
 Build-Local on the clean commit, then bind the guarded physical run to the
 resulting ZIP/DLL hashes and MVID.
+## Checkpoint: unavailable-source reachability regression
+
+Branch codex/kbp-not-ready-deep-linking-2026-10-07; exact pre-commit HEAD
+8ec8cbf00c2030e4b86b8b0424795a8f816a37ce; version 0.3.0; dirty only with
+this focused repair and evidence. The previously running complete source
+gate was stopped at its archival manifest comparison so this change can
+be qualified on a new clean candidate. Its completed components were C#
+412/412, runtime filesystem 38/38 and problem-evidence 18/18. It did not
+reach a complete source-qualified verdict or enter live runtime.
+
+A real-service regression removed the saved buff from current discovery.
+Ordinary Apply correctly identified its authored casting, but the graph
+lacked the selected catalogue row required to finish reveal. The focused
+runner reproduced PASS=14 FAIL=1 at artifacts/wp2a-missing-source-red.log.
+The repair supplies an explicitly unavailable selected row only during
+problem inspection, without a provider or readiness judgment. Reveal now
+waits for all graph, catalogue and inspector rectangles before moving any
+scroll. Actual imported Draft provenance is also exercised without
+guessing its caster.
+
+After repair: affected MSBuild test rebuild and the --blocked-navigation
+runner PASS=15 FAIL=0 (artifacts/wp2a-focused-15.log). scripts/Build.ps1
+source validation 42/42 and build 1/1 pass, with no compiler warnings
+(artifacts/wp2a-unavailable-source-build.log). Development DLL SHA-256
+1f315543524edbd48af18b531445166a47dc07d7f59e17ac2a6fc34699be87e5 is not
+yet a qualified candidate.
+
+Rejected theory: an unavailable saved source always has a catalogue row
+because selected entries bypass filters. That rule applies only to entries
+discovery actually supplied. No source catalogue audit or readiness
+implementation was added.
+
+Exact next action: commit; Build-Local for the harness's required ZIP
+prerequisite; run the complete Test-SourceOnly gate to zero failures;
+rebuild the final clean candidate; run the candidate-bound blocked-only
+physical scenario; verify exact restoration and protected saves.
+Physical visibility remains uncertain until that run passes.
