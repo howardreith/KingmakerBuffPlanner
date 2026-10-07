@@ -436,6 +436,16 @@ namespace KingmakerBuffPlanner.Execution
                     step.StateOf(first) != CastingOutcomeState.Cancelled ||
                     rest.Any(id => step.StateOf(id) != CastingOutcomeState.NotProcessed))
                     return "cancel-report:" + step.Report.TerminalReason + ":" + States(step);
+                if (step.Report.Submitted != 1) return "cancel-native-submission:" + step.Report.Submitted;
+                // Coordinator cancellation retains executor failures in the
+                // canonical entry detail (including later cleanup failures).
+                // A Cancelled state never erases that uncertainty.
+                var stopping = new[] { CastExecutionStatus.ResidualStateUnsettled,
+                    CastExecutionStatus.FailedValidation, CastExecutionStatus.FailedSubmission,
+                    CastExecutionStatus.FailedExecution, CastExecutionStatus.TimedOutUnconfirmed };
+                CastingOutcomeEntry uncertain = step.Report.Entries.FirstOrDefault(entry =>
+                    stopping.Any(status => entry.Detail.IndexOf(status + ":", StringComparison.Ordinal) >= 0));
+                if (uncertain != null) return "cancel-cleanup:" + uncertain.CastingId + ":" + uncertain.Detail;
                 if (step.Transitions.Count != castings.Count || step.Availability.Count != castings.Count ||
                     rest.Any(id => step.TransitionOf(id) != "absent") ||
                     step.Transitions.Any(value => value.EndsWith(":unobserved", StringComparison.Ordinal)))
