@@ -4919,7 +4919,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             if (!RuntimeTestProtocol.IsCastingQualificationScenario(_request.Scenario) ||
                 _qualificationRecord.Selection == null ||
-                _qualificationRecord.Selection.Recipe != CastingQualificationRecipe.StopReload ||
+                !CastingQualificationRecipe.IsRecoveryRecipe(_qualificationRecord.Selection.Recipe) ||
                 !_qualificationWorkspaceClosed || BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime)
                 throw new InvalidOperationException("The recovery reload is not authorized with the planner open or outside its recipe.");
             CastingExecutionHost owner = BuffPlannerUiRoot.CastingHostForRuntime;
@@ -4931,7 +4931,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _recoveryPlayerBefore = Kingmaker.Game.Instance.Player;
                 _recoverySessionBefore = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
                 _log.Info("[KBP-RECOVERY] before reload;pid=" + System.Diagnostics.Process.GetCurrentProcess().Id +
-                    ";running=" + owner.IsRunning + ";accepting=" + owner.Accepting +
+                    ";run=" + owner.ActiveRunId + ";routine=" + owner.ActiveScopeRoutineId +
+                    ";inFlight=" + owner.ActiveCastingInFlight + ";running=" + owner.IsRunning + ";accepting=" + owner.Accepting +
                     ";shutdown=" + owner.ShutdownReason + ";reported=" + owner.ReportedRuns +
                     ";campaign=" + Kingmaker.Game.Instance.Player.GameId + ".");
                 _liveSaveLoader.BeginGuardedReload();

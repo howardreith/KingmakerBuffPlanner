@@ -61,6 +61,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("execution-host-cancel-deadline-shutdown", TestExecutionHostCancelDeadlineShutdown);
             Run("same-process-stop-reload-driver-uses-new-world", () => TestStopReloadRecoveryDriver(root));
             Run("reload-driver-refuses-an-unobserved-load", () => TestStopReloadRecoveryDriver(root, false));
+            Run("same-process-in-flight-unload-driver-uses-new-world", () => TestStopReloadRecoveryDriver(root, true, true));
             Run("production-apply-end-to-end-through-host",
                 () => TestProductionApplyEndToEnd(root));
             Run("run-presentation-separates-effects-and-spending", TestRunPresentation);
@@ -3576,7 +3577,7 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The host can reload with the planner open, or outside the reload scenario.");
             string recovery = SourceBlock(host, "private string GuardedRecoveryReload()");
             if (recovery == null || !recovery.Contains("IsCastingQualificationScenario(_request.Scenario)") ||
-                !recovery.Contains("_qualificationRecord.Selection.Recipe != CastingQualificationRecipe.StopReload") ||
+                !recovery.Contains("!CastingQualificationRecipe.IsRecoveryRecipe(_qualificationRecord.Selection.Recipe)") ||
                 !recovery.Contains("!_qualificationWorkspaceClosed || BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime") ||
                 recovery.IndexOf("throw new InvalidOperationException", StringComparison.Ordinal) >
                     recovery.IndexOf("_liveSaveLoader.BeginGuardedReload();", StringComparison.Ordinal) ||
@@ -6264,13 +6265,13 @@ namespace KingmakerBuffPlanner.Tests
             }
         }
 
-        private static void TestStopReloadRecoveryDriver(string root, bool cleanReload = true)
+        private static void TestStopReloadRecoveryDriver(string root, bool cleanReload = true, bool immediate = false)
         {
             var original = new FiniteBuffWorld();
             FiniteBuffWorld world = original;
             CastingWorkspaceInputs initial = original.Inputs();
             CastingQualificationSelection selection = CastingQualificationRecipe.Select(
-                CastingQualificationRecipe.StopReload, initial, "fixture-campaign");
+                immediate ? CastingQualificationRecipe.CancelReload : CastingQualificationRecipe.StopReload, initial, "fixture-campaign");
             var forecast = CastingQualificationForecast.Forecast(selection, initial, "fixture-campaign");
             if (forecast.Count != 2 || forecast.Any(value => value.ProjectionId == null) ||
                 forecast[0].ProjectionId == forecast[1].ProjectionId)
@@ -6278,25 +6279,26 @@ namespace KingmakerBuffPlanner.Tests
             string refusal;
             var allowance = CastingQualificationAllowance.Parse(QualificationAllowanceJson(value =>
             {
-                value["recipe"] = CastingQualificationRecipe.StopReload;
+                value["recipe"] = selection.Recipe;
                 value["fixtureGameId"] = "fixture-campaign";
                 value["approvedProjectionIds"] = new JArray(forecast.Select(item => item.ProjectionId));
                 value["maximumNativeSubmissions"] = forecast.Sum(item => item.CastingIds.Count);
             }), "qual-run-1", out refusal);
             if (allowance == null) throw new InvalidOperationException(refusal);
             long now = 0;
-            var host = new CastingExecutionHost(settings => new InstantCastExecutor(world, true), () => now);
+            var host = new CastingExecutionHost(settings => new InstantCastExecutor(world, true, 1), () => now);
             var record = new CastingQualificationRecord { CastingScenario = true };
             int reports = 0;
             int reloads = 0;
             host.RunCompleted = report => reports++;
             var driver = new CastingQualificationDriver(record, allowance, "fixture-campaign",
                 () => world.Inputs(), boundary => new CastingWorkspaceSession(
-                    Path.Combine(root, "stop-reload-" + cleanReload), "fixture-campaign", boundary),
+                    Path.Combine(root, "stop-reload-" + cleanReload + immediate), "fixture-campaign", boundary),
                 host, (step, label) => world.Observe(step, label), () => now, 240000,
-                CastingQualificationRecipe.StopReload, guardedReload: () =>
+                selection.Recipe, guardedReload: () =>
                 {
                     reloads++;
+                    if (immediate) { host.Cancel("area-unloading"); host.Cancel("area-unloading"); }
                     if (!cleanReload) return "passed=False;world-unobserved";
                     if (host.IsRunning || reports != 1 || original.Fired.Count != 1 ||
                         original.Active.Count != 1 || original.Tokens.Values.Count(value => !value) != 1)
@@ -6306,7 +6308,7 @@ namespace KingmakerBuffPlanner.Tests
                 });
             for (int tick = 0; tick < 100 && !driver.Completed; tick++) { now += 16; driver.Update(); }
             if (!driver.Completed || reloads != 1 || host.IsRunning)
-                throw new InvalidOperationException("The recovery scenario did not reach one terminal.");
+                throw new InvalidOperationException("The recovery scenario did not reach one terminal: " + driver.Phase + ";reloads=" + reloads + ";reports=" + reports + ";" + string.Join("|", record.Violations()));
             if (!cleanReload)
             {
                 if (host.StartedRuns != 1 || reports != 1 || record.Violations().Count == 0)

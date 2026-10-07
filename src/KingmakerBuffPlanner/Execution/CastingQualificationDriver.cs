@@ -221,7 +221,7 @@ namespace KingmakerBuffPlanner.Execution
         {
             get
             {
-                if (Selection != null && Selection.Recipe == CastingQualificationRecipe.StopReload) return RecoveryStepNames;
+                if (Selection != null && CastingQualificationRecipe.IsRecoveryRecipe(Selection.Recipe)) return RecoveryStepNames;
                 if (IsGroup) return GroupStepNames;
                 if (IsEnhanced) return EnhancedStepNames;
                 if (IsAbilityPool) return AbilityPoolStepNames;
@@ -244,7 +244,7 @@ namespace KingmakerBuffPlanner.Execution
         public IList<string> Violations()
         {
             var violations = new List<string>(Failures);
-            if (CastingScenario && Selection != null && Selection.Recipe == CastingQualificationRecipe.StopReload &&
+            if (CastingScenario && Selection != null && CastingQualificationRecipe.IsRecoveryRecipe(Selection.Recipe) &&
                 (RecoveryReload == null || !RecoveryReload.StartsWith("passed=True;", StringComparison.Ordinal)))
                 violations.Add("recovery-reload:" + (RecoveryReload ?? "missing"));
             if (Selection == null || !Selection.Selected)
@@ -284,7 +284,7 @@ namespace KingmakerBuffPlanner.Execution
             // so there the press must land while the first cast is in
             // progress (the stop waits for it to complete). The two-phase
             // recipes have no stop step.
-            if (!IsGroup && !IsEnhanced && !IsAbilityPool && !IsShared)
+            if (!IsGroup && !IsEnhanced && !IsAbilityPool && !IsShared && Selection.Recipe != CastingQualificationRecipe.CancelReload)
             {
                 if (StopPress == null) violations.Add("stop-press:none");
                 else if (!StopPressHandled) violations.Add("stop-press:not-handled:" + StopPress);
@@ -430,6 +430,31 @@ namespace KingmakerBuffPlanner.Execution
             if (step.Report.CleanupFailures.Count != 0)
                 return "cleanup:" + string.Join("|", step.Report.CleanupFailures.ToArray());
             string failure = null;
+            if (name == "stop" && Selection.Recipe == CastingQualificationRecipe.CancelReload)
+            {
+                if (!step.Report.Cancelled || step.Report.TerminalReason != "cancelled:area-unloading" ||
+                    step.StateOf(first) != CastingOutcomeState.Cancelled ||
+                    rest.Any(id => step.StateOf(id) != CastingOutcomeState.NotProcessed))
+                    return "cancel-report:" + step.Report.TerminalReason + ":" + States(step);
+                if (step.Transitions.Count != castings.Count || step.Availability.Count != castings.Count ||
+                    rest.Any(id => step.TransitionOf(id) != "absent") ||
+                    step.Transitions.Any(value => value.EndsWith(":unobserved", StringComparison.Ordinal)))
+                    return "cancel-observation-incomplete";
+                // A cancelled attempt can have spent and applied. Validate
+                // against the native spend record, without inventing rollback.
+                var spent = step.Report.Entries.Where(value => value.SpendReported)
+                    .Select(value => value.CastingId).ToList();
+                foreach (string availability in step.Availability)
+                {
+                    string[] parts = availability.Split(new[] { ':' }, 2);
+                    string[] values = parts[1].Split('>');
+                    int before, after;
+                    if (values.Length != 2 || !int.TryParse(values[0], out before) || !int.TryParse(values[1], out after) ||
+                        before - after != ExpectedSpend(step.Name, parts[0], spent))
+                        return "cancel-resource:" + availability;
+                }
+                return null;
+            }
             if (name == "stop")
             {
                 if (!step.Report.Cancelled ||
@@ -447,11 +472,11 @@ namespace KingmakerBuffPlanner.Execution
             {
                 if (step.Report.TerminalReason != "completed")
                     failure = "report:" + step.Report.TerminalReason;
-                else if (step.StateOf(first) != (Selection.Recipe == CastingQualificationRecipe.StopReload
+                else if (step.StateOf(first) != (CastingQualificationRecipe.IsRecoveryRecipe(Selection.Recipe)
                         ? CastingOutcomeState.Omitted : CastingOutcomeState.Skipped) ||
                     rest.Any(id => step.StateOf(id) != CastingOutcomeState.EffectConfirmed))
                     failure = "states:" + States(step);
-                else if (step.TransitionOf(first) != (Selection.Recipe == CastingQualificationRecipe.StopReload
+                else if (step.TransitionOf(first) != (CastingQualificationRecipe.IsRecoveryRecipe(Selection.Recipe)
                         ? "absent" : "unchanged") ||
                     rest.Any(id => step.TransitionOf(id) != "new-instance"))
                     failure = "effects:" + string.Join(",", step.Transitions.ToArray());
@@ -1010,6 +1035,8 @@ namespace KingmakerBuffPlanner.Execution
         // How often the planner's owner has ticked it (null: unobservable).
         private readonly Func<long> _ownerTicks;
         private readonly Func<string> _guardedReload;
+        private bool _loadRequested;
+        private bool _cancelObserved;
         private long? _ownerTicksAtDisable;
         private int _runsAtDisable;
         private bool _stopPressed;
@@ -1074,6 +1101,7 @@ namespace KingmakerBuffPlanner.Execution
         public void Terminate(string reason)
         {
             if (Completed) return;
+            _host.RunCompleted -= ObserveUnloadTerminal;
             if (_host.IsRunning) _host.Cancel(reason);
             RecordInterruptedStep();
             Finish(string.IsNullOrEmpty(reason) ? "terminated" : reason);
@@ -1096,6 +1124,7 @@ namespace KingmakerBuffPlanner.Execution
 
         private void Finish(string reason)
         {
+            _host.RunCompleted -= ObserveUnloadTerminal;
             if (Completed) return;
             // A run that ends during the held disable (deadline, exception,
             // shutdown) never leaves the planner disabled behind it.
@@ -1152,10 +1181,13 @@ namespace KingmakerBuffPlanner.Execution
                 case "select": Select(); return;
                 case "author": Author(); return;
                 case "stop": Begin(CastingQualificationForecast.Stop); return;
-                case "stop-wait": Wait(true, Recipe == CastingQualificationRecipe.StopReload ? "reload" : "complete"); return;
+                case "stop-wait":
+                    if (Recipe == CastingQualificationRecipe.CancelReload) WaitForUnload();
+                    else Wait(true, CastingQualificationRecipe.IsRecoveryRecipe(Recipe) ? "reload" : "complete");
+                    return;
                 case "reload": Reload(); return;
                 case "complete": Begin(CastingQualificationForecast.Complete); return;
-                case "complete-wait": Wait(false, Recipe == CastingQualificationRecipe.StopReload ? "done" : "repeat"); return;
+                case "complete-wait": Wait(false, CastingQualificationRecipe.IsRecoveryRecipe(Recipe) ? "done" : "repeat"); return;
                 case "repeat": Repeat(); return;
                 case "recast-edit": RecastEdit(); return;
                 case "recast": Begin(CastingQualificationForecast.Recast); return;
@@ -1916,6 +1948,36 @@ namespace KingmakerBuffPlanner.Execution
         // Waits on the run (pumping it unless its owner does); the stop step
         // presses the player's stop once the first casting is in progress
         // or has finished.
+        private void WaitForUnload()
+        {
+            if (!_loadRequested)
+            {
+                if (!_host.IsRunning || !_host.ActiveCastingInFlight)
+                {
+                    if (!_host.IsRunning) Fail("load-did-not-interrupt-an-active-cast");
+                    if (!_ownerPumpsHost && !WorldHeld()) _host.Pump();
+                    return;
+                }
+                if (_guardedReload == null) { Fail("guarded-reload-unavailable"); return; }
+                _loadRequested = true;
+                _host.RunCompleted += ObserveUnloadTerminal;
+            }
+            Reload();
+        }
+
+        private void ObserveUnloadTerminal(CastingRunReport report)
+        {
+            _host.RunCompleted -= ObserveUnloadTerminal;
+            CastingQualificationStepResult interrupted = _running;
+            if (interrupted == null || _cancelObserved) return;
+            _cancelObserved = true;
+            interrupted.Report = report;
+            ObserveTransitions(interrupted, "cancel-before-world-replacement");
+            _running = null;
+            string failure = Record.StepFailure(interrupted.Name);
+            if (failure != null) Fail("step:" + failure);
+        }
+
         private void Reload()
         {
             if (_guardedReload == null) { Fail("guarded-reload-unavailable"); return; }
@@ -1924,6 +1986,9 @@ namespace KingmakerBuffPlanner.Execution
             Record.RecoveryReload = evidence;
             if (!evidence.StartsWith("passed=True;", StringComparison.Ordinal))
             { Fail("guarded-reload:" + evidence); return; }
+            if (Completed) return;
+            if (Recipe == CastingQualificationRecipe.CancelReload && !_cancelObserved)
+            { Fail("unload-terminal-not-observed"); return; }
             if (!_host.Accepting || _host.IsRunning)
             { Fail("host-after-reload:accepting=" + _host.Accepting + ";shutdown=" + _host.ShutdownReason); return; }
             _session.FocusGraphCasting(Record.Selection.Castings[0].CastingId);
