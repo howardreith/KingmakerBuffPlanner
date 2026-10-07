@@ -83,6 +83,12 @@ namespace KingmakerBuffPlanner.UI
         // Inspector.
         private RectTransform _inspectorContent;
         private Text _inspectorTitle;
+        private ScrollRect _inspectorScroll;
+        private bool _showedProblems;
+        private Vector2 _laidOutViewportSize;
+        internal string ProblemRevealCastingIdForRuntime { get; private set; }
+        internal bool ProblemChipVisibleBeforeRevealForRuntime { get; private set; }
+        internal float ProblemGraphScrollBeforeRevealForRuntime { get; private set; }
         // Footer.
         private Text _footerSelectedRun;
         private Text _footerOnePass;
@@ -175,6 +181,10 @@ namespace KingmakerBuffPlanner.UI
         internal void RefreshView()
         {
             if (_disposed) return;
+            float cataloguePosition = CatalogueScroll() == null ? 1f
+                : CatalogueScroll().verticalNormalizedPosition;
+            float inspectorPosition = _inspectorScroll == null ? 1f
+                : _inspectorScroll.verticalNormalizedPosition;
             CastingWorkspaceInputs inputs = _inputs();
             CastingGraphView view = _session.BuildGraph(inputs);
             _session.PresentForReview(inputs);
@@ -198,6 +208,60 @@ namespace KingmakerBuffPlanner.UI
             if (_nativeTheme != null) _nativeTheme.ApplyTo(_root);
             KingmakerUiFactory.OwnPointerHighlights(_root);
             PropagateUiLayer();
+            Canvas.ForceUpdateCanvases();
+            if (CatalogueScroll() != null) CatalogueScroll().verticalNormalizedPosition = cataloguePosition;
+            if (_inspectorScroll != null) _inspectorScroll.verticalNormalizedPosition = inspectorPosition;
+            RevealPendingProblem();
+        }
+
+        // Geometry-only resize handling: no additional compiler or readiness
+        // path. A size change may re-arm one reveal; ordinary ticks do not.
+        internal void TickGeometry()
+        {
+            if (_disposed || _lastView == null || _graphViewport == null) return;
+            if ((_graphViewport.rect.size - _laidOutViewportSize).sqrMagnitude > 1f)
+            {
+                RebuildGraph(_lastView);
+                if (_session.ProblemNavigation.Active) _session.ProblemNavigation.RequestReveal();
+            }
+            RevealPendingProblem();
+        }
+
+        private void RevealPendingProblem()
+        {
+            string id = _session.ProblemNavigation.PendingRevealCastingId;
+            if (id == null || _lastView == null ||
+                !string.Equals(id, _lastView.FocusedCastingId, StringComparison.Ordinal)) return;
+            Canvas.ForceUpdateCanvases();
+            RectTransform chip = FindGraphPart("Casting." + id);
+            RectTransform tile = _catalogueContent == null ? null
+                : _catalogueContent.Find("Source." + _lastView.SelectedSourceId) as RectTransform;
+            if (chip != null && !string.Equals(ProblemRevealCastingIdForRuntime, id, StringComparison.Ordinal))
+            {
+                ProblemRevealCastingIdForRuntime = id;
+                ProblemChipVisibleBeforeRevealForRuntime = ScreenCentre(chip) != null;
+                ProblemGraphScrollBeforeRevealForRuntime = _graphScroll.verticalNormalizedPosition;
+            }
+            if (!RevealInScroll(_graphScroll, chip) || !RevealInScroll(CatalogueScroll(), tile) ||
+                _inspectorScroll == null || _inspectorScroll.viewport.rect.height <= 0) return;
+            _inspectorScroll.StopMovement();
+            _inspectorScroll.verticalNormalizedPosition = 1f;
+            _session.ProblemNavigation.CompleteReveal(id);
+        }
+
+        private static bool RevealInScroll(ScrollRect scroll, RectTransform target)
+        {
+            if (scroll == null || target == null || scroll.content == null || scroll.viewport == null ||
+                scroll.viewport.rect.height <= 0) return false;
+            Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(scroll.viewport, target);
+            float offset = CastingProblemScrollReveal.VerticalOffset(scroll.viewport.rect.yMin,
+                scroll.viewport.rect.yMax, bounds.min.y, bounds.max.y, 12f);
+            float overflow = scroll.content.rect.height - scroll.viewport.rect.height;
+            scroll.StopMovement();
+            if (overflow > 0)
+                scroll.verticalNormalizedPosition = Mathf.Clamp01(
+                    scroll.verticalNormalizedPosition - offset / overflow);
+            return true;
         }
 
         // ------------------------------------------------------------------
@@ -229,6 +293,10 @@ namespace KingmakerBuffPlanner.UI
                 rect = _catalogueContent.Find("Source." + part.Substring(5)) as RectTransform;
             else if (part != null && part.StartsWith("routine:", StringComparison.Ordinal) && _routineBar != null)
                 rect = _routineBar.Find("Routine." + part.Substring(8)) as RectTransform;
+            else if (part == "problem-next" && _inspectorContent != null)
+                rect = _inspectorContent.Find("ProblemNext") as RectTransform;
+            else if (part == "problem-previous" && _inspectorContent != null)
+                rect = _inspectorContent.Find("ProblemPrevious") as RectTransform;
             else if (part != null && _graphContent != null)
             {
                 if (part.StartsWith("caster:", StringComparison.Ordinal))
@@ -263,7 +331,54 @@ namespace KingmakerBuffPlanner.UI
             Vector2 centre = RectTransformUtility.WorldToScreenPoint(camera, (corners[0] + corners[2]) * 0.5f);
             if (centre.x < 1f || centre.y < 1f || centre.x > Screen.width - 1 || centre.y > Screen.height - 1)
                 return null;
+            // A screen point behind a viewport mask is not visible evidence.
+            foreach (Mask mask in rect.GetComponentsInParent<Mask>())
+                if (mask.enabled && !RectTransformUtility.RectangleContainsScreenPoint(
+                        RectOf(mask), centre, camera)) return null;
+            foreach (RectMask2D mask in rect.GetComponentsInParent<RectMask2D>())
+                if (mask.enabled && !RectTransformUtility.RectangleContainsScreenPoint(
+                        RectOf(mask), centre, camera)) return null;
             return centre;
+        }
+
+        internal float ProblemChipVisibleFractionForRuntime(string castingId)
+        {
+            RectTransform chip = FindGraphPart("Casting." + castingId);
+            if (chip == null || _graphViewport == null) return 0f;
+            Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(_graphViewport, chip);
+            Rect viewport = _graphViewport.rect;
+            float width = Mathf.Max(0f, Mathf.Min(viewport.xMax, bounds.max.x) - Mathf.Max(viewport.xMin, bounds.min.x));
+            float height = Mathf.Max(0f, Mathf.Min(viewport.yMax, bounds.max.y) - Mathf.Max(viewport.yMin, bounds.min.y));
+            return bounds.size.x <= 0 || bounds.size.y <= 0 ? 0f : width * height / (bounds.size.x * bounds.size.y);
+        }
+
+        internal bool? ProblemControlEnabledForRuntime(bool next)
+        {
+            Transform control = _inspectorContent == null ? null
+                : _inspectorContent.Find(next ? "ProblemNext" : "ProblemPrevious");
+            Button button = control == null ? null : control.GetComponent<Button>();
+            return button == null ? (bool?)null : button.interactable;
+        }
+
+        internal string VisibleInspectorTextForRuntime
+        {
+            get
+            {
+                return _inspectorContent == null ? string.Empty : string.Join("\n",
+                    _inspectorContent.GetComponentsInChildren<Text>()
+                        .Where(text => ScreenCentre(text.rectTransform) != null)
+                        .Select(text => text.text).ToArray());
+            }
+        }
+
+        internal float InspectorScrollPositionForRuntime
+        {
+            get { return _inspectorScroll == null ? -1f : _inspectorScroll.verticalNormalizedPosition; }
+        }
+
+        internal string FooterResultForRuntime
+        {
+            get { return _footerResult == null ? string.Empty : _footerResult.text; }
         }
 
         private ScrollRect CatalogueScroll()
@@ -819,6 +934,7 @@ namespace KingmakerBuffPlanner.UI
             _inspectorTitle.rectTransform.sizeDelta = new Vector2(0f, 24f);
             ScrollRect scroll = KingmakerUiFactory.CreateScrollView("Scroll", lane, _theme,
                 out _inspectorContent, 10f);
+            _inspectorScroll = scroll;
             KingmakerUiFactory.SetAnchors(RectOf(scroll), 0f, 0f, 1f, 1f, 0f, 0f, 0f, 28f);
             ContentSizeFitter fitter = _inspectorContent.gameObject.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -1111,6 +1227,7 @@ namespace KingmakerBuffPlanner.UI
             float scroll = _graphScroll == null ? 1f : _graphScroll.verticalNormalizedPosition;
             KingmakerUiFactory.DestroyChildren(_graphContent);
             Vector2 viewport = GraphViewportSize();
+            _laidOutViewportSize = _graphViewport == null ? viewport : _graphViewport.rect.size;
             GraphLayoutMetrics m = MetricsFor(viewport.x);
             GraphLayoutResult layout = CastingGraphLayout.Compute(view, m);
             _lastLayout = layout;
@@ -1311,7 +1428,9 @@ namespace KingmakerBuffPlanner.UI
             AddSpellInspect(button, () => _session.BuildGraph(_freshInputs()),
                 ChipInspectTitle(casting, _lastView),
                 casting.SpellDescription, casting.SpellDurationText, true);
-            string status = casting.StatusLabel +
+            string status = (_session.ProblemNavigation.Active && casting.Selected
+                ? "Problem " + _session.ProblemNavigation.Position + " of " + _session.ProblemNavigation.Count +
+                    " · Not ready" : casting.StatusLabel) +
                 (casting.ShortInOnePass ? " · short in one pass" : string.Empty) +
                 (casting.RedundantInOnePass ? " · covered earlier" : string.Empty) +
                 (casting.NeedsReview ? " · review" : string.Empty);
@@ -1583,14 +1702,34 @@ namespace KingmakerBuffPlanner.UI
                 _showRetargets = false;
             }
             _inspectorTitle.text = inspector.Title;
-            ActionButton("DoneEditing", "Done (back to the next casting)", () => _session.ClearGraphFocus());
+            CastingProblemNavigation problems = _session.ProblemNavigation;
+            bool problem = problems.Active && string.Equals(problems.Current.CastingId,
+                inspector.CastingId, StringComparison.Ordinal);
+            if (problem)
+            {
+                Line("ProblemPosition", inspector.RoutineName + " · Problem " + problems.Position +
+                    " of " + problems.Count, 17, Burgundy, true);
+                Line("ProblemBuff", view.SelectedSourceCaption, 16, _theme.DarkBrownText, true);
+            }
+            else ActionButton("DoneEditing", "Done (back to the next casting)", () => _session.ClearGraphFocus());
             Line("Headline", inspector.Headline, 17, _theme.DarkBrownText, true);
             CastingGraphCasting chip = inspector.Chip;
             string status = chip == null ? "Not shown in this routine" : chip.StatusLabel;
             Line("CastingStatus", "Status: " + status, 14,
-                chip != null && chip.Readiness == ResolvedCastingReadiness.Blocked ? BlockedInk : LegalInk, true);
-            foreach (string reason in inspector.Reasons)
-                Line("Reason", "· " + reason, 13, BlockedInk, false);
+                problem || chip != null && chip.Readiness == ResolvedCastingReadiness.Blocked ? BlockedInk : LegalInk, true);
+            foreach (string reason in problem ? problems.Current.Reasons.Select(WorkspaceReasonText.Describe)
+                : inspector.Reasons)
+                Line("Reason", (problem ? "Not ready: " : "· ") + reason, 13, BlockedInk, false);
+            if (problem)
+            {
+                Button previous = ActionButton("ProblemPrevious", "Previous Problem",
+                    () => _session.NavigateProblem(-1));
+                Button next = ActionButton("ProblemNext", "Next Problem",
+                    () => _session.NavigateProblem(1));
+                KingmakerUiFactory.SetInteractable(previous, problems.CanPrevious);
+                KingmakerUiFactory.SetInteractable(next, problems.CanNext);
+                ActionButton("DoneEditing", "Done (back to the next casting)", () => _session.ClearGraphFocus());
+            }
             if (chip != null && chip.ShortInOnePass)
                 Line("ShortInOnePass", "· short of a resource when every routine runs in one pass", 13, BlockedInk, false);
             if (chip != null && chip.RedundantInOnePass)
@@ -1951,22 +2090,19 @@ namespace KingmakerBuffPlanner.UI
                 return;
             }
             WorkspaceApplyResult result = _session.Apply(mode, _session.SelectedRoutineId, inputs);
-            if (!result.Allowed && result.GateDecision != null && !result.GateDecision.Allowed &&
+            if (!result.Allowed && result.BlockingCastings.Count != 0 &&
                 mode == CastingApplyMode.Ordinary)
-            {
-                int notReady = _lastView == null ? 0
-                    : Math.Max(0, _lastView.RoutineCastingCount - _lastView.RoutineReadyCount);
-                _footerResult.text = WorkspaceFooterText.RunBlocked(name, notReady);
                 _readyOnlyButton.gameObject.SetActive(true);
-                return;
-            }
             if (result.Allowed && result.Dispatch != null && result.Dispatch.Submitted)
             {
                 // The run proceeds in the world; the result is reported at its end.
                 _close();
                 return;
             }
-            _footerResult.text = CastingRunPresentation.DescribeRefusal(name, result);
+            string refusal = CastingRunPresentation.DescribeRefusal(name, result, _session);
+            _session.RecordAttempt(refusal);
+            _footerResult.text = refusal;
+            Debug.Log("[KBP-CF-RUN] refused;reason=" + result.ReviewReason);
             if (result.Dispatch != null && !result.Dispatch.Submitted && result.Projection != null &&
                 result.Projection.Converted)
                 _footerResult.text += " Would run " + result.Projection.Plan.Steps.Count +
@@ -1975,6 +2111,13 @@ namespace KingmakerBuffPlanner.UI
 
         private void RebuildFooter(CastingGraphView view)
         {
+            bool problems = _session.ProblemNavigation.Active;
+            if (problems || _showedProblems)
+                _footerResult.text = _session.LastAttemptMessage ?? DescribeReadiness();
+            _showedProblems = problems;
+            if (problems) _readyOnlyButton.gameObject.SetActive(true);
+            else if (view.SelectedRoutineGate != null && view.SelectedRoutineGate.BlockingCastings.Count == 0)
+                _readyOnlyButton.gameObject.SetActive(false);
             _footerSelectedRun.text = view.SelectedRunLabel + ": " + (view.SelectedRunBudget.Count == 0
                 ? "nothing spent yet" : string.Join("   ", view.SelectedRunBudget.ToArray()));
             // The conflict first: a long pool list may be cut short, the

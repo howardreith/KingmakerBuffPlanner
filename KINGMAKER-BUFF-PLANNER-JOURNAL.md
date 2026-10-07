@@ -2605,3 +2605,8 @@ every run). Highlights:
   transactions Restored, no KBP/Gunslinger locks, Mods restored by each run's
   transaction, protected saves clean, owner-pause/stop flags absent.
 
+
+
+## 2026-10-07 — WP2A implementation checkpoint
+
+Focused branch codex/kbp-not-ready-deep-linking-2026-10-07 starts at current origin/main b707c1f47859f2ecae517b2cd162d20ca18c7583; version remains 0.3.0. Original checkout/WP1 preserved. Shared structured blockers, canonical focus, transient navigation, repair recomputation and measured one-shot reveal implemented. Focused regressions PASS=11 FAIL=0; source validation PASS=42 FAIL=0; production build PASS=1 FAIL=0, no warnings. Candidate/runtime identity is not yet frozen. Commands, development DLL hash, rejected approaches, ownership audit and exact next action are in docs/WP2A-NOT-READY-NAVIGATION.md. Discovery/casting contracts and native coverage remain unchanged. Next: blocked-only physical scenario, complete mechanical gate, clean candidate and guarded HUD reveal qualification.
