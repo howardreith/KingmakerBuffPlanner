@@ -10,8 +10,9 @@ namespace KingmakerBuffPlanner.UI
     // supervised manual session or physical HUD click during automation
     // casts through those routes (each refuses with LockReason). The only
     // native submissions an automation session can make go through the
-    // harness's own allowance-bound boundaries (the single-cast probe and
-    // the casting qualification), which never use the player routes.
+    // harness's own allowance-bound boundaries. The recovery qualification
+    // alone delivers its exact ordered projections through the player route
+    // to exercise the root-owned session and completion ownership.
     internal static class NativeCastingSessionPolicy
     {
         internal static bool Locked { get; private set; }
@@ -22,6 +23,26 @@ namespace KingmakerBuffPlanner.UI
             Locked = true;
             LockReason = "native-submission-disabled:runtime-test-session:" +
                 (string.IsNullOrEmpty(scenario) ? "unknown" : scenario);
+        }
+
+        // Guarded recovery uses the existing qualification boundary and host,
+        // through the root's normal routine entry. No unlocked session or
+        // other recipe can arm it; its ordered projections, mode and total
+        // submission cap remain checked by that boundary on every request.
+        internal static Execution.CastingQualificationBoundary RecoveryBoundary { get; private set; }
+
+        internal static bool ArmRecoveryBoundary(Execution.CastingQualificationBoundary boundary)
+        {
+            if (!Locked || LockReason != "native-submission-disabled:runtime-test-session:live-cast-qual" ||
+                boundary == null || RecoveryBoundary != null ||
+                !Execution.CastingQualificationRecipe.IsRecoveryRecipe(boundary.Recipe)) return false;
+            RecoveryBoundary = boundary;
+            return true;
+        }
+
+        internal static void DisarmRecoveryBoundary()
+        {
+            RecoveryBoundary = null;
         }
 
         // The one exception an allowance-bound classic cast run arms: a

@@ -167,6 +167,8 @@ namespace KingmakerBuffPlanner.UI
             string scopeRoutineId,
             ExplicitStepConversion projection)
         {
+            Execution.CastingQualificationBoundary recovery = NativeCastingSessionPolicy.RecoveryBoundary;
+            if (recovery != null) return recovery.Submit(plan, decision, scopeRoutineId, projection);
             string digest = Execution.CastingFirstPlanDigest.Of(scopeRoutineId, plan);
             string refusal;
             if (!NativeCastingSessionPolicy.TryConsumeCastingFirstGrant(scopeRoutineId, digest,
