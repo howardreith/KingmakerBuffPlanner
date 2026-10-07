@@ -1188,7 +1188,7 @@ namespace KingmakerBuffPlanner.UI
                 // No floating result (the accepted HUD boundary): a refusal
                 // the player resolves in the planner opens it on that
                 // routine, with the reason in the footer.
-                if (CastingRunPresentation.OpensPlanner(result.ReviewReason) &&
+                if (CastingRunPresentation.OpensPlanner(result) &&
                     _castingWorkspace == null)
                 {
                     try

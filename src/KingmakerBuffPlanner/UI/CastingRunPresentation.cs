@@ -240,6 +240,14 @@ namespace KingmakerBuffPlanner.UI
         // unsupported castings, import review): the planner opens on that
         // routine. Informational refusals (nothing to cast, a run already in
         // progress, casting unavailable in this session) do not.
+        // Casting-owned refusals open from structured state. Global results
+        // retain the product's established opening policy.
+        internal static bool OpensPlanner(WorkspaceApplyResult result)
+        {
+            return result != null && (result.BlockingCastings.Count != 0 ||
+                OpensPlanner(result.ReviewReason));
+        }
+
         internal static bool OpensPlanner(string reason)
         {
             string value = reason ?? string.Empty;

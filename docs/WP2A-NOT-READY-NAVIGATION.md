@@ -136,3 +136,27 @@ prerequisite; run the complete Test-SourceOnly gate to zero failures;
 rebuild the final clean candidate; run the candidate-bound blocked-only
 physical scenario; verify exact restoration and protected saves.
 Physical visibility remains uncertain until that run passes.
+## Checkpoint: structured HUD opening boundary
+
+Branch unchanged; exact pre-commit HEAD
+c7c3600fde5bb0b25a7f2b580dc9ea76eb095817; version 0.3.0; dirty with this
+narrow contract change. HUD opening now consumes WorkspaceApplyResult:
+casting blockers open directly; only global refusals consult the existing
+opening policy. A real-gate regression changes only presentation refusal
+text and still requires automatic opening, while an unknown global refusal
+retains the prior closed-planner policy. No identity is parsed from prose.
+
+MSBuild affected tests and --blocked-navigation: PASS=15 FAIL=0, no
+compiler warnings (artifacts/wp2a-focused-structured-open.log).
+The preceding complete gate (artifacts/wp2a-source-gate-3.log) passed
+413 C# / 38 filesystem / 18 evidence checks with zero failures in those
+components; it was deliberately stopped during archival purity hashing
+to qualify this final contract on a new clean commit. No live action.
+Rejected dependency: casting-specific automatic opening conditioned on
+the wording/category of ReviewReason.
+
+Exact next action: commit, rebuild prerequisite ZIP, complete unchanged
+Test-SourceOnly, rebuild final clean candidate, then physical blocked-only
+HUD qualification and exact installation/save restoration. Runtime
+visibility remains unqualified. Earlier prerequisite identities are not
+the final candidate.
