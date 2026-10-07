@@ -1,0 +1,1901 @@
+{
+  "schemaVersion": 1,
+  "capturedAtUtc": "2026-10-07T12:14:30.385Z",
+  "branch": "codex/kbp-interrupted-run-reload-recovery-2026-10-07",
+  "checkpointHead": "4480e1529532321f82e639349e40a4145da75a34",
+  "publicVersion": "0.3.0",
+  "verdict": "Diagnostic work only; reported player lockout not reproduced; ordinary production lifecycle unchanged.",
+  "candidate": {
+    "schemaVersion": 1,
+    "purpose": "WP1 diagnostic correction only; ordinary lifecycle unchanged; protocol 406/406; baseline full mechanical gate passed; current full gate pending",
+    "commit": "4480e1529532321f82e639349e40a4145da75a34",
+    "packageSha256": "8c593e082f24acc4d4441b8d76dec4766f9135f35e4b0980450afbab3b55b168",
+    "dllSha256": "4b0e26229e62c340089bec76bf30c20f1d468dfaed06b76cf44d846eaf80491c",
+    "assemblyMvid": "1b767261-afa8-4f3e-9022-3166fe884a08",
+    "version": "0.3.0",
+    "worktree": "C:\\Dev\\KingmakerBuffPlannerLab\\repo\\KingmakerBuffPlanner-WP1",
+    "frozenAtUtc": "2026-10-07T11:28:19.8077695Z",
+    "files": [
+      "KingmakerBuffPlanner-0.3.0-local-runtime.zip",
+      "KingmakerBuffPlanner-0.3.0-local-runtime.zip.build-local.json"
+    ],
+    "frozenPackagePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\qualification-frozen\\4480e1529532321f82e639349e40a4145da75a34\\KingmakerBuffPlanner-0.3.0-local-runtime.zip",
+    "manifestPath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\qualification-frozen\\4480e1529532321f82e639349e40a4145da75a34\\KingmakerBuffPlanner-0.3.0-local-runtime.zip.build-local.json",
+    "manifestSha256": "373c029a05a408c63415c88bfe7863cf5db9713ab4f9dd8d07a3e94f92e80bd6"
+  },
+  "runs": [
+    {
+      "runId": "wp1-4480e15-cancel-animated-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-4480e15-cancel-animated-01",
+      "commit": "4480e1529532321f82e639349e40a4145da75a34",
+      "packageSha256": "8c593e082f24acc4d4441b8d76dec4766f9135f35e4b0980450afbab3b55b168",
+      "dllSha256": "4b0e26229e62c340089bec76bf30c20f1d468dfaed06b76cf44d846eaf80491c",
+      "mvid": "1b767261-afa8-4f3e-9022-3166fe884a08",
+      "status": "PASS",
+      "pass": 85,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 40980,
+      "startedAtUtc": "2026-10-07T11:37:27.0519130Z",
+      "endedAtUtc": "2026-10-07T11:38:30.6138172Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_ADVANCED_WORKING",
+        "baselineSaveName": "KBP_ADVANCED_BASELINE",
+        "expectedGameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb",
+        "qualificationAllowance": "{\"schemaVersion\":5,\"kind\":\"kbp-casting-qualification\",\"runId\":\"wp1-4480e15-cancel-animated-01\",\"sourceCommit\":\"4480e1529532321f82e639349e40a4145da75a34\",\"packageSha256\":\"8c593e082f24acc4d4441b8d76dec4766f9135f35e4b0980450afbab3b55b168\",\"dllSha256\":\"4b0e26229e62c340089bec76bf30c20f1d468dfaed06b76cf44d846eaf80491c\",\"assemblyMvid\":\"1b767261-afa8-4f3e-9022-3166fe884a08\",\"fixtureGameId\":\"cb1f405d-0b0c-4281-8b76-3b4f3b690abb\",\"recipe\":\"cancel-reload\",\"executionMode\":\"animated\",\"approvedProjectionIds\":[\"16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234\",\"ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e\"],\"maximumNativeSubmissions\":3,\"approvedBy\":\"Howie Reith\",\"authority\":\"Explicit WP1 task authorization dated 2026-10-07 for guarded disposable-fixture recovery reproduction; no release authorization\",\"compatibilityProfileId\":\"advanced-gunslinger-0136\",\"compatibilityIdentity\":\"088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7\",\"workingSaveSha256\":\"9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d\",\"purpose\":\"cancel-reload casting-first qualification in animated mode (guarded WORKING reload during the first active casting, immediate world-unload cancellation, fresh second projection, native effect and resource observations; no retry)\"}\r\n",
+        "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+        "executionMode": "animated",
+        "expectedGameName": "Cleric",
+        "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+        "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+        "qualificationRecipe": "cancel-reload",
+        "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-4480e15-cancel-animated-01",
+        "scenario": "live-cast-qual",
+        "fixtureFamily": "Advanced",
+        "profileId": "advanced-gunslinger-0136",
+        "compatibilityIdentity": "088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7",
+        "advancedBindingManifest": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\advanced-fixture\\bootstrap-advanced-fixture-20260924-01\\fixture-manifest.json",
+        "fixture": {
+          "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+          "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+          "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+          "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d",
+          "gameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb"
+        },
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T11:38:38.9025601Z"
+      },
+      "hashes": {
+        "runtime-result.json": "1b8fc6fafe41c381b377e4e1e743a41eede7800e6f884b0df298ed664ab66d51",
+        "run-completion.json": "ea331e81b76652b4e1f8cad024e4a44c19c2e373939ab9d8ad90f721078d1a79",
+        "qual-outcome.json": "89572e44fe97feb68bc8f340c0cb18620bf44d67db480b62ad0029c5f099bc5b",
+        "protected-saves.json": "3a21bbf32c39cf30238764cfb17a817cb52a0736009eb575f45a73a48dfd680f",
+        "orchestration.json": "05ba8cea449776f589f8fa0b891a328d37e981c9666c0e05014617564fc38bd0",
+        "runtime-request.json": "182ff1b6eb5e5616dff8ad2e0f49afe1e4e6132c64bd7b3009aca392afec8625",
+        "saveload-chain-events.json": "e2d94624f5c7d4dabf5f84f41295b384260c3151f35c6debfe25e4ea96e89a56"
+      },
+      "qualification": {
+        "recipe": "cancel-reload",
+        "executionMode": "animated",
+        "terminalReason": "completed",
+        "runsStarted": 2,
+        "runsReported": 2,
+        "callbackFailure": null,
+        "recoveryReload": "passed=True;pid=40980;running=False;accepting=True;shutdown=;runs=1/1;pendingCompletion=False;completionOwners=1;sessionReport=run-1;campaign=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;sessionReused=True;hudRoots=1;subscriptions=1;loaded=gameId=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;areaType=Kingmaker.Dungeon.Blueprints.BlueprintDungeonArea;sceneType=Kingmaker.EntitySystem.AreaPersistentState;partyCount=4;mainCharacterType=Kingmaker.EntitySystem.Entities.UnitReference;afterLoadCallback=True;loadGameCorrelated=True;writesObserved=False;elapsedMs=6140",
+        "lifecycleAfter": "subscriptions=1;hudRoots=1;hudInstalled=True;plannerRoots=1;mode=Default",
+        "stopPress": null,
+        "stopPressedInFlight": null,
+        "steps": [
+          {
+            "name": "stop",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-1",
+            "projectionId": "16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234",
+            "terminal": "cancelled:area-unloading",
+            "entries": [
+              "qual-cast-1=Cancelled;submitted=True;spend=False;free=False;detail=Cancelled:cancelled-in-flight;last:FailedExecution:animated-operation-abandoned-in-flight",
+              "qual-cast-2=NotProcessed;submitted=False;spend=False;free=False;detail=NotProcessed:halted:cancelled"
+            ],
+            "transitions": [
+              "qual-cast-1:absent",
+              "qual-cast-2:absent"
+            ],
+            "availability": [
+              "qual-cast-1:6>6",
+              "qual-cast-2:1>1"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": true
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:stop-before:qual-cast-1#1;available=6;clock=721761010000;effects=[]",
+              "qual-cast-2:stop-before:qual-cast-2#2;available=1;clock=721761010000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:cancel-before-world-replacement:qual-cast-1#3;available=6;clock=721761410000;effects=[]",
+              "qual-cast-2:cancel-before-world-replacement:qual-cast-2#4;available=1;clock=721761410000;slots=level-1|type-0|index-5:True;effects=[]"
+            ]
+          },
+          {
+            "name": "complete",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-2",
+            "projectionId": "ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e",
+            "terminal": "completed",
+            "entries": [
+              "qual-cast-1=Omitted;submitted=False;spend=False;free=False;detail=explicitly-disabled",
+              "qual-cast-2=EffectConfirmed;submitted=True;spend=True;free=False;detail=ResourceSpent:ResourceSpent:native-command-spend-completed"
+            ],
+            "transitions": [
+              "qual-cast-1:absent",
+              "qual-cast-2:new-instance"
+            ],
+            "availability": [
+              "qual-cast-1:6>6",
+              "qual-cast-2:1>0"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": false
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:complete-before:qual-cast-1#5;available=6;clock=721772660000;effects=[]",
+              "qual-cast-2:complete-before:qual-cast-2#6;available=1;clock=721772660000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:complete-after:qual-cast-1#7;available=6;clock=721801070000;effects=[]",
+              "qual-cast-2:complete-after:qual-cast-2#8;available=0;clock=721801070000;slots=level-1|type-0|index-5:False;effects=[a4742d7afde0f4f47b380abed025b219#-2066589696@727196840000{}]"
+            ]
+          }
+        ],
+        "failures": [],
+        "violations": []
+      }
+    },
+    {
+      "runId": "wp1-4480e15-cancel-instant-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-4480e15-cancel-instant-01",
+      "commit": "4480e1529532321f82e639349e40a4145da75a34",
+      "packageSha256": "8c593e082f24acc4d4441b8d76dec4766f9135f35e4b0980450afbab3b55b168",
+      "dllSha256": "4b0e26229e62c340089bec76bf30c20f1d468dfaed06b76cf44d846eaf80491c",
+      "mvid": "1b767261-afa8-4f3e-9022-3166fe884a08",
+      "status": "PASS",
+      "pass": 85,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 33204,
+      "startedAtUtc": "2026-10-07T11:41:07.3411462Z",
+      "endedAtUtc": "2026-10-07T11:42:09.5681697Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_ADVANCED_WORKING",
+        "baselineSaveName": "KBP_ADVANCED_BASELINE",
+        "expectedGameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb",
+        "qualificationAllowance": "{\"schemaVersion\":5,\"kind\":\"kbp-casting-qualification\",\"runId\":\"wp1-4480e15-cancel-instant-01\",\"sourceCommit\":\"4480e1529532321f82e639349e40a4145da75a34\",\"packageSha256\":\"8c593e082f24acc4d4441b8d76dec4766f9135f35e4b0980450afbab3b55b168\",\"dllSha256\":\"4b0e26229e62c340089bec76bf30c20f1d468dfaed06b76cf44d846eaf80491c\",\"assemblyMvid\":\"1b767261-afa8-4f3e-9022-3166fe884a08\",\"fixtureGameId\":\"cb1f405d-0b0c-4281-8b76-3b4f3b690abb\",\"recipe\":\"cancel-reload\",\"executionMode\":\"instant\",\"approvedProjectionIds\":[\"16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234\",\"ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e\"],\"maximumNativeSubmissions\":3,\"approvedBy\":\"Howie Reith\",\"authority\":\"Explicit WP1 task authorization dated 2026-10-07 for guarded disposable-fixture recovery reproduction; no release authorization\",\"compatibilityProfileId\":\"advanced-gunslinger-0136\",\"compatibilityIdentity\":\"088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7\",\"workingSaveSha256\":\"9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d\",\"purpose\":\"cancel-reload casting-first qualification in instant mode (guarded WORKING reload during the first active casting, immediate world-unload cancellation, fresh second projection, native effect and resource observations; no retry)\"}\r\n",
+        "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+        "executionMode": "instant",
+        "expectedGameName": "Cleric",
+        "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+        "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+        "qualificationRecipe": "cancel-reload",
+        "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-4480e15-cancel-instant-01",
+        "scenario": "live-cast-qual",
+        "fixtureFamily": "Advanced",
+        "profileId": "advanced-gunslinger-0136",
+        "compatibilityIdentity": "088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7",
+        "advancedBindingManifest": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\advanced-fixture\\bootstrap-advanced-fixture-20260924-01\\fixture-manifest.json",
+        "fixture": {
+          "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+          "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+          "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+          "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d",
+          "gameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb"
+        },
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T11:42:18.3259075Z"
+      },
+      "hashes": {
+        "runtime-result.json": "05411faa33f0b27e85bbaa4324dd3b22bcc1782e64ef5f8f6517bd985002aab6",
+        "run-completion.json": "f060e7887813228e8fe3ea0e62ab7564c9e8928ee9c81b289761360b0e15eb7c",
+        "qual-outcome.json": "b5b344a569dbe268e8b5f9ce222aee5969ed11187482b6eb342e8ccfd9a0c6ab",
+        "protected-saves.json": "d0fb3dae43abcb47a63b42d6d6c14a5ad2277295322bf3aa658f2f48f4d87b65",
+        "orchestration.json": "ea45d6769f0aac4277dbe31f88230613d59c3fd98822f7e6731e8dcc34ee3850",
+        "runtime-request.json": "ec93dec39874e4b1827d6ed420b64f1314a24bd8299ed8267cf611ad57bd8697",
+        "saveload-chain-events.json": "84e7a0d7525051f48333d79b6899bf0087176c46772173b10ef6e645ffc4e42b"
+      },
+      "qualification": {
+        "recipe": "cancel-reload",
+        "executionMode": "instant",
+        "terminalReason": "completed",
+        "runsStarted": 2,
+        "runsReported": 2,
+        "callbackFailure": null,
+        "recoveryReload": "passed=True;pid=33204;running=False;accepting=True;shutdown=;runs=1/1;pendingCompletion=False;completionOwners=1;sessionReport=run-1;campaign=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;sessionReused=True;hudRoots=1;subscriptions=1;loaded=gameId=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;areaType=Kingmaker.Dungeon.Blueprints.BlueprintDungeonArea;sceneType=Kingmaker.EntitySystem.AreaPersistentState;partyCount=4;mainCharacterType=Kingmaker.EntitySystem.Entities.UnitReference;afterLoadCallback=True;loadGameCorrelated=True;writesObserved=False;elapsedMs=6234",
+        "lifecycleAfter": "subscriptions=1;hudRoots=1;hudInstalled=True;plannerRoots=1;mode=Default",
+        "stopPress": null,
+        "stopPressedInFlight": null,
+        "steps": [
+          {
+            "name": "stop",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-1",
+            "projectionId": "16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234",
+            "terminal": "cancelled:area-unloading",
+            "entries": [
+              "qual-cast-1=Cancelled;submitted=True;spend=True;free=False;detail=Cancelled:cancelled-in-flight;last:NotConfirmed:ResourceSpent:native-resource-delta-observed",
+              "qual-cast-2=NotProcessed;submitted=False;spend=False;free=False;detail=NotProcessed:halted:cancelled"
+            ],
+            "transitions": [
+              "qual-cast-1:absent",
+              "qual-cast-2:absent"
+            ],
+            "availability": [
+              "qual-cast-1:6>5",
+              "qual-cast-2:1>1"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": true
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:stop-before:qual-cast-1#1;available=6;clock=721761030000;effects=[]",
+              "qual-cast-2:stop-before:qual-cast-2#2;available=1;clock=721761030000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:cancel-before-world-replacement:qual-cast-1#3;available=5;clock=721761430000;effects=[]",
+              "qual-cast-2:cancel-before-world-replacement:qual-cast-2#4;available=1;clock=721761430000;slots=level-1|type-0|index-5:True;effects=[]"
+            ]
+          },
+          {
+            "name": "complete",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-2",
+            "projectionId": "ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e",
+            "terminal": "completed",
+            "entries": [
+              "qual-cast-1=Omitted;submitted=False;spend=False;free=False;detail=explicitly-disabled",
+              "qual-cast-2=EffectConfirmed;submitted=True;spend=True;free=False;detail=EffectConfirmed:EffectConfirmed:expected-effects-observed;rule-success:True;umd-failed:False;spell-failed:False;spend-invoked:True;spend-failure:none;provider-direct:False;provider-status:none;provider-completion-failure:none;spend-owner:source-ability-data;available-before:1;available-after:0;strategy:DirectRuleCast;strategy-reason:ordinary-direct-rule-cast;carrier-guid:1eaf1020e82028d4db55e6e464269e00;delivery-guid:;resolution:reserved-memorized-slot:level-1|type-0|index-5;source-ability-data:11f06c00@1eaf1020e82028d4db55e6e464269e00;execution-ability-data:11f06c00@1eaf1020e82028d4db55e6e464269e00;rule-cast-submitted:true;expected-effects:a4742d7afde0f4f47b380abed025b219;targets:4ecca5cc-8530-4f25-91dd-3ff0fbc1a274;carrier-command-created:false;delivery-command-created:false;effects-observed-at-submit:False;transaction-complete:True;transaction-state:ordinary-rule-cast-settled;cleanup-complete:True;cleanup-state:ordinary-rule-cast-settled"
+            ],
+            "transitions": [
+              "qual-cast-1:absent",
+              "qual-cast-2:new-instance"
+            ],
+            "availability": [
+              "qual-cast-1:6>6",
+              "qual-cast-2:1>0"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": false
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:complete-before:qual-cast-1#5;available=6;clock=721772410000;effects=[]",
+              "qual-cast-2:complete-before:qual-cast-2#6;available=1;clock=721772410000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:complete-after:qual-cast-1#7;available=6;clock=721773480000;effects=[]",
+              "qual-cast-2:complete-after:qual-cast-2#8;available=0;clock=721773480000;slots=level-1|type-0|index-5:False;effects=[a4742d7afde0f4f47b380abed025b219#-1347038976@727173210000{}]"
+            ]
+          }
+        ],
+        "failures": [],
+        "violations": []
+      }
+    },
+    {
+      "runId": "wp1-4480e15-cancel-select-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-4480e15-cancel-select-01",
+      "commit": "4480e1529532321f82e639349e40a4145da75a34",
+      "packageSha256": "8c593e082f24acc4d4441b8d76dec4766f9135f35e4b0980450afbab3b55b168",
+      "dllSha256": "4b0e26229e62c340089bec76bf30c20f1d468dfaed06b76cf44d846eaf80491c",
+      "mvid": "1b767261-afa8-4f3e-9022-3166fe884a08",
+      "status": "PASS",
+      "pass": 85,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 39116,
+      "startedAtUtc": "2026-10-07T11:33:36.8288793Z",
+      "endedAtUtc": "2026-10-07T11:34:27.8232519Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_ADVANCED_WORKING",
+        "baselineSaveName": "KBP_ADVANCED_BASELINE",
+        "expectedGameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb",
+        "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+        "executionMode": "instant",
+        "expectedGameName": "Cleric",
+        "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+        "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+        "qualificationRecipe": "cancel-reload",
+        "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-4480e15-cancel-select-01",
+        "scenario": "live-cast-qual-select",
+        "fixtureFamily": "Advanced",
+        "profileId": "advanced-gunslinger-0136",
+        "compatibilityIdentity": "088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7",
+        "advancedBindingManifest": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\advanced-fixture\\bootstrap-advanced-fixture-20260924-01\\fixture-manifest.json",
+        "fixture": {
+          "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+          "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+          "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+          "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d",
+          "gameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb"
+        },
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T11:34:38.0272246Z"
+      },
+      "hashes": {
+        "runtime-result.json": "2c97805168baf63448ba9ce65f5595344d6d05f2e7d7cdafd1c12f1814788a2f",
+        "run-completion.json": "2a6774b2a312bcf896206a519becf4420cfa315528f3faef34f82f7e52e90c31",
+        "qual-outcome.json": "8c7829f77f300d5bf9837008706a4bd595575d3842a366b48b5376ec82dea10c",
+        "protected-saves.json": "644cd0092a07f566253ab6b57b7b605078fe153a7a2d6263e4c8c5d322a839de",
+        "orchestration.json": "71e887cc49d5e729b8c284d1359fb832484b45ea3b76681c6f82ab14fc07dc28",
+        "runtime-request.json": "1a9691d7ac5ed0ab82c990e973c3096840cc2ac3d0c89d62b5b68945d233d8ad",
+        "saveload-chain-events.json": "93f025e1e67d716346206cab1e2c10bc2602700f735d3d48dfc4f70c719e3a9c"
+      },
+      "qualification": {
+        "recipe": "cancel-reload",
+        "executionMode": null,
+        "terminalReason": "completed",
+        "runsStarted": 0,
+        "runsReported": 0,
+        "callbackFailure": null,
+        "recoveryReload": null,
+        "lifecycleAfter": "subscriptions=1;hudRoots=1;hudInstalled=True;plannerRoots=1;mode=Default",
+        "stopPress": null,
+        "stopPressedInFlight": null,
+        "steps": [],
+        "failures": [],
+        "violations": []
+      }
+    },
+    {
+      "runId": "wp1-4480e15-core-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-4480e15-core-01",
+      "commit": "4480e1529532321f82e639349e40a4145da75a34",
+      "packageSha256": "8c593e082f24acc4d4441b8d76dec4766f9135f35e4b0980450afbab3b55b168",
+      "dllSha256": "4b0e26229e62c340089bec76bf30c20f1d468dfaed06b76cf44d846eaf80491c",
+      "mvid": "1b767261-afa8-4f3e-9022-3166fe884a08",
+      "status": "PASS",
+      "pass": 87,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 7748,
+      "startedAtUtc": "2026-10-07T11:30:12.5740081Z",
+      "endedAtUtc": "2026-10-07T11:31:05.3267637Z",
+      "requestParameters": {},
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-4480e15-core-01",
+        "scenario": "final-no-save-core",
+        "fixtureFamily": "Automation",
+        "profileId": "full-user",
+        "compatibilityIdentity": "c9a1664ca57e1bbe8b7b9f193a4f4633bd80498bdfcb2a636aa6a37ea110ca43",
+        "advancedBindingManifest": null,
+        "fixture": null,
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": false,
+        "protectedSavesCompared": false,
+        "protectedSavesClean": null,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T11:31:21.2120872Z"
+      },
+      "hashes": {
+        "runtime-result.json": "6873e6568fd5d6b56b10457928d1b826455e6b02fae400ab3f5f58096b56a9fb",
+        "run-completion.json": "4ee7c17684569f104ec7d62acee80a3aa5c4281b0ccfaa28c66ab45e73f9c8c3",
+        "orchestration.json": "90087c822bf401c69d6adbfa343cd4d68293e5301bf7cd0ef52cd9522b885ee2",
+        "runtime-request.json": "b33b98fbda7030e95e2b953bc3c1cc5345d894238f479f54a56871c9a848ab57"
+      },
+      "qualification": null
+    },
+    {
+      "runId": "wp1-4480e15-stop-animated-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-4480e15-stop-animated-01",
+      "commit": "4480e1529532321f82e639349e40a4145da75a34",
+      "packageSha256": "8c593e082f24acc4d4441b8d76dec4766f9135f35e4b0980450afbab3b55b168",
+      "dllSha256": "4b0e26229e62c340089bec76bf30c20f1d468dfaed06b76cf44d846eaf80491c",
+      "mvid": "1b767261-afa8-4f3e-9022-3166fe884a08",
+      "status": "PASS",
+      "pass": 85,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 18400,
+      "startedAtUtc": "2026-10-07T11:50:57.2071589Z",
+      "endedAtUtc": "2026-10-07T11:52:04.1026804Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_ADVANCED_WORKING",
+        "baselineSaveName": "KBP_ADVANCED_BASELINE",
+        "expectedGameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb",
+        "qualificationAllowance": "{\"schemaVersion\":5,\"kind\":\"kbp-casting-qualification\",\"runId\":\"wp1-4480e15-stop-animated-01\",\"sourceCommit\":\"4480e1529532321f82e639349e40a4145da75a34\",\"packageSha256\":\"8c593e082f24acc4d4441b8d76dec4766f9135f35e4b0980450afbab3b55b168\",\"dllSha256\":\"4b0e26229e62c340089bec76bf30c20f1d468dfaed06b76cf44d846eaf80491c\",\"assemblyMvid\":\"1b767261-afa8-4f3e-9022-3166fe884a08\",\"fixtureGameId\":\"cb1f405d-0b0c-4281-8b76-3b4f3b690abb\",\"recipe\":\"stop-reload\",\"executionMode\":\"animated\",\"approvedProjectionIds\":[\"16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234\",\"ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e\"],\"maximumNativeSubmissions\":3,\"approvedBy\":\"Howie Reith\",\"authority\":\"Explicit WP1 task authorization dated 2026-10-07 for guarded disposable-fixture recovery reproduction; no release authorization\",\"compatibilityProfileId\":\"advanced-gunslinger-0136\",\"compatibilityIdentity\":\"088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7\",\"workingSaveSha256\":\"9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d\",\"purpose\":\"stop-reload casting-first qualification in animated mode (player Stop, same-process guarded WORKING reload, fresh second projection, effect and resource observations; no native retry)\"}\r\n",
+        "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+        "executionMode": "animated",
+        "expectedGameName": "Cleric",
+        "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+        "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+        "qualificationRecipe": "stop-reload",
+        "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-4480e15-stop-animated-01",
+        "scenario": "live-cast-qual",
+        "fixtureFamily": "Advanced",
+        "profileId": "advanced-gunslinger-0136",
+        "compatibilityIdentity": "088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7",
+        "advancedBindingManifest": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\advanced-fixture\\bootstrap-advanced-fixture-20260924-01\\fixture-manifest.json",
+        "fixture": {
+          "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+          "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+          "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+          "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d",
+          "gameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb"
+        },
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T11:52:12.3212521Z"
+      },
+      "hashes": {
+        "runtime-result.json": "6247947439fbf11a2b79835790878bd3eab816709cff5b45569fc79d435633b1",
+        "run-completion.json": "335d605e4e492600c62c6b300c4c046d2e090f651e35247c66d1564562a16153",
+        "qual-outcome.json": "bb29c389a697ec19711cbc447f3df538819944952d5c9a8f438e47625795ada1",
+        "protected-saves.json": "bc26ea0347f9f7848557cf59272ceae4c5ad86b176b89d086ee9761817c60ac2",
+        "orchestration.json": "501936722bceeeb4eab95b126d13775e037afbba3c2711563ed1ace8c2ff1def",
+        "runtime-request.json": "e66fe747e0e0faf31e11b16dd92de2b9cd91273603ec5188e159a25c10d6163c",
+        "saveload-chain-events.json": "c2b6b7b3796ae8a0749315be04edfa7c6ba382259869f7ea51385c89cd8091d6"
+      },
+      "qualification": {
+        "recipe": "stop-reload",
+        "executionMode": "animated",
+        "terminalReason": "completed",
+        "runsStarted": 2,
+        "runsReported": 2,
+        "callbackFailure": null,
+        "recoveryReload": "passed=True;pid=18400;running=False;accepting=True;shutdown=;runs=1/1;pendingCompletion=False;completionOwners=1;sessionReport=run-1;campaign=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;sessionReused=True;hudRoots=1;subscriptions=1;loaded=gameId=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;areaType=Kingmaker.Dungeon.Blueprints.BlueprintDungeonArea;sceneType=Kingmaker.EntitySystem.AreaPersistentState;partyCount=4;mainCharacterType=Kingmaker.EntitySystem.Entities.UnitReference;afterLoadCallback=True;loadGameCorrelated=True;writesObserved=False;elapsedMs=6255",
+        "lifecycleAfter": "subscriptions=1;hudRoots=1;hudInstalled=True;plannerRoots=1;mode=Default",
+        "stopPress": "routine-press;handled=True;inFlight=True;pending=player-stopped",
+        "stopPressedInFlight": true,
+        "steps": [
+          {
+            "name": "stop",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-1",
+            "projectionId": "16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234",
+            "terminal": "cancelled:player-stopped",
+            "entries": [
+              "qual-cast-1=EffectConfirmed;submitted=True;spend=True;free=False;detail=ResourceSpent:ResourceSpent:native-command-spend-completed",
+              "qual-cast-2=NotProcessed;submitted=False;spend=False;free=False;detail=NotProcessed:halted:cancelled"
+            ],
+            "transitions": [
+              "qual-cast-1:new-instance",
+              "qual-cast-2:absent"
+            ],
+            "availability": [
+              "qual-cast-1:6>5",
+              "qual-cast-2:1>1"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": true
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:stop-before:qual-cast-1#1;available=6;clock=721760950000;effects=[]",
+              "qual-cast-2:stop-before:qual-cast-2#2;available=1;clock=721760950000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:stop-after:qual-cast-1#3;available=5;clock=721789650000;effects=[a4742d7afde0f4f47b380abed025b219#794389504@727184890000{}]",
+              "qual-cast-2:stop-after:qual-cast-2#4;available=1;clock=721789650000;slots=level-1|type-0|index-5:True;effects=[]"
+            ]
+          },
+          {
+            "name": "complete",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-2",
+            "projectionId": "ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e",
+            "terminal": "completed",
+            "entries": [
+              "qual-cast-1=Omitted;submitted=False;spend=False;free=False;detail=explicitly-disabled",
+              "qual-cast-2=EffectConfirmed;submitted=True;spend=True;free=False;detail=ResourceSpent:ResourceSpent:native-command-spend-completed"
+            ],
+            "transitions": [
+              "qual-cast-1:absent",
+              "qual-cast-2:new-instance"
+            ],
+            "availability": [
+              "qual-cast-1:6>6",
+              "qual-cast-2:1>0"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": false
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:complete-before:qual-cast-1#5;available=6;clock=721771170000;effects=[]",
+              "qual-cast-2:complete-before:qual-cast-2#6;available=1;clock=721771170000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:complete-after:qual-cast-1#7;available=6;clock=721799240000;effects=[]",
+              "qual-cast-2:complete-after:qual-cast-2#8;available=0;clock=721799240000;slots=level-1|type-0|index-5:False;effects=[a4742d7afde0f4f47b380abed025b219#1957287936@727195190000{}]"
+            ]
+          }
+        ],
+        "failures": [],
+        "violations": []
+      }
+    },
+    {
+      "runId": "wp1-4480e15-stop-instant-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-4480e15-stop-instant-01",
+      "commit": "4480e1529532321f82e639349e40a4145da75a34",
+      "packageSha256": "8c593e082f24acc4d4441b8d76dec4766f9135f35e4b0980450afbab3b55b168",
+      "dllSha256": "4b0e26229e62c340089bec76bf30c20f1d468dfaed06b76cf44d846eaf80491c",
+      "mvid": "1b767261-afa8-4f3e-9022-3166fe884a08",
+      "status": "PASS",
+      "pass": 85,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 13904,
+      "startedAtUtc": "2026-10-07T11:47:35.3187675Z",
+      "endedAtUtc": "2026-10-07T11:48:35.9665494Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_ADVANCED_WORKING",
+        "baselineSaveName": "KBP_ADVANCED_BASELINE",
+        "expectedGameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb",
+        "qualificationAllowance": "{\"schemaVersion\":5,\"kind\":\"kbp-casting-qualification\",\"runId\":\"wp1-4480e15-stop-instant-01\",\"sourceCommit\":\"4480e1529532321f82e639349e40a4145da75a34\",\"packageSha256\":\"8c593e082f24acc4d4441b8d76dec4766f9135f35e4b0980450afbab3b55b168\",\"dllSha256\":\"4b0e26229e62c340089bec76bf30c20f1d468dfaed06b76cf44d846eaf80491c\",\"assemblyMvid\":\"1b767261-afa8-4f3e-9022-3166fe884a08\",\"fixtureGameId\":\"cb1f405d-0b0c-4281-8b76-3b4f3b690abb\",\"recipe\":\"stop-reload\",\"executionMode\":\"instant\",\"approvedProjectionIds\":[\"16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234\",\"ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e\"],\"maximumNativeSubmissions\":3,\"approvedBy\":\"Howie Reith\",\"authority\":\"Explicit WP1 task authorization dated 2026-10-07 for guarded disposable-fixture recovery reproduction; no release authorization\",\"compatibilityProfileId\":\"advanced-gunslinger-0136\",\"compatibilityIdentity\":\"088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7\",\"workingSaveSha256\":\"9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d\",\"purpose\":\"stop-reload casting-first qualification in instant mode (player Stop, same-process guarded WORKING reload, fresh second projection, effect and resource observations; no native retry)\"}\r\n",
+        "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+        "executionMode": "instant",
+        "expectedGameName": "Cleric",
+        "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+        "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+        "qualificationRecipe": "stop-reload",
+        "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-4480e15-stop-instant-01",
+        "scenario": "live-cast-qual",
+        "fixtureFamily": "Advanced",
+        "profileId": "advanced-gunslinger-0136",
+        "compatibilityIdentity": "088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7",
+        "advancedBindingManifest": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\advanced-fixture\\bootstrap-advanced-fixture-20260924-01\\fixture-manifest.json",
+        "fixture": {
+          "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+          "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+          "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+          "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d",
+          "gameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb"
+        },
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T11:48:44.4483255Z"
+      },
+      "hashes": {
+        "runtime-result.json": "2cf4773584d129e2d2015877e963d7ea8fe3066991a02c8fff48ef974fc692be",
+        "run-completion.json": "6a223fdb0f58712921490c60d8e495072d767ef35c5491a3e2f17432e3e703ec",
+        "qual-outcome.json": "48968c7f2f60b5eb341da0274e6e9e01989f83ae00e91a95cc04708863bca967",
+        "protected-saves.json": "12b370ebee7f7cdb2325dc06d5b4833ed7ab37a87ee83155a909e32f24c8e584",
+        "orchestration.json": "f99cf1da7951e667c2069bfae9bdff5de59b44c860a4d24be1573b2100df6b91",
+        "runtime-request.json": "8d74deb91b56a78ec3cd8957a3cb687bf3921496111b0516268d7398c8c0e585",
+        "saveload-chain-events.json": "05932363635a93f0419ffcb31a2e07946acaf438f62d43d666dc9bf43a006292"
+      },
+      "qualification": {
+        "recipe": "stop-reload",
+        "executionMode": "instant",
+        "terminalReason": "completed",
+        "runsStarted": 2,
+        "runsReported": 2,
+        "callbackFailure": null,
+        "recoveryReload": "passed=True;pid=13904;running=False;accepting=True;shutdown=;runs=1/1;pendingCompletion=False;completionOwners=1;sessionReport=run-1;campaign=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;sessionReused=True;hudRoots=1;subscriptions=1;loaded=gameId=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;areaType=Kingmaker.Dungeon.Blueprints.BlueprintDungeonArea;sceneType=Kingmaker.EntitySystem.AreaPersistentState;partyCount=4;mainCharacterType=Kingmaker.EntitySystem.Entities.UnitReference;afterLoadCallback=True;loadGameCorrelated=True;writesObserved=False;elapsedMs=6600",
+        "lifecycleAfter": "subscriptions=1;hudRoots=1;hudInstalled=True;plannerRoots=1;mode=Default",
+        "stopPress": "routine-press;handled=True;inFlight=True;pending=player-stopped",
+        "stopPressedInFlight": true,
+        "steps": [
+          {
+            "name": "stop",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-1",
+            "projectionId": "16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234",
+            "terminal": "cancelled:player-stopped",
+            "entries": [
+              "qual-cast-1=EffectConfirmed;submitted=True;spend=True;free=False;detail=EffectConfirmed:EffectConfirmed:expected-effects-observed;rule-success:True;umd-failed:False;spell-failed:False;spend-invoked:True;spend-failure:none;provider-direct:False;provider-status:none;provider-completion-failure:none;spend-owner:source-ability-data;available-before:6;available-after:5;strategy:DirectRuleCast;strategy-reason:ordinary-direct-rule-cast;carrier-guid:1eaf1020e82028d4db55e6e464269e00;delivery-guid:;resolution:known-spell:spellbook:0c21cfcab6ce4395bd4df330ab3cf715;source-ability-data:1c3d8700@1eaf1020e82028d4db55e6e464269e00;execution-ability-data:1c3d8700@1eaf1020e82028d4db55e6e464269e00;rule-cast-submitted:true;expected-effects:a4742d7afde0f4f47b380abed025b219;targets:4b44c129-c40b-4f77-84fc-cb671ca034fe;carrier-command-created:false;delivery-command-created:false;effects-observed-at-submit:False;transaction-complete:True;transaction-state:ordinary-rule-cast-settled;cleanup-complete:True;cleanup-state:ordinary-rule-cast-settled",
+              "qual-cast-2=NotProcessed;submitted=False;spend=False;free=False;detail=NotProcessed:halted:cancelled"
+            ],
+            "transitions": [
+              "qual-cast-1:new-instance",
+              "qual-cast-2:absent"
+            ],
+            "availability": [
+              "qual-cast-1:6>5",
+              "qual-cast-2:1>1"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": true
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:stop-before:qual-cast-1#1;available=6;clock=721761070000;effects=[]",
+              "qual-cast-2:stop-before:qual-cast-2#2;available=1;clock=721761070000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:stop-after:qual-cast-1#3;available=5;clock=721762460000;effects=[a4742d7afde0f4f47b380abed025b219#-1174213632@727161870000{}]",
+              "qual-cast-2:stop-after:qual-cast-2#4;available=1;clock=721762460000;slots=level-1|type-0|index-5:True;effects=[]"
+            ]
+          },
+          {
+            "name": "complete",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-2",
+            "projectionId": "ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e",
+            "terminal": "completed",
+            "entries": [
+              "qual-cast-1=Omitted;submitted=False;spend=False;free=False;detail=explicitly-disabled",
+              "qual-cast-2=EffectConfirmed;submitted=True;spend=True;free=False;detail=EffectConfirmed:EffectConfirmed:expected-effects-observed;rule-success:True;umd-failed:False;spell-failed:False;spend-invoked:True;spend-failure:none;provider-direct:False;provider-status:none;provider-completion-failure:none;spend-owner:source-ability-data;available-before:1;available-after:0;strategy:DirectRuleCast;strategy-reason:ordinary-direct-rule-cast;carrier-guid:1eaf1020e82028d4db55e6e464269e00;delivery-guid:;resolution:reserved-memorized-slot:level-1|type-0|index-5;source-ability-data:24c88700@1eaf1020e82028d4db55e6e464269e00;execution-ability-data:24c88700@1eaf1020e82028d4db55e6e464269e00;rule-cast-submitted:true;expected-effects:a4742d7afde0f4f47b380abed025b219;targets:4ecca5cc-8530-4f25-91dd-3ff0fbc1a274;carrier-command-created:false;delivery-command-created:false;effects-observed-at-submit:False;transaction-complete:True;transaction-state:ordinary-rule-cast-settled;cleanup-complete:True;cleanup-state:ordinary-rule-cast-settled"
+            ],
+            "transitions": [
+              "qual-cast-1:absent",
+              "qual-cast-2:new-instance"
+            ],
+            "availability": [
+              "qual-cast-1:6>6",
+              "qual-cast-2:1>0"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": false
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:complete-before:qual-cast-1#5;available=6;clock=721771630000;effects=[]",
+              "qual-cast-2:complete-before:qual-cast-2#6;available=1;clock=721771630000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:complete-after:qual-cast-1#7;available=6;clock=721772670000;effects=[]",
+              "qual-cast-2:complete-after:qual-cast-2#8;available=0;clock=721772670000;slots=level-1|type-0|index-5:False;effects=[a4742d7afde0f4f47b380abed025b219#-1030886400@727172430000{}]"
+            ]
+          }
+        ],
+        "failures": [],
+        "violations": []
+      }
+    },
+    {
+      "runId": "wp1-4480e15-stop-select-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-4480e15-stop-select-01",
+      "commit": "4480e1529532321f82e639349e40a4145da75a34",
+      "packageSha256": "8c593e082f24acc4d4441b8d76dec4766f9135f35e4b0980450afbab3b55b168",
+      "dllSha256": "4b0e26229e62c340089bec76bf30c20f1d468dfaed06b76cf44d846eaf80491c",
+      "mvid": "1b767261-afa8-4f3e-9022-3166fe884a08",
+      "status": "PASS",
+      "pass": 85,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 40756,
+      "startedAtUtc": "2026-10-07T11:44:24.8421766Z",
+      "endedAtUtc": "2026-10-07T11:45:16.2560946Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_ADVANCED_WORKING",
+        "baselineSaveName": "KBP_ADVANCED_BASELINE",
+        "expectedGameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb",
+        "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+        "executionMode": "instant",
+        "expectedGameName": "Cleric",
+        "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+        "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+        "qualificationRecipe": "stop-reload",
+        "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-4480e15-stop-select-01",
+        "scenario": "live-cast-qual-select",
+        "fixtureFamily": "Advanced",
+        "profileId": "advanced-gunslinger-0136",
+        "compatibilityIdentity": "088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7",
+        "advancedBindingManifest": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\advanced-fixture\\bootstrap-advanced-fixture-20260924-01\\fixture-manifest.json",
+        "fixture": {
+          "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+          "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+          "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+          "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d",
+          "gameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb"
+        },
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T11:45:24.7039062Z"
+      },
+      "hashes": {
+        "runtime-result.json": "a71c6089c82c4e5a0d91a996b908841c0ee36677e8a12128edf7bc4be1cdd98a",
+        "run-completion.json": "97915c70b07c66cf0b29d3af54a78d605776a8339fed4936e39d9edc28032bb7",
+        "qual-outcome.json": "fcb71f70e641ae2dd409ccc042e59fd0b44f04adcd126cda7ab7c4d00f32e9ae",
+        "protected-saves.json": "8432a15239559c3c4b235178a0d9a7ebab905a0fbe9cfed70138e8581713c130",
+        "orchestration.json": "ae7979495d2b9bf691e524261814edf23881138258a29dfa85180111ed0dd10a",
+        "runtime-request.json": "a9d17e6b9f5f71b02af1c53bb0b35373fe375b3059bd71e499da9ab15315cd5a",
+        "saveload-chain-events.json": "695334d6abdc0ed71dca97844a3122112f42a202dfd560ef5bb698be98064ebc"
+      },
+      "qualification": {
+        "recipe": "stop-reload",
+        "executionMode": null,
+        "terminalReason": "completed",
+        "runsStarted": 0,
+        "runsReported": 0,
+        "callbackFailure": null,
+        "recoveryReload": null,
+        "lifecycleAfter": "subscriptions=1;hudRoots=1;hudInstalled=True;plannerRoots=1;mode=Default",
+        "stopPress": null,
+        "stopPressedInFlight": null,
+        "steps": [],
+        "failures": [],
+        "violations": []
+      }
+    },
+    {
+      "runId": "wp1-71cce84-advanced-inspect-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-71cce84-advanced-inspect-01",
+      "commit": "71cce84b2b82c515db3dca35a5efd8adb61e31d7",
+      "packageSha256": "8d7d6c1239e4f212d60d94ef4aaf4045ac251e530d22d5741b9bceb80d492ee1",
+      "dllSha256": "67ddfda828396117491159a40587ebfb288303987f4afc3e3dca3cd79340c9cc",
+      "mvid": "85eaec3c-61be-4977-9750-7e3ccc62376b",
+      "status": "PASS",
+      "pass": 85,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 12024,
+      "startedAtUtc": "2026-10-07T10:47:26.2091739Z",
+      "endedAtUtc": "2026-10-07T10:48:18.8195497Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_ADVANCED_WORKING",
+        "baselineSaveName": "KBP_ADVANCED_BASELINE",
+        "expectedGameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb",
+        "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+        "executionMode": "instant",
+        "expectedGameName": "Cleric",
+        "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+        "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+        "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-71cce84-advanced-inspect-01",
+        "scenario": "live-advanced-inspect",
+        "fixtureFamily": "Advanced",
+        "profileId": "advanced-gunslinger-0136",
+        "compatibilityIdentity": "088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7",
+        "advancedBindingManifest": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\advanced-fixture\\bootstrap-advanced-fixture-20260924-01\\fixture-manifest.json",
+        "fixture": {
+          "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+          "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+          "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+          "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d",
+          "gameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb"
+        },
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T10:48:27.0365431Z"
+      },
+      "hashes": {
+        "runtime-result.json": "d745afdf46b05e43235387517f4b4737a29d1699a30195a71e9bdcc97c613927",
+        "run-completion.json": "9861af07fb71f4908c5acf104f7ae7bc8375d8008707be4f783f8eca93f3f2ef",
+        "protected-saves.json": "855ef383b4080e03f5a5bb031d93e85e7c86894a15edcff4ee0881e8805d817b",
+        "orchestration.json": "cc01c537b7ce5f92355cfd289c9accd8a6481c1851b762ed48548c9137c24c08",
+        "runtime-request.json": "e99e2e8559e9c14cd176471a631b7fb2cc81327cdc489af4f772bdd85807c15c",
+        "saveload-chain-events.json": "1c8b7a08fd7f7caab88530c6a3378ec9b570ddf69b052c23cdbb03143f37b267"
+      },
+      "qualification": null
+    },
+    {
+      "runId": "wp1-71cce84-cancel-advanced-select-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-71cce84-cancel-advanced-select-01",
+      "commit": "71cce84b2b82c515db3dca35a5efd8adb61e31d7",
+      "packageSha256": "8d7d6c1239e4f212d60d94ef4aaf4045ac251e530d22d5741b9bceb80d492ee1",
+      "dllSha256": "67ddfda828396117491159a40587ebfb288303987f4afc3e3dca3cd79340c9cc",
+      "mvid": "85eaec3c-61be-4977-9750-7e3ccc62376b",
+      "status": "PASS",
+      "pass": 85,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 37020,
+      "startedAtUtc": "2026-10-07T11:03:22.8658432Z",
+      "endedAtUtc": "2026-10-07T11:04:13.8264818Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_ADVANCED_WORKING",
+        "baselineSaveName": "KBP_ADVANCED_BASELINE",
+        "expectedGameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb",
+        "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+        "executionMode": "instant",
+        "expectedGameName": "Cleric",
+        "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+        "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+        "qualificationRecipe": "cancel-reload",
+        "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-71cce84-cancel-advanced-select-01",
+        "scenario": "live-cast-qual-select",
+        "fixtureFamily": "Advanced",
+        "profileId": "advanced-gunslinger-0136",
+        "compatibilityIdentity": "088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7",
+        "advancedBindingManifest": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\advanced-fixture\\bootstrap-advanced-fixture-20260924-01\\fixture-manifest.json",
+        "fixture": {
+          "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+          "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+          "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+          "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d",
+          "gameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb"
+        },
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T11:04:22.2658399Z"
+      },
+      "hashes": {
+        "runtime-result.json": "08b416efea3971f6b55c17a650ecfa32c775f23fb03d43efbd9cd60dd3530319",
+        "run-completion.json": "2e1d0182ef64b2a610d8488c5c0b5450faacf65d088dfd42a287d4d8bfaed072",
+        "qual-outcome.json": "76411a28ca8ecf312239ec70a2978b37da12aa55d93b2e20872f4eb3f2885f4c",
+        "protected-saves.json": "4450eb515608063873cbfca7cebae9982bd1c1b9fcbf075b91362ba7fead9e5c",
+        "orchestration.json": "dc93050d7ce4998c592ba900777c931683faeb6a1d545296bb0581d4479a0296",
+        "runtime-request.json": "5e6c8e69db9978a6491629f38633157be6b81480dc3791a811956c159c62db79",
+        "saveload-chain-events.json": "e3af27df9f5c38a7cd6e30ba22c7e77038e3081188a9a37ad337e0b23851c972"
+      },
+      "qualification": {
+        "recipe": "cancel-reload",
+        "executionMode": null,
+        "terminalReason": "completed",
+        "runsStarted": 0,
+        "runsReported": 0,
+        "callbackFailure": null,
+        "recoveryReload": null,
+        "lifecycleAfter": null,
+        "stopPress": null,
+        "stopPressedInFlight": null,
+        "steps": [],
+        "failures": [],
+        "violations": []
+      }
+    },
+    {
+      "runId": "wp1-71cce84-cancel-animated-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-71cce84-cancel-animated-01",
+      "commit": "71cce84b2b82c515db3dca35a5efd8adb61e31d7",
+      "packageSha256": "8d7d6c1239e4f212d60d94ef4aaf4045ac251e530d22d5741b9bceb80d492ee1",
+      "dllSha256": "67ddfda828396117491159a40587ebfb288303987f4afc3e3dca3cd79340c9cc",
+      "mvid": "85eaec3c-61be-4977-9750-7e3ccc62376b",
+      "status": "FAIL",
+      "pass": 84,
+      "fail": 1,
+      "failedAssertions": [
+        {
+          "id": "qualification-run",
+          "expected": "stop/complete as forecast",
+          "observed": "stop-wait:step:cancel-cleanup:qual-cast-1:Cancelled:cancelled-in-flight;last:FailedExecution:animated-operation-abandoned-in-flight|recovery-reload:missing",
+          "status": "FAIL"
+        }
+      ],
+      "processId": 39816,
+      "startedAtUtc": "2026-10-07T11:10:46.6964582Z",
+      "endedAtUtc": "2026-10-07T11:11:39.5831133Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_ADVANCED_WORKING",
+        "baselineSaveName": "KBP_ADVANCED_BASELINE",
+        "expectedGameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb",
+        "qualificationAllowance": "{\"schemaVersion\":5,\"kind\":\"kbp-casting-qualification\",\"runId\":\"wp1-71cce84-cancel-animated-01\",\"sourceCommit\":\"71cce84b2b82c515db3dca35a5efd8adb61e31d7\",\"packageSha256\":\"8d7d6c1239e4f212d60d94ef4aaf4045ac251e530d22d5741b9bceb80d492ee1\",\"dllSha256\":\"67ddfda828396117491159a40587ebfb288303987f4afc3e3dca3cd79340c9cc\",\"assemblyMvid\":\"85eaec3c-61be-4977-9750-7e3ccc62376b\",\"fixtureGameId\":\"cb1f405d-0b0c-4281-8b76-3b4f3b690abb\",\"recipe\":\"cancel-reload\",\"executionMode\":\"animated\",\"approvedProjectionIds\":[\"16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234\",\"ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e\"],\"maximumNativeSubmissions\":3,\"approvedBy\":\"Howie Reith\",\"authority\":\"Explicit WP1 task authorization dated 2026-10-07 for guarded disposable-fixture recovery reproduction; no release authorization\",\"compatibilityProfileId\":\"advanced-gunslinger-0136\",\"compatibilityIdentity\":\"088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7\",\"workingSaveSha256\":\"9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d\",\"purpose\":\"cancel-reload casting-first qualification in animated mode (guarded WORKING reload during the first active casting, immediate world-unload cancellation, fresh second projection, native effect and resource observations; no retry)\"}\r\n",
+        "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+        "executionMode": "animated",
+        "expectedGameName": "Cleric",
+        "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+        "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+        "qualificationRecipe": "cancel-reload",
+        "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-71cce84-cancel-animated-01",
+        "scenario": "live-cast-qual",
+        "fixtureFamily": "Advanced",
+        "profileId": "advanced-gunslinger-0136",
+        "compatibilityIdentity": "088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7",
+        "advancedBindingManifest": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\advanced-fixture\\bootstrap-advanced-fixture-20260924-01\\fixture-manifest.json",
+        "fixture": {
+          "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+          "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+          "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+          "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d",
+          "gameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb"
+        },
+        "gameResultStatus": "FAIL",
+        "harnessSucceeded": false,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": false,
+        "completedAtUtc": "2026-10-07T11:11:47.9647917Z"
+      },
+      "hashes": {
+        "runtime-result.json": "a26a61e2ed087020ce8411e4df74db652e10a247198eea98fffd48df07b716b3",
+        "run-completion.json": "51ee55f7b4f37be110a2415015f6b069a83f5bce857a22069ac7416abfd42b28",
+        "qual-outcome.json": "319909ce10afc3c317bcf99c7381f80548035ef371fa1f141937738a5fddb8b7",
+        "protected-saves.json": "88db4bb2b00063d5e94cef3e662ddbe080e10aba30cd4a003fc2722d505f8b25",
+        "orchestration.json": "fe028513be423cb34dd1ca01b18898d552a3781174623d4554ace65728dd0dbc",
+        "runtime-request.json": "c211e73d0dae7807e859690c65c7165f5d8d622c6f3935704418e3910d2a0b32",
+        "saveload-chain-events.json": "aeb3bfd95c9a5d2b1c104ec6664794bac482252e97b8ae3a63be43a81dca6d51"
+      },
+      "qualification": {
+        "recipe": "cancel-reload",
+        "executionMode": "animated",
+        "terminalReason": "failed:stop-wait",
+        "runsStarted": 0,
+        "runsReported": 0,
+        "callbackFailure": null,
+        "recoveryReload": null,
+        "lifecycleAfter": null,
+        "stopPress": null,
+        "stopPressedInFlight": null,
+        "steps": [
+          {
+            "name": "stop",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-1",
+            "projectionId": "16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234",
+            "terminal": "cancelled:area-unloading",
+            "entries": [
+              "qual-cast-1=Cancelled;submitted=True;spend=False;free=False;detail=Cancelled:cancelled-in-flight;last:FailedExecution:animated-operation-abandoned-in-flight",
+              "qual-cast-2=NotProcessed;submitted=False;spend=False;free=False;detail=NotProcessed:halted:cancelled"
+            ],
+            "transitions": [
+              "qual-cast-1:absent",
+              "qual-cast-2:absent"
+            ],
+            "availability": [
+              "qual-cast-1:6>6",
+              "qual-cast-2:1>1"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": true
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:stop-before:qual-cast-1#1;available=6;clock=721760340000;effects=[]",
+              "qual-cast-2:stop-before:qual-cast-2#2;available=1;clock=721760340000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:cancel-before-world-replacement:qual-cast-1#3;available=6;clock=721760740000;effects=[]",
+              "qual-cast-2:cancel-before-world-replacement:qual-cast-2#4;available=1;clock=721760740000;slots=level-1|type-0|index-5:True;effects=[]"
+            ]
+          }
+        ],
+        "failures": [
+          "stop-wait:step:cancel-cleanup:qual-cast-1:Cancelled:cancelled-in-flight;last:FailedExecution:animated-operation-abandoned-in-flight"
+        ],
+        "violations": [
+          "stop-wait:step:cancel-cleanup:qual-cast-1:Cancelled:cancelled-in-flight;last:FailedExecution:animated-operation-abandoned-in-flight",
+          "recovery-reload:missing"
+        ]
+      }
+    },
+    {
+      "runId": "wp1-71cce84-cancel-instant-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-71cce84-cancel-instant-01",
+      "commit": "71cce84b2b82c515db3dca35a5efd8adb61e31d7",
+      "packageSha256": "8d7d6c1239e4f212d60d94ef4aaf4045ac251e530d22d5741b9bceb80d492ee1",
+      "dllSha256": "67ddfda828396117491159a40587ebfb288303987f4afc3e3dca3cd79340c9cc",
+      "mvid": "85eaec3c-61be-4977-9750-7e3ccc62376b",
+      "status": "PASS",
+      "pass": 85,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 20300,
+      "startedAtUtc": "2026-10-07T11:07:09.1247824Z",
+      "endedAtUtc": "2026-10-07T11:08:09.4223989Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_ADVANCED_WORKING",
+        "baselineSaveName": "KBP_ADVANCED_BASELINE",
+        "expectedGameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb",
+        "qualificationAllowance": "{\"schemaVersion\":5,\"kind\":\"kbp-casting-qualification\",\"runId\":\"wp1-71cce84-cancel-instant-01\",\"sourceCommit\":\"71cce84b2b82c515db3dca35a5efd8adb61e31d7\",\"packageSha256\":\"8d7d6c1239e4f212d60d94ef4aaf4045ac251e530d22d5741b9bceb80d492ee1\",\"dllSha256\":\"67ddfda828396117491159a40587ebfb288303987f4afc3e3dca3cd79340c9cc\",\"assemblyMvid\":\"85eaec3c-61be-4977-9750-7e3ccc62376b\",\"fixtureGameId\":\"cb1f405d-0b0c-4281-8b76-3b4f3b690abb\",\"recipe\":\"cancel-reload\",\"executionMode\":\"instant\",\"approvedProjectionIds\":[\"16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234\",\"ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e\"],\"maximumNativeSubmissions\":3,\"approvedBy\":\"Howie Reith\",\"authority\":\"Explicit WP1 task authorization dated 2026-10-07 for guarded disposable-fixture recovery reproduction; no release authorization\",\"compatibilityProfileId\":\"advanced-gunslinger-0136\",\"compatibilityIdentity\":\"088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7\",\"workingSaveSha256\":\"9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d\",\"purpose\":\"cancel-reload casting-first qualification in instant mode (guarded WORKING reload during the first active casting, immediate world-unload cancellation, fresh second projection, native effect and resource observations; no retry)\"}\r\n",
+        "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+        "executionMode": "instant",
+        "expectedGameName": "Cleric",
+        "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+        "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+        "qualificationRecipe": "cancel-reload",
+        "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-71cce84-cancel-instant-01",
+        "scenario": "live-cast-qual",
+        "fixtureFamily": "Advanced",
+        "profileId": "advanced-gunslinger-0136",
+        "compatibilityIdentity": "088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7",
+        "advancedBindingManifest": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\advanced-fixture\\bootstrap-advanced-fixture-20260924-01\\fixture-manifest.json",
+        "fixture": {
+          "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+          "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+          "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+          "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d",
+          "gameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb"
+        },
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T11:08:17.6102071Z"
+      },
+      "hashes": {
+        "runtime-result.json": "cb11ca715e06dd18359ec70cd3755f97cbeabb01971f0050647f3bed17de833d",
+        "run-completion.json": "5b635e17d77a009ffb2aee8cd399fbb23299a9756597c5f4f6284fcdd1d0f21b",
+        "qual-outcome.json": "927b67409ddcedba45627eb03ad5827dd072878d6c4b582a4815710c1e3e7793",
+        "protected-saves.json": "860ba09c11cc4c7327900ff4515975008754837d8e6d3171dad404839e730c70",
+        "orchestration.json": "c79c4ccae1668c5fdb069490f30bcb5b93c5d0330d1d45524c14aac7b188221c",
+        "runtime-request.json": "22cd4f393a52360cf2e92e2703f93087173db4c7d0f955d2c4ce2d4ec2b9d286",
+        "saveload-chain-events.json": "e13beeb588d78cba757945343611b9ccd6bac570a80f9a2c1b9b90e5535416b2"
+      },
+      "qualification": {
+        "recipe": "cancel-reload",
+        "executionMode": "instant",
+        "terminalReason": "completed",
+        "runsStarted": 0,
+        "runsReported": 0,
+        "callbackFailure": null,
+        "recoveryReload": "passed=True;pid=20300;running=False;accepting=True;shutdown=;runs=1/1;pendingCompletion=False;completionOwners=1;sessionReport=run-1;campaign=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;sessionReused=True;hudRoots=1;subscriptions=1;loaded=gameId=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;areaType=Kingmaker.Dungeon.Blueprints.BlueprintDungeonArea;sceneType=Kingmaker.EntitySystem.AreaPersistentState;partyCount=4;mainCharacterType=Kingmaker.EntitySystem.Entities.UnitReference;afterLoadCallback=True;loadGameCorrelated=True;writesObserved=False;elapsedMs=6182",
+        "lifecycleAfter": null,
+        "stopPress": null,
+        "stopPressedInFlight": null,
+        "steps": [
+          {
+            "name": "stop",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-1",
+            "projectionId": "16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234",
+            "terminal": "cancelled:area-unloading",
+            "entries": [
+              "qual-cast-1=Cancelled;submitted=True;spend=True;free=False;detail=Cancelled:cancelled-in-flight;last:NotConfirmed:ResourceSpent:native-resource-delta-observed",
+              "qual-cast-2=NotProcessed;submitted=False;spend=False;free=False;detail=NotProcessed:halted:cancelled"
+            ],
+            "transitions": [
+              "qual-cast-1:absent",
+              "qual-cast-2:absent"
+            ],
+            "availability": [
+              "qual-cast-1:6>5",
+              "qual-cast-2:1>1"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": true
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:stop-before:qual-cast-1#1;available=6;clock=721760720000;effects=[]",
+              "qual-cast-2:stop-before:qual-cast-2#2;available=1;clock=721760720000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:cancel-before-world-replacement:qual-cast-1#3;available=5;clock=721761120000;effects=[]",
+              "qual-cast-2:cancel-before-world-replacement:qual-cast-2#4;available=1;clock=721761120000;slots=level-1|type-0|index-5:True;effects=[]"
+            ]
+          },
+          {
+            "name": "complete",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-2",
+            "projectionId": "ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e",
+            "terminal": "completed",
+            "entries": [
+              "qual-cast-1=Omitted;submitted=False;spend=False;free=False;detail=explicitly-disabled",
+              "qual-cast-2=EffectConfirmed;submitted=True;spend=True;free=False;detail=EffectConfirmed:EffectConfirmed:expected-effects-observed;rule-success:True;umd-failed:False;spell-failed:False;spend-invoked:True;spend-failure:none;provider-direct:False;provider-status:none;provider-completion-failure:none;spend-owner:source-ability-data;available-before:1;available-after:0;strategy:DirectRuleCast;strategy-reason:ordinary-direct-rule-cast;carrier-guid:1eaf1020e82028d4db55e6e464269e00;delivery-guid:;resolution:reserved-memorized-slot:level-1|type-0|index-5;source-ability-data:20f4b980@1eaf1020e82028d4db55e6e464269e00;execution-ability-data:20f4b980@1eaf1020e82028d4db55e6e464269e00;rule-cast-submitted:true;expected-effects:a4742d7afde0f4f47b380abed025b219;targets:4ecca5cc-8530-4f25-91dd-3ff0fbc1a274;carrier-command-created:false;delivery-command-created:false;effects-observed-at-submit:False;transaction-complete:True;transaction-state:ordinary-rule-cast-settled;cleanup-complete:True;cleanup-state:ordinary-rule-cast-settled"
+            ],
+            "transitions": [
+              "qual-cast-1:absent",
+              "qual-cast-2:new-instance"
+            ],
+            "availability": [
+              "qual-cast-1:6>6",
+              "qual-cast-2:1>0"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": false
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:complete-before:qual-cast-1#5;available=6;clock=721771340000;effects=[]",
+              "qual-cast-2:complete-before:qual-cast-2#6;available=1;clock=721771340000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:complete-after:qual-cast-1#7;available=6;clock=721772430000;effects=[]",
+              "qual-cast-2:complete-after:qual-cast-2#8;available=0;clock=721772430000;slots=level-1|type-0|index-5:False;effects=[a4742d7afde0f4f47b380abed025b219#-1095098752@727172140000{}]"
+            ]
+          }
+        ],
+        "failures": [],
+        "violations": []
+      }
+    },
+    {
+      "runId": "wp1-71cce84-core-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-71cce84-core-01",
+      "commit": "71cce84b2b82c515db3dca35a5efd8adb61e31d7",
+      "packageSha256": "8d7d6c1239e4f212d60d94ef4aaf4045ac251e530d22d5741b9bceb80d492ee1",
+      "dllSha256": "67ddfda828396117491159a40587ebfb288303987f4afc3e3dca3cd79340c9cc",
+      "mvid": "85eaec3c-61be-4977-9750-7e3ccc62376b",
+      "status": "PASS",
+      "pass": 87,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 25732,
+      "startedAtUtc": "2026-10-07T10:38:36.1587677Z",
+      "endedAtUtc": "2026-10-07T10:39:30.8005640Z",
+      "requestParameters": {},
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-71cce84-core-01",
+        "scenario": "final-no-save-core",
+        "fixtureFamily": "Automation",
+        "profileId": "full-user",
+        "compatibilityIdentity": "c9a1664ca57e1bbe8b7b9f193a4f4633bd80498bdfcb2a636aa6a37ea110ca43",
+        "advancedBindingManifest": null,
+        "fixture": null,
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": false,
+        "protectedSavesCompared": false,
+        "protectedSavesClean": null,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T10:39:47.1476198Z"
+      },
+      "hashes": {
+        "runtime-result.json": "06b6709d7061589c90e61236e2dbcec162d179a8d77d16c9eeb69b96be397047",
+        "run-completion.json": "a3d299a575dcc88108371fb476c059275b0218a227440f289110fea48100aefc",
+        "orchestration.json": "d0bc1472f3292588faae20e7c9dd39b2c9769bdb039ba21a1fa8888ac3246fcf",
+        "runtime-request.json": "7c03bc1485158286840247fb0df2c90b562250ca61f6ae60fa1cdb2eb7faeee1"
+      },
+      "qualification": null
+    },
+    {
+      "runId": "wp1-71cce84-stop-advanced-select-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-71cce84-stop-advanced-select-01",
+      "commit": "71cce84b2b82c515db3dca35a5efd8adb61e31d7",
+      "packageSha256": "8d7d6c1239e4f212d60d94ef4aaf4045ac251e530d22d5741b9bceb80d492ee1",
+      "dllSha256": "67ddfda828396117491159a40587ebfb288303987f4afc3e3dca3cd79340c9cc",
+      "mvid": "85eaec3c-61be-4977-9750-7e3ccc62376b",
+      "status": "PASS",
+      "pass": 85,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 37140,
+      "startedAtUtc": "2026-10-07T10:51:16.4332234Z",
+      "endedAtUtc": "2026-10-07T10:52:07.9684362Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_ADVANCED_WORKING",
+        "baselineSaveName": "KBP_ADVANCED_BASELINE",
+        "expectedGameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb",
+        "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+        "executionMode": "instant",
+        "expectedGameName": "Cleric",
+        "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+        "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+        "qualificationRecipe": "stop-reload",
+        "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-71cce84-stop-advanced-select-01",
+        "scenario": "live-cast-qual-select",
+        "fixtureFamily": "Advanced",
+        "profileId": "advanced-gunslinger-0136",
+        "compatibilityIdentity": "088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7",
+        "advancedBindingManifest": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\advanced-fixture\\bootstrap-advanced-fixture-20260924-01\\fixture-manifest.json",
+        "fixture": {
+          "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+          "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+          "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+          "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d",
+          "gameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb"
+        },
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T10:52:15.9634532Z"
+      },
+      "hashes": {
+        "runtime-result.json": "d51f5132d8727c5035d79593605677c77dbb10dc07ad66f96a284b282210e082",
+        "run-completion.json": "06cd65a0cf97cb10648b7b60db2571b311999fa97eb678a2b6a7f10ee1d95fe6",
+        "qual-outcome.json": "876a92822a7ade6626fb2bf24fdd5912999f61f030878d16af5cb22d4fce05fc",
+        "protected-saves.json": "62b9283a9f421a6022fbebc8640f72bcd8aabc84e251ed1bdce0d9d32f2d405e",
+        "orchestration.json": "a76b0816017d6396f5b1087cf082a8dae8afc2991ff2b372ab864645a7053a33",
+        "runtime-request.json": "ab25a3210bdeb2e81dbe8413f808893b4cf42efe1423e2f9ad627454cc184820",
+        "saveload-chain-events.json": "fd314c7d3ea4614af3e5b7d0fd29c6ee80a271bbf3eae47f294504f01f3d9448"
+      },
+      "qualification": {
+        "recipe": "stop-reload",
+        "executionMode": null,
+        "terminalReason": "completed",
+        "runsStarted": 0,
+        "runsReported": 0,
+        "callbackFailure": null,
+        "recoveryReload": null,
+        "lifecycleAfter": null,
+        "stopPress": null,
+        "stopPressedInFlight": null,
+        "steps": [],
+        "failures": [],
+        "violations": []
+      }
+    },
+    {
+      "runId": "wp1-71cce84-stop-animated-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-71cce84-stop-animated-01",
+      "commit": "71cce84b2b82c515db3dca35a5efd8adb61e31d7",
+      "packageSha256": "8d7d6c1239e4f212d60d94ef4aaf4045ac251e530d22d5741b9bceb80d492ee1",
+      "dllSha256": "67ddfda828396117491159a40587ebfb288303987f4afc3e3dca3cd79340c9cc",
+      "mvid": "85eaec3c-61be-4977-9750-7e3ccc62376b",
+      "status": "PASS",
+      "pass": 85,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 40268,
+      "startedAtUtc": "2026-10-07T10:59:32.9018962Z",
+      "endedAtUtc": "2026-10-07T11:00:39.5314156Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_ADVANCED_WORKING",
+        "baselineSaveName": "KBP_ADVANCED_BASELINE",
+        "expectedGameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb",
+        "qualificationAllowance": "{\"schemaVersion\":5,\"kind\":\"kbp-casting-qualification\",\"runId\":\"wp1-71cce84-stop-animated-01\",\"sourceCommit\":\"71cce84b2b82c515db3dca35a5efd8adb61e31d7\",\"packageSha256\":\"8d7d6c1239e4f212d60d94ef4aaf4045ac251e530d22d5741b9bceb80d492ee1\",\"dllSha256\":\"67ddfda828396117491159a40587ebfb288303987f4afc3e3dca3cd79340c9cc\",\"assemblyMvid\":\"85eaec3c-61be-4977-9750-7e3ccc62376b\",\"fixtureGameId\":\"cb1f405d-0b0c-4281-8b76-3b4f3b690abb\",\"recipe\":\"stop-reload\",\"executionMode\":\"animated\",\"approvedProjectionIds\":[\"16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234\",\"ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e\"],\"maximumNativeSubmissions\":3,\"approvedBy\":\"Howie Reith\",\"authority\":\"Explicit WP1 task authorization dated 2026-10-07 for guarded disposable-fixture recovery reproduction; no release authorization\",\"compatibilityProfileId\":\"advanced-gunslinger-0136\",\"compatibilityIdentity\":\"088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7\",\"workingSaveSha256\":\"9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d\",\"purpose\":\"stop-reload casting-first qualification in animated mode (player Stop, same-process guarded WORKING reload, fresh second projection, effect and resource observations; no native retry)\"}\r\n",
+        "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+        "executionMode": "animated",
+        "expectedGameName": "Cleric",
+        "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+        "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+        "qualificationRecipe": "stop-reload",
+        "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-71cce84-stop-animated-01",
+        "scenario": "live-cast-qual",
+        "fixtureFamily": "Advanced",
+        "profileId": "advanced-gunslinger-0136",
+        "compatibilityIdentity": "088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7",
+        "advancedBindingManifest": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\advanced-fixture\\bootstrap-advanced-fixture-20260924-01\\fixture-manifest.json",
+        "fixture": {
+          "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+          "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+          "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+          "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d",
+          "gameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb"
+        },
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T11:00:49.7373147Z"
+      },
+      "hashes": {
+        "runtime-result.json": "5e1345e82efd758e96b8ef902ff9f5cef0028ed34dafcd93547f99657c425007",
+        "run-completion.json": "94dfcbff678894955311156ce7b80b1152b77ce3c8b2f89341845437db6867d3",
+        "qual-outcome.json": "9dcd9fcbb73e2dd6b5fba0380b8b4895fd5fb6b4e932aa979b9bb71e987ba8e2",
+        "protected-saves.json": "020c94b8d05e326505b2003c9082d65313d859a384b4e0cde786ef07351ecf0f",
+        "orchestration.json": "aeaa4bcbfe7838675d415a6c6d22e1240f475d0038f64c2a5e163fc3510b91dd",
+        "runtime-request.json": "d3c78e89f69245dcf53931f6f93d48928e5a72574f179efe88baa62f6a4d48c1",
+        "saveload-chain-events.json": "d624f2c61e9685a98de4c505b5ef4f6923a6c6919b584185037d8d87afd7157e"
+      },
+      "qualification": {
+        "recipe": "stop-reload",
+        "executionMode": "animated",
+        "terminalReason": "completed",
+        "runsStarted": 0,
+        "runsReported": 0,
+        "callbackFailure": null,
+        "recoveryReload": "passed=True;pid=40268;running=False;accepting=True;shutdown=;runs=1/1;pendingCompletion=False;completionOwners=1;sessionReport=run-1;campaign=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;sessionReused=True;hudRoots=1;subscriptions=1;loaded=gameId=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;areaType=Kingmaker.Dungeon.Blueprints.BlueprintDungeonArea;sceneType=Kingmaker.EntitySystem.AreaPersistentState;partyCount=4;mainCharacterType=Kingmaker.EntitySystem.Entities.UnitReference;afterLoadCallback=True;loadGameCorrelated=True;writesObserved=False;elapsedMs=6305",
+        "lifecycleAfter": null,
+        "stopPress": "routine-press;handled=True;inFlight=True;pending=player-stopped",
+        "stopPressedInFlight": true,
+        "steps": [
+          {
+            "name": "stop",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-1",
+            "projectionId": "16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234",
+            "terminal": "cancelled:player-stopped",
+            "entries": [
+              "qual-cast-1=EffectConfirmed;submitted=True;spend=True;free=False;detail=ResourceSpent:ResourceSpent:native-command-spend-completed",
+              "qual-cast-2=NotProcessed;submitted=False;spend=False;free=False;detail=NotProcessed:halted:cancelled"
+            ],
+            "transitions": [
+              "qual-cast-1:new-instance",
+              "qual-cast-2:absent"
+            ],
+            "availability": [
+              "qual-cast-1:6>5",
+              "qual-cast-2:1>1"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": true
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:stop-before:qual-cast-1#1;available=6;clock=721760750000;effects=[]",
+              "qual-cast-2:stop-before:qual-cast-2#2;available=1;clock=721760750000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:stop-after:qual-cast-1#3;available=5;clock=721789480000;effects=[a4742d7afde0f4f47b380abed025b219#-688071808@727185030000{}]",
+              "qual-cast-2:stop-after:qual-cast-2#4;available=1;clock=721789480000;slots=level-1|type-0|index-5:True;effects=[]"
+            ]
+          },
+          {
+            "name": "complete",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-2",
+            "projectionId": "ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e",
+            "terminal": "completed",
+            "entries": [
+              "qual-cast-1=Omitted;submitted=False;spend=False;free=False;detail=explicitly-disabled",
+              "qual-cast-2=EffectConfirmed;submitted=True;spend=True;free=False;detail=ResourceSpent:ResourceSpent:native-command-spend-completed"
+            ],
+            "transitions": [
+              "qual-cast-1:absent",
+              "qual-cast-2:new-instance"
+            ],
+            "availability": [
+              "qual-cast-1:6>6",
+              "qual-cast-2:1>0"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": false
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:complete-before:qual-cast-1#5;available=6;clock=721772470000;effects=[]",
+              "qual-cast-2:complete-before:qual-cast-2#6;available=1;clock=721772470000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:complete-after:qual-cast-1#7;available=6;clock=721800630000;effects=[]",
+              "qual-cast-2:complete-after:qual-cast-2#8;available=0;clock=721800630000;slots=level-1|type-0|index-5:False;effects=[a4742d7afde0f4f47b380abed025b219#1450183296@727196610000{}]"
+            ]
+          }
+        ],
+        "failures": [],
+        "violations": []
+      }
+    },
+    {
+      "runId": "wp1-71cce84-stop-instant-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-71cce84-stop-instant-01",
+      "commit": "71cce84b2b82c515db3dca35a5efd8adb61e31d7",
+      "packageSha256": "8d7d6c1239e4f212d60d94ef4aaf4045ac251e530d22d5741b9bceb80d492ee1",
+      "dllSha256": "67ddfda828396117491159a40587ebfb288303987f4afc3e3dca3cd79340c9cc",
+      "mvid": "85eaec3c-61be-4977-9750-7e3ccc62376b",
+      "status": "PASS",
+      "pass": 85,
+      "fail": 0,
+      "failedAssertions": [],
+      "processId": 7628,
+      "startedAtUtc": "2026-10-07T10:55:37.1526118Z",
+      "endedAtUtc": "2026-10-07T10:56:37.7084740Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_ADVANCED_WORKING",
+        "baselineSaveName": "KBP_ADVANCED_BASELINE",
+        "expectedGameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb",
+        "qualificationAllowance": "{\"schemaVersion\":5,\"kind\":\"kbp-casting-qualification\",\"runId\":\"wp1-71cce84-stop-instant-01\",\"sourceCommit\":\"71cce84b2b82c515db3dca35a5efd8adb61e31d7\",\"packageSha256\":\"8d7d6c1239e4f212d60d94ef4aaf4045ac251e530d22d5741b9bceb80d492ee1\",\"dllSha256\":\"67ddfda828396117491159a40587ebfb288303987f4afc3e3dca3cd79340c9cc\",\"assemblyMvid\":\"85eaec3c-61be-4977-9750-7e3ccc62376b\",\"fixtureGameId\":\"cb1f405d-0b0c-4281-8b76-3b4f3b690abb\",\"recipe\":\"stop-reload\",\"executionMode\":\"instant\",\"approvedProjectionIds\":[\"16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234\",\"ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e\"],\"maximumNativeSubmissions\":3,\"approvedBy\":\"Howie Reith\",\"authority\":\"Explicit WP1 task authorization dated 2026-10-07 for guarded disposable-fixture recovery reproduction; no release authorization\",\"compatibilityProfileId\":\"advanced-gunslinger-0136\",\"compatibilityIdentity\":\"088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7\",\"workingSaveSha256\":\"9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d\",\"purpose\":\"stop-reload casting-first qualification in instant mode (player Stop, same-process guarded WORKING reload, fresh second projection, effect and resource observations; no native retry)\"}\r\n",
+        "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+        "executionMode": "instant",
+        "expectedGameName": "Cleric",
+        "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+        "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+        "qualificationRecipe": "stop-reload",
+        "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-71cce84-stop-instant-01",
+        "scenario": "live-cast-qual",
+        "fixtureFamily": "Advanced",
+        "profileId": "advanced-gunslinger-0136",
+        "compatibilityIdentity": "088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7",
+        "advancedBindingManifest": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-backups\\advanced-fixture\\bootstrap-advanced-fixture-20260924-01\\fixture-manifest.json",
+        "fixture": {
+          "baselineFileName": "Manual_308_KBP_ADVANCED_BASELINE.zks",
+          "baselineSha256": "6b5b7ea0ee36aca4b5ad01dc585aae28062c6d10e0b77c844f0eaffd5d182f81",
+          "workingFileName": "Manual_309_KBP_ADVANCED_WORKING.zks",
+          "workingSha256": "9787613753f38abf08dceeac8f7a66a6b0b1a5cb28ee0a7cd8805f0f265f1e7d",
+          "gameId": "cb1f405d-0b0c-4281-8b76-3b4f3b690abb"
+        },
+        "gameResultStatus": "PASS",
+        "harnessSucceeded": true,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": true,
+        "completedAtUtc": "2026-10-07T10:56:45.7226749Z"
+      },
+      "hashes": {
+        "runtime-result.json": "699bbb357e43ea9598dfe2bf12ecdaad4c46db960764e72874c728b3704c17bf",
+        "run-completion.json": "72183ab4cc5bcfdd04d909790845649518d0ceaef11988069be0a7ce9b9981e5",
+        "qual-outcome.json": "cee8160de6860ef086e3fb0e39f053efd7e84678eba20021bd1976ca978728d2",
+        "protected-saves.json": "00834ea4c31d14e5257cc231e7850c748f253891b49e1097c6b189c0250c4ca9",
+        "orchestration.json": "10d1efb8b84358d53db65ca3a60a4faae126e2e8baaaae075ca0bd36c31704a3",
+        "runtime-request.json": "1b3aaef3da1cb0babd5c3972fe4c4bb336348ecea1cacb96af9925641b9adc06",
+        "saveload-chain-events.json": "7fd3335ffd5701fdd5c7b9d70430533772fc78d07367324c3007a34b8318e6ea"
+      },
+      "qualification": {
+        "recipe": "stop-reload",
+        "executionMode": "instant",
+        "terminalReason": "completed",
+        "runsStarted": 0,
+        "runsReported": 0,
+        "callbackFailure": null,
+        "recoveryReload": "passed=True;pid=7628;running=False;accepting=True;shutdown=;runs=1/1;pendingCompletion=False;completionOwners=1;sessionReport=run-1;campaign=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;sessionReused=True;hudRoots=1;subscriptions=1;loaded=gameId=cb1f405d-0b0c-4281-8b76-3b4f3b690abb;areaType=Kingmaker.Dungeon.Blueprints.BlueprintDungeonArea;sceneType=Kingmaker.EntitySystem.AreaPersistentState;partyCount=4;mainCharacterType=Kingmaker.EntitySystem.Entities.UnitReference;afterLoadCallback=True;loadGameCorrelated=True;writesObserved=False;elapsedMs=6124",
+        "lifecycleAfter": null,
+        "stopPress": "routine-press;handled=True;inFlight=True;pending=player-stopped",
+        "stopPressedInFlight": true,
+        "steps": [
+          {
+            "name": "stop",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-1",
+            "projectionId": "16fc546b9bc4231ce6fb9b1e0dac4a4ac62af8e1069bcc403f43f1278a285234",
+            "terminal": "cancelled:player-stopped",
+            "entries": [
+              "qual-cast-1=EffectConfirmed;submitted=True;spend=True;free=False;detail=EffectConfirmed:EffectConfirmed:expected-effects-observed;rule-success:True;umd-failed:False;spell-failed:False;spend-invoked:True;spend-failure:none;provider-direct:False;provider-status:none;provider-completion-failure:none;spend-owner:source-ability-data;available-before:6;available-after:5;strategy:DirectRuleCast;strategy-reason:ordinary-direct-rule-cast;carrier-guid:1eaf1020e82028d4db55e6e464269e00;delivery-guid:;resolution:known-spell:spellbook:0c21cfcab6ce4395bd4df330ab3cf715;source-ability-data:12318a80@1eaf1020e82028d4db55e6e464269e00;execution-ability-data:12318a80@1eaf1020e82028d4db55e6e464269e00;rule-cast-submitted:true;expected-effects:a4742d7afde0f4f47b380abed025b219;targets:4b44c129-c40b-4f77-84fc-cb671ca034fe;carrier-command-created:false;delivery-command-created:false;effects-observed-at-submit:False;transaction-complete:True;transaction-state:ordinary-rule-cast-settled;cleanup-complete:True;cleanup-state:ordinary-rule-cast-settled",
+              "qual-cast-2=NotProcessed;submitted=False;spend=False;free=False;detail=NotProcessed:halted:cancelled"
+            ],
+            "transitions": [
+              "qual-cast-1:new-instance",
+              "qual-cast-2:absent"
+            ],
+            "availability": [
+              "qual-cast-1:6>5",
+              "qual-cast-2:1>1"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": true
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:stop-before:qual-cast-1#1;available=6;clock=721760390000;effects=[]",
+              "qual-cast-2:stop-before:qual-cast-2#2;available=1;clock=721760390000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:stop-after:qual-cast-1#3;available=5;clock=721761810000;effects=[a4742d7afde0f4f47b380abed025b219#-1342771328@727161190000{}]",
+              "qual-cast-2:stop-after:qual-cast-2#4;available=1;clock=721761810000;slots=level-1|type-0|index-5:True;effects=[]"
+            ]
+          },
+          {
+            "name": "complete",
+            "applyAllowed": true,
+            "applyReason": "run-started:run-2",
+            "projectionId": "ae707cae600c3f4d3812074d1dffcae54eef087ff203dceb2e7032d22608064e",
+            "terminal": "completed",
+            "entries": [
+              "qual-cast-1=Omitted;submitted=False;spend=False;free=False;detail=explicitly-disabled",
+              "qual-cast-2=EffectConfirmed;submitted=True;spend=True;free=False;detail=EffectConfirmed:EffectConfirmed:expected-effects-observed;rule-success:True;umd-failed:False;spell-failed:False;spend-invoked:True;spend-failure:none;provider-direct:False;provider-status:none;provider-completion-failure:none;spend-owner:source-ability-data;available-before:1;available-after:0;strategy:DirectRuleCast;strategy-reason:ordinary-direct-rule-cast;carrier-guid:1eaf1020e82028d4db55e6e464269e00;delivery-guid:;resolution:reserved-memorized-slot:level-1|type-0|index-5;source-ability-data:83a03980@1eaf1020e82028d4db55e6e464269e00;execution-ability-data:83a03980@1eaf1020e82028d4db55e6e464269e00;rule-cast-submitted:true;expected-effects:a4742d7afde0f4f47b380abed025b219;targets:4ecca5cc-8530-4f25-91dd-3ff0fbc1a274;carrier-command-created:false;delivery-command-created:false;effects-observed-at-submit:False;transaction-complete:True;transaction-state:ordinary-rule-cast-settled;cleanup-complete:True;cleanup-state:ordinary-rule-cast-settled"
+            ],
+            "transitions": [
+              "qual-cast-1:absent",
+              "qual-cast-2:new-instance"
+            ],
+            "availability": [
+              "qual-cast-1:6>6",
+              "qual-cast-2:1>0"
+            ],
+            "tokens": [
+              {
+                "castingId": "qual-cast-2",
+                "tokenId": "level-1|type-0|index-5",
+                "before": true,
+                "after": false
+              }
+            ],
+            "unreadTokenCastings": [],
+            "cleanupFailures": [],
+            "caster": null,
+            "modifiers": [],
+            "remainingSeconds": [],
+            "observations": [
+              "qual-cast-1:complete-before:qual-cast-1#5;available=6;clock=721772290000;effects=[]",
+              "qual-cast-2:complete-before:qual-cast-2#6;available=1;clock=721772290000;slots=level-1|type-0|index-5:True;effects=[]",
+              "qual-cast-1:complete-after:qual-cast-1#7;available=6;clock=721773320000;effects=[]",
+              "qual-cast-2:complete-after:qual-cast-2#8;available=0;clock=721773320000;slots=level-1|type-0|index-5:False;effects=[a4742d7afde0f4f47b380abed025b219#560307840@727173090000{}]"
+            ]
+          }
+        ],
+        "failures": [],
+        "violations": []
+      }
+    },
+    {
+      "runId": "wp1-71cce84-stop-select-01",
+      "evidencePath": "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\wp1-71cce84-stop-select-01",
+      "commit": "71cce84b2b82c515db3dca35a5efd8adb61e31d7",
+      "packageSha256": "8d7d6c1239e4f212d60d94ef4aaf4045ac251e530d22d5741b9bceb80d492ee1",
+      "dllSha256": "67ddfda828396117491159a40587ebfb288303987f4afc3e3dca3cd79340c9cc",
+      "mvid": "85eaec3c-61be-4977-9750-7e3ccc62376b",
+      "status": "FAIL",
+      "pass": 83,
+      "fail": 2,
+      "failedAssertions": [
+        {
+          "id": "qualification-selection",
+          "expected": "recipe selected;2 forecast steps",
+          "observed": "no-eligible-qualification-recipe",
+          "status": "FAIL"
+        },
+        {
+          "id": "qualification-selection-only-no-dispatch",
+          "expected": "no boundary;no run",
+          "observed": "select:selection-refused:no-eligible-qualification-recipe|selection:no-eligible-qualification-recipe|forecast-incomplete;qualificationRuns=0",
+          "status": "FAIL"
+        }
+      ],
+      "processId": 19972,
+      "startedAtUtc": "2026-10-07T10:42:41.5960132Z",
+      "endedAtUtc": "2026-10-07T10:43:37.3499797Z",
+      "requestParameters": {
+        "workingSaveName": "KBP_AUTOMATION_WORKING",
+        "baselineSaveName": "KBP_AUTOMATION_BASELINE",
+        "expectedGameId": "df33d1ff-4ec8-4707-bfa0-5e059bf9a049",
+        "workingFileName": "Manual_305_KBP_AUTOMATION_WORKING.zks",
+        "executionMode": "instant",
+        "expectedGameName": "Hedwirg",
+        "baselineFileName": "Manual_304_KBP_AUTOMATION_BASELINE.zks",
+        "baselineSha256": "f13de02d7c59a70a34d335a413f0d90fc7e63cdcb327224ecf5885ed6e1f8300",
+        "qualificationRecipe": "stop-reload",
+        "workingSha256": "eded233c784fd658ddf2c46b2b54d5a310c39bff62506f0324b0f35c045bbec7"
+      },
+      "completion": {
+        "schemaVersion": 1,
+        "runId": "wp1-71cce84-stop-select-01",
+        "scenario": "live-cast-qual-select",
+        "fixtureFamily": "Automation",
+        "profileId": "full-user",
+        "compatibilityIdentity": "c9a1664ca57e1bbe8b7b9f193a4f4633bd80498bdfcb2a636aa6a37ea110ca43",
+        "advancedBindingManifest": null,
+        "fixture": {
+          "baselineFileName": "Manual_304_KBP_AUTOMATION_BASELINE.zks",
+          "baselineSha256": "f13de02d7c59a70a34d335a413f0d90fc7e63cdcb327224ecf5885ed6e1f8300",
+          "workingFileName": "Manual_305_KBP_AUTOMATION_WORKING.zks",
+          "workingSha256": "eded233c784fd658ddf2c46b2b54d5a310c39bff62506f0324b0f35c045bbec7",
+          "gameId": "df33d1ff-4ec8-4707-bfa0-5e059bf9a049"
+        },
+        "gameResultStatus": "FAIL",
+        "harnessSucceeded": false,
+        "kingmakerExited": true,
+        "restorationVerified": true,
+        "restorationFailure": null,
+        "protectedSavesApplicable": true,
+        "protectedSavesCompared": true,
+        "protectedSavesClean": true,
+        "manualRehearsal": false,
+        "complete": false,
+        "completedAtUtc": "2026-10-07T10:43:45.9036530Z"
+      },
+      "hashes": {
+        "runtime-result.json": "260baf939a223751c7fa5146ab6472e1027f70b87c17432c03f17243507cd340",
+        "run-completion.json": "eed0421970cf3b7de860471d5132a68b723bb5f9bc74f161d476473d9269466a",
+        "qual-outcome.json": "88e6a373414a385144e7a21728b65f76e507b24f20769b9cc62a4c1459111d9f",
+        "protected-saves.json": "aa9940459eab55cdf5911ee6ac4fa4a745a2aa0dc31b2d8bdff49c7724b19aac",
+        "orchestration.json": "8dc7329a1aaf3073cc86e717e06e1ebae110a781464d0e38aee7e49f8de1481e",
+        "runtime-request.json": "89950462138be0275ab503d8cd6455b47c182915177dd4a9ffee8c723019dd54",
+        "saveload-chain-events.json": "50a792a8b0443d396607f6bdc5ab9152036c1ff75ebf441c6c0b16b9682420cd"
+      },
+      "qualification": {
+        "recipe": "stop-reload",
+        "executionMode": null,
+        "terminalReason": "failed:select",
+        "runsStarted": 0,
+        "runsReported": 0,
+        "callbackFailure": null,
+        "recoveryReload": null,
+        "lifecycleAfter": null,
+        "stopPress": null,
+        "stopPressedInFlight": null,
+        "steps": [],
+        "failures": [
+          "select:selection-refused:no-eligible-qualification-recipe"
+        ],
+        "violations": [
+          "select:selection-refused:no-eligible-qualification-recipe",
+          "selection:no-eligible-qualification-recipe",
+          "forecast-incomplete"
+        ]
+      }
+    }
+  ],
+  "closedAtUtc": "2026-10-07T12:39:58.700Z",
+  "ownerCloseout": {
+    "reason": "Owner tested again, reports the problem is no longer present, and asks to let it go unless a new problem was discovered.",
+    "clarification": {
+      "executionModes": [
+        "instant",
+        "animated"
+      ],
+      "interruption": "quickload key during casting",
+      "probableModifiers": [
+        "Share Transmutation",
+        "rods"
+      ]
+    },
+    "noNewProductDefectDemonstrated": true,
+    "candidateOwnerAccepted": false,
+    "testedOwnerArtifact": "not specified",
+    "investigationStopped": true,
+    "productionRecoveryRepair": false
+  },
+  "sourceGate": {
+    "command": ".\\scripts\\Test-SourceOnly.ps1",
+    "commit": "4480e1529532321f82e639349e40a4145da75a34",
+    "status": "INTERRUPTED_BY_OWNER",
+    "exitCode": 1,
+    "stoppedProcessId": 10504,
+    "logPath": "C:\\Dev\\KingmakerBuffPlannerLab\\repo\\KingmakerBuffPlanner-WP1\\artifacts\\wp1-4480e15-source-gate.log",
+    "sha256": "d99d58f3ec30772429e8cb696c3997bf4a90165b13aadcf55fffaed7afc0ae47",
+    "completedStages": [
+      {
+        "gate": "Source validation",
+        "pass": 42,
+        "fail": 0
+      },
+      {
+        "gate": "Protocol tests",
+        "pass": 406,
+        "fail": 0
+      },
+      {
+        "gate": "Runtime harness filesystem tests",
+        "pass": 38,
+        "fail": 0
+      }
+    ],
+    "completeCurrentSourceQualification": false,
+    "reason": "Owner ended investigation while the source-only gate was hashing the deployment WhatIf purity snapshot; no live operation or child process was active."
+  },
+  "earlierSafetyGate": {
+    "path": "C:\\Dev\\KingmakerBuffPlannerLab\\repo\\KingmakerBuffPlanner-WP1\\artifacts\\wp1-baseline-source-gate.log",
+    "sha256": "07d3c852a9b6058d57b75c614140e4e3923b349afda0b8535e4cd0a1f13cd5e1",
+    "status": "completed; zero failures",
+    "limitation": "Started before diagnostic changes; its initial compiled protocol total was 398. It is not the complete gate for final candidate 4480e15."
+  },
+  "focusedEvidence": [
+    {
+      "path": "C:\\Dev\\KingmakerBuffPlannerLab\\repo\\KingmakerBuffPlanner-WP1\\artifacts\\wp1-4480e15-protocol.log",
+      "sha256": "32579ec814e20006ed0717fda1976f063c763cf87bbee42e8905562d08207337"
+    },
+    {
+      "path": "C:\\Dev\\KingmakerBuffPlannerLab\\repo\\KingmakerBuffPlanner-WP1\\artifacts\\wp1-4480e15-build.log",
+      "sha256": "fc1650a9dd6bfe467f971e742debf0dec32e71393909778281161dd20f748e1d"
+    },
+    {
+      "path": "C:\\Dev\\KingmakerBuffPlannerLab\\repo\\KingmakerBuffPlanner-WP1\\artifacts\\wp1-uncertain-cleanup-red.log",
+      "sha256": "bf33c48d1cc5b87b2bf14926d7194747e524d73f34939c5fd646dc620d148f7b"
+    },
+    {
+      "path": "C:\\Dev\\KingmakerBuffPlannerLab\\repo\\KingmakerBuffPlanner-WP1\\artifacts\\wp1-uncertain-cleanup-green.log",
+      "sha256": "4721152cdebdacf483f8ab1ff7f5292be9db107fce43d1086e62c5fec4a7ea69"
+    },
+    {
+      "path": "C:\\Dev\\KingmakerBuffPlannerLab\\repo\\KingmakerBuffPlanner-WP1\\artifacts\\wp1-animated-cancel-red.log",
+      "sha256": "a32b8f51cb7965c442e94af2b9eb0bd900f244bd1415319012842764e497008e"
+    },
+    {
+      "path": "C:\\Dev\\KingmakerBuffPlannerLab\\repo\\KingmakerBuffPlanner-WP1\\artifacts\\wp1-animated-cancel-green.log",
+      "sha256": "32579ec814e20006ed0717fda1976f063c763cf87bbee42e8905562d08207337"
+    },
+    {
+      "path": "C:\\Dev\\KingmakerBuffPlannerLab\\repo\\KingmakerBuffPlanner-WP1\\artifacts\\wp1-quickload-contracts.log",
+      "sha256": "40ebe426707bc9e79bb63874e1d9959df49f7384320cd652f1c842233c1a2f4b"
+    }
+  ],
+  "commits": [
+    "27cfc4b72c86165bd1010c32a880f9da33f7c540 test: add guarded same-process stop and reload reproduction",
+    "8c75d4834ba6a923127477fb386749ab9e812aaa test: trace guarded reload during an active casting",
+    "23b2f1e7055665ee3b2c9a7a62ad56ad055ebc19 chore: guard pushes for the owner-named recovery branch",
+    "f343fbe114138c5955d838e5a7aaad715c8928e9 test: reproduce recovery through the owned HUD routine path",
+    "71cce84b2b82c515db3dca35a5efd8adb61e31d7 test: reject uncertain cleanup in reload qualification",
+    "4480e1529532321f82e639349e40a4145da75a34 test: distinguish owned animated cancellation from cleanup failure"
+  ]
+}

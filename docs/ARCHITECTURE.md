@@ -1,5 +1,9 @@
 # Architecture
 
+## 2026-10-07 WP1 closed at owner request
+
+WP1 added narrowly guarded runtime reproduction/evidence through the existing root-owned session, serial host and exact allowance. Ordinary lifecycle/cleanup/discovery rules remain unchanged; Stop, temporary unload Cancel and deliberate Shutdown are distinct owners' transitions. The owner reports the issue no longer occurs; investigation closed without a product repair. [Diagnosis/ownership/limits](INTERRUPTED-RUN-RELOAD-RECOVERY.md).
+
 ## 2026-09-06 failed human validation: routing diagnosis
 
 Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.

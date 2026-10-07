@@ -1,5 +1,9 @@
 # Windows Autonomous Runtime Testing
 
+## 2026-10-07 WP1 closed at owner request
+
+Exact recipes `stop-reload` and `cancel-reload` use the existing live-cast-qual selection/allowance protocol, root-owned session/host, installed HUD pointer entry and read-only WORKING reload. The final chains bound approved Advanced/profile identities and ran interruption, reload and second real cast in one process; unknown cleanup refuses a second request. Direct guarded Game.LoadGame does not qualify physical quickload selection. Owner closed the investigation; no additional runtime work is scheduled. [Evidence/guard scope/NOT RUN](INTERRUPTED-RUN-RELOAD-RECOVERY.md).
+
 Status: IN PROGRESS
 
 Runtime testing is an explicit, source-controlled request/result protocol plus a transactional external orchestrator. Ordinary game launches cannot activate it.

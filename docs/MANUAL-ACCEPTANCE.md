@@ -1,5 +1,9 @@
 # Manual Acceptance
 
+## 2026-10-07 WP1 closed at owner request
+
+The owner retested and reports the issue no longer occurs. No further owner trial is needed for this closed investigation; no candidate owner-acceptance claim is made because its tested artifact was not identified. If it returns, preserve the exact quickload-during-cast sequence, mode, Share/rod intent and UMM log, using only a proven disposable target. [Closeout and future reproduction](INTERRUPTED-RUN-RELOAD-RECOVERY.md).
+
 ## 2026-09-06 failed human validation: routing diagnosis
 
 Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.
