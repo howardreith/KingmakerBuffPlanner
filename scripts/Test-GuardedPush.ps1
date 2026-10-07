@@ -7,7 +7,7 @@ $ErrorActionPreference = 'Stop'
 
 $root = Get-KbpRepositoryRoot
 $lab = Split-Path -Parent (Split-Path -Parent $root)
-$helper = Join-Path $lab 'codex-policy\Push-KingmakerBuffPlanner.ps1'
+$helper = Join-Path $PSScriptRoot 'Push-KingmakerBuffPlanner.ps1'
 if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) {
     throw "Guarded push helper is missing: $helper"
 }
@@ -22,7 +22,7 @@ foreach ($marker in $required) {
 }
 $beforeHead = (& git -C $root rev-parse HEAD).Trim()
 $beforeStatus = @(& git -C $root status --porcelain)
-$output = @(& $helper -WhatIf -Confirm:$false)
+$output = @(& $helper -RepositoryRoot $root -WhatIf -Confirm:$false)
 $afterHead = (& git -C $root rev-parse HEAD).Trim()
 $afterStatus = @(& git -C $root status --porcelain)
 if ($beforeHead -cne $afterHead -or ($beforeStatus -join "`n") -cne ($afterStatus -join "`n")) {
