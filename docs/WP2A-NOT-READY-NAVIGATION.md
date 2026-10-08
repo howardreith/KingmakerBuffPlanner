@@ -254,3 +254,64 @@ zero failures, rebuild the clean candidate, repeat the physical blocked-only
 scenario at the next measured eligible idle window, verify all restoration
 and protected saves, then record/push the final evidence. No other package,
 PR, merge, tag, release or permanent installation.
+
+## Checkpoint: shared-lab qualification overlap, 2026-10-08
+
+Branch codex/kbp-not-ready-deep-linking-2026-10-07; exact HEAD before this
+documentation checkpoint 0d730845cb17e81a8279f405d11b0fd3f639ee68;
+version 0.3.0; remote main remains b707c1f47859f2ecae517b2cd162d20ca18c7583.
+The tracked worktree was clean and the focused remote matched HEAD at the
+continuation audit. No Work Package 1 changes or other work package.
+
+Command: scripts/Test-SourceOnly.ps1 under Windows PowerShell 5.1.
+Gate 6 (artifacts/wp2a-source-gate-6.log) was interrupted, wrapper exit
+1073807364, during launcher archive purity; the gate did not complete.
+Gates 7 and 8 (matching numbered logs) each passed source 42 / C# 413,
+then refused a foreign Kingmaker process and exited 1.
+Gate 9 (artifacts/wp2a-source-gate-9.log) passed source 42 / C# 413 /
+filesystem 38 / problem evidence 23 / package 4, then deployment WhatIf
+refused foreign Kingmaker PID 11240; exit 1. No compiler warnings.
+These are incomplete qualification attempts, not full-gate passes.
+
+The unchanged full gate previously passed at clean 783af83 with suite
+PASS=1 FAIL=0 (artifacts/wp2a-source-gate-5.log). Its archive checks read
+eight snapshots, about 322 GiB, in approximately six hours. The Gunslinger
+lab's repeated launches make brief idle gaps inadequate. No assertion,
+archive target, safety policy or ownership control was weakened.
+
+Current prerequisite build on clean 0d73084:
+artifacts/wp2a-prerequisite-build-0d73084.log;
+source PASS=42 FAIL=0 / build PASS=1 FAIL=0 /
+package PASS=4 FAIL=0 / local build PASS=1 FAIL=0.
+ZIP 842999863887d09b329c335196986dc6d299ae56486655bf0d2825dc4b1fc77f;
+DLL e78d0df1fb566d4dfa3edb6060d07f08455b6ebe86143264b6389808635c9a0f;
+MVID a7ae5eb7-d2ad-4b2c-ab36-25f1a1db3a15.
+Manifest: artifacts/local-runtime/0.3.0/
+KingmakerBuffPlanner-0.3.0-local-runtime.zip.build-local.json.
+This prerequisite is not the final post-gate candidate.
+
+The earlier physical run and its original failed outer completion are
+preserved under C:/Dev/KingmakerBuffPlannerLab/runtime-evidence/
+wp2a-783af83-problems-01/. Its game PASS, actual visible card/reason/
+Problem 1 of 2, physical Next/Previous/Escape, exact intent/profile equality,
+zero dispatch and unchanged native signatures remain evidence. The
+corrected independent recheck passed; the failed completion was not edited.
+Restoration verified and protected saves compared clean. Continuation
+audit found every planner deployment transaction Restored (399).
+No new physical trial or live deployment occurred during these overlaps.
+
+Rejected assumption: a short gap between foreign trials is enough for
+the full archival purity gate. Uncertainty: when the other lab will finish,
+and whether fresh complete orchestration will pass on the corrected
+verifier. The owner's instruction remains "Use the next idle window".
+
+Exact next action: preserve both labs' legitimate state; wait for sustained
+quiet without foreign ownership; build a clean prerequisite for the
+documented HEAD; complete unchanged Test-SourceOnly with zero failures;
+build the final clean candidate and record its exact identity; run the
+guarded blocked-only physical scenario after measured input idle >=180s;
+verify actual visibility, no native effects or debits, complete outer
+orchestration, exact restoration and protected saves; record final evidence
+and guarded-push the clean branch. No PR/merge/tag/release, permanent
+installation or later work package. Current runtime qualification remains
+pending.
