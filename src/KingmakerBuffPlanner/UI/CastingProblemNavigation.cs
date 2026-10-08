@@ -152,7 +152,13 @@ namespace KingmakerBuffPlanner.UI
                         new WorkspaceApplyResult(false, string.Join(",", gate.BlockingReasons), gate, null)));
                 return;
             }
-            if (moved) FocusCurrentProblem();
+            // A retained blocker still owns its inspector. Explicit manual
+            // operations leave problem mode before changing focus; recover
+            // a lost focus defensively through the canonical boundary.
+            bool focusLost = !string.Equals(EditingFocusCastingId,
+                ProblemNavigation.Current.CastingId, StringComparison.Ordinal);
+            if (focusLost) ProblemNavigation.RequestReveal();
+            if (moved || focusLost) FocusCurrentProblem();
             else RecordAttempt(CastingRunPresentation.DescribeProblem(this));
         }
     }

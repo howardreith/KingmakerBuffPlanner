@@ -1,43 +1,37 @@
-# Autonomous blockers — WP2A, 2026-10-08
+# Autonomous blockers — WP2A review correction, 2026-10-08
 
-External qualification blocker: the Gunslinger lab is repeatedly holding
+P2 focus-ownership and P3 group-origin review corrections are implemented and
+regressed. Duplicate/Reload exit mode; refresh restores a lost active focus
+through FocusGraphCasting and requests one reveal. Known origins are named.
+Focused PASS=20 FAIL=0; complete C# PASS=418 FAIL=0; no compiler warnings.
+Exact pre-correction HEAD 8d4e4f3c6f9810a1b02606f82bf1722f5256b9cf;
+branch codex/kbp-not-ready-deep-linking-2026-10-07; version stays 0.3.0.
+Production changes require a new complete gate and fresh runtime trial.
+
+External qualification blocker: the Gunslinger lab repeatedly holds
 C:/Dev/KingmakerGunslingerLab/compatibility-state/compatibility.lock and
-launching Kingmaker against the shared installation. The unchanged complete
-source/mechanical gate safely refused those overlaps. It cannot finish
-until a sustained quiet installation window is available.
+launches Kingmaker against the shared installation. At 18:27 UTC PID 17384
+was active. The unchanged complete source/mechanical gate cannot finish
+until a sustained quiet installation window is available. Its prior archive
+checks took about six hours. Gate 10 passed source 42 / C# 413 / filesystem
+38 / evidence 23 / package 4, then refused foreign PID 5420 (exit 1).
+Do not restart the full gate between brief launch gaps.
 
-Exact HEAD before this documentation checkpoint:
-f031f87e71aca99c09118495b9659e24bdcaace1; version 0.3.0.
-The previous full source gate passed on 783af83. Production C# is unchanged
-between that commit and f031f87. The current full gate remains incomplete;
-focused tests and the corrected independent evidence checks pass.
+Prior physical UI evidence is positive and independently rechecked, but its
+original outer completion is FAILED and preserved. Fresh fully successful
+candidate-bound orchestration is mandatory. Its prior installation was
+restored and protected saves compared clean; all 399 own deployment
+transactions were Restored at the preceding audit. This correction has made
+no new live deployment/input or save mutation.
 
-No production defect is pending. The first physical UI record is positive
-and independently rechecked, but its original outer completion failed on
-evidence-reader contracts and remains failed. A fresh fully successful
-candidate-bound run is mandatory. Its prior installation was restored and
-protected saves compared clean. Continuation audit: all 399 planner
-deployment transactions are Restored.
+Do not seize the foreign lease, stop foreign processes, relax archive purity,
+bypass measured input idle >=180 seconds or mutate protected saves. Owner
+instructed "Use the next idle window"; no repeated permission is needed.
+Wait for the other lab to finish or for owner coordination in that session.
 
-Do not seize the foreign lease, stop foreign game processes, relax archive
-purity, bypass the 180-second desktop idle policy, or mutate protected saves.
-The owner authorized the next eligible idle window; no repeated permission
-request is required. A timing/coordination question is pending, and the safe
-default is to wait for the other lab to finish.
-
-The owned guarded push helper permits the authorized focused branch and
-passed its six checks. The branch is pushed; no PR/merge/tag/release exists.
-Linked-worktree writes use authorized reviewed escalated calls.
-
-Next action and exact evidence:
-docs/WP2A-NOT-READY-NAVIGATION.md and AUTONOMOUS-RESUME.md.
-
-Latest attempt: gate 10 began on clean f031f87 after twenty quiet minutes.
-Source 42 / C# 413 / filesystem 38 / evidence 23 / package 4 passed;
-the deployment guard then refused foreign Kingmaker PID 5420, exit 1.
-Foreign lease: runtime-20261008T163555Z-c8ea60b6503940a6b04467deafc9d927.
-Evidence: artifacts/wp2a-source-gate-10.log and its start.json.
-Twenty quiet minutes did not establish a sustained window. Do not restart
-the entire gate between further gaps. Wait for the other lab to finish
-or for owner coordination in that lab's own session. No foreign action was
-taken and no new WP2A deployment or physical trial occurred.
+Next: clean correction commit and guarded push, clean prerequisite build,
+sustained quiet window, complete unchanged gate, final exact candidate build,
+fresh guarded HUD trial, restoration/protected-save verification and evidence.
+No PR/merge/tag/release, permanent install or later work package.
+Exact commands/evidence: docs/WP2A-NOT-READY-NAVIGATION.md and
+AUTONOMOUS-RESUME.md. Linked-worktree writes use authorized reviewed calls.

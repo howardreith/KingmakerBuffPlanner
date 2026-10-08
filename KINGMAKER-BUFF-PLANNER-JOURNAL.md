@@ -2879,3 +2879,28 @@ scenario after measured desktop input idle >=180 seconds, verify actual
 visibility and complete outer orchestration, restore/reconcile/protect
 saves, record evidence and guarded-push. No PR, merge, tag, release,
 permanent install or later work package.
+
+## WP2A review correction — 2026-10-08
+
+Branch codex/kbp-not-ready-deep-linking-2026-10-07; pre-correction HEAD
+8d4e4f3c6f9810a1b02606f82bf1722f5256b9cf; version 0.3.0, no version bump.
+Fixed reviewed P2 focus divergence: Duplicate and Reload leave problem mode;
+refresh defensively restores a lost active problem focus through the canonical
+FocusGraphCasting boundary and requests a single reveal. Fixed P3 wording:
+known group origins are named; genuinely unresolved origins remain "group".
+
+Five new real-service/temp-file regressions failed against the previous
+production code (focused PASS=15 FAIL=5); final focused PASS=20 FAIL=0,
+complete C# PASS=418 FAIL=0. No compiler warnings. Duplicate retains existing
+autosave and one Undo operation; navigation adds no edit or write. Exact
+commands, failures, evidence, rejected test assumption and full diff review
+are in docs/WP2A-NOT-READY-NAVIGATION.md's engineering-review checkpoint.
+
+Implemented and regressed, qualification pending. Production C# has changed,
+so the old 783af83 complete gate does not qualify this correction. The other
+lab still owns Kingmaker (18:27 UTC, PID 17384). No new live deployment/input
+or save mutation; prior restoration and original failed outer completion
+preserved. Next: clean commit/guarded push, clean prerequisite build, sustained
+quiet window, unchanged full gate, final identity-bound build and fresh guarded
+HUD trial, restore/protect saves and record evidence. No foreign interference,
+PR/merge/tag/release/permanent install or later work package.

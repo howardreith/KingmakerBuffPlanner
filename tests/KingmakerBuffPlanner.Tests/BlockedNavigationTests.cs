@@ -29,6 +29,11 @@ namespace KingmakerBuffPlanner.Tests
             Run("blocked-navigation-preserves-existing-undo-entry", () => TestProblemExistingUndo(root));
             Run("blocked-navigation-global-refresh-failure-clears-stale-focus", () => TestProblemGlobalRefresh(root));
             Run("blocked-navigation-unavailable-source-keeps-reveal-targets", () => TestProblemUnavailableSource(root));
+            Run("blocked-navigation-duplicate-current-problem-leaves-mode", () => TestProblemDuplicateExit(root));
+            Run("blocked-navigation-reload-same-blocker-leaves-mode", () => TestProblemReloadExit(root, false));
+            Run("blocked-navigation-reload-different-blockers-leaves-mode", () => TestProblemReloadExit(root, true));
+            Run("blocked-navigation-active-inspector-focus-invariant", () => TestProblemFocusInvariant(root));
+            Run("blocked-navigation-group-summary-identifies-known-origin", () => TestProblemOriginSummary(root));
         }
 
         private static PlannedCasting ProblemCasting(string id, int order,
@@ -145,6 +150,163 @@ namespace KingmakerBuffPlanner.Tests
             Expect(session.DocumentIntentSignature() == signature && ProblemFiles(dir) == files &&
                 !session.CanUndo && session.ReviewStatusFor("long") == review &&
                 dispatch.RecordedSubmissions.Count == 0, "inspection authored, saved, authorized or dispatched");
+        }
+
+        private static void TestProblemDuplicateExit(string root)
+        {
+            string dir;
+            var dispatch = new DisabledCastingDispatchBoundary();
+            CastingWorkspaceSession session = ProblemSession(root, "duplicate-problem",
+                new[] { ProblemCasting("original", 0) }, out dir, dispatch);
+            CastingWorkspaceInputs inputs = GraphInputs();
+            session.Apply(CastingApplyMode.Ordinary, "long", inputs);
+            session.ProblemNavigation.CompleteReveal("original");
+            string originalIntent = session.DocumentIntentSignature();
+            string files = ProblemFiles(dir);
+            CastingGraphEditResult duplicate = session.DuplicateFocusedCasting();
+            Expect(duplicate.Edit.Applied && duplicate.CastingId != "original",
+                "the real duplicate authoring operation failed");
+            Expect(!session.ProblemNavigation.Active &&
+                session.ProblemNavigation.PendingRevealCastingId == null &&
+                session.LastAttemptMessage == null,
+                "duplicating a problem retained navigation for the original");
+            string duplicatedFiles = ProblemFiles(dir);
+            Expect(duplicatedFiles != files && !session.IsDirty && session.CanUndo &&
+                new CastingWorkspaceSession(dir, session.CampaignId).DocumentIntentSignature() ==
+                    session.DocumentIntentSignature(),
+                "the duplicate did not preserve its existing authoring/autosave behavior");
+            CastingGraphView view = session.BuildGraph(inputs);
+            Expect(view.FocusedCastingId == duplicate.CastingId &&
+                view.Inspector.CastingId == duplicate.CastingId &&
+                view.SelectedRoutineGate.BlockingCastings.Any(value => value.CastingId == "original"),
+                "duplicate inspection was lost or the original blocker disappeared");
+            Expect(ProblemFiles(dir) == duplicatedFiles && session.CanUndo &&
+                dispatch.RecordedSubmissions.Count == 0,
+                "duplicate inspection saved, dispatched or lost its authored Undo entry");
+            Expect(session.Undo() && session.DocumentIntentSignature() == originalIntent && !session.CanUndo,
+                "leaving problem mode added an authoring operation beyond the duplicate");
+        }
+
+        private static void TestProblemReloadExit(string root, bool different)
+        {
+            string dir;
+            var dispatch = new DisabledCastingDispatchBoundary();
+            CastingWorkspaceSession session = ProblemSession(root, "reload-problem-" + different,
+                new[] { ProblemCasting("original", 0) }, out dir, dispatch);
+            CastingWorkspaceInputs inputs = GraphInputs();
+            session.Apply(CastingApplyMode.Ordinary, "long", inputs);
+            session.ProblemNavigation.CompleteReveal("original");
+            if (different)
+            {
+                var authoring = new CastingAuthoringService(session.Document);
+                Expect(authoring.RemoveCasting("original").Applied, "replacement removal failed");
+                Expect(authoring.AddCasting(ProblemCasting("replacement", 0, source: GraphSourceB)).Applied,
+                    "replacement authoring failed");
+                Expect(authoring.AddCasting(ProblemCasting("another", 1, source: GraphSourceD)).Applied,
+                    "second replacement authoring failed");
+                new CastingPlanRepository(dir).Save(CastingPlanProfile.FromDocument(authoring.Document));
+            }
+            string storedIntent = new CastingWorkspaceSession(dir, session.CampaignId).DocumentIntentSignature();
+            string files = ProblemFiles(dir);
+            Expect(session.Reload() == CastingPlanLoadStatus.Loaded, "real stored plan did not reload");
+            Expect(!session.ProblemNavigation.Active &&
+                session.ProblemNavigation.PendingRevealCastingId == null &&
+                session.EditingFocusCastingId == null && session.LastAttemptMessage == null,
+                "reload retained navigation owned by the replaced document");
+            for (int refresh = 0; refresh < 2; refresh++)
+            {
+                CastingGraphView view = session.BuildGraph(inputs);
+                Expect(!session.ProblemNavigation.Active && view.FocusedCastingId == null &&
+                    view.Inspector == null && view.SelectedRoutineGate.BlockingCastings.Count == (different ? 2 : 1),
+                    "a refresh restored stale problem navigation after reload");
+            }
+            Expect(session.DocumentIntentSignature() == storedIntent && !session.IsDirty &&
+                !session.CanUndo && ProblemFiles(dir) == files && dispatch.RecordedSubmissions.Count == 0,
+                "reload navigation authored, saved or dispatched");
+            session.Apply(CastingApplyMode.Ordinary, "long", inputs);
+            Expect(session.ProblemNavigation.Active &&
+                session.EditingFocusCastingId == (different ? "replacement" : "original") &&
+                session.ProblemNavigation.Position == 1,
+                "a fresh Run after reload did not enter the current blocker set");
+        }
+
+        private static void TestProblemFocusInvariant(string root)
+        {
+            foreach (bool missingFocus in new[] { false, true })
+            {
+                string dir;
+                var dispatch = new DisabledCastingDispatchBoundary();
+                CastingWorkspaceSession session = ProblemSession(root, "focus-invariant-" + missingFocus,
+                    new[] { ProblemCasting("first", 0, source: GraphSourceB),
+                        ProblemCasting("other", 1) }, out dir, dispatch);
+                CastingWorkspaceInputs inputs = GraphInputs();
+                WorkspaceApplyResult refusal = session.Apply(CastingApplyMode.Ordinary, "long", inputs);
+                if (missingFocus) session.ClearGraphFocus();
+                else session.FocusGraphCasting("other");
+                // Exercise a future caller's retained transient navigator
+                // with a missing/wrong inspector, using the real gate result.
+                session.ProblemNavigation.Begin(refusal.GateDecision);
+                session.ProblemNavigation.CompleteReveal("first");
+                string signature = session.DocumentIntentSignature();
+                string files = ProblemFiles(dir);
+                CastingReviewStatus review = session.ReviewStatusFor("long");
+                CastingGraphView view = session.BuildGraph(inputs);
+                Expect(session.ProblemNavigation.Active &&
+                    session.ProblemNavigation.Current.CastingId == session.EditingFocusCastingId &&
+                    view.Inspector.CastingId == session.EditingFocusCastingId &&
+                    view.FocusedCastingId == "first" && view.SelectedSourceId == GraphSourceB &&
+                    session.ProblemNavigation.PendingRevealCastingId == "first",
+                    "active navigator and rendered inspector retained different casting identities");
+                session.ProblemNavigation.CompleteReveal("first");
+                session.BuildGraph(inputs);
+                Expect(session.ProblemNavigation.PendingRevealCastingId == null,
+                    "the defensive focus invariant continuously reclaimed scrolling");
+                Expect(session.DocumentIntentSignature() == signature && ProblemFiles(dir) == files &&
+                    !session.CanUndo && session.ReviewStatusFor("long") == review &&
+                    dispatch.RecordedSubmissions.Count == 0,
+                    "defensive focus recovery authored, saved, authorized or dispatched");
+            }
+        }
+
+        private static void TestProblemOriginSummary(string root)
+        {
+            PlannedCasting Group(string id, int order, string anchor, string caster = "unit-cleric")
+            {
+                return new PlannedCasting(id, "long", order, GraphSourceC, GraphAbilityC,
+                    caster, caster == null ? null : "book-cleric-group",
+                    anchor == null ? CastingTargetMode.CasterCenteredOrigin : CastingTargetMode.AnchoredOrigin,
+                    null, anchor == null ? CastingOrigin.CasterCentered() : CastingOrigin.Anchored(anchor),
+                    null, null, null, ExistingEffectPolicy.SkipAlreadyActive, null,
+                    CastingAuthoringState.Draft, null);
+            }
+            string dir;
+            CastingWorkspaceSession session = ProblemSession(root, "origin-summary", new[] {
+                Group("valerie", 0, "unit-t1"), Group("amiri", 1, "unit-t2"),
+                Group("caster", 2, null), Group("unknown-origin", 3, "absent-unit"),
+                Group("unknown-caster", 4, null, null), ProblemCasting("direct", 5)
+            }, out dir);
+            CastingWorkspaceInputs inputs = GraphInputs();
+            session.BuildGraph(inputs);
+            string signature = session.DocumentIntentSignature();
+            string files = ProblemFiles(dir);
+            session.Apply(CastingApplyMode.Ordinary, "long", inputs);
+            Expect(session.ProblemNavigation.Count == 6 &&
+                session.CastingLabel("valerie") == "Buff (Harrim -> centered on Valerie)" &&
+                session.LastAttemptMessage.Contains("Buff (Harrim -> centered on Valerie)"),
+                "the first group problem discarded its known anchor");
+            Expect(session.NavigateProblem(1) &&
+                session.CastingLabel("amiri") == "Buff (Harrim -> centered on Amiri)" &&
+                session.LastAttemptMessage.Contains("Buff (Harrim -> centered on Amiri)"),
+                "group problems at different anchors remained indistinguishable");
+            Expect(session.NavigateProblem(1) &&
+                session.LastAttemptMessage.Contains("Buff (Harrim -> centered on Harrim)"),
+                "a known caster-centered problem discarded its origin");
+            Expect(session.CastingLabel("unknown-origin") == "Buff (Harrim -> group)" &&
+                session.CastingLabel("unknown-caster") == "Buff ( -> group)" &&
+                session.CastingLabel("direct") == "Buff (Linzi -> Valerie)",
+                "unresolved group origins were guessed or direct target labels changed");
+            Expect(session.DocumentIntentSignature() == signature && ProblemFiles(dir) == files &&
+                !session.CanUndo, "origin presentation authored or saved the plan");
         }
 
         private static void TestProblemUnavailableSource(string root)

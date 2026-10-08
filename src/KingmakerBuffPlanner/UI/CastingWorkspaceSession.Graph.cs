@@ -195,6 +195,7 @@ namespace KingmakerBuffPlanner.UI
         // the end of its routine, then focused. The original is unchanged.
         public CastingGraphEditResult DuplicateFocusedCasting()
         {
+            LeaveProblemNavigation();
             PlannedCasting focused = FocusedCasting();
             if (focused == null) return GraphRefusal("no-editing-focus");
             // A copy is fresh intent: no import provenance travels with it,

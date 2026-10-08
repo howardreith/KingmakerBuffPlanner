@@ -410,3 +410,86 @@ scenario after measured desktop input idle >=180 seconds, verify actual
 visibility and complete outer orchestration, restore/reconcile/protect
 saves, record evidence and guarded-push. No PR, merge, tag, release,
 permanent install or later work package.
+
+## Checkpoint: engineering-review P2 and P3 corrected, qualification pending
+
+Branch codex/kbp-not-ready-deep-linking-2026-10-07; exact pre-correction
+HEAD 8d4e4f3c6f9810a1b02606f82bf1722f5256b9cf; version remains 0.3.0.
+Origin/main was fetched and remains b707c1f47859f2ecae517b2cd162d20ca18c7583;
+the focused remote matched the clean starting HEAD. No open pull requests.
+Original checkout and WP1 state were preserved; no branch was inherited.
+
+The review identified a real focus-ownership defect: Duplicate moved the
+inspector to the copy while retaining the original problem; Reload cleared
+focus while retaining the old navigator. A surviving blocker then prevented
+reconciliation from restoring focus. Both could hide the problem controls
+while the footer still reported an active problem. This corrects the earlier
+self-review's assumption that all deliberate focus replacements left mode.
+
+Implemented correction: DuplicateFocusedCasting and Reload explicitly leave
+problem navigation before operating. The refresh boundary checks that an
+active Current.CastingId equals EditingFocusCastingId. A lost focus is restored
+through FocusGraphCasting and requests one reveal; later unchanged refreshes
+do not reclaim scrolling. Duplicate retains its existing authored copy,
+autosave and one Undo entry. Reload does not resurrect navigation; a new Run
+starts from the current stored blocker set.
+
+P3 is resolved, not waived. CastingLabel keeps direct-target display names
+and now identifies a known group origin as "centered on <party name>" from
+the casting's explicit Origin. Caster-centered origins use the saved caster;
+anchored origins use the saved anchor. An origin absent from the current
+party snapshot remains "group". No caster, provider or readiness is guessed.
+
+Behavioral regressions use the real gate, compiler, session, authoring service
+and temporary repository files. The five additions cover duplicate-current-
+problem, Reload with the same blocker, Reload with different blockers, active
+navigator/inspector consistency for both missing and wrong focus, and two
+same-spell group blockers with different named anchors plus caster-centered,
+unresolved-origin and direct-target cases. Navigation/recovery assertions
+cover exact document intent, file bytes/timestamps, Undo, review authorization
+and zero dispatch. Duplicate separately proves its existing authored autosave
+and exactly one Undo operation, with no extra write from inspection.
+
+Commands and exact outcomes:
+- MSBuild tests/KingmakerBuffPlanner.Tests/KingmakerBuffPlanner.Tests.csproj
+  /t:Rebuild /p:Configuration=Release /m /nologo /v:minimal.
+- artifacts/tests/KingmakerBuffPlanner.Tests.exe --blocked-navigation:
+  before production corrections PASS=15 FAIL=5, one failure for each finding;
+  final corrected suite PASS=20 FAIL=0.
+- artifacts/tests/KingmakerBuffPlanner.Tests.exe: PASS=418 FAIL=0.
+- scripts/Validate-Source.ps1: PASS=42 FAIL=0; evidence
+  artifacts/wp2a-review-source-validation.log.
+- No compiler warnings. Evidence: artifacts/wp2a-review-regressions-red.log,
+  artifacts/wp2a-review-regressions-green.log and
+  artifacts/wp2a-review-complete-csharp.log.
+
+An intermediate 19/1 result exposed a new test's incorrect assumption that
+Duplicate does not autosave. The assertion was corrected to preserve the
+existing authoring contract; the production persistence behavior was not
+changed. The original red Duplicate regression failed earlier at the missing
+navigation exit, so it detects the reviewed defect independently.
+
+Full diff review: the corrections add no refusal-string parsing, readiness
+predicate, second compile path, persisted navigation, authorization or native
+submission. Structured blocker order, omissions, shared HUD/planner Apply,
+manual exits, global refusal and Ready Casts Only policy are unchanged.
+No production C# source qualification from 783af83 is transferred to these
+new production changes. Implemented and regressed; complete final source gate
+and fresh successful physical runtime qualification remain pending.
+
+Ownership observation at 2026-10-08T18:27:28.6382466Z: the Gunslinger lab held
+its compatibility lock for runtime-20261008T182340Z-f34335fa85ba4580ac604cf52c57b938
+and Kingmaker PID 17384. No foreign process or lease was touched. No new WP2A
+live staging, physical input or save mutation occurred. The previously
+restored trial and its original failed outer completion remain unchanged.
+
+Exact next action: commit and guarded-push the focused review correction,
+build a clean prerequisite for that exact commit, and obtain a sustained
+quiet installation window. Then run unchanged scripts/Test-SourceOnly.ps1
+with zero failures, build/freeze the exact post-gate candidate, and run a
+fresh candidate-bound blocked HUD trial through the corrected verifier after
+measured desktop input idle >=180 seconds. Verify complete outer success,
+actual masked card visibility, unchanged document/profile/native state,
+restoration and protected-save integrity. Do not rerun the expensive full
+gate between short foreign launches, seize ownership, merge, tag, release,
+create a PR, permanently install or start another work package.
