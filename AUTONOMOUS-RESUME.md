@@ -1,53 +1,87 @@
-# Autonomous resume — WP2A review correction, 2026-10-08
+# Autonomous resume — WP2A qualification freeze, 2026-10-08T22:37Z
 
-Active mission: find blocked castings immediately. Branch
+This is a dated pre-qualification checkpoint. Before resuming, read
+artifacts/wp2a-running-checkpoint.json and the identity-bound evidence paths
+below. A later complete, identity-matched record supersedes this snapshot.
+Do not infer qualification from a prerequisite manifest or the old game PASS.
+
+Mission: find blocked castings immediately. Branch
 codex/kbp-not-ready-deep-linking-2026-10-07, worktree private/worktrees/WP2A.
-Base b707c1f47859f2ecae517b2cd162d20ca18c7583; exact pre-correction HEAD
-8d4e4f3c6f9810a1b02606f82bf1722f5256b9cf. Version remains 0.3.0.
-No Work Package 1 changes inherited. Original checkout preserved.
+Base origin/main b707c1f47859f2ecae517b2cd162d20ca18c7583; checkpoint HEAD
+adbddd14d66861e26247ebb7e4f39158a2db7c6e, fix(ui): keep blocked navigation
+aligned with inspector focus. Version 0.3.0. Original checkout and WP1
+preserved; no WP1 branch inherited.
 
-Engineering review P2 and P3 are implemented and regressed: Duplicate and
-Reload explicitly leave problem mode; refresh enforces active navigator and
-inspector casting identity through canonical FocusGraphCasting, with one-shot
-reveal. Group summaries name known caster-centered or anchored origins.
-Five new behavioral regressions failed against the previous code; final
-focused PASS=20 FAIL=0, complete C# PASS=418 FAIL=0, no compiler warnings.
-Logs: artifacts/wp2a-review-regressions-{red,green}.log and
-artifacts/wp2a-review-complete-csharp.log.
+P2 and P3 are implemented and regressed. Duplicate and Reload leave problem
+mode; refresh restores a lost active focus through FocusGraphCasting and
+requests one reveal. Known group origins are named. Five regressions were
+red against the prior code (15/5), then focused PASS=20 FAIL=0 and complete
+C# PASS=418 FAIL=0. Source validation 42/0; no compiler warnings. Evidence:
+artifacts/wp2a-review-regressions-{red,green}.log,
+artifacts/wp2a-review-complete-csharp.log,
+artifacts/wp2a-review-source-validation.log.
+Guarded-push helper tests 6/0; the owned helper finished PASS, remote matched
+adbddd14, worktree clean. Its first stderr-capturing wrapper failed after the
+push had succeeded; the transcript-backed repeat verified PASS/up-to-date:
+artifacts/wp2a-review-guarded-push-verified.log.
 
-Production C# changed in this correction. The full Test-SourceOnly pass at
-783af83 cannot qualify it. Gate 10 at f031f87 was incomplete: source 42 /
-C# 413 / filesystem 38 / evidence 23 / package 4 passed, then foreign PID
-5420 caused exit 1. A twenty-minute quiet gap did not establish the several-
-hour window. No gate safety assertion or archive target may be weakened.
-The fresh final complete source gate remains required.
+Clean prerequisite at adbddd14: artifacts/local-runtime/0.3.0/
+KingmakerBuffPlanner-0.3.0-local-runtime.zip; manifest is that path plus
+.build-local.json. ZIP 8af5b5d887bff40ef1dea90d48e7c3e18398b04f9f5aa41d787b12f5f29199c0;
+DLL caf1bc50e691ee846a185bcde8dd928b6622cc5251bf07d078a378445e72285a;
+MVID 81b584b4-6fee-43eb-9f16-61a3984dcd17. Frozen prerequisite:
+artifacts/prerequisite-wp2a-adbddd1. Build-Local passed source 42/0, build
+1/0, package 4/0, local 1/0. This is not the final qualified candidate.
+This documentation checkpoint changes HEAD; rebuild a clean prerequisite
+for that HEAD before the complete gate.
 
-The preserved physical record wp2a-783af83-problems-01 has game PASS and
-actual HUD/offscreen reveal/Next/Previous/Escape evidence, exact intent/profile
-equality, zero dispatch and unchanged native state. Its original outer
-completion remains FAILED on the evidence-reader contracts; corrected
-independent recheck passed. Restoration/protected-save comparisons passed.
-A fresh complete outer run on the corrected final candidate remains mandatory.
+The full old gate at 783af83 does not qualify the production correction.
+Gate 10 at f031f87 was incomplete (42 source / 413 C# / 38 filesystem /
+23 evidence / 4 package passed, then foreign PID 5420 refused, exit 1).
+No new full gate or live WP2A run has begun for this correction.
 
-At 2026-10-08T18:27:28.6382466Z the Gunslinger lab held its compatibility
-lock and Kingmaker PID 17384. No foreign state was touched; no new WP2A
-live deployment, input or save mutation. Owner timing authority persists:
-"Use the next idle window", with measured actual input idle >=180 seconds.
+Owner's latest instruction: "Keep waiting for the other lab to finish."
+The foreign lab repeatedly resumes after short gaps. At 22:37 UTC there
+was no lease/game, but no completion signal. Observe only; do not seize
+its lease, stop its processes or retry between brief gaps. Actual measured
+desktop input idle >=180 seconds is still mandatory for physical input;
+earlier authority "Use the next idle window" remains valid.
 
-Next: commit and guarded-push the focused review correction; build a clean
-prerequisite for that exact commit; wait for the other lab to finish or owner
-coordination in its own session. In a sustained quiet window complete unchanged
-scripts/Test-SourceOnly.ps1 with zero failures, then Build-Local, record/freeze
-exact ZIP/DLL/MVID/manifest/commit identity, and run candidate-bound
-live-workspace-physical / PhysicalExpectation problems / full-user / Automation /
-owner display with no casting allowance. Verify fresh complete orchestration,
-actual clipped card visibility, reason/problem position, unchanged authored
-and native state, exact restoration, all transactions/claims reconciled and
-protected saves. Record final evidence and guarded-push the clean branch.
-No PR/merge/tag/release/permanent install/native-effect or owner-acceptance
-claim, foreign lease seizure or later work package.
+Next, after the other lab finishes:
 
-Current qualification: implemented and regressed; final source-qualified and
-runtime-qualified pending. Exact evidence/rejected assumptions/hashes:
-docs/WP2A-NOT-READY-NAVIGATION.md. Latest ignored running checkpoint:
-artifacts/wp2a-running-checkpoint.json.
+1. Confirm ownership, clean HEAD, restored transactions and save integrity.
+2. Run unchanged scripts/Test-SourceOnly.ps1 with zero failures on the
+   frozen clean commit. Planned log: artifacts/wp2a-source-gate-11.log.
+3. Run scripts/Build-Local.ps1 after that pass on the same clean commit;
+   freeze exact ZIP, DLL SHA, MVID, manifest, gate log and commit in
+   artifacts/qualified-wp2a-review-final.
+4. Fresh run ID wp2a-review-final-problems-02 (unused at this checkpoint):
+   Invoke-KingmakerRuntimeTest.ps1, live-workspace-physical,
+   PhysicalExpectation problems, full-user, Automation, owner display,
+   instant, TimeoutSeconds 1200, no native casting allowance. Use Windows
+   PowerShell -Command, guarded WhatIf purity first, then the next eligible
+   idle window. Never use -File or bypass ownership.
+5. Inspect actual screenshots and clipped card geometry, translated reason,
+   problem position/controls, exact intent/profile/Undo/review equality and
+   zero dispatch/run/resource/effect changes. Require fresh complete outer
+   orchestration plus verified restoration and protected-save comparison.
+6. Write the measured handoff in the generated candidate evidence directory
+   and update the ignored running checkpoint; keep the frozen source commit
+   unchanged so gate, candidate, runtime record and clean pushed HEAD agree.
+
+Fresh runtime evidence path:
+C:/Dev/KingmakerBuffPlannerLab/runtime-evidence/wp2a-review-final-problems-02.
+A final handoff must cite the exact frozen commit and manifest, complete
+source-gate result, run-completion.json and verified screen evidence.
+
+Preserve wp2a-783af83-problems-01: game PASS and strong physical UI evidence,
+but original outer completion FAILED. Independent corrected recheck passed;
+it does not retroactively qualify that run. Installation restored, protected
+saves clean; all 399 own transactions were Restored at the 18:37 audit.
+No new live staging, input or save mutation in this review correction.
+
+At this checkpoint: implemented and regressed; final source-qualified and
+runtime-qualified pending. Not native-qualified, released or owner-accepted.
+No PR, merge, tag, release, permanent install, protected/ordinary save
+mutation, foreign interference or later work package. See
+docs/WP2A-NOT-READY-NAVIGATION.md for the dated engineering evidence.

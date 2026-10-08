@@ -1,37 +1,43 @@
-# Autonomous blockers — WP2A review correction, 2026-10-08
+# Autonomous blockers — WP2A qualification freeze, 2026-10-08T22:37Z
 
-P2 focus-ownership and P3 group-origin review corrections are implemented and
-regressed. Duplicate/Reload exit mode; refresh restores a lost active focus
-through FocusGraphCasting and requests one reveal. Known origins are named.
-Focused PASS=20 FAIL=0; complete C# PASS=418 FAIL=0; no compiler warnings.
-Exact pre-correction HEAD 8d4e4f3c6f9810a1b02606f82bf1722f5256b9cf;
-branch codex/kbp-not-ready-deep-linking-2026-10-07; version stays 0.3.0.
-Production changes require a new complete gate and fresh runtime trial.
+Dated pre-qualification snapshot. Check artifacts/wp2a-running-checkpoint.json
+and the exact candidate-bound gate/runtime records for any later outcome.
 
-External qualification blocker: the Gunslinger lab repeatedly holds
-C:/Dev/KingmakerGunslingerLab/compatibility-state/compatibility.lock and
-launches Kingmaker against the shared installation. At 18:27 UTC PID 17384
-was active. The unchanged complete source/mechanical gate cannot finish
-until a sustained quiet installation window is available. Its prior archive
-checks took about six hours. Gate 10 passed source 42 / C# 413 / filesystem
-38 / evidence 23 / package 4, then refused foreign PID 5420 (exit 1).
-Do not restart the full gate between brief launch gaps.
+Review corrections P2/P3 are committed and guarded-pushed at checkpoint HEAD
+adbddd14d66861e26247ebb7e4f39158a2db7c6e on
+codex/kbp-not-ready-deep-linking-2026-10-07; version remains 0.3.0.
+Focused regressions 20/0, complete C# 418/0, source validation 42/0, push-helper
+checks 6/0; no compiler warnings. Five new regressions failed before the fix.
+Duplicate/Reload exit mode; active navigator and inspector align through
+canonical focus; known group origins appear. See the detailed WP2A report.
 
-Prior physical UI evidence is positive and independently rechecked, but its
-original outer completion is FAILED and preserved. Fresh fully successful
-candidate-bound orchestration is mandatory. Its prior installation was
-restored and protected saves compared clean; all 399 own deployment
-transactions were Restored at the preceding audit. This correction has made
-no new live deployment/input or save mutation.
+External blocker: the other lab repeatedly uses the shared installation.
+Owner explicitly answered "Keep waiting for the other lab to finish."
+At 22:37 UTC no lease/game was present, but completion was not confirmed.
+Brief gaps have repeatedly ended in another launch, including after a
+twenty-minute quiet interval. The unchanged full gate takes about six hours;
+do not start it between those gaps or weaken its archive/purity checks.
 
-Do not seize the foreign lease, stop foreign processes, relax archive purity,
-bypass measured input idle >=180 seconds or mutate protected saves. Owner
-instructed "Use the next idle window"; no repeated permission is needed.
-Wait for the other lab to finish or for owner coordination in that session.
+The adbddd14 clean prerequisite is frozen in
+artifacts/prerequisite-wp2a-adbddd1; it is not final qualification.
+This documentation checkpoint changes HEAD and requires a matching clean
+prerequisite. Final source gate, post-gate build and fresh physical run must
+share one frozen clean commit. Planned gate log:
+artifacts/wp2a-source-gate-11.log; final evidence directory:
+artifacts/qualified-wp2a-review-final; unused fresh trial:
+wp2a-review-final-problems-02. Write final measured evidence there rather
+than changing the qualified source commit afterwards.
 
-Next: clean correction commit and guarded push, clean prerequisite build,
-sustained quiet window, complete unchanged gate, final exact candidate build,
-fresh guarded HUD trial, restoration/protected-save verification and evidence.
-No PR/merge/tag/release, permanent install or later work package.
-Exact commands/evidence: docs/WP2A-NOT-READY-NAVIGATION.md and
-AUTONOMOUS-RESUME.md. Linked-worktree writes use authorized reviewed calls.
+Prior wp2a-783af83-problems-01 has positive, independently rechecked game
+evidence but a preserved FAILED outer completion. Fresh complete successful
+orchestration is mandatory. Its install restoration/protected-save comparison
+passed; all 399 own transactions were Restored at the 18:37 audit. No new
+WP2A live staging, input or save mutation in this correction.
+
+Do not touch the foreign lease/processes or protected/ordinary owner saves.
+Measured input idle >=180 seconds is required; "Use the next idle window"
+remains authorized. After lab completion, finish the unchanged full gate,
+build/freeze the final exact candidate, run the guarded physical problems
+trial, verify all restoration/claims/save evidence, and hand off a clean
+guarded-pushed branch. No PR/merge/tag/release/permanent install/later package.
+Exact procedure and evidence contracts: AUTONOMOUS-RESUME.md.

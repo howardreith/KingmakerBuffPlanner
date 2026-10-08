@@ -2904,3 +2904,42 @@ preserved. Next: clean commit/guarded push, clean prerequisite build, sustained
 quiet window, unchanged full gate, final identity-bound build and fresh guarded
 HUD trial, restore/protect saves and record evidence. No foreign interference,
 PR/merge/tag/release/permanent install or later work package.
+
+## WP2A pushed review fixes and qualification freeze — 2026-10-08T22:37Z
+
+Checkpoint HEAD adbddd14d66861e26247ebb7e4f39158a2db7c6e,
+fix(ui): keep blocked navigation aligned with inspector focus; branch
+codex/kbp-not-ready-deep-linking-2026-10-07, base b707c1f47859f2ecae517b2cd162d20ca18c7583,
+version 0.3.0. Clean/pushed verified. P2/P3 implemented and regressed:
+focused 20/0, complete C# 418/0, source validation 42/0, no compiler warnings;
+new tests red 15/5 before the correction. Owned push-helper checks 6/0;
+transcript-backed guarded push PASS/up-to-date. Original stderr-wrapper
+failure after a successful push is preserved and explained in the WP2A report.
+
+Clean adbddd14 prerequisite: Build-Local source 42/0, build 1/0, package 4/0,
+local 1/0. ZIP 8af5b5d887bff40ef1dea90d48e7c3e18398b04f9f5aa41d787b12f5f29199c0;
+DLL caf1bc50e691ee846a185bcde8dd928b6622cc5251bf07d078a378445e72285a;
+MVID 81b584b4-6fee-43eb-9f16-61a3984dcd17. ZIP/manifest/logs frozen at
+artifacts/prerequisite-wp2a-adbddd1; f031f87 prerequisite preserved.
+This is not final qualification. Exact commands/paths/hashes/rejected wrapper
+assumption are in docs/WP2A-NOT-READY-NAVIGATION.md.
+
+Owner answered "Keep waiting for the other lab to finish." Repeated foreign
+launches after brief gaps are recorded in the ignored ownership-watch log.
+At 22:37 UTC no lease/game was present, but there was no finish signal.
+Rejected: quiet installation proves lab completion. No new full gate/live
+WP2A run; no foreign change, physical input, save mutation or native claim.
+Previous original outer FAILED trial is preserved; restoration/protected
+comparison passed and 399 own transactions were Restored at the 18:37 audit.
+
+This documentation freeze fixes stale resume actions before the final gate.
+Next: commit/guarded-push, clean matching prerequisite, continue waiting; after
+lab completion run unchanged full source gate (planned gate-11 log), post-gate
+exact build, freeze artifacts/qualified-wp2a-review-final, fresh guarded
+wp2a-review-final-problems-02 after actual input idle >=180 seconds, verify
+screen/reason/navigation/unchanged authored and native evidence, complete
+outer orchestration, restoration/claims/protected saves. Write final measured
+handoff in the identity-bound generated evidence; leave the qualified clean
+source commit unchanged so gate, build, runtime and pushed HEAD match.
+At this snapshot: implemented/regressed; final source/runtime qualification
+pending. No PR/merge/tag/release/permanent install/later work package.
