@@ -1694,6 +1694,15 @@ namespace KingmakerBuffPlanner.UI
             string target = casting.TargetMode == CastingTargetMode.DirectTarget
                 ? UnitDisplayName(_lastInputs, casting.DirectTargetUnitId)
                 : "group";
+            if (casting.TargetMode != CastingTargetMode.DirectTarget && casting.Origin != null)
+            {
+                string originId = casting.Origin.IsCasterCentered
+                    ? casting.CasterUnitId : casting.Origin.AnchorUnitId;
+                if (!string.IsNullOrEmpty(originId) && _lastInputs != null &&
+                    _lastInputs.Snapshot != null && _lastInputs.Snapshot.Units.Any(unit =>
+                        unit != null && string.Equals(unit.UnitId, originId, StringComparison.Ordinal)))
+                    target = "centered on " + UnitDisplayName(_lastInputs, originId);
+            }
             return spell + " (" + UnitDisplayName(_lastInputs, casting.CasterUnitId) +
                 " -> " + target + ")";
         }
@@ -2305,6 +2314,7 @@ namespace KingmakerBuffPlanner.UI
 
         public CastingPlanLoadStatus Reload()
         {
+            LeaveProblemNavigation();
             CastingPlanLoadResult loaded = _repository.Load(CampaignId);
             LastReloadNote = null;
             // Re-review, then focused re-review: with no plan file on disk
