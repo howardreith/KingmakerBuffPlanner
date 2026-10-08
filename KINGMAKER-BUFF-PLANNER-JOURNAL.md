@@ -2784,3 +2784,98 @@ orchestration, exact restoration and protected saves; record final evidence
 and guarded-push the clean branch. No PR/merge/tag/release, permanent
 installation or later work package. Current runtime qualification remains
 pending.
+
+## Checkpoint: gate 10 refused by foreign runtime; handoff remains pending
+
+Branch codex/kbp-not-ready-deep-linking-2026-10-07; exact pre-documentation
+HEAD f031f87e71aca99c09118495b9659e24bdcaace1; version 0.3.0.
+That commit was clean and pushed using the owned helper. Documentation
+validation PASS=42 FAIL=0; guarded push helper PASS=6 FAIL=0.
+Logs: artifacts/wp2a-continuation-doc-validation.log and
+artifacts/wp2a-continuation-guarded-push.log.
+
+After twenty observed quiet minutes, unchanged scripts/Test-SourceOnly.ps1
+started at 2026-10-08T16:02:37.8228860Z under Windows PowerShell 5.1,
+PID 8828. Source PASS=42 FAIL=0; C# PASS=413 FAIL=0; filesystem PASS=38
+FAIL=0; problem evidence PASS=23 FAIL=0; package PASS=4 FAIL=0.
+At the deployment WhatIf boundary the guard refused foreign Kingmaker
+PID 5420. Wrapper exit 1; complete gate NOT passed. No compiler warnings.
+Evidence: artifacts/wp2a-source-gate-10.log and
+artifacts/wp2a-source-gate-10-start.json.
+The foreign lease identified
+runtime-20261008T163555Z-c8ea60b6503940a6b04467deafc9d927.
+No new WP2A live deployment, physical input or save mutation occurred.
+
+Clean prerequisite identity, not a final qualified candidate:
+commit f031f87e71aca99c09118495b9659e24bdcaace1;
+package artifacts/local-runtime/0.3.0/KingmakerBuffPlanner-0.3.0-local-runtime.zip;
+ZIP 249b2d5a10e233b412285af36a31fe07716c9fdd08a1696123968246a53a5449;
+DLL ae95357a5699ec38fd149f0416828756e0d6567cd1cbb483ac5ebc43242bb4b7;
+MVID f0ca5ab8-0325-41c7-9781-b08df7b4dc8c;
+manifest at the package path plus .build-local.json.
+Build log artifacts/wp2a-prerequisite-build-f031f87.log:
+source 42 / build 1 / package 4 / local package 1, all zero failures.
+Production C# remains identical to the fully source-qualified 783af83.
+
+The preserved first physical record contains exact before/after document
+equality (15,082 characters). Its UTF-8 SHA-256 fingerprint is
+e685c17f9a52edd1654e0b022934142fd8ef05c356783664ffdbf7462edcb262
+both before and after; the actual signature remains campaign + U+0002 +
+normalized profile JSON, not this reporting fingerprint. The profile file
+SHA-256 stayed 46c5c9a25864a0990504a553995bc8188c8f492123edfb0861b4d8554cf8ddea.
+Physical moon opened Long / Resistance / Linzi -> Hedwirg at
+wp2a-blocked-late: chip (937.504,147.660172), visible fraction ~1.0,
+catalogue (197.776047,626.4199), inspector at top. Graph 1.0 -> 0.115682006;
+the chip was masked before reveal. Problem 1 of 2 -> 2 of 2 -> 1 of 2,
+with correct boundary controls. Raw reason unresolved-saved-request was
+translated to "Not ready: this casting is a Draft; finish its choices and
+mark it Ready". Dispatch attempts/runs started 0; native signatures,
+Undo and authorization unchanged. The original failed outer completion,
+positive game result, independent recheck and verified restoration remain
+separate facts. They are not promoted to a fresh complete run.
+
+Self-review of the implementation:
+1. No casting identity/order comes from BlockingReasons, ReviewReason or
+   human-readable refusal prose. Existing global opening-category policy
+   remains; it extracts no casting identity.
+2. Structured CastingBlocker entries follow compiled execution order.
+3. Disabled/already-satisfied omissions are outside the blocker list.
+4. Planner and HUD use the same WorkspaceApplyResult/session Apply boundary.
+5. FocusGraphCasting is the canonical source/routine/focus operation.
+6. Selected filtered rows remain included; unavailable saved buffs retain
+   a non-authoring reveal placeholder. Physical late-card reveal is proven.
+7. Reveal is consumed once; unchanged refreshes preserve scrolling.
+8. Manual selections, Done and nested Escape leave problem mode.
+9. Navigation does not alter document/profile, Undo, save/review state or
+   execution/resource state. Real-service regressions and physical equality
+   cover these boundaries.
+10. Global refusals create no casting navigation request.
+11. Repairs recompile/regate; retain a remaining current blocker or move to
+    the next/new last, and exit when none remain.
+12. Ready Casts Only keeps the original omissions and enhancement policy.
+13. A new successful submission clears pending navigation/reveal.
+14. The first physical record has clipped screen points, substantial card
+    overlap and inspected screenshots. A fresh complete candidate run is
+    still pending; focus ID alone is not treated as visibility.
+15. The previous live installation was restored; all 399 own deployment
+    transactions were Restored at the continuation audit.
+16. The WP2A physical trial compared protected/ordinary owner saves clean;
+    no allowed changed saves, violations or blocking records. This source
+    attempt made no live save changes.
+
+Rejected assumption: a twenty-minute quiet interval proves the other lab
+has finished. Uncertainty: a sustained installation window and a fresh
+complete run on the corrected verifier. Implemented and regressed;
+full source qualification of the current candidate and runtime
+qualification remain pending. Not native-qualified, released or
+owner-accepted.
+
+Exact next action: wait for the other lab to finish or owner coordination;
+do not seize its lease, kill its process or rerun between short gaps.
+On a confirmed quiet window, build a clean prerequisite for the documented
+HEAD, finish unchanged Test-SourceOnly with zero failures, build the final
+clean candidate, record/freeze exact identity, run the guarded problems
+scenario after measured desktop input idle >=180 seconds, verify actual
+visibility and complete outer orchestration, restore/reconcile/protect
+saves, record evidence and guarded-push. No PR, merge, tag, release,
+permanent install or later work package.

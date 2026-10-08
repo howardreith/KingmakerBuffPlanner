@@ -3,7 +3,7 @@
 Active mission: find blocked castings immediately. Branch
 codex/kbp-not-ready-deep-linking-2026-10-07, worktree private/worktrees/WP2A.
 Base b707c1f47859f2ecae517b2cd162d20ca18c7583; exact HEAD before this
-documentation checkpoint: 0d730845cb17e81a8279f405d11b0fd3f639ee68.
+documentation checkpoint: f031f87e71aca99c09118495b9659e24bdcaace1.
 Version remains 0.3.0. No Work Package 1 changes inherited.
 
 Implemented and regressed: ordered structured blockers; shared planner/HUD
@@ -23,7 +23,7 @@ it is preserved unchanged. Restoration and protected-save comparisons
 passed. The corrected independent recheck passed. A fresh complete outer
 run on the corrected candidate is still required.
 
-The current complete gate is NOT complete. Gate 6 was interrupted; gates
+The current complete gate is NOT complete. Gate 10 on f031f87 passed source 42 / C# 413 / filesystem 38 / evidence 23 / package 4, then refused foreign PID 5420 and exited 1 (artifacts/wp2a-source-gate-10.log). It began after twenty observed quiet minutes, which did not guarantee the several-hour window. No new deployment or physical trial occurred. Gate 6 was interrupted; gates
 7, 8 and 9 stopped safely when the Gunslinger lab launched Kingmaker.
 Gate 9 passed source 42 / C# 413 / filesystem 38 / evidence 23 / package 4,
 then the deployment WhatIf refused foreign PID 11240. Source-only archive
