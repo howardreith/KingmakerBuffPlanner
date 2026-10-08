@@ -493,3 +493,77 @@ actual masked card visibility, unchanged document/profile/native state,
 restoration and protected-save integrity. Do not rerun the expensive full
 gate between short foreign launches, seize ownership, merge, tag, release,
 create a PR, permanently install or start another work package.
+
+## Checkpoint: pushed review fixes and qualification freeze — 2026-10-08T22:37Z
+
+Exact checkpoint HEAD adbddd14d66861e26247ebb7e4f39158a2db7c6e,
+fix(ui): keep blocked navigation aligned with inspector focus, on
+codex/kbp-not-ready-deep-linking-2026-10-07; base b707c1f47859f2ecae517b2cd162d20ca18c7583,
+version 0.3.0. Clean worktree and pushed remote were verified. P2/P3 are
+resolved in source, not waived. Focused 20/0 and complete C# 418/0, source
+validation 42/0, no compiler warnings; five new regressions were red (15/5).
+
+Owned Push-KingmakerBuffPlanner.ps1 helper checks passed 6/0. The first
+stderr-capturing wrapper returned exit 1 on Git's normal progress after the
+push had succeeded; remote inspection proved adbddd14. A transcript-backed
+repeat finished helper PASS/up-to-date, exit 0. Evidence:
+artifacts/wp2a-review-guarded-push-verified.log. No raw push, PR or publication.
+
+Build-Local on clean adbddd14 passed source 42/0, build 1/0, package 4/0,
+local 1/0; log artifacts/wp2a-prerequisite-build-adbddd1.log.
+Prerequisite package:
+artifacts/local-runtime/0.3.0/KingmakerBuffPlanner-0.3.0-local-runtime.zip.
+ZIP SHA-256 8af5b5d887bff40ef1dea90d48e7c3e18398b04f9f5aa41d787b12f5f29199c0;
+DLL SHA-256 caf1bc50e691ee846a185bcde8dd928b6622cc5251bf07d078a378445e72285a;
+DLL MVID 81b584b4-6fee-43eb-9f16-61a3984dcd17. Manifest: package path
+plus .build-local.json, generator scripts/Build-Local.ps1, validated true,
+commit adbddd14d66861e26247ebb7e4f39158a2db7c6e. Exact ZIP/manifest/logs
+are preserved in artifacts/prerequisite-wp2a-adbddd1. The f031f87
+prerequisite was preserved separately before rebuilding. Neither is final
+qualification; a validated Build-Local manifest alone is insufficient.
+
+Owner's latest timing instruction is "Keep waiting for the other lab to
+finish." Observation log artifacts/wp2a-review-ownership-watch.jsonl
+records repeated foreign launches after short gaps. At 22:37 UTC there was
+no lease/game, but no completion signal. No new complete gate or WP2A live
+run has started. No foreign process, lease or installation was changed.
+The read-only observer writes only ignored local status evidence.
+
+This documentation checkpoint removes stale instructions to commit/push the
+already-pushed review fixes. It precedes the final gate and therefore changes
+HEAD; rebuild a clean matching prerequisite before the unchanged gate.
+Keep the resulting qualification commit frozen. Planned final records:
+
+- artifacts/wp2a-source-gate-11.log: unchanged scripts/Test-SourceOnly.ps1.
+- artifacts/qualified-wp2a-review-final: exact post-gate package, manifest,
+  source log and measured final handoff.
+- C:/Dev/KingmakerBuffPlannerLab/runtime-evidence/wp2a-review-final-problems-02:
+  unused fresh candidate-bound physical problems trial, corrected verifier,
+  actual screen/card/reason/navigation evidence and run-completion.json.
+
+At this dated snapshot the feature is implemented and regressed; final
+source-qualified and runtime-qualified remain pending. A later complete,
+identity-matched generated evidence record supersedes this snapshot. A final
+handoff must show the same clean pushed commit across source gate, post-gate
+build and fresh runtime record. Do not modify tracked files after freezing
+that commit merely to update a status sentence; store measured outcomes in
+the identity-bound evidence directory and cite them explicitly in the handoff.
+
+Rejected assumption: idle installation means the other lab has finished.
+Uncertainty: its finish signal and the sustained six-hour window. The prior
+positive game trial remains an original FAILED outer completion, preserved.
+All 399 own transactions were Restored at the 18:37 audit; that trial's
+protected-save comparison was clean. This continuation made no live staging,
+physical input, save mutation, native dispatch, effect or resource claim.
+No public version bump, PR, merge, tag, release, permanent install, protected
+save mutation, foreign interference or later work package.
+
+Exact next action: commit/guarded-push this documentation freeze, build its
+matching clean prerequisite, and continue the owner-requested wait. After
+the other lab finishes, complete the unchanged gate with zero failures, then
+build/freeze that exact clean commit, wait for measured input idle >=180
+seconds under existing authority, run the fresh guarded HUD trial, inspect
+actual clipped visibility, verify complete outer success/restoration/claims/
+protected saves and write the measured evidence handoff. Full procedure:
+AUTONOMOUS-RESUME.md. Current generated progress:
+artifacts/wp2a-running-checkpoint.json.
