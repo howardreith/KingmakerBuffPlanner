@@ -1,3 +1,12 @@
+# Autonomous blockers — 0.4.0 owner-review candidate, 2026-10-09
+
+Open items (details in `docs/REMAINING-WORK-0.4.0-HANDOFF.md`): owner
+acceptance of every package; the human-reproduction compatibility profile's
+BagOfTricks fixture identity no longer matches (owner decision); no native
+run is possible for the strict-Instant blocker (no animated-only source in
+any guarded fixture), group re-centring or Share visibility (not in the
+physical fixture). The WP2A snapshot below is historical.
+
 # Autonomous blockers — WP2A qualification freeze, 2026-10-08T22:37Z
 
 Dated pre-qualification snapshot. Check artifacts/wp2a-running-checkpoint.json

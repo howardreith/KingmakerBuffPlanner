@@ -1,3 +1,4 @@
+> 0.4.0 owner-review candidate (unreleased): rc3 `c452e01b360f380b9ca9268e0be3ea05d1b288c6`, package `cc50fb3c7629bc8cf3a03467780e72f2f0f1ec787cd83b1ce54e8de31a59b480`. Packages, evidence and the owner checklist: `docs/REMAINING-WORK-0.4.0-HANDOFF.md`.
 > Unreleased WP2A candidate: ordinary blocked runs focus the first blocking casting; HUD refusals open directly to it. Previous/Next navigate current blockers without editing or saving. Repairs recompute through the compiler/gate. Global refusals stay global; Ready Casts Only remains an explicit fallback. Duplicate and Reload leave problem inspection; group summaries identify known origins. Review corrections are implemented and regressed. Qualification belongs to the exact manifest, complete source gate and fresh guarded runtime completion; see the dated checkpoint and required records in [WP2A evidence](../docs/WP2A-NOT-READY-NAVIGATION.md). Historical 0.3.0 evidence below is unchanged.
 
 # Qualification

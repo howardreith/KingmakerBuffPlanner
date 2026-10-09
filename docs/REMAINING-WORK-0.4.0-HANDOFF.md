@@ -7,6 +7,7 @@ bulky evidence stays under the lab's `runtime-evidence\<runId>\`.
   `private\worktrees\KBP040`), created from `origin/main`
   `16f87ed1dc9b00b683ac7192f4ae8d95da7853fc` (WP2A merged, PR #4).
 - Public release: `v0.3.0`. No 0.4.0 tag, merge, or release is authorized.
+- Owner-review candidate: rc3 `c452e01b360f380b9ca9268e0be3ea05d1b288c6` (see the final report below).
 - Shell rule: run every gate/harness/launcher script through Windows
   PowerShell 5.1 as `powershell.exe -NoProfile -NonInteractive -Command
   "& .\scripts\Name.ps1 ..."`. Launched with `-File`, Test-RuntimeHarness
@@ -14,7 +15,228 @@ bulky evidence stays under the lab's `runtime-evidence\<runId>\`.
   `Get-FileHash`, which then returns nothing); the qualified WP2A head
   reproduces the same failure under `-File`.
 
-## Package status
+## Final consolidated report (0.4.0 owner-review candidate)
+
+Candidate: **`c452e01b360f380b9ca9268e0be3ea05d1b288c6`** (rc3), internal
+version 0.4.0. Not merged, not tagged, not released, not installed.
+Owner acceptance is pending for every package.
+
+### A. Overall verdict
+
+| Package | Implemented | Regressed | Source-qualified | Runtime-qualified (guarded, rc3) | Native-qualified | Owner |
+|---|---|---|---|---|---|---|
+| WP2B spellbook button | yes | yes | yes | yes | yes: physical OS-input handoff (`kbp040-rc3-spellbook`; first proven in `kbp040-wp2b-spellbook-02`) | pending |
+| WP4 execution policy | yes | yes | yes | yes | combat refusal in Instant and Animated (`kbp040-rc3-combat-instant`, `-animated`); explicit Animated cast (`kbp040-rc3-cast-sticky-animated`). The strict-Instant blocker has **no native run**: no guarded fixture has an animated-only source after WP6 (source-proven only) | pending |
+| WP3 direct manipulation | yes | yes | yes | yes | physical portrait add / same-portrait remove / re-add / retarget / provider change / Undo / nested Escape (`kbp040-rc3-authoring`); control gestures, autosave and reopen (`kbp040-rc3-wsqual`, 95/95). Group re-centring and Share visibility: source-proven only (the automation party has no group spell and no Share caster; physical scenarios are not admitted on the advanced copy) | pending |
+| WP5 catalogue audit | yes | yes | yes | yes | catalogue exports on rc3 for native-only, call-of-the-wild and full-user; the in-game buff list of the automation party (`kbp040-rc3-sel-*`) | pending |
+| WP6 Magic Circle | yes | yes | yes | yes | Instant and Animated casts on an ally with effect, single spend and cleanup (`kbp040-rc3-cast-sticky-instant`, `-animated`) | pending |
+| WP7 parchment | yes | yes | yes | yes | live paper and spell scroll at 1920x1080 and 1280x720 (`kbp040-rc3-sel-1080`, `-720`); the look itself is the owner's judgement | pending |
+
+### B. Branches and commits
+
+- Integration branch `claude/kbp-complete-remaining-work-2026-10-09`
+  (worktree `private\worktrees\KBP040`), base `origin/main`
+  `16f87ed1dc9b00b683ac7192f4ae8d95da7853fc`. Published for review as
+  `codex/kingmaker-buff-planner-0.4.0` (same commits; the project's guarded
+  push helper admits only `codex/kingmaker-buff-planner*` names). Pushed
+  state and the draft PR link are recorded at the end of this report.
+- Focused branches merged into it: `claude/kbp-040-wp6-sticky-recipe`
+  (`ad7ca01` `2dde708` `2ec8e63`, merge `d2a2a60`), `claude/kbp-040-wp7-parchment`
+  (`d85e6e5` `ff9e877` `17d7420` `91d1c6e`, merge `567e273`), integrated on
+  `claude/kbp-040-integration` and fast-forwarded.
+- WP2B `e84a892` `e29c4ec` `11a30db` `a5ab3c3`; WP4 `d0d43e4` `512af36`; WP3
+  `0274b7c` `898cfeb` `14c7902`; WP6 `3c80ed0` `c452e01` + recipe; WP5 `d8614ef`
+  + records `1f4bac2`; WP7 + `7383347` `d8b659e` `168ad8d`; harness `98bd032`
+  `fe06e26` `3cb3f90` `d31e857`; records `4edcf6f`; release prep `8e764a5`.
+- Tested candidates (each frozen under
+  `runtime-backups\qualification-frozen\<commit>`): rc1 `8e764a5` (13 runs;
+  two harness/record defects found, fixed in `d31e857` and `c452e01`); rc2
+  `d31e857` (frozen, never run, superseded); **rc3 `c452e01`** (all runs).
+  The release-prep commit precedes the two fixes because the fixes were found
+  by running the frozen 0.4.0 build; neither touches a version surface.
+- Gunslinger: no branch, no change (WP6's owner is the Buff Planner).
+- Worktrees: clean. Diff from `16f87ed`: 91 files under `src`, `tests`,
+  `scripts`, `docs`, `planning` and one compatibility profile; no unrelated
+  work.
+
+### C. Package-by-package behaviour
+
+Detailed sections follow this report (WP2B, WP4, WP3, WP6, WP5, WP7). In
+short:
+
+- **WP2B.** Root cause: the button sat under the service window's native
+  Close (`ServiceWindow/Top/Close`) and the handoff looked for "Close" in the
+  wrong subtree. Repair: the button is drawn above the top bar and placed
+  against the live native controls; the handoff closes the spellbook through
+  its real close, waits for release, opens the planner, and on failure
+  reopens the spellbook. Physical evidence: three OS-input cycles plus one
+  simulated recovery, every one clean, at 1920x1080 (rc3).
+- **WP4.** Combat: every routine route refuses while `Player.IsInCombat`
+  with exactly "Buff routines cannot run during combat." before compiling,
+  saving, authorizing or dispatching. Native: with a party member held in the
+  game's combat state the HUD moon press was refused with that text, no
+  dispatch refusal, no run, no editor, availability `99>99`, no effect; after
+  release the next press reached the session lock - in both modes. Strict
+  Instant: a non-instant strategy is a casting-specific blocker in Instant
+  (WP2A navigation focuses it); Animated is explicit. 0.3.0 profiles load;
+  their stored preferences are read but not honoured and rewritten on the
+  next save.
+- **WP3.** Portrait matrix: nothing focused - add and focus, or focus the
+  existing casting; focused direct - own portrait removes, another
+  retargets, an occupied or unreachable one is refused with the reason;
+  focused group - re-centres. Caster/source clicks change the provider (an
+  ambiguous caster now shows its exact rows - `14c7902`, found by the
+  physical run's design). Disable, Duplicate, Cast By, the retarget/coverage
+  menus and the obsolete header text are gone; Share rows appear only where
+  the mechanism applies. Group castings require nobody; 0.3.0 required
+  recipients are archived byte-exact (`*.pre-0.4.0.orig`) on first save.
+  Undo and autosave: proven natively by `kbp040-rc3-authoring` (Undo of a
+  provider change and of a move, autosave durable) and `kbp040-rc3-wsqual`
+  (Undo, save, close and reopen).
+- **WP5.** Structural classifier rules (hostile ability rider, save-gated
+  effect, harmful condition / faction change, mechanics-free buff, hidden
+  bookkeeping marker, restoration tracker); one facts builder for live
+  discovery and the export; the export classifies with the 0.3.0 rules too.
+  rc3 counts (static before -> after / live before -> after): native-only
+  379 -> 374 / 516 -> 505; call-of-the-wild 2355 -> 2268 / 3413 -> 3301;
+  full-user 2418 -> 2323 / 3490 -> 3366. Removed: Hideous Laughter, Treat
+  Affliction, Treat Deadly Wounds, Dazing Touch, Eyebite and the rest listed
+  in `planning/CATALOG-AUDIT-0.4.0.md`; kept: Mage Armor, Haste, Bless,
+  Prayer, Freedom of Movement, Bull's Strength, Mirror Image and every
+  legitimate self, ally, party, ability and item buff checked. Audit
+  files: `runtime-evidence\kbp040-rc3-catalog-{native,cotw,full}\native-buff-catalog-audit.json`;
+  full human-readable report copied beside them as
+  `catalog-audit-0.4.0-full.md`.
+- **WP6.** Root cause: Magic Circle against Alignment (KingmakerGunslinger)
+  delivers through a touch that may also target enemies; the planner
+  classified every such delivery `AnimatedFallback`
+  (`sticky-delivery-hostile-targeting-ambiguous`), so 0.3.0's default fallback
+  cast it slowly through the animated two-command path. Owner: the Buff
+  Planner. Strategy before -> after: `AnimatedFallback` ->
+  `StickyTouchDeliveryRuleCast` (`supported-willing-target-sticky-touch-delivery`),
+  with the native touch auto-hit condition checked before each cast. Native
+  Instant (rc3): one rule cast of the derived delivery `b05e3a50...` from
+  carrier `8d9b3a1b...`, `Spend()` once by the source data, prepared slot
+  `1>0`, no carrier or delivery command, no held touch, cleanup settled, a
+  new effect instance on the ally; a repeat casts nothing; Always recast with
+  the slot spent is refused (`prepared-slots-exhausted`) before submission.
+  Animated (rc3): the game's own command path with the same spend, effect,
+  repeat and refusal.
+- **WP7.** Visual architecture: two contract-checked native donors
+  (`dialogue_backsheet` paper, `blockscroll_bottom` rule) found at runtime in
+  the game's own character-build UI, drawn as owned half-scale nine-sliced
+  layers with a shadow; exact fallback to the previous look. References:
+  KingmakerGunslinger's Teleport modal (the native world-map dialog) and
+  KingmakerDiceRoller's Roll for Stats (the same paper sheet). No game or
+  third-party art is committed or packaged (`docs/VISUAL-THEME.md`). Live
+  fixes: translucent washes drop their Outline (`7383347`); the header rule
+  follows the routine bar (`d8b659e`). Screenshots: `kbp040-rc3-sel-1080`
+  and `kbp040-rc3-sel-720` (`physical-cf-graph*.png`, `physical-cf-inspect*.png`).
+  Input: the description's wheel scrolls only itself (the graph beneath
+  did not move), Escape closes the description, then the planner, never the
+  game menu; no world input leaked.
+
+### D. Testing
+
+- Per package: focused prefixes (`spellbook-`, `execution-policy-`,
+  `direct-manipulation-`, `catalog-audit-`, `sticky-qual-`, `wp7-`,
+  `physical-`), Validate-Source and production builds (warnings are errors
+  at level 4) after every change; regressions failed against the prior
+  behaviour where a mutation check was made (provider rows, settled touch,
+  WP3/WP4/WP5 regressions as listed in their sections).
+- Complete C# suite on rc3: **471/471**. Validate-Source 42/42.
+- Complete `Test-SourceOnly.ps1` on rc3: see "Complete gate" below.
+- Runtime (guarded, rc3): 15 runs PASS - `kbp040-rc3-sel-sticky`,
+  `-cast-sticky-instant`, `-cast-sticky-animated`, `-sel-1080`, `-sel-720`,
+  `-combat-instant`, `-combat-animated`, `-authoring`, `-spellbook`,
+  `-wsqual`, `-catalog-cotw`, `-catalog-native`, `-catalog-full`; plus the
+  advanced inspection `kbp040-rc1-insp-adv`. Earlier package-era runs are in
+  the sections below.
+- NOT RUN, and why: the strict-Instant blocker natively (no animated-only
+  source exists in any guarded fixture after WP6); group re-centring and
+  Share visibility natively (no group spell or Share caster in the
+  automation party; physical scenarios are not admitted on the advanced
+  copy); the human-reproduction catalogue (its BagOfTricks fixture identity
+  no longer matches - environment drift, the profile is the owner's); a
+  catalogue export on the advanced copy (not an admitted scenario); 2560x1440
+  (this session's display is 1920x1080) and an alternate in-game UI scale
+  (would change the owner's game settings).
+
+### E. Candidate identity
+
+| Item | Value |
+|---|---|
+| Commit | `c452e01b360f380b9ca9268e0be3ea05d1b288c6` |
+| Internal version | 0.4.0 (`KbpVersion` 0.4.0; `Info.json` 0.4.0; assembly and file version 0.4.0.0; informational 0.4.0) |
+| ZIP | `C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-K042\artifacts\release\0.4.0\KingmakerBuffPlanner-0.4.0.zip` (copy: `C:\Dev\KingmakerBuffPlannerLab\package-archive\0.4.0-rc3\`) |
+| ZIP SHA-256 | `cc50fb3c7629bc8cf3a03467780e72f2f0f1ec787cd83b1ce54e8de31a59b480` |
+| DLL SHA-256 | `d6273e74a65b2977d7549e8d5f9d66e53e67a44a86090e7d961273ab56f47858` |
+| DLL MVID | `7654b673-66fb-4972-ad5e-d4aa54a1a029` |
+| Manifest | `release-manifest.json` beside the ZIP: `deterministicBuilds: 2`, `validated: true`, `publicationStatus: local-only` |
+| Layout | `KingmakerBuffPlanner/{Info.json, KingmakerBuffPlanner.dll, NativeEffectOverrides.json, THIRD-PARTY-NOTICES.md}`; package validation 4/4 |
+| Runtime identity | every rc3 run loaded exactly this package (same SHA-256, DLL and MVID), frozen at `runtime-backups\qualification-frozen\c452e01...\FREEZE.json` |
+
+### F. Safety
+
+- Disposable fixtures only: `KBP_AUTOMATION_WORKING` (full-user profile) and
+  the owner-approved advanced copy `KBP_ADVANCED_WORKING`
+  (`advanced-gunslinger-0136`); baselines never loaded for writing; no save
+  written; protected saves compared and clean on every save-backed run.
+- Every run staged the candidate transactionally and restored the `Mods`
+  folder (and the game's registry display values for windowed runs)
+  byte-exact: all 33 mission transactions are `Restored` with restoration
+  verified; no deployment lock, no staging left, no dispatcher claim. The
+  candidate is not installed.
+- Casting allowances were written mechanically by `New-KbpRunAllowance.ps1`
+  under this mission's authority, one per run, for the frozen build.
+- No other lab's lease or process was touched; no guard was weakened; no
+  merge, tag, release or release asset; no Gunslinger change.
+
+### G. Owner-review checklist (main game)
+
+Install the ZIP after backing up `Mods\KingmakerBuffPlanner` (with
+`UserSettings`) outside `Mods`; Unity Mod Manager should list 0.4.0.
+
+1. Open the spellbook (B) and click the Buff Planner button (below the
+   window's close button): the spellbook closes and the planner opens.
+2. Confirm the planner opens correctly on the scroll paper, all lanes
+   readable.
+3. Pick a buff, a caster and its exact source row, click a recipient (one
+   casting, selected), then click the same recipient again: it is removed.
+4. Add a direct buff again and click another recipient: it moves (an
+   occupied or unreachable recipient is refused with the reason).
+5. Add a group buff, click another portrait (re-centres), then its centre
+   portrait (removes).
+6. Confirm the simplified sidebar: no Disable, Duplicate, Cast By or
+   required-recipient menus, no obsolete header text.
+7. Confirm Share Transmutation appears only for a Brown-Fur Transmuter
+   source that can use it.
+8. Start a fight and press a HUD routine: "Buff routines cannot run during
+   combat."; nothing is spent.
+9. Compare Instant and Animated (Mode button): Instant casts at once;
+   Animated plays the normal casting.
+10. In Instant mode cast Magic Circle against Alignment on an ally: it is
+    instant (no casting animation), the slot is spent once, the circle
+    appears.
+11. Browse the buff catalogue for anything that is not a real buff.
+12. Confirm Hideous Laughter and Treat Affliction (and Treat Deadly Wounds)
+    are absent; note whether losing Light, Daylight or Elemental Bastion is
+    acceptable.
+13. Inspect the parchment planner at your own resolution.
+14. Right-click a spell: the description is a spell scroll; the wheel
+    scrolls it; Escape or a click outside closes it.
+15. Run ordinary Long / Important / Short routines from the HUD.
+16. Make a casting Not Ready (for example remove its slot) and confirm Not
+    Ready navigation still focuses it.
+17. Use Undo, close and reopen the planner and reload the save: the plan
+    persists.
+18. Report PASS or the exact defects.
+
+### Complete gate
+
+`scripts\Test-SourceOnly.ps1` on rc3 (worktree `KingmakerBuffPlanner-K042`, clean): RUNNING at the time of this record; the result is appended below when it completes.
+
+## Package status (history)
 
 | Package | Commits | Regressed | Source-qualified | Native-qualified | Owner |
 |---|---|---|---|---|---|
