@@ -34,6 +34,46 @@ writes nothing, and the next deliberate save writes the enforced values
 (`true`/`false`), rotating the previous file into the `.bak` chain. A rolled
 back 0.3.0 reads those values and therefore the same strict behaviour.
 
+## 0.4.0 willing-target touch buffs (WP6)
+
+Magic Circle against Alignment (all four variants, and the paladin and
+antipaladin families) is a sticky-touch carrier whose delivery
+(`AbilityDeliverTouch`) may also be aimed at an enemy. 0.3.0 classified every
+such delivery `AnimatedFallback` (`sticky-delivery-hostile-targeting-ambiguous`),
+so in 0.3.0 Instant mode it was cast through the normal two-command animated
+path (carrier, then delivery) - the slowness the owner observed - and in
+0.4.0's strict Instant it would have been Not Ready.
+
+The classifier now treats an enemy-capable delivery as a willing-target buff
+when the delivery is `EffectOnAlly == Helpful` and **not**
+`EffectOnEnemy == Harmful`; the reason is
+`supported-willing-target-sticky-touch-delivery` and the strategy is
+`StickyTouchDeliveryRuleCast`. A delivery harmful to enemies, unhelpful to
+allies, or point-capable keeps the fallback. The decision is structural: no
+spell name or GUID is consulted.
+
+Kingmaker 2.1.7b `RuleAttackRoll.OnTrigger` auto-hits a touch attack when the
+target is the caster, or is not the caster's enemy, not of a neutral faction
+and not confused. Before every instant sticky delivery the instant adapter
+checks exactly that (`KingmakerStickyTouchCastAdapter.AutoHitRefusal`) and
+otherwise fails validation with `sticky-delivery-not-auto-hit:<reason>`
+before anything is spent, so the ally branch of the delivery is the one that
+runs and no attack is rolled. The rest of the sticky contract above is
+unchanged: one `RuleCastSpell` for the derived delivery data, one `Spend()` on
+the source data, effect confirmation through the expected buff, and cleanup
+of the held touch.
+
+Ownership: Magic Circle against Alignment is not a native Kingmaker 2.1.7b
+spell; KingmakerGunslinger registers it (`KMG.Spells.MagicCircle.*`, installed
+0.0.140, fixture 0.0.136). Its delivery is a faithful willing-target touch:
+`CanTargetEnemies`, `EffectOnAlly = Helpful`, `EffectOnEnemy = Helpful`, and an
+action graph whose `ContextConditionIsAlly` branch applies the carrier while
+the other branch requires a failed Will save. Nothing in that shape is wrong;
+the slowness came from the planner's over-conservative classification and
+0.3.0's animated-fallback default, so the correction belongs to the Buff
+Planner. No Gunslinger change is made or required, and the planner still has
+no compile-time Gunslinger dependency.
+
 ## 0.0.18 sticky-touch transaction boundary
 
 Provider capability and configured mode are now separate. Every `CastStep`

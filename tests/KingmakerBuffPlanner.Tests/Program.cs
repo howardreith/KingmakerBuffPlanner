@@ -4257,6 +4257,23 @@ namespace KingmakerBuffPlanner.Tests
 
         private static void TestUnsupportedStickyTouchClassification()
         {
+            // WP6 (0.4.0): a delivery that may target enemies is a
+            // willing-target buff only when helpful to allies and not harmful
+            // to enemies (Magic Circle against Alignment); otherwise it keeps
+            // the hostile-ambiguity fallback.
+            CastExecutionCapability willing = StickyTouchExecutionClassifier.Classify(true, true, true,
+                true, true, true, true, false, true, false);
+            if (willing.Strategy != CastExecutionStrategy.StickyTouchDeliveryRuleCast ||
+                willing.Reason != "supported-willing-target-sticky-touch-delivery")
+                throw new InvalidOperationException("A willing-target touch buff was not instant-capable.");
+            foreach (CastExecutionCapability hostile in new[]
+            {
+                StickyTouchExecutionClassifier.Classify(true, true, true, true, true, true, true, false, true, true),
+                StickyTouchExecutionClassifier.Classify(true, true, true, true, true, true, true, false, false, false),
+                StickyTouchExecutionClassifier.Classify(true, true, true, true, true, true, true, true, true, false)
+            })
+                if (hostile.Strategy != CastExecutionStrategy.AnimatedFallback)
+                    throw new InvalidOperationException("A harmful, unhelpful or point-capable delivery became instant.");
             CastExecutionCapability[] unsupported =
             {
                 StickyTouchExecutionClassifier.Classify(true, false, false,

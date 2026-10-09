@@ -53,6 +53,15 @@ explicit animated fallback. No localized name, Freedom of Movement GUID,
 caster, spellbook, party-size, or iteration-count condition exists in
 production.
 
+0.4.0 (WP6): an enemy-capable delivery is no longer automatically ambiguous.
+When `AbilityDeliverTouch`'s ability is `EffectOnAlly == Helpful` and not
+`EffectOnEnemy == Harmful` it is a willing-target buff
+(`supported-willing-target-sticky-touch-delivery`, instant-capable); the
+instant adapter requires the native touch auto-hit condition (target is the
+caster, or not an enemy, not neutral-faction, not confused) before
+submission. Magic Circle against Alignment is the motivating case; the rule
+names no spell.
+
 ## 0.0.17 recipient and optional-Share contract
 
 - `ContextActionPartyMembers` retains `EffectTarget.Party`; one structural
