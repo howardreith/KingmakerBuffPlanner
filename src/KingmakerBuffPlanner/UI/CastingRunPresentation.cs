@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Text;
+using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Planning;
 
 namespace KingmakerBuffPlanner.UI
@@ -107,6 +108,9 @@ namespace KingmakerBuffPlanner.UI
         internal static string DescribeRefusal(string routineName, WorkspaceApplyResult result)
         {
             string reason = result == null ? "unknown" : result.ReviewReason ?? string.Empty;
+            // WP4: the global combat refusal is one plain sentence; it names
+            // no routine or casting because none of them is at fault.
+            if (reason == CastingExecutionPolicy.CombatActive) return CombatRefusalText;
             string text;
             if (reason.StartsWith("nothing-to-cast", StringComparison.Ordinal))
                 text = "nothing to cast - every buff is already active, disabled or omitted";
@@ -138,6 +142,8 @@ namespace KingmakerBuffPlanner.UI
                 text = "refused";
             return routineName + " was not cast: " + text + ". (" + reason + ")";
         }
+
+        internal const string CombatRefusalText = "Buff routines cannot run during combat.";
 
         // v1.2 §5: a HUD routine button's tooltip in casting-first mode. A
         // click runs that routine at once after a fresh check of the party;

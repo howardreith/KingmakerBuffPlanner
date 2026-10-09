@@ -1384,8 +1384,9 @@ namespace KingmakerBuffPlanner.UI
         internal PlannerSettingsViewModel(BuffPlannerProfile profile)
         {
             CastingMode = profile.Execution.Mode == "instant" ? "Instant" : "Animated";
-            CombatUse = profile.Execution.OutOfCombatOnly ? "Blocked" : "Allowed";
-            Fallback = profile.Execution.AllowAnimatedFallback ? "Allowed" : "Disabled";
+            // WP4 (0.4.0): enforced policy, no longer settings.
+            CombatUse = "Never during combat";
+            Fallback = "Off (Instant never animates)";
             ExistingBuffs = profile.Execution.RecastExisting ? "Recast" : "Skip active";
             Hotkey = string.IsNullOrWhiteSpace(profile.Ui.Hotkey)
                 ? PlannerHotkeyText.Default : profile.Ui.Hotkey;

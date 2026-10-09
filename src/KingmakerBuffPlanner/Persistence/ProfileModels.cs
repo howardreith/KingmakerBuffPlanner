@@ -248,10 +248,36 @@ namespace KingmakerBuffPlanner.Persistence
             return new ExecutionProfile
             {
                 Mode = "instant",
-                AllowAnimatedFallback = true,
-                OutOfCombatOnly = true,
+                AllowAnimatedFallback = CastingExecutionPolicy.AllowAnimatedFallback,
+                OutOfCombatOnly = CastingExecutionPolicy.OutOfCombatOnly,
                 RecastExisting = false
             };
+        }
+
+        // WP4 (0.4.0): routines never run in combat and Instant never falls
+        // back to an animated cast. Neither is a preference any more. The
+        // two fields stay in the schema (every earlier reader requires
+        // them) and are written with the enforced values, so a stored
+        // 0.3.0 choice is read but has no effect, and a rollback reads
+        // the same strict policy.
+        internal ExecutionProfile WithEnforcedPolicy()
+        {
+            return new ExecutionProfile
+            {
+                Mode = Mode,
+                AllowAnimatedFallback = CastingExecutionPolicy.AllowAnimatedFallback,
+                OutOfCombatOnly = CastingExecutionPolicy.OutOfCombatOnly,
+                RecastExisting = RecastExisting
+            };
+        }
+
+        internal bool DiffersFromEnforcedPolicy
+        {
+            get
+            {
+                return AllowAnimatedFallback != CastingExecutionPolicy.AllowAnimatedFallback ||
+                    OutOfCombatOnly != CastingExecutionPolicy.OutOfCombatOnly;
+            }
         }
     }
 }

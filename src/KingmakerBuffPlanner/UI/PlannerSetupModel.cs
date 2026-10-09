@@ -718,18 +718,6 @@ namespace KingmakerBuffPlanner.UI
             _save(Profile);
         }
 
-        public void ToggleOutOfCombatOnly()
-        {
-            Profile.Execution.OutOfCombatOnly = !Profile.Execution.OutOfCombatOnly;
-            _save(Profile);
-        }
-
-        public void ToggleAnimatedFallback()
-        {
-            Profile.Execution.AllowAnimatedFallback = !Profile.Execution.AllowAnimatedFallback;
-            _save(Profile);
-        }
-
         public void ToggleRecastExisting()
         {
             Profile.Execution.RecastExisting = !Profile.Execution.RecastExisting;

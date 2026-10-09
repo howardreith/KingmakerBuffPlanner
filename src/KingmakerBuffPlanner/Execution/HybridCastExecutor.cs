@@ -13,6 +13,7 @@ namespace KingmakerBuffPlanner.Execution
         private readonly Func<CastStep, bool> _requiresNativeCommand;
         private readonly bool _allowAnimatedFallback;
         private readonly bool _outOfCombatOnly;
+        private readonly bool _strictInstant;
         private readonly Action<int, CastStep, bool, string> _routeSelected;
 
         public HybridCastExecutor(
@@ -21,13 +22,19 @@ namespace KingmakerBuffPlanner.Execution
             bool allowAnimatedFallback,
             bool outOfCombatOnly,
             Func<CastStep, bool> requiresNativeCommand = null,
-            Action<int, CastStep, bool, string> routeSelected = null)
+            Action<int, CastStep, bool, string> routeSelected = null,
+            bool strictInstant = false)
             : this(instantRuntime, animatedRuntime, null,
                 allowAnimatedFallback, outOfCombatOnly,
-                requiresNativeCommand, routeSelected)
+                requiresNativeCommand, routeSelected, strictInstant)
         {
         }
 
+        // strictInstant (WP4, 0.4.0): Instant mode never runs a normal
+        // animated cast. A step that needs a native command or an animated
+        // fallback is refused before any native work or spend; planning
+        // already reports such a casting Not Ready, so this is the
+        // executor's own fail-closed guard.
         public HybridCastExecutor(
             IInstantCastRuntimeAdapter instantRuntime,
             ICastRuntimeAdapter animatedRuntime,
@@ -35,14 +42,16 @@ namespace KingmakerBuffPlanner.Execution
             bool allowAnimatedFallback,
             bool outOfCombatOnly,
             Func<CastStep, bool> requiresNativeCommand = null,
-            Action<int, CastStep, bool, string> routeSelected = null)
+            Action<int, CastStep, bool, string> routeSelected = null,
+            bool strictInstant = false)
         {
             _instantRuntime = instantRuntime ?? throw new ArgumentNullException("instantRuntime");
             _animatedRuntime = animatedRuntime ?? throw new ArgumentNullException("animatedRuntime");
             _legacyRequiresAnimated = requiresAnimated;
             _requiresNativeCommand = requiresNativeCommand ?? (step => false);
-            _allowAnimatedFallback = allowAnimatedFallback;
+            _allowAnimatedFallback = allowAnimatedFallback && !strictInstant;
             _outOfCombatOnly = outOfCombatOnly;
+            _strictInstant = strictInstant;
             _routeSelected = routeSelected;
         }
 
@@ -76,8 +85,8 @@ namespace KingmakerBuffPlanner.Execution
                 bool mandatoryNativeCommand = nativeCallback || nativeStrategy;
                 bool animatedFallback = fallbackStrategy || legacyCallback;
                 bool useAnimated = mandatoryNativeCommand || animatedFallback;
-                bool refused = animatedFallback && !mandatoryNativeCommand &&
-                    !_allowAnimatedFallback;
+                bool refused = _strictInstant ? useAnimated
+                    : animatedFallback && !mandatoryNativeCommand && !_allowAnimatedFallback;
                 string route = "configured-mode:instant;planned-strategy:" +
                     step.ExecutionStrategy + ";actual-executor:" +
                     (refused ? "Refused" : useAnimated ? "Animated" : "Instant") +
@@ -86,6 +95,7 @@ namespace KingmakerBuffPlanner.Execution
                     ";legacy-callback:" + legacyCallback +
                     ";fallback-strategy:" + fallbackStrategy +
                     ";allow-animated-fallback:" + _allowAnimatedFallback +
+                    ";strict-instant:" + _strictInstant +
                     ";reason:" + step.ExecutionStrategyReason;
                 report.Add(index, step, CastExecutionStatus.ExecutorSelected, route);
                 if (_routeSelected != null)
@@ -98,7 +108,10 @@ namespace KingmakerBuffPlanner.Execution
                         step.ExecutionStrategy + ";reason:" +
                         step.ExecutionStrategyReason);
                     report.Add(index, step, CastExecutionStatus.FailedValidation,
-                        "animated-fallback-disabled");
+                        _strictInstant
+                            ? CastingExecutionPolicy.InstantRouteUnavailable + ":" +
+                                step.ExecutionStrategy + ":" + step.ExecutionStrategyReason
+                            : "animated-fallback-disabled");
                     continue;
                 }
                 ICastExecutor executor = useAnimated

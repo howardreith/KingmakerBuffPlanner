@@ -33,6 +33,7 @@
     <Compile Include="CastingGraphTests.cs" />
     <Compile Include="BlockedNavigationTests.cs" />
     <Compile Include="SpellbookEntryTests.cs" />
+    <Compile Include="ExecutionPolicyTests.cs" />
     <Compile Include="AutosaveLifecycleTests.cs" />
     <Compile Include="SharePlanningTests.cs" />
     <Compile Include="UndoHistoryTests.cs" />

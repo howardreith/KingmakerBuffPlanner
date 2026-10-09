@@ -30,6 +30,27 @@ namespace KingmakerBuffPlanner.Domain.Planning
         ProviderDirectRuleCast
     }
 
+    // WP4 (0.4.0) execution policy. Instant is strict: a casting runs
+    // instantly only through a qualified rule-cast route and never falls
+    // back to a normal animated cast; a casting that cannot is Not Ready in
+    // Instant mode and runs only in the explicit Animated mode. Routines
+    // never run during combat. Neither rule is a player setting any more;
+    // the legacy persisted preference fields are normalized to this policy.
+    public static class CastingExecutionPolicy
+    {
+        public const bool OutOfCombatOnly = true;
+        public const bool AllowAnimatedFallback = false;
+        public const string InstantRouteUnavailable = "instant-route-unavailable";
+        public const string CombatActive = "combat-active";
+
+        public static bool IsInstantCapable(CastExecutionStrategy strategy)
+        {
+            return strategy == CastExecutionStrategy.DirectRuleCast ||
+                strategy == CastExecutionStrategy.StickyTouchDeliveryRuleCast ||
+                strategy == CastExecutionStrategy.ProviderDirectRuleCast;
+        }
+    }
+
     public sealed class CastExecutionCapability
     {
         public CastExecutionCapability(CastExecutionStrategy strategy, string reason)

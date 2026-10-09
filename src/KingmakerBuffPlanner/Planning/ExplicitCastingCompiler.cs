@@ -268,7 +268,8 @@ namespace KingmakerBuffPlanner.Planning
             string budgetRoutineScope = null,
             IEnumerable<ICastingTargetingModifier> targetingModifiers = null,
             bool projectEffects = false,
-            ActiveEffectSnapshot liveEffects = null)
+            ActiveEffectSnapshot liveEffects = null,
+            bool strictInstant = false)
         {
             if (document == null) throw new ArgumentNullException("document");
             if (snapshot == null) throw new ArgumentNullException("snapshot");
@@ -295,8 +296,8 @@ namespace KingmakerBuffPlanner.Planning
                 ProviderSnapshot provider;
                 List<ModifierUsageDemand> modifierDemands;
                 castings.Add(CompileOne(casting, snapshot, options, effectsBySource,
-                    enhancementList, modifierList, diagnostics, liveEffects, out matched,
-                    out intended, out provider, out modifierDemands));
+                    enhancementList, modifierList, diagnostics, liveEffects, strictInstant,
+                    out matched, out intended, out provider, out modifierDemands));
                 matchedEnhancements[casting.CastingId] = matched;
                 intendedEnhancements[casting.CastingId] = intended;
                 providers[casting.CastingId] = provider;
@@ -394,6 +395,7 @@ namespace KingmakerBuffPlanner.Planning
             List<ICastingTargetingModifier> targetingModifiers,
             List<string> diagnostics,
             ActiveEffectSnapshot liveEffects,
+            bool strictInstant,
             out List<CastEnhancementSnapshot> matchedEnhancements,
             out List<CastEnhancementSnapshot> intendedEnhancements,
             out ProviderSnapshot providerSnapshot,
@@ -542,6 +544,15 @@ namespace KingmakerBuffPlanner.Planning
                 reasons.Add("already-active:" + string.Join(",", satisfiedUnits.ToArray()));
             else
                 reasons.AddRange(resourceReasons);
+            // WP4 strict Instant: a casting whose effective route is not a
+            // qualified instant rule cast is Not Ready in Instant mode (it
+            // never silently animates); an already-active skip casts nothing
+            // and stays a skip. The reason names this casting, so the gate
+            // and Not Ready navigation identify it structurally.
+            if (strictInstant && !alreadyActive && strategy.HasValue &&
+                !CastingExecutionPolicy.IsInstantCapable(strategy.Value))
+                reasons.Add(CastingExecutionPolicy.InstantRouteUnavailable + ":" +
+                    strategy.Value + ":" + (strategyReason ?? string.Empty));
             ResolvedCastingReadiness readiness =
                 casting.State == CastingAuthoringState.Draft
                     ? ResolvedCastingReadiness.Draft
