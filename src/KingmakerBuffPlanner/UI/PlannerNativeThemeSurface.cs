@@ -68,7 +68,6 @@ namespace KingmakerBuffPlanner.UI
             if (surface == null || _parchments.Contains(surface)) return;
             _parchments.Add(surface);
             surface.Apply(_scrollPaperDonor, PaperUnavailableReason());
-            LogParchment();
         }
 
         internal void RegisterRule(ParchmentRule rule)
@@ -114,11 +113,12 @@ namespace KingmakerBuffPlanner.UI
             string reason = PaperUnavailableReason();
             foreach (ParchmentSurface surface in _parchments) surface.Apply(_scrollPaperDonor, reason);
             foreach (ParchmentRule rule in _rules) rule.Apply(_scrollRuleDonor);
-            LogParchment();
         }
 
-        // Logged once per distinct outcome (never per frame): the live lane
-        // reads which paper the planner actually drew from the game log.
+        // Logged once per distinct outcome after a whole binding pass (never
+        // per frame, never the transient state between the paper's and the
+        // rule's bindings): the live lane reads which paper the planner
+        // actually drew from the game log.
         private void LogParchment()
         {
             if (_parchments.Count == 0) return;
@@ -185,6 +185,7 @@ namespace KingmakerBuffPlanner.UI
             NativeThemeResource sound = _theme.Resources.Get(NativeThemeCapability.Sound);
             if (sound != null) ApplyClickSounds(sound.Components[0]);
             _summary = _theme.Resources.Summary;
+            LogParchment();
         }
 
         internal void ApplyTo(RectTransform scope)
