@@ -444,6 +444,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunShareQualificationDriverTests(root);
                 RunSpellbookEntryTests();
                 RunExecutionPolicyTests(root);
+                RunStickyTouchQualificationTests(root);
                 RunDirectManipulationTests(root);
                 RunCatalogAuditTests();
                 RunPolicyAuthoringPhysicalTests(root);
