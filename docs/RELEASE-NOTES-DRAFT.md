@@ -15,8 +15,9 @@ spell description are drawn on the game's own scroll paper.
   spellbook closes first; if the planner cannot open, the spellbook comes
   back.
 - **Never during combat.** A routine pressed while the party is in combat is
-  refused with "Buff routines cannot run during combat." Nothing is spent.
-  This is no longer a setting.
+  refused with "Buff routines cannot run during combat." - in the
+  casting-first planner and the Classic planner alike, before anything is
+  planned, saved or spent. This is no longer a setting.
 - **Strict Instant.** In Instant mode a casting that cannot be cast
   instantly is Not Ready with its reason (the planner shows it); choose
   **Animated** to cast it normally. The "animate buffs that cannot be
@@ -30,12 +31,17 @@ spell description are drawn on the game's own scroll paper.
 - **Group castings** affect whoever the area reaches; nobody is "required"
   and a member outside the area never blocks the cast. Required-recipient
   choices from 0.3.0 are archived beside the plan the first time it saves.
-- **Catalogue audit.** Attacks with caster riders (Hideous Laughter), the
-  Heal skill's Treat Affliction / Treat Deadly Wounds cooldowns, harmful
-  conditions (Dazing Touch), save-gated effects, activation markers and
-  restoration trackers no longer appear as buffs. Light, Daylight and
-  Elemental Bastion also leave the catalogue (their buffs have no mechanics
-  of their own).
+- **Catalogue audit.** Attacks with caster riders (Hideous Laughter), combat
+  maneuvers, harmful conditions (Dazing Touch), save-gated effects, heals and
+  restorations with their cooldowns (the Heal skill's Treat Affliction / Treat
+  Deadly Wounds, Counter Curse, Kinetic Healer) and revivals (Inspiring
+  Recovery) no longer appear as buffs. Buffs whose effect lives in the
+  abilities that read them stay (Targeted Bomb Admixture, Venomous Strike,
+  Elemental Bastion, School Understanding), as do Light and Daylight. With
+  Call of the Wild, the shaman's Battle / Bone / Wind Ward and Draconic
+  Resilience hexes are planned by their ward buff, and 20 more revelations and
+  hexes appear (Air Barrier, Spirit Shield, Ice Armor, Armor of Bones, Time
+  Sight, Gift of Claw and Horn, Mythmaker).
 - **Magic Circle against Alignment** (KingmakerGunslinger) casts instantly
   on an ally in Instant mode.
 - **Scroll paper.** The planner and the right-click spell description are
