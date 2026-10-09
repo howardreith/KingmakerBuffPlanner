@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Kingmaker.Blueprints;
 using Kingmaker.Blueprints.Items.Ecnchantments;
+using Kingmaker.Designers.Mechanics.Buffs;
 using Kingmaker.UnitLogic.Buffs.Blueprints;
+using Kingmaker.UnitLogic.FactLogic;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.GameAdapters;
@@ -32,6 +34,7 @@ namespace KingmakerBuffPlanner.Discovery
             var entries = new List<NativeCatalogEntry>();
             NativeAccessibilityIndex accessibility = NativeAccessibilityIndex.Build();
             var classifier = new NativeCandidateClassifier();
+            var before040 = new NativeCandidateClassifier(NativeCandidateRuleSet.Pre040);
             var adapter = new KingmakerActionGraphAdapter();
             var scanner = new ActionGraphScanner();
             foreach (BlueprintAbility ability in ResourcesLibrary.GetBlueprints<BlueprintAbility>()
@@ -109,48 +112,24 @@ namespace KingmakerBuffPlanner.Discovery
                                 overrideApplication.Entry.Reason,
                         RuntimeEvidence = new string[0]
                     };
-                    NativeCandidateAuditDecision decision = classifier.Classify(
-                        new NativeCandidateAuditFacts
-                        {
-                            IsPlayerAccessible = candidate,
-                            CanTargetSelf = entry.CanTargetSelf,
-                            CanTargetFriends = entry.CanTargetFriends,
-                            CanTargetEnemies = entry.CanTargetEnemies,
-                            CanTargetPoint = entry.CanTargetPoint,
-                            HasVariants = entry.VariantGuids.Length != 0,
-                            IsStickyTouch = entry.IsStickyTouch,
-                            EffectOnAlly = entry.EffectOnAlly,
-                            EffectOnEnemy = entry.EffectOnEnemy,
-                            Range = entry.Range,
-                            AbilityComponentTypes = entry.AbilityComponentTypes,
-                            Effects = effects.Select(e => new NativeCandidateEffectFacts
-                            {
-                                Kind = e.Kind,
-                                Target = e.Target,
-                                Harmful = e.Harmful,
-                                IsHiddenInUi = e.IsHiddenInUi,
-                                IsClassFeature = e.IsClassFeature,
-                                RemoveOnRest = e.RemoveOnRest,
-                                StayOnDeath = e.StayOnDeath,
-                                ComponentTypes = e.ComponentTypes,
-                                SourceContract = e.SourceContract,
-                                ActionPath = e.ActionPath
-                            }).ToArray(),
-                            DiagnosticContracts = scan.Diagnostics.Select(d =>
-                                d.NodeIdentity + "|" + d.Detail).ToArray(),
-                            Diagnostics = scan.Diagnostics.Select(d =>
-                                new NativeCandidateDiagnosticFacts
-                                {
-                                    Code = d.Code,
-                                    Contract = d.NodeIdentity,
-                                    Detail = d.Detail,
-                                    ActionPath = d.ActionPath
-                                }).ToArray()
-                        });
+                    NativeCandidateAuditFacts facts = AuditFacts(ability, candidate, effects, scan.Diagnostics);
+                    NativeCandidateAuditDecision decision = classifier.Classify(facts);
                     entry.Disposition = decision.Disposition;
                     entry.SupportClass = decision.SupportClass;
                     entry.DispositionReason = decision.Reason;
                     entry.QualificationStatus = decision.QualificationStatus;
+                    entry.DispositionBefore040 = before040.Classify(facts).Disposition;
+                    // Live discovery classifies every ability a party member
+                    // actually has as reachable (KingmakerBuffSourceDiscovery):
+                    // the live scope is that classification, so sources the
+                    // static index cannot reach (the Heal skill's Treat
+                    // Affliction) are audited too.
+                    NativeCandidateAuditFacts live = AuditFacts(ability, true, effects, scan.Diagnostics);
+                    NativeCandidateAuditDecision liveDecision = classifier.Classify(live);
+                    entry.LiveDisposition = liveDecision.Disposition;
+                    entry.LiveDispositionReason = liveDecision.Reason;
+                    entry.LiveDispositionBefore040 = before040.Classify(live).Disposition;
+                    entry.Payloads = liveDecision.Payloads.Select(e => e.EffectId).ToArray();
                     if (overrideApplication.Entry != null)
                     {
                         EffectOverrideEntry applied = overrideApplication.Entry;
@@ -164,6 +143,14 @@ namespace KingmakerBuffPlanner.Discovery
                         entry.QualificationStatus = entry.Disposition == "include"
                             ? "DEFER-runtime-qualification" : entry.Disposition == "exclude"
                                 ? "PASS-excluded-by-definition" : "FAIL-unsupported";
+                        // An override decides both scopes under both rule sets.
+                        entry.DispositionBefore040 = entry.Disposition;
+                        entry.LiveDisposition = entry.Disposition;
+                        entry.LiveDispositionReason = entry.DispositionReason;
+                        entry.LiveDispositionBefore040 = entry.Disposition;
+                        entry.Payloads = entry.Disposition == "include"
+                            ? effects.Select(e => e.EffectGuid).Distinct(StringComparer.Ordinal).ToArray()
+                            : new string[0];
                     }
                     entries.Add(entry);
                 }
@@ -184,14 +171,18 @@ namespace KingmakerBuffPlanner.Discovery
                             new DiscoveryDiagnostic("scanner-exception", ability.AssetGuid,
                                 exception.GetType().FullName + ": " + exception.Message)
                         },
-                        Disposition = "scanner-exception"
+                        Disposition = "scanner-exception",
+                        DispositionBefore040 = "scanner-exception",
+                        LiveDisposition = "scanner-exception",
+                        LiveDispositionBefore040 = "scanner-exception",
+                        Payloads = new string[0]
                     });
                 }
             }
 
             return new NativeCatalogExport
             {
-                SchemaVersion = 4,
+                SchemaVersion = 5,
                 Profile = _profileId,
                 GeneratorCommit = BuildInfo.Commit,
                 AbilityCount = entries.Count,
@@ -216,7 +207,92 @@ namespace KingmakerBuffPlanner.Discovery
                 OptionalIncludedCount = entries.Count(e => e.Ownership != "native" && e.Disposition == "include"),
                 OptionalUnsupportedCount = entries.Count(e => e.Ownership != "native" &&
                     e.Disposition == "unsupported-with-reason"),
+                Audit040 = NativeCatalogAudit.Summarize(entries.Select(AuditInput)),
                 Abilities = entries.ToArray()
+            };
+        }
+
+        // One exported entry as the 0.4.0 catalogue audit reads it.
+        internal static NativeCatalogAuditInput AuditInput(NativeCatalogEntry entry)
+        {
+            return new NativeCatalogAuditInput
+            {
+                AbilityGuid = entry.AbilityGuid,
+                InternalName = entry.InternalName,
+                DisplayName = entry.DisplayName,
+                Ownership = entry.Ownership,
+                AbilityType = entry.AbilityType,
+                IsSpell = entry.IsSpell,
+                IsCandidate = entry.IsCandidate,
+                FirstAccessibilitySource = (entry.AccessibilitySources ?? new string[0]).FirstOrDefault(),
+                CanTargetSelf = entry.CanTargetSelf,
+                CanTargetFriends = entry.CanTargetFriends,
+                IsStickyTouch = entry.IsStickyTouch,
+                SupportClass = entry.SupportClass,
+                QualificationStatus = entry.QualificationStatus,
+                ManualOverride = entry.ManualOverride,
+                Disposition = entry.Disposition,
+                DispositionReason = entry.DispositionReason,
+                DispositionBefore040 = entry.DispositionBefore040,
+                LiveDisposition = entry.LiveDisposition,
+                LiveDispositionReason = entry.LiveDispositionReason,
+                LiveDispositionBefore040 = entry.LiveDispositionBefore040,
+                Effects = (entry.Effects ?? new NativeEffectRecord[0]).Select(e => new NativeCatalogAuditEffect
+                {
+                    EffectGuid = e.EffectGuid,
+                    EffectName = e.EffectName,
+                    Kind = e.Kind,
+                    Target = e.Target
+                }).ToArray(),
+                Payloads = entry.Payloads ?? new string[0]
+            };
+        }
+
+        // The classifier facts of one ability, shared by the catalogue export
+        // and live discovery so both judge exactly the same facts.
+        internal static NativeCandidateAuditFacts AuditFacts(BlueprintAbility ability, bool accessible,
+            IEnumerable<NativeEffectRecord> effects, IEnumerable<DiscoveryDiagnostic> diagnostics)
+        {
+            DiscoveryDiagnostic[] scanned = (diagnostics ?? new DiscoveryDiagnostic[0]).ToArray();
+            return new NativeCandidateAuditFacts
+            {
+                IsPlayerAccessible = accessible,
+                CanTargetSelf = ability.CanTargetSelf,
+                CanTargetFriends = ability.CanTargetFriends,
+                CanTargetEnemies = ability.CanTargetEnemies,
+                CanTargetPoint = ability.CanTargetPoint,
+                HasVariants = (ability.Variants ?? new BlueprintAbility[0]).Any(v => v != null),
+                IsStickyTouch = ability.StickyTouch != null,
+                EffectOnAlly = ability.EffectOnAlly.ToString(),
+                EffectOnEnemy = ability.EffectOnEnemy.ToString(),
+                Range = ability.Range.ToString(),
+                AbilityComponentTypes = (ability.ComponentsArray ?? new BlueprintComponent[0])
+                    .Where(c => c != null).Select(c => c.GetType().FullName)
+                    .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToArray(),
+                Effects = (effects ?? new NativeEffectRecord[0]).Select(e => new NativeCandidateEffectFacts
+                {
+                    EffectId = e.EffectGuid,
+                    EffectName = e.EffectName,
+                    Kind = e.Kind,
+                    Target = e.Target,
+                    Harmful = e.Harmful,
+                    IsHiddenInUi = e.IsHiddenInUi,
+                    IsClassFeature = e.IsClassFeature,
+                    RemoveOnRest = e.RemoveOnRest,
+                    StayOnDeath = e.StayOnDeath,
+                    ComponentTypes = e.ComponentTypes,
+                    GrantedConditions = e.GrantedConditions,
+                    SourceContract = e.SourceContract,
+                    ActionPath = e.ActionPath
+                }).ToArray(),
+                DiagnosticContracts = scanned.Select(d => d.NodeIdentity + "|" + d.Detail).ToArray(),
+                Diagnostics = scanned.Select(d => new NativeCandidateDiagnosticFacts
+                {
+                    Code = d.Code,
+                    Contract = d.NodeIdentity,
+                    Detail = d.Detail,
+                    ActionPath = d.ActionPath
+                }).ToArray()
             };
         }
 
@@ -229,6 +305,7 @@ namespace KingmakerBuffPlanner.Discovery
                 bool? harmful = null;
                 string name = string.Empty;
                 string[] componentTypes = new string[0];
+                string[] grantedConditions = new string[0];
                 bool hidden = false;
                 bool classFeature = false;
                 bool removeOnRest = false;
@@ -243,6 +320,11 @@ namespace KingmakerBuffPlanner.Discovery
                         componentTypes = (buff.ComponentsArray ?? new BlueprintComponent[0])
                             .Where(c => c != null).Select(c => c.GetType().FullName)
                             .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToArray();
+                        grantedConditions = (buff.ComponentsArray ?? new BlueprintComponent[0])
+                            .Select(c => c is AddCondition ? ((AddCondition)c).Condition.ToString()
+                                : c is BuffStatusCondition ? ((BuffStatusCondition)c).Condition.ToString() : null)
+                            .Where(v => v != null).Distinct(StringComparer.Ordinal)
+                            .OrderBy(v => v, StringComparer.Ordinal).ToArray();
                         hidden = buff.IsHiddenInUI;
                         classFeature = buff.IsClassFeature;
                         removeOnRest = buff.RemoveOnRest;
@@ -272,6 +354,7 @@ namespace KingmakerBuffPlanner.Discovery
                     RemoveOnRest = removeOnRest,
                     StayOnDeath = stayOnDeath,
                     ComponentTypes = componentTypes,
+                    GrantedConditions = grantedConditions,
                     SourceContract = leaf.SourceContract,
                     ActionPath = leaf.ActionPath
                 };
@@ -332,7 +415,8 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("optionalCandidateCount", Order = 17)] public int OptionalCandidateCount { get; set; }
         [JsonProperty("optionalIncludedCount", Order = 18)] public int OptionalIncludedCount { get; set; }
         [JsonProperty("optionalUnsupportedCount", Order = 19)] public int OptionalUnsupportedCount { get; set; }
-        [JsonProperty("abilities", Order = 20)]
+        [JsonProperty("audit040", Order = 20)] public NativeCatalogAuditSummary Audit040 { get; set; }
+        [JsonProperty("abilities", Order = 21)]
         public NativeCatalogEntry[] Abilities { get; set; }
     }
 
@@ -396,6 +480,14 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("manualOverride", Order = 36)] public string ManualOverride { get; set; }
         [JsonProperty("runtimeEvidence", Order = 37)] public string[] RuntimeEvidence { get; set; }
         [JsonProperty("qualificationStatus", Order = 38)] public string QualificationStatus { get; set; }
+        // The 0.4.0 catalogue audit (WP5): the disposition under the rules
+        // released through 0.3.0, and the live-discovery scope (the ability
+        // classified as reachable) under both rule sets.
+        [JsonProperty("dispositionBefore040", Order = 39)] public string DispositionBefore040 { get; set; }
+        [JsonProperty("liveDisposition", Order = 40)] public string LiveDisposition { get; set; }
+        [JsonProperty("liveDispositionReason", Order = 41)] public string LiveDispositionReason { get; set; }
+        [JsonProperty("liveDispositionBefore040", Order = 42)] public string LiveDispositionBefore040 { get; set; }
+        [JsonProperty("payloads", Order = 43)] public string[] Payloads { get; set; }
     }
 
     internal sealed class NativeEffectRecord
@@ -412,6 +504,7 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("componentTypes", Order = 10)] public string[] ComponentTypes { get; set; }
         [JsonProperty("sourceContract", Order = 11)] public string SourceContract { get; set; }
         [JsonProperty("actionPath", Order = 12)] public string ActionPath { get; set; }
+        [JsonProperty("grantedConditions", Order = 13)] public string[] GrantedConditions { get; set; }
     }
 
     internal sealed class NativeActionRecord

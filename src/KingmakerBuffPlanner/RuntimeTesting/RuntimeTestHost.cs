@@ -517,6 +517,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 NativeCatalogExport catalog = null;
                 string catalogPath = null;
                 string catalogHash = null;
+                NativeCatalogAuditDocument catalogAudit = null;
+                string catalogAuditHash = null;
                 HarmonyPatchInventory harmonyInventory = null;
                 string harmonyInventoryHash = null;
                 RuntimePerformanceProfile performanceProfile = null;
@@ -539,7 +541,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     string catalogJson = Serialize(catalog);
                     JObject catalogDocument = JObject.Parse(catalogJson);
                     JArray abilityDocuments = catalogDocument["abilities"] as JArray;
-                    if ((int)catalogDocument["schemaVersion"] != 4 || abilityDocuments == null ||
+                    if ((int)catalogDocument["schemaVersion"] != 5 || abilityDocuments == null ||
                         abilityDocuments.Count != catalog.AbilityCount)
                         throw new InvalidDataException("Serialized catalog contract did not reconcile.");
                     foreach (JObject abilityDocument in abilityDocuments.OfType<JObject>())
@@ -551,6 +553,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     }
                     AtomicFile.WriteUtf8(catalogPath, catalogJson);
                     catalogHash = Hashing.Sha256(catalogPath);
+                    // The 0.4.0 catalogue audit (WP5): every included or
+                    // removed source with its rule, effects and reason.
+                    catalogAudit = NativeCatalogAudit.Document(_request.ProfileId, BuildInfo.Commit,
+                        catalog.Abilities.Select(NativeCatalogExporter.AuditInput));
+                    string catalogAuditPath = Path.Combine(
+                        _request.EvidenceDirectory, "native-buff-catalog-audit.json");
+                    AtomicFile.WriteUtf8(catalogAuditPath, Serialize(catalogAudit));
+                    catalogAuditHash = Hashing.Sha256(catalogAuditPath);
                     harmonyInventory = new HarmonyPatchInventoryExporter().Export(_request.ProfileId, harmony);
                     string harmonyInventoryPath = Path.Combine(
                         _request.EvidenceDirectory, "harmony-patch-inventory.json");
@@ -605,6 +615,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     CatalogOptionalCandidateCount = catalog == null ? 0 : catalog.OptionalCandidateCount,
                     CatalogOptionalIncludedCount = catalog == null ? 0 : catalog.OptionalIncludedCount,
                     CatalogOptionalUnsupportedCount = catalog == null ? 0 : catalog.OptionalUnsupportedCount,
+                    CatalogAuditSha256 = catalogAuditHash,
+                    CatalogAuditRecordCount = catalogAudit == null ? 0 : catalogAudit.Records.Length,
+                    CatalogAuditStaticIncludedBefore040 = catalogAudit == null ? 0
+                        : catalogAudit.Summary.Totals.StaticIncludedBefore040,
+                    CatalogAuditStaticIncluded = catalogAudit == null ? 0 : catalogAudit.Summary.Totals.StaticIncluded,
+                    CatalogAuditLiveIncludedBefore040 = catalogAudit == null ? 0
+                        : catalogAudit.Summary.Totals.LiveIncludedBefore040,
+                    CatalogAuditLiveIncluded = catalogAudit == null ? 0 : catalogAudit.Summary.Totals.LiveIncluded,
+                    CatalogAuditAddedCount = catalogAudit == null ? 0 : catalogAudit.Summary.AddedCount,
                     HarmonyPatchInventorySha256 = harmonyInventoryHash,
                     HarmonyPatchTargetCount = harmonyInventory == null ? 0 : harmonyInventory.TargetCount,
                     HarmonyPatchRecordCount = harmonyInventory == null ? 0 : harmonyInventory.PatchCount,

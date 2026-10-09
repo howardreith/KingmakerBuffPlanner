@@ -445,6 +445,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunSpellbookEntryTests();
                 RunExecutionPolicyTests(root);
                 RunDirectManipulationTests(root);
+                RunCatalogAuditTests();
             }
             finally
             {
@@ -1182,6 +1183,9 @@ namespace KingmakerBuffPlanner.Tests
             bool classFeature = false,
             IEnumerable<string> components = null)
         {
+            // A real buff carries mechanics; a buff with only bookkeeping
+            // components is a marker under the 0.4.0 audit rules, so a
+            // fixture names its components only when they matter.
             return new NativeCandidateEffectFacts
             {
                 Kind = kind,
@@ -1189,7 +1193,7 @@ namespace KingmakerBuffPlanner.Tests
                 Harmful = harmful,
                 IsHiddenInUi = hidden,
                 IsClassFeature = classFeature,
-                ComponentTypes = (components ?? new string[0]).ToArray(),
+                ComponentTypes = (components ?? new[] { "Kingmaker.UnitLogic.FactLogic.AddStatBonus" }).ToArray(),
                 SourceContract = source,
                 ActionPath = path
             };

@@ -651,7 +651,7 @@ function Assert-KbpRuntimeResult {
         if ($Result.catalogSha256 -cne (Get-KbpSha256 $catalogPath)) { throw 'Native catalog hash mismatch.' }
         if ([int]$Result.catalogAbilityCount -le 0) { throw 'Native catalog is empty.' }
         $catalog = Read-KbpJson $catalogPath
-        if ([int]$catalog.schemaVersion -ne 4 -or
+        if ([int]$catalog.schemaVersion -ne 5 -or
             [string]$catalog.profile -cne [string]$Request.profileId -or
             [int]$catalog.abilityCount -ne [int]$Result.catalogAbilityCount -or
             @($catalog.abilities).Count -ne [int]$catalog.abilityCount) {
@@ -661,6 +661,27 @@ function Assert-KbpRuntimeResult {
             [string]::IsNullOrWhiteSpace([string]$_.expression.expressionType)
         })
         if ($missingExpressions.Count -ne 0) { throw 'Native catalog contains expressions without discriminators.' }
+        # The 0.4.0 catalogue audit (WP5): present, hashed, reconciled with the
+        # catalog's own audit summary, and it only ever removes entries.
+        $auditPath = Join-Path $Request.evidenceDirectory 'native-buff-catalog-audit.json'
+        if (-not (Test-Path -LiteralPath $auditPath -PathType Leaf)) { throw 'Native catalog audit evidence is missing.' }
+        if ([string]$Result.catalogAuditSha256 -cne (Get-KbpSha256 $auditPath)) { throw 'Native catalog audit hash mismatch.' }
+        $audit = Read-KbpJson $auditPath
+        $totals = $audit.summary.totals
+        $catalogTotals = $catalog.audit040.totals
+        if ([int]$audit.schemaVersion -ne 1 -or [string]$audit.profile -cne [string]$Request.profileId -or
+            @($audit.records).Count -ne [int]$Result.catalogAuditRecordCount -or
+            [int]$totals.staticIncluded -ne [int]$Result.catalogAuditStaticIncluded -or
+            [int]$totals.staticIncludedBefore040 -ne [int]$Result.catalogAuditStaticIncludedBefore040 -or
+            [int]$totals.liveIncluded -ne [int]$Result.catalogAuditLiveIncluded -or
+            [int]$totals.liveIncludedBefore040 -ne [int]$Result.catalogAuditLiveIncludedBefore040 -or
+            [int]$catalogTotals.staticIncluded -ne [int]$totals.staticIncluded -or
+            [int]$catalogTotals.liveIncluded -ne [int]$totals.liveIncluded -or
+            [int]$audit.summary.addedCount -ne 0 -or [int]$Result.catalogAuditAddedCount -ne 0 -or
+            [int]$totals.staticIncluded -gt [int]$totals.staticIncludedBefore040 -or
+            [int]$totals.liveIncluded -gt [int]$totals.liveIncludedBefore040) {
+            throw 'Native catalog audit does not reconcile with the catalog and the runtime result.'
+        }
         $harmonyPath = Join-Path $Request.evidenceDirectory 'harmony-patch-inventory.json'
         if (-not (Test-Path -LiteralPath $harmonyPath -PathType Leaf)) { throw 'Harmony patch inventory evidence is missing.' }
         if ($Result.harmonyPatchInventorySha256 -cne (Get-KbpSha256 $harmonyPath)) {

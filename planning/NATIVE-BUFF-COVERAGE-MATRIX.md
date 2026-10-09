@@ -1,5 +1,44 @@
 # Native Buff Coverage Matrix
 
+## 0.4.0 beneficial-buff catalogue audit (WP5)
+
+The catalogue is structural; the audit adds rules to the same classifier
+(`Discovery/NativeCandidateClassifier.cs`, rule set `Current`) and keeps the
+0.3.0 rules as rule set `Pre040` only so that every catalogue export reports
+what the audit changed. Live discovery (`KingmakerBuffSourceDiscovery`) and the
+catalogue export now build their classifier facts with one shared builder
+(`NativeCatalogExporter.AuditFacts`), so both judge identical facts. No spell
+name or GUID is consulted and no override was added.
+
+| Rule | Removes | Reason code | Example (exported facts) |
+| --- | --- | --- | --- |
+| Hostile ability rider | an effect on the caster or current target of an ability aimed at enemies (can target enemies and not allies, or harmful to enemies and not helpful to allies) | `hostile-ability-rider` (or `offensive-carrier-only` when the ability is an offensive carrier) | Hideous Laughter's Call of the Wild Infectious Charms caster rider |
+| Save-gated effect | an effect that lands only on a failed saving throw | `save-gated-effect` | the non-ally branch of Magic Circle (its ally branch stays the payload) |
+| Harmful condition | a buff that changes its bearer's faction, or whose only mechanics impose a harmful `UnitCondition` (read from `AddCondition` / `BuffStatusCondition`) | `harmful-only` | Dazing Touch (`DazeBuff`, Dazed) |
+| Mechanics-free buff | a buff whose components only keep its books (rank, descriptor, uniqueness, stored context, cleanup) - cooldowns, activation markers, cosmetic buffs; the proven enchant-pool signal buff is exempt | `mechanics-free-marker-only` / `reactive-restoration-marker-only` | the Heal skill's Treat Affliction and Treat Deadly Wounds cooldowns, Light |
+| Hidden bookkeeping marker | a hidden buff of bookkeeping plus on-apply/cleanup actions | `hidden-marker-only` | Targeted Bomb Admixture |
+| Restoration tracker | a hidden buff beside an instantaneous heal, restoration, removal or dispel | `reactive-restoration-marker-only` | Inspiring Recovery's check buff |
+
+Conditional alternatives are preserved: a mixed graph keeps only the payloads
+on a branch the rules understand (Magic Circle's ally branch); a buff on the
+same branch as damage, a charm, and a hostile rider fail closed. A planned
+source's payloads are exported per entry (`payloads`).
+
+The guarded `native-buff-catalog` scenario writes `native-buff-catalog.json`
+(schema 5: `dispositionBefore040`, `liveDisposition`,
+`liveDispositionBefore040`, `payloads`, `grantedConditions`, and the
+`audit040` summary) and `native-buff-catalog-audit.json` (every included or
+removed source: name, blueprint, ownership, source kind, provider, scope,
+rule, persistent beneficial effects, target semantics, execution support,
+qualification status, exclusion reason). The harness verifies its hash,
+reconciles its counts with the catalog and the result, and refuses an audit
+that adds entries. `scripts/ConvertTo-KbpCatalogAuditReport.ps1` renders the
+human-readable report. Regressions: `catalog-audit-*` (Hideous Laughter,
+Treat Affliction, Treat Deadly Wounds, Dazing Touch, restoration tracker,
+markers, legitimate self / ally / party / ability / item buffs, mixed
+graphs, audit summary). Per-profile before/after counts are recorded in
+`docs/REMAINING-WORK-0.4.0-HANDOFF.md` once the guarded runs exist.
+
 ## 2026-09-06 failed human validation: routing diagnosis
 
 Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.
