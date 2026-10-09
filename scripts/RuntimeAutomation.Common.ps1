@@ -1137,7 +1137,8 @@ function Assert-KbpSpellbookEntryOutcome {
             $null -eq $cycle.buttonX -or [double]$cycle.buttonX -le 0 -or
             [double]$cycle.buttonX -ge [int]$record.screenWidth -or $null -eq $cycle.buttonY -or
             [double]$cycle.buttonY -le 0 -or [double]$cycle.buttonY -ge [int]$record.screenHeight -or
-            [int]$cycle.nativeCloseInvocations -ne 1 -or [int]$cycle.openerInvocations -ne 1) {
+            [int]$cycle.nativeCloseInvocations -ne 1 -or [int]$cycle.openerInvocations -ne 1 -or
+            [int]$cycle.nativeReleases -ne 1) {
             throw "Spellbook cycle $suffix did not offer one topmost button and hand off exactly once."
         }
         if ($fault) {
@@ -1151,8 +1152,8 @@ function Assert-KbpSpellbookEntryOutcome {
         }
         elseif ([int]$cycle.workspaceOpens -ne 1 -or [string]$cycle.handoffState -cne 'Completed' -or
             -not [bool]$cycle.plannerOpenAfterClick -or -not [bool]$cycle.inputLeaseHeldAfterClick -or
-            [bool]$cycle.spellbookShownAfterClick -or [bool]$cycle.nativeOwnerActiveAfterClick -or
-            [int]$cycle.plannerRootsAfterClick -ne 1) {
+            [bool]$cycle.spellbookShownAfterClick -or [bool]$cycle.serviceWindowShownAfterClick -or
+            -not [bool]$cycle.plannerOwnsFullScreenAfterClick -or [int]$cycle.plannerRootsAfterClick -ne 1) {
             throw "Spellbook cycle $suffix did not open the planner exactly once after the native close."
         }
         if (-not [bool]$cycle.plannerClosedAfterEscape -or -not [bool]$cycle.inputLeaseReleasedAfterEscape -or

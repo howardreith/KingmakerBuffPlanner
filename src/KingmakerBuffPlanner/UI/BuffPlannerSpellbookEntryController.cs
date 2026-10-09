@@ -92,6 +92,8 @@ namespace KingmakerBuffPlanner.UI
         internal string LastRefusalForRuntime { get; private set; }
         internal int NativeCloseInvocationsForRuntime { get; private set; }
         internal int OpenerInvocationsForRuntime { get; private set; }
+        // Handoffs whose native owner (mode and window) was observed released.
+        internal int NativeReleasesForRuntime { get; private set; }
         internal int ButtonsAttachedForRuntime { get; private set; }
         internal bool NativeOwnerActiveForRuntime { get { return NativeOwnerActive(); } }
 
@@ -146,6 +148,7 @@ namespace KingmakerBuffPlanner.UI
                 // Native ownership released: invoke the opener exactly once,
                 // then wait out the deferred presentation lifecycle.
                 bool accepted = false;
+                NativeReleasesForRuntime++;
                 OpenerInvocationsForRuntime++;
                 try { accepted = _openPlanner(); }
                 catch (Exception exception)
