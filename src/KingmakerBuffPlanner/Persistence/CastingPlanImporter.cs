@@ -332,15 +332,16 @@ namespace KingmakerBuffPlanner.Persistence
                 pooledEnhancements++;
             }
             string directTarget = null;
-            var coverage = new List<string>();
             CastingTargetMode mode;
             CastingOrigin origin = null;
             if (recipientKey == GroupKey || recipientKey == GroupingUnknownKey ||
                 recipientKey == NoRecipientKey)
             {
+                // WP3 (0.4.0): the classic targets are not required
+                // recipients; a group casting affects whoever its area
+                // reaches. The grouping-unknown review item still names them.
                 mode = CastingTargetMode.CasterCenteredOrigin;
                 origin = CastingOrigin.CasterCentered();
-                coverage.AddRange(child.TargetUnitIds);
                 if (recipientKey == GroupKey)
                 {
                     reviewItems.Add(GroupReviewNote);
@@ -368,7 +369,7 @@ namespace KingmakerBuffPlanner.Persistence
                 castingId,
                 entry.RoutineId, 0, entry.Assignment.SourceId,
                 entry.Assignment.Ability.ToKey(), casterUnitId, child.SpellbookGuid,
-                mode, directTarget, origin, coverage, null, enhancements,
+                mode, directTarget, origin, null, null, enhancements,
                 entry.Assignment.ExistingEffectPolicy,
                 entry.Assignment.IgnoredPresenceMarkers,
                 ready ? CastingAuthoringState.Ready : CastingAuthoringState.Draft,

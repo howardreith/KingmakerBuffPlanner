@@ -222,6 +222,7 @@
     <Compile Include="UI\CastingWorkspaceModels.cs" />
     <Compile Include="UI\CastingWorkspaceSession.cs" />
     <Compile Include="UI\CastingWorkspaceSession.Graph.cs" />
+    <Compile Include="UI\CastingWorkspaceSession.DirectManipulation.cs" />
     <Compile Include="UI\CastingProblemNavigation.cs" />
     <Compile Include="UI\CastingGraphModels.cs" />
     <Compile Include="UI\PlannerButtonPalette.cs" />

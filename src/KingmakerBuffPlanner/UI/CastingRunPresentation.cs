@@ -173,8 +173,6 @@ namespace KingmakerBuffPlanner.UI
                     "executable for this caster";
             if (value.Contains(":exact-enhancement-source:"))
                 return "an exact rod or item identity is not executed yet";
-            if (value.Contains(":required-coverage-incomplete:"))
-                return "required recipients are outside the predicted area of effect";
             return value;
         }
 

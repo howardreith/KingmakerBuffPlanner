@@ -161,6 +161,35 @@ namespace KingmakerBuffPlanner.Execution
             return delivered;
         }
 
+        // WP3 (0.4.0): a group cast affects whoever the native ability
+        // reaches from its centre and no predicted member is required. The
+        // attempt is confirmed when it delivered the expected effect (a new
+        // or refreshed, unsuppressed instance) to at least one predicted
+        // recipient; a member it did not reach - moved out of the area, or
+        // already covered for longer - is not a failure. An empty recipient
+        // set confirms nothing.
+        public static bool AnyReached(IReadOnlyList<string> recipients, EffectExpression expected,
+            EffectBaseline baseline, Func<string, IEnumerable<ObservedEffectInstance>> readAfter)
+        {
+            return ReachedRecipients(recipients, expected, baseline, readAfter).Count != 0;
+        }
+
+        public static IReadOnlyList<string> ReachedRecipients(IReadOnlyList<string> recipients,
+            EffectExpression expected, EffectBaseline baseline,
+            Func<string, IEnumerable<ObservedEffectInstance>> readAfter)
+        {
+            var reached = new List<string>();
+            if (recipients == null || baseline == null || readAfter == null) return reached;
+            foreach (string unitId in recipients)
+            {
+                IReadOnlyList<ObservedEffectInstance> before;
+                if (!baseline.TryGet(unitId, out before)) continue;
+                IEnumerable<ObservedEffectInstance> after = readAfter(unitId);
+                if (after != null && Reached(expected, before, after)) reached.Add(unitId);
+            }
+            return reached;
+        }
+
         // The complete expected effect over unsuppressed instances both
         // before and after the cast: a pre-covered recipient's kept coverage.
         public static bool StillCovered(EffectExpression expected,

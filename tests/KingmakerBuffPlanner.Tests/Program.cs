@@ -304,7 +304,7 @@ namespace KingmakerBuffPlanner.Tests
                     TestCastingA02ThreeRecipientsThreeInvocations);
                 Run("casting-a03-group-one-invocation-six-beneficiaries",
                     TestCastingA03GroupOneInvocationSixBeneficiaries);
-                Run("casting-a04-missed-coverage-no-auto-second-cast",
+                Run("casting-a04-member-outside-area-never-blocks-or-doubles",
                     TestCastingA04MissedCoverageNoAutoSecondCast);
                 Run("casting-authoring-scope-undo-and-read-only-compile",
                     TestCastingAuthoringScopeUndoAndReadOnlyCompile);
@@ -444,6 +444,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunShareQualificationDriverTests(root);
                 RunSpellbookEntryTests();
                 RunExecutionPolicyTests(root);
+                RunDirectManipulationTests(root);
             }
             finally
             {
@@ -11385,11 +11386,13 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "Incomplete coverage silently produced a different cast count.");
             ResolvedCasting group = plan.Castings[0];
-            if (!group.CoverageIncomplete || group.CoverageGaps.Count != 1 ||
-                group.CoverageGaps[0].UnitId != "unit-rogue" ||
-                group.CoverageGaps[0].Reason != "outside-predicted-coverage")
+            // WP3 (0.4.0): a group casting affects whoever the area reaches;
+            // a member outside it (here an authored 0.3.0 "required" one) is
+            // neither a gap nor a blocker.
+            if (group.CoverageIncomplete || group.CoverageGaps.Count != 0 ||
+                group.RequiredCoverageUnitIds.Count != 0 || !group.IsExecutable)
                 throw new InvalidOperationException(
-                    "The missed recipient was not disclosed as a coverage gap.");
+                    "A member outside the area constrained or blocked the group casting.");
             if (group.PredictedBeneficiaryUnitIds.Contains("unit-rogue"))
                 throw new InvalidOperationException(
                     "An uncovered recipient was counted as a predicted beneficiary.");
@@ -11654,8 +11657,10 @@ namespace KingmakerBuffPlanner.Tests
                 third.Provenance.LegacySchemaVersion != 5)
                 throw new InvalidOperationException(
                     "Group origin, draft state, or migration provenance drifted.");
-            if (third.RequiredCoverageUnitIds.Count != 3)
-                throw new InvalidOperationException("Required coverage drifted.");
+            // WP3 (0.4.0): required group recipients are retired intent and
+            // never reach the domain.
+            if (third.RequiredCoverageUnitIds.Count != 0)
+                throw new InvalidOperationException("Retired required coverage reached the domain.");
             string original = File.ReadAllText(repository.GetProfilePath("fixture-campaign"));
             repository.Save(CastingPlanProfile.FromDocument(roundTripped));
             if (File.ReadAllText(repository.GetProfilePath("fixture-campaign")) != original)
@@ -11876,10 +11881,10 @@ namespace KingmakerBuffPlanner.Tests
             if (group.State != CastingAuthoringState.Draft ||
                 group.CasterUnitId != "unit-cleric" ||
                 group.TargetMode != CastingTargetMode.CasterCenteredOrigin ||
-                group.RequiredCoverageUnitIds.Count != 3 ||
+                group.RequiredCoverageUnitIds.Count != 0 ||
                 group.DirectTargetUnitId != null)
                 throw new InvalidOperationException(
-                    "Group coverage or review state drifted.");
+                    "Group review state drifted, or old recipients became required (WP3).");
             if (group.Provenance == null || !group.Provenance.Note.Contains(
                     "group-origin-and-count-pending-review"))
                 throw new InvalidOperationException(
@@ -13307,11 +13312,10 @@ namespace KingmakerBuffPlanner.Tests
             if (view.Cards.Count != 1 ||
                 !view.Cards[0].OriginLabel.Contains("caster") ||
                 view.Cards[0].PredictedBeneficiaryUnitIds.Count != 5 ||
-                view.Cards[0].CoverageGapUnitIds.Count != 1 ||
-                view.Cards[0].CoverageGapUnitIds[0] != "unit-rogue" ||
+                view.Cards[0].CoverageGapUnitIds.Count != 0 ||
                 view.Cards[0].CostLabels.Count != 1)
                 throw new InvalidOperationException(
-                    "Group origin, beneficiaries, or the honest gap is wrong.");
+                    "Group origin or beneficiaries are wrong, or an outside member became a gap (WP3).");
             if (groupSession.Document.Castings.Count != 1)
                 throw new InvalidOperationException(
                     "Missed coverage created an extra casting.");
@@ -15392,10 +15396,13 @@ namespace KingmakerBuffPlanner.Tests
                 legacy, null, PerTarget("source-bulls"));
             PlannedCasting unknown = result.Document.Castings.Single(value =>
                 value.Provenance.LegacyAssignmentId == "legacy-unknown");
+            // WP3: the old recipients stay named in the review item, not as
+            // required coverage.
             if (unknown.State != CastingAuthoringState.Draft ||
-                unknown.RequiredCoverageUnitIds.Count != 2 ||
+                unknown.RequiredCoverageUnitIds.Count != 0 ||
                 !unknown.Provenance.ReviewItems.Any(item => item.StartsWith(
-                    "grouping-unknown:", StringComparison.Ordinal)) ||
+                    "grouping-unknown:", StringComparison.Ordinal) &&
+                    item.Contains("targets=")) ||
                 result.Document.Castings.Count(value =>
                     value.Provenance.LegacyAssignmentId == "legacy-unknown") != 1)
                 throw new InvalidOperationException("Unknown grouping was guessed or split.");
@@ -15575,11 +15582,14 @@ namespace KingmakerBuffPlanner.Tests
             if (!session.UpdateFocusedCasting(pinned().WithDirectTarget("unit-t3")).Applied ||
                 pinned().Provenance.UnresolvedReviewItems.Count != 1)
                 throw new InvalidOperationException("A retarget manufactured a review resolution.");
-            if (!session.SetFocusedCastingState(CastingAuthoringState.Disabled).Applied ||
+            // WP3: Disable is retired; the refusal changes nothing, and the
+            // unresolved review still cannot be bypassed by Ready.
+            AuthoringEditResult disable = session.SetFocusedCastingState(CastingAuthoringState.Disabled);
+            if (disable.Applied || !disable.Reason.StartsWith("disable-retired", StringComparison.Ordinal) ||
                 pinned().Provenance.UnresolvedReviewItems.Count != 1)
-                throw new InvalidOperationException("Disabling manufactured a review resolution.");
+                throw new InvalidOperationException("Disable authored a record or touched the import review.");
             if (session.SetFocusedCastingState(CastingAuthoringState.Ready).Applied)
-                throw new InvalidOperationException("Disabled -> Ready bypassed the import review.");
+                throw new InvalidOperationException("Ready bypassed the import review.");
             session.Save();
             session.Reload();
             if (pinned().Provenance.UnresolvedReviewItems.Count != 1 ||
@@ -15600,7 +15610,7 @@ namespace KingmakerBuffPlanner.Tests
             if (!resolved.Applied || !resolved.Scope.Contains(pinItem) ||
                 pinned().Provenance.UnresolvedReviewItems.Count != 0 ||
                 !pinned().Provenance.ReviewItems.Contains(pinItem) ||
-                pinned().State != CastingAuthoringState.Disabled)
+                pinned().State != CastingAuthoringState.Draft)
                 throw new InvalidOperationException("Resolution was not disclosed or erased history.");
             session.Undo();
             if (pinned().Provenance.UnresolvedReviewItems.Count != 1)
@@ -16226,9 +16236,12 @@ namespace KingmakerBuffPlanner.Tests
             {
                 ExplicitStepConversion gapConversion = ExplicitCastingStepConverter.Convert(
                     gapPlan, gapDecision, groupOptions, effects);
-                if (gapConversion.Converted)
+                // WP3 (0.4.0): a member outside the predicted area is no
+                // longer a required recipient, so the group casting converts.
+                if (!gapConversion.Converted)
                     throw new InvalidOperationException(
-                        "Incomplete required coverage converted successfully.");
+                        "A member outside the area still blocked the group projection: " +
+                        gapConversion.Refusal);
             }
 
             // Probe scope: one plain direct casting converts; two, a group,
@@ -17055,9 +17068,9 @@ namespace KingmakerBuffPlanner.Tests
             session.Draft.CasterUnitId = null;
             session.Draft.State = CastingAuthoringState.Draft;
             Assert(session.AddCastingFromDraft(inputs).Applied);
-            session.FocusCasting("cast-1");
-            Assert(session.SetFocusedCastingState(CastingAuthoringState.Disabled)
-                .Applied);
+            // A Disabled record as an earlier version saved it (WP3 retired
+            // the player command; such records stay readable).
+            Assert(session.DisableCastingForQualification("cast-1").Applied);
             session.Save();
             // Reopen: identities, order, disabled state, and the unresolved
             // draft survive the production persistence round trip.

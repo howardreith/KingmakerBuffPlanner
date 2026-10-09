@@ -59,6 +59,21 @@ namespace KingmakerBuffPlanner.Persistence
             NullValueHandling = NullValueHandling.Ignore)]
         public int? FormatRevision { get; set; }
 
+        // WP3 (0.4.0): required group recipients stored by 0.3.0. They are
+        // retired intent: the domain no longer carries them, the session
+        // archives the exact file once before the first write that drops
+        // them, and that write stores empty lists (which every earlier
+        // reader still accepts).
+        internal int LegacyRequiredCoverageCount
+        {
+            get
+            {
+                return Castings == null ? 0 : Castings.Sum(value =>
+                    value == null || value.RequiredCoverageUnitIds == null
+                        ? 0 : value.RequiredCoverageUnitIds.Count);
+            }
+        }
+
         public static CastingPlanProfile CreateDefault(string campaignId)
         {
             return new CastingPlanProfile
