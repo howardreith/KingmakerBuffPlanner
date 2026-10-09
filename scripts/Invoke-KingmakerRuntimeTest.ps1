@@ -50,8 +50,11 @@ param(
     # What the physical scenario expects of the moon press: 'select' (no
     # allowance; the press is refused by the lock and the plan digest is
     # published) or 'cast' (the allowance arms a single-use grant and the
-    # press runs Long once). Only valid with -Scenario live-workspace-physical.
-    [ValidateSet('cast', 'select')][string]$PhysicalExpectation = 'cast',
+    # press runs Long once), or 'problems' (a late-Draft fixture refuses
+    # before dispatch and physically reveals/navigates the blockers).
+    # Problems never takes or arms a casting allowance.
+    # Only valid with -Scenario live-workspace-physical.
+    [ValidateSet('cast', 'select', 'problems')][string]$PhysicalExpectation = 'cast',
     # Fixture family: the approved automation pair (default) or the
     # owner-designated advanced copy. The advanced copy is loaded only by
     # non-casting scenarios and only when it matches its guarded bootstrap

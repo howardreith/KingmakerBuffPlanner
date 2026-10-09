@@ -5,6 +5,23 @@ using System.Linq;
 
 namespace KingmakerBuffPlanner.Planning
 {
+    // Calculated identity for one casting that refuses ordinary Apply.
+    // Presentation text is never an identity or a navigation protocol.
+    public sealed class CastingBlocker
+    {
+        internal CastingBlocker(string castingId, string routineId, IEnumerable<string> reasons)
+        {
+            CastingId = castingId;
+            RoutineId = routineId ?? string.Empty;
+            Reasons = new ReadOnlyCollection<string>((reasons ?? new string[0])
+                .Distinct(StringComparer.Ordinal).ToList());
+        }
+
+        public string CastingId { get; private set; }
+        public string RoutineId { get; private set; }
+        public IReadOnlyList<string> Reasons { get; private set; }
+    }
+
     // One casting that this apply decision does not execute, with the exact
     // reasons. Omissions are always disclosed — never silently dropped.
     public sealed class CastingOmission
@@ -32,7 +49,7 @@ namespace KingmakerBuffPlanner.Planning
             string scopeRoutineId,
             IEnumerable<string> executableCastingIds,
             IEnumerable<CastingOmission> omissions,
-            IEnumerable<string> blockingReasons)
+            IEnumerable<string> blockingReasons, IEnumerable<CastingBlocker> blockingCastings = null)
         {
             Allowed = allowed;
             Mode = mode;
@@ -40,6 +57,8 @@ namespace KingmakerBuffPlanner.Planning
             ExecutableCastingIds = new ReadOnlyCollection<string>(
                 executableCastingIds.ToList());
             Omissions = new ReadOnlyCollection<CastingOmission>(omissions.ToList());
+            BlockingCastings = new ReadOnlyCollection<CastingBlocker>(
+                (blockingCastings ?? new CastingBlocker[0]).ToList());
             BlockingReasons = new ReadOnlyCollection<string>(blockingReasons
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(value => value, StringComparer.Ordinal).ToList());
@@ -52,6 +71,9 @@ namespace KingmakerBuffPlanner.Planning
         public IReadOnlyList<string> ExecutableCastingIds { get; private set; }
         public IReadOnlyList<CastingOmission> Omissions { get; private set; }
         public IReadOnlyList<string> BlockingReasons { get; private set; }
+        // Compiled execution order. Disabled/already-active omissions and
+        // global refusals never appear here.
+        public IReadOnlyList<CastingBlocker> BlockingCastings { get; private set; }
     }
 
     public enum CastingApplyMode
@@ -93,6 +115,7 @@ namespace KingmakerBuffPlanner.Planning
             var executable = new List<string>();
             var omissions = new List<CastingOmission>();
             var blocking = new List<string>();
+            var blockingCastings = new List<CastingBlocker>();
             foreach (ResolvedCasting casting in plan.Castings)
             {
                 if (scopeRoutineId != null &&
@@ -132,12 +155,16 @@ namespace KingmakerBuffPlanner.Planning
                 omissions.Add(new CastingOmission(
                     casting.CastingId, casting.RoutineId, reasons));
                 if (blocks && mode == CastingApplyMode.Ordinary)
+                {
+                    blockingCastings.Add(new CastingBlocker(
+                        casting.CastingId, casting.RoutineId, reasons));
                     blocking.Add(fallback + "-casting:" + casting.CastingId + ":" +
                         reasons[0]);
+                }
             }
             if (mode == CastingApplyMode.Ordinary && blocking.Count != 0)
                 return new CastingApplyDecision(
-                    false, mode, scopeRoutineId, executable, omissions, blocking);
+                    false, mode, scopeRoutineId, executable, omissions, blocking, blockingCastings);
             return new CastingApplyDecision(
                 true, mode, scopeRoutineId, executable, omissions, new string[0]);
         }

@@ -17,6 +17,7 @@ try {
     & $testExe
     if ($LASTEXITCODE -ne 0) { throw "Source-only test runner failed with exit code $LASTEXITCODE." }
     & (Join-Path $PSScriptRoot 'Test-RuntimeHarness.ps1')
+    & (Join-Path $PSScriptRoot 'Test-ProblemNavigationEvidence.ps1')
     & (Join-Path $PSScriptRoot 'Test-DeploymentWhatIf.ps1')
     & (Join-Path $PSScriptRoot 'Test-RuntimeLauncherFileWhatIf.ps1')
     & (Join-Path $PSScriptRoot 'Test-FixtureInventoryEvidence.ps1')

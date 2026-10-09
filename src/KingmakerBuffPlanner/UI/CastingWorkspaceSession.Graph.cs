@@ -75,6 +75,7 @@ namespace KingmakerBuffPlanner.UI
         public AuthoringEditResult SelectGraphSource(string providerKey,
             CastingWorkspaceInputs inputs = null)
         {
+            LeaveProblemNavigation();
             AuthoringEditResult result = ChooseDraftProvider(providerKey, inputs);
             if (result.Applied) EditingFocusCastingId = null;
             return result;
@@ -98,6 +99,7 @@ namespace KingmakerBuffPlanner.UI
 
         public void ClearGraphFocus()
         {
+            LeaveProblemNavigation();
             EditingFocusCastingId = null;
         }
 
@@ -114,6 +116,7 @@ namespace KingmakerBuffPlanner.UI
         public CastingGraphEditResult AddGraphCasting(string unitId,
             CastingWorkspaceInputs inputs = null)
         {
+            LeaveProblemNavigation();
             if (inputs != null) _lastInputs = inputs;
             if (_lastInputs == null)
                 return GraphRefusal("draft-ability-unresolved:no-discovery-inputs");
@@ -192,6 +195,7 @@ namespace KingmakerBuffPlanner.UI
         // the end of its routine, then focused. The original is unchanged.
         public CastingGraphEditResult DuplicateFocusedCasting()
         {
+            LeaveProblemNavigation();
             PlannedCasting focused = FocusedCasting();
             if (focused == null) return GraphRefusal("no-editing-focus");
             // A copy is fresh intent: no import provenance travels with it,
@@ -318,6 +322,9 @@ namespace KingmakerBuffPlanner.UI
             // plan: the two budget views the addendum requires. The caster
             // lane's counts come from the one-pass plan's own ledger.
             ExplicitCastingPlan plan = Compile(inputs, SelectedRoutineId, false);
+            CastingApplyDecision routineGate = _gate.Evaluate(
+                plan, CastingApplyMode.Ordinary, SelectedRoutineId);
+            RefreshProblemNavigation(routineGate);
             CastingForecast onePass = _forecast.ForecastOnePass(
                 _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
                 inputs.EffectsBySource, inputs.Enhancements, inputs.TargetingModifiers);
@@ -344,6 +351,13 @@ namespace KingmakerBuffPlanner.UI
                 FocusedCastingId = EditingFocusCastingId
             };
             List<WorkspaceSourceOption> sources = BuildSourceOptions(inputs, source);
+            // A casting-specific refusal remains inspectable when discovery
+            // no longer supplies its buff. Keep a selected reveal target;
+            // this placeholder provides no provider or readiness judgment.
+            if (ProblemNavigation.Active && !sources.Any(value =>
+                    string.Equals(value.SourceId, source, StringComparison.Ordinal)))
+                sources.Add(new WorkspaceSourceOption(source, "Unavailable saved buff", true,
+                    iconAbility: FocusedCasting()?.Ability));
             WorkspaceSourceOption selected = sources.FirstOrDefault(value => value.Selected);
             view.SelectedSourceCaption = selected == null ? (source.Length == 0 ? "no buff selected"
                 : "unnamed buff source") : selected.Label;
@@ -418,7 +432,7 @@ namespace KingmakerBuffPlanner.UI
                 _authoring.Document.Routines.Select(value => RoutineDisplayName(value.RoutineId)).ToArray()) +
                 ", no rest)";
             view.OnePassBudget = FooterLinesOf(onePass.Plan);
-            view.SelectedRoutineGate = _gate.Evaluate(plan, CastingApplyMode.Ordinary, SelectedRoutineId);
+            view.SelectedRoutineGate = routineGate;
             view.ReviewStatus = _review.StatusFor(SelectedRoutineId);
             List<ResolvedCasting> routineCastings = plan.Castings.Where(value => string.Equals(
                 value.RoutineId, SelectedRoutineId, StringComparison.Ordinal)).ToList();

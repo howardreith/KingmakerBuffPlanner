@@ -1137,6 +1137,10 @@ namespace KingmakerBuffPlanner.UI
             {
                 _log.Error("[KBP-CF-RUN] fresh preflight inputs unavailable;routine=" +
                     routineId + ".", exception);
+                string refusal = name + " was not cast: the party state could not be refreshed (" +
+                    exception.Message + ").";
+                if (CastingSession != null) CastingSession.RecordGlobalRefusal(refusal);
+                if (_castingWorkspace != null) _castingWorkspace.ShowNotice(refusal);
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Refused,
                     name + " was not cast: the party state could not be refreshed (" +
@@ -1167,10 +1171,15 @@ namespace KingmakerBuffPlanner.UI
             }
             if (!result.Allowed)
             {
-                string refusal = CastingRunPresentation.DescribeRefusal(name, result);
+                string refusal = CastingRunPresentation.DescribeRefusal(name, result, session);
                 _log.Info("[KBP-CF-RUN] refused;routine=" + routineId + ";mode=" + mode +
                     ";reason=" + result.ReviewReason + ".");
                 session.RecordAttempt(refusal);
+                if (_castingWorkspace != null)
+                {
+                    _castingWorkspace.RefreshView();
+                    _castingWorkspace.ShowNotice(refusal);
+                }
                 _lastCastingPress[PressKey(session, routineId)] = refusal;
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Refused, refusal,
@@ -1179,12 +1188,12 @@ namespace KingmakerBuffPlanner.UI
                 // No floating result (the accepted HUD boundary): a refusal
                 // the player resolves in the planner opens it on that
                 // routine, with the reason in the footer.
-                if (CastingRunPresentation.OpensPlanner(result.ReviewReason) &&
+                if (CastingRunPresentation.OpensPlanner(result) &&
                     _castingWorkspace == null)
                 {
                     try
                     {
-                        session.SelectRoutine(routineId);
+                        if (!session.ProblemNavigation.Active) session.SelectRoutine(routineId);
                         OpenSetup();
                     }
                     catch (Exception exception)
@@ -1505,6 +1514,8 @@ namespace KingmakerBuffPlanner.UI
             // authoring edits; the next open reloads the last explicitly
             // saved document. The session is never silently reconstructed
             // while open.
+            if (CastingSession != null && CastingSession.ProblemNavigation.Active)
+                CastingSession.ClearGraphFocus();
             _castingWorkspace.Dispose();
             _castingWorkspace = null;
             // Unsaved intent is PRESERVED across an ordinary close/reopen
@@ -1875,6 +1886,7 @@ namespace KingmakerBuffPlanner.UI
             try
             {
                 if (_spellbookEntry != null) _spellbookEntry.Tick();
+                if (_castingWorkspace != null) _castingWorkspace.TickGeometry();
                 if (_castingWorkspace != null && Input.GetKeyDown(KeyCode.Escape))
                 {
                     // Escape first leaves the workspace's own focused casting

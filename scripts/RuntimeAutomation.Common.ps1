@@ -950,6 +950,118 @@ function Get-KbpAllowanceBindingFormatRefusal {
 # Classic routine; a physical workspace run judged exactly the actions this
 # launcher delivered (every request acknowledged, none failed, the typed
 # text the one the host recorded). Other scenarios pass through.
+function Assert-KbpProblemNavigationOutcome {
+    param([Parameter(Mandatory = $true)]$Request)
+    $directory = [string]$Request.evidenceDirectory
+    $path = Join-Path $directory 'physical-workspace-problems.json'
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Physical problem evidence is missing.' }
+    $record = Read-KbpJson $path
+    $required = @('schemaVersion', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256', 'assemblyMvid',
+        'screenWidth', 'screenHeight', 'plannerClosedBeforeHud', 'coldSessionBeforeHud', 'plannerOpenedByHud',
+        'graphOverflow', 'firstChipVisibleBeforeReveal', 'graphScrollBefore', 'graphScrollAfter',
+        'sourceId', 'firstCastingId', 'secondCastingId', 'documentBefore', 'documentAfter',
+        'profileBeforeSha256', 'profileAfterSha256', 'resourcesBefore', 'resourcesAfter', 'effectsBefore',
+        'effectsAfter', 'runsStarted', 'dispatchAttempts', 'undoBefore', 'undoAfter', 'acceptedDigestAfter',
+        'escapeLeftFocus', 'plannerClosedAfterEscape', 'inputLeaseReleased', 'acknowledged',
+        'failures', 'observations', 'violations')
+    foreach ($key in $required) {
+        if ($null -eq $record.PSObject.Properties[$key]) { throw "Physical problem evidence is missing $key." }
+    }
+    if ([int]$record.schemaVersion -ne 1 -or [string]$record.runId -cne [string]$Request.runId -or
+        [string]$record.sourceCommit -cne [string]$Request.expectedCommit -or
+        [string]$record.packageSha256 -cne [string]$Request.expectedPackageSha256 -or
+        [string]$record.dllSha256 -cne [string]$Request.expectedDllSha256 -or
+        [string]$record.assemblyMvid -cnotmatch '^[0-9a-f-]{36}$' -or
+        @($record.failures).Count -ne 0 -or @($record.violations).Count -ne 0) {
+        throw 'Physical problem evidence does not match this candidate-bound request or has violations.'
+    }
+    $actions = @('problem-moon', 'problem-next', 'problem-previous', 'problem-escape-focus', 'problem-escape-close')
+    $acknowledged = @($record.acknowledged)
+    if (@($actions | Where-Object { $acknowledged -cnotcontains $_ }).Count -ne 0 -or
+        @($acknowledged | Where-Object { ($actions + @('problem-menu-close-1', 'problem-menu-close-2',
+            'problem-menu-close-3')) -cnotcontains $_ }).Count -ne 0) {
+        throw 'Physical problem actions are incomplete or unexpected.'
+    }
+    foreach ($action in $acknowledged) {
+        $ack = Read-KbpJson (Join-Path $directory ("physical-input-{0}.ack.json" -f $action))
+        $expectedAction = if ($action -like '*escape*' -or $action -like 'problem-menu-close-*') {
+            'key-escape'
+        } else { 'click' }
+        $failureProperty = $ack.PSObject.Properties['deliveryFailed']
+        $deliveryFailed = $null -ne $failureProperty -and [bool]$failureProperty.Value
+        if ($deliveryFailed -or [string]$ack.runId -cne [string]$Request.runId -or
+            [string]$ack.actionId -cne [string]$action -or [string]$ack.action -cne $expectedAction) {
+            throw "Physical action was not delivered with the expected identity: $action"
+        }
+    }
+    if (-not [bool]$record.plannerClosedBeforeHud -or -not [bool]$record.coldSessionBeforeHud -or
+        -not [bool]$record.plannerOpenedByHud -or -not [bool]$record.graphOverflow -or
+        [bool]$record.firstChipVisibleBeforeReveal -or [double]$record.graphScrollAfter -ge [double]$record.graphScrollBefore -or
+        -not [bool]$record.escapeLeftFocus -or -not [bool]$record.plannerClosedAfterEscape -or
+        -not [bool]$record.inputLeaseReleased) { throw 'HUD reveal or nested Escape evidence failed.' }
+    # ProfileIntentSignature is campaign + U+0002 + normalized profile JSON.
+    # Check that machine contract; preserve exact equality at every step.
+    $signature = [string]$record.documentBefore
+    $separator = $signature.IndexOf([char]2)
+    if ($separator -le 0) { throw 'Physical problem evidence has no campaign-bound authored intent.' }
+    $campaign = $signature.Substring(0, $separator)
+    try { $intent = $signature.Substring($separator + 1) | ConvertFrom-Json }
+    catch { throw 'Physical problem evidence has no readable authored intent.' }
+    foreach ($key in @('schemaVersion', 'campaignId', 'routines', 'castings', 'ui', 'execution')) {
+        if ($null -eq $intent -or $null -eq $intent.PSObject.Properties[$key]) {
+            throw 'Physical problem evidence has no structured authored intent.'
+        }
+    }
+    if ([int]$intent.schemaVersion -ne 0 -or [string]$intent.campaignId -cne $campaign -or
+        @($intent.routines).Count -eq 0 -or @($intent.castings).Count -eq 0) {
+        throw 'Physical problem evidence has unbound or empty authored intent.'
+    }
+    if ([string]$record.documentBefore -cne [string]$record.documentAfter -or
+        [string]$record.profileBeforeSha256 -cnotmatch '^[0-9a-f]{64}$' -or
+        [string]$record.profileBeforeSha256 -cne [string]$record.profileAfterSha256 -or
+        [string]::IsNullOrEmpty([string]$record.resourcesBefore) -or
+        [string]$record.resourcesBefore -cne [string]$record.resourcesAfter -or
+        [string]::IsNullOrEmpty([string]$record.effectsBefore) -or
+        [string]$record.effectsBefore -cne [string]$record.effectsAfter -or
+        [int]$record.runsStarted -ne 0 -or [int]$record.dispatchAttempts -ne 0 -or
+        [bool]$record.undoBefore -ne [bool]$record.undoAfter -or $null -ne $record.acceptedDigestAfter) {
+        throw 'Blocked navigation changed plan, persistence, Undo, authorization or native state.'
+    }
+    $observations = @($record.observations)
+    $ids = @('wp2a-blocked-late', 'wp2a-blocked-last', 'wp2a-blocked-late')
+    if ($observations.Count -ne 3 -or [string]$record.firstCastingId -cne $ids[0] -or
+        [string]$record.secondCastingId -cne $ids[1]) { throw 'Problem order evidence is incomplete.' }
+    for ($index = 0; $index -lt 3; $index++) {
+        $observation = $observations[$index]
+        $position = if ($index -eq 1) { 2 } else { 1 }
+        if ([string]$observation.castingId -cne $ids[$index] -or
+            [string]$observation.routineId -cne 'long' -or [string]$observation.sourceId -cne [string]$record.sourceId -or
+            [int]$observation.position -ne $position -or [int]$observation.count -ne 2 -or
+            [string]$observation.documentSignature -cne [string]$record.documentBefore -or
+            [double]$observation.chipVisibleFraction -lt 0.9 -or
+            [Math]::Abs([double]$observation.inspectorScroll - 1) -gt 0.001 -or
+            [bool]$observation.previousEnabled -ne ($position -gt 1) -or
+            [bool]$observation.nextEnabled -ne ($position -lt 2) -or
+            [string]$observation.inspectorText -cnotlike "*Problem $position of 2*" -or
+            [string]$observation.inspectorText -cnotlike '*this casting is a Draft; finish its choices and mark it Ready*' -or
+            [string]$observation.footerText -cnotlike "*Problem $position of 2*" -or
+            (@($observation.machineReasons) -join ',') -cne 'unresolved-saved-request') {
+            throw "Problem $position does not show the correct actionable inspector and controls."
+        }
+        foreach ($prefix in @('chip', 'catalogue', 'routine')) {
+            $x = $observation.PSObject.Properties[$prefix + 'X'].Value
+            $y = $observation.PSObject.Properties[$prefix + 'Y'].Value
+            if ($null -eq $x -or $null -eq $y -or [double]$x -le 0 -or [double]$y -le 0 -or
+                [double]$x -ge [int]$record.screenWidth -or [double]$y -ge [int]$record.screenHeight) {
+                throw "Problem $position has no actual on-screen $prefix point."
+            }
+        }
+        $shot = Join-Path $directory ('problem-' + ($index + 1) + '.png')
+        if (-not (Test-Path -LiteralPath $shot -PathType Leaf) -or (Get-Item -LiteralPath $shot).Length -lt 1024) {
+            throw "Physical problem screenshot is missing: $shot"
+        }
+    }
+}
 function Assert-KbpScenarioOutcome {
     param([Parameter(Mandatory = $true)]$Request)
     $scenario = [string]$Request.scenario
@@ -1071,6 +1183,11 @@ function Assert-KbpScenarioOutcome {
             @($steps | Where-Object { [string]$_.finalStatus -cne 'EffectConfirmed' }).Count -ne 0) {
             throw "Classic cast evidence does not show exactly the approved plan run once under its grant: $path"
         }
+        return
+    }
+    if ($scenario -ceq 'live-workspace-physical' -and
+        [string]$Request.parameters.physicalExpectation -ceq 'problems') {
+        Assert-KbpProblemNavigationOutcome -Request $Request
         return
     }
     if ($scenario -ceq 'live-workspace-physical') {
