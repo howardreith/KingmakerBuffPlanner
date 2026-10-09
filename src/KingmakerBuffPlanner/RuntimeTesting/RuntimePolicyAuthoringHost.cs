@@ -121,6 +121,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 QuickExecutionResult refused = BuffPlannerUiRoot.QuickResultForRuntime("long");
                 _physicalRecord.CombatRefusal = refused == null ? "no-result"
                     : refused.Disposition + ":" + refused.Message;
+                // rc4 review finding 2: the Classic route, in the same held
+                // combat, before the resources and effects are read again.
+                HoldCombat();
+                ClassicCombatProbe classic = BuffPlannerUiRoot.ClassicCombatProbeForRuntime("long");
+                if (classic != null)
+                {
+                    _physicalRecord.ClassicCombatRefusal = classic.Refusal;
+                    _physicalRecord.ClassicCombatYielded = classic.Yielded;
+                    _physicalRecord.ClassicCombatRefreshes = classic.Refreshes;
+                    _physicalRecord.ClassicCombatPreviews = classic.Previews;
+                    _physicalRecord.ClassicCombatReportChanged = classic.ReportChanged;
+                    _physicalRecord.ClassicCombatExecuting = classic.ExecutingAfter;
+                    _physicalRecord.ClassicCombatProfileUnchanged = classic.ProfileUnchanged;
+                }
+                else _physicalRecord.ClassicCombatRefusal = "no-classic-session";
                 CastingWorkspaceInputs after = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
                 if (after != null)
                 {

@@ -1384,7 +1384,9 @@ function Assert-KbpScenarioOutcome {
         if ($expectation -ceq 'combat') {
             $combatKeys = @('combatInCombatBefore', 'combatAtPress', 'combatRunStarted', 'combatEditorOpened',
                 'combatDispatchRefusals', 'combatRefusal', 'combatAvailability', 'combatEffectAfter',
-                'combatClearedBeforeMoon')
+                'combatClearedBeforeMoon', 'classicCombatRefusal', 'classicCombatYielded', 'classicCombatRefreshes',
+                'classicCombatPreviews', 'classicCombatReportChanged', 'classicCombatExecuting',
+                'classicCombatProfileUnchanged')
             $names = @($record.PSObject.Properties | ForEach-Object Name)
             $availability = ([string]$record.combatAvailability).Split('>')
             if (@($combatKeys | Where-Object { $names -cnotcontains $_ }).Count -ne 0 -or
@@ -1398,6 +1400,18 @@ function Assert-KbpScenarioOutcome {
                 $null -eq $record.combatEffectAfter -or [bool]$record.combatEffectAfter -or
                 $null -eq $record.combatClearedBeforeMoon -or -not [bool]$record.combatClearedBeforeMoon) {
                 throw "The physical combat press was not refused for combat before dispatch with nothing spent: $path"
+            }
+            # rc4 review finding 2: the Classic route in the same combat was
+            # refused at its admission - nothing yielded, refreshed, previewed,
+            # reported, left executing, or written.
+            if (([string]$record.classicCombatRefusal).IndexOf('Buff routines cannot run during combat.', [StringComparison]::Ordinal) -lt 0 -or
+                $null -eq $record.classicCombatYielded -or [int]$record.classicCombatYielded -ne 0 -or
+                $null -eq $record.classicCombatRefreshes -or [int]$record.classicCombatRefreshes -ne 0 -or
+                $null -eq $record.classicCombatPreviews -or [int]$record.classicCombatPreviews -ne 0 -or
+                $null -eq $record.classicCombatReportChanged -or [bool]$record.classicCombatReportChanged -or
+                $null -eq $record.classicCombatExecuting -or [bool]$record.classicCombatExecuting -or
+                $null -eq $record.classicCombatProfileUnchanged -or -not [bool]$record.classicCombatProfileUnchanged) {
+                throw "The Classic route was not refused for combat before any preparation: $path"
             }
         }
         # 0.4.0 (WP3) re-read: every direct graph gesture did what the
