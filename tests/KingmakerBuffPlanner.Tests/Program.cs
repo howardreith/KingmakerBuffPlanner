@@ -448,6 +448,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunDirectManipulationTests(root);
                 RunCatalogAuditTests();
                 RunPolicyAuthoringPhysicalTests(root);
+                RunParchmentThemeTests();
             }
             finally
             {
@@ -5139,6 +5140,11 @@ namespace KingmakerBuffPlanner.Tests
             ThemeNode party = owner.Add("Party");
             ThemeNode partyCharacter = party.Add("Character");
             partyCharacter.Add("Highlight", Comp(NativeThemeComponent.Image, new ThemeToken()));
+            // WP7: the in-game character build carries the scroll paper and
+            // rule donors (complete native hierarchy).
+            ThemeNode scrollPaper;
+            ThemeNode scrollRule;
+            AddCharacterBuildDonors(owner, out scrollPaper, out scrollRule);
             source.Owner = owner;
             return owner;
         }
@@ -5154,8 +5160,10 @@ namespace KingmakerBuffPlanner.Tests
                     throw new InvalidOperationException("Complete donor hierarchy rejected " +
                         capability + ": " + full.Failure(capability));
             string summary = full.Summary;
-            if (!summary.Contains("Paper=ok(proven)") || !summary.Contains("Buttons=ok(proven)") ||
-                !summary.Contains("ButtonText=ok(scan)") || !summary.Contains("Scrollbar=ok(scan)"))
+            if (!summary.StartsWith("Paper=ok(proven)", StringComparison.Ordinal) ||
+                !summary.Contains("Buttons=ok(proven)") ||
+                !summary.Contains("ButtonText=ok(scan)") || !summary.Contains("Scrollbar=ok(scan)") ||
+                !summary.Contains("ScrollPaper=ok(candidate)") || !summary.Contains("ScrollRule=ok(candidate)"))
                 throw new InvalidOperationException("Resolution summary lost locator provenance: " + summary);
 
             // One missing donor (the button's label text) must reject exactly
@@ -5273,7 +5281,8 @@ namespace KingmakerBuffPlanner.Tests
                 plannerRoot, source);
             if (ownedScoped.IsAvailable(NativeThemeCapability.Paper) ||
                 ownedScoped.IsAvailable(NativeThemeCapability.Buttons) ||
-                ownedScoped.IsAvailable(NativeThemeCapability.Body))
+                ownedScoped.IsAvailable(NativeThemeCapability.Body) ||
+                ownedScoped.IsAvailable(NativeThemeCapability.ScrollPaper))
                 throw new InvalidOperationException(
                     "An owned-overlay lookup root resolved native ServiceWindow donors.");
 

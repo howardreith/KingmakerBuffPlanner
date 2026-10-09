@@ -43,6 +43,7 @@
     <Compile Include="EverydayUseWordingTests.cs" />
     <Compile Include="ShareQualificationDriverTests.cs" />
     <Compile Include="StickyTouchQualificationTests.cs" />
+    <Compile Include="ParchmentThemeTests.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\ShareCastingModifierAdapter.cs"><Link>GameAdapters\ShareCastingModifierAdapter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\EnhancementLeaseCleanup.cs"><Link>GameAdapters\EnhancementLeaseCleanup.cs</Link></Compile>
     <Compile Include="TestBuildInfo.cs" />
@@ -150,6 +151,10 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeResolver.cs"><Link>UI\NativeThemeResolver.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeRecovery.cs"><Link>UI\NativeThemeRecovery.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ControlCaptionFit.cs"><Link>UI\ControlCaptionFit.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeSpriteContract.cs"><Link>UI\NativeSpriteContract.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ParchmentTreatment.cs"><Link>UI\ParchmentTreatment.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerParchmentPalette.cs"><Link>UI\PlannerParchmentPalette.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SpellScrollModal.cs"><Link>UI\SpellScrollModal.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimePaths.cs">
       <Link>RuntimeTesting\RuntimePaths.cs</Link>
     </Compile>

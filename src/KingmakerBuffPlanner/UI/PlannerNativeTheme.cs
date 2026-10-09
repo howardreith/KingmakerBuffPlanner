@@ -88,13 +88,22 @@ namespace KingmakerBuffPlanner.UI
 
             public void Validate(NativeThemeCapability capability, object[] values)
             {
-                // Structural validation only. Exact sprite-name/border/pixel
-                // contracts for every donor are intentionally not asserted
-                // here: the live campaign inventory lane is still open, and a
+                // Structural validation for the older donors. Exact
+                // sprite-name/border/pixel contracts are not asserted for
+                // them: the live campaign inventory lane is still open, and a
                 // wrong hard assumption would disable a whole surface. Each
-                // borrower re-checks what it actually consumes.
+                // borrower re-checks what it actually consumes. The WP7
+                // scroll donors are drawn nine-sliced at a computed scale,
+                // so they ARE held to their exact contract: any other sheet
+                // would draw stretched or oversized corners.
                 switch (capability)
                 {
+                    case NativeThemeCapability.ScrollPaper:
+                        RequireContract((Image)values[0], NativeSpriteContract.ScrollPaper);
+                        break;
+                    case NativeThemeCapability.ScrollRule:
+                        RequireContract((Image)values[0], NativeSpriteContract.ScrollRule);
+                        break;
                     case NativeThemeCapability.Paper:
                     case NativeThemeCapability.Ornament:
                         RequireSlicedSprite((Image)values[0]);
@@ -129,6 +138,22 @@ namespace KingmakerBuffPlanner.UI
                     default:
                         throw new ArgumentOutOfRangeException("capability");
                 }
+            }
+
+            private static void RequireContract(Image image, NativeSpriteContract contract)
+            {
+                string failure = contract.Failure(Facts(image));
+                if (failure != null)
+                    throw new InvalidOperationException("Unqualified native scroll sprite: " + failure);
+            }
+
+            private static NativeSpriteFacts Facts(Image image)
+            {
+                Sprite sprite = image == null ? null : image.sprite;
+                if (sprite == null) return null;
+                return new NativeSpriteFacts(sprite.name, sprite.rect.width, sprite.rect.height,
+                    sprite.border.x, sprite.border.y, sprite.border.z, sprite.border.w,
+                    sprite.pixelsPerUnit, image.type == Image.Type.Sliced, sprite.texture != null);
             }
 
             private static void RequireSlicedSprite(Image image)
