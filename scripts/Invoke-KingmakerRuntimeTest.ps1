@@ -75,7 +75,9 @@ param(
     # exact size through Unity's launch arguments. A size larger than this
     # session's display is refused before anything changes; the game's
     # registry key (Unity PlayerPrefs) is restored byte-exact after exit.
-    [ValidateSet('owner', 'windowed-1920x1080', 'windowed-2560x1440')][string]$DisplayMode = 'owner'
+    # 0.4.0 (WP7): 1600x900 and 1280x720 give a meaningfully different
+    # resolution on a 1920x1080 session, where 2560x1440 is refused.
+    [ValidateSet('owner', 'windowed-1920x1080', 'windowed-2560x1440', 'windowed-1600x900', 'windowed-1280x720')][string]$DisplayMode = 'owner'
 )
 
 Set-StrictMode -Version Latest
