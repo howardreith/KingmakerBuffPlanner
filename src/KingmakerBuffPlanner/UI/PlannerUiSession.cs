@@ -616,6 +616,18 @@ namespace KingmakerBuffPlanner.UI
             // and gated above, so the refusal is the only difference. The
             // one exception is an allowance-bound classic cast run's
             // single-use grant for exactly this plan, routine and mode.
+            // WP4 (0.4.0): routines never run during combat - a global
+            // refusal before any native work, in the classic planner too.
+            if (Kingmaker.Game.Instance != null && Kingmaker.Game.Instance.Player != null &&
+                Kingmaker.Game.Instance.Player.IsInCombat)
+            {
+                LastExecutionReport = new ExecutionReport(preview.Plan);
+                Status = CastingRunPresentation.CombatRefusalText;
+                Complete(completed, new QuickExecutionResult(routineId, routineName,
+                    QuickExecutionDisposition.Refused, Status, preview.Plan.Steps.Count, 0, 0));
+                _log.Info("[KBP-QUICK] combat refused;group=" + routineId + ".");
+                yield break;
+            }
             string grantRefusal = null;
             if (NativeCastingSessionPolicy.Locked &&
                 !NativeCastingSessionPolicy.TryConsumeClassicGrant(routineId,
@@ -653,8 +665,8 @@ namespace KingmakerBuffPlanner.UI
                     out directCapable, out directReason);
                 executor = new HybridCastExecutor(
                     new KingmakerInstantCastAdapter(_log.Info), new KingmakerAnimatedCastAdapter(),
-                    Model.Profile.Execution.AllowAnimatedFallback,
-                    Model.Profile.Execution.OutOfCombatOnly,
+                    CastingExecutionPolicy.AllowAnimatedFallback,
+                    CastingExecutionPolicy.OutOfCombatOnly,
                     step => step.EnhancementIds.Any(nativeEnhancements.Contains),
                     (index, step, animated, route) =>
                     {
@@ -683,10 +695,11 @@ namespace KingmakerBuffPlanner.UI
                         fallbackWarnings.Add(warning);
                         Status = warning;
                         _log.Info("[KBP-INSTANT-FALLBACK] " + warning);
-                    });
+                    },
+                    strictInstant: true);
             }
             else executor = new AnimatedCastExecutor(new KingmakerAnimatedCastAdapter(),
-                Model.Profile.Execution.OutOfCombatOnly);
+                CastingExecutionPolicy.OutOfCombatOnly);
             IsExecuting = true;
             _log.Info("[KBP-QUICK] execution invoked;group=" + routineId +
                 ";mode=" + Model.Profile.Execution.Mode + ";steps=" +

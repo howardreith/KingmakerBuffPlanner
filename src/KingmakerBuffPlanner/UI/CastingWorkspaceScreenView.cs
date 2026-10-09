@@ -1681,21 +1681,6 @@ namespace KingmakerBuffPlanner.UI
                 _session.Draft.ExistingEffectPolicy = recastDraft
                     ? ExistingEffectPolicy.SkipAlreadyActive : ExistingEffectPolicy.Overwrite;
             });
-            Section("Plan settings");
-            ActionButton("AnimatedFallback", (_session.AllowAnimatedFallback ? "[x] " : "[  ] ") +
-                "Instant mode: animate buffs that cannot be instant", () =>
-            {
-                _session.SetAllowAnimatedFallback(!_session.AllowAnimatedFallback);
-                _footerResult.text = WorkspaceFooterText.SettingChanged("Animated fallback",
-                    _session.AllowAnimatedFallback);
-            });
-            ActionButton("OutOfCombatOnly", (_session.OutOfCombatOnly ? "[x] " : "[  ] ") +
-                "Cast only out of combat", () =>
-            {
-                _session.SetOutOfCombatOnly(!_session.OutOfCombatOnly);
-                _footerResult.text = WorkspaceFooterText.SettingChanged("Out-of-combat only",
-                    _session.OutOfCombatOnly);
-            });
         }
 
         private string _inspectedCastingId;

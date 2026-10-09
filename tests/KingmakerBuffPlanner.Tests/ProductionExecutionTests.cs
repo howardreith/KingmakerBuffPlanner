@@ -47,7 +47,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("planners-show-unusable-files-and-refused-saves", () => TestPersistenceNoticesShown(root));
             Run("provider-choices-name-the-book-and-refuse-twins", () => TestProviderLabelsAndTwins(root));
             Run("next-casting-enhancements-follow-its-caster", () => TestDraftEnhancementsFollowTheCaster(root));
-            Run("out-of-combat-setting-is-saved", () => TestOutOfCombatSettingSaved(root));
+            Run("legacy-out-of-combat-preference-is-enforced", () => TestOutOfCombatSettingSaved(root));
             Run("footer-counts-only-this-routines-one-pass-shortfalls", () => TestFooterCountsOnlyShortfalls(root));
             Run("reload-without-a-plan-file-never-blocks-or-discards", () => TestReloadWithoutPlanFile(root));
             Run("classic-screen-policy-closes-once-and-scopes-results", TestClassicRunScreenPolicy);
@@ -904,7 +904,7 @@ namespace KingmakerBuffPlanner.Tests
                     OutOfCombatOnly = true, RecastExisting = true
                 }));
             var session = new CastingWorkspaceSession(dir, "workspace-campaign");
-            if (session.ExecutionMode != "instant" || session.AllowAnimatedFallback ||
+            if (session.ExecutionMode != "instant" || session.ExecutionSettings.AllowAnimatedFallback ||
                 session.IsDirty)
                 throw new InvalidOperationException("Loaded execution settings were not adopted.");
             PartyProviderSnapshot snapshot;
@@ -933,7 +933,10 @@ namespace KingmakerBuffPlanner.Tests
             // Everyday-use v1.2: a genuinely new plan starts from the
             // Instant default (an explicit saved animated choice — set and
             // verified above — is the user's preference and persists).
-            if (fresh.ExecutionMode != "instant" || !fresh.AllowAnimatedFallback)
+            // WP4: the defaults carry the enforced policy (never in combat,
+            // never an animated fallback).
+            if (fresh.ExecutionMode != "instant" || fresh.ExecutionSettings.AllowAnimatedFallback ||
+                !fresh.ExecutionSettings.OutOfCombatOnly)
                 throw new InvalidOperationException("A new plan did not start from the defaults.");
         }
 
@@ -1437,10 +1440,9 @@ namespace KingmakerBuffPlanner.Tests
                 "_session.MoveFocusedCastingWithinRoutine(1)",
                 "_session.SetFocusedRecastPolicy(inspector.RecastsExisting",
                 "_session.Draft.ExistingEffectPolicy = recastDraft",
-                "_session.SetAllowAnimatedFallback(!_session.AllowAnimatedFallback);",
-                // Re-review: the out-of-combat rule and the target-mode
-                // switches (imported castings in the wrong shape).
-                "_session.SetOutOfCombatOnly(!_session.OutOfCombatOnly);",
+                // Re-review: the target-mode switches (imported castings in
+                // the wrong shape). WP4 removed the out-of-combat and
+                // animated-fallback settings (enforced policy now).
                 "bool? groupAbility = _session.FocusedCastingIsGroupAbility(_inputs());",
                 "if (groupAbility == true)",
                 "else if (groupAbility == false)",
@@ -1551,8 +1553,10 @@ namespace KingmakerBuffPlanner.Tests
             Assert(blocked.LegacyImportBlocked);
             Assert(AddDraftCasting(blocked, inputs, "unit-wizard", "unit-t2").Applied);
             string authored = blocked.Document.Castings.Single().CastingId;
-            bool chosenOutOfCombat = !blocked.OutOfCombatOnly;
-            blocked.SetOutOfCombatOnly(chosenOutOfCombat);
+            // A setting the player chose in this session (WP4: the mode is
+            // the remaining execution setting).
+            string chosenMode = blocked.ExecutionMode == "instant" ? "animated" : "instant";
+            blocked.SetExecutionMode(chosenMode);
             File.Delete(classicPath);
             BuffPlannerProfile legacy = BuffPlannerProfile.CreateDefault("workspace-campaign");
             legacy.Routines[0].Assignments.Add(LegacyAssignment("source-bulls", CastingBuffAbility,
@@ -1563,8 +1567,8 @@ namespace KingmakerBuffPlanner.Tests
             if (blocked.LegacyImportBlocked || blocked.PersistenceBlocked || merged.Count != 2 ||
                 !merged.Contains(authored) || blocked.IsDirty || blocked.LastReloadNote != "imported-into-unsaved" ||
                 new CastingWorkspaceSession(mergeDir, "workspace-campaign").Document.Castings.Count != 2 ||
-                blocked.OutOfCombatOnly != chosenOutOfCombat ||
-                new CastingWorkspaceSession(mergeDir, "workspace-campaign").OutOfCombatOnly != chosenOutOfCombat)
+                blocked.ExecutionMode != chosenMode ||
+                new CastingWorkspaceSession(mergeDir, "workspace-campaign").ExecutionMode != chosenMode)
                 throw new InvalidOperationException("Castings added while the classic import was blocked were not kept: " +
                     string.Join(",", merged.ToArray()) + "|" + blocked.LastReloadNote);
             // Last review: when the player changed no setting in the session,
@@ -1845,21 +1849,42 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The next casting carried an enhancement to a caster without it.");
         }
 
-        // Re-review: the out-of-combat rule has a casting-first control; the
-        // change is unsaved until Save, then kept.
+        // WP4 (supersedes the 0.3.0 out-of-combat control): a plan saved with
+        // the old out-of-combat preference switched off still loads, but its
+        // runs carry the enforced policy; the next deliberate save writes it.
         private static void TestOutOfCombatSettingSaved(string root)
         {
             string dir = Path.Combine(root, "out-of-combat-setting");
             Directory.CreateDirectory(dir);
+            var repository = new CastingPlanRepository(dir);
+            repository.Save(CastingPlanProfile.FromDocument(
+                new CastingPlanDocument("workspace-campaign", new[]
+                {
+                    new RoutineDefinition("long", "Long"),
+                    new RoutineDefinition("important", "Important"),
+                    new RoutineDefinition("short", "Short")
+                }, new PlannedCasting[0]), null,
+                new ExecutionProfile
+                {
+                    Mode = "animated", AllowAnimatedFallback = true,
+                    OutOfCombatOnly = false, RecastExisting = true
+                }));
             var session = new CastingWorkspaceSession(dir, "workspace-campaign",
                 new DisabledCastingDispatchBoundary());
-            bool before = session.OutOfCombatOnly;
-            session.SetOutOfCombatOnly(!before);
-            if (session.OutOfCombatOnly == before ||
-                session.ExecutionSettings.OutOfCombatOnly == before || session.IsDirty)
-                throw new InvalidOperationException("The out-of-combat change did not take or did not autosave.");
-            if (new CastingWorkspaceSession(dir, "workspace-campaign").OutOfCombatOnly == before)
-                throw new InvalidOperationException("The out-of-combat setting was not autosaved.");
+            if (!session.ExecutionSettings.OutOfCombatOnly || session.ExecutionSettings.AllowAnimatedFallback ||
+                !session.LegacyExecutionPreferencesOverridden || session.ExecutionMode != "animated" ||
+                !session.ExecutionSettings.RecastExisting || session.IsDirty)
+                throw new InvalidOperationException("A stored 0.3.0 combat/fallback preference stayed active.");
+            // Loading wrote nothing; the stored bytes stay until a deliberate save.
+            if (!repository.Load("workspace-campaign").Profile.Execution.AllowAnimatedFallback)
+                throw new InvalidOperationException("Loading rewrote the plan.");
+            session.SetExecutionMode("instant");
+            CastingPlanProfile saved = repository.Load("workspace-campaign").Profile;
+            if (!saved.Execution.OutOfCombatOnly || saved.Execution.AllowAnimatedFallback ||
+                saved.Execution.Mode != "instant" || !saved.Execution.RecastExisting)
+                throw new InvalidOperationException("The next save did not write the enforced policy.");
+            if (new CastingWorkspaceSession(dir, "workspace-campaign").LegacyExecutionPreferencesOverridden)
+                throw new InvalidOperationException("The enforced file still reports a legacy preference.");
         }
 
         // Re-review: an imported casting whose old plan did not say single

@@ -327,7 +327,8 @@ namespace KingmakerBuffPlanner.UI
             RefreshProblemNavigation(routineGate);
             CastingForecast onePass = _forecast.ForecastOnePass(
                 _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
-                inputs.EffectsBySource, inputs.Enhancements, inputs.TargetingModifiers);
+                inputs.EffectsBySource, inputs.Enhancements, inputs.TargetingModifiers,
+                StrictInstant);
             RefreshPoolLabels(inputs);
             if (EditingFocusCastingId != null && FocusedCasting() == null)
                 EditingFocusCastingId = null;

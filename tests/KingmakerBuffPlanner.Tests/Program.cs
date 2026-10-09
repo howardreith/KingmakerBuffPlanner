@@ -443,6 +443,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunEverydayUseWordingTests(root);
                 RunShareQualificationDriverTests(root);
                 RunSpellbookEntryTests();
+                RunExecutionPolicyTests(root);
             }
             finally
             {
@@ -2619,8 +2620,6 @@ namespace KingmakerBuffPlanner.Tests
             model.SetProviderMaximumCasts(provider.Key.Canonical, 1);
             model.SetScale(1.25f);
             model.ToggleExecutionMode();
-            model.ToggleOutOfCombatOnly();
-            model.ToggleAnimatedFallback();
             model.ToggleRecastExisting();
             model.TogglePlannerHotkey();
             var reordered = new PartyProviderSnapshot(units.Reverse(), new[] { provider }, new[] { pool });
@@ -2631,11 +2630,11 @@ namespace KingmakerBuffPlanner.Tests
                 reloaded.GetProviderPreference(provider.Key.Canonical).MaximumCasts != 1 ||
                 reloaded.Profile.Ui.Scale != 1.25f ||
                 reloaded.Profile.Execution.Mode != "animated" ||
-                reloaded.Profile.Execution.OutOfCombatOnly ||
+                !reloaded.Profile.Execution.OutOfCombatOnly ||
                 reloaded.Profile.Execution.AllowAnimatedFallback ||
                 !reloaded.Profile.Execution.RecastExisting ||
                 reloaded.Profile.Ui.Hotkey != "Ctrl+Shift+P" ||
-                reloaded.Profile.HiddenSourceIds.Count != 0 || saves < 11)
+                reloaded.Profile.HiddenSourceIds.Count != 0 || saves < 9)
                 throw new InvalidOperationException("Setup state did not survive party reorder/persistence mutations.");
             reloaded.ToggleTarget("short", "unit-a");
             if (!reloaded.IsTargetWanted("short", "unit-a") ||

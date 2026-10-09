@@ -26,10 +26,12 @@ namespace KingmakerBuffPlanner.UI
             IReadOnlyDictionary<string, EffectExpression> effectsBySource,
             IEnumerable<CastEnhancementSnapshot> enhancements,
             IEnumerable<ICastingTargetingModifier> targetingModifiers = null,
-            ActiveEffectSnapshot liveEffects = null)
+            ActiveEffectSnapshot liveEffects = null,
+            bool combatActive = false)
         {
             Snapshot = snapshot ?? throw new ArgumentNullException("snapshot");
             LiveEffects = liveEffects;
+            CombatActive = combatActive;
             ProviderOptions = (providerOptions ?? new ProviderPlanningOption[0])
                 .Where(value => value != null).ToList();
             EffectsBySource = effectsBySource ??
@@ -49,6 +51,8 @@ namespace KingmakerBuffPlanner.UI
         // Live effects on the party (with instance detail in production);
         // null when unknown, which disables the live existing-effect skip.
         public ActiveEffectSnapshot LiveEffects { get; private set; }
+        // WP4: the party is in combat now; every routine refuses globally.
+        public bool CombatActive { get; private set; }
     }
 
     // The boundary between the reviewed casting plan and native submission.
@@ -290,7 +294,7 @@ namespace KingmakerBuffPlanner.UI
                     Scale = recovery.UiSettings.Scale,
                     Hotkey = recovery.UiSettings.Hotkey
                 };
-                _executionSettings = CopyOf(recovery.ExecutionSettings);
+                _executionSettings = EnforcedSettings(recovery.ExecutionSettings);
                 _executionSettingsChosen = false;
                 RaiseCastingIdMark(_authoring.Document.Castings.Select(
                     value => value.CastingId));
@@ -514,8 +518,21 @@ namespace KingmakerBuffPlanner.UI
                 : new UiProfile { Scale = profile.Ui.Scale, Hotkey = profile.Ui.Hotkey };
             _executionSettings = profile == null || profile.Execution == null
                 ? ExecutionProfile.Default()
-                : CopyOf(profile.Execution);
+                : EnforcedSettings(profile.Execution);
         }
+
+        // WP4: a stored 0.3.0 out-of-combat or animated-fallback choice is
+        // read but never honoured; the next deliberate save writes the
+        // enforced values (rotating the previous file into the backups).
+        private ExecutionProfile EnforcedSettings(ExecutionProfile stored)
+        {
+            LegacyExecutionPreferencesOverridden = stored.DiffersFromEnforcedPolicy;
+            return stored.WithEnforcedPolicy();
+        }
+
+        // Whether the loaded plan carried a 0.3.0 combat/fallback preference
+        // that the enforced 0.4.0 policy overrides.
+        public bool LegacyExecutionPreferencesOverridden { get; private set; }
 
         private static ExecutionProfile CopyOf(ExecutionProfile value)
         {
@@ -540,27 +557,6 @@ namespace KingmakerBuffPlanner.UI
             get { return _executionSettings.Mode; }
         }
 
-        public bool AllowAnimatedFallback
-        {
-            get { return _executionSettings.AllowAnimatedFallback; }
-        }
-
-        public bool OutOfCombatOnly
-        {
-            get { return _executionSettings.OutOfCombatOnly; }
-        }
-
-        // Re-review: the out-of-combat rule the executors honour gets a
-        // casting-first control.
-        public void SetOutOfCombatOnly(bool value)
-        {
-            ExecutionProfile next = CopyOf(_executionSettings);
-            next.OutOfCombatOnly = value;
-            _executionSettings = next;
-            _executionSettingsChosen = true;
-            AutosaveSettingsNow();
-        }
-
         // "animated" (native casting animations, the default) or "instant".
         public void SetExecutionMode(string mode)
         {
@@ -568,15 +564,6 @@ namespace KingmakerBuffPlanner.UI
                 throw new ArgumentException("Unknown execution mode.", "mode");
             ExecutionProfile next = CopyOf(_executionSettings);
             next.Mode = mode;
-            _executionSettings = next;
-            _executionSettingsChosen = true;
-            AutosaveSettingsNow();
-        }
-
-        public void SetAllowAnimatedFallback(bool allow)
-        {
-            ExecutionProfile next = CopyOf(_executionSettings);
-            next.AllowAnimatedFallback = allow;
             _executionSettings = next;
             _executionSettingsChosen = true;
             AutosaveSettingsNow();
@@ -923,7 +910,7 @@ namespace KingmakerBuffPlanner.UI
             CastingForecast onePass = _forecast.ForecastOnePass(
                 _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
                 inputs.EffectsBySource, inputs.Enhancements,
-                inputs.TargetingModifiers);
+                inputs.TargetingModifiers, StrictInstant);
             CastingApplyDecision onePassGate = _gate.Evaluate(
                 onePass.Plan, CastingApplyMode.Ordinary);
             WorkspaceEditingScope scope = EditingFocusCastingId == null
@@ -1536,6 +1523,12 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_submissionInFlight)
                 return RefusedInFlight(null);
+            // WP4: buff routines never run during combat. A global refusal,
+            // before compilation, persistence, authorization or any native
+            // submission; it names no casting and focuses none.
+            if (inputs != null && inputs.CombatActive)
+                return new WorkspaceApplyResult(false, CastingExecutionPolicy.CombatActive,
+                    null, null);
             if (LegacyImportBlocked)
                 return new WorkspaceApplyResult(false,
                     "legacy-import-unresolved:" + LegacyImportBlockReason,
@@ -2407,7 +2400,14 @@ namespace KingmakerBuffPlanner.UI
                 _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
                 inputs.EffectsBySource, inputs.Enhancements,
                 routineScope, inputs.TargetingModifiers, projectEffects,
-                inputs.LiveEffects);
+                inputs.LiveEffects, StrictInstant);
+        }
+
+        // WP4: Instant mode is strict. A casting with no qualified instant
+        // route is Not Ready while Instant is selected (never animated).
+        private bool StrictInstant
+        {
+            get { return string.Equals(_executionSettings.Mode, "instant", StringComparison.Ordinal); }
         }
 
         // Guarded-scenario seam: the same deterministic compile Apply uses

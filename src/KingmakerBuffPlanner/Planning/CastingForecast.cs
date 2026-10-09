@@ -98,14 +98,15 @@ namespace KingmakerBuffPlanner.Planning
             IEnumerable<ProviderPlanningOption> providerOptions,
             IReadOnlyDictionary<string, EffectExpression> effectsBySource,
             IEnumerable<CastEnhancementSnapshot> enhancements = null,
-            IEnumerable<ICastingTargetingModifier> targetingModifiers = null)
+            IEnumerable<ICastingTargetingModifier> targetingModifiers = null,
+            bool strictInstant = false)
         {
             if (document == null) throw new ArgumentNullException("document");
             // The one-pass sequence carries structural effect presence
             // forward between routines as well as resource balances.
             ExplicitCastingPlan plan = _compiler.Compile(
                 document, snapshot, providerOptions, effectsBySource, enhancements,
-                null, targetingModifiers, true);
+                null, targetingModifiers, true, null, strictInstant);
             return new CastingForecast(
                 null,
                 document.Routines.Select(value => value.RoutineId).ToList(),

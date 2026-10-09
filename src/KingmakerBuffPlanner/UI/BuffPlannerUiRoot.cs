@@ -1589,7 +1589,9 @@ namespace KingmakerBuffPlanner.UI
                 _session.Model.EffectsBySource,
                 _session.Model.Enhancements,
                 ShareModifiersFor(_session.Model.Snapshot, _session.Model.Enhancements),
-                _session.ActiveEffects);
+                _session.ActiveEffects,
+                Game.Instance != null && Game.Instance.Player != null &&
+                    Game.Instance.Player.IsInCombat);
         }
 
         // The pure Share Transmutation modifier (everyday-use v1.2 §7,
@@ -1724,14 +1726,15 @@ namespace KingmakerBuffPlanner.UI
         }
 
         // The same executors and adapters the classic planner uses: animated
-        // native casting by default; Instant mode through the hybrid executor
-        // (animated only where a step requires a native command or the
-        // player allowed the animated fallback).
+        // native casting in the explicit Animated mode; Instant mode through
+        // the hybrid executor in strict mode (WP4: a step without an instant
+        // route is refused, never animated). Combat refusal is the enforced
+        // policy, not a setting.
         private ICastExecutor CreateCastingExecutor(ExecutionProfile settings)
         {
             if (!string.Equals(settings.Mode, "instant", StringComparison.Ordinal))
                 return new AnimatedCastExecutor(new KingmakerAnimatedCastAdapter(),
-                    settings.OutOfCombatOnly);
+                    CastingExecutionPolicy.OutOfCombatOnly);
             IEnumerable<CastEnhancementSnapshot> enhancements = _session.Model == null
                 ? new CastEnhancementSnapshot[0] : _session.Model.Enhancements;
             var nativeCommand = new HashSet<string>(enhancements
@@ -1739,11 +1742,12 @@ namespace KingmakerBuffPlanner.UI
                 .Select(value => value.EnhancementId), StringComparer.Ordinal);
             return new HybridCastExecutor(
                 new KingmakerInstantCastAdapter(_log.Info), new KingmakerAnimatedCastAdapter(),
-                settings.AllowAnimatedFallback, settings.OutOfCombatOnly,
+                CastingExecutionPolicy.AllowAnimatedFallback, CastingExecutionPolicy.OutOfCombatOnly,
                 step => step.EnhancementIds.Any(nativeCommand.Contains),
                 (index, step, animated, route) => _log.Info("[KBP-CF-ROUTE] step=" + index +
                     ";casting=" + step.AssignmentId + ";provider=" + step.Provider.Canonical +
-                    ";animated=" + animated + ";" + route + "."));
+                    ";animated=" + animated + ";" + route + "."),
+                strictInstant: true);
         }
 
         private void OnCastingRunCompleted(CastingRunReport report)
