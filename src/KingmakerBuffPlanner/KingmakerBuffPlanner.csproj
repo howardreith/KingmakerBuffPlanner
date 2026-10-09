@@ -105,6 +105,7 @@
     <Compile Include="Discovery\EffectOverrideRegistry.cs" />
     <Compile Include="Discovery\NativeAccessibilityIndex.cs" />
     <Compile Include="Discovery\NativeCandidateClassifier.cs" />
+    <Compile Include="Discovery\NativeCatalogAudit.cs" />
     <Compile Include="Discovery\NativeCatalogExporter.cs" />
     <Compile Include="Discovery\SelectableAbilityVariants.cs" />
     <Compile Include="Domain\Effects\EffectExpression.cs" />

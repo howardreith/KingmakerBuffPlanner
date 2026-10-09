@@ -35,6 +35,7 @@
     <Compile Include="SpellbookEntryTests.cs" />
     <Compile Include="ExecutionPolicyTests.cs" />
     <Compile Include="DirectManipulationTests.cs" />
+    <Compile Include="CatalogAuditTests.cs" />
     <Compile Include="AutosaveLifecycleTests.cs" />
     <Compile Include="SharePlanningTests.cs" />
     <Compile Include="UndoHistoryTests.cs" />
@@ -49,6 +50,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\DiscoveryNode.cs"><Link>Discovery\DiscoveryNode.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\EffectOverrideRegistry.cs"><Link>Discovery\EffectOverrideRegistry.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\NativeCandidateClassifier.cs"><Link>Discovery\NativeCandidateClassifier.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\NativeCatalogAudit.cs"><Link>Discovery\NativeCatalogAudit.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\SelectableAbilityVariants.cs"><Link>Discovery\SelectableAbilityVariants.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Compatibility\SpellbookRoleResolver.cs"><Link>Compatibility\SpellbookRoleResolver.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Compatibility\CallOfTheWildMetamagicNames.cs"><Link>Compatibility\CallOfTheWildMetamagicNames.cs</Link></Compile>
