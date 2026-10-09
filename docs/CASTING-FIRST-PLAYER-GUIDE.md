@@ -43,13 +43,35 @@ expanded, merged or substituted behind your back.
 2. Pick a caster in the left lane. When the caster can cast the buff in
    more than one way, pick the exact source row (spellbook and level, item
    or ability); each row says what the whole plan leaves of that pool.
-3. Click a target on the right: one line and one casting card appear. Two
-   allies are two castings.
-4. Click a casting's line or card to edit just that casting in the panel on
-   the right: caster or source, target, routine and order, enhancements,
-   **If the buff is already there** (skip, or cast it again anyway),
-   **Disable** (keep it, do not cast), **Duplicate** and **Remove**.
-5. **Undo** undoes the last edit (and saves).
+3. Click a target on the right: one line and one casting card appear, and
+   the new casting is selected. Two allies are two castings.
+4. Work on the selected casting directly in the graph (0.4.0):
+   - click its recipient's portrait again to **remove** it;
+   - click another portrait to **move** it there (a group casting is
+     **re-centred** there instead); a portrait it cannot reach is refused
+     with the reason and nothing changes;
+   - click another caster, or another exact source row, on the left to
+     **change who casts it** - its target, routine, order, enhancements the
+     new caster has and "already there" choice stay; an enhancement only
+     the old caster had is named and dropped (Undo brings it back).
+   With nothing selected, a portrait that already has a casting of this buff
+   selects that casting instead of adding a second one, and **Done** (or
+   Escape) clears the selection.
+5. The panel on the right shows the selected casting's status and reasons,
+   its target or group centre, enhancements, routine and order, **If the
+   buff is already there** (skip, or cast it again anyway) and **Remove**.
+   There is no Disable or Duplicate any more: remove a casting you do not
+   want. A casting an earlier version left **Disabled** still loads, is
+   never cast, blocks nothing, and can be removed.
+6. **Undo** undoes the last edit (and saves).
+
+**Group castings** (0.4.0) are one cast centred on one party member (or
+the caster). The cast affects whoever the spell's area reaches from that
+centre when it is cast; the panel shows who is expected to be reached, but
+nobody is "required" and a member standing outside the area never blocks
+the cast. Plans saved by 0.3.0 with required recipients still load; those
+choices are archived beside the plan (`*.pre-0.4.0.orig`) the first time
+the plan is saved and no longer constrain anything.
 
 **Enhancements** show only what is meaningful for that exact caster,
 source and spell (for example Extend or Brown-Fur Powerful Change when they
@@ -61,7 +83,9 @@ dropped silently.
 **Share Transmutation** (Brown-Fur Transmuter, from the KingmakerGunslinger
 mod): for an eligible personal transmutation, after choosing the exact
 caster and source, choose **Share with an ally** before clicking the
-target, then click the ally. Without Share the spell stays self-only. The
+target, then click the ally. The choice appears only for a caster and
+source that can use it; a saved casting whose Share no longer applies keeps
+it visible with the reason so you can untick it. Without Share the spell stays self-only. The
 Arcane Reservoir cost is budgeted together with the spell's own cost; when
 either is short the casting is blocked as a whole. Turning Share off on a
 casting keeps its ally target visible and blocked (so you can repair it or
