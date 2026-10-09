@@ -1,97 +1,74 @@
-# Kingmaker Buff Planner 0.3.0 — the casting-first planner
+# Kingmaker Buff Planner 0.4.0 — owner-review candidate (draft)
 
-**0.3.0 is the 0.2.0 release renumbered so Unity Mod Manager recognizes it as
-the newest version.** UMM compares versions by stripping every non-digit
-from each part, so the earlier `0.2.0-rc6` preview read as 0.2.6 and looked
-newer than 0.2.0. The planner code is the same as 0.2.0; only the version
-number changed.
+**Draft for owner review. 0.4.0 is not tagged or released.**
 
-0.3.0 replaces the classic buff planner with the **casting-first planner**:
-you plan every cast explicitly — who casts it, from which spell source, on
-whom, with which enhancements — and run whole routines with one click.
+0.4.0 completes the casting-first planner's remaining work: the spellbook
+button works, routines never run in combat, Instant mode is strict, castings
+are edited directly in the graph, the beneficial-buff catalogue is audited,
+Magic Circle against Alignment casts instantly, and the planner and the
+spell description are drawn on the game's own scroll paper.
 
-## Highlights
+## What changed
 
-- **One planner, no ceremony.** Every edit saves itself; there is no Save
-  button and no Accept Plan step. The footer shows Saved / Saving... /
-  Not saved; if a save ever fails your edits stay in the planner, runs wait
-  until the newest edit is saved, and the footer offers Retry save (or
-  Reload).
-- **One-click routines.** On the HUD the moon runs **Long**, the diamond
-  **Important**, the sun **Short** — the planner stays closed while the
-  party casts. The gear button or Ctrl+Shift+B opens the planner. Press a
-  running routine's button again to stop after the cast in progress.
-- **Exact castings.** Each casting is one cast: one caster, one spell source
-  (spellbook level, prepared slot, item or ability), one target or group
-  origin, and its own enhancements. Nothing is substituted behind your
-  back; a blocked casting is refused with its reason.
-- **A continuous casting graph.** Casters and their sources on the left, one
-  line and card per casting, recipients on the right, on one scrolling
-  parchment; the inspector edits the selected casting.
-- **Right-click any buff, header or casting card** for the game's own full
-  description of that exact spell. Escape closes the description, then the
-  planner — never the game's menu.
-- **Share Transmutation** (Brown-Fur Transmuter, from the KingmakerGunslinger
-  mod): choose the caster and source, then "Share with an ally" before the
-  target. The spell slot and the Arcane Reservoir are budgeted together; a
-  shortage blocks the whole casting. Powerful Change combines with it.
-- **Meaningful enhancements only:** metamagic rods and class features are
-  offered when they make sense for that spell and caster; an older choice
-  that no longer applies stays visible and removable.
-- **Shared resources are accounted across the whole plan** (spontaneous
-  slots, rod uses, the reservoir), and reservations are all-or-nothing.
-- **Instant casting by default**, with Animated available; an explicit
-  Animated choice from an earlier version is kept.
+- **Spellbook button.** The Buff Planner button in the native spellbook now
+  opens the planner (it used to sit under the window's close button). The
+  spellbook closes first; if the planner cannot open, the spellbook comes
+  back.
+- **Never during combat.** A routine pressed while the party is in combat is
+  refused with "Buff routines cannot run during combat." Nothing is spent.
+  This is no longer a setting.
+- **Strict Instant.** In Instant mode a casting that cannot be cast
+  instantly is Not Ready with its reason (the planner shows it); choose
+  **Animated** to cast it normally. The "animate buffs that cannot be
+  instant" checkbox is gone.
+- **Direct graph editing.** With a casting selected, click its recipient
+  again to remove it, another portrait to move it (a group casting is
+  re-centred), another caster or source row to change who casts it. Done or
+  Escape clears the selection. Disable, Duplicate and the Cast By and
+  required-recipient menus are gone; a legacy Disabled casting still loads
+  and can be removed. Share Transmutation is offered only where it applies.
+- **Group castings** affect whoever the area reaches; nobody is "required"
+  and a member outside the area never blocks the cast. Required-recipient
+  choices from 0.3.0 are archived beside the plan the first time it saves.
+- **Catalogue audit.** Attacks with caster riders (Hideous Laughter), the
+  Heal skill's Treat Affliction / Treat Deadly Wounds cooldowns, harmful
+  conditions (Dazing Touch), save-gated effects, activation markers and
+  restoration trackers no longer appear as buffs. Light, Daylight and
+  Elemental Bastion also leave the catalogue (their buffs have no mechanics
+  of their own).
+- **Magic Circle against Alignment** (KingmakerGunslinger) casts instantly
+  on an ally in Instant mode.
+- **Scroll paper.** The planner and the right-click spell description are
+  drawn on the game's own parchment (borrowed from the game at runtime; no
+  game art ships with the mod), falling back to the previous look if the
+  paper cannot be found. Clicking outside the description closes it.
 
 ## Upgrading
 
-- **Back up first:** copy your whole `Mods\KingmakerBuffPlanner` folder,
-  including `UserSettings`, to a folder outside `Mods` before installing.
-- The first time a campaign opens, its classic plan (0.0.19 or 0.1.x) is
-  imported once into the casting-first plan. The classic plan file is never
-  modified and a byte-exact copy is archived beside it
-  (`kbp-casting-<hash>.orig`). A classic casting that let the planner choose
-  "any caster" becomes a Draft with no caster — pick one; the planner never
-  guesses. A casting-first plan saved by 0.2.0 or a 0.2.0 preview is loaded as it is.
-- A game that explicitly chose the Classic planner in an earlier preview
-  keeps it until you use "Switch to the casting-first planner" on the mod's
-  settings page (one way).
-- To roll back, restore your backup folder (it contains its own
-  `UserSettings`).
+Back up the whole `Mods\KingmakerBuffPlanner` folder (with `UserSettings`)
+outside `Mods` before installing. 0.3.0 plans load unchanged; their stored
+combat/animation preferences are read but no longer honoured, and the next
+save writes the enforced values. To roll back, restore the backup.
 
 ## Requirements and compatibility
 
 - Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b with Unity Mod Manager.
-- Checked alongside BagOfTricks, BetterVendors, CallOfTheWild, CheatMenu,
-  CraftMagicItems, EddicKingmakerRespec, KingmakerBugfixes,
-  KingmakerDiceRoller, KingmakerGunslinger (0.0.133 and 0.0.136),
-  KingmakerLastAzlantiPreserver, ProperFlanking2, RacesUnleashed, SkipIntro,
-  TweakOrTreat and ZFavoredClass. None of them is required; Share
-  Transmutation needs KingmakerGunslinger's Brown-Fur Transmuter.
+- Checked alongside the same mod set as 0.3.0 (BagOfTricks, BetterVendors,
+  CallOfTheWild, CheatMenu, CraftMagicItems, EddicKingmakerRespec,
+  KingmakerBugfixes, KingmakerDiceRoller, KingmakerGunslinger 0.0.133 and
+  0.0.136, KingmakerLastAzlantiPreserver, ProperFlanking2, RacesUnleashed,
+  SkipIntro, TweakOrTreat, ZFavoredClass). None is required; Share
+  Transmutation needs KingmakerGunslinger's Brown-Fur Transmuter and Magic
+  Circle against Alignment comes from KingmakerGunslinger.
 
 ## Known limitations
 
-- Windowed display mode has not been qualified (tested at 1920x1080
-  fullscreen and the owner's own display settings).
-- Share Transmutation is supported for the Brown-Fur Transmuter only.
-- Metamagic spell variants, pets, ability pools with more than one use, and
-  an area change during a run have not been checked in the game.
-- 0.3.0 (like 0.2.0) is the first release of the casting-first planner; feedback is
-  welcome and adjustments are planned.
-
-## Qualification
-
-The 0.3.0 code (identical to 0.2.0) was qualified as candidate `8d7681d03752f3f7170f25f7d45029f71c46a884`:
-the full source-only gate (source validation, 398 protocol tests, runtime
-harness, package, deployment, launcher, fixture, rollback and publisher
-checks) and 41 of 41 guarded in-game runs on disposable test campaigns —
-the one-click Long routine from a cold start, the right-click description,
-the continuous scroll, autosave with reopen and save reload, classic-plan
-import, Share Transmutation and Share + Powerful Change (Instant and
-Animated), paid spell slots with Stop / repeat / recast, group spells,
-Powerful Change, an Extend rod, ability pools and plan-wide resource
-accounting. The 0.2.0 and 0.3.0 release commits add only the version number and
-documentation to that candidate, and its build was checked again in the
-game before publication. The row-by-row record is
-`docs/E01-E27-ACCEPTANCE-MATRIX.md`; the player guide is
-`docs/CASTING-FIRST-PLAYER-GUIDE.md`.
+- The exact in-game qualification of this candidate and its limits are in
+  `docs/REMAINING-WORK-0.4.0-HANDOFF.md`.
+- Instant mode's "Not Ready" for a casting that can only be cast animated has
+  no in-game check: after the Magic Circle repair no test party has such a
+  source (it is proven by the planner's own compiler and navigation tests).
+- Group re-centring by portrait click is checked in code, not in the game
+  (the standard test party has no group spell).
+- At 1280x720 the catalogue's Spells / Abilities tab captions wrap.
+- The visual look (scroll paper) is the owner's judgement to accept.
