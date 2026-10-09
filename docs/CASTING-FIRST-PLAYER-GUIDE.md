@@ -1,6 +1,7 @@
-# Buff Planner: player guide (0.3.0)
+# Buff Planner: player guide (0.4.0)
 
-This guide describes the casting-first planner as released in 0.3.0 (the same planner as 0.2.0). It is
+This guide describes the casting-first planner of 0.4.0 (an owner-review candidate; 0.3.0 is the
+published release). It is
 the only normal planner: there is
 no Save button, no Accept Plan step and no Classic switch in the planner.
 "What has been checked in the game" at the end says exactly which parts a
@@ -177,8 +178,8 @@ it is resolved.
 
 Install archive-first: back up the whole `Mods\KingmakerBuffPlanner` folder
 (including `UserSettings`) outside the `Mods` folder before replacing it,
-then confirm Unity Mod Manager lists version 0.3.0 (its log line
-`[KBP-BOOT] Main.Load exited;version=0.3.0;commit=<commit>` names the
+then confirm Unity Mod Manager lists version 0.4.0 (its log line
+`[KBP-BOOT] Main.Load exited;version=0.4.0;commit=<commit>` names the
 release commit). To roll back, copy the new `UserSettings` outside `Mods`,
 delete the new folder and copy your backup back. The release notes give the
 exact steps and the package checksum.
