@@ -167,6 +167,16 @@ namespace KingmakerBuffPlanner.Discovery
             if (facts.CanTargetPoint)
                 return Exclude("point-target-without-placement",
                     "Point-target abilities are excluded until a deterministic safe placement rule exists.");
+            // rc4 (lead review, finding 1): the native AbilityTargetBreathOfLife
+            // target check admits only a dead or dying party member (IsDead with
+            // the recently-dead buff, or a death-door condition) or an undead to
+            // harm - never a living ally (its CanTarget, Assembly-CSharp 2.1.7b).
+            // Such an ability revives; whatever buff it leaves follows the
+            // revival (Inspiring Recovery's check buff casts its morale buff
+            // only when it ends).
+            if (AuditRules && abilityComponents.Any(value => ShortName(value) == "AbilityTargetBreathOfLife"))
+                return Exclude("revival-target-only",
+                    "The ability's own target check (AbilityTargetBreathOfLife) admits only a dead or dying ally, or an undead to harm: it revives, it is not a buff to plan beforehand.");
             if (effects.Count == 0)
             {
                 if (restorative.Count != 0)
@@ -285,10 +295,14 @@ namespace KingmakerBuffPlanner.Discovery
             List<NativeCandidateEffectFacts> opaque = payloads.Where(IsOpaque).ToList();
             if (opaque.Count != 0 && opaque.Count == payloads.Count)
                 return Unsupported("opaque-hidden-buff-actions",
-                    "The only remaining persistent effect is a hidden buff whose own actions are not understood (" +
+                    "The only remaining persistent effect is a hidden buff whose own actions are not proved (" +
                     string.Join("; ", opaque.Select(e => (e.EffectName ?? e.EffectId) + ": " +
                         string.Join(", ", (e.FactActions ?? new NativeCandidateFactActions[0])
-                            .SelectMany(list => list.Unrecognized ?? new string[0])
+                            .SelectMany(list => (list.Unrecognized ?? new string[0]).Concat(
+                                list.List == "Deactivated"
+                                    ? (list.AppliedEffects ?? new NativeCandidateEffectFacts[0])
+                                        .Select(applied => "applies " + (applied.EffectName ?? applied.EffectId) + " when it ends")
+                                    : new string[0]))
                             .Distinct(StringComparer.Ordinal).ToArray())).ToArray()) +
                     "); it is neither proved bookkeeping nor a proved buff.");
             payloads = payloads.Where(e => !IsOpaque(e)).ToList();
@@ -482,13 +496,18 @@ namespace KingmakerBuffPlanner.Discovery
                 .Any(applied => applied.Harmful != true && !IsHarmfulCondition(applied));
         }
 
-        // A hidden buff running an action the adapter does not recognize: its
-        // ongoing behaviour is not proved either way (rc4).
+        // A hidden buff whose ongoing behaviour is not proved either way
+        // (rc4): its own actions run something the adapter does not
+        // recognize, or apply a beneficial buff only when it ends (a delayed
+        // effect no cast can confirm).
         private bool IsOpaque(NativeCandidateEffectFacts effect)
         {
-            return AuditRules && effect != null && effect.IsHiddenInUi && !IsBeneficialCarrier(effect) &&
-                (effect.FactActions ?? new NativeCandidateFactActions[0])
-                    .Any(list => (list.Unrecognized ?? new string[0]).Count != 0);
+            if (!AuditRules || effect == null || !effect.IsHiddenInUi || IsBeneficialCarrier(effect)) return false;
+            IReadOnlyList<NativeCandidateFactActions> lists = effect.FactActions ?? new NativeCandidateFactActions[0];
+            return lists.Any(list => (list.Unrecognized ?? new string[0]).Count != 0) ||
+                lists.Where(list => list.List == "Deactivated")
+                    .SelectMany(list => list.AppliedEffects ?? new NativeCandidateEffectFacts[0])
+                    .Any(applied => applied.Harmful != true && !IsHarmfulCondition(applied));
         }
 
         // Instantaneous restoration actions (no persistent state of their
