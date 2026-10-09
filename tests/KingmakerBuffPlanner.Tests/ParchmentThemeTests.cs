@@ -24,6 +24,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("wp7-spell-scroll-layout-hierarchy", TestSpellScrollLayoutHierarchy);
             Run("wp7-inks-stay-legible-on-the-paper", TestInksStayLegibleOnThePaper);
             Run("wp7-workspace-wires-the-scroll-paper", TestWorkspaceWiresTheScrollPaper);
+            Run("wp7-translucent-wash-drops-its-outline", TestTranslucentWashDropsItsOutline);
         }
 
         private static NativeSpriteFacts PaperFacts(string name = "dialogue_backsheet", float width = 858f,
@@ -413,6 +414,27 @@ namespace KingmakerBuffPlanner.Tests
         // their exact contracts; the workspace never runs the localScale
         // reset that would double the paper layer; Escape and the backdrop
         // go through the description's policy before the planner's own.
+        // Regression for kbp040-wp7-sel-1080-01: an Outline under a 30% lane
+        // wash filled the lane with its reddish brown. On the native paper a
+        // translucent wash never keeps its Outline; an opaque one may; the
+        // fallback restores exactly what the panel had.
+        private static void TestTranslucentWashDropsItsOutline()
+        {
+            Expect(!ParchmentSurfaces.WashKeepsOutline(true, PlannerParchmentPalette.WellWashAlpha, true) &&
+                !ParchmentSurfaces.WashKeepsOutline(true, PlannerParchmentPalette.LedgerWashAlpha, true) &&
+                !ParchmentSurfaces.WashKeepsOutline(true, 0f, true),
+                "a translucent wash on the paper kept an Outline that fills it");
+            Expect(ParchmentSurfaces.WashKeepsOutline(true, 1f, true) &&
+                !ParchmentSurfaces.WashKeepsOutline(true, 1f, false),
+                "an opaque panel lost or gained its own Outline");
+            Expect(ParchmentSurfaces.WashKeepsOutline(false, PlannerParchmentPalette.WellWashAlpha, true) &&
+                !ParchmentSurfaces.WashKeepsOutline(false, PlannerParchmentPalette.WellWashAlpha, false),
+                "the fallback did not restore the panel's own Outline");
+            string adapter = UiSource("PlannerParchment.cs");
+            Expect(adapter.Contains("ParchmentSurfaces.WashKeepsOutline(Native, wash.PaperAlpha,"),
+                "the wash adapter does not apply the outline policy");
+        }
+
         private static void TestWorkspaceWiresTheScrollPaper()
         {
             string view = UiSource("CastingWorkspaceScreenView.cs");

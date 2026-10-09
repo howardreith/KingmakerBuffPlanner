@@ -101,9 +101,14 @@ below and 24 above it, so the sheet's darker folded top and bottom bands lie
 outside the header and footer and its curled side edges reach under 8 units
 in (lanes start 2.8% of the frame in). The frame's flat tint goes transparent
 (it stays the hit surface) and its outline yields. The three lanes' wells
-become a 30% wash of their tint with their gold outline kept, so the sheet
-shows through while each lane keeps its edge; the footer's budget ledger keeps
-60% of its ground for its small text. Two rules sit under the header row and
+become a 30% wash of their tint, so the sheet shows through; the footer's
+budget ledger keeps 60% of its ground for its small text. A translucent wash
+drops its Outline: Unity's Outline effect draws four offset copies of the
+whole graphic under it, which a wash no longer hides, so the first live run
+(`kbp040-wp7-sel-1080-01`) showed every lane filled with the outline's
+reddish brown and the paper only in the margins
+(`ParchmentSurfaces.WashKeepsOutline`, regression
+`wp7-translucent-wash-drops-its-outline`). Two rules sit under the header row and
 in the gap above the footer, drawn right above the paper and beneath every
 control. Casting chips keep their opaque grounds, and chips, caster and source
 rows and target cards keep their own grounds, outlines and state inks

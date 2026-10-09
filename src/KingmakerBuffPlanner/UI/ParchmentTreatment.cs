@@ -175,5 +175,18 @@ namespace KingmakerBuffPlanner.UI
         // The soft second silhouette under the sheet (Roll for Stats).
         internal const float ShadowOffsetX = 2f;
         internal const float ShadowOffsetY = -3f;
+
+        // Unity's Outline effect draws four offset copies of the WHOLE graphic
+        // in its colour, under it. Under an opaque panel only the copies'
+        // edges show; under a translucent wash they fill the panel. With the
+        // lanes washed to 30% that filled every well with the outline's
+        // reddish brown (kbp040-wp7-sel-1080-01: the paper showed only in the
+        // margins). A wash on the paper therefore never keeps an Outline; it
+        // gets it back exactly on fallback, when the panel is opaque again.
+        internal static bool WashKeepsOutline(bool paperNative, float washAlpha, bool outlineBefore)
+        {
+            if (!paperNative) return outlineBefore;
+            return outlineBefore && washAlpha >= 1f;
+        }
     }
 }
