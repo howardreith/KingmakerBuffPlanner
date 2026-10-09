@@ -20,7 +20,12 @@ namespace KingmakerBuffPlanner.UI
         private readonly NativeThemeRecovery _recovery = new NativeThemeRecovery();
         private readonly HashSet<Button> _sounded = new HashSet<Button>();
         private readonly List<RectTransform> _paperSurfaces = new List<RectTransform>();
+        private readonly List<ParchmentSurface> _parchments = new List<ParchmentSurface>();
+        private readonly List<ParchmentRule> _rules = new List<ParchmentRule>();
         private readonly List<string> _diagnostics = new List<string>();
+        private Image _scrollPaperDonor;
+        private Image _scrollRuleDonor;
+        private string _parchmentLogged;
         private string _summary = string.Empty;
 
         internal static PlannerNativeThemeSurface Attach(RectTransform root,
@@ -52,6 +57,75 @@ namespace KingmakerBuffPlanner.UI
             foreach (RectTransform existing in _paperSurfaces)
                 if (existing == surface) return;
             _paperSurfaces.Add(surface);
+        }
+
+        // The casting-first planner's scroll paper (WP7): surfaces and rules
+        // take the current ScrollPaper/ScrollRule donors at registration -
+        // the spell scroll is built lazily, after the first binding pass -
+        // and again whenever a binding changes them.
+        internal void RegisterParchment(ParchmentSurface surface)
+        {
+            if (surface == null || _parchments.Contains(surface)) return;
+            _parchments.Add(surface);
+            surface.Apply(_scrollPaperDonor, PaperUnavailableReason());
+            LogParchment();
+        }
+
+        internal void RegisterRule(ParchmentRule rule)
+        {
+            if (rule == null || _rules.Contains(rule)) return;
+            _rules.Add(rule);
+            rule.Apply(_scrollRuleDonor);
+        }
+
+        // Which donors were borrowed and what each surface and rule drew:
+        // "scrollPaper=ok|scrollRule=fallback(<reason>)|<surface>|<rule>...".
+        internal string ParchmentEvidence
+        {
+            get
+            {
+                var parts = new List<string>
+                {
+                    "scrollPaper=" + CapabilityEvidence(NativeThemeCapability.ScrollPaper),
+                    "scrollRule=" + CapabilityEvidence(NativeThemeCapability.ScrollRule)
+                };
+                foreach (ParchmentSurface surface in _parchments) parts.Add(surface.Evidence);
+                foreach (ParchmentRule rule in _rules) parts.Add(rule.Evidence);
+                return string.Join("|", parts.ToArray());
+            }
+        }
+
+        private string CapabilityEvidence(NativeThemeCapability capability)
+        {
+            if (_theme == null) return "fallback(no theme)";
+            return _theme.Resources.IsAvailable(capability) ? "ok"
+                : "fallback(" + (_theme.Resources.Failure(capability) ?? "not attempted") + ")";
+        }
+
+        private string PaperUnavailableReason()
+        {
+            if (_scrollPaperDonor != null) return null;
+            string failure = _theme == null ? null : _theme.Resources.Failure(NativeThemeCapability.ScrollPaper);
+            return failure ?? "not-applied";
+        }
+
+        private void RefreshParchment()
+        {
+            string reason = PaperUnavailableReason();
+            foreach (ParchmentSurface surface in _parchments) surface.Apply(_scrollPaperDonor, reason);
+            foreach (ParchmentRule rule in _rules) rule.Apply(_scrollRuleDonor);
+            LogParchment();
+        }
+
+        // Logged once per distinct outcome (never per frame): the live lane
+        // reads which paper the planner actually drew from the game log.
+        private void LogParchment()
+        {
+            if (_parchments.Count == 0) return;
+            string evidence = ParchmentEvidence;
+            if (string.Equals(evidence, _parchmentLogged, StringComparison.Ordinal)) return;
+            _parchmentLogged = evidence;
+            Debug.Log("[KBP-THEME] parchment " + evidence);
         }
 
         private void Record(string message)
@@ -88,6 +162,12 @@ namespace KingmakerBuffPlanner.UI
             _bindings.Add(NativeThemeCapability.Sound,
                 delegate(object[] components) { ApplyClickSounds(components[0]); },
                 delegate { });
+            _bindings.Add(NativeThemeCapability.ScrollPaper,
+                components => { _scrollPaperDonor = (Image)components[0]; RefreshParchment(); },
+                delegate { _scrollPaperDonor = null; RefreshParchment(); });
+            _bindings.Add(NativeThemeCapability.ScrollRule,
+                components => { _scrollRuleDonor = (Image)components[0]; RefreshParchment(); },
+                delegate { _scrollRuleDonor = null; RefreshParchment(); });
             if (_theme.Resources.AvailableCount != NativeThemeResolution.Capabilities.Length)
                 Record("native theme resolved partially at attach;native=" +
                     _nativeLookupRoot.GetInstanceID() + ";summary=" +

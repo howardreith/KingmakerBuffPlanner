@@ -34,9 +34,10 @@ namespace KingmakerBuffPlanner.UI
 
         private static readonly Color Ink = new Color(0.20f, 0.14f, 0.10f, 0.85f);
         private static readonly Color InkFaint = new Color(0.20f, 0.14f, 0.10f, 0.35f);
-        private static readonly Color Burgundy = new Color(0.55f, 0.13f, 0.08f, 1f);
-        private static readonly Color BlockedInk = new Color(0.72f, 0.26f, 0.12f, 0.95f);
-        private static readonly Color LegalInk = new Color(0.22f, 0.42f, 0.22f, 0.95f);
+        // The inks the contrast tests measure on the paper (WP7).
+        private static readonly Color Burgundy = KingmakerUiFactory.ToColor(PlannerParchmentPalette.Burgundy);
+        private static readonly Color BlockedInk = KingmakerUiFactory.ToColor(PlannerParchmentPalette.BlockedInk, 0.95f);
+        private static readonly Color LegalInk = KingmakerUiFactory.ToColor(PlannerParchmentPalette.LegalInk, 0.95f);
         private const float LineThickness = 2f;
         private const float SelectedLineThickness = 4f;
         private const float CorridorThickness = 24f;
@@ -50,11 +51,13 @@ namespace KingmakerBuffPlanner.UI
         private PlannerNativeThemeSurface _nativeTheme;
         private RectTransform _root;
         private RectTransform _frame;
+        // WP7: the frame's native scroll paper (exact fallback: the flat
+        // tint and outline above).
+        private ParchmentSurface _frameParchment;
         private int _uiLayer;
         private bool _disposed;
         private bool _importAnnounced;
         private float _reloadArmedUntil;
-        private string _pageArtEvidence = "page=fallback;not-attempted";
         private CastingGraphView _lastView;
         private GraphLayoutResult _lastLayout;
         private GraphLayoutMetrics _lastMetrics;
@@ -92,6 +95,7 @@ namespace KingmakerBuffPlanner.UI
         private Text _footerOnePass;
         private Text _footerResult;
         private Text _footerSave;
+        private Image _footerLedger;
         private Button _footerRecovery;
         private string _shownSaveState;
         private Button _modeButton;
@@ -136,7 +140,19 @@ namespace KingmakerBuffPlanner.UI
             get { return _root == null ? null : _root.gameObject; }
         }
 
-        internal string PageArtEvidence { get { return _pageArtEvidence; } }
+        // Everyday-use v1.2's one continuous scroll (the two-page book art
+        // stays retired), now drawn on the native paper when its donor
+        // validates: which donors were borrowed and what every parchment
+        // surface and rule drew (WP7).
+        internal string PageArtEvidence
+        {
+            get { return "page=continuous-scroll;book-art-retired;" + WorkspacePaperEvidenceForRuntime; }
+        }
+
+        internal string WorkspacePaperEvidenceForRuntime
+        {
+            get { return _nativeTheme == null ? "parchment=unavailable" : _nativeTheme.ParchmentEvidence; }
+        }
 
         // The last rendered read model and geometry (runtime evidence only).
         internal CastingGraphView LastGraphForRuntime { get { return _lastView; } }
@@ -529,14 +545,18 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.Stretch(_frame, 24, 24, 24, 60);
             // Everyday-use v1.2: one continuous scroll. The borrowed
             // two-page book sprite (with its central binding under the
-            // graph connections) is retired; the composed continuous
-            // native-compatible parchment below IS the writing surface.
-            _pageArtEvidence = ApplyContinuousScrollArt(_frame);
+            // graph connections) stays retired. WP7: the continuous
+            // writing surface is the native scroll paper, one sheet with no
+            // central fold, drawn under every lane; the flat tint and
+            // outline above remain its exact fallback.
+            _frameParchment = ParchmentSurface.Create(ParchmentSurfaces.WorkspaceFrame, _frame,
+                ParchmentSurfaces.WorkspaceFrameOutsets);
             BuildHeader(_frame);
             BuildCatalogue(_frame);
             BuildGraphArea(_frame);
             BuildInspector(_frame);
             BuildFooter(_frame);
+            ApplyScrollPaper();
             PropagateUiLayer();
         }
 
@@ -549,14 +569,35 @@ namespace KingmakerBuffPlanner.UI
             "ServiceWindow/CharacterScreen/BookBackground"
         };
 
-        // The continuous writing surface: the composed parchment frame with
-        // no central fold. A native continuous-paper donor may replace the
-        // composed tint when one is verified; nothing here mutates a donor.
-        private static string ApplyContinuousScrollArt(RectTransform frame)
+        // The frame's paper and its scroll rules. The lanes' flat wells and
+        // the footer ledger become light washes on the paper so the sheet
+        // shows through while each lane keeps its edge; the rules under the
+        // header and above the footer close the scroll's body (hidden
+        // without the paper, so a failed theme is exactly the flat look).
+        // Nothing here reads or mutates a donor: the theme surface hands the
+        // validated ScrollPaper/ScrollRule donors to these owned layers.
+        private void ApplyScrollPaper()
         {
-            string evidence = "page=continuous-scroll;book-art-retired";
-            Debug.Log("[KBP-THEME] workspace page art " + evidence);
-            return evidence;
+            foreach (ScrollRect lane in new[] { CatalogueScroll(), _graphScroll, _inspectorScroll })
+                if (lane != null)
+                    _frameParchment.AddWash(lane.GetComponent<Image>(), PlannerParchmentPalette.WellWashAlpha, true);
+            _frameParchment.AddWash(_footerLedger, PlannerParchmentPalette.LedgerWashAlpha, true);
+            // Between the header row (its controls end 41 units down) and
+            // the routine bar; and in the gap between the lanes (8.5% of the
+            // frame up) and the footer (7.8%).
+            ParchmentRule header = ParchmentRule.Create("HeaderRule", _frame, _frameParchment, false);
+            KingmakerUiFactory.SetAnchors(header.Rect, 0.028f, 1f, 0.972f, 1f);
+            header.Rect.anchoredPosition = new Vector2(0f, -45f);
+            ParchmentRule footer = ParchmentRule.Create("FooterRule", _frame, _frameParchment, false);
+            KingmakerUiFactory.SetAnchors(footer.Rect, 0.028f, 0.0815f, 0.972f, 0.0815f);
+            // The rules are part of the sheet: drawn right above the paper
+            // and beneath every control, so a crowded small screen covers
+            // them instead of striking through its routine tabs.
+            header.Rect.SetSiblingIndex(1);
+            footer.Rect.SetSiblingIndex(2);
+            _nativeTheme.RegisterParchment(_frameParchment);
+            _nativeTheme.RegisterRule(header);
+            _nativeTheme.RegisterRule(footer);
         }
 
         // ------------------------------------------------------------------
@@ -1027,6 +1068,7 @@ namespace KingmakerBuffPlanner.UI
             Image ground = KingmakerUiFactory.AddFramedPanel(ledger, _theme.ParchmentRaised, _theme.GoldAccent);
             ground.raycastTarget = false;
             ledger.SetAsFirstSibling();
+            _footerLedger = ground;
             _footerResult.text = DescribeReadiness();
             ShowSaveState();
         }
@@ -1418,8 +1460,10 @@ namespace KingmakerBuffPlanner.UI
             string captured = casting.CastingId;
             RectTransform rect = Place(KingmakerUiFactory.CreateRect("Casting." + casting.CastingId, layer),
                 placement.Left.X, placement.Top, m.ChipWidth, m.ChipHeight);
-            Image background = KingmakerUiFactory.AddPanel(rect, casting.Selected
-                ? new Color(1f, 0.93f, 0.80f, 1f) : new Color(0.99f, 0.95f, 0.86f, 1f));
+            // Opaque on the paper too: the chip's state reads from its own
+            // ground, outline and status ink (contrast-tested, WP7).
+            Image background = KingmakerUiFactory.AddPanel(rect, KingmakerUiFactory.ToColor(casting.Selected
+                ? PlannerParchmentPalette.ChipGroundSelected : PlannerParchmentPalette.ChipGround));
             Outline outline = rect.gameObject.AddComponent<Outline>();
             outline.effectColor = casting.Selected ? Burgundy
                 : casting.Readiness == ResolvedCastingReadiness.Blocked ? BlockedInk : Ink;
