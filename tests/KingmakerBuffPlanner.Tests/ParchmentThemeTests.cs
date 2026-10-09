@@ -8,8 +8,9 @@ namespace KingmakerBuffPlanner.Tests
     // WP7 parchment and spell-scroll overhaul: the native scroll paper and
     // rule are borrowed only under their exact sprite contracts through the
     // capability resolver, drawn at a computed layer scale that keeps the
-    // nine-slice borders at their verified size, and fall back exactly; and
-    // the inks stay legible on the measured paper.
+    // nine-slice borders at their verified size, and fall back exactly; the
+    // spell scroll's input policy, text composition and layout hierarchy;
+    // and the inks stay legible on the measured paper.
     internal static partial class Program
     {
         private static void RunParchmentThemeTests()
@@ -18,6 +19,9 @@ namespace KingmakerBuffPlanner.Tests
             Run("wp7-scroll-donors-resolve-per-capability", TestScrollDonorsResolvePerCapability);
             Run("wp7-paper-layer-scale-keeps-native-borders", TestPaperLayerScaleKeepsNativeBorders);
             Run("wp7-scroll-rules-follow-paper-and-structure", TestScrollRulesFollowPaperAndStructure);
+            Run("wp7-spell-scroll-input-policy", TestSpellScrollInputPolicy);
+            Run("wp7-spell-scroll-content-is-native-and-read-only", TestSpellScrollContentIsNative);
+            Run("wp7-spell-scroll-layout-hierarchy", TestSpellScrollLayoutHierarchy);
             Run("wp7-inks-stay-legible-on-the-paper", TestInksStayLegibleOnThePaper);
             Run("wp7-workspace-wires-the-scroll-paper", TestWorkspaceWiresTheScrollPaper);
         }
@@ -217,19 +221,21 @@ namespace KingmakerBuffPlanner.Tests
             ParchmentInsets frame = ParchmentSurfaces.WorkspaceFrameOutsets;
             ParchmentInsets scroll = ParchmentSurfaces.SpellScrollOutsets;
             Expect(workspace.DrawsUndistorted(1232f + frame.Left + frame.Right, 636f + frame.Bottom + frame.Top) &&
-                workspace.DrawsUndistorted(760f + scroll.Left + scroll.Right, 520f + scroll.Bottom + scroll.Top) &&
+                workspace.DrawsUndistorted(SpellScrollLayout.PanelWidth + scroll.Left + scroll.Right,
+                    SpellScrollLayout.PanelHeight + scroll.Bottom + scroll.Top) &&
                 !workspace.DrawsUndistorted(130f, 600f) && !workspace.DrawsUndistorted(600f, 80f),
                 "a supported parchment surface would squash its corners");
             // Unscaled, the 760-wide scroll would spend 263 of its units on
             // borders (oversized); the layer halves that.
             Expect(ParchmentLayerGeometry.DrawnUnits(268f + 258f, 200f, 100f, 1f) > 260f &&
-                workspace.MinimumWidth < 0.2f * 760f,
+                workspace.MinimumWidth < 0.2f * SpellScrollLayout.PanelWidth,
                 "the scroll's borders are oversized");
             // The rule at its native height on the canvas, whole units.
             Expect(ParchmentLayerGeometry.RuleHeight(NativeSpriteContract.ScrollRule, 100f) == 6f &&
                 ParchmentLayerGeometry.RuleHeight(NativeSpriteContract.ScrollRule, 200f) == 11f &&
-                ParchmentRulePolicy.HairlineHeight == 2f,
-                "the rule height is wrong");
+                SpellScrollLayout.RuleSlotHeight >= ParchmentLayerGeometry.RuleHeight(NativeSpriteContract.ScrollRule, 100f) &&
+                SpellScrollLayout.RuleSlotHeight >= ParchmentRulePolicy.HairlineHeight,
+                "the rule height or its reserved slot is wrong");
             // The outsets keep the sheet's darker folded top and bottom
             // bands outside the frame (its header and footer sit on the
             // writing area); the curled side edges reach under 8 units in.
@@ -256,6 +262,95 @@ namespace KingmakerBuffPlanner.Tests
                 ParchmentRulePolicy.Resolve(false, false, true) == ParchmentRuleMode.Hairline &&
                 ParchmentRulePolicy.Resolve(false, true, true) == ParchmentRuleMode.Hairline,
                 "the description's structural rule disappears with a donor");
+        }
+
+        // Escape closes the description first; an outside click closes it
+        // and is consumed; inside clicks and stray wheels are swallowed; the
+        // wheel over the text scrolls only the text. Closed, nothing is
+        // claimed, so the planner's own Escape and wheel apply again.
+        private static void TestSpellScrollInputPolicy()
+        {
+            var state = new SpellScrollModalState();
+            foreach (SpellScrollInput input in Enum.GetValues(typeof(SpellScrollInput)))
+                Expect(state.Handle(input) == SpellScrollOutcome.NotHandled && !state.IsOpen,
+                    "a closed description claimed " + input);
+            SpellScrollContent first = SpellScrollContent.Compose("#1 Resistance", "Native text.", "1 minute", true);
+            state.Open(first);
+            Expect(state.IsOpen && ReferenceEquals(state.Content, first), "the description did not open");
+            Expect(state.Handle(SpellScrollInput.WheelOverDescription) == SpellScrollOutcome.ScrollsDescription &&
+                state.Handle(SpellScrollInput.WheelElsewhere) == SpellScrollOutcome.Consumed &&
+                state.Handle(SpellScrollInput.ClickInsideScroll) == SpellScrollOutcome.Consumed && state.IsOpen,
+                "the wheel or a click inside leaked past or closed the description");
+            Expect(state.Handle(SpellScrollInput.ClickOutsideScroll) == SpellScrollOutcome.Closed && !state.IsOpen,
+                "an outside click did not close the description");
+            Expect(state.Handle(SpellScrollInput.ClickOutsideScroll) == SpellScrollOutcome.NotHandled,
+                "the closing click was handled twice");
+            state.Open(first);
+            SpellScrollContent probe = SpellScrollContent.Compose("Layout probe", "Long text.", string.Empty, false);
+            state.Open(probe);
+            Expect(state.IsOpen && ReferenceEquals(state.Content, probe), "re-showing did not replace the content in place");
+            Expect(state.Handle(SpellScrollInput.Escape) == SpellScrollOutcome.Closed && !state.IsOpen &&
+                state.Handle(SpellScrollInput.Escape) == SpellScrollOutcome.NotHandled,
+                "Escape did not close the description first and then fall through to the planner");
+            Expect(SpellScrollModalState.OutsideClickPolicy == "outside-click-closes;consumed;never-clicks-through",
+                "the documented outside-click policy changed");
+        }
+
+        private static void TestSpellScrollContentIsNative()
+        {
+            const string native = "  You gain <b>acid</b> resistance 10.\r\n\r\nAt 7th level: 20.  ";
+            SpellScrollContent exact = SpellScrollContent.Compose("#2 Resist Energy", native, "  10 minutes/level ", true);
+            Expect(exact.Body == native && exact.HasNativeDescription,
+                "the native description was altered: '" + exact.Body + "'");
+            Expect(exact.Title == "#2 Resist Energy" &&
+                exact.Meta == "10 minutes/level" + SpellScrollContent.MetaSeparator + SpellScrollContent.ExactNote,
+                "the title or meta line changed: " + exact.Meta);
+            SpellScrollContent base_ = SpellScrollContent.Compose(null, " \n ", null, false);
+            Expect(base_.Title.Length == 0 && base_.Meta == SpellScrollContent.BaseNote &&
+                base_.Body == SpellScrollContent.MissingDescription && !base_.HasNativeDescription,
+                "an empty description was not stated honestly");
+            Expect(SpellScrollContent.BaseNote == "base spell — select a caster/source for exact values" &&
+                SpellScrollContent.MissingDescription == "The game provides no description for this spell.",
+                "the player-facing description wording changed");
+        }
+
+        private static void TestSpellScrollLayoutHierarchy()
+        {
+            SpellScrollLayout layout = SpellScrollLayout.Compute(SpellScrollLayout.PanelWidth,
+                SpellScrollLayout.PanelHeight);
+            SpellScrollRect[] parts = { layout.Title, layout.Meta, layout.Rule, layout.Body, layout.Close };
+            foreach (SpellScrollRect part in parts)
+                Expect(part.X >= 0f && part.Y >= 0f && part.Right <= layout.Width && part.Bottom <= layout.Height &&
+                    part.Width > 0f && part.Height > 0f, "a scroll part leaves the sheet");
+            Expect(layout.Title.Bottom <= layout.Meta.Y && layout.Meta.Bottom <= layout.Rule.Y &&
+                layout.Rule.Bottom <= layout.Body.Y, "title, meta, rule and body are out of order");
+            for (int first = 0; first < parts.Length; first++)
+                for (int second = first + 1; second < parts.Length; second++)
+                    Expect(!parts[first].Overlaps(parts[second]), "scroll parts " + first + "/" + second + " overlap");
+            Expect(Near(layout.Title.X, layout.Width - layout.Title.Right) &&
+                Near(layout.Rule.X, layout.Width - layout.Rule.Right),
+                "the title or rule is not centred on the sheet");
+            Expect(layout.Body.Height >= 0.7f * layout.Height, "the description body is cramped: " + layout.Body.Height);
+            // The physical wheel probe aims at the scroll's centre: it must
+            // land on the description, never on the title or backdrop.
+            Expect(layout.Body.X < layout.Width / 2f && layout.Body.Right > layout.Width / 2f &&
+                layout.Body.Y < layout.Height / 2f && layout.Body.Bottom > layout.Height / 2f,
+                "the scroll's centre is not over the description");
+            // Every text and the Close button sit on the plain writing area:
+            // inside the sheet's darker edge zone reach (zone minus outset).
+            ParchmentInsets outsets = ParchmentSurfaces.SpellScrollOutsets;
+            float unit = ParchmentLayerGeometry.UnitsPerSpritePixel;
+            float reachLeft = PlannerParchmentPalette.EdgeZoneLeftPixels * unit - outsets.Left;
+            float reachRight = PlannerParchmentPalette.EdgeZoneRightPixels * unit - outsets.Right;
+            float reachTop = PlannerParchmentPalette.EdgeZoneTopPixels * unit - outsets.Top;
+            float reachBottom = PlannerParchmentPalette.EdgeZoneBottomPixels * unit - outsets.Bottom;
+            foreach (SpellScrollRect part in parts)
+                Expect(part.X >= reachLeft && layout.Width - part.Right >= reachRight && part.Y >= reachTop &&
+                    layout.Height - part.Bottom >= reachBottom, "a scroll part sits on the sheet's darker edge");
+            // The panel keeps the physical record's on-screen floor at the
+            // supported resolutions (25% of 1920x1080 and 2560x1440).
+            Expect(layout.Width >= 0.25f * 2560f && layout.Height >= 0.25f * 1440f,
+                "the spell scroll is too small for the physical judgement at 2560x1440");
         }
 
         // The paper is lighter than every ground the flat look ever gave, so
@@ -313,10 +408,11 @@ namespace KingmakerBuffPlanner.Tests
         }
 
         // Unity-bound wiring that cannot run here, checked in source: the
-        // frame registers its paper and rules with the
+        // frame and the description register their paper and rules with the
         // native theme surface; the scroll capabilities are validated with
         // their exact contracts; the workspace never runs the localScale
-        // reset that would double the paper layer.
+        // reset that would double the paper layer; Escape and the backdrop
+        // go through the description's policy before the planner's own.
         private static void TestWorkspaceWiresTheScrollPaper()
         {
             string view = UiSource("CastingWorkspaceScreenView.cs");
@@ -326,6 +422,21 @@ namespace KingmakerBuffPlanner.Tests
                 paper.Contains("PlannerParchmentPalette.WellWashAlpha") && paper.Contains("PlannerParchmentPalette.LedgerWashAlpha"),
                 "the workspace frame does not take the scroll paper");
             Expect(!view.Contains("ForceLayoutAndSnap"), "the workspace resets localScale under its paper layers");
+            string build = SourceBlock(view, "private void BuildSpellInspect()");
+            Expect(build != null &&
+                build.Contains("RectTransform backdrop = KingmakerUiFactory.CreateRect(\"Backdrop\", _inspectRoot);") &&
+                build.Contains("RectTransform panel = KingmakerUiFactory.CreateRect(\"Panel\", _inspectRoot);") &&
+                build.Contains("sink.OutsideClick = () => SpellInspectInput(SpellScrollInput.ClickOutsideScroll);") &&
+                build.Contains("_nativeTheme.RegisterParchment(_inspectParchment);") &&
+                build.Contains("_nativeTheme.RegisterRule(_inspectRule);") &&
+                build.IndexOf("CreateRect(\"Backdrop\"", StringComparison.Ordinal) <
+                    build.IndexOf("CreateRect(\"Panel\"", StringComparison.Ordinal),
+                "the spell scroll's backdrop is not a sibling drawn beneath the scroll");
+            string escape = SourceBlock(view, "internal bool HandleEscape()");
+            Expect(escape != null && escape.IndexOf("_inspectState.Handle(SpellScrollInput.Escape)", StringComparison.Ordinal) >= 0 &&
+                escape.IndexOf("_inspectState.Handle(SpellScrollInput.Escape)", StringComparison.Ordinal) <
+                    escape.IndexOf("_session.ClearGraphFocus();", StringComparison.Ordinal),
+                "Escape does not close the description before the focused casting");
             string theme = UiSource("PlannerNativeTheme.cs");
             Expect(theme.Contains("RequireContract((Image)values[0], NativeSpriteContract.ScrollPaper);") &&
                 theme.Contains("RequireContract((Image)values[0], NativeSpriteContract.ScrollRule);"),

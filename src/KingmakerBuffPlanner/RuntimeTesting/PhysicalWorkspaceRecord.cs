@@ -200,6 +200,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool? InspectOpenAfterWheels { get; set; }
         public float? GraphScrollUnderInspectBefore { get; set; }
         public float? GraphScrollUnderInspectAfter { get; set; }
+        // WP7 paper evidence, diagnostic only (never a violation: the
+        // readable flat fallback is a legitimate outcome): which scroll
+        // donors were borrowed and what the workspace frame, its rules and
+        // the open spell scroll drew - layer scale, canvas reference, drawn
+        // borders, size - and the description's input policy.
+        public string WorkspacePaperEvidence { get; set; }
+        public string InspectPaperEvidence { get; set; }
 
         // The description's own judgement (E05/E06), Unity-free.
         public IList<string> InspectViolations()
