@@ -969,18 +969,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // Physical-input acceptance (Unity-free rules in
                     // PhysicalWorkspaceRecord): every action delivered by the
                     // OS and acknowledged, and the view's own state after it.
-                    IList<string> violations = PhysicalProblemsRequested ? _problemRecord.Violations() : _physicalRecord.Violations();
+                    IList<string> violations = PhysicalProblemsRequested ? _problemRecord.Violations()
+                        : PhysicalSpellbookRequested ? _spellbookRecord.Violations() : _physicalRecord.Violations();
+                    string physicalClaim = PhysicalProblemsRequested
+                        ? "blocked HUD focus, visible card, reasons, Previous/Next, Escape (OS input)"
+                        : PhysicalSpellbookRequested
+                            ? "spellbook key, Buff Planner click, native close, planner open, Escape, recovery (OS input)"
+                            : "search typing, wheel, press target, focus loss, Escape (OS input)";
                     result.Assertions.Add(violations.Count == 0
-                        ? RuntimeTestAssertion.Pass("physical-workspace",
-                            PhysicalProblemsRequested ? "blocked HUD focus, visible card, reasons, Previous/Next, Escape (OS input)"
-                                : "search typing, wheel, press target, focus loss, Escape (OS input)",
+                        ? RuntimeTestAssertion.Pass("physical-workspace", physicalClaim,
                             "screen=" + _physicalRecord.ScreenWidth + "x" + _physicalRecord.ScreenHeight +
                                 ";text=" + _physicalRecord.SearchTextAfterFocus + ";selected=" +
                                 _physicalRecord.SelectedBeforeClick + ">" + _physicalRecord.SelectedAfterClick +
                                 ";wheel=" + _physicalRecord.WheelEvidence)
-                        : RuntimeTestAssertion.Fail("physical-workspace",
-                            PhysicalProblemsRequested ? "blocked HUD focus, visible card, reasons, Previous/Next, Escape (OS input)"
-                                : "search typing, wheel, press target, focus loss, Escape (OS input)",
+                        : RuntimeTestAssertion.Fail("physical-workspace", physicalClaim,
                             string.Join("|", violations.ToArray())));
                     if (violations.Count != 0)
                     {
@@ -2241,7 +2243,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     // E12: the cold moon press comes BEFORE any planner
                     // hotkey is requested (phase 125); the hotkey follows it.
-                    _physicalStep = PhysicalProblemsRequested ? 0 : 100;
+                    _physicalStep = PhysicalProblemsRequested ? 0
+                        : PhysicalSpellbookRequested ? SpellbookStartStep : 100;
                     _liveUiPhase = 125;
                     return false;
                 }
@@ -4079,6 +4082,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             double settled = _physicalSettle == null ? 0 : _physicalSettle.Elapsed.TotalSeconds;
             if (PhysicalProblemsRequested)
                 return UpdateProblemNavigation(view, settled);
+            if (PhysicalSpellbookRequested)
+                return UpdateSpellbookEntry(settled);
             if (_physicalRecord.CastingFirst)
                 return UpdatePhysicalCastingFirst(view, settled);
             if (view == null && _physicalStep >= 1 && _physicalStep <= 7)
@@ -4201,6 +4206,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private bool FinishPhysical(string failure)
         {
             if (PhysicalProblemsRequested) return FinishProblemNavigation(failure);
+            if (PhysicalSpellbookRequested) return FinishSpellbookEntry(failure);
             if (failure != null) _physicalRecord.Failures.Add(failure);
             // The single-use exception ends with this scenario, used or not.
             if (_physicalGrant != null)
@@ -5322,6 +5328,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     {
                         _problemRecord.Failures.Add("shutdown:" + reason);
                         PublishProblemRecord();
+                    }
+                    else if (PhysicalSpellbookRequested)
+                    {
+                        _spellbookRecord.Failures.Add("shutdown:" + reason);
+                        PublishSpellbookRecord();
                     }
                     else PublishPhysicalRecord();
                 }

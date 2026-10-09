@@ -138,6 +138,8 @@
     <Compile Include="RuntimeTesting\PhysicalWorkspaceRecord.cs" />
     <Compile Include="RuntimeTesting\ProblemNavigationRecord.cs" />
     <Compile Include="RuntimeTesting\RuntimeProblemNavigationHost.cs" />
+    <Compile Include="RuntimeTesting\SpellbookEntryRecord.cs" />
+    <Compile Include="RuntimeTesting\RuntimeSpellbookEntryHost.cs" />
     <Compile Include="Execution\CastingCapabilityInventory.cs" />
     <Compile Include="Execution\CastingQualification.cs" />
     <Compile Include="Execution\CastingQualificationDriver.cs" />
