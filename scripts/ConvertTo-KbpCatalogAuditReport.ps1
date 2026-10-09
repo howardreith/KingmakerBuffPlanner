@@ -4,7 +4,13 @@ param(
     # native-buff-catalog scenario (one per compatibility profile).
     [Parameter(Mandatory = $true)][string[]]$AuditPath,
     # The human-readable Markdown report to write.
-    [Parameter(Mandatory = $true)][string]$OutputPath
+    [Parameter(Mandatory = $true)][string]$OutputPath,
+    # Optional (rc4): the native-only profile's native-buff-catalog.json from
+    # the same generator commit. It lists every ability of the unmodded game,
+    # so an entry a multi-mod audit reports as unattributed (no staged mod's
+    # inventory claims it, and a staged mod declares none) is resolved to
+    # native when, and only when, the unmodded game has it.
+    [string]$NativeCatalogPath
 )
 
 # The 0.4.0 catalogue audit (WP5): renders the machine-readable audit that the
@@ -36,6 +42,37 @@ foreach ($path in $AuditPath) {
     $audits += [pscustomobject]@{ Path = $path; Sha256 = $hash; Audit = $audit }
 }
 
+$nativeGuids = $null
+$nativeCommit = $null
+if (-not [string]::IsNullOrWhiteSpace($NativeCatalogPath)) {
+    if (-not (Test-Path -LiteralPath $NativeCatalogPath -PathType Leaf)) { throw "Native catalog is missing: $NativeCatalogPath" }
+    $nativeCatalog = Get-Content -LiteralPath $NativeCatalogPath -Raw | ConvertFrom-Json
+    if ([string]$nativeCatalog.profile -cne 'native-only' -or [int]$nativeCatalog.schemaVersion -ne 5) {
+        throw "The native reference is not a schema 5 native-only catalogue: $NativeCatalogPath"
+    }
+    $nativeCommit = [string]$nativeCatalog.generatorCommit
+    foreach ($entry in $audits) {
+        if ([string]$entry.Audit.generatorCommit -cne $nativeCommit) {
+            throw "The native reference ($nativeCommit) is not from the audit's generator commit ($($entry.Audit.generatorCommit))."
+        }
+    }
+    $nativeGuids = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    foreach ($ability in @($nativeCatalog.abilities)) { [void]$nativeGuids.Add([string]$ability.abilityGuid) }
+    if ($nativeGuids.Count -ne [int]$nativeCatalog.abilityCount) { throw 'The native reference does not reconcile.' }
+    $nativeCatalog = $null
+}
+
+# The owner a record is reported under: the game's proved ownership, with an
+# unattributed entry resolved to native only by the unmodded game's catalogue.
+function Get-KbpReportedOwner($Record, [string]$Profile) {
+    $owner = [string]$Record.ownership
+    if ($owner -ceq 'unattributed' -and $null -ne $nativeGuids -and $Profile -cne 'native-only' -and
+        $nativeGuids.Contains([string]$Record.abilityGuid)) {
+        return 'native (native-only reference)'
+    }
+    return $owner
+}
+
 $lines = New-Object System.Collections.Generic.List[string]
 $lines.Add('# Beneficial-buff catalogue audit (0.4.0, WP5)')
 $lines.Add('')
@@ -52,6 +89,36 @@ foreach ($entry in $audits) {
     $lines.Add("| $($entry.Audit.profile) | ``$($entry.Audit.generatorCommit)`` | ``$(Format-KbpCell $entry.Path)`` | ``$($entry.Sha256)`` |")
 }
 $lines.Add('')
+$lines.Add('## Ownership')
+$lines.Add('')
+$lines.Add('Ownership is proved by each staged mod''s own blueprint inventory (a Call of the Wild library')
+$lines.Add('`loaded_blueprints.txt`, or the Kingmaker Gunslinger identifier manifest). A blueprint no')
+$lines.Add('inventory claims is native only when that is proved: in the native-only profile, when every')
+$lines.Add('staged mod declares an inventory, or - in this report - when the native-only catalogue of the')
+$lines.Add('same generator commit lists it. Anything else stays **unattributed**.')
+if ($null -ne $nativeGuids) {
+    $lines.Add('')
+    $lines.Add("Native reference: ``$(Format-KbpCell $NativeCatalogPath)`` (generator ``$nativeCommit``, $($nativeGuids.Count) abilities).")
+}
+foreach ($entry in $audits) {
+    $ownership = if ($entry.Audit.PSObject.Properties.Name -contains 'ownership') { $entry.Audit.ownership } else { $null }
+    $lines.Add('')
+    if ($null -eq $ownership) {
+        $lines.Add("$($entry.Audit.profile): the audit records no ownership sources (written before rc4).")
+        continue
+    }
+    $lines.Add("$($entry.Audit.profile): $(Format-KbpCell $ownership.basis)")
+    if (@($ownership.sources).Count -ne 0) {
+        $lines.Add('')
+        $lines.Add('| Staged mod | Owner | Inventory | Entries |')
+        $lines.Add('| --- | --- | --- | ---: |')
+        foreach ($source in @($ownership.sources)) {
+            $inventory = if ([string]::IsNullOrEmpty([string]$source.inventory)) { '(none declared)' } else { "``$($source.inventory)``" }
+            $lines.Add("| $($source.directory) | $($source.owner) | $inventory | $($source.entryCount) |")
+        }
+    }
+}
+$lines.Add('')
 $lines.Add('## Counts')
 $lines.Add('')
 $lines.Add('| Profile | Ownership | Static before | Static after | Live before | Live after |')
@@ -59,9 +126,35 @@ $lines.Add('| --- | --- | ---: | ---: | ---: | ---: |')
 foreach ($entry in $audits) {
     $totals = $entry.Audit.summary.totals
     $lines.Add("| $($entry.Audit.profile) | **all** | $($totals.staticIncludedBefore040) | $($totals.staticIncluded) | $($totals.liveIncludedBefore040) | $($totals.liveIncluded) |")
-    foreach ($property in @($entry.Audit.summary.byOwnership.PSObject.Properties | Sort-Object Name)) {
-        $counts = $property.Value
-        $lines.Add("| $($entry.Audit.profile) | $($property.Name) | $($counts.staticIncludedBefore040) | $($counts.staticIncluded) | $($counts.liveIncludedBefore040) | $($counts.liveIncluded) |")
+    $records = @($entry.Audit.records)
+    $flagged = $records.Count -ne 0 -and ($records[0].PSObject.Properties.Name -contains 'liveIncluded')
+    if ($flagged) {
+        # Regroup the records' own count flags by the reported owner; the
+        # totals must come out unchanged.
+        $groups = @{}
+        foreach ($record in $records) {
+            $owner = Get-KbpReportedOwner $record ([string]$entry.Audit.profile)
+            if (-not $groups.ContainsKey($owner)) { $groups[$owner] = @(0, 0, 0, 0) }
+            if ([bool]$record.staticIncludedBefore040) { $groups[$owner][0]++ }
+            if ([bool]$record.staticIncluded) { $groups[$owner][1]++ }
+            if ([bool]$record.liveIncludedBefore040) { $groups[$owner][2]++ }
+            if ([bool]$record.liveIncluded) { $groups[$owner][3]++ }
+        }
+        $sums = @(0, 0, 0, 0)
+        foreach ($owner in @($groups.Keys | Sort-Object)) {
+            $counts = $groups[$owner]
+            for ($index = 0; $index -lt 4; $index++) { $sums[$index] += $counts[$index] }
+            $lines.Add("| $($entry.Audit.profile) | $owner | $($counts[0]) | $($counts[1]) | $($counts[2]) | $($counts[3]) |")
+        }
+        if ($sums[0] -ne [int]$totals.staticIncludedBefore040 -or $sums[1] -ne [int]$totals.staticIncluded -or
+            $sums[2] -ne [int]$totals.liveIncludedBefore040 -or $sums[3] -ne [int]$totals.liveIncluded) {
+            throw "The $($entry.Audit.profile) records do not reconcile with its totals."
+        }
+    } else {
+        foreach ($property in @($entry.Audit.summary.byOwnership.PSObject.Properties | Sort-Object Name)) {
+            $counts = $property.Value
+            $lines.Add("| $($entry.Audit.profile) | $($property.Name) | $($counts.staticIncludedBefore040) | $($counts.staticIncluded) | $($counts.liveIncludedBefore040) | $($counts.liveIncluded) |")
+        }
     }
 }
 $lines.Add('')
@@ -84,7 +177,7 @@ foreach ($entry in $audits) {
     $lines.Add('| Name | Blueprint | Ownership | Source kind | Scope | Exclusion reason |')
     $lines.Add('| --- | --- | --- | --- | --- | --- |')
     foreach ($record in $removed) {
-        $lines.Add("| $(Format-KbpCell $record.displayName) | ``$($record.abilityGuid)`` ($(Format-KbpCell $record.internalName)) | $($record.ownership) | $($record.sourceKind) | $($record.scope) | $(Format-KbpCell $record.exclusionReason) |")
+        $lines.Add("| $(Format-KbpCell $record.displayName) | ``$($record.abilityGuid)`` ($(Format-KbpCell $record.internalName)) | $(Get-KbpReportedOwner $record ([string]$entry.Audit.profile)) | $($record.sourceKind) | $($record.scope) | $(Format-KbpCell $record.exclusionReason) |")
     }
     $lines.Add('')
     $lines.Add("## $($entry.Audit.profile): included ($($included.Count))")
@@ -93,7 +186,7 @@ foreach ($entry in $audits) {
     $lines.Add('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |')
     foreach ($record in $included) {
         $rule = if ([string]::IsNullOrEmpty([string]$record.manualOverride)) { $record.inclusionRule } else { "override: $($record.manualOverride)" }
-        $lines.Add("| $(Format-KbpCell $record.displayName) | ``$($record.abilityGuid)`` | $($record.ownership) | $($record.sourceKind) | $($record.scope) | $(Format-KbpCell $record.provider) | $(Format-KbpCell $rule) | $(Format-KbpCell (Format-KbpEffects @($record.persistentBeneficialEffects))) | $($record.targetSemantics) | $($record.executionSupport) | $($record.qualificationStatus) |")
+        $lines.Add("| $(Format-KbpCell $record.displayName) | ``$($record.abilityGuid)`` | $(Get-KbpReportedOwner $record ([string]$entry.Audit.profile)) | $($record.sourceKind) | $($record.scope) | $(Format-KbpCell $record.provider) | $(Format-KbpCell $rule) | $(Format-KbpCell (Format-KbpEffects @($record.persistentBeneficialEffects))) | $($record.targetSemantics) | $($record.executionSupport) | $($record.qualificationStatus) |")
     }
 }
 

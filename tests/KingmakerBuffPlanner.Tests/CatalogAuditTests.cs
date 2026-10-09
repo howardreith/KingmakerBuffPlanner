@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using KingmakerBuffPlanner.Discovery;
 
@@ -13,8 +14,9 @@ namespace KingmakerBuffPlanner.Tests
         // diagnostics), classified under the 0.4.0 rules and under the rules
         // released through 0.3.0, so every regression also proves which rule
         // removed it.
-        private static void RunCatalogAuditTests()
+        private static void RunCatalogAuditTests(string root)
         {
+            Run("catalog-ownership-multi-mod-inventories", () => TestMultiModOwnership(root));
             Run("catalog-audit-hideous-laughter-rider-excluded", TestAuditHideousLaughter);
             Run("catalog-audit-treat-affliction-cooldown-excluded", TestAuditTreatAffliction);
             Run("catalog-audit-treat-deadly-wounds-cooldown-excluded", TestAuditTreatDeadlyWounds);
@@ -455,6 +457,111 @@ namespace KingmakerBuffPlanner.Tests
                     now.Reason);
         }
 
+        // rc4 review finding 3: the full-user profile stages Call of the
+        // Wild, Kingmaker Gunslinger and other mods, and its audit called
+        // every entry native. Ownership now comes from each staged mod's own
+        // inventory (the exact formats and GUIDs below are the full-user
+        // fixture's), and a blueprint none claims is native only when that is
+        // proved - otherwise unattributed.
+        private static void TestMultiModOwnership(string root)
+        {
+            const string hunterClass = "32486dcfda61462fbfd66b5644786b39";      // CallOfTheWild loaded_blueprints.txt
+            const string calmWinds = "e117e1e0a17a4acec001000000000082";        // KingmakerGunslinger 0.0.133 manifest
+            const string perfectRecall = "1724756533b64af4a659d7155113ddd0";    // TweakOrTreat loaded_blueprints.txt
+            const string targetedBombAdmixture = "24afb2c948c731440a3aaf5411904c89"; // native, in no inventory
+            const string claimedTwice = "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a";
+            string mods = Path.Combine(root, "ownership-mods");
+            Action<string, string> mod = (directory, infoName) =>
+            {
+                Directory.CreateDirectory(Path.Combine(mods, directory));
+                File.WriteAllText(Path.Combine(mods, directory, infoName), "{\"Id\":\"" + directory + "\"}");
+            };
+            Action<string, string[]> loaded = (directory, guids) => File.WriteAllLines(
+                Path.Combine(mods, directory, BlueprintOwnershipIndex.LoadedBlueprintsFile),
+                guids.Select((guid, index) => "Blueprint" + index + "\t" + guid +
+                    "\tKingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility").ToArray());
+            mod("CallOfTheWild", "info.json");
+            loaded("CallOfTheWild", new[] { hunterClass, claimedTwice });
+            mod("KingmakerGunslinger", "Info.json");
+            Directory.CreateDirectory(Path.Combine(mods, "KingmakerGunslinger", "blueprints"));
+            File.WriteAllText(Path.Combine(mods, "KingmakerGunslinger", "blueprints", "blueprints.json"),
+                "{\"schemaVersion\":1,\"namespace\":\"KMG\",\"policy\":{\"runtimeGenerationAllowed\":false," +
+                "\"format\":\"guid\",\"retiredIdsRemainReserved\":true},\"entries\":[" +
+                "{\"symbol\":\"KMG.ElementalRaces.CalmWinds\",\"guid\":\"" + calmWinds + "\",\"plannedType\":" +
+                "\"BlueprintAbility\",\"status\":\"active\",\"milestone\":\"m\",\"notes\":\"n\"}," +
+                "{\"symbol\":\"KMG.Shared\",\"guid\":\"" + claimedTwice + "\",\"plannedType\":\"BlueprintBuff\"," +
+                "\"status\":\"reserved\",\"milestone\":\"m\",\"notes\":\"n\"}]}");
+            mod("TweakOrTreat", "info.json");
+            loaded("TweakOrTreat", new[] { perfectRecall });
+            mod("RacesUnleashed", "info.json");                 // stages no inventory
+            mod("KingmakerBuffPlanner", "Info.json");           // the planner itself
+            Directory.CreateDirectory(Path.Combine(mods, "NotAMod")); // no Info.json
+
+            BlueprintOwnershipIndex full = BlueprintOwnershipIndex.Load(mods, "full-user");
+            if (full.GetOwnership(hunterClass) != "call-of-the-wild" ||
+                full.GetOwnership(calmWinds) != "kingmaker-gunslinger" ||
+                full.GetOwnership(perfectRecall) != "tweak-or-treat")
+                throw new InvalidOperationException("A staged mod's own inventory did not attribute its blueprint: " +
+                    full.GetOwnership(hunterClass) + "/" + full.GetOwnership(calmWinds) + "/" +
+                    full.GetOwnership(perfectRecall));
+            if (full.GetOwnership(targetedBombAdmixture) != "unattributed" ||
+                full.GetOwnership(claimedTwice) != "unattributed")
+                throw new InvalidOperationException("An unproved attribution was not reported as unattributed: " +
+                    full.GetOwnership(targetedBombAdmixture) + "/" + full.GetOwnership(claimedTwice));
+            if (full.Sources.Count != 4 ||
+                string.Join(",", full.Sources.Select(s => s.Owner + "=" + s.Inventory + ":" + s.EntryCount).ToArray()) !=
+                    "call-of-the-wild=loaded_blueprints.txt:2,kingmaker-gunslinger=blueprints/blueprints.json:2," +
+                    "races-unleashed=:0,tweak-or-treat=loaded_blueprints.txt:1" ||
+                full.UninventoriedBasis.IndexOf("RacesUnleashed", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException("The ownership sources are not the staged mods: " +
+                    full.UninventoriedBasis);
+
+            // Every staged mod declares an inventory: what none claims is native.
+            Directory.Delete(Path.Combine(mods, "RacesUnleashed"), true);
+            BlueprintOwnershipIndex complete = BlueprintOwnershipIndex.Load(mods, "full-user");
+            if (complete.GetOwnership(targetedBombAdmixture) != "native" ||
+                complete.GetOwnership(calmWinds) != "kingmaker-gunslinger")
+                throw new InvalidOperationException("Complete inventories did not prove native ownership.");
+            if (BlueprintOwnershipIndex.Load(mods, "native-only").GetOwnership(calmWinds) != "native")
+                throw new InvalidOperationException("The native-only profile stages no optional mod.");
+            if (BlueprintOwnershipIndex.IsOptionalOwner("native") ||
+                BlueprintOwnershipIndex.IsOptionalOwner("unattributed") ||
+                !BlueprintOwnershipIndex.IsOptionalOwner("kingmaker-gunslinger"))
+                throw new InvalidOperationException("Optional counts must cover proved mod ownership only.");
+            File.Delete(Path.Combine(mods, "CallOfTheWild", BlueprintOwnershipIndex.LoadedBlueprintsFile));
+            try
+            {
+                BlueprintOwnershipIndex.Load(mods, "call-of-the-wild");
+                throw new InvalidOperationException("The Call of the Wild profile ran without its inventory.");
+            }
+            catch (FileNotFoundException) { }
+
+            // The audit groups by the proved owner and keeps each record's
+            // own counts, so a report can regroup them exactly.
+            Func<string, string, NativeCatalogAuditInput> entry = (guid, owner) => new NativeCatalogAuditInput
+            {
+                AbilityGuid = guid, DisplayName = guid, Ownership = owner, AbilityType = "Spell",
+                IsCandidate = true, CanTargetFriends = true, SupportClass = "automatic",
+                DispositionBefore040 = "include", Disposition = "include",
+                DispositionReason = "valid-beneficial-party-effect: kept",
+                LiveDispositionBefore040 = "include", LiveDisposition = "include",
+                LiveDispositionReason = "valid-beneficial-party-effect: kept",
+                Effects = new NativeCatalogAuditEffect[0], Payloads = new string[0]
+            };
+            NativeCatalogAuditDocument document = NativeCatalogAudit.Document("full-user", "commit", new[]
+            {
+                entry(hunterClass, full.GetOwnership(hunterClass)),
+                entry(calmWinds, full.GetOwnership(calmWinds)),
+                entry(targetedBombAdmixture, full.GetOwnership(targetedBombAdmixture))
+            }, full.UninventoriedBasis, full.Sources);
+            if (document.Summary.ByOwnership.ContainsKey("native") ||
+                document.Summary.ByOwnership["unattributed"].LiveIncluded != 1 ||
+                document.Summary.ByOwnership["kingmaker-gunslinger"].StaticIncluded != 1 ||
+                document.Ownership.Sources.Length != 4 || document.Ownership.Basis != full.UninventoriedBasis ||
+                document.Records.Count(r => r.LiveIncluded && r.StaticIncluded) != 3)
+                throw new InvalidOperationException("The audit did not report proved ownership.");
+        }
+
         private static void TestAuditSummary()
         {
             Func<string, string, bool, string, string, string, string, NativeCatalogAuditInput> input =
@@ -506,6 +613,11 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("Audit ownership counts are wrong.");
             if (document.Records.Length != 3 || document.Records.Any(r => r.DisplayName == "Fireball"))
                 throw new InvalidOperationException("Audit records are not exactly the included and removed sources.");
+            if (document.Records.Count(r => r.StaticIncludedBefore040) != totals.StaticIncludedBefore040 ||
+                document.Records.Count(r => r.StaticIncluded) != totals.StaticIncluded ||
+                document.Records.Count(r => r.LiveIncludedBefore040) != totals.LiveIncludedBefore040 ||
+                document.Records.Count(r => r.LiveIncluded) != totals.LiveIncluded)
+                throw new InvalidOperationException("Audit record count flags do not sum to the totals.");
             NativeCatalogAuditRecord kept = document.Records.Single(r => r.DisplayName == "Bull's Strength");
             NativeCatalogAuditRecord rider = document.Records.Single(r => r.DisplayName == "Hideous Laughter");
             NativeCatalogAuditRecord treat = document.Records.Single(r => r.DisplayName == "Treat Affliction");

@@ -446,7 +446,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunExecutionPolicyTests(root);
                 RunStickyTouchQualificationTests(root);
                 RunDirectManipulationTests(root);
-                RunCatalogAuditTests();
+                RunCatalogAuditTests(root);
                 RunPolicyAuthoringPhysicalTests(root);
                 RunParchmentThemeTests();
             }
@@ -689,18 +689,26 @@ namespace KingmakerBuffPlanner.Tests
         private static void TestBlueprintOwnership()
         {
             const string optionalGuid = "0123456789abcdef0123456789abcdef";
-            BlueprintOwnershipIndex index = BlueprintOwnershipIndex.Parse(new[]
+            string[] parsed = BlueprintOwnershipIndex.ParseLoadedBlueprints(new[]
             {
                 "OptionalAbility\t" + optionalGuid + "\tKingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility",
                 "malformed",
                 "Uppercase\t0123456789ABCDEF0123456789ABCDEF\tType"
+            }).ToArray();
+            // The only staged mod declares its inventory, so a blueprint it
+            // does not claim is proved native.
+            BlueprintOwnershipIndex index = BlueprintOwnershipIndex.FromInventories(new[]
+            {
+                new KeyValuePair<BlueprintOwnershipSource, IEnumerable<string>>(
+                    new BlueprintOwnershipSource("call-of-the-wild", "CallOfTheWild",
+                        BlueprintOwnershipIndex.LoadedBlueprintsFile, parsed.Length), parsed)
             });
-            if (index.GetOwnership(optionalGuid) != "call-of-the-wild" ||
+            if (parsed.Length != 1 || index.GetOwnership(optionalGuid) != "call-of-the-wild" ||
                 index.GetOwnership("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") != "native")
                 throw new InvalidOperationException("Optional ownership inventory lost exact GUID identity.");
             try
             {
-                BlueprintOwnershipIndex.Parse(new[] { "malformed" });
+                BlueprintOwnershipIndex.ParseLoadedBlueprints(new[] { "malformed" });
                 throw new InvalidOperationException("Empty optional ownership inventory was accepted.");
             }
             catch (InvalidDataException) { }
