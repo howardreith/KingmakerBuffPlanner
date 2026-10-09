@@ -32,11 +32,19 @@
     <Compile Include="ProductionExecutionTests.cs" />
     <Compile Include="CastingGraphTests.cs" />
     <Compile Include="BlockedNavigationTests.cs" />
+    <Compile Include="SpellbookEntryTests.cs" />
+    <Compile Include="ExecutionPolicyTests.cs" />
+    <Compile Include="DirectManipulationTests.cs" />
+    <Compile Include="CatalogAuditTests.cs" />
+    <Compile Include="CatalogAdjudicationTests.cs" />
+    <Compile Include="PolicyAuthoringPhysicalTests.cs" />
     <Compile Include="AutosaveLifecycleTests.cs" />
     <Compile Include="SharePlanningTests.cs" />
     <Compile Include="UndoHistoryTests.cs" />
     <Compile Include="EverydayUseWordingTests.cs" />
     <Compile Include="ShareQualificationDriverTests.cs" />
+    <Compile Include="StickyTouchQualificationTests.cs" />
+    <Compile Include="ParchmentThemeTests.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\ShareCastingModifierAdapter.cs"><Link>GameAdapters\ShareCastingModifierAdapter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\EnhancementLeaseCleanup.cs"><Link>GameAdapters\EnhancementLeaseCleanup.cs</Link></Compile>
     <Compile Include="TestBuildInfo.cs" />
@@ -46,6 +54,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\DiscoveryNode.cs"><Link>Discovery\DiscoveryNode.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\EffectOverrideRegistry.cs"><Link>Discovery\EffectOverrideRegistry.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\NativeCandidateClassifier.cs"><Link>Discovery\NativeCandidateClassifier.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\NativeCatalogAudit.cs"><Link>Discovery\NativeCatalogAudit.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\SelectableAbilityVariants.cs"><Link>Discovery\SelectableAbilityVariants.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Compatibility\SpellbookRoleResolver.cs"><Link>Compatibility\SpellbookRoleResolver.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Compatibility\CallOfTheWildMetamagicNames.cs"><Link>Compatibility\CallOfTheWildMetamagicNames.cs</Link></Compile>
@@ -78,11 +87,13 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AvailableCountJudgement.cs"><Link>Execution\AvailableCountJudgement.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\WorldGatedEnumerator.cs"><Link>Execution\WorldGatedEnumerator.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ClassicRunScreenPolicy.cs"><Link>UI\ClassicRunScreenPolicy.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ClassicRoutineAdmission.cs"><Link>UI\ClassicRoutineAdmission.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AppliedEffectJudgement.cs"><Link>Execution\AppliedEffectJudgement.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\LegacyProfileFixture.cs"><Link>RuntimeTesting\LegacyProfileFixture.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\PersistenceMessages.cs"><Link>Persistence\PersistenceMessages.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\PhysicalWorkspaceRecord.cs"><Link>RuntimeTesting\PhysicalWorkspaceRecord.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\ProblemNavigationRecord.cs"><Link>RuntimeTesting\ProblemNavigationRecord.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\SpellbookEntryRecord.cs"><Link>RuntimeTesting\SpellbookEntryRecord.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingQualificationDriver.cs"><Link>Execution\CastingQualificationDriver.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\SingleCastProbeObservation.cs"><Link>Execution\SingleCastProbeObservation.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\MaterialComponentAvailability.cs"><Link>Execution\MaterialComponentAvailability.cs</Link></Compile>
@@ -113,6 +124,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceModels.cs"><Link>UI\CastingWorkspaceModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.cs"><Link>UI\CastingWorkspaceSession.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.Graph.cs"><Link>UI\CastingWorkspaceSession.Graph.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.DirectManipulation.cs"><Link>UI\CastingWorkspaceSession.DirectManipulation.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingProblemNavigation.cs"><Link>UI\CastingProblemNavigation.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingGraphModels.cs"><Link>UI\CastingGraphModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerButtonPalette.cs"><Link>UI\PlannerButtonPalette.cs</Link></Compile>
@@ -135,11 +147,16 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\AssignmentEligibility.cs"><Link>UI\AssignmentEligibility.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SpellbookHandoffStateMachine.cs"><Link>UI\SpellbookHandoffStateMachine.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SpellbookWindowLocator.cs"><Link>UI\SpellbookWindowLocator.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SpellbookEntryPlacement.cs"><Link>UI\SpellbookEntryPlacement.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeModel.cs"><Link>UI\NativeThemeModel.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeDonorLookup.cs"><Link>UI\NativeThemeDonorLookup.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeResolver.cs"><Link>UI\NativeThemeResolver.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeRecovery.cs"><Link>UI\NativeThemeRecovery.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ControlCaptionFit.cs"><Link>UI\ControlCaptionFit.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeSpriteContract.cs"><Link>UI\NativeSpriteContract.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ParchmentTreatment.cs"><Link>UI\ParchmentTreatment.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerParchmentPalette.cs"><Link>UI\PlannerParchmentPalette.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SpellScrollModal.cs"><Link>UI\SpellScrollModal.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimePaths.cs">
       <Link>RuntimeTesting\RuntimePaths.cs</Link>
     </Compile>

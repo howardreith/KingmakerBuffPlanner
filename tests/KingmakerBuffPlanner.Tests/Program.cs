@@ -25,6 +25,8 @@ namespace KingmakerBuffPlanner.Tests
     {
         private static int _passed;
         private static bool _blockedNavigationOnly;
+        // Focused iteration: "--only <prefix> [<prefix>...]" runs matching tests.
+        private static string[] _onlyPrefixes;
         private static readonly List<string> Failures = new List<string>();
         private static string _protocolEvidenceRoot;
 
@@ -33,7 +35,10 @@ namespace KingmakerBuffPlanner.Tests
             try
             {
                 _blockedNavigationOnly = args.SequenceEqual(new[] { "--blocked-navigation" });
-                if (args.Length != 0 && !_blockedNavigationOnly)
+                if (!_blockedNavigationOnly && args.Length >= 2 &&
+                        string.Equals(args[0], "--only", StringComparison.Ordinal))
+                    _onlyPrefixes = args.Skip(1).ToArray();
+                else if (args.Length != 0 && !_blockedNavigationOnly)
                     throw new ArgumentException("Unknown test suite.");
                 return RunAll();
             }
@@ -299,7 +304,7 @@ namespace KingmakerBuffPlanner.Tests
                     TestCastingA02ThreeRecipientsThreeInvocations);
                 Run("casting-a03-group-one-invocation-six-beneficiaries",
                     TestCastingA03GroupOneInvocationSixBeneficiaries);
-                Run("casting-a04-missed-coverage-no-auto-second-cast",
+                Run("casting-a04-member-outside-area-never-blocks-or-doubles",
                     TestCastingA04MissedCoverageNoAutoSecondCast);
                 Run("casting-authoring-scope-undo-and-read-only-compile",
                     TestCastingAuthoringScopeUndoAndReadOnlyCompile);
@@ -437,6 +442,13 @@ namespace KingmakerBuffPlanner.Tests
                 RunUndoHistoryTests(root);
                 RunEverydayUseWordingTests(root);
                 RunShareQualificationDriverTests(root);
+                RunSpellbookEntryTests();
+                RunExecutionPolicyTests(root);
+                RunStickyTouchQualificationTests(root);
+                RunDirectManipulationTests(root);
+                RunCatalogAuditTests(root);
+                RunPolicyAuthoringPhysicalTests(root);
+                RunParchmentThemeTests();
             }
             finally
             {
@@ -677,18 +689,26 @@ namespace KingmakerBuffPlanner.Tests
         private static void TestBlueprintOwnership()
         {
             const string optionalGuid = "0123456789abcdef0123456789abcdef";
-            BlueprintOwnershipIndex index = BlueprintOwnershipIndex.Parse(new[]
+            string[] parsed = BlueprintOwnershipIndex.ParseLoadedBlueprints(new[]
             {
                 "OptionalAbility\t" + optionalGuid + "\tKingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility",
                 "malformed",
                 "Uppercase\t0123456789ABCDEF0123456789ABCDEF\tType"
+            }).ToArray();
+            // The only staged mod declares its inventory, so a blueprint it
+            // does not claim is proved native.
+            BlueprintOwnershipIndex index = BlueprintOwnershipIndex.FromInventories(new[]
+            {
+                new KeyValuePair<BlueprintOwnershipSource, IEnumerable<string>>(
+                    new BlueprintOwnershipSource("call-of-the-wild", "CallOfTheWild",
+                        BlueprintOwnershipIndex.LoadedBlueprintsFile, parsed.Length), parsed)
             });
-            if (index.GetOwnership(optionalGuid) != "call-of-the-wild" ||
+            if (parsed.Length != 1 || index.GetOwnership(optionalGuid) != "call-of-the-wild" ||
                 index.GetOwnership("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") != "native")
                 throw new InvalidOperationException("Optional ownership inventory lost exact GUID identity.");
             try
             {
-                BlueprintOwnershipIndex.Parse(new[] { "malformed" });
+                BlueprintOwnershipIndex.ParseLoadedBlueprints(new[] { "malformed" });
                 throw new InvalidOperationException("Empty optional ownership inventory was accepted.");
             }
             catch (InvalidDataException) { }
@@ -1174,6 +1194,9 @@ namespace KingmakerBuffPlanner.Tests
             bool classFeature = false,
             IEnumerable<string> components = null)
         {
+            // A real buff carries mechanics; a buff with only bookkeeping
+            // components is a marker under the 0.4.0 audit rules, so a
+            // fixture names its components only when they matter.
             return new NativeCandidateEffectFacts
             {
                 Kind = kind,
@@ -1181,7 +1204,7 @@ namespace KingmakerBuffPlanner.Tests
                 Harmful = harmful,
                 IsHiddenInUi = hidden,
                 IsClassFeature = classFeature,
-                ComponentTypes = (components ?? new string[0]).ToArray(),
+                ComponentTypes = (components ?? new[] { "Kingmaker.UnitLogic.FactLogic.AddStatBonus" }).ToArray(),
                 SourceContract = source,
                 ActionPath = path
             };
@@ -2613,8 +2636,6 @@ namespace KingmakerBuffPlanner.Tests
             model.SetProviderMaximumCasts(provider.Key.Canonical, 1);
             model.SetScale(1.25f);
             model.ToggleExecutionMode();
-            model.ToggleOutOfCombatOnly();
-            model.ToggleAnimatedFallback();
             model.ToggleRecastExisting();
             model.TogglePlannerHotkey();
             var reordered = new PartyProviderSnapshot(units.Reverse(), new[] { provider }, new[] { pool });
@@ -2625,11 +2646,11 @@ namespace KingmakerBuffPlanner.Tests
                 reloaded.GetProviderPreference(provider.Key.Canonical).MaximumCasts != 1 ||
                 reloaded.Profile.Ui.Scale != 1.25f ||
                 reloaded.Profile.Execution.Mode != "animated" ||
-                reloaded.Profile.Execution.OutOfCombatOnly ||
+                !reloaded.Profile.Execution.OutOfCombatOnly ||
                 reloaded.Profile.Execution.AllowAnimatedFallback ||
                 !reloaded.Profile.Execution.RecastExisting ||
                 reloaded.Profile.Ui.Hotkey != "Ctrl+Shift+P" ||
-                reloaded.Profile.HiddenSourceIds.Count != 0 || saves < 11)
+                reloaded.Profile.HiddenSourceIds.Count != 0 || saves < 9)
                 throw new InvalidOperationException("Setup state did not survive party reorder/persistence mutations.");
             reloaded.ToggleTarget("short", "unit-a");
             if (!reloaded.IsTargetWanted("short", "unit-a") ||
@@ -4251,6 +4272,23 @@ namespace KingmakerBuffPlanner.Tests
 
         private static void TestUnsupportedStickyTouchClassification()
         {
+            // WP6 (0.4.0): a delivery that may target enemies is a
+            // willing-target buff only when helpful to allies and not harmful
+            // to enemies (Magic Circle against Alignment); otherwise it keeps
+            // the hostile-ambiguity fallback.
+            CastExecutionCapability willing = StickyTouchExecutionClassifier.Classify(true, true, true,
+                true, true, true, true, false, true, false);
+            if (willing.Strategy != CastExecutionStrategy.StickyTouchDeliveryRuleCast ||
+                willing.Reason != "supported-willing-target-sticky-touch-delivery")
+                throw new InvalidOperationException("A willing-target touch buff was not instant-capable.");
+            foreach (CastExecutionCapability hostile in new[]
+            {
+                StickyTouchExecutionClassifier.Classify(true, true, true, true, true, true, true, false, true, true),
+                StickyTouchExecutionClassifier.Classify(true, true, true, true, true, true, true, false, false, false),
+                StickyTouchExecutionClassifier.Classify(true, true, true, true, true, true, true, true, true, false)
+            })
+                if (hostile.Strategy != CastExecutionStrategy.AnimatedFallback)
+                    throw new InvalidOperationException("A harmful, unhelpful or point-capable delivery became instant.");
             CastExecutionCapability[] unsupported =
             {
                 StickyTouchExecutionClassifier.Classify(true, false, false,
@@ -5110,6 +5148,11 @@ namespace KingmakerBuffPlanner.Tests
             ThemeNode party = owner.Add("Party");
             ThemeNode partyCharacter = party.Add("Character");
             partyCharacter.Add("Highlight", Comp(NativeThemeComponent.Image, new ThemeToken()));
+            // WP7: the in-game character build carries the scroll paper and
+            // rule donors (complete native hierarchy).
+            ThemeNode scrollPaper;
+            ThemeNode scrollRule;
+            AddCharacterBuildDonors(owner, out scrollPaper, out scrollRule);
             source.Owner = owner;
             return owner;
         }
@@ -5125,8 +5168,10 @@ namespace KingmakerBuffPlanner.Tests
                     throw new InvalidOperationException("Complete donor hierarchy rejected " +
                         capability + ": " + full.Failure(capability));
             string summary = full.Summary;
-            if (!summary.Contains("Paper=ok(proven)") || !summary.Contains("Buttons=ok(proven)") ||
-                !summary.Contains("ButtonText=ok(scan)") || !summary.Contains("Scrollbar=ok(scan)"))
+            if (!summary.StartsWith("Paper=ok(proven)", StringComparison.Ordinal) ||
+                !summary.Contains("Buttons=ok(proven)") ||
+                !summary.Contains("ButtonText=ok(scan)") || !summary.Contains("Scrollbar=ok(scan)") ||
+                !summary.Contains("ScrollPaper=ok(candidate)") || !summary.Contains("ScrollRule=ok(candidate)"))
                 throw new InvalidOperationException("Resolution summary lost locator provenance: " + summary);
 
             // One missing donor (the button's label text) must reject exactly
@@ -5244,7 +5289,8 @@ namespace KingmakerBuffPlanner.Tests
                 plannerRoot, source);
             if (ownedScoped.IsAvailable(NativeThemeCapability.Paper) ||
                 ownedScoped.IsAvailable(NativeThemeCapability.Buttons) ||
-                ownedScoped.IsAvailable(NativeThemeCapability.Body))
+                ownedScoped.IsAvailable(NativeThemeCapability.Body) ||
+                ownedScoped.IsAvailable(NativeThemeCapability.ScrollPaper))
                 throw new InvalidOperationException(
                     "An owned-overlay lookup root resolved native ServiceWindow donors.");
 
@@ -9533,6 +9579,9 @@ namespace KingmakerBuffPlanner.Tests
         {
             if (_blockedNavigationOnly && !name.StartsWith("blocked-navigation-", StringComparison.Ordinal))
                 return;
+            if (_onlyPrefixes != null &&
+                    !_onlyPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal)))
+                return;
             try
             {
                 action();
@@ -11377,11 +11426,13 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "Incomplete coverage silently produced a different cast count.");
             ResolvedCasting group = plan.Castings[0];
-            if (!group.CoverageIncomplete || group.CoverageGaps.Count != 1 ||
-                group.CoverageGaps[0].UnitId != "unit-rogue" ||
-                group.CoverageGaps[0].Reason != "outside-predicted-coverage")
+            // WP3 (0.4.0): a group casting affects whoever the area reaches;
+            // a member outside it (here an authored 0.3.0 "required" one) is
+            // neither a gap nor a blocker.
+            if (group.CoverageIncomplete || group.CoverageGaps.Count != 0 ||
+                group.RequiredCoverageUnitIds.Count != 0 || !group.IsExecutable)
                 throw new InvalidOperationException(
-                    "The missed recipient was not disclosed as a coverage gap.");
+                    "A member outside the area constrained or blocked the group casting.");
             if (group.PredictedBeneficiaryUnitIds.Contains("unit-rogue"))
                 throw new InvalidOperationException(
                     "An uncovered recipient was counted as a predicted beneficiary.");
@@ -11646,8 +11697,10 @@ namespace KingmakerBuffPlanner.Tests
                 third.Provenance.LegacySchemaVersion != 5)
                 throw new InvalidOperationException(
                     "Group origin, draft state, or migration provenance drifted.");
-            if (third.RequiredCoverageUnitIds.Count != 3)
-                throw new InvalidOperationException("Required coverage drifted.");
+            // WP3 (0.4.0): required group recipients are retired intent and
+            // never reach the domain.
+            if (third.RequiredCoverageUnitIds.Count != 0)
+                throw new InvalidOperationException("Retired required coverage reached the domain.");
             string original = File.ReadAllText(repository.GetProfilePath("fixture-campaign"));
             repository.Save(CastingPlanProfile.FromDocument(roundTripped));
             if (File.ReadAllText(repository.GetProfilePath("fixture-campaign")) != original)
@@ -11868,10 +11921,10 @@ namespace KingmakerBuffPlanner.Tests
             if (group.State != CastingAuthoringState.Draft ||
                 group.CasterUnitId != "unit-cleric" ||
                 group.TargetMode != CastingTargetMode.CasterCenteredOrigin ||
-                group.RequiredCoverageUnitIds.Count != 3 ||
+                group.RequiredCoverageUnitIds.Count != 0 ||
                 group.DirectTargetUnitId != null)
                 throw new InvalidOperationException(
-                    "Group coverage or review state drifted.");
+                    "Group review state drifted, or old recipients became required (WP3).");
             if (group.Provenance == null || !group.Provenance.Note.Contains(
                     "group-origin-and-count-pending-review"))
                 throw new InvalidOperationException(
@@ -13299,11 +13352,10 @@ namespace KingmakerBuffPlanner.Tests
             if (view.Cards.Count != 1 ||
                 !view.Cards[0].OriginLabel.Contains("caster") ||
                 view.Cards[0].PredictedBeneficiaryUnitIds.Count != 5 ||
-                view.Cards[0].CoverageGapUnitIds.Count != 1 ||
-                view.Cards[0].CoverageGapUnitIds[0] != "unit-rogue" ||
+                view.Cards[0].CoverageGapUnitIds.Count != 0 ||
                 view.Cards[0].CostLabels.Count != 1)
                 throw new InvalidOperationException(
-                    "Group origin, beneficiaries, or the honest gap is wrong.");
+                    "Group origin or beneficiaries are wrong, or an outside member became a gap (WP3).");
             if (groupSession.Document.Castings.Count != 1)
                 throw new InvalidOperationException(
                     "Missed coverage created an extra casting.");
@@ -15384,10 +15436,13 @@ namespace KingmakerBuffPlanner.Tests
                 legacy, null, PerTarget("source-bulls"));
             PlannedCasting unknown = result.Document.Castings.Single(value =>
                 value.Provenance.LegacyAssignmentId == "legacy-unknown");
+            // WP3: the old recipients stay named in the review item, not as
+            // required coverage.
             if (unknown.State != CastingAuthoringState.Draft ||
-                unknown.RequiredCoverageUnitIds.Count != 2 ||
+                unknown.RequiredCoverageUnitIds.Count != 0 ||
                 !unknown.Provenance.ReviewItems.Any(item => item.StartsWith(
-                    "grouping-unknown:", StringComparison.Ordinal)) ||
+                    "grouping-unknown:", StringComparison.Ordinal) &&
+                    item.Contains("targets=")) ||
                 result.Document.Castings.Count(value =>
                     value.Provenance.LegacyAssignmentId == "legacy-unknown") != 1)
                 throw new InvalidOperationException("Unknown grouping was guessed or split.");
@@ -15567,11 +15622,14 @@ namespace KingmakerBuffPlanner.Tests
             if (!session.UpdateFocusedCasting(pinned().WithDirectTarget("unit-t3")).Applied ||
                 pinned().Provenance.UnresolvedReviewItems.Count != 1)
                 throw new InvalidOperationException("A retarget manufactured a review resolution.");
-            if (!session.SetFocusedCastingState(CastingAuthoringState.Disabled).Applied ||
+            // WP3: Disable is retired; the refusal changes nothing, and the
+            // unresolved review still cannot be bypassed by Ready.
+            AuthoringEditResult disable = session.SetFocusedCastingState(CastingAuthoringState.Disabled);
+            if (disable.Applied || !disable.Reason.StartsWith("disable-retired", StringComparison.Ordinal) ||
                 pinned().Provenance.UnresolvedReviewItems.Count != 1)
-                throw new InvalidOperationException("Disabling manufactured a review resolution.");
+                throw new InvalidOperationException("Disable authored a record or touched the import review.");
             if (session.SetFocusedCastingState(CastingAuthoringState.Ready).Applied)
-                throw new InvalidOperationException("Disabled -> Ready bypassed the import review.");
+                throw new InvalidOperationException("Ready bypassed the import review.");
             session.Save();
             session.Reload();
             if (pinned().Provenance.UnresolvedReviewItems.Count != 1 ||
@@ -15592,7 +15650,7 @@ namespace KingmakerBuffPlanner.Tests
             if (!resolved.Applied || !resolved.Scope.Contains(pinItem) ||
                 pinned().Provenance.UnresolvedReviewItems.Count != 0 ||
                 !pinned().Provenance.ReviewItems.Contains(pinItem) ||
-                pinned().State != CastingAuthoringState.Disabled)
+                pinned().State != CastingAuthoringState.Draft)
                 throw new InvalidOperationException("Resolution was not disclosed or erased history.");
             session.Undo();
             if (pinned().Provenance.UnresolvedReviewItems.Count != 1)
@@ -16218,9 +16276,12 @@ namespace KingmakerBuffPlanner.Tests
             {
                 ExplicitStepConversion gapConversion = ExplicitCastingStepConverter.Convert(
                     gapPlan, gapDecision, groupOptions, effects);
-                if (gapConversion.Converted)
+                // WP3 (0.4.0): a member outside the predicted area is no
+                // longer a required recipient, so the group casting converts.
+                if (!gapConversion.Converted)
                     throw new InvalidOperationException(
-                        "Incomplete required coverage converted successfully.");
+                        "A member outside the area still blocked the group projection: " +
+                        gapConversion.Refusal);
             }
 
             // Probe scope: one plain direct casting converts; two, a group,
@@ -17047,9 +17108,9 @@ namespace KingmakerBuffPlanner.Tests
             session.Draft.CasterUnitId = null;
             session.Draft.State = CastingAuthoringState.Draft;
             Assert(session.AddCastingFromDraft(inputs).Applied);
-            session.FocusCasting("cast-1");
-            Assert(session.SetFocusedCastingState(CastingAuthoringState.Disabled)
-                .Applied);
+            // A Disabled record as an earlier version saved it (WP3 retired
+            // the player command; such records stay readable).
+            Assert(session.DisableCastingForQualification("cast-1").Applied);
             session.Save();
             // Reopen: identities, order, disabled state, and the unresolved
             // draft survive the production persistence round trip.

@@ -647,13 +647,7 @@ namespace KingmakerBuffPlanner.UI
                 _session.Model.ToggleExecutionMode(); RefreshAll(true);
             }, () =>
             {
-                _session.Model.ToggleOutOfCombatOnly(); RefreshAll(true);
-            }, () =>
-            {
                 _session.Model.ToggleRecastExisting(); RefreshAll(true);
-            }, () =>
-            {
-                _session.Model.ToggleAnimatedFallback(); RefreshAll(true);
             }, () =>
             {
                 _session.Model.TogglePlannerHotkey();

@@ -24,47 +24,10 @@ namespace KingmakerBuffPlanner.GameAdapters
                 new KingmakerActionGraphAdapter().Adapt(ability));
             EffectOverrideApplication applied = _overrides.Apply(ability.AssetGuid, scan.Expression);
             expression = applied.Expression;
-            NativeEffectRecord[] effects = NativeCatalogExporter.GetEffects(expression);
-            NativeCandidateAuditDecision decision = _classifier.Classify(new NativeCandidateAuditFacts
-            {
-                IsPlayerAccessible = true,
-                CanTargetSelf = ability.CanTargetSelf,
-                CanTargetFriends = ability.CanTargetFriends,
-                CanTargetEnemies = ability.CanTargetEnemies,
-                CanTargetPoint = ability.CanTargetPoint,
-                HasVariants = (ability.Variants ?? new BlueprintAbility[0]).Length != 0,
-                IsStickyTouch = ability.StickyTouch != null,
-                EffectOnAlly = ability.EffectOnAlly.ToString(),
-                EffectOnEnemy = ability.EffectOnEnemy.ToString(),
-                Range = ability.Range.ToString(),
-                AbilityComponentTypes = (ability.ComponentsArray ??
-                    new Kingmaker.Blueprints.BlueprintComponent[0])
-                    .Where(component => component != null)
-                    .Select(component => component.GetType().FullName).ToArray(),
-                Effects = effects.Select(e => new NativeCandidateEffectFacts
-                {
-                    Kind = e.Kind,
-                    Target = e.Target,
-                    Harmful = e.Harmful,
-                    IsHiddenInUi = e.IsHiddenInUi,
-                    IsClassFeature = e.IsClassFeature,
-                    RemoveOnRest = e.RemoveOnRest,
-                    StayOnDeath = e.StayOnDeath,
-                    ComponentTypes = e.ComponentTypes,
-                    SourceContract = e.SourceContract,
-                    ActionPath = e.ActionPath
-                }).ToArray(),
-                DiagnosticContracts = scan.Diagnostics.Select(d =>
-                    d.NodeIdentity + "|" + d.Detail).ToArray(),
-                Diagnostics = scan.Diagnostics.Select(d =>
-                    new NativeCandidateDiagnosticFacts
-                    {
-                        Code = d.Code,
-                        Contract = d.NodeIdentity,
-                        Detail = d.Detail,
-                        ActionPath = d.ActionPath
-                    }).ToArray()
-            });
+            // Every ability reaching live discovery belongs to a party member,
+            // so it is reachable; the facts are the catalogue export's own.
+            NativeCandidateAuditDecision decision = _classifier.Classify(NativeCatalogExporter.AuditFacts(
+                ability, true, NativeCatalogExporter.GetEffects(expression), scan.Diagnostics));
             if (applied.Entry != null)
             {
                 if (applied.Entry.Disposition == "exclude" ||

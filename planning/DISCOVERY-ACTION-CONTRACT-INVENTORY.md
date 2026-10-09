@@ -53,6 +53,15 @@ explicit animated fallback. No localized name, Freedom of Movement GUID,
 caster, spellbook, party-size, or iteration-count condition exists in
 production.
 
+0.4.0 (WP6): an enemy-capable delivery is no longer automatically ambiguous.
+When `AbilityDeliverTouch`'s ability is `EffectOnAlly == Helpful` and not
+`EffectOnEnemy == Harmful` it is a willing-target buff
+(`supported-willing-target-sticky-touch-delivery`, instant-capable); the
+instant adapter requires the native touch auto-hit condition (target is the
+caster, or not an enemy, not neutral-faction, not confused) before
+submission. Magic Circle against Alignment is the motivating case; the rule
+names no spell.
+
 ## 0.0.17 recipient and optional-Share contract
 
 - `ContextActionPartyMembers` retains `EffectTarget.Party`; one structural
@@ -175,6 +184,10 @@ Exact target: installed Kingmaker 2.1.7b `Assembly-CSharp.dll` SHA-256 `3b6450ff
 | Unknown ActionList wrapper | cached, deterministic, bounded exact-`ActionList` fields/properties; getter failures become diagnostics | recurse safely while preserving exact type/assembly/path | PASS |
 | `ContextActionSelectByValue` | private `m_Variants[]`, each wrapper has exact `Action: ActionList` | preserve runtime-selected alternatives as conditional/AnyOf branches | PASS |
 | `ContextActionRandomize` | private `m_Actions[]`, each wrapper has exact `Action: ActionList` | preserve randomized alternatives as conditional/AnyOf branches | PASS |
+| Call of the Wild `CallOfTheWild.NewMechanics.RunActionsDependingOnContextValue` (rc4) | `actions: ActionList[]`, one list run, chosen by `value` (fixture `CallOfTheWild.dll` 1.14.4c-2.1, SHA-256 `4ebf8e1e...`; source `NewMechanics.cs`) | value-selected alternatives as conditional/AnyOf branches, by exact type and field shape (an absent or retyped field is an explicit unknown node) | PASS structurally; rc4 catalogue runs |
+| Call of the Wild `CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds` (rc4) | `Value`, `stats_to_heal`, `multiply_by_hd`: heals hit points and ability damage | exact restorative action | PASS structurally |
+| `AddFactContextActions` on an effect buff (rc4) | `Activated`, `NewRound`, `Deactivated: ActionList` | read through the same exact adapter; record applied effects, restorative, offensive and unrecognized actions per list (`factActions`); `ContextActionSpawnFx` is presentation only | PASS structurally |
+| Self-gating ability checkers (rc4) | `AbilityTargetHasFact` (`CheckedFacts`, `Inverted`), `AbilityCasterHasNoFacts.Facts`, Call of the Wild `AbilityTargetHasNoFactUnlessBuffsFromCaster.CheckedBuffs` (on the ability and its sticky-touch delivery) | record the facts an ability forbids itself (`selfGatedFactIds`): a lockout when the ability also does something else | PASS structurally |
 | `MagicFang` | `Enchantment[]`, duration, greater/level contracts | emit exact worn-item enchantment leaves alongside the duration buff | PASS |
 | `ContextActionSpawnMonster` | `AfterSpawn: ActionList`, summon blueprint/pool/duration | classify as summoning; never reinterpret after-spawn creature buffs as planner effects | PASS |
 | `ContextActionWeaponEnchantPool` | default enchantments, duration, pool/group | retain exact signal buff and structured dynamic-pool diagnostic; native execution applies selected pool | PASS structurally; runtime deferred |

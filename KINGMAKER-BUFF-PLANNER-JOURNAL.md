@@ -1,5 +1,34 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-09 0.4.0 release train: rc1 -> rc4 (lead review)
+
+- Branch `claude/kbp-complete-remaining-work-2026-10-09` from `origin/main`
+  `16f87ed`; published as `codex/kingmaker-buff-planner-0.4.0`. WP2B, WP4, WP3,
+  WP5, WP6, WP7 implemented, integrated and runtime-qualified on rc3
+  `c452e01` (complete gate PASS, 5 h 16 min).
+- Lead review of rc3: (1) WP5 removed genuine buffs under marker rules that
+  read "no mechanics of its own" as "not a buff"; (2) the Classic route
+  checked combat after refresh/preview/review; (3) the full-user audit called
+  every entry native. Fixed in rc4 `009b6dd` (`11b8d14`, `e7bd532`, `77e6946`,
+  `7ccf0c9`, `009b6dd`): Classic admission refuses combat first; ownership
+  proved per staged mod's own inventory (unattributed otherwise); markers only
+  when proved (lockout, restoration, understood hidden bookkeeping), a buff's
+  own fact actions read, exact Call of the Wild adapters for
+  `RunActionsDependingOnContextValue` and `ContextActionTreatDeadlyWounds`,
+  `revival-target-only`, and `blueprint-references.json` as evidence.
+- Rejected theory: "a hidden buff beside a heal only tracks it" - Inspiring
+  Recovery's hidden check buff casts the morale buff when it ends (its
+  `factActions`); the real reason it is not a pre-combat buff is
+  `AbilityTargetBreathOfLife` (dead or dying targets only, from its IL).
+- Rejected theory: instance-ID sign as proof of native ownership - several
+  full-user mods ship Unity asset bundles; ownership comes from inventories.
+- Environment: OS-input physical runs failed with "Kingmaker foreground
+  activation failed" while the desktop was in use around midday; the same
+  runs passed at 05:00-06:00 (rc3) and between failures (rc4). Product-neutral.
+- Records: `docs/REMAINING-WORK-0.4.0-HANDOFF.md` (rc4 report first),
+  `planning/CATALOG-AUDIT-0.4.0.md` (per-entry adjudication of all 125 rc3
+  removals: 50 restored, 75 excluded, 0 unsupported; 20 newly offered).
+
 ## 2026-09-27 autonomous session: windowed-input repair, live budget proof, unattended desktop, preview package
 
 - The owner's standing authorization: own the work through a usable private

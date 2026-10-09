@@ -174,3 +174,95 @@ It covers the mission section 8 items the automation party cannot:
    `approvals\<runId>.json`.
 5. Casting run:
    `Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual -FixtureFamily Advanced -QualificationRecipe finite-direct-mixed -CompatibilityProfileId <profile> -TimeoutSeconds 900 -RunId <runId> -QualificationAllowancePath <file>`.
+
+## Recipe `sticky-touch-direct` (advanced copy, 0.4.0 WP6)
+
+Status: **prepared, not run.** No runtime qualification is claimed: the
+recipe, its forecast and its step rules are proven by source/unit tests
+only (`sticky-qual-*`), against fixture graphs and the production
+executors, not against the game.
+
+It qualifies the WP6 willing-target touch (Magic Circle against Alignment,
+registered by KingmakerGunslinger) in both casting modes on the advanced
+party (`advanced-gunslinger-0136`), where the Cleric has exactly one
+Magic Circle prepared.
+
+### Contracts
+
+- **Selection (structural, no spell name or GUID).** A provider option
+  classified `StickyTouchDeliveryRuleCast`, from a plain spellbook source
+  (no metamagic, no special source) whose prepared slot or spontaneous
+  level holds exactly one cast, cast on a targetable party member other
+  than the caster that lacks the effect (a self cast omits the delivery;
+  pets come after party members). A willing-target delivery
+  (`supported-willing-target-sticky-touch-delivery`) is preferred over a
+  beneficial one. The effect must be the ally branch's buff: every effect
+  is a buff on the touched unit, nothing unmodeled appears, and the only
+  condition is a single `ContextConditionIsAlly` whose branches apply the
+  same buffs (the planner confirms Magic Circle through its carrier).
+  Coverage reports `sticky-touch`, `willing-target` or `beneficial`,
+  `prepared` or `spontaneous`, `single-cast`, `ally`; every refused
+  candidate is recorded (for example `pool-not-single-cast:2`, `self-only`,
+  `strategy:AnimatedFallback:...`, `effect-shape:...`).
+- **Projection.** One step, `use`: `qual-cast-1` alone, strategy
+  `StickyTouchDeliveryRuleCast`. Budget: 1 native submission.
+- **Steps.** `use` (cast once), `repeat` (nothing to cast), `exhausted`
+  (Always recast with the cast spent: refused before submission).
+
+### Expected observations (fresh native reads)
+
+| Step | Report | Effects | Resources |
+| --- | --- | --- | --- |
+| use | completed; `qual-cast-1` confirmed, one submission, spend reported | ally: new carrier instance | the source drops by exactly one cast (prepared: its reserved slot T>F) |
+| repeat | refused as `nothing-to-cast:1` | unchanged | unchanged |
+| exhausted | refused, exactly: prepared `apply-refused:blocked-casting:qual-cast-1:prepared-slots-exhausted:<pool>`; spontaneous `apply-refused:blocked-casting:qual-cast-1:resource-pool-exhausted:<pool>:<left><<units>` with left < units (`0<1`) | unchanged | `0>0`; the spent slot F>F |
+
+The `use` step's route is judged from the run report entry. **Instant:**
+the instant engine's record shows `strategy:StickyTouchDeliveryRuleCast`
+for the forecast reason, `provider-direct:False`, `rule-success:True`,
+`umd-failed:False`, `rule-cast-submitted:true`, `spend-invoked:True`
+owned by the source data, no carrier or delivery command created, a
+delivery GUID different from the carrier's, and the transaction and its
+cleanup settled with `held-touch:False;delivery-command-present:False`
+for that carrier and delivery. **Animated:** the game's own command path
+(`native-command-spend-completed`) and no instant-engine record. The run
+report keeps only the final executor record, so the animated carrier and
+delivery command stages are not separately judged; a delivery state left
+behind would have failed the casting (`ResidualStateUnsettled`).
+
+### Procedure
+
+Prerequisites: a frozen, gated build of the candidate commit
+(`runtime-backups\qualification-frozen\<commit>\FREEZE.json`, made after
+`Build-Local.ps1`); the runs are launched from a clean checkout of that
+commit whose `..\..\approvals` is the lab's
+`C:\Dev\KingmakerBuffPlannerLab\approvals` (the main checkout or a sibling
+`C:\Dev\KingmakerBuffPlannerLab\repo\<name>`; a nested
+`private\worktrees\*` checkout resolves another folder and is refused);
+Windows PowerShell 5.1 through `-Command`; and a completed passing
+`live-advanced-inspect` of the same bound pair and compatibility identity
+(the launcher refuses an advanced casting run without one). Run ids are
+fresh; `<batch>` stands for the batch prefix.
+
+```powershell
+# 1. Non-casting inspection (if none passed for this bound pair yet)
+powershell.exe -NoProfile -NonInteractive -Command "& .\scripts\Invoke-KingmakerRuntimeTest.ps1 -Scenario live-advanced-inspect -FixtureFamily Advanced -CompatibilityProfileId advanced-gunslinger-0136 -RunId <batch>-insp-sticky-touch -TimeoutSeconds 1200"
+# 2. Selection (non-casting; Instant only, the projection is mode-independent)
+powershell.exe -NoProfile -NonInteractive -Command "& .\scripts\Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual-select -QualificationRecipe sticky-touch-direct -ExecutionMode instant -FixtureFamily Advanced -CompatibilityProfileId advanced-gunslinger-0136 -RunId <batch>-sel-sticky-touch -TimeoutSeconds 1500"
+# 3. One allowance per mode, from the selection evidence
+powershell.exe -NoProfile -NonInteractive -Command "& .\scripts\New-KbpRunAllowance.ps1 -Kind qualification -RunId <batch>-cast-sticky-touch-instant -SelectionRunId <batch>-sel-sticky-touch -ExpectedCommit <commit> -FreezeKind qualification-frozen -ExecutionMode instant -ApprovedBy howard -Authority '<authority>'"
+powershell.exe -NoProfile -NonInteractive -Command "& .\scripts\New-KbpRunAllowance.ps1 -Kind qualification -RunId <batch>-cast-sticky-touch-animated -SelectionRunId <batch>-sel-sticky-touch -ExpectedCommit <commit> -FreezeKind qualification-frozen -ExecutionMode animated -ApprovedBy howard -Authority '<authority>'"
+# 4. The casting runs
+powershell.exe -NoProfile -NonInteractive -Command "& .\scripts\Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual -QualificationRecipe sticky-touch-direct -ExecutionMode instant -QualificationAllowancePath C:\Dev\KingmakerBuffPlannerLab\approvals\<batch>-cast-sticky-touch-instant.json -FixtureFamily Advanced -CompatibilityProfileId advanced-gunslinger-0136 -RunId <batch>-cast-sticky-touch-instant -TimeoutSeconds 1800"
+powershell.exe -NoProfile -NonInteractive -Command "& .\scripts\Invoke-KingmakerRuntimeTest.ps1 -Scenario live-cast-qual -QualificationRecipe sticky-touch-direct -ExecutionMode animated -QualificationAllowancePath C:\Dev\KingmakerBuffPlannerLab\approvals\<batch>-cast-sticky-touch-animated.json -FixtureFamily Advanced -CompatibilityProfileId advanced-gunslinger-0136 -RunId <batch>-cast-sticky-touch-animated -TimeoutSeconds 1800"
+```
+
+Through the lab dispatcher the same chain is the job builder's
+`@{ r = 'sticky-touch-direct'; adv = $true; modes = @('instant', 'animated') }`
+entry. Each casting run reloads the unchanged WORKING save, so the Cleric's
+slot is available to both. Evidence: `qual-outcome.json` (selection,
+coverage, rejections, the forecast, each step's entries with their route
+detail, transitions, availability and slot readings),
+`capability-inventory.json` (the discovered Magic Circle structure, if the
+selection refuses it), `runtime-result.json`, `protected-saves.json` and
+the verified restoration.

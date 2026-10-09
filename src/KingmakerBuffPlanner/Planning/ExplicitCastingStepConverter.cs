@@ -419,9 +419,6 @@ namespace KingmakerBuffPlanner.Planning
             if ((casting.Enhancements ?? new AuthoredEnhancementSelection[0])
                     .Any(value => value != null && value.ExactSourceRef != null))
                 return "unsupported-contract:exact-enhancement-source:" + id;
-            if (casting.TargetMode != CastingTargetMode.DirectTarget &&
-                casting.CoverageIncomplete)
-                return "unsupported-contract:required-coverage-incomplete:" + id;
             if (scope == ExplicitProjectionScope.SingleCastProbe)
             {
                 if (casting.TargetMode != CastingTargetMode.DirectTarget)

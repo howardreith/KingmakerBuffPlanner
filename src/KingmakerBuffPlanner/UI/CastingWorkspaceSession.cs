@@ -26,10 +26,12 @@ namespace KingmakerBuffPlanner.UI
             IReadOnlyDictionary<string, EffectExpression> effectsBySource,
             IEnumerable<CastEnhancementSnapshot> enhancements,
             IEnumerable<ICastingTargetingModifier> targetingModifiers = null,
-            ActiveEffectSnapshot liveEffects = null)
+            ActiveEffectSnapshot liveEffects = null,
+            bool combatActive = false)
         {
             Snapshot = snapshot ?? throw new ArgumentNullException("snapshot");
             LiveEffects = liveEffects;
+            CombatActive = combatActive;
             ProviderOptions = (providerOptions ?? new ProviderPlanningOption[0])
                 .Where(value => value != null).ToList();
             EffectsBySource = effectsBySource ??
@@ -49,6 +51,8 @@ namespace KingmakerBuffPlanner.UI
         // Live effects on the party (with instance detail in production);
         // null when unknown, which disables the live existing-effect skip.
         public ActiveEffectSnapshot LiveEffects { get; private set; }
+        // WP4: the party is in combat now; every routine refuses globally.
+        public bool CombatActive { get; private set; }
     }
 
     // The boundary between the reviewed casting plan and native submission.
@@ -290,7 +294,7 @@ namespace KingmakerBuffPlanner.UI
                     Scale = recovery.UiSettings.Scale,
                     Hotkey = recovery.UiSettings.Hotkey
                 };
-                _executionSettings = CopyOf(recovery.ExecutionSettings);
+                _executionSettings = EnforcedSettings(recovery.ExecutionSettings);
                 _executionSettingsChosen = false;
                 RaiseCastingIdMark(_authoring.Document.Castings.Select(
                     value => value.CastingId));
@@ -311,6 +315,7 @@ namespace KingmakerBuffPlanner.UI
                     ReplaceAuthoring(new CastingAuthoringService(
                         loaded.Profile.ToDocument()));
                     AdoptSettings(loaded.Profile);
+                    NoteRetiredSemantics(loaded.Profile);
                     break;
                 case CastingPlanLoadStatus.Absent:
                     // First open in this campaign: import the legacy
@@ -424,6 +429,37 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        // WP3/WP4 (0.4.0): a loaded plan still carrying retired 0.3.0
+        // semantics (required group recipients, combat/fallback choices).
+        private bool _retiredSemanticsPending;
+
+        // Required group recipients the loaded 0.3.0 plan stored; they no
+        // longer constrain anything (archived, then dropped by the next save).
+        public int RetiredGroupCoverageCount { get; private set; }
+        // Where the exact pre-0.4.0 file was archived, once it was.
+        public string RetiredSemanticsArchivePath { get; private set; }
+
+        private void NoteRetiredSemantics(CastingPlanProfile profile)
+        {
+            RetiredGroupCoverageCount = profile == null ? 0 : profile.LegacyRequiredCoverageCount;
+            _retiredSemanticsPending = RetiredGroupCoverageCount != 0 || (profile != null &&
+                profile.Execution != null && profile.Execution.DiffersFromEnforcedPolicy);
+        }
+
+        // The one canonical write: archive retired semantics first, once. A
+        // failed archive fails the save (the in-memory intent and the last
+        // good file stay), so the 0.3.0 intent is never dropped unrecorded.
+        private void SaveProfile()
+        {
+            if (_retiredSemanticsPending)
+            {
+                RetiredSemanticsArchivePath = _repository.ArchiveRetiredSemanticsOnce(CampaignId);
+                _retiredSemanticsPending = false;
+            }
+            _repository.Save(CastingPlanProfile.FromDocument(
+                _authoring.Document, _uiSettings, _executionSettings));
+        }
+
         private void PersistNow(string cause)
         {
             if (PersistenceBlocked)
@@ -433,8 +469,7 @@ namespace KingmakerBuffPlanner.UI
             }
             try
             {
-                _repository.Save(CastingPlanProfile.FromDocument(
-                    _authoring.Document, _uiSettings, _executionSettings));
+                SaveProfile();
                 _savedIntentSignature = DocumentIntentSignature();
                 LoadStatus = CastingPlanLoadStatus.Loaded;
                 LoadWarning = string.Empty;
@@ -514,8 +549,21 @@ namespace KingmakerBuffPlanner.UI
                 : new UiProfile { Scale = profile.Ui.Scale, Hotkey = profile.Ui.Hotkey };
             _executionSettings = profile == null || profile.Execution == null
                 ? ExecutionProfile.Default()
-                : CopyOf(profile.Execution);
+                : EnforcedSettings(profile.Execution);
         }
+
+        // WP4: a stored 0.3.0 out-of-combat or animated-fallback choice is
+        // read but never honoured; the next deliberate save writes the
+        // enforced values (rotating the previous file into the backups).
+        private ExecutionProfile EnforcedSettings(ExecutionProfile stored)
+        {
+            LegacyExecutionPreferencesOverridden = stored.DiffersFromEnforcedPolicy;
+            return stored.WithEnforcedPolicy();
+        }
+
+        // Whether the loaded plan carried a 0.3.0 combat/fallback preference
+        // that the enforced 0.4.0 policy overrides.
+        public bool LegacyExecutionPreferencesOverridden { get; private set; }
 
         private static ExecutionProfile CopyOf(ExecutionProfile value)
         {
@@ -540,27 +588,6 @@ namespace KingmakerBuffPlanner.UI
             get { return _executionSettings.Mode; }
         }
 
-        public bool AllowAnimatedFallback
-        {
-            get { return _executionSettings.AllowAnimatedFallback; }
-        }
-
-        public bool OutOfCombatOnly
-        {
-            get { return _executionSettings.OutOfCombatOnly; }
-        }
-
-        // Re-review: the out-of-combat rule the executors honour gets a
-        // casting-first control.
-        public void SetOutOfCombatOnly(bool value)
-        {
-            ExecutionProfile next = CopyOf(_executionSettings);
-            next.OutOfCombatOnly = value;
-            _executionSettings = next;
-            _executionSettingsChosen = true;
-            AutosaveSettingsNow();
-        }
-
         // "animated" (native casting animations, the default) or "instant".
         public void SetExecutionMode(string mode)
         {
@@ -568,15 +595,6 @@ namespace KingmakerBuffPlanner.UI
                 throw new ArgumentException("Unknown execution mode.", "mode");
             ExecutionProfile next = CopyOf(_executionSettings);
             next.Mode = mode;
-            _executionSettings = next;
-            _executionSettingsChosen = true;
-            AutosaveSettingsNow();
-        }
-
-        public void SetAllowAnimatedFallback(bool allow)
-        {
-            ExecutionProfile next = CopyOf(_executionSettings);
-            next.AllowAnimatedFallback = allow;
             _executionSettings = next;
             _executionSettingsChosen = true;
             AutosaveSettingsNow();
@@ -822,6 +840,7 @@ namespace KingmakerBuffPlanner.UI
                             // The legacy execution/UI settings travel with
                             // the import (the migration wrote them).
                             AdoptSettings(reloaded.Profile);
+                            NoteRetiredSemantics(reloaded.Profile);
                             return reloaded.Profile.ToDocument();
                         }
                         MigrationWarning = "migrated-candidate-did-not-reopen:" +
@@ -923,7 +942,7 @@ namespace KingmakerBuffPlanner.UI
             CastingForecast onePass = _forecast.ForecastOnePass(
                 _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
                 inputs.EffectsBySource, inputs.Enhancements,
-                inputs.TargetingModifiers);
+                inputs.TargetingModifiers, StrictInstant);
             CastingApplyDecision onePassGate = _gate.Evaluate(
                 onePass.Plan, CastingApplyMode.Ordinary);
             WorkspaceEditingScope scope = EditingFocusCastingId == null
@@ -1536,6 +1555,12 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_submissionInFlight)
                 return RefusedInFlight(null);
+            // WP4: buff routines never run during combat. A global refusal,
+            // before compilation, persistence, authorization or any native
+            // submission; it names no casting and focuses none.
+            if (inputs != null && inputs.CombatActive)
+                return new WorkspaceApplyResult(false, CastingExecutionPolicy.CombatActive,
+                    null, null);
             if (LegacyImportBlocked)
                 return new WorkspaceApplyResult(false,
                     "legacy-import-unresolved:" + LegacyImportBlockReason,
@@ -1845,6 +1870,14 @@ namespace KingmakerBuffPlanner.UI
             return _authoring.AddCasting(casting);
         }
 
+        // Guarded qualification only (the shared-recipe witness phase): a
+        // Disabled record with the legacy non-blocking omission. Players have
+        // no Disable command since 0.4.0 (WP3).
+        internal AuthoringEditResult DisableCastingForQualification(string castingId)
+        {
+            return _authoring.SetCastingState(castingId, CastingAuthoringState.Disabled);
+        }
+
         public AuthoringEditResult AddCastingFromDraft(
             CastingWorkspaceInputs inputs = null)
         {
@@ -1961,6 +1994,16 @@ namespace KingmakerBuffPlanner.UI
                     : CastingOrigin.CasterCentered();
             try
             {
+                // WP3: the members the group casting was expected to reach,
+                // read before the change (prediction, not required intent).
+                IReadOnlyList<string> reached = new string[0];
+                if (focused.TargetMode != CastingTargetMode.DirectTarget &&
+                    mode == CastingTargetMode.DirectTarget && _lastInputs != null)
+                {
+                    ResolvedCasting before = Compile(_lastInputs, focused.RoutineId, false)
+                        .CastingById(focused.CastingId);
+                    if (before != null) reached = before.PredictedBeneficiaryUnitIds;
+                }
                 AuthoringEditResult result = UpdateFocusedCasting(focused.WithTargeting(
                     mode, direct, origin, requiredCoverageUnitIds));
                 // Focused re-review: a group casting made single-target names
@@ -1968,7 +2011,7 @@ namespace KingmakerBuffPlanner.UI
                 if (result.Applied && focused.TargetMode != CastingTargetMode.DirectTarget &&
                     mode == CastingTargetMode.DirectTarget)
                 {
-                    List<string> dropped = focused.RequiredCoverageUnitIds
+                    List<string> dropped = reached
                         .Where(unitId => !string.Equals(unitId, direct, StringComparison.Ordinal))
                         .Distinct(StringComparer.Ordinal).ToList();
                     if (dropped.Count != 0)
@@ -2211,10 +2254,16 @@ namespace KingmakerBuffPlanner.UI
                 EditingFocusCastingId, targetRoutineId, targetPosition);
         }
 
+        // WP3 (0.4.0): the normal way to stop casting something is to remove
+        // it; no new Disabled record is authored. A Disabled record an
+        // earlier version saved stays readable, keeps its non-blocking
+        // omission and can be removed. Marking a genuine Draft Ready stays.
         public AuthoringEditResult SetFocusedCastingState(CastingAuthoringState state)
         {
             if (EditingFocusCastingId == null)
                 return AuthoringEditResult.Refuse("no-editing-focus");
+            if (state == CastingAuthoringState.Disabled)
+                return AuthoringEditResult.Refuse("disable-retired:remove-the-casting-instead");
             return _authoring.SetCastingState(EditingFocusCastingId, state);
         }
 
@@ -2236,8 +2285,7 @@ namespace KingmakerBuffPlanner.UI
             // The loaded (or imported) player settings are written back
             // unchanged unless the player changed them - never reset to
             // defaults by a document save.
-            _repository.Save(CastingPlanProfile.FromDocument(
-                _authoring.Document, _uiSettings, _executionSettings));
+            SaveProfile();
             _savedIntentSignature = DocumentIntentSignature();
             // The primary is now written and current: a notice about a
             // missing file and a loaded backup no longer applies.
@@ -2359,6 +2407,7 @@ namespace KingmakerBuffPlanner.UI
                     ReplaceAuthoring(new CastingAuthoringService(
                         loaded.Profile.ToDocument()));
                     AdoptSettings(loaded.Profile);
+                    NoteRetiredSemantics(loaded.Profile);
                     PersistenceBlocked = false;
                     LegacyImportBlocked = false;
                     LegacyImportBlockReason = null;
@@ -2407,7 +2456,14 @@ namespace KingmakerBuffPlanner.UI
                 _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
                 inputs.EffectsBySource, inputs.Enhancements,
                 routineScope, inputs.TargetingModifiers, projectEffects,
-                inputs.LiveEffects);
+                inputs.LiveEffects, StrictInstant);
+        }
+
+        // WP4: Instant mode is strict. A casting with no qualified instant
+        // route is Not Ready while Instant is selected (never animated).
+        private bool StrictInstant
+        {
+            get { return string.Equals(_executionSettings.Mode, "instant", StringComparison.Ordinal); }
         }
 
         // Guarded-scenario seam: the same deterministic compile Apply uses

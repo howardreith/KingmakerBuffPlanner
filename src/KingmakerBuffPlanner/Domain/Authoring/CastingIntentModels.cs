@@ -225,7 +225,13 @@ namespace KingmakerBuffPlanner.Domain.Authoring
             TargetMode = targetMode;
             DirectTargetUnitId = string.IsNullOrWhiteSpace(directTargetUnitId) ? null : directTargetUnitId;
             Origin = origin;
-            RequiredCoverageUnitIds = Distinct(requiredCoverageUnitIds, "requiredCoverageUnitIds");
+            // WP3 (0.4.0): a group casting is one invocation that affects
+            // whoever the native ability reaches from its centre; no party
+            // member is a required-coverage constraint any more. Stored
+            // 0.3.0 values are archived and migrated out at load
+            // (CastingPlanProfile.LegacyRequiredCoverageCount), so the
+            // retired intent never reaches the domain and cannot block.
+            RequiredCoverageUnitIds = Distinct(new string[0], "requiredCoverageUnitIds");
             TargetingModifiers = DistinctBy(
                 targetingModifiers, value => value.ModifierId, "targetingModifiers");
             Enhancements = DistinctBy(

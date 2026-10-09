@@ -268,7 +268,8 @@ namespace KingmakerBuffPlanner.Planning
             string budgetRoutineScope = null,
             IEnumerable<ICastingTargetingModifier> targetingModifiers = null,
             bool projectEffects = false,
-            ActiveEffectSnapshot liveEffects = null)
+            ActiveEffectSnapshot liveEffects = null,
+            bool strictInstant = false)
         {
             if (document == null) throw new ArgumentNullException("document");
             if (snapshot == null) throw new ArgumentNullException("snapshot");
@@ -295,8 +296,8 @@ namespace KingmakerBuffPlanner.Planning
                 ProviderSnapshot provider;
                 List<ModifierUsageDemand> modifierDemands;
                 castings.Add(CompileOne(casting, snapshot, options, effectsBySource,
-                    enhancementList, modifierList, diagnostics, liveEffects, out matched,
-                    out intended, out provider, out modifierDemands));
+                    enhancementList, modifierList, diagnostics, liveEffects, strictInstant,
+                    out matched, out intended, out provider, out modifierDemands));
                 matchedEnhancements[casting.CastingId] = matched;
                 intendedEnhancements[casting.CastingId] = intended;
                 providers[casting.CastingId] = provider;
@@ -394,6 +395,7 @@ namespace KingmakerBuffPlanner.Planning
             List<ICastingTargetingModifier> targetingModifiers,
             List<string> diagnostics,
             ActiveEffectSnapshot liveEffects,
+            bool strictInstant,
             out List<CastEnhancementSnapshot> matchedEnhancements,
             out List<CastEnhancementSnapshot> intendedEnhancements,
             out ProviderSnapshot providerSnapshot,
@@ -440,14 +442,6 @@ namespace KingmakerBuffPlanner.Planning
                     predicted = new string[0];
                     option = null;
                 }
-            }
-            else if (casting.TargetMode != CastingTargetMode.DirectTarget &&
-                casting.RequiredCoverageUnitIds.Count != 0)
-            {
-                // Without a resolved option there is no predicted coverage;
-                // every intended recipient stays visible as uncovered intent.
-                gaps.AddRange(casting.RequiredCoverageUnitIds.Select(
-                    unitId => new CoverageGap(unitId, "coverage-unresolved")));
             }
             var applied = new List<string>();
             var omitted = new List<string>();
@@ -542,6 +536,15 @@ namespace KingmakerBuffPlanner.Planning
                 reasons.Add("already-active:" + string.Join(",", satisfiedUnits.ToArray()));
             else
                 reasons.AddRange(resourceReasons);
+            // WP4 strict Instant: a casting whose effective route is not a
+            // qualified instant rule cast is Not Ready in Instant mode (it
+            // never silently animates); an already-active skip casts nothing
+            // and stays a skip. The reason names this casting, so the gate
+            // and Not Ready navigation identify it structurally.
+            if (strictInstant && !alreadyActive && strategy.HasValue &&
+                !CastingExecutionPolicy.IsInstantCapable(strategy.Value))
+                reasons.Add(CastingExecutionPolicy.InstantRouteUnavailable + ":" +
+                    strategy.Value + ":" + (strategyReason ?? string.Empty));
             ResolvedCastingReadiness readiness =
                 casting.State == CastingAuthoringState.Draft
                     ? ResolvedCastingReadiness.Draft
@@ -863,7 +866,9 @@ namespace KingmakerBuffPlanner.Planning
                 return null;
             }
             // One invocation; beneficiaries are derived edges, never extra
-            // castings, and uncovered intent stays visible as gaps.
+            // castings. WP3 (0.4.0): the cast affects whoever the native
+            // ability reaches from its centre; the prediction is read-only
+            // information and no member is a required-coverage constraint.
             IReadOnlyList<string> predicted = option.CoveredTargetIdsForAnchor(anchorId);
             if (predicted == null || predicted.Count == 0)
             {
@@ -872,10 +877,6 @@ namespace KingmakerBuffPlanner.Planning
                 reasons.Add("predicted-coverage-empty:" + anchorId);
                 return null;
             }
-            var covered = new HashSet<string>(predicted, StringComparer.Ordinal);
-            gaps.AddRange(casting.RequiredCoverageUnitIds
-                .Where(unitId => !covered.Contains(unitId))
-                .Select(unitId => new CoverageGap(unitId, "outside-predicted-coverage")));
             return predicted;
         }
 
@@ -977,9 +978,7 @@ namespace KingmakerBuffPlanner.Planning
             IReadOnlyList<string> recipients =
                 casting.TargetMode == CastingTargetMode.DirectTarget
                     ? new ReadOnlyCollection<string>(new[] { casting.DirectTargetUnitId })
-                    : casting.RequiredCoverageUnitIds.Count != 0
-                        ? casting.RequiredCoverageUnitIds
-                        : predicted;
+                    : predicted;
             if (recipients == null || recipients.Count == 0 ||
                 recipients.Any(string.IsNullOrEmpty))
                 return false;

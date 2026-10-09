@@ -162,6 +162,19 @@ namespace KingmakerBuffPlanner.Persistence
             AtomicFile.WriteUtf8(path, Serialize(profile));
         }
 
+        // WP3/WP4 (0.4.0): before the first write that drops retired 0.3.0
+        // semantics (required group recipients, combat/fallback
+        // preferences), the exact primary bytes are archived once beside it
+        // (read back and compared). Null when there is no primary yet.
+        internal string ArchiveRetiredSemanticsOnce(string campaignId)
+        {
+            string primary = GetProfilePath(campaignId);
+            if (!File.Exists(primary)) return null;
+            return AtomicFile.WriteExactArchive(_settingsDirectory,
+                Path.GetFileNameWithoutExtension(primary) + ".pre-0.4.0",
+                File.ReadAllBytes(primary));
+        }
+
         internal string GetProfilePath(string campaignId)
         {
             RequireCampaign(campaignId);

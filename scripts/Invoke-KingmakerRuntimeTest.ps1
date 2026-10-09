@@ -34,7 +34,7 @@ param(
     # Qualification recipe (qualification scenarios only): the selection
     # run defaults to zero-cost-mixed; a casting run takes its recipe from
     # the allowance, and when this is given as well it must name the same.
-    [ValidateSet('zero-cost-mixed', 'finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct', 'shared-personal', 'shared-powerful')][string]$QualificationRecipe,
+    [ValidateSet('zero-cost-mixed', 'finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct', 'shared-personal', 'shared-powerful', 'sticky-touch-direct')][string]$QualificationRecipe,
     # Classic cast (live-classic-cast only): the run-bound kbp-classic-cast
     # allowance under the lab approvals directory naming the exact classic
     # plan digest (from a live-classic-select run), the casting mode and a
@@ -52,9 +52,19 @@ param(
     # published) or 'cast' (the allowance arms a single-use grant and the
     # press runs Long once), or 'problems' (a late-Draft fixture refuses
     # before dispatch and physically reveals/navigates the blockers).
-    # Problems never takes or arms a casting allowance.
+    # Problems never takes or arms a casting allowance. 'spellbook' opens
+    # the native spellbook with the game's own key binding, clicks the owned
+    # Buff Planner button and closes the planner with Escape (three cycles
+    # and one simulated recovery); it never takes a casting allowance.
+    # 'combat' (0.4.0, WP4) is a selection run whose first moon press happens
+    # while the host holds a party member in the game's combat state: it
+    # must be refused for combat before dispatch, then the ordinary press is
+    # refused by the lock. 'authoring' (0.4.0, WP3) is a selection run that
+    # then performs the direct graph gestures (add, same-portrait remove,
+    # retarget, provider change, Undo, nested Escape) through the OS
+    # pointer. Neither takes a casting allowance.
     # Only valid with -Scenario live-workspace-physical.
-    [ValidateSet('cast', 'select', 'problems')][string]$PhysicalExpectation = 'cast',
+    [ValidateSet('cast', 'select', 'problems', 'spellbook', 'combat', 'authoring')][string]$PhysicalExpectation = 'cast',
     # Fixture family: the approved automation pair (default) or the
     # owner-designated advanced copy. The advanced copy is loaded only by
     # non-casting scenarios and only when it matches its guarded bootstrap
@@ -65,7 +75,9 @@ param(
     # exact size through Unity's launch arguments. A size larger than this
     # session's display is refused before anything changes; the game's
     # registry key (Unity PlayerPrefs) is restored byte-exact after exit.
-    [ValidateSet('owner', 'windowed-1920x1080', 'windowed-2560x1440')][string]$DisplayMode = 'owner'
+    # 0.4.0 (WP7): 1600x900 and 1280x720 give a meaningfully different
+    # resolution on a 1920x1080 session, where 2560x1440 is refused.
+    [ValidateSet('owner', 'windowed-1920x1080', 'windowed-2560x1440', 'windowed-1600x900', 'windowed-1280x720')][string]$DisplayMode = 'owner'
 )
 
 Set-StrictMode -Version Latest
@@ -878,7 +890,7 @@ public static class KbpPhysicalInput {
                 $deliveryDetail = $null
                 # Typing and the focus cycle are never repeated: a retry
                 # after a partial delivery would change what was delivered.
-                $singleShot = @('type', 'focus-cycle', 'hotkey') -ccontains [string]$physical.action
+                $singleShot = @('type', 'focus-cycle', 'hotkey', 'key') -ccontains [string]$physical.action
                 $maxAttempts = if ($singleShot) { 1 } else { 3 }
                 for ($attempt = 1; $attempt -le $maxAttempts -and -not $delivered; $attempt++) {
                     try {
@@ -890,6 +902,16 @@ public static class KbpPhysicalInput {
                             [KbpPhysicalInput]::KeyUp([byte]0x42)
                             [KbpPhysicalInput]::KeyUp([byte]0x10)
                             [KbpPhysicalInput]::KeyUp([byte]0x11)
+                        } elseif ([string]$physical.action -eq 'key') {
+                            # One unmodified letter key (the game's own
+                            # binding, e.g. the spellbook): A-Z only.
+                            $virtualKey = [int]$physical.vk
+                            if ($virtualKey -lt 0x41 -or $virtualKey -gt 0x5A) {
+                                throw "Physical key requests accept only A-Z: $virtualKey"
+                            }
+                            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]$virtualKey)
+                            Start-Sleep -Milliseconds 100
+                            [KbpPhysicalInput]::KeyUp([byte]$virtualKey)
                         } elseif ([string]$physical.action -eq 'key-escape') {
                             [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
                             Start-Sleep -Milliseconds 100

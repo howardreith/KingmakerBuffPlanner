@@ -248,37 +248,58 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         }
 
         // Another legal recipient for the focused casting: neither its caster
-        // nor its current recipient, preferably one no other casting reaches.
+        // nor its current recipient, preferably one with no casting of the buff
+        // in the routine (WP3: a recipient holds at most one, so a portrait
+        // that already has one refuses the move), then one no other scripted
+        // casting reaches.
         private string GraphRetarget(UI.CastingWorkspaceSession session, CastingWorkspaceInputs inputs,
             string castingId)
         {
             UI.CastingGraphView graph = session.BuildGraph(inputs);
-            Domain.Authoring.PlannedCasting casting = session.Document.Castings.FirstOrDefault(value =>
-                value != null && string.Equals(value.CastingId, castingId, StringComparison.Ordinal));
+            List<string> candidates = RetargetCandidates(session, graph, castingId);
+            Domain.Authoring.PlannedCasting casting = CastingById(session, castingId);
+            string current = casting == null ? null : casting.DirectTargetUnitId;
+            return candidates.FirstOrDefault(unit => IsFreeRecipient(graph, unit)) ??
+                candidates.FirstOrDefault(unit => !_interactionCastTargets.Contains(unit)) ??
+                candidates.FirstOrDefault() ?? current ?? _interactionTargets[0];
+        }
+
+        private List<string> RetargetCandidates(UI.CastingWorkspaceSession session, UI.CastingGraphView graph,
+            string castingId)
+        {
+            Domain.Authoring.PlannedCasting casting = CastingById(session, castingId);
             string caster = casting == null ? null : casting.CasterUnitId;
             string current = casting == null ? null : casting.DirectTargetUnitId;
-            List<string> candidates = (graph.Inspector != null &&
+            return (graph.Inspector != null &&
                     string.Equals(graph.Inspector.CastingId, castingId, StringComparison.Ordinal)
                     ? graph.Inspector.Retargets.Select(target => target.UnitId)
                     : _interactionTargets)
                 .Where(unit => !string.Equals(unit, caster, StringComparison.Ordinal) &&
                     !string.Equals(unit, current, StringComparison.Ordinal)).ToList();
-            return candidates.FirstOrDefault(unit => !_interactionCastTargets.Contains(unit)) ??
-                candidates.FirstOrDefault() ?? current ?? _interactionTargets[0];
         }
 
-        // The focused inspector's retarget control for a unit. Its list opens
-        // through its own toggle only when closed (the toggle would close an
-        // open list).
+        private static bool IsFreeRecipient(UI.CastingGraphView graph, string unitId)
+        {
+            UI.CastingGraphTargetNode node = graph.TargetById(unitId);
+            return node != null && node.CastingIds.Count == 0;
+        }
+
+        // Retargets the focused casting the 0.4.0 way (WP3): a click on
+        // another recipient's portrait. The inspector's retarget list is
+        // gone.
         private static string InvokeRetarget(string unitId)
         {
-            string outcome = Invoke("Retarget." + unitId);
-            // Missing, or only a same-frame destroyed-pending copy: closed.
-            if (!outcome.StartsWith("control-missing", StringComparison.Ordinal) &&
-                !outcome.StartsWith("control-inactive", StringComparison.Ordinal)) return outcome;
-            string toggle = Invoke("ToggleRetargets");
-            if (toggle != WorkspaceControlOutcome.Invoked) return "toggle-" + toggle;
-            return Invoke("Retarget." + unitId);
+            return Invoke("Target." + unitId);
+        }
+
+        // WP3: a casting added through the graph stays focused, and with a
+        // casting focused a caster, source or portrait click edits that
+        // casting. The player's Done clears the focus before the next
+        // casting is configured; nothing to clear is a no-op.
+        private static string ClearGraphFocus(UI.CastingWorkspaceSession session)
+        {
+            if (session.EditingFocusCastingId == null) return WorkspaceControlOutcome.AlreadyReady;
+            return Invoke("DoneEditing");
         }
 
         // A focus change made directly on the session (not through a
@@ -517,6 +538,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 NativeCatalogExport catalog = null;
                 string catalogPath = null;
                 string catalogHash = null;
+                NativeCatalogAuditDocument catalogAudit = null;
+                string catalogAuditHash = null;
+                BlueprintReferenceDocument references = null;
+                string referencesHash = null;
                 HarmonyPatchInventory harmonyInventory = null;
                 string harmonyInventoryHash = null;
                 RuntimePerformanceProfile performanceProfile = null;
@@ -539,7 +564,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     string catalogJson = Serialize(catalog);
                     JObject catalogDocument = JObject.Parse(catalogJson);
                     JArray abilityDocuments = catalogDocument["abilities"] as JArray;
-                    if ((int)catalogDocument["schemaVersion"] != 4 || abilityDocuments == null ||
+                    if ((int)catalogDocument["schemaVersion"] != 5 || abilityDocuments == null ||
                         abilityDocuments.Count != catalog.AbilityCount)
                         throw new InvalidDataException("Serialized catalog contract did not reconcile.");
                     foreach (JObject abilityDocument in abilityDocuments.OfType<JObject>())
@@ -551,6 +576,42 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     }
                     AtomicFile.WriteUtf8(catalogPath, catalogJson);
                     catalogHash = Hashing.Sha256(catalogPath);
+                    // The 0.4.0 catalogue audit (WP5): every included or
+                    // removed source with its rule, effects and reason.
+                    catalogAudit = NativeCatalogAudit.Document(_request.ProfileId, BuildInfo.Commit,
+                        catalog.Abilities.Select(NativeCatalogExporter.AuditInput),
+                        catalog.OwnershipBasis, catalog.OwnershipSources);
+                    string catalogAuditPath = Path.Combine(
+                        _request.EvidenceDirectory, "native-buff-catalog-audit.json");
+                    AtomicFile.WriteUtf8(catalogAuditPath, Serialize(catalogAudit));
+                    catalogAuditHash = Hashing.Sha256(catalogAuditPath);
+                    // rc4 (review finding 1): who reads each buff the audit's
+                    // decisions turn on - every buff with no mechanics of its
+                    // own in a source included before 0.4.0, and every effect
+                    // of a source the 0.4.0 rules removed or left unsupported.
+                    var referenceTargets = new Dictionary<string, KeyValuePair<string, string>>(StringComparer.Ordinal);
+                    foreach (NativeCatalogEntry entry in catalog.Abilities)
+                    {
+                        bool changed = (entry.IsCandidate && entry.DispositionBefore040 == "include" &&
+                                entry.Disposition != "include") ||
+                            (entry.LiveDispositionBefore040 == "include" && entry.LiveDisposition != "include");
+                        bool includedBefore = entry.LiveDispositionBefore040 == "include";
+                        foreach (NativeEffectRecord effect in entry.Effects ?? new NativeEffectRecord[0])
+                        {
+                            if (effect.Kind != "Buff" && effect.Kind != "AreaBuff") continue;
+                            bool flag = NativeCandidateClassifier.HasNoMechanicsOfItsOwn(effect.ComponentTypes);
+                            if ((!changed && !(includedBefore && flag)) ||
+                                referenceTargets.ContainsKey(effect.EffectGuid))
+                                continue;
+                            referenceTargets[effect.EffectGuid] = new KeyValuePair<string, string>(effect.EffectName,
+                                changed ? "an effect of a source the 0.4.0 rules removed or left unsupported"
+                                    : "a buff with no mechanics of its own in a source included before 0.4.0");
+                        }
+                    }
+                    references = BlueprintReferenceIndex.Build(_request.ProfileId, BuildInfo.Commit, referenceTargets);
+                    string referencesPath = Path.Combine(_request.EvidenceDirectory, "blueprint-references.json");
+                    AtomicFile.WriteUtf8(referencesPath, Serialize(references));
+                    referencesHash = Hashing.Sha256(referencesPath);
                     harmonyInventory = new HarmonyPatchInventoryExporter().Export(_request.ProfileId, harmony);
                     string harmonyInventoryPath = Path.Combine(
                         _request.EvidenceDirectory, "harmony-patch-inventory.json");
@@ -605,6 +666,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     CatalogOptionalCandidateCount = catalog == null ? 0 : catalog.OptionalCandidateCount,
                     CatalogOptionalIncludedCount = catalog == null ? 0 : catalog.OptionalIncludedCount,
                     CatalogOptionalUnsupportedCount = catalog == null ? 0 : catalog.OptionalUnsupportedCount,
+                    CatalogAuditSha256 = catalogAuditHash,
+                    CatalogAuditRecordCount = catalogAudit == null ? 0 : catalogAudit.Records.Length,
+                    CatalogAuditStaticIncludedBefore040 = catalogAudit == null ? 0
+                        : catalogAudit.Summary.Totals.StaticIncludedBefore040,
+                    CatalogAuditStaticIncluded = catalogAudit == null ? 0 : catalogAudit.Summary.Totals.StaticIncluded,
+                    CatalogAuditLiveIncludedBefore040 = catalogAudit == null ? 0
+                        : catalogAudit.Summary.Totals.LiveIncludedBefore040,
+                    CatalogAuditLiveIncluded = catalogAudit == null ? 0 : catalogAudit.Summary.Totals.LiveIncluded,
+                    CatalogAuditAddedCount = catalogAudit == null ? 0 : catalogAudit.Summary.AddedCount,
+                    CatalogReferencesSha256 = referencesHash,
+                    CatalogReferenceTargetCount = references == null ? 0 : references.Targets.Length,
+                    CatalogReferenceScannedCount = references == null ? 0 : references.ScannedBlueprints,
                     HarmonyPatchInventorySha256 = harmonyInventoryHash,
                     HarmonyPatchTargetCount = harmonyInventory == null ? 0 : harmonyInventory.TargetCount,
                     HarmonyPatchRecordCount = harmonyInventory == null ? 0 : harmonyInventory.PatchCount,
@@ -969,18 +1042,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // Physical-input acceptance (Unity-free rules in
                     // PhysicalWorkspaceRecord): every action delivered by the
                     // OS and acknowledged, and the view's own state after it.
-                    IList<string> violations = PhysicalProblemsRequested ? _problemRecord.Violations() : _physicalRecord.Violations();
+                    IList<string> violations = PhysicalProblemsRequested ? _problemRecord.Violations()
+                        : PhysicalSpellbookRequested ? _spellbookRecord.Violations() : _physicalRecord.Violations();
+                    string physicalClaim = PhysicalProblemsRequested
+                        ? "blocked HUD focus, visible card, reasons, Previous/Next, Escape (OS input)"
+                        : PhysicalSpellbookRequested
+                            ? "spellbook key, Buff Planner click, native close, planner open, Escape, recovery (OS input)"
+                            : "search typing, wheel, press target, focus loss, Escape (OS input)";
                     result.Assertions.Add(violations.Count == 0
-                        ? RuntimeTestAssertion.Pass("physical-workspace",
-                            PhysicalProblemsRequested ? "blocked HUD focus, visible card, reasons, Previous/Next, Escape (OS input)"
-                                : "search typing, wheel, press target, focus loss, Escape (OS input)",
+                        ? RuntimeTestAssertion.Pass("physical-workspace", physicalClaim,
                             "screen=" + _physicalRecord.ScreenWidth + "x" + _physicalRecord.ScreenHeight +
                                 ";text=" + _physicalRecord.SearchTextAfterFocus + ";selected=" +
                                 _physicalRecord.SelectedBeforeClick + ">" + _physicalRecord.SelectedAfterClick +
                                 ";wheel=" + _physicalRecord.WheelEvidence)
-                        : RuntimeTestAssertion.Fail("physical-workspace",
-                            PhysicalProblemsRequested ? "blocked HUD focus, visible card, reasons, Previous/Next, Escape (OS input)"
-                                : "search typing, wheel, press target, focus loss, Escape (OS input)",
+                        : RuntimeTestAssertion.Fail("physical-workspace", physicalClaim,
                             string.Join("|", violations.ToArray())));
                     if (violations.Count != 0)
                     {
@@ -2241,7 +2316,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     // E12: the cold moon press comes BEFORE any planner
                     // hotkey is requested (phase 125); the hotkey follows it.
-                    _physicalStep = PhysicalProblemsRequested ? 0 : 100;
+                    _physicalStep = PhysicalProblemsRequested ? 0
+                        : PhysicalSpellbookRequested ? SpellbookStartStep : 100;
                     _liveUiPhase = 125;
                     return false;
                 }
@@ -3653,6 +3729,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // closes the inspect first and the workspace second.
         private bool UpdatePhysicalCastingFirst(CastingWorkspaceScreenView view, double settled)
         {
+            if (_physicalStep >= CombatStartStep && _physicalStep < CombatStartStep + 10)
+                return UpdateCombatPress(view, settled);
+            if (_physicalStep >= AuthoringStartStep && _physicalStep < AuthoringStartStep + 30)
+                return UpdatePhysicalAuthoring(view, settled);
             if (_physicalStep == 100)
             {
                 // A stale dismissal escape from the launcher can leave the
@@ -3761,7 +3841,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         { "importantCastings", new JArray(_physicalRecord.SeedImportantCastings.Cast<object>().ToArray()) },
                         { "shortCastings", new JArray(_physicalRecord.SeedShortCastings.Cast<object>().ToArray()) }
                     }.ToString(Formatting.Indented) + Environment.NewLine);
-                if (_physicalRecord.MoonExpectation != "select")
+                if (_physicalRecord.MoonExpectation == "cast")
                 {
                     // The run-bound allowance binds this exact stored plan,
                     // build, fixture and save; the grant it arms is the ONLY
@@ -3782,11 +3862,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.LongEffectBefore = SeedEffectActive(inputs, _physicalSeedLong);
                 _physicalRecord.ImportantEffectBefore = SeedEffectActive(inputs, _physicalSeedImportant);
                 _physicalLongAvailableBefore = SeedCastsAvailable(inputs, _physicalSeedLong);
-                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "physical-cf-moon-before.png"));
-                _physicalRunsBeforeMoon = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
-                _physicalMoonEditorSeen = false;
-                return RequestPhysical("cf-moon", "click",
-                    BuffPlannerUiRoot.HudButtonCenterForRuntime("long"), null, 102);
+                // 0.4.0 (WP4): a combat run presses the moon in combat first.
+                if (_physicalRecord.MoonExpectation == "combat")
+                {
+                    _physicalStep = CombatStartStep;
+                    return false;
+                }
+                return PressColdMoon();
             }
             if (_physicalStep == 102)
             {
@@ -3869,6 +3951,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 BuffPlannerUiRoot.BeginPhysicalInputProbe();
                 _physicalRecord.DocumentSignatureBeforeBrowse =
                     BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                // 0.4.0 (WP3): an authoring run performs the direct graph
+                // gestures instead of the browse and description gestures.
+                if (_physicalRecord.MoonExpectation == "authoring")
+                {
+                    _physicalStep = AuthoringStartStep;
+                    return false;
+                }
                 // D13: the Short tab (its castings overflow the graph) is
                 // clicked physically; selecting a routine is browsing only.
                 Vector2? tab = view.ScreenPointForRuntime("routine:short");
@@ -3957,6 +4046,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.InspectOverflow = view.SpellInspectOverflowForRuntime;
                 _physicalRecord.InspectScrollBefore = view.SpellInspectScrollPositionForRuntime;
                 _physicalRecord.GraphScrollUnderInspectBefore = view.GraphScrollPositionForRuntime;
+                // What the frames above show (WP7): the paper each surface drew.
+                _physicalRecord.WorkspacePaperEvidence = view.WorkspacePaperEvidenceForRuntime;
+                _physicalRecord.InspectPaperEvidence = view.SpellInspectPaperEvidenceForRuntime;
                 Vector2? centre = view.SpellInspectPanelCentreForRuntime;
                 if (centre == null) return FinishPhysical("inspect-panel-not-on-screen");
                 // The wheel over the open description belongs to it: the
@@ -4050,10 +4142,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalModeBefore = GameModeName();
                 _physicalRecord.CastingFirst = BuffPlannerUiRoot.CastingFirstActiveForRuntime;
                 object expectation;
-                _physicalRecord.MoonExpectation =
-                    _request.Parameters.TryGetValue("physicalExpectation", out expectation) &&
-                        string.Equals(expectation as string, "select", StringComparison.Ordinal)
-                        ? "select" : "cast";
+                _physicalRecord.MoonExpectation = NormalizedMoonExpectation(
+                    _request.Parameters.TryGetValue("physicalExpectation", out expectation)
+                        ? expectation as string : null);
                 // Casting-first: the isolation probe covers the planner's own
                 // gestures (step 3 on), not the moon run's legitimate casts.
                 if (!_physicalRecord.CastingFirst) BuffPlannerUiRoot.BeginPhysicalInputProbe();
@@ -4079,6 +4170,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             double settled = _physicalSettle == null ? 0 : _physicalSettle.Elapsed.TotalSeconds;
             if (PhysicalProblemsRequested)
                 return UpdateProblemNavigation(view, settled);
+            if (PhysicalSpellbookRequested)
+                return UpdateSpellbookEntry(settled);
             if (_physicalRecord.CastingFirst)
                 return UpdatePhysicalCastingFirst(view, settled);
             if (view == null && _physicalStep >= 1 && _physicalStep <= 7)
@@ -4201,6 +4294,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private bool FinishPhysical(string failure)
         {
             if (PhysicalProblemsRequested) return FinishProblemNavigation(failure);
+            if (PhysicalSpellbookRequested) return FinishSpellbookEntry(failure);
             if (failure != null) _physicalRecord.Failures.Add(failure);
             // The single-use exception ends with this scenario, used or not.
             if (_physicalGrant != null)
@@ -4286,6 +4380,43 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "moonRunStarted", record.MoonRunStarted },
                 { "moonWorkspaceStayedClosed", record.MoonWorkspaceStayedClosed },
                 { "moonExpectation", record.MoonExpectation },
+                { "combatUnitId", record.CombatUnitId },
+                { "combatInCombatBefore", Nullable(record.CombatInCombatBefore) },
+                { "combatHeldUpdates", record.CombatHeldUpdates },
+                { "combatAtPress", Nullable(record.CombatAtPress) },
+                { "combatRunStarted", Nullable(record.CombatRunStarted) },
+                { "combatEditorOpened", Nullable(record.CombatEditorOpened) },
+                { "combatDispatchRefusals", Nullable(record.CombatDispatchRefusals) },
+                { "combatRefusal", record.CombatRefusal },
+                { "combatAvailability", record.CombatAvailability },
+                { "combatEffectAfter", Nullable(record.CombatEffectAfter) },
+                { "combatClearedBeforeMoon", Nullable(record.CombatClearedBeforeMoon) },
+                { "classicCombatRefusal", record.ClassicCombatRefusal },
+                { "classicCombatYielded", Nullable(record.ClassicCombatYielded) },
+                { "classicCombatRefreshes", Nullable(record.ClassicCombatRefreshes) },
+                { "classicCombatPreviews", Nullable(record.ClassicCombatPreviews) },
+                { "classicCombatReportChanged", Nullable(record.ClassicCombatReportChanged) },
+                { "classicCombatExecuting", Nullable(record.ClassicCombatExecuting) },
+                { "classicCombatProfileUnchanged", Nullable(record.ClassicCombatProfileUnchanged) },
+                { "authoringRoutine", record.AuthoringRoutine },
+                { "authoringSource", record.AuthoringSource },
+                { "authoringCaster", record.AuthoringCaster },
+                { "authoringTargets", record.AuthoringTargets },
+                { "authoringBuffSelected", Nullable(record.AuthoringBuffSelected) },
+                { "authoringCountBefore", Nullable(record.AuthoringCountBefore) },
+                { "authoringCountAfter", Nullable(record.AuthoringCountAfter) },
+                { "authoringAdded", Nullable(record.AuthoringAdded) },
+                { "authoringRemoved", Nullable(record.AuthoringRemoved) },
+                { "authoringReadded", Nullable(record.AuthoringReadded) },
+                { "authoringRetargeted", Nullable(record.AuthoringRetargeted) },
+                { "authoringProviderChanged", Nullable(record.AuthoringProviderChanged) },
+                { "authoringProviderKeptTarget", Nullable(record.AuthoringProviderKeptTarget) },
+                { "authoringProviderUndone", Nullable(record.AuthoringProviderUndone) },
+                { "authoringUndoRestored", Nullable(record.AuthoringUndoRestored) },
+                { "authoringFocusedBeforeEscape", Nullable(record.AuthoringFocusedBeforeEscape) },
+                { "authoringEscapeClearedFocus", Nullable(record.AuthoringEscapeClearedFocus) },
+                { "authoringOpenAfterFirstEscape", Nullable(record.AuthoringOpenAfterFirstEscape) },
+                { "authoringDurable", Nullable(record.AuthoringDurable) },
                 { "moonRefusal", record.MoonRefusal },
                 { "moonAllowanceStatus", record.MoonAllowanceStatus },
                 { "moonGrantDescribe", record.MoonGrantDescribe },
@@ -4339,6 +4470,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "inspectOpenAfterWheels", Nullable(record.InspectOpenAfterWheels) },
                 { "graphScrollUnderInspectBefore", Nullable(record.GraphScrollUnderInspectBefore) },
                 { "graphScrollUnderInspectAfter", Nullable(record.GraphScrollUnderInspectAfter) },
+                { "workspacePaperEvidence", record.WorkspacePaperEvidence },
+                { "inspectPaperEvidence", record.InspectPaperEvidence },
                 { "documentSignatureBeforeBrowse", record.DocumentSignatureBeforeBrowse },
                 { "documentSignatureAfterInspect", record.DocumentSignatureAfterInspect },
                 { "notes", new JArray(record.Notes.Cast<object>().ToArray()) },
@@ -5323,6 +5456,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _problemRecord.Failures.Add("shutdown:" + reason);
                         PublishProblemRecord();
                     }
+                    else if (PhysicalSpellbookRequested)
+                    {
+                        _spellbookRecord.Failures.Add("shutdown:" + reason);
+                        PublishSpellbookRecord();
+                    }
                     else PublishPhysicalRecord();
                 }
                 catch (Exception exception)
@@ -5512,8 +5650,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     string siblingsBefore =
                         WorkspaceCastStepEvaluator.SiblingSignature(
                             session.Document.Castings, null);
-                    // The graph gesture: the caster, its exact source row, then
-                    // the target whose click adds the casting.
+                    // The graph gesture: Done on the casting the previous add
+                    // left focused, the caster, its exact source row, then the
+                    // target whose click adds the casting.
+                    string doneBefore = ClearGraphFocus(session);
+                    if (doneBefore != WorkspaceControlOutcome.AlreadyReady)
+                        _workspaceInteraction.AddNote("cast" + (index + 1) + "DoneBefore=" + doneBefore);
                     string casterClick = Invoke("Caster." + caster);
                     int row = UsableSourceRow(session, currentInputs, caster);
                     string sourceClick = row < 0 ? "control-missing:Provider." + caster + ".usable"
@@ -5570,6 +5712,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // Negative case: with NO caster chosen, a target click must
                     // be refused and leave the document untouched (review G4;
                     // the graph's analogue of an Add with nothing chosen).
+                    // Nothing may be focused, or the click would edit it.
+                    _workspaceInteraction.AddNote("refusedAddDoneBefore=" + ClearGraphFocus(session));
                     session.SelectCaster(null);
                     session.Draft.CasterUnitId = null;
                     session.Draft.Ability = null;
@@ -5617,9 +5761,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 if (_workspaceInteractionStep == 6)
                 {
-                    // Retarget through the FOCUSED inspector's real control.
+                    // Retarget the FOCUSED casting through its new recipient's
+                    // portrait (WP3).
                     string editId = _interactionCastIds.Count > 1
                         ? _interactionCastIds[1] : string.Empty;
+                    // WP3: a recipient holds at most one casting of a buff in
+                    // a routine. With every legal recipient taken (three
+                    // castings in a three-member party) the move has nowhere
+                    // to go, so the third casting is removed first the
+                    // player's way - its card, then its recipient's portrait -
+                    // and cast 2 then moves to the freed recipient.
+                    UI.CastingGraphView before = session.BuildGraph(currentInputs);
+                    if (!RetargetCandidates(session, before, editId).Any(unit => IsFreeRecipient(before, unit)) &&
+                        _interactionCastIds.Count > 2)
+                    {
+                        string thirdId = _interactionCastIds[2];
+                        Domain.Authoring.PlannedCasting third = CastingById(session, thirdId);
+                        string focusThird = Invoke("Casting." + thirdId);
+                        string removeThird = third == null ? "missing"
+                            : Invoke("Target." + third.DirectTargetUnitId);
+                        bool removed = CastingById(session, thirdId) == null;
+                        string refocus = Invoke("Casting." + editId);
+                        _workspaceInteraction.AddNote("retargetFreedRecipient=" + thirdId + ";focus=" + focusThird +
+                            ";remove=" + removeThird + ";removed=" + removed + ";refocus=" + refocus);
+                    }
                     // Another legal recipient for cast 2's source: neither the
                     // caster nor its current recipient; the re-edit reuses it.
                     _interactionRetarget = GraphRetarget(session, currentInputs, editId);

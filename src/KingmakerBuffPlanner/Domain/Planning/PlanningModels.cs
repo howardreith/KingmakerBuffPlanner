@@ -30,6 +30,27 @@ namespace KingmakerBuffPlanner.Domain.Planning
         ProviderDirectRuleCast
     }
 
+    // WP4 (0.4.0) execution policy. Instant is strict: a casting runs
+    // instantly only through a qualified rule-cast route and never falls
+    // back to a normal animated cast; a casting that cannot is Not Ready in
+    // Instant mode and runs only in the explicit Animated mode. Routines
+    // never run during combat. Neither rule is a player setting any more;
+    // the legacy persisted preference fields are normalized to this policy.
+    public static class CastingExecutionPolicy
+    {
+        public const bool OutOfCombatOnly = true;
+        public const bool AllowAnimatedFallback = false;
+        public const string InstantRouteUnavailable = "instant-route-unavailable";
+        public const string CombatActive = "combat-active";
+
+        public static bool IsInstantCapable(CastExecutionStrategy strategy)
+        {
+            return strategy == CastExecutionStrategy.DirectRuleCast ||
+                strategy == CastExecutionStrategy.StickyTouchDeliveryRuleCast ||
+                strategy == CastExecutionStrategy.ProviderDirectRuleCast;
+        }
+    }
+
     public sealed class CastExecutionCapability
     {
         public CastExecutionCapability(CastExecutionStrategy strategy, string reason)
@@ -44,6 +65,12 @@ namespace KingmakerBuffPlanner.Domain.Planning
 
     public static class StickyTouchExecutionClassifier
     {
+        // The two instant sticky-touch reasons: a delivery that may also be
+        // aimed at enemies yet is a willing-target buff (WP6), and one that
+        // can only reach the caster or friends.
+        public const string WillingTargetReason = "supported-willing-target-sticky-touch-delivery";
+        public const string BeneficialReason = "supported-beneficial-sticky-touch-delivery";
+
         public static CastExecutionCapability Classify(
             bool isStickyTouch,
             bool hasDeliveryBlueprint,
@@ -52,7 +79,9 @@ namespace KingmakerBuffPlanner.Domain.Planning
             bool deliveryCanTargetSelf,
             bool deliveryCanTargetFriends,
             bool deliveryCanTargetEnemies,
-            bool deliveryCanTargetPoint)
+            bool deliveryCanTargetPoint,
+            bool deliveryHelpfulToAllies = false,
+            bool deliveryHarmfulToEnemies = true)
         {
             if (!isStickyTouch)
                 return new CastExecutionCapability(
@@ -66,13 +95,20 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 return AnimatedFallback("sticky-delivery-target-anchor-unsupported");
             if (deliveryCanTargetPoint)
                 return AnimatedFallback("sticky-delivery-point-targeting-ambiguous");
-            if (deliveryCanTargetEnemies)
+            // WP6 (0.4.0): a delivery that may also be aimed at an enemy is
+            // still a willing-target buff when it is helpful to allies and
+            // not harmful to enemies (Magic Circle against Alignment: its
+            // ally branch applies the carrier). The planner aims it only at
+            // its own party, where the native touch attack auto-hits (the
+            // instant adapter checks that condition before every cast).
+            if (deliveryCanTargetEnemies &&
+                (!deliveryHelpfulToAllies || deliveryHarmfulToEnemies))
                 return AnimatedFallback("sticky-delivery-hostile-targeting-ambiguous");
             if (!deliveryCanTargetSelf && !deliveryCanTargetFriends)
                 return AnimatedFallback("sticky-delivery-has-no-beneficial-unit-target");
             return new CastExecutionCapability(
                 CastExecutionStrategy.StickyTouchDeliveryRuleCast,
-                "supported-beneficial-sticky-touch-delivery");
+                deliveryCanTargetEnemies ? WillingTargetReason : BeneficialReason);
         }
 
         private static CastExecutionCapability AnimatedFallback(string reason)

@@ -282,7 +282,7 @@ if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-Qua
 }
 # Every recipe the host knows can be approved (the group recipe included).
 foreach ($knownRecipe in @('finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct',
-        'shared-personal', 'shared-powerful')) {
+        'shared-personal', 'shared-powerful', 'sticky-touch-direct')) {
     if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-QualificationFixtureJson @{ recipe = $knownRecipe }) `
             -RunId 'qual-bind-test' -BuildManifest $manifestFixture -Recipe $knownRecipe)) {
         throw "A $knownRecipe qualification allowance was refused by the build binding."
@@ -516,12 +516,20 @@ try {
         'cf-escape-inspect', 'cf-escape-close')
     $physicalKinds = @{ 'cf-moon' = 'click'; 'cf-routine-short' = 'click'; 'cf-wheel' = 'wheel'
         'cf-right-click' = 'rightclick'; 'cf-inspect-wheel' = 'wheel'; 'cf-long-wheel' = 'wheel'
-        'cf-escape-inspect' = 'key-escape'; 'cf-escape-close' = 'key-escape' }
+        'cf-escape-inspect' = 'key-escape'; 'cf-escape-close' = 'key-escape'; 'cf-moon-combat' = 'click'
+        'auth-caster' = 'click'; 'auth-source' = 'click'; 'auth-add' = 'click'; 'auth-remove' = 'click'
+        'auth-readd' = 'click'; 'auth-retarget' = 'click'; 'auth-undo' = 'click'; 'auth-focus' = 'click'
+        'auth-escape-focus' = 'key-escape' }
+    $authoringActions = @('cf-moon', 'auth-caster', 'auth-source', 'auth-add', 'auth-remove', 'auth-readd',
+        'auth-retarget', 'auth-undo', 'auth-focus', 'auth-escape-focus', 'cf-escape-close')
     function New-PhysicalOutcomeCase([string]$Name, [string]$Expectation, [scriptblock]$Tamper,
         [string]$ExpectedScreen = '1920x1080') {
         $directory = Join-Path $outcomeRoot $Name
         New-Item -ItemType Directory -Path $directory | Out-Null
-        foreach ($id in $physicalActions) {
+        $runActions = if ($Expectation -ceq 'authoring') { $authoringActions }
+            elseif ($Expectation -ceq 'combat') { @('cf-moon-combat') + $physicalActions }
+            else { $physicalActions }
+        foreach ($id in $runActions) {
             $sent = [ordered]@{ schemaVersion = 1; runId = 'physical-run'; actionId = $id; action = $physicalKinds[$id] }
             Write-KbpJsonAtomic (Join-Path $directory "physical-input-$id.json") $sent
             Write-KbpJsonAtomic (Join-Path $directory "physical-input-$id.ack.json") ([ordered]@{
@@ -532,7 +540,7 @@ try {
             runId = 'physical-run'; kingmakerProcessId = 4242; plannerHotkeySentAtUtc = '2026-09-24T00:00:00Z' })
         $record = [ordered]@{ schemaVersion = 1; runId = 'physical-run'; expectedScreen = '1920x1080'
             screen = '1920x1080'; openedPhysically = $true; castingFirst = $true
-            moonExpectation = $Expectation; acknowledged = $physicalActions; failures = @(); violations = @()
+            moonExpectation = $Expectation; acknowledged = $runActions; failures = @(); violations = @()
             coldSessionBeforeMoon = $true; editorNeverOpenedBeforeMoon = $true
             seedLongCastings = @('seed-long-1'); seedImportantCastings = @('seed-important-1')
             moonWorkspaceStayedClosed = $true; escMenuOpenAfterClose = $false
@@ -543,11 +551,31 @@ try {
             inspectOverflow = -250; inspectScrollBefore = 1.0; inspectScrollAfter = 1.0
             longProbeChars = 6100; longProbeOverflow = 2400; longScrollBefore = 1.0; longScrollAfter = 0.92
             inspectOpenAfterWheels = $true; graphScrollUnderInspectBefore = 0.7; graphScrollUnderInspectAfter = 0.7 }
-        if ($Expectation -ceq 'select') {
+        if ($Expectation -ceq 'select' -or $Expectation -ceq 'combat' -or $Expectation -ceq 'authoring') {
             $record.moonRunStarted = $false
             $record.moonRefusal = 'native-submission-disabled:runtime-test-session:live-workspace-physical:cf-grant-absent;Refused'
         }
-        else {
+        if ($Expectation -ceq 'combat') {
+            $record.combatInCombatBefore = $false; $record.combatAtPress = $true; $record.combatRunStarted = $false
+            $record.combatEditorOpened = $false; $record.combatDispatchRefusals = 0
+            $record.combatRefusal = 'Refused:Buff routines cannot run during combat.'
+            $record.combatAvailability = '99>99'; $record.combatEffectAfter = $false
+            $record.combatClearedBeforeMoon = $true
+            $record.classicCombatRefusal = 'Refused:Buff routines cannot run during combat.'
+            $record.classicCombatYielded = 0; $record.classicCombatRefreshes = 0; $record.classicCombatPreviews = 0
+            $record.classicCombatReportChanged = $false; $record.classicCombatExecuting = $false
+            $record.classicCombatProfileUnchanged = $true
+        }
+        if ($Expectation -ceq 'authoring') {
+            foreach ($flag in @('authoringBuffSelected', 'authoringAdded', 'authoringRemoved', 'authoringReadded',
+                    'authoringRetargeted', 'authoringUndoRestored', 'authoringFocusedBeforeEscape',
+                    'authoringEscapeClearedFocus', 'authoringOpenAfterFirstEscape', 'authoringDurable')) {
+                $record[$flag] = $true
+            }
+            $record.authoringCountBefore = 16; $record.authoringCountAfter = 17
+            $record.authoringProviderChanged = $null
+        }
+        if ($Expectation -ceq 'cast') {
             $record.moonRunStarted = $true
             $record.moonGrantConsumed = $true
             $record.moonGrantAttempts = 1
@@ -568,12 +596,39 @@ try {
     }
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-good' 'select' $null)
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-cast-good' 'cast' $null)
+    Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-combat-good' 'combat' $null)
+    Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-authoring-good' 'authoring' $null)
     # Owner display (no -DisplayMode): beta-3c1c5d4ar13-phys-sel-01 passed
     # in game and the judge threw reading the absent expectedScreen.
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-owner-select' 'select' $null '')
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-owner-cast' 'cast' $null '')
     $physicalOutcomeCases = [ordered]@{
         'missing-ack' = @('select', { param($d) Remove-Item -LiteralPath (Join-Path $d 'physical-input-cf-wheel.ack.json') })
+        # 0.4.0 (WP4/WP3).
+        'combat-not-refused-for-combat' = @('combat', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.combatRefusal = 'Refused:Casting is locked.'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'combat-reached-dispatch' = @('combat', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.combatDispatchRefusals = 1; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'combat-spent' = @('combat', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.combatAvailability = '99>98'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'combat-not-in-combat' = @('combat', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.combatAtPress = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'combat-press-missing' = @('combat', { param($d) Remove-Item -LiteralPath (Join-Path $d 'physical-input-cf-moon-combat.ack.json') })
+        # rc4 review finding 2: the Classic route prepared before refusing.
+        'combat-classic-prepared' = @('combat', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.classicCombatRefreshes = 1; $r.classicCombatPreviews = 1; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'authoring-retarget-failed' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.authoringRetargeted = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'authoring-provider-not-undone' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.authoringProviderChanged = $true; $r | Add-Member -NotePropertyName authoringProviderKeptTarget -NotePropertyValue $true -Force
+            $r | Add-Member -NotePropertyName authoringProviderUndone -NotePropertyValue $false -Force
+            Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'authoring-escape-closed-first' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.authoringOpenAfterFirstEscape = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'authoring-count' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.authoringCountAfter = 18; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'authoring-browse-request' = @('authoring', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-wheel.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'cf-wheel'; action = 'wheel' }) })
         'failed-ack' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-moon.ack.json') ([ordered]@{
             schemaVersion = 1; runId = 'physical-run'; actionId = 'cf-moon'; action = 'click'; deliveryFailed = $true }) })
         'other-action' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-right-click.ack.json') ([ordered]@{
@@ -865,6 +920,16 @@ $launcherActions = @([regex]::Matches($launcherActionsBlock, "'([^']+)'") | ForE
 if ($recordActions.Count -ne 8 -or ($recordActions -join ',') -cne ($launcherActions -join ',')) {
     throw "The launcher's judged physical actions differ from the record's: $($launcherActions -join ',')"
 }
+# 0.4.0 (WP3): the authoring run's judged gestures are the record's
+# AuthoringActions, in order.
+$authoringBlock = [regex]::Match($recordSource, 'public static readonly string\[\] AuthoringActions =\s*\{([^}]*)\}').Groups[1].Value
+$recordAuthoring = @([regex]::Matches($authoringBlock, '"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+$launcherAuthoringBlock = [regex]::Match((Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1') -Raw),
+    'if \(\$expectation -ceq ''authoring''\) \{\s*\$expected = @\(([^)]*)\)').Groups[1].Value
+$launcherAuthoring = @([regex]::Matches($launcherAuthoringBlock, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+if ($recordAuthoring.Count -ne 11 -or ($recordAuthoring -join ',') -cne ($launcherAuthoring -join ',')) {
+    throw "The launcher's judged authoring gestures differ from the record's: $($launcherAuthoring -join ',')"
+}
 # The allowance writer (review C5): what it writes from recorded selection
 # evidence is exactly what the launcher's own checks accept, bound to the
 # selection run's profile, identity and WORKING save; it never overwrites,
@@ -943,6 +1008,17 @@ try {
         $sharedRequest.parameters | Add-Member -NotePropertyName qualificationRecipe -NotePropertyValue $sharedRecipe
         Write-KbpJsonAtomic $sharedRequestPath $sharedRequest
     }
+    # 0.4.0 WP6: a sticky-touch-direct selection (one forecast use step)
+    # writes allowances the launcher accepts in both modes, with a budget
+    # of its one casting and a purpose within the launcher's bound.
+    New-WriterSelection 'sticky-select' 'live-cast-qual-select' 'instant' @{ 'qual-outcome.json' = [ordered]@{
+        castingScenario = $false; violations = @()
+        selection = [ordered]@{ selected = $true; recipe = 'sticky-touch-direct'; castings = @('qual-cast-1') }
+        forecast = @([ordered]@{ name = 'use'; projectionId = ('a' * 64); castingIds = @('qual-cast-1') }) } }
+    $stickyRequestPath = Join-Path $writerEvidence 'sticky-select\runtime-request.json'
+    $stickyRequest = Read-KbpJson $stickyRequestPath
+    $stickyRequest.parameters | Add-Member -NotePropertyName qualificationRecipe -NotePropertyValue 'sticky-touch-direct'
+    Write-KbpJsonAtomic $stickyRequestPath $stickyRequest
     # H3: a cold-moon physical selection (typed seed evidence, digest record
     # whose cap is exactly its Long castings) gets a cf-physical allowance
     # the launcher accepts; an unseeded selection or a whole-plan cap is
@@ -1017,6 +1093,22 @@ try {
                 [int]$sharedWritten.maximumNativeSubmissions -ne 2 -or [string]$sharedWritten.recipe -cne $sharedRecipe) {
                 throw "The written $sharedRecipe ($sharedMode) allowance is not what the launcher accepts."
             }
+        }
+    }
+    foreach ($stickyMode in @('instant', 'animated')) {
+        $stickyPath = & $writerScript -Kind qualification -RunId "sticky-$stickyMode-run" `
+            -SelectionRunId 'sticky-select' -ExecutionMode $stickyMode @writerCommon | Select-Object -Last 1
+        $stickyJson = [IO.File]::ReadAllText($stickyPath)
+        $stickyWritten = $stickyJson | ConvertFrom-Json
+        if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $stickyJson -RunId "sticky-$stickyMode-run" `
+                -BuildManifest $writerManifest -Recipe 'sticky-touch-direct' -ExecutionMode $stickyMode) -or
+            $null -ne (Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $stickyJson -ProfileId 'full-user' `
+                -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64) -FixtureGameId 'game') -or
+            [int]$stickyWritten.maximumNativeSubmissions -ne 1 -or [string]$stickyWritten.recipe -cne 'sticky-touch-direct' -or
+            [string]$stickyWritten.executionMode -cne $stickyMode -or
+            ((@($stickyWritten.approvedProjectionIds) -join ',') -cne ('a' * 64)) -or
+            -not ([string]$stickyWritten.purpose).StartsWith("sticky-touch-direct casting-first qualification in $stickyMode mode")) {
+            throw "The written sticky-touch-direct ($stickyMode) allowance is not what the launcher accepts."
         }
     }
     $physPath = & $writerScript -Kind cf-physical -RunId 'phys-run' -SelectionRunId 'phys-select' -ExecutionMode instant @writerCommon |

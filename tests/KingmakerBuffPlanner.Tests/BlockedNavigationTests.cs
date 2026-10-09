@@ -163,26 +163,29 @@ namespace KingmakerBuffPlanner.Tests
             session.ProblemNavigation.CompleteReveal("original");
             string originalIntent = session.DocumentIntentSignature();
             string files = ProblemFiles(dir);
-            CastingGraphEditResult duplicate = session.DuplicateFocusedCasting();
-            Expect(duplicate.Edit.Applied && duplicate.CastingId != "original",
-                "the real duplicate authoring operation failed");
+            // WP3: the authoring gesture on a focused problem is a portrait
+            // click (Duplicate is retired); here it moves the problem
+            // casting to another recipient.
+            CastingGraphClickResult moved = session.ClickGraphRecipient("unit-t2", inputs);
+            Expect(moved.Outcome == CastingGraphClickOutcome.Retargeted && moved.CastingId == "original",
+                "the real retarget authoring operation failed: " + moved.Outcome + " " +
+                    (moved.Edit == null ? string.Empty : moved.Edit.Reason));
             Expect(!session.ProblemNavigation.Active &&
                 session.ProblemNavigation.PendingRevealCastingId == null &&
                 session.LastAttemptMessage == null,
-                "duplicating a problem retained navigation for the original");
-            string duplicatedFiles = ProblemFiles(dir);
-            Expect(duplicatedFiles != files && !session.IsDirty && session.CanUndo &&
+                "authoring on a problem retained navigation for the original");
+            string movedFiles = ProblemFiles(dir);
+            Expect(movedFiles != files && !session.IsDirty && session.CanUndo &&
                 new CastingWorkspaceSession(dir, session.CampaignId).DocumentIntentSignature() ==
                     session.DocumentIntentSignature(),
-                "the duplicate did not preserve its existing authoring/autosave behavior");
+                "the retarget did not preserve its existing authoring/autosave behavior");
             CastingGraphView view = session.BuildGraph(inputs);
-            Expect(view.FocusedCastingId == duplicate.CastingId &&
-                view.Inspector.CastingId == duplicate.CastingId &&
+            Expect(view.FocusedCastingId == "original" && view.Inspector.CastingId == "original" &&
                 view.SelectedRoutineGate.BlockingCastings.Any(value => value.CastingId == "original"),
-                "duplicate inspection was lost or the original blocker disappeared");
-            Expect(ProblemFiles(dir) == duplicatedFiles && session.CanUndo &&
+                "inspection was lost or the original blocker disappeared");
+            Expect(ProblemFiles(dir) == movedFiles && session.CanUndo &&
                 dispatch.RecordedSubmissions.Count == 0,
-                "duplicate inspection saved, dispatched or lost its authored Undo entry");
+                "inspection saved, dispatched or lost its authored Undo entry");
             Expect(session.Undo() && session.DocumentIntentSignature() == originalIntent && !session.CanUndo,
                 "leaving problem mode added an authoring operation beyond the duplicate");
         }
@@ -400,7 +403,8 @@ namespace KingmakerBuffPlanner.Tests
             session.Apply(CastingApplyMode.Ordinary, "long", GraphInputs());
             Expect(session.ProblemNavigation.Count == 2 && session.NavigateProblem(1),
                 "changing-resource fixture did not start at the last of two problems");
-            Expect(session.SetFocusedCastingState(CastingAuthoringState.Disabled).Applied,
+            // WP3: removal is the explicit repair (Disable is retired).
+            Expect(session.RemoveFocusedCasting().Applied,
                 "explicit last-problem repair was refused");
             session.BuildGraph(GraphInputs(bardLevel2: 0));
             Expect(session.EditingFocusCastingId == "new-last" &&
