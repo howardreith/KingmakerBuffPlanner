@@ -202,12 +202,18 @@ namespace KingmakerBuffPlanner.Discovery
                     e.Disposition == "unsupported-with-reason"),
                 RuntimeQualifiedDirectCount = 0,
                 RuntimeQualifiedEquivalenceClassCount = 0,
-                OptionalAbilityCount = entries.Count(e => e.Ownership != "native"),
-                OptionalCandidateCount = entries.Count(e => e.Ownership != "native" && e.IsCandidate),
-                OptionalIncludedCount = entries.Count(e => e.Ownership != "native" && e.Disposition == "include"),
-                OptionalUnsupportedCount = entries.Count(e => e.Ownership != "native" &&
+                // Optional counts cover the entries an optional mod's own
+                // inventory proves it owns (never an unattributed entry).
+                OptionalAbilityCount = entries.Count(e => BlueprintOwnershipIndex.IsOptionalOwner(e.Ownership)),
+                OptionalCandidateCount = entries.Count(e =>
+                    BlueprintOwnershipIndex.IsOptionalOwner(e.Ownership) && e.IsCandidate),
+                OptionalIncludedCount = entries.Count(e =>
+                    BlueprintOwnershipIndex.IsOptionalOwner(e.Ownership) && e.Disposition == "include"),
+                OptionalUnsupportedCount = entries.Count(e => BlueprintOwnershipIndex.IsOptionalOwner(e.Ownership) &&
                     e.Disposition == "unsupported-with-reason"),
                 Audit040 = NativeCatalogAudit.Summarize(entries.Select(AuditInput)),
+                OwnershipBasis = _ownership.UninventoriedBasis,
+                OwnershipSources = _ownership.Sources.ToArray(),
                 Abilities = entries.ToArray()
             };
         }
@@ -416,7 +422,12 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("optionalIncludedCount", Order = 18)] public int OptionalIncludedCount { get; set; }
         [JsonProperty("optionalUnsupportedCount", Order = 19)] public int OptionalUnsupportedCount { get; set; }
         [JsonProperty("audit040", Order = 20)] public NativeCatalogAuditSummary Audit040 { get; set; }
-        [JsonProperty("abilities", Order = 21)]
+        // How ownership was proved (rc4 review finding 3): the attribution of
+        // blueprints no inventory claims, and each staged mod's inventory.
+        [JsonProperty("ownershipBasis", Order = 21)] public string OwnershipBasis { get; set; }
+        [JsonProperty("ownershipSources", Order = 22)]
+        public BlueprintOwnershipSource[] OwnershipSources { get; set; }
+        [JsonProperty("abilities", Order = 23)]
         public NativeCatalogEntry[] Abilities { get; set; }
     }
 

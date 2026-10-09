@@ -85,6 +85,19 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("qualificationStatus", Order = 13)] public string QualificationStatus { get; set; }
         [JsonProperty("exclusionReason", Order = 14)] public string ExclusionReason { get; set; }
         [JsonProperty("manualOverride", Order = 15)] public string ManualOverride { get; set; }
+        // The entry's own place in each count (rc4): the summary is exactly
+        // these flags summed, so a report can regroup the counts (by a
+        // resolved owner) without the game.
+        [JsonProperty("staticIncludedBefore040", Order = 16)] public bool StaticIncludedBefore040 { get; set; }
+        [JsonProperty("staticIncluded", Order = 17)] public bool StaticIncluded { get; set; }
+        [JsonProperty("liveIncludedBefore040", Order = 18)] public bool LiveIncludedBefore040 { get; set; }
+        [JsonProperty("liveIncluded", Order = 19)] public bool LiveIncluded { get; set; }
+    }
+
+    public sealed class NativeCatalogAuditOwnership
+    {
+        [JsonProperty("basis", Order = 1)] public string Basis { get; set; }
+        [JsonProperty("sources", Order = 2)] public BlueprintOwnershipSource[] Sources { get; set; }
     }
 
     public sealed class NativeCatalogAuditDocument
@@ -93,7 +106,8 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("profile", Order = 2)] public string Profile { get; set; }
         [JsonProperty("generatorCommit", Order = 3)] public string GeneratorCommit { get; set; }
         [JsonProperty("summary", Order = 4)] public NativeCatalogAuditSummary Summary { get; set; }
-        [JsonProperty("records", Order = 5)] public NativeCatalogAuditRecord[] Records { get; set; }
+        [JsonProperty("ownership", Order = 5)] public NativeCatalogAuditOwnership Ownership { get; set; }
+        [JsonProperty("records", Order = 6)] public NativeCatalogAuditRecord[] Records { get; set; }
     }
 
     public static class NativeCatalogAudit
@@ -128,7 +142,8 @@ namespace KingmakerBuffPlanner.Discovery
         }
 
         public static NativeCatalogAuditDocument Document(string profile, string commit,
-            IEnumerable<NativeCatalogAuditInput> inputs)
+            IEnumerable<NativeCatalogAuditInput> inputs, string ownershipBasis = null,
+            IEnumerable<BlueprintOwnershipSource> ownershipSources = null)
         {
             List<NativeCatalogAuditInput> all = (inputs ?? new NativeCatalogAuditInput[0])
                 .Where(value => value != null).ToList();
@@ -138,6 +153,11 @@ namespace KingmakerBuffPlanner.Discovery
                 Profile = profile,
                 GeneratorCommit = commit,
                 Summary = Summarize(all),
+                Ownership = new NativeCatalogAuditOwnership
+                {
+                    Basis = ownershipBasis ?? string.Empty,
+                    Sources = (ownershipSources ?? new BlueprintOwnershipSource[0]).ToArray()
+                },
                 Records = all.Where(value => LiveNow(value) || StaticNow(value) || IsRemoved(value))
                     .OrderBy(value => value.DisplayName ?? string.Empty, StringComparer.Ordinal)
                     .ThenBy(value => value.AbilityGuid, StringComparer.Ordinal)
@@ -178,7 +198,11 @@ namespace KingmakerBuffPlanner.Discovery
                     (input.IsStickyTouch ? "+sticky-touch" : string.Empty),
                 QualificationStatus = input.QualificationStatus ?? string.Empty,
                 ExclusionReason = removed ? reason ?? string.Empty : string.Empty,
-                ManualOverride = input.ManualOverride ?? string.Empty
+                ManualOverride = input.ManualOverride ?? string.Empty,
+                StaticIncludedBefore040 = StaticBefore(input),
+                StaticIncluded = StaticNow(input),
+                LiveIncludedBefore040 = LiveBefore(input),
+                LiveIncluded = LiveNow(input)
             };
         }
 

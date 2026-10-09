@@ -577,7 +577,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // The 0.4.0 catalogue audit (WP5): every included or
                     // removed source with its rule, effects and reason.
                     catalogAudit = NativeCatalogAudit.Document(_request.ProfileId, BuildInfo.Commit,
-                        catalog.Abilities.Select(NativeCatalogExporter.AuditInput));
+                        catalog.Abilities.Select(NativeCatalogExporter.AuditInput),
+                        catalog.OwnershipBasis, catalog.OwnershipSources);
                     string catalogAuditPath = Path.Combine(
                         _request.EvidenceDirectory, "native-buff-catalog-audit.json");
                     AtomicFile.WriteUtf8(catalogAuditPath, Serialize(catalogAudit));
