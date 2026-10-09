@@ -9,24 +9,19 @@ namespace KingmakerBuffPlanner.Tests
     {
         // rc4 lead review, finding 1: the 0.4.0 audit removed real buffs
         // under marker rules that read "no mechanics of its own" as "not a
-        // buff". Every fixture below is the exact fact set the rc3 catalogue
-        // export recorded for the named ability (generated from
-        // kbp040-rc3-catalog-*/native-buff-catalog.json, not restated from a
-        // rule); facts rc4 adds - an ability's self-gating facts, a buff's own
-        // fact actions, the effects the exact Call of the Wild adapters now
-        // read - are added explicitly and cite their source.
+        // buff". Every fixture below is the exact fact set the guarded rc4
+        // pre-candidate catalogue export recorded for the named ability
+        // (generated from kbp040-rc4p-catalog-*/native-buff-catalog.json at
+        // 7ccf0c9, not restated from a rule): its effects and components, the
+        // effects the exact Call of the Wild adapters read, the facts the
+        // ability forbids itself (selfGatedFactIds) and each buff's own
+        // AddFactContextActions (factActions).
         private static void RunCatalogAdjudicationTests()
         {
             Run("catalog-adjudication-buffs-without-own-mechanics-retained", TestAdjudicationFlagBuffs);
             Run("catalog-adjudication-hex-ward-is-its-ward-not-its-cooldown", TestAdjudicationHexWard);
             Run("catalog-adjudication-restorations-and-their-markers-excluded", TestAdjudicationRestorations);
-            Run("catalog-adjudication-hidden-buff-actions-carrier-marker-or-opaque", TestAdjudicationHiddenActions);
-        }
-
-        private static NativeCandidateAuditFacts Gated(NativeCandidateAuditFacts facts, params string[] ids)
-        {
-            facts.SelfGatedFactIds = ids;
-            return facts;
+            Run("catalog-adjudication-revival-and-hidden-buff-actions", TestAdjudicationHiddenActions);
         }
 
         private static NativeCandidateFactActions FactList(string list, IEnumerable<NativeCandidateEffectFacts> applied,
@@ -42,8 +37,8 @@ namespace KingmakerBuffPlanner.Tests
             };
         }
 
-        // Retained under both rule sets, and excluded by the rc3 rule that
-        // treated a buff with no mechanics of its own as a marker.
+        // Kept under both rule sets; the rc3 rule that read a buff with no
+        // mechanics of its own as a marker dropped each of these.
         private static NativeCandidateAuditDecision ExpectRestored(NativeCandidateAuditFacts facts, string what)
         {
             NativeCandidateAuditDecision now = new NativeCandidateClassifier().Classify(facts);
@@ -56,23 +51,24 @@ namespace KingmakerBuffPlanner.Tests
 
         private static void TestAdjudicationFlagBuffs()
         {
-            // Targeted Bomb Admixture: the visible buff has no components;
-            // the alchemist's bombs read it. Its presence is the state.
+            // Targeted Bomb Admixture: the visible buff has no components; 24
+            // alchemist bomb abilities read it (ContextConditionCasterHasFact,
+            // blueprint-references.json). Its presence is the state.
             NativeCandidateAuditDecision bomb = ExpectRestored(RealTargetedBombAdmixture(), "Targeted Bomb Admixture");
             if (bomb.Payloads.Single().EffectId != "768b4b33721a36d4c8030e4878a13d28")
                 throw new InvalidOperationException("Targeted Bomb Admixture lost its buff as payload.");
-            // Light and Daylight: utility light, a deliberate product-scope
-            // inclusion (their buffs carry UniqueBuff / no components).
+            // Light and Daylight: light only (no components beyond UniqueBuff,
+            // read by nothing but their own abilities) - kept; excluding them
+            // would be the owner's product-scope decision.
             ExpectRestored(RealLight(), "Light");
             ExpectRestored(RealDaylight(), "Daylight");
-            // Elemental Bastion; and the same buff guarded against stacking
-            // (the ability forbids its caster to have it) is still the
-            // ability's own effect, not a lockout: nothing else is done.
+            // Elemental Bastion forbids its caster to have its own buff
+            // (AbilityCasterHasNoFacts): a guard against stacking, not a
+            // lockout, because the ability does nothing else.
+            if (!RealElementalBastion().SelfGatedFactIds.Contains("99953956704788444964899b5b8e96ab"))
+                throw new InvalidOperationException("The Elemental Bastion fixture lost its own gate.");
             ExpectRestored(RealElementalBastion(), "Elemental Bastion");
-            ExpectRestored(Gated(RealElementalBastion(), "99953956704788444964899b5b8e96ab"),
-                "Elemental Bastion guarded against stacking");
-            // Call of the Wild's Venomous Strike selection (the brawler's
-            // strikes read the selected buff) and Arcanist School
+            // Call of the Wild's Venomous Strike selection and Arcanist School
             // Understanding activation.
             ExpectRestored(RealVenomousStrikeBlind(), "Venomous Strike: Blindness");
             ExpectRestored(RealSchoolUnderstandingAbjuration(), "Activate School Understanding (Abjuration)");
@@ -92,76 +88,44 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The enchant-pool signal lost its explicit adapter.");
         }
 
-        // ShamanBattleWardHexAbility: rc3 saw only the hex cooldown, because
-        // the ward buff is applied through Call of the Wild's
-        // RunActionsDependingOnContextValue. The exact adapter now reads its
-        // value-selected lists: ShamanBattleWard1Buff..5Buff (GUIDs from Call
-        // of the Wild's own loaded_blueprints.txt; AddStatBonus AC deflection
-        // plus AddTargetAttackRollTrigger, ShamanHexes.createBattleWardHex).
-        // AbilityTargetHasNoFactUnlessBuffsFromCaster forbids recasting over
-        // the cooldown (HexEngine.addWitchHexCooldownScaling).
+        // ShamanBattleWardHexAbility: the exact Call of the Wild adapter reads
+        // RunActionsDependingOnContextValue's value-selected lists, so the
+        // export holds ShamanBattleWard1Buff..5Buff (AddStatBonus deflection,
+        // AddTargetAttackRollTrigger) beside the hex cooldown, which the
+        // ability forbids its target to have
+        // (AbilityTargetHasNoFactUnlessBuffsFromCaster). rc3 saw only the
+        // cooldown and removed the hex.
         private static void TestAdjudicationHexWard()
         {
             NativeCandidateAuditFacts ward = RealShamanBattleWard();
-            NativeCandidateEffectFacts cooldown = ward.Effects.Single();
-            string[] wardBuffs =
-            {
-                "219440d0fc5843d5a1942aacd43a92d0", "77d0424e938f455cb1ef14423bcf59ad",
-                "6884f0602a594144afb8365318494a32", "57b097b06d294ab9b69f06a9eadf6e95",
-                "68966a356c1b43d28c199b740f19dcbd"
-            };
-            const string adapter = "8bc6ba5c82d44deaaef24cec75490d05/0:ActionList/0:RunActionsDependingOnContextValue";
-            ward.Effects = wardBuffs.Select((guid, index) => new NativeCandidateEffectFacts
-            {
-                EffectId = guid,
-                EffectName = "ShamanBattleWard" + (index + 1) + "Buff",
-                Kind = "Buff",
-                Target = "CurrentTarget",
-                Harmful = false,
-                ComponentTypes = new[]
-                {
-                    "Kingmaker.UnitLogic.FactLogic.AddStatBonus",
-                    "Kingmaker.UnitLogic.Mechanics.Components.AddTargetAttackRollTrigger"
-                },
-                GrantedConditions = new string[0],
-                SourceContract = "ContextActionApplyBuff",
-                ActionPath = adapter + string.Concat(Enumerable.Repeat("/false", index)) +
-                    (index == wardBuffs.Length - 1 ? string.Empty : "/true") + "/0:ContextActionApplyBuff"
-            }).Concat(new[] { cooldown }).ToArray();
-            ward.DiagnosticContracts = new string[0];
-            ward.Diagnostics = new NativeCandidateDiagnosticFacts[0];
-            NativeCandidateAuditDecision decision = new NativeCandidateClassifier()
-                .Classify(Gated(ward, cooldown.EffectId));
+            const string cooldown = "926b9e0d2ac44c298f246afd5ca180aa";
+            string[] wardBuffs = ward.Effects.Where(e => e.EffectId != cooldown).Select(e => e.EffectId)
+                .Distinct().OrderBy(v => v, StringComparer.Ordinal).ToArray();
+            if (wardBuffs.Length != 5 || !ward.SelfGatedFactIds.Contains(cooldown))
+                throw new InvalidOperationException("The Battle Ward fixture is not the adapted export.");
+            NativeCandidateAuditDecision decision = new NativeCandidateClassifier().Classify(ward);
             if (decision.Disposition != "include" ||
-                !decision.Payloads.Select(e => e.EffectId).OrderBy(v => v, StringComparer.Ordinal)
-                    .SequenceEqual(wardBuffs.OrderBy(v => v, StringComparer.Ordinal)))
+                !decision.Payloads.Select(e => e.EffectId).Distinct().OrderBy(v => v, StringComparer.Ordinal)
+                    .SequenceEqual(wardBuffs))
                 throw new InvalidOperationException("Battle Ward is not its ward buff (the cooldown is a lockout): " +
                     decision.Reason + " payloads=" + string.Join(",", decision.Payloads.Select(e => e.EffectName).ToArray()));
+            // Without the adapter (rc3's facts: the cooldown alone, beside an
+            // unread wrapper) nothing proves a buff, and the lockout alone is
+            // not one.
+            NativeCandidateAuditFacts unread = RealShamanBattleWard();
+            unread.Effects = unread.Effects.Where(e => e.EffectId == cooldown).ToArray();
+            if (new NativeCandidateClassifier().Classify(unread).Disposition != "include")
+                throw new InvalidOperationException("A lone self-gated buff was treated as a lockout.");
         }
 
         private static void TestAdjudicationRestorations()
         {
-            // Treat Affliction (the Heal skill): a dispel and its visible
-            // zero-component cooldown, with and without its own gate.
+            // Treat Affliction (the Heal skill): a dispel; its visible,
+            // component-free cooldown is the target's lockout.
             ExpectAudit(RealTreatAffliction(), "reactive-restoration-marker-only", "Treat Affliction");
-            ExpectAudit(Gated(RealTreatAffliction(), RealTreatAffliction().Effects.Single().EffectId),
-                "reactive-restoration-marker-only", "Treat Affliction, gated");
-            // Treat Deadly Wounds: the exact adapter now reads Call of the
-            // Wild's ContextActionTreatDeadlyWounds as a restoration (it heals
-            // hit points and ability damage, HealingMechanics), and the
-            // ability forbids recasting over its cooldown
-            // (createAbilityTargetHasFact(inverted: true), SkillUnlocks).
-            NativeCandidateAuditFacts deadly = RealTreatDeadlyWounds();
-            deadly.Diagnostics = deadly.Diagnostics.Select(d => new NativeCandidateDiagnosticFacts
-            {
-                Code = "restorative-action",
-                Contract = d.Contract,
-                Detail = "restorative-action",
-                ActionPath = d.ActionPath
-            }).ToArray();
-            deadly.DiagnosticContracts = deadly.Diagnostics.Select(d => d.Contract + "|restorative-action").ToArray();
-            ExpectAudit(Gated(deadly, "45b17e675f524da4b6a0198ac0427f79"), "reactive-restoration-marker-only",
-                "Treat Deadly Wounds");
+            // Treat Deadly Wounds: Call of the Wild's ContextActionTreatDeadlyWounds
+            // is an exact restoration (it heals hit points and ability damage).
+            ExpectAudit(RealTreatDeadlyWounds(), "reactive-restoration-marker-only", "Treat Deadly Wounds");
             // Kinetic Healer's Burn Offload: the hidden BurnOtherBuff adds
             // nonlethal damage to the healed ally (KineticistFix: StatType
             // DamageNonLethal) - the heal's cost, not a buff.
@@ -175,35 +139,42 @@ namespace KingmakerBuffPlanner.Tests
             ExpectAudit(RealChannelHealLiving(), "reactive-restoration-marker-only", "Channel Positive Energy");
         }
 
-        // Inspiring Recovery's hidden check buff (ReplaceAbilityParamsWithContext
-        // + AddFactContextActions) beside a heal: what its own actions do
-        // decides it - never the assumption that such a buff is bookkeeping.
+        // Inspiring Recovery: its hidden InspiringRecoveryCheckBuff
+        // (ReplaceAbilityParamsWithContext + AddFactContextActions) is not
+        // bookkeeping - when it ends it casts a spell that puts the visible
+        // InspiringRecoveryBuff (AddStatBonus) on the allies around - and the
+        // ability itself can target only a dead or dying ally
+        // (AbilityTargetBreathOfLife). 0.3.0 offered it as a buff.
         private static void TestAdjudicationHiddenActions()
         {
+            ExpectAudit(RealInspiringRecovery(), "revival-target-only", "Inspiring Recovery");
+            NativeCandidateEffectFacts check = RealInspiringRecovery().Effects.Single();
+            NativeCandidateEffectFacts morale = check.FactActions.Single(list => list.List == "Deactivated")
+                .AppliedEffects.Single(e => e.EffectName == "InspiringRecoveryBuff");
+            // The same facts without the revival target check isolate what the
+            // check buff's own actions decide.
             Func<NativeCandidateFactActions[], NativeCandidateAuditFacts> recovery = lists =>
             {
                 NativeCandidateAuditFacts facts = RealInspiringRecovery();
-                facts.Effects.Single().FactActions = lists;
-                // The rule demonstration below isolates the check buff from
-                // the heal and the undead-damage branch.
+                facts.AbilityComponentTypes = facts.AbilityComponentTypes
+                    .Where(value => !value.EndsWith("AbilityTargetBreathOfLife", StringComparison.Ordinal)).ToArray();
                 facts.Diagnostics = new NativeCandidateDiagnosticFacts[0];
                 facts.DiagnosticContracts = new string[0];
+                if (lists != null) facts.Effects.Single().FactActions = lists;
                 return facts;
             };
-            var morale = new NativeCandidateEffectFacts
-            {
-                EffectId = "fixture-applied", EffectName = "AppliedMoraleBuff", Kind = "Buff",
-                Target = "CurrentTarget", Harmful = false,
-                ComponentTypes = new[] { "Kingmaker.UnitLogic.FactLogic.AddContextStatBonus" },
-                GrantedConditions = new string[0], SourceContract = "ContextActionApplyBuff",
-                ActionPath = "fixture/0:ContextActionApplyBuff"
-            };
-            // A hidden buff that applies a beneficial buff carries it.
+            // Its real actions apply the morale buff only when it ends: a
+            // delayed effect no cast can confirm - unsupported, named.
+            NativeCandidateAuditDecision delayed = new NativeCandidateClassifier().Classify(recovery(null));
+            if (delayed.Disposition != "unsupported-with-reason" || delayed.ReasonCode != "opaque-hidden-buff-actions" ||
+                delayed.Reason.IndexOf("applies InspiringRecoveryBuff when it ends", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException("A delayed hidden buff was not unsupported: " + delayed.Reason);
+            // Applying the same buff on activation carries it.
             NativeCandidateAuditDecision carrier = new NativeCandidateClassifier().Classify(
                 recovery(new[] { FactList("Activated", new[] { morale }) }));
             if (carrier.Disposition != "include")
                 throw new InvalidOperationException("A hidden carrier of a beneficial buff was dropped: " + carrier.Reason);
-            // One whose actions only remove buffs is proved bookkeeping.
+            // Actions that only remove buffs are proved bookkeeping.
             NativeCandidateAuditDecision marker = new NativeCandidateClassifier().Classify(recovery(new[]
             {
                 FactList("Deactivated", null,
@@ -211,8 +182,7 @@ namespace KingmakerBuffPlanner.Tests
             }));
             if (marker.Disposition != "exclude")
                 throw new InvalidOperationException("A hidden bookkeeping buff was kept: " + marker.Reason);
-            // One running an action the adapter cannot read is unsupported,
-            // with the action named - neither assumed bookkeeping nor a buff.
+            // An action the adapter cannot read is unsupported, named.
             NativeCandidateAuditDecision opaque = new NativeCandidateClassifier().Classify(recovery(new[]
             {
                 FactList("NewRound", null, null, new[] { "unknown-node:Fixture.UnknownAction, Fixture, Version=1.0.0.0" })
@@ -220,16 +190,16 @@ namespace KingmakerBuffPlanner.Tests
             if (opaque.Disposition != "unsupported-with-reason" || opaque.ReasonCode != "opaque-hidden-buff-actions" ||
                 opaque.Reason.IndexOf("Fixture.UnknownAction", StringComparison.Ordinal) < 0)
                 throw new InvalidOperationException("A hidden buff with unread actions was not unsupported: " + opaque.Reason);
-            // Under the rules released through 0.3.0 the check buff was a
-            // payload (ReplaceAbilityParamsWithContext was no marker
-            // component): the audit only ever removes.
-            if (new NativeCandidateClassifier(NativeCandidateRuleSet.Pre040).Classify(recovery(new[]
-                    { FactList("NewRound", null, null, new[] { "unknown-node:Fixture.UnknownAction" }) }))
-                .Disposition != "include")
+            // The audit only ever removes: under the 0.3.0 rules each variant
+            // was a payload (ReplaceAbilityParamsWithContext was no marker
+            // component).
+            if (new NativeCandidateClassifier(NativeCandidateRuleSet.Pre040).Classify(recovery(null))
+                    .Disposition != "include")
                 throw new InvalidOperationException("Inspiring Recovery's 0.3.0 classification changed.");
         }
 
-        // Targeted Bomb Admixture (24afb2c948c731440a3aaf5411904c89, TargetedBombAdmixture): exact facts from the rc3 catalogue export
+        // Targeted Bomb Admixture (24afb2c948c731440a3aaf5411904c89, TargetedBombAdmixture): exact facts from the rc4 pre-candidate catalogue export
+        // (kbp040-rc4p-catalog-native, generator 7ccf0c9).
         private static NativeCandidateAuditFacts RealTargetedBombAdmixture()
         {
             return new NativeCandidateAuditFacts
@@ -238,6 +208,7 @@ namespace KingmakerBuffPlanner.Tests
                 CanTargetSelf = true, CanTargetFriends = true, CanTargetEnemies = false, CanTargetPoint = false,
                 EffectOnAlly = "None", EffectOnEnemy = "None", Range = "Personal",
                 AbilityComponentTypes = new[] { "Kingmaker.Blueprints.Classes.Spells.SpellComponent", "Kingmaker.Blueprints.Classes.Spells.SpellListComponent", "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction" },
+                SelfGatedFactIds = new string[0],
                 Effects = new[]
                 {
                     new NativeCandidateEffectFacts
@@ -253,12 +224,12 @@ namespace KingmakerBuffPlanner.Tests
                 DiagnosticContracts = new string[0],
                 Diagnostics = new NativeCandidateDiagnosticFacts[]
                 {
-
                 }
             };
         }
 
-        // Light (95f206566c5261c42aa5b3e7e0d1e36c, MageLight): exact facts from the rc3 catalogue export
+        // Light (95f206566c5261c42aa5b3e7e0d1e36c, MageLight): exact facts from the rc4 pre-candidate catalogue export
+        // (kbp040-rc4p-catalog-native, generator 7ccf0c9).
         private static NativeCandidateAuditFacts RealLight()
         {
             return new NativeCandidateAuditFacts
@@ -267,6 +238,7 @@ namespace KingmakerBuffPlanner.Tests
                 CanTargetSelf = true, CanTargetFriends = true, CanTargetEnemies = false, CanTargetPoint = false,
                 EffectOnAlly = "None", EffectOnEnemy = "None", Range = "Touch",
                 AbilityComponentTypes = new[] { "Kingmaker.Blueprints.Classes.Spells.CantripComponent", "Kingmaker.Blueprints.Classes.Spells.SpellComponent", "Kingmaker.Blueprints.Classes.Spells.SpellListComponent", "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction", "Kingmaker.UnitLogic.Abilities.Components.AbilityExecuteActionOnCast", "Kingmaker.UnitLogic.Abilities.Components.TargetCheckers.AbilityTargetIsPartyMember" },
+                SelfGatedFactIds = new string[0],
                 Effects = new[]
                 {
                     new NativeCandidateEffectFacts
@@ -282,12 +254,12 @@ namespace KingmakerBuffPlanner.Tests
                 DiagnosticContracts = new string[0],
                 Diagnostics = new NativeCandidateDiagnosticFacts[]
                 {
-
                 }
             };
         }
 
-        // Daylight (2b877386976817a429002e8bb10bb3fc, DayLight): exact facts from the rc3 catalogue export
+        // Daylight (2b877386976817a429002e8bb10bb3fc, DayLight): exact facts from the rc4 pre-candidate catalogue export
+        // (kbp040-rc4p-catalog-native, generator 7ccf0c9).
         private static NativeCandidateAuditFacts RealDaylight()
         {
             return new NativeCandidateAuditFacts
@@ -296,6 +268,7 @@ namespace KingmakerBuffPlanner.Tests
                 CanTargetSelf = true, CanTargetFriends = true, CanTargetEnemies = false, CanTargetPoint = false,
                 EffectOnAlly = "None", EffectOnEnemy = "None", Range = "Touch",
                 AbilityComponentTypes = new[] { "Kingmaker.Blueprints.Classes.Spells.SpellComponent", "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction", "Kingmaker.UnitLogic.Abilities.Components.AbilityExecuteActionOnCast", "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx", "Kingmaker.UnitLogic.Abilities.Components.TargetCheckers.AbilityTargetIsPartyMember", "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig" },
+                SelfGatedFactIds = new string[0],
                 Effects = new[]
                 {
                     new NativeCandidateEffectFacts
@@ -311,12 +284,12 @@ namespace KingmakerBuffPlanner.Tests
                 DiagnosticContracts = new string[0],
                 Diagnostics = new NativeCandidateDiagnosticFacts[]
                 {
-
                 }
             };
         }
 
-        // Elemental Bastion (af6e27aa6e300454580d7de074ff315a, ElementalBastionAbility): exact facts from the rc3 catalogue export
+        // Elemental Bastion (af6e27aa6e300454580d7de074ff315a, ElementalBastionAbility): exact facts from the rc4 pre-candidate catalogue export
+        // (kbp040-rc4p-catalog-native, generator 7ccf0c9).
         private static NativeCandidateAuditFacts RealElementalBastion()
         {
             return new NativeCandidateAuditFacts
@@ -325,6 +298,7 @@ namespace KingmakerBuffPlanner.Tests
                 CanTargetSelf = true, CanTargetFriends = false, CanTargetEnemies = false, CanTargetPoint = false,
                 EffectOnAlly = "None", EffectOnEnemy = "None", Range = "Personal",
                 AbilityComponentTypes = new[] { "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction", "Kingmaker.UnitLogic.Abilities.Components.CasterCheckers.AbilityCasterHasNoFacts" },
+                SelfGatedFactIds = new[] { "99953956704788444964899b5b8e96ab" },
                 Effects = new[]
                 {
                     new NativeCandidateEffectFacts
@@ -345,7 +319,8 @@ namespace KingmakerBuffPlanner.Tests
             };
         }
 
-        // Venomous Strike: Blindness (a15cc14cb4ae4f7eadca522accc93fcb, BlindVenomousStrikeAbility): exact facts from the rc3 catalogue export
+        // Venomous Strike: Blindness (a15cc14cb4ae4f7eadca522accc93fcb, BlindVenomousStrikeAbility): exact facts from the rc4 pre-candidate catalogue export
+        // (kbp040-rc4p-catalog-cotw, generator 7ccf0c9).
         private static NativeCandidateAuditFacts RealVenomousStrikeBlind()
         {
             return new NativeCandidateAuditFacts
@@ -354,6 +329,7 @@ namespace KingmakerBuffPlanner.Tests
                 CanTargetSelf = true, CanTargetFriends = false, CanTargetEnemies = false, CanTargetPoint = false,
                 EffectOnAlly = "Helpful", EffectOnEnemy = "None", Range = "Personal",
                 AbilityComponentTypes = new[] { "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction", "Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic", "Kingmaker.UnitLogic.Abilities.Components.AbilityShowIfCasterHasFact", "Kingmaker.UnitLogic.Mechanics.Components.ContextCalculateAbilityParamsBasedOnClass" },
+                SelfGatedFactIds = new string[0],
                 Effects = new[]
                 {
                     new NativeCandidateEffectFacts
@@ -374,7 +350,8 @@ namespace KingmakerBuffPlanner.Tests
             };
         }
 
-        // Activate School Understanding (Specialist School — Abjuration) (9e6fa939eab643d4a1ba6c984a4bcdaa, SchoolUnderstangingAbjurationBuffAbility): exact facts from the rc3 catalogue export
+        // Activate School Understanding (Specialist School — Abjuration) (9e6fa939eab643d4a1ba6c984a4bcdaa, SchoolUnderstangingAbjurationBuffAbility): exact facts from the rc4 pre-candidate catalogue export
+        // (kbp040-rc4p-catalog-cotw, generator 7ccf0c9).
         private static NativeCandidateAuditFacts RealSchoolUnderstandingAbjuration()
         {
             return new NativeCandidateAuditFacts
@@ -383,6 +360,7 @@ namespace KingmakerBuffPlanner.Tests
                 CanTargetSelf = true, CanTargetFriends = false, CanTargetEnemies = false, CanTargetPoint = false,
                 EffectOnAlly = "Helpful", EffectOnEnemy = "None", Range = "Personal",
                 AbilityComponentTypes = new[] { "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction", "Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic", "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig" },
+                SelfGatedFactIds = new string[0],
                 Effects = new[]
                 {
                     new NativeCandidateEffectFacts
@@ -398,12 +376,12 @@ namespace KingmakerBuffPlanner.Tests
                 DiagnosticContracts = new string[0],
                 Diagnostics = new NativeCandidateDiagnosticFacts[]
                 {
-
                 }
             };
         }
 
-        // Kinetic Healer: Burn Offload (ff91b86df91d42549bb319e75c47df66, KineticHealerBurnOtherAbility): exact facts from the rc3 catalogue export
+        // Kinetic Healer: Burn Offload (ff91b86df91d42549bb319e75c47df66, KineticHealerBurnOtherAbility): exact facts from the rc4 pre-candidate catalogue export
+        // (kbp040-rc4p-catalog-cotw, generator 7ccf0c9).
         private static NativeCandidateAuditFacts RealKineticHealerBurnOffload()
         {
             return new NativeCandidateAuditFacts
@@ -412,6 +390,7 @@ namespace KingmakerBuffPlanner.Tests
                 CanTargetSelf = false, CanTargetFriends = true, CanTargetEnemies = false, CanTargetPoint = false,
                 EffectOnAlly = "None", EffectOnEnemy = "None", Range = "Touch",
                 AbilityComponentTypes = new[] { "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction", "Kingmaker.UnitLogic.Abilities.Components.ActionPanelLogic", "Kingmaker.UnitLogic.Abilities.Components.TargetCheckers.AbilityTargetHasFact", "Kingmaker.UnitLogic.Class.Kineticist.AbilityKineticist", "Kingmaker.UnitLogic.Mechanics.Components.ContextCalculateSharedValue", "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig" },
+                SelfGatedFactIds = new[] { "734a29b693e9ec346ba2951b27987e33", "fd389783027d63343b4a5634bd81645f" },
                 Effects = new[]
                 {
                     new NativeCandidateEffectFacts
@@ -452,7 +431,8 @@ namespace KingmakerBuffPlanner.Tests
             };
         }
 
-        // Counter Curse: Dispel (41523716359c4fc88c40a44a6179d6ca, CounterCurseDispel1Ability): exact facts from the rc3 catalogue export
+        // Counter Curse: Dispel (41523716359c4fc88c40a44a6179d6ca, CounterCurseDispel1Ability): exact facts from the rc4 pre-candidate catalogue export
+        // (kbp040-rc4p-catalog-cotw, generator 7ccf0c9).
         private static NativeCandidateAuditFacts RealCounterCurseDispel()
         {
             return new NativeCandidateAuditFacts
@@ -461,6 +441,7 @@ namespace KingmakerBuffPlanner.Tests
                 CanTargetSelf = true, CanTargetFriends = true, CanTargetEnemies = false, CanTargetPoint = false,
                 EffectOnAlly = "None", EffectOnEnemy = "None", Range = "Medium",
                 AbilityComponentTypes = new[] { "Kingmaker.Blueprints.Classes.Spells.SpellComponent", "Kingmaker.Blueprints.Classes.Spells.SpellListComponent", "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction", "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx" },
+                SelfGatedFactIds = new string[0],
                 Effects = new[]
                 {
                     new NativeCandidateEffectFacts
@@ -482,7 +463,8 @@ namespace KingmakerBuffPlanner.Tests
             };
         }
 
-        // Channel Positive Energy — Heal Living (5d20cd71566d4e2d8a2fd2de5d63454b, WarpriestChannelEnergyHealLiving): exact facts from the rc3 catalogue export
+        // Channel Positive Energy — Heal Living (5d20cd71566d4e2d8a2fd2de5d63454b, WarpriestChannelEnergyHealLiving): exact facts from the rc4 pre-candidate catalogue export
+        // (kbp040-rc4p-catalog-cotw, generator 7ccf0c9).
         private static NativeCandidateAuditFacts RealChannelHealLiving()
         {
             return new NativeCandidateAuditFacts
@@ -491,6 +473,7 @@ namespace KingmakerBuffPlanner.Tests
                 CanTargetSelf = true, CanTargetFriends = true, CanTargetEnemies = false, CanTargetPoint = false,
                 EffectOnAlly = "None", EffectOnEnemy = "Harmful", Range = "Personal",
                 AbilityComponentTypes = new[] { "CallOfTheWild.NewMechanics.ContextCalculateAbilityParamsBasedOnClasses", "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent", "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction", "Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic", "Kingmaker.UnitLogic.Abilities.Components.AbilityTargetsAround", "Kingmaker.UnitLogic.Abilities.Components.AbilityUseOnRest", "Kingmaker.UnitLogic.Abilities.Components.ActionPanelLogic", "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx", "Kingmaker.UnitLogic.Mechanics.Components.ContextCalculateSharedValue", "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig" },
+                SelfGatedFactIds = new string[0],
                 Effects = new[]
                 {
                     new NativeCandidateEffectFacts
@@ -514,7 +497,8 @@ namespace KingmakerBuffPlanner.Tests
             };
         }
 
-        // Treat Affliction (4843cb4c23951f54290c5149a4907f54, LoreReligionUseAbility): exact facts from the rc3 catalogue export
+        // Treat Affliction (4843cb4c23951f54290c5149a4907f54, LoreReligionUseAbility): exact facts from the rc4 pre-candidate catalogue export
+        // (kbp040-rc4p-catalog-native, generator 7ccf0c9).
         private static NativeCandidateAuditFacts RealTreatAffliction()
         {
             return new NativeCandidateAuditFacts
@@ -523,6 +507,7 @@ namespace KingmakerBuffPlanner.Tests
                 CanTargetSelf = true, CanTargetFriends = true, CanTargetEnemies = false, CanTargetPoint = false,
                 EffectOnAlly = "Helpful", EffectOnEnemy = "None", Range = "Medium",
                 AbilityComponentTypes = new[] { "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction", "Kingmaker.UnitLogic.Abilities.Components.TargetCheckers.AbilityTargetHasFact" },
+                SelfGatedFactIds = new[] { "b89dcf508d48da74f8dd5234e6a5eb84" },
                 Effects = new[]
                 {
                     new NativeCandidateEffectFacts
@@ -543,7 +528,8 @@ namespace KingmakerBuffPlanner.Tests
             };
         }
 
-        // Treat Deadly Wounds (54c9837b07de4afc9e86516b22c460bb, TreatDeadlyWoundsHealSkillAbility): exact facts from the rc3 catalogue export
+        // Treat Deadly Wounds (54c9837b07de4afc9e86516b22c460bb, TreatDeadlyWoundsHealSkillAbility): exact facts from the rc4 pre-candidate catalogue export
+        // (kbp040-rc4p-catalog-cotw, generator 7ccf0c9).
         private static NativeCandidateAuditFacts RealTreatDeadlyWounds()
         {
             return new NativeCandidateAuditFacts
@@ -552,6 +538,7 @@ namespace KingmakerBuffPlanner.Tests
                 CanTargetSelf = true, CanTargetFriends = true, CanTargetEnemies = false, CanTargetPoint = false,
                 EffectOnAlly = "Helpful", EffectOnEnemy = "None", Range = "Touch",
                 AbilityComponentTypes = new[] { "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction", "Kingmaker.UnitLogic.Abilities.Components.TargetCheckers.AbilityTargetHasFact", "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig" },
+                SelfGatedFactIds = new[] { "45b17e675f524da4b6a0198ac0427f79" },
                 Effects = new[]
                 {
                     new NativeCandidateEffectFacts
@@ -564,21 +551,22 @@ namespace KingmakerBuffPlanner.Tests
                         ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/1:ContextActionApplyBuff"
                     }
                 },
-                DiagnosticContracts = new[] { "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|unsupported-action", "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|unsupported-action", "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|unsupported-action", "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|unsupported-action", "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|unsupported-action", "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|unsupported-action", "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|unsupported-action" },
+                DiagnosticContracts = new[] { "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|restorative-action", "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|restorative-action", "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|restorative-action", "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|restorative-action", "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|restorative-action", "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|restorative-action", "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0|restorative-action" },
                 Diagnostics = new NativeCandidateDiagnosticFacts[]
                 {
-                    new NativeCandidateDiagnosticFacts { Code = "unknown-node", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "unsupported-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/0:ActionList/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" },
-                    new NativeCandidateDiagnosticFacts { Code = "unknown-node", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "unsupported-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/1:ActionList/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" },
-                    new NativeCandidateDiagnosticFacts { Code = "unknown-node", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "unsupported-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/5:ActionList/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" },
-                    new NativeCandidateDiagnosticFacts { Code = "unknown-node", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "unsupported-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/5:ActionList/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" },
-                    new NativeCandidateDiagnosticFacts { Code = "unknown-node", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "unsupported-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/5:ActionList/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" },
-                    new NativeCandidateDiagnosticFacts { Code = "unknown-node", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "unsupported-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/5:ActionList/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" },
-                    new NativeCandidateDiagnosticFacts { Code = "unknown-node", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "unsupported-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/5:ActionList/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" }
+                    new NativeCandidateDiagnosticFacts { Code = "restorative-action", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "restorative-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/0:ActionList/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" },
+                    new NativeCandidateDiagnosticFacts { Code = "restorative-action", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "restorative-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/1:ActionList/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" },
+                    new NativeCandidateDiagnosticFacts { Code = "restorative-action", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "restorative-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/5:ActionList/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" },
+                    new NativeCandidateDiagnosticFacts { Code = "restorative-action", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "restorative-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/5:ActionList/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" },
+                    new NativeCandidateDiagnosticFacts { Code = "restorative-action", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "restorative-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/5:ActionList/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" },
+                    new NativeCandidateDiagnosticFacts { Code = "restorative-action", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "restorative-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/5:ActionList/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" },
+                    new NativeCandidateDiagnosticFacts { Code = "restorative-action", Contract = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0", Detail = "restorative-action", ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:reflected:CallOfTheWild.SkillMechanics.ContextActionSkillCheckWithFailures, CallOfTheWild, Version=1.0.0.0/5:ActionList/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0" }
                 }
             };
         }
 
-        // Battle Ward (8bc6ba5c82d44deaaef24cec75490d05, ShamanBattleWardHexAbility): exact facts from the rc3 catalogue export
+        // Battle Ward (8bc6ba5c82d44deaaef24cec75490d05, ShamanBattleWardHexAbility): exact facts from the rc4 pre-candidate catalogue export
+        // (kbp040-rc4p-catalog-cotw, generator 7ccf0c9).
         private static NativeCandidateAuditFacts RealShamanBattleWard()
         {
             return new NativeCandidateAuditFacts
@@ -587,8 +575,54 @@ namespace KingmakerBuffPlanner.Tests
                 CanTargetSelf = true, CanTargetFriends = true, CanTargetEnemies = false, CanTargetPoint = false,
                 EffectOnAlly = "Helpful", EffectOnEnemy = "None", Range = "Touch",
                 AbilityComponentTypes = new[] { "CallOfTheWild.NewMechanics.AbilityTargetHasNoFactUnlessBuffsFromCaster", "CallOfTheWild.NewMechanics.ContextCalculateAbilityParamsBasedOnClasses", "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction", "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx", "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig" },
+                SelfGatedFactIds = new[] { "926b9e0d2ac44c298f246afd5ca180aa" },
                 Effects = new[]
                 {
+                    new NativeCandidateEffectFacts
+                    {
+                        EffectId = "68966a356c1b43d28c199b740f19dcbd", EffectName = "ShamanBattleWard5Buff", Kind = "Buff", Target = "CurrentTarget",
+                        Harmful = false, IsHiddenInUi = false, IsClassFeature = false,
+                        ComponentTypes = new[] { "Kingmaker.UnitLogic.FactLogic.AddStatBonus", "Kingmaker.UnitLogic.Mechanics.Components.AddTargetAttackRollTrigger" },
+                        GrantedConditions = new string[0],
+                        SourceContract = "ContextActionApplyBuff",
+                        ActionPath = "8bc6ba5c82d44deaaef24cec75490d05/0:ActionList/0:RunActionsDependingOnContextValue:alternative:0/false/false/false/false/0:ContextActionApplyBuff"
+                    },
+                    new NativeCandidateEffectFacts
+                    {
+                        EffectId = "57b097b06d294ab9b69f06a9eadf6e95", EffectName = "ShamanBattleWard4Buff", Kind = "Buff", Target = "CurrentTarget",
+                        Harmful = false, IsHiddenInUi = false, IsClassFeature = false,
+                        ComponentTypes = new[] { "Kingmaker.UnitLogic.FactLogic.AddStatBonus", "Kingmaker.UnitLogic.Mechanics.Components.AddTargetAttackRollTrigger" },
+                        GrantedConditions = new string[0],
+                        SourceContract = "ContextActionApplyBuff",
+                        ActionPath = "8bc6ba5c82d44deaaef24cec75490d05/0:ActionList/0:RunActionsDependingOnContextValue:alternative:0/false/false/false/true/0:ContextActionApplyBuff"
+                    },
+                    new NativeCandidateEffectFacts
+                    {
+                        EffectId = "6884f0602a594144afb8365318494a32", EffectName = "ShamanBattleWard3Buff", Kind = "Buff", Target = "CurrentTarget",
+                        Harmful = false, IsHiddenInUi = false, IsClassFeature = false,
+                        ComponentTypes = new[] { "Kingmaker.UnitLogic.FactLogic.AddStatBonus", "Kingmaker.UnitLogic.Mechanics.Components.AddTargetAttackRollTrigger" },
+                        GrantedConditions = new string[0],
+                        SourceContract = "ContextActionApplyBuff",
+                        ActionPath = "8bc6ba5c82d44deaaef24cec75490d05/0:ActionList/0:RunActionsDependingOnContextValue:alternative:0/false/false/true/0:ContextActionApplyBuff"
+                    },
+                    new NativeCandidateEffectFacts
+                    {
+                        EffectId = "77d0424e938f455cb1ef14423bcf59ad", EffectName = "ShamanBattleWard2Buff", Kind = "Buff", Target = "CurrentTarget",
+                        Harmful = false, IsHiddenInUi = false, IsClassFeature = false,
+                        ComponentTypes = new[] { "Kingmaker.UnitLogic.FactLogic.AddStatBonus", "Kingmaker.UnitLogic.Mechanics.Components.AddTargetAttackRollTrigger" },
+                        GrantedConditions = new string[0],
+                        SourceContract = "ContextActionApplyBuff",
+                        ActionPath = "8bc6ba5c82d44deaaef24cec75490d05/0:ActionList/0:RunActionsDependingOnContextValue:alternative:0/false/true/0:ContextActionApplyBuff"
+                    },
+                    new NativeCandidateEffectFacts
+                    {
+                        EffectId = "219440d0fc5843d5a1942aacd43a92d0", EffectName = "ShamanBattleWard1Buff", Kind = "Buff", Target = "CurrentTarget",
+                        Harmful = false, IsHiddenInUi = false, IsClassFeature = false,
+                        ComponentTypes = new[] { "Kingmaker.UnitLogic.FactLogic.AddStatBonus", "Kingmaker.UnitLogic.Mechanics.Components.AddTargetAttackRollTrigger" },
+                        GrantedConditions = new string[0],
+                        SourceContract = "ContextActionApplyBuff",
+                        ActionPath = "8bc6ba5c82d44deaaef24cec75490d05/0:ActionList/0:RunActionsDependingOnContextValue:alternative:0/true/0:ContextActionApplyBuff"
+                    },
                     new NativeCandidateEffectFacts
                     {
                         EffectId = "926b9e0d2ac44c298f246afd5ca180aa", EffectName = "ShamanBattleWardHexAbilityCooldownBuff", Kind = "Buff", Target = "CurrentTarget",
@@ -599,15 +633,15 @@ namespace KingmakerBuffPlanner.Tests
                         ActionPath = "8bc6ba5c82d44deaaef24cec75490d05/0:ActionList/1:ContextActionApplyBuff"
                     }
                 },
-                DiagnosticContracts = new[] { "CallOfTheWild.NewMechanics.RunActionsDependingOnContextValue, CallOfTheWild, Version=1.0.0.0|unsupported-action" },
+                DiagnosticContracts = new string[0],
                 Diagnostics = new NativeCandidateDiagnosticFacts[]
                 {
-                    new NativeCandidateDiagnosticFacts { Code = "unknown-node", Contract = "CallOfTheWild.NewMechanics.RunActionsDependingOnContextValue, CallOfTheWild, Version=1.0.0.0", Detail = "unsupported-action", ActionPath = "8bc6ba5c82d44deaaef24cec75490d05/0:ActionList/0:CallOfTheWild.NewMechanics.RunActionsDependingOnContextValue, CallOfTheWild, Version=1.0.0.0" }
                 }
             };
         }
 
-        // Inspiring Recovery (788d72e7713cf90418ee1f38449416dc, InspiringRecovery): exact facts from the rc3 catalogue export
+        // Inspiring Recovery (788d72e7713cf90418ee1f38449416dc, InspiringRecovery): exact facts from the rc4 pre-candidate catalogue export
+        // (kbp040-rc4p-catalog-native, generator 7ccf0c9).
         private static NativeCandidateAuditFacts RealInspiringRecovery()
         {
             return new NativeCandidateAuditFacts
@@ -616,6 +650,7 @@ namespace KingmakerBuffPlanner.Tests
                 CanTargetSelf = true, CanTargetFriends = true, CanTargetEnemies = false, CanTargetPoint = false,
                 EffectOnAlly = "Helpful", EffectOnEnemy = "Harmful", Range = "Medium",
                 AbilityComponentTypes = new[] { "Kingmaker.Blueprints.Classes.Spells.SpellComponent", "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent", "Kingmaker.Blueprints.Classes.Spells.SpellListComponent", "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction", "Kingmaker.UnitLogic.Abilities.Components.AbilityUseOnRest", "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx", "Kingmaker.UnitLogic.Abilities.Components.TargetCheckers.AbilityTargetBreathOfLife", "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig" },
+                SelfGatedFactIds = new string[0],
                 Effects = new[]
                 {
                     new NativeCandidateEffectFacts
@@ -625,7 +660,28 @@ namespace KingmakerBuffPlanner.Tests
                         ComponentTypes = new[] { "Kingmaker.Designers.Mechanics.Facts.ReplaceAbilityParamsWithContext", "Kingmaker.UnitLogic.Mechanics.Components.AddFactContextActions" },
                         GrantedConditions = new string[0],
                         SourceContract = "ContextActionApplyBuff",
-                        ActionPath = "788d72e7713cf90418ee1f38449416dc/0:ActionList/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/1:ContextActionApplyBuff"
+                        ActionPath = "788d72e7713cf90418ee1f38449416dc/0:ActionList/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/false/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/1:ContextActionApplyBuff",
+                        FactActions = new[]
+                        {
+                            new NativeCandidateFactActions
+                            {
+                                List = "Deactivated",
+                                AppliedEffects = new NativeCandidateEffectFacts[]
+                                {
+                                    new NativeCandidateEffectFacts
+                                    {
+                                        EffectId = "87cd09cdcde2856489a8dd44a55030dc", EffectName = "InspiringRecoveryBuff", Kind = "Buff", Target = "AlliedAreaRecipients",
+                                        Harmful = false, IsHiddenInUi = false, IsClassFeature = false,
+                                        ComponentTypes = new[] { "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent", "Kingmaker.UnitLogic.FactLogic.AddStatBonus" },
+                                        GrantedConditions = new string[0],
+                                        SourceContract = "ContextActionApplyBuff",
+                                        ActionPath = "ActionList/0:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:2763a0d6d73dd564895887eb0fd3d147/0:2763a0d6d73dd564895887eb0fd3d147/0:AbilityTargetsAround/0:ActionList/0:ContextActionApplyBuff"
+                                    }
+                                },
+                                Restorative = new string[0], Offensive = new string[0],
+                                Unrecognized = new string[0]
+                            }
+                        }
                     }
                 },
                 DiagnosticContracts = new[] { "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDamage, Assembly-CSharp, Version=0.0.0.0|offensive-action", "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionHealTarget, Assembly-CSharp, Version=0.0.0.0|restorative-action", "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionBreathOfLife, Assembly-CSharp, Version=0.0.0.0|unsupported-action" },
@@ -637,6 +693,5 @@ namespace KingmakerBuffPlanner.Tests
                 }
             };
         }
-
     }
 }
