@@ -315,6 +315,7 @@ namespace KingmakerBuffPlanner.UI
                     ReplaceAuthoring(new CastingAuthoringService(
                         loaded.Profile.ToDocument()));
                     AdoptSettings(loaded.Profile);
+                    NoteRetiredSemantics(loaded.Profile);
                     break;
                 case CastingPlanLoadStatus.Absent:
                     // First open in this campaign: import the legacy
@@ -428,6 +429,37 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        // WP3/WP4 (0.4.0): a loaded plan still carrying retired 0.3.0
+        // semantics (required group recipients, combat/fallback choices).
+        private bool _retiredSemanticsPending;
+
+        // Required group recipients the loaded 0.3.0 plan stored; they no
+        // longer constrain anything (archived, then dropped by the next save).
+        public int RetiredGroupCoverageCount { get; private set; }
+        // Where the exact pre-0.4.0 file was archived, once it was.
+        public string RetiredSemanticsArchivePath { get; private set; }
+
+        private void NoteRetiredSemantics(CastingPlanProfile profile)
+        {
+            RetiredGroupCoverageCount = profile == null ? 0 : profile.LegacyRequiredCoverageCount;
+            _retiredSemanticsPending = RetiredGroupCoverageCount != 0 || (profile != null &&
+                profile.Execution != null && profile.Execution.DiffersFromEnforcedPolicy);
+        }
+
+        // The one canonical write: archive retired semantics first, once. A
+        // failed archive fails the save (the in-memory intent and the last
+        // good file stay), so the 0.3.0 intent is never dropped unrecorded.
+        private void SaveProfile()
+        {
+            if (_retiredSemanticsPending)
+            {
+                RetiredSemanticsArchivePath = _repository.ArchiveRetiredSemanticsOnce(CampaignId);
+                _retiredSemanticsPending = false;
+            }
+            _repository.Save(CastingPlanProfile.FromDocument(
+                _authoring.Document, _uiSettings, _executionSettings));
+        }
+
         private void PersistNow(string cause)
         {
             if (PersistenceBlocked)
@@ -437,8 +469,7 @@ namespace KingmakerBuffPlanner.UI
             }
             try
             {
-                _repository.Save(CastingPlanProfile.FromDocument(
-                    _authoring.Document, _uiSettings, _executionSettings));
+                SaveProfile();
                 _savedIntentSignature = DocumentIntentSignature();
                 LoadStatus = CastingPlanLoadStatus.Loaded;
                 LoadWarning = string.Empty;
@@ -809,6 +840,7 @@ namespace KingmakerBuffPlanner.UI
                             // The legacy execution/UI settings travel with
                             // the import (the migration wrote them).
                             AdoptSettings(reloaded.Profile);
+                            NoteRetiredSemantics(reloaded.Profile);
                             return reloaded.Profile.ToDocument();
                         }
                         MigrationWarning = "migrated-candidate-did-not-reopen:" +
@@ -1838,6 +1870,14 @@ namespace KingmakerBuffPlanner.UI
             return _authoring.AddCasting(casting);
         }
 
+        // Guarded qualification only (the shared-recipe witness phase): a
+        // Disabled record with the legacy non-blocking omission. Players have
+        // no Disable command since 0.4.0 (WP3).
+        internal AuthoringEditResult DisableCastingForQualification(string castingId)
+        {
+            return _authoring.SetCastingState(castingId, CastingAuthoringState.Disabled);
+        }
+
         public AuthoringEditResult AddCastingFromDraft(
             CastingWorkspaceInputs inputs = null)
         {
@@ -1954,6 +1994,16 @@ namespace KingmakerBuffPlanner.UI
                     : CastingOrigin.CasterCentered();
             try
             {
+                // WP3: the members the group casting was expected to reach,
+                // read before the change (prediction, not required intent).
+                IReadOnlyList<string> reached = new string[0];
+                if (focused.TargetMode != CastingTargetMode.DirectTarget &&
+                    mode == CastingTargetMode.DirectTarget && _lastInputs != null)
+                {
+                    ResolvedCasting before = Compile(_lastInputs, focused.RoutineId, false)
+                        .CastingById(focused.CastingId);
+                    if (before != null) reached = before.PredictedBeneficiaryUnitIds;
+                }
                 AuthoringEditResult result = UpdateFocusedCasting(focused.WithTargeting(
                     mode, direct, origin, requiredCoverageUnitIds));
                 // Focused re-review: a group casting made single-target names
@@ -1961,7 +2011,7 @@ namespace KingmakerBuffPlanner.UI
                 if (result.Applied && focused.TargetMode != CastingTargetMode.DirectTarget &&
                     mode == CastingTargetMode.DirectTarget)
                 {
-                    List<string> dropped = focused.RequiredCoverageUnitIds
+                    List<string> dropped = reached
                         .Where(unitId => !string.Equals(unitId, direct, StringComparison.Ordinal))
                         .Distinct(StringComparer.Ordinal).ToList();
                     if (dropped.Count != 0)
@@ -2204,10 +2254,16 @@ namespace KingmakerBuffPlanner.UI
                 EditingFocusCastingId, targetRoutineId, targetPosition);
         }
 
+        // WP3 (0.4.0): the normal way to stop casting something is to remove
+        // it; no new Disabled record is authored. A Disabled record an
+        // earlier version saved stays readable, keeps its non-blocking
+        // omission and can be removed. Marking a genuine Draft Ready stays.
         public AuthoringEditResult SetFocusedCastingState(CastingAuthoringState state)
         {
             if (EditingFocusCastingId == null)
                 return AuthoringEditResult.Refuse("no-editing-focus");
+            if (state == CastingAuthoringState.Disabled)
+                return AuthoringEditResult.Refuse("disable-retired:remove-the-casting-instead");
             return _authoring.SetCastingState(EditingFocusCastingId, state);
         }
 
@@ -2229,8 +2285,7 @@ namespace KingmakerBuffPlanner.UI
             // The loaded (or imported) player settings are written back
             // unchanged unless the player changed them - never reset to
             // defaults by a document save.
-            _repository.Save(CastingPlanProfile.FromDocument(
-                _authoring.Document, _uiSettings, _executionSettings));
+            SaveProfile();
             _savedIntentSignature = DocumentIntentSignature();
             // The primary is now written and current: a notice about a
             // missing file and a loaded backup no longer applies.
@@ -2352,6 +2407,7 @@ namespace KingmakerBuffPlanner.UI
                     ReplaceAuthoring(new CastingAuthoringService(
                         loaded.Profile.ToDocument()));
                     AdoptSettings(loaded.Profile);
+                    NoteRetiredSemantics(loaded.Profile);
                     PersistenceBlocked = false;
                     LegacyImportBlocked = false;
                     LegacyImportBlockReason = null;

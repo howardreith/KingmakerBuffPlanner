@@ -58,8 +58,6 @@ namespace KingmakerBuffPlanner.UI
         private CastingGraphView _lastView;
         private GraphLayoutResult _lastLayout;
         private GraphLayoutMetrics _lastMetrics;
-        private bool _showProviders;
-        private bool _showRetargets;
 
         // Header.
         private Text _title;
@@ -1118,11 +1116,6 @@ namespace KingmakerBuffPlanner.UI
                 rect.anchoredPosition = new Vector2(x, 0f);
                 x += 158f;
             }
-            Text scope = KingmakerUiFactory.CreateText("RoutineScope", _routineBar, _theme,
-                "New castings go to the selected routine; each routine runs on its own.", 13,
-                TextAnchor.MiddleLeft);
-            scope.color = _theme.MutedBrownText;
-            KingmakerUiFactory.SetAnchors(scope.rectTransform, 0f, 0f, 1f, 1f, x + 10f, 0f, 0f, 0f);
         }
 
         private void RebuildCatalogue(CastingGraphView view)
@@ -1330,7 +1323,8 @@ namespace KingmakerBuffPlanner.UI
                 Button button = header.gameObject.AddComponent<Button>();
                 button.targetGraphic = background;
                 ApplyRowHover(button, caster.Selected);
-                button.onClick.AddListener(() => Command(() => _session.SelectGraphCaster(captured, _inputs())));
+                button.onClick.AddListener(() => Command(() =>
+                    SurfaceClick(_session.ClickGraphCaster(captured, _inputs()))));
             }
             if (caster.Selected)
             {
@@ -1368,7 +1362,7 @@ namespace KingmakerBuffPlanner.UI
                 ApplyRowHover(button, row.Selected);
                 string key = row.ProviderKey;
                 button.onClick.AddListener(() => Command(() =>
-                    Surface(_session.SelectGraphSource(key, _inputs()), "source")));
+                    SurfaceClick(_session.ClickGraphSource(key, _inputs()))));
                 Text label = KingmakerUiFactory.CreateText("Label", rect, _theme, row.Label +
                         (row.IsGroup ? "  (group)" : string.Empty), 14, TextAnchor.UpperLeft);
                 label.fontStyle = FontStyle.Bold;
@@ -1404,7 +1398,8 @@ namespace KingmakerBuffPlanner.UI
             Button button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = background;
             ApplyRowHover(button, false);
-            button.onClick.AddListener(() => Command(() => AddCastingTo(captured)));
+            button.onClick.AddListener(() => Command(() =>
+                SurfaceClick(_session.ClickGraphRecipient(captured, _inputs()))));
             Image portrait = AddPortrait(rect, target.UnitId, 62f, 6f);
             if (portrait != null && illegal) portrait.color = new Color(0.55f, 0.50f, 0.48f, 0.75f);
             Text name = KingmakerUiFactory.CreateText("Name", rect, _theme, target.DisplayName, 15, TextAnchor.UpperLeft);
@@ -1452,8 +1447,7 @@ namespace KingmakerBuffPlanner.UI
             first.resizeTextMaxSize = 14;
             KingmakerUiFactory.Stretch(first.rectTransform, 7, 5, 22, 3);
             string detail = casting.IsGroup
-                ? "Group · reaches " + casting.Beneficiaries.Count +
-                    (casting.CoverageGaps.Count == 0 ? string.Empty : " · misses " + casting.CoverageGaps.Count)
+                ? "Group · expected to reach " + casting.Beneficiaries.Count
                 : casting.EnhancementBadges.Count == 0 ? "no enhancement"
                 : string.Join(", ", casting.EnhancementBadges.ToArray());
             if (casting.IsGroup && casting.EnhancementBadges.Count != 0)
@@ -1683,17 +1677,8 @@ namespace KingmakerBuffPlanner.UI
             });
         }
 
-        private string _inspectedCastingId;
-
         private void RebuildCastingInspector(CastingGraphView view, CastingGraphInspector inspector)
         {
-            if (!string.Equals(_inspectedCastingId, inspector.CastingId, StringComparison.Ordinal))
-            {
-                // Another casting: its choosers start closed.
-                _inspectedCastingId = inspector.CastingId;
-                _showProviders = false;
-                _showRetargets = false;
-            }
             _inspectorTitle.text = inspector.Title;
             CastingProblemNavigation problems = _session.ProblemNavigation;
             bool problem = problems.Active && string.Equals(problems.Current.CastingId,
@@ -1737,18 +1722,6 @@ namespace KingmakerBuffPlanner.UI
                 ActionButton("ResolveImportReview", "Resolve review (keep current choices)", () =>
                     Surface(_session.ResolveFocusedImportReview(), "resolve review"));
             }
-            // Caster and source.
-            Section("Cast by");
-            Line("CasterSource", inspector.CasterName + " · " + inspector.SourceLabel, 14, _theme.DarkBrownText, false);
-            ActionButton("ToggleProviders", _showProviders ? "Hide other casters and sources"
-                : "Change caster or source (" + inspector.Providers.Count + ")", () => _showProviders = !_showProviders);
-            if (_showProviders)
-                for (int index = 0; index < inspector.Providers.Count; index++)
-                {
-                    WorkspaceProviderChoice choice = inspector.Providers[index];
-                    ActionButton("FocusedProvider." + index, (choice.Selected ? "[x] " : "[  ] ") + choice.Label,
-                        () => Surface(_session.SetFocusedProvider(choice.ProviderKey, _inputs()), "caster"));
-                }
             // Target or group coverage.
             PlannedCasting focused = inspector.Casting;
             bool group = focused.TargetMode != CastingTargetMode.DirectTarget;
@@ -1765,8 +1738,7 @@ namespace KingmakerBuffPlanner.UI
                 if (groupAbility == true)
                     ActionButton("FocusedMode.Group", "Make it a group casting (centred on the caster)",
                         () => Surface(_session.SetFocusedTargeting(CastingTargetMode.CasterCenteredOrigin, null, null,
-                            focused.DirectTargetUnitId == null ? null : new[] { focused.DirectTargetUnitId }),
-                            "mode"));
+                            null), "mode"));
             }
             else if (groupAbility == false)
             {
@@ -1781,28 +1753,15 @@ namespace KingmakerBuffPlanner.UI
                 }
             }
             if (group && inspector.CoverageText.Length != 0)
-                Line("Coverage", inspector.CoverageText, 13,
-                    chip != null && chip.CoverageGaps.Count != 0 ? BlockedInk : _theme.DarkBrownText, false);
-            ActionButton("ToggleRetargets", _showRetargets ? "Hide other " + (group ? "centres" : "targets")
-                : group ? "Move the centre, or mark required recipients" : "Move to another target",
-                () => _showRetargets = !_showRetargets);
-            if (_showRetargets)
-            {
-                foreach (CastingGraphTargetNode target in inspector.Retargets)
-                {
-                    string unit = target.UnitId;
-                    ActionButton("Retarget." + unit, (group ? "Centre on " : "Move to ") + target.DisplayName,
-                        () => Surface(_session.RetargetFocusedCasting(unit), "retarget"));
-                }
-                if (group)
-                    foreach (CastingGraphTargetNode target in view.Targets)
-                    {
-                        string unit = target.UnitId;
-                        bool required = inspector.Casting.RequiredCoverageUnitIds.Contains(unit);
-                        ActionButton("Coverage." + unit, (required ? "[x] " : "[  ] ") + "Required: " +
-                            target.DisplayName, () => Surface(_session.SetFocusedCoverage(unit, !required), "coverage"));
-                    }
-            }
+                Line("Coverage", inspector.CoverageText, 13, _theme.DarkBrownText, false);
+            // WP3: retargeting, re-centring, removal and the caster are graph
+            // gestures; the inspector only says how.
+            Line("GestureHint", group
+                ? "Click another party member to re-centre it there; click its centre again to remove it. " +
+                    "Click another caster or source on the left to change who casts it."
+                : "Click another portrait to move it; click its recipient again to remove it. " +
+                    "Click another caster or source on the left to change who casts it.",
+                12, _theme.MutedBrownText, false);
             // v1.2 §7 / E16: this casting's own Share control - on/off
             // through the normal authoring boundary (announces, autosaves,
             // undoable), with the same honest availability the compiler
@@ -1825,9 +1784,13 @@ namespace KingmakerBuffPlanner.UI
                     if (modifier.CostText.Length != 0)
                         Line("FocusedModifierCost", "Cost: " + modifier.CostText, 12,
                             _theme.DarkBrownText, false);
-                    if (!modifier.Selected && modifier.UnavailableReason.Length != 0)
-                        Line("FocusedModifierUnavailable",
-                            WorkspaceReasonText.DescribeNested(modifier.UnavailableReason),
+                    // A saved choice that no longer applies stays visible
+                    // as a repair warning; untick it to repair the casting.
+                    if (modifier.UnavailableReason.Length != 0)
+                        Line("FocusedModifierUnavailable", (modifier.Selected
+                                ? "Chosen, but no longer available: " : string.Empty) +
+                            WorkspaceReasonText.DescribeNested(modifier.UnavailableReason) +
+                            (modifier.Selected ? " - untick it to repair this casting" : string.Empty),
                             12, BlockedInk, false);
                 }
             }
@@ -1883,19 +1846,16 @@ namespace KingmakerBuffPlanner.UI
             if (inspector.LastRun.Length != 0)
                 Line("LastRun", "Last run: " + inspector.LastRun, 12, _theme.MutedBrownText, false);
             Section("This casting");
-            bool disabled = inspector.Casting.State == CastingAuthoringState.Disabled;
-            if (inspector.Casting.State != CastingAuthoringState.Ready)
-                ActionButton("Enable", "Mark Ready", () => Surface(_session.SetFocusedCastingState(
+            // WP3: a genuine Draft (an imported choice still to finish) can be
+            // marked Ready. A Disabled record from an earlier version is shown
+            // honestly - it is never cast and never blocks - and is removed,
+            // not re-enabled; no new Disabled record or duplicate is authored.
+            if (inspector.Casting.State == CastingAuthoringState.Draft)
+                ActionButton("MarkReady", "Mark Ready", () => Surface(_session.SetFocusedCastingState(
                     CastingAuthoringState.Ready), "mark ready"));
-            if (!disabled)
-                ActionButton("Disable", "Disable (keep it, do not cast)", () => Surface(
-                    _session.SetFocusedCastingState(CastingAuthoringState.Disabled), "disable"));
-            ActionButton("Duplicate", "Duplicate (a second, separate casting)", () =>
-            {
-                CastingGraphEditResult result = _session.DuplicateFocusedCasting();
-                if (!result.Applied) Surface(result.Edit, "duplicate");
-                else _footerResult.text = "Added a separate casting (Undo removes it).";
-            });
+            if (inspector.Casting.State == CastingAuthoringState.Disabled)
+                Line("LegacyDisabled", "Disabled in an earlier version: it is not cast and blocks nothing. " +
+                    "Remove it if you no longer want it.", 13, _theme.MutedBrownText, false);
             ActionButton("Remove", "Remove this casting", () =>
             {
                 AuthoringEditResult result = _session.RemoveFocusedCasting();
@@ -1975,23 +1935,40 @@ namespace KingmakerBuffPlanner.UI
             RefreshView();
         }
 
-        private void AddCastingTo(string unitId)
+        // WP3: one footer sentence per graph gesture; a refusal keeps the
+        // casting unchanged and says why.
+        private void SurfaceClick(CastingGraphClickResult result)
         {
-            CastingGraphEditResult result = _session.AddGraphCasting(unitId, _inputs());
-            if (result.Applied)
+            if (result == null) return;
+            switch (result.Outcome)
             {
-                _footerResult.text = "Added one casting (Undo removes it). Click its line or card to add enhancements.";
-                _showProviders = false;
-                _showRetargets = false;
-                return;
+                case CastingGraphClickOutcome.Added:
+                    _footerResult.text = "Added one casting and selected it. Click the same portrait again " +
+                        "to remove it, or another to move it (Undo reverses either).";
+                    return;
+                case CastingGraphClickOutcome.Focused:
+                    _footerResult.text = "Selected the casting this recipient already has. Click the portrait " +
+                        "again to remove it.";
+                    return;
+                case CastingGraphClickOutcome.Removed:
+                    _footerResult.text = "Casting removed (Undo restores it).";
+                    return;
+                case CastingGraphClickOutcome.Retargeted:
+                    _footerResult.text = "Moved the casting to a new recipient (Undo moves it back).";
+                    return;
+                case CastingGraphClickOutcome.Recentred:
+                    _footerResult.text = "Re-centred the group casting (Undo moves it back).";
+                    return;
+                case CastingGraphClickOutcome.ProviderChanged:
+                    _footerResult.text = "Changed who casts it" + (string.IsNullOrEmpty(result.Edit.Reason)
+                        ? string.Empty : ": " + result.Edit.Reason) + " (Undo restores the previous caster).";
+                    return;
+                case CastingGraphClickOutcome.DraftConfigured:
+                    return;
+                default:
+                    Surface(result.Edit, "that click");
+                    return;
             }
-            if (result.ShowedExisting)
-            {
-                _footerResult.text = "That target already has a casting of this buff here: it is shown. " +
-                    "Use Duplicate for a second one.";
-                return;
-            }
-            Surface(result.Edit, "add");
         }
 
         // A denied operation explains itself; an applied one with a note

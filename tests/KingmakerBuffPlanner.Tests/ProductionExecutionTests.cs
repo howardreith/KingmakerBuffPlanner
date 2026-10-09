@@ -407,9 +407,9 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The gate misreported an already-active casting.");
         }
 
-        // A group casting is satisfied only when every INTENDED recipient
-        // (the required coverage, or all predicted beneficiaries when none
-        // is required) already has the effect.
+        // A group casting is satisfied only when every predicted beneficiary
+        // already has the effect (WP3: required coverage is retired; an
+        // authored 0.3.0 required list no longer narrows the check).
         private static void TestGroupExistingEffectRecipients()
         {
             List<ProviderPlanningOption> options;
@@ -432,8 +432,8 @@ namespace KingmakerBuffPlanner.Tests
                 On(unit, "group-effect", null, 1, null);
             ResolvedCasting requiredMet = compile(new[] { "unit-t1", "unit-t2" },
                 LiveEffects(group("unit-t1"), group("unit-t2")));
-            if (requiredMet.Readiness != ResolvedCastingReadiness.AlreadySatisfied)
-                throw new InvalidOperationException("Required coverage already active did not skip: " +
+            if (requiredMet.Readiness != ResolvedCastingReadiness.Ready)
+                throw new InvalidOperationException("A retired required list narrowed the skip check: " +
                     string.Join(",", requiredMet.ReadinessReasons.ToArray()));
             if (compile(new[] { "unit-t1", "unit-t2" }, LiveEffects(group("unit-t1")))
                     .Readiness != ResolvedCastingReadiness.Ready)
@@ -1433,8 +1433,10 @@ namespace KingmakerBuffPlanner.Tests
                 "KingmakerBuffPlanner", "UI", "CastingWorkspaceSession.Graph.cs")));
             foreach (string wiring in new[]
             {
-                "_session.SetFocusedProvider(choice.ProviderKey, _inputs())",
-                "_session.SelectGraphSource(key, _inputs())",
+                // WP3: the caster and exact source are graph gestures.
+                "SurfaceClick(_session.ClickGraphCaster(captured, _inputs()))",
+                "SurfaceClick(_session.ClickGraphSource(key, _inputs()))",
+                "SurfaceClick(_session.ClickGraphRecipient(captured, _inputs()))",
                 "_session.MoveFocusedCastingToRoutine(routineId)",
                 "_session.MoveFocusedCastingWithinRoutine(-1)",
                 "_session.MoveFocusedCastingWithinRoutine(1)",
@@ -1447,8 +1449,7 @@ namespace KingmakerBuffPlanner.Tests
                 "if (groupAbility == true)",
                 "else if (groupAbility == false)",
                 "ActionButton(\"FocusedMode.Group\", \"Make it a group casting (centred on the caster)\"",
-                "_session.SetFocusedTargeting(CastingTargetMode.CasterCenteredOrigin, null, null, " +
-                    "focused.DirectTargetUnitId == null ? null : new[] { focused.DirectTargetUnitId })",
+                "_session.SetFocusedTargeting(CastingTargetMode.CasterCenteredOrigin, null, null, null)",
                 "ActionButton(\"FocusedSingle.\" + unit, \"Single target: \" + target.DisplayName",
                 "_session.SetFocusedTargeting(CastingTargetMode.DirectTarget, unit, null, null)",
                 "WorkspaceFooterText.WholePlan(view.OnePassShortCount);"
@@ -1919,8 +1920,9 @@ namespace KingmakerBuffPlanner.Tests
             PlannedCasting after = session.Document.Castings.Single();
             ResolvedCasting compiled = session.CompilePlan(inputs).CastingById("cast-unknown");
             session.BuildView(inputs);
+            // WP3: the old plan's recipients are named by the review item
+            // (they are no longer required coverage).
             if (session.FocusedCastingIsGroupAbility(inputs) != false ||
-                single.Reason != "it no longer reaches unit-t2 - add a casting for each, or Undo" ||
                 WorkspaceReasonText.DescribeReviewItem("grouping-unknown:single-or-group-pending-review;targets=unit-t1,unit-t2",
                     unitId => unitId.ToUpperInvariant()) !=
                     "the old plan did not say single target or group (it named UNIT-T1, UNIT-T2); choose")

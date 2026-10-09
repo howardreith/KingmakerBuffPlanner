@@ -443,14 +443,6 @@ namespace KingmakerBuffPlanner.Planning
                     option = null;
                 }
             }
-            else if (casting.TargetMode != CastingTargetMode.DirectTarget &&
-                casting.RequiredCoverageUnitIds.Count != 0)
-            {
-                // Without a resolved option there is no predicted coverage;
-                // every intended recipient stays visible as uncovered intent.
-                gaps.AddRange(casting.RequiredCoverageUnitIds.Select(
-                    unitId => new CoverageGap(unitId, "coverage-unresolved")));
-            }
             var applied = new List<string>();
             var omitted = new List<string>();
             var matched = new List<CastEnhancementSnapshot>();
@@ -874,7 +866,9 @@ namespace KingmakerBuffPlanner.Planning
                 return null;
             }
             // One invocation; beneficiaries are derived edges, never extra
-            // castings, and uncovered intent stays visible as gaps.
+            // castings. WP3 (0.4.0): the cast affects whoever the native
+            // ability reaches from its centre; the prediction is read-only
+            // information and no member is a required-coverage constraint.
             IReadOnlyList<string> predicted = option.CoveredTargetIdsForAnchor(anchorId);
             if (predicted == null || predicted.Count == 0)
             {
@@ -883,10 +877,6 @@ namespace KingmakerBuffPlanner.Planning
                 reasons.Add("predicted-coverage-empty:" + anchorId);
                 return null;
             }
-            var covered = new HashSet<string>(predicted, StringComparer.Ordinal);
-            gaps.AddRange(casting.RequiredCoverageUnitIds
-                .Where(unitId => !covered.Contains(unitId))
-                .Select(unitId => new CoverageGap(unitId, "outside-predicted-coverage")));
             return predicted;
         }
 
@@ -988,9 +978,7 @@ namespace KingmakerBuffPlanner.Planning
             IReadOnlyList<string> recipients =
                 casting.TargetMode == CastingTargetMode.DirectTarget
                     ? new ReadOnlyCollection<string>(new[] { casting.DirectTargetUnitId })
-                    : casting.RequiredCoverageUnitIds.Count != 0
-                        ? casting.RequiredCoverageUnitIds
-                        : predicted;
+                    : predicted;
             if (recipients == null || recipients.Count == 0 ||
                 recipients.Any(string.IsNullOrEmpty))
                 return false;

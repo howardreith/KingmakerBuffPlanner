@@ -1196,9 +1196,10 @@ namespace KingmakerBuffPlanner.Tests
             CastingGraphView view = session.BuildGraph(inputs);
             Expect(Row(view, "unit-bard", bKey).CapacityText == "0 / 2 remaining" &&
                 !Row(view, "unit-bard", bKey).Usable, "the one-pass pool across routines is not exhausted for B");
-            // Disabling one restores one; removing the other restores the rest.
+            // A Disabled record (as an earlier version saved it; WP3 retired
+            // the command) restores one; removing the other restores the rest.
             session.FocusGraphCasting(a);
-            Expect(session.SetFocusedCastingState(CastingAuthoringState.Disabled).Applied, "disable refused");
+            Expect(session.DisableCastingForQualification(a).Applied, "legacy disabled state refused");
             session.SelectGraphBuff(GraphSourceB, inputs);
             Expect(Row(session.BuildGraph(inputs), "unit-bard", bKey).CapacityText == "1 of 2 casts remaining",
                 "disabling a casting did not restore capacity");
@@ -1297,8 +1298,27 @@ namespace KingmakerBuffPlanner.Tests
                 "undo did not restore the casting and the rod budget");
         }
 
-        // G08: a target that already has a casting is shown, not doubled; an
-        // explicit duplicate is a distinct record, chip, line and cost.
+        // WP3 (0.4.0): the planner no longer authors duplicates, but a
+        // parallel record an earlier version saved stays readable and
+        // independent. Such a record is added exactly as a loaded plan would
+        // carry it (a copy with its own id), then focused.
+        private static string LegacyDuplicate(CastingWorkspaceSession session, string castingId)
+        {
+            PlannedCasting focused = session.Document.Castings.Single(value => value.CastingId == castingId);
+            string copyId = castingId + "-legacy-copy";
+            var copy = new PlannedCasting(copyId, focused.RoutineId, focused.Order + 1,
+                focused.SourceId, focused.Ability, focused.CasterUnitId, focused.SpellbookGuid,
+                focused.TargetMode, focused.DirectTargetUnitId, focused.Origin, null,
+                focused.TargetingModifiers, focused.Enhancements, focused.ExistingEffectPolicy,
+                focused.IgnoredPresenceMarkers, focused.State, null);
+            Expect(session.AddCastingForRuntime(copy).Applied, "the legacy duplicate was not added");
+            session.FocusGraphCasting(copyId);
+            return copyId;
+        }
+
+        // G08: a target that already has a casting is shown, not doubled; a
+        // parallel record from an earlier version is a distinct record,
+        // chip, line and cost.
         private static void TestGraphParallelCastings(string root)
         {
             CastingWorkspaceInputs inputs;
@@ -1308,12 +1328,12 @@ namespace KingmakerBuffPlanner.Tests
             CastingGraphEditResult again = session.AddGraphCasting("unit-t1", inputs);
             Expect(!again.Applied && again.ShowedExisting && again.CastingId == one &&
                 session.Document.Castings.Count == 1, "clicking an assigned target added a second casting");
-            CastingGraphEditResult copy = session.DuplicateFocusedCasting();
-            Expect(copy.Applied && copy.CastingId != one && session.Document.Castings.Count == 2,
-                "duplicate did not add a distinct record");
+            string copyId = LegacyDuplicate(session, one);
+            Expect(copyId != one && session.Document.Castings.Count == 2,
+                "the duplicate is not a distinct record");
             CastingGraphView view = session.BuildGraph(inputs);
             CastingGraphCasting first = view.CastingById(one);
-            CastingGraphCasting second = view.CastingById(copy.CastingId);
+            CastingGraphCasting second = view.CastingById(copyId);
             Expect(first.ParallelCount == 2 && second.ParallelCount == 2 &&
                 first.ParallelIndex != second.ParallelIndex && second.Selected && !first.Selected,
                 "parallel castings collapsed or share selection");
@@ -1326,25 +1346,26 @@ namespace KingmakerBuffPlanner.Tests
             // Made distinct (Extend), it costs its own slot and rod use.
             Expect(session.ToggleFocusedEnhancement("rod-extend-bard", inputs).Applied, "rod refused");
             view = session.BuildGraph(inputs);
-            Expect(!view.CastingById(copy.CastingId).RedundantInOnePass &&
+            Expect(!view.CastingById(copyId).RedundantInOnePass &&
                 Row(view, "unit-bard", aKey).CapacityText == "2 of 4 casts remaining" &&
                 view.CastingById(one).EnhancementBadges.Count == 0,
                 "the distinct parallel casting did not cost its own slot");
             GraphLayoutResult layout = CastingGraphLayout.Compute(view, null);
             GraphChipPlacement a = layout.ChipFor(one);
-            GraphChipPlacement b = layout.ChipFor(copy.CastingId);
+            GraphChipPlacement b = layout.ChipFor(copyId);
             GraphLayoutMetrics m = new GraphLayoutMetrics();
             Expect(Math.Abs(a.Top - b.Top) >= m.ChipHeight, "parallel chips overlap");
             GraphConnection ca = layout.ConnectionFor(one);
-            GraphConnection cb = layout.ConnectionFor(copy.CastingId);
+            GraphConnection cb = layout.ConnectionFor(copyId);
             Expect(Math.Abs(ca.Inbound.From.Y - cb.Inbound.From.Y) > 0.5f &&
                 Math.Abs(ca.Outbound.To.Y - cb.Outbound.To.Y) > 0.5f,
                 "parallel connections share their exact anchors");
         }
 
         // G09: one group casting = one origin, one chip, one cost; derived
-        // beneficiary branches; missed required coverage visible; clicking a
-        // covered member never adds a second group cast.
+        // beneficiary branches (read-only prediction, WP3: nobody is a
+        // required recipient); clicking a covered member never adds a second
+        // group cast.
         private static void TestGraphGroupCasting(string root)
         {
             CastingWorkspaceInputs inputs;
@@ -1373,12 +1394,12 @@ namespace KingmakerBuffPlanner.Tests
             CastingGraphEditResult covered = session.AddGraphCasting("unit-t1", inputs);
             Expect(!covered.Applied && covered.ShowedExisting && session.Document.Castings.Count == 1,
                 "clicking a covered member added a second group cast");
-            Expect(session.SetFocusedCoverage("unit-t3", true).Applied, "coverage edit refused");
             view = session.BuildGraph(inputs);
-            Expect(view.Castings.Single().CoverageGaps.SequenceEqual(new[] { "unit-t3" }) &&
-                view.Inspector.CoverageText.IndexOf("MISSED: Octavia", StringComparison.Ordinal) >= 0 &&
+            Expect(view.Castings.Single().CoverageGaps.Count == 0 &&
+                view.Inspector.CoverageText.StartsWith("Expected to reach 4:", StringComparison.Ordinal) &&
+                view.Inspector.CoverageText.IndexOf("required", StringComparison.OrdinalIgnoreCase) < 0 &&
                 session.Document.Castings.Count == 1,
-                "missed required coverage is not visible, or a second casting was added");
+                "the group prediction is not read-only information, or a second casting was added");
             Expect(Row(view, "unit-cleric", GraphProviderKey("unit-cleric", "book-cleric-group", GraphAbilityC, "level-3"))
                 .CapacityText == "1 of 2 casts remaining", "the group casting did not cost exactly one cast");
         }
@@ -1411,7 +1432,7 @@ namespace KingmakerBuffPlanner.Tests
             string aKey = GraphProviderKey("unit-bard", "book-bard", GraphAbilityA, "level-2");
             string one = GraphAdd(session, inputs, GraphSourceA, "unit-bard", aKey, "unit-t1");
             session.ToggleFocusedEnhancement("rod-extend-bard", inputs);
-            session.DuplicateFocusedCasting();
+            LegacyDuplicate(session, one);
             GraphAdd(session, inputs, GraphSourceA, "unit-cleric", null, "unit-t2");
             session.SelectGraphBuff(GraphSourceA, inputs);
             session.ClearGraphFocus();

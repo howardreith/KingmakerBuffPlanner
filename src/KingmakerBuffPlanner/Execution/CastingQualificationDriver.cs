@@ -1393,11 +1393,11 @@ namespace KingmakerBuffPlanner.Execution
                 kept = now != null && SameSharedIntent(now, before);
             }
             Record.ShareDraftDisarmKeptCasting = kept && !draftArmed();
-            // The shared casting is disabled through the inspector's own
-            // command (kept, visible, not cast) - as the forecast's witness
-            // phase models it.
-            _session.FocusCasting(sharedId);
-            AuthoringEditResult disabled = _session.SetFocusedCastingState(CastingAuthoringState.Disabled);
+            // The shared casting is kept but not cast - a Disabled record, as
+            // the forecast's witness phase models it. WP3 retired the player
+            // command; a Disabled record keeps its non-blocking omission, so
+            // the qualification authors it through the runtime-only seam.
+            AuthoringEditResult disabled = _session.DisableCastingForQualification(sharedId);
             if (!disabled.Applied) { Fail("shared-disable-refused:" + disabled.Reason); return; }
             _session.ClearGraphFocus();
             PlannedCasting witness = Record.Selection.Castings[1];
