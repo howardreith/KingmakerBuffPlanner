@@ -497,13 +497,36 @@ namespace KingmakerBuffPlanner.UI
         {
             string routineName = RoutineDisplayName(routineId);
             _log.Info("[KBP-QUICK] pointer/listener accepted;group=" + routineId + ".");
-            if (IsExecuting)
-            {
-                Complete(completed, new QuickExecutionResult(routineId, routineName,
+            // WP4 (0.4.0, rc4 review): combat refuses right after the
+            // running-routine guard, before the refresh (profile rebinding and
+            // saving), the preview and compiler, the review gates and any
+            // dispatch; PrepareAndCast checks again at its final boundary.
+            return ClassicRoutineAdmission.Run(
+                () => IsExecuting,
+                () => Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Refused,
-                    "Another buff routine is already executing.", 0, 0, 0));
-                yield break;
-            }
+                    "Another buff routine is already executing.", 0, 0, 0)),
+                CombatNow,
+                () =>
+                {
+                    Status = CastingRunPresentation.CombatRefusalText;
+                    Complete(completed, new QuickExecutionResult(routineId, routineName,
+                        QuickExecutionDisposition.Refused, Status, 0, 0, 0));
+                    _log.Info("[KBP-QUICK] combat refused before preparation;group=" +
+                        routineId + ".");
+                },
+                () => PrepareAndCast(routineId, routineName, completed, readyOnlyExplicit));
+        }
+
+        private static bool CombatNow()
+        {
+            return Game.Instance != null && Game.Instance.Player != null &&
+                Game.Instance.Player.IsInCombat;
+        }
+
+        private IEnumerator PrepareAndCast(string routineId, string routineName,
+            Action<QuickExecutionResult> completed, bool readyOnlyExplicit)
+        {
             Refresh();
             _log.Info("[KBP-QUICK] profile refreshed;group=" + routineId +
                 ";model=" + (Model != null) + ";profile=" + (ProfileStatus ?? string.Empty) + ".");
@@ -616,16 +639,18 @@ namespace KingmakerBuffPlanner.UI
             // and gated above, so the refusal is the only difference. The
             // one exception is an allowance-bound classic cast run's
             // single-use grant for exactly this plan, routine and mode.
-            // WP4 (0.4.0): routines never run during combat - a global
-            // refusal before any native work, in the classic planner too.
-            if (Kingmaker.Game.Instance != null && Kingmaker.Game.Instance.Player != null &&
-                Kingmaker.Game.Instance.Player.IsInCombat)
+            // WP4 (0.4.0): routines never run during combat. The admission
+            // refused combat before any of the work above; this final
+            // boundary refuses combat that began while the run prepared,
+            // still before any native work.
+            if (CombatNow())
             {
                 LastExecutionReport = new ExecutionReport(preview.Plan);
                 Status = CastingRunPresentation.CombatRefusalText;
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Refused, Status, preview.Plan.Steps.Count, 0, 0));
-                _log.Info("[KBP-QUICK] combat refused;group=" + routineId + ".");
+                _log.Info("[KBP-QUICK] combat refused at the final boundary;group=" +
+                    routineId + ".");
                 yield break;
             }
             string grantRefusal = null;

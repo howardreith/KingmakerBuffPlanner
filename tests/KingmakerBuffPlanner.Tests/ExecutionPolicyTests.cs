@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -24,6 +25,8 @@ namespace KingmakerBuffPlanner.Tests
         {
             Run("execution-policy-combat-refuses-both-modes-before-anything",
                 () => TestCombatRefusal(root));
+            Run("execution-policy-classic-combat-refuses-before-preparation",
+                () => TestClassicCombatAdmission(root));
             Run("execution-policy-strict-instant-blocker-is-casting-specific",
                 () => TestStrictInstantBlocker(root));
             Run("execution-policy-legacy-fallback-profile-never-animates",
@@ -120,6 +123,146 @@ namespace KingmakerBuffPlanner.Tests
                     throw new InvalidOperationException(mode + ": a press after combat did not run: " +
                         after.ReviewReason);
             }
+        }
+
+        // rc4 review finding 2: the boundaries a Classic routine run crosses
+        // in PlannerUiSession.PrepareAndCast, in its order - the refresh that
+        // rebinds and saves the profile, the preview/compiler, the review
+        // baseline read and its spending, the executor and the resources it
+        // spends - observed by counters and by the profile file itself.
+        private sealed class ClassicRunProbe
+        {
+            private readonly string _dir;
+            private readonly PlannerReviewCoordinator _review = new PlannerReviewCoordinator();
+            internal readonly List<QuickExecutionResult> Results = new List<QuickExecutionResult>();
+            internal bool Executing;
+            internal bool Combat;
+            internal int PreparationsStarted;
+            internal int PreparationsDisposed;
+            internal int Refreshes;
+            internal int ProfileWrites;
+            internal int Previews;
+            internal int ReviewReads;
+            internal int ReviewSpends;
+            internal int ExecutorCalls;
+            internal int ResourceSpends;
+
+            internal ClassicRunProbe(string dir)
+            {
+                _dir = dir;
+            }
+
+            internal string SettingsDirectory
+            {
+                get { return Path.Combine(_dir, "UserSettings"); }
+            }
+
+            internal int BoundariesCrossed
+            {
+                get
+                {
+                    return PreparationsStarted + Refreshes + ProfileWrites + Previews +
+                        ReviewReads + ReviewSpends + ExecutorCalls + ResourceSpends;
+                }
+            }
+
+            internal IEnumerator Start(string routineId)
+            {
+                return ClassicRoutineAdmission.Run(
+                    () => Executing,
+                    () => Results.Add(new QuickExecutionResult(routineId, "Long",
+                        QuickExecutionDisposition.Refused,
+                        "Another buff routine is already executing.", 0, 0, 0)),
+                    () => Combat,
+                    () => Results.Add(new QuickExecutionResult(routineId, "Long",
+                        QuickExecutionDisposition.Refused,
+                        CastingRunPresentation.CombatRefusalText, 0, 0, 0)),
+                    () => Prepare(routineId));
+            }
+
+            private IEnumerator Prepare(string routineId)
+            {
+                PreparationsStarted++;
+                try
+                {
+                    Refreshes++;
+                    new ProfileRepository(_dir).Save(BuffPlannerProfile.CreateDefault("probe-campaign"));
+                    ProfileWrites++;
+                    Previews++;
+                    _review.BaselineFor("probe-campaign", routineId);
+                    ReviewReads++;
+                    yield return null;
+                    _review.Spent(routineId);
+                    ReviewSpends++;
+                    ExecutorCalls++;
+                    ResourceSpends++;
+                    yield return null;
+                    Results.Add(new QuickExecutionResult(routineId, "Long",
+                        QuickExecutionDisposition.Completed, "cast", 1, 1, 1));
+                }
+                finally
+                {
+                    PreparationsDisposed++;
+                }
+            }
+        }
+
+        private static void TestClassicCombatAdmission(string root)
+        {
+            string dir = Path.Combine(root, "policy-classic-combat");
+            Directory.CreateDirectory(dir);
+
+            // Combat already active: one refusal with the global sentence,
+            // nothing yielded, and no boundary crossed.
+            var combat = new ClassicRunProbe(dir) { Combat = true };
+            IEnumerator refused = combat.Start("long");
+            int yielded = 0;
+            while (refused.MoveNext()) yielded++;
+            if (yielded != 0 || combat.Results.Count != 1 ||
+                combat.Results[0].Disposition != QuickExecutionDisposition.Refused ||
+                combat.Results[0].Message != "Buff routines cannot run during combat." ||
+                combat.Results[0].Planned != 0 || combat.Results[0].Submitted != 0)
+                throw new InvalidOperationException("The Classic run did not refuse combat once, " +
+                    "at once, with the global sentence.");
+            if (combat.BoundariesCrossed != 0 || combat.PreparationsDisposed != 0 ||
+                Directory.Exists(combat.SettingsDirectory))
+                throw new InvalidOperationException("Combat crossed a Classic preparation boundary: " +
+                    "refresh=" + combat.Refreshes + ";profile-writes=" + combat.ProfileWrites +
+                    ";previews=" + combat.Previews + ";review=" + combat.ReviewReads + "/" +
+                    combat.ReviewSpends + ";executor=" + combat.ExecutorCalls + ";resources=" +
+                    combat.ResourceSpends + ".");
+
+            // A routine already running is refused first, combat or not.
+            var busy = new ClassicRunProbe(dir) { Combat = true, Executing = true };
+            IEnumerator busyRun = busy.Start("long");
+            while (busyRun.MoveNext()) { }
+            if (busy.Results.Count != 1 ||
+                busy.Results[0].Message != "Another buff routine is already executing." ||
+                busy.BoundariesCrossed != 0 || Directory.Exists(busy.SettingsDirectory))
+                throw new InvalidOperationException("The running-routine guard did not come first.");
+
+            // Out of combat the same probe crosses every boundary, so the
+            // counters above could see the work they found absent.
+            var peace = new ClassicRunProbe(dir);
+            IEnumerator run = peace.Start("long");
+            while (run.MoveNext()) { }
+            if (peace.PreparationsStarted != 1 || peace.Refreshes != 1 || peace.ProfileWrites != 1 ||
+                peace.Previews != 1 || peace.ReviewReads != 1 || peace.ReviewSpends != 1 ||
+                peace.ExecutorCalls != 1 || peace.ResourceSpends != 1 ||
+                peace.PreparationsDisposed != 1 || peace.Results.Count != 1 ||
+                peace.Results[0].Disposition != QuickExecutionDisposition.Completed ||
+                !File.Exists(new ProfileRepository(dir).GetProfilePath("probe-campaign")))
+                throw new InvalidOperationException("An admitted Classic run did not cross its boundaries.");
+
+            // Disposing an admitted run part-way disposes its preparation
+            // before anything after the stop point runs.
+            var stopped = new ClassicRunProbe(Path.Combine(dir, "stopped"));
+            IEnumerator partial = stopped.Start("long");
+            Assert(partial.MoveNext());
+            ((IDisposable)partial).Dispose();
+            if (stopped.PreparationsDisposed != 1 || stopped.ReviewSpends != 0 ||
+                stopped.ExecutorCalls != 0 || stopped.Results.Count != 0)
+                throw new InvalidOperationException("Stopping the Classic run did not dispose its preparation.");
         }
 
         private static void TestStrictInstantBlocker(string root)
