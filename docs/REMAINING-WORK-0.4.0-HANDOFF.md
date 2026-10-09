@@ -19,11 +19,11 @@ bulky evidence stays under the lab's `runtime-evidence\<runId>\`.
 | Package | Commits | Regressed | Source-qualified | Native-qualified | Owner |
 |---|---|---|---|---|---|
 | WP2B spellbook entry | `e84a892` `e29c4ec` `11a30db` | yes | focused | physical PASS (`kbp040-wp2b-spellbook-02`) | pending |
-| WP4 execution policy | `d0d43e4` `512af36` | yes | focused + full unit | pending (integrated campaign) | pending |
-| WP3 direct manipulation | `0274b7c` `898cfeb` | yes | focused + full unit | pending (integrated campaign) | pending |
-| WP6 Magic Circle | `3c80ed0` | yes | focused + full unit | pending (sticky-touch qualification recipe) | pending |
-| WP5 catalogue audit | `d8614ef` | yes | focused + full unit | catalogue exports running | pending |
-| WP7 parchment | in progress | | | | pending |
+| WP4 execution policy | `d0d43e4` `512af36` | yes | focused + full unit | physical `combat` expectation built (`fe06e26`); runs in the campaign | pending |
+| WP3 direct manipulation | `0274b7c` `898cfeb` `14c7902` | yes | focused + full unit | physical `authoring` expectation built (`fe06e26`); runs in the campaign | pending |
+| WP6 Magic Circle | `3c80ed0` + recipe `ad7ca01` `2dde708` `2ec8e63` | yes | focused + full unit | `sticky-touch-direct` recipe built; runs in the campaign | pending |
+| WP5 catalogue audit | `d8614ef` | yes | focused + full unit | catalogue exports PASS (native-only, full-user); in-game buff list spot check | pending |
+| WP7 parchment | `d85e6e5` `ff9e877` `17d7420` `91d1c6e` `7383347` `d8b659e` | yes | focused + full unit | live paper drawn at 1920x1080 and 1280x720 (`kbp040-wp7-sel-*`) | pending (visual judgement is the owner's) |
 
 "Full unit" is the complete `KingmakerBuffPlanner.Tests.exe` suite (446/446 at
 `d8614ef`), not the complete `Test-SourceOnly.ps1` gate.
@@ -234,4 +234,91 @@ and selection markers (School Understanding, Cold Snap, Deadeye, Heaven's
 Leap, Wild Flanking Partner) that must not be planned; Elemental Bastion is
 the one entry whose exclusion may be a loss. An include override in
 `NativeEffectOverrides.json` would restore it if wanted.
+
+## WP7 — parchment and spell-scroll visual overhaul
+
+References (details, provenance and licensing: `docs/VISUAL-THEME.md`):
+the Teleport modal of KingmakerGunslinger (it is the native world-map
+`GlobalMapMessageBox`; the mod draws only hairline dividers) and Roll for
+Stats in KingmakerDiceRoller (it borrows the native `dialogue_backsheet`
+sheet at runtime and draws it as a half-scale nine-sliced layer with a soft
+shadow). Neither ships game art, and neither does the planner.
+
+Implementation (`d85e6e5` `ff9e877` `17d7420` `91d1c6e`, merged): two new
+capabilities in the existing native-theme resolver, each with an exact
+contract checked before use and failing on its own:
+`ScrollPaper` (`dialogue_backsheet`, 858x551, border 268/169/258/165, 200 PPU)
+and `ScrollRule` (`blockscroll_bottom`, 147x11, border 20/0/20/0), both found
+under the in-game `CharacterBuild` UI. The workspace frame and the spell
+description draw the paper as a layer at scale 0.25 x spritePPU / canvas
+reference PPU (0.5 at the expected 100), so the borders are drawn at
+67/42.25/64.5/41.25 units and never stretched; the paper overhangs the frame
+so its folded bands stay outside the header and footer. Any failure restores
+the previous flat look exactly. The description is a spell scroll (title,
+duration/meta line, rule, native read-only body with its own wheel); Escape
+closes it first; a complete click outside closes it and is consumed. The
+theme summary and `physical-workspace.json` (`workspacePaperEvidence`,
+`inspectPaperEvidence`) record what was drawn. Tests: `wp7-*` (9).
+
+Display: this session's display is 1920x1080, so the launcher refuses
+`windowed-2560x1440`; `168ad8d` adds `windowed-1600x900` and
+`windowed-1280x720` as the meaningfully different supported sizes. An
+alternate in-game UI scale would change the owner's game settings and was not
+practical.
+
+## Integration
+
+Integration branch `claude/kbp-040-integration` (worktree
+`private\worktrees\KBP040-INT`): `fe06e26` + merge of the WP6 qualification
+recipe branch `claude/kbp-040-wp6-sticky-recipe` (`ad7ca01` `2dde708`
+`2ec8e63`) + merge of `claude/kbp-040-wp7-parchment`; conflicts were only
+the two test-registration lines (union). Full unit suite 468/468;
+Validate-Source 42/42.
+
+Live WP7 findings (each fixed with a regression):
+
+- `kbp040-wp7-sel-1080-01` (on `3cb3f90`, windowed 1920x1080, PASS): both
+  donors resolved (`paper=native`, refPPU 100, borders 67/42.3/64.5/41.3,
+  undistorted; ornament rules drawn), the description read as a spell
+  scroll, but every lane well looked like an opaque reddish-brown slab:
+  Unity's Outline effect fills a translucent wash with its colour. Fixed in
+  `7383347` (a translucent wash drops its Outline).
+- `kbp040-wp7-sel-1080-02` (on `7383347`, PASS): the paper shows through
+  every lane; cards, portraits and inks legible. `kbp040-wp7-sel-720-01`
+  (1280x720, PASS): every key control on screen and the description scroll
+  intact, but the header rule struck through the "Routine:" row. Fixed in
+  `d8b659e` (the rule sits in the gap above the routines, or is hidden).
+  Known 720p limitation, not WP7: the catalogue's Spells/Abilities tab
+  captions wrap at that width.
+- The same runs are the in-game WP5 spot check on the standard party: the
+  buff list shows Aid Another (AC / Attack) and Resistance only - Light,
+  Treat Affliction and Treat Deadly Wounds, offered by 0.3.0, are gone.
+
+WP3 defect found while building the physical gesture run (`14c7902`): with
+a casting focused, a caster who can cast the buff in more than one way was
+refused, but the graph draws source rows for the chosen caster only and the
+refusal left the previous caster chosen, so that caster's rows never
+appeared and the provider could not be changed to it. The ambiguous click
+now shows that caster's rows (focus kept); the regression fails without it.
+
+Physical evidence harness (`fe06e26`, `3cb3f90`): `live-workspace-physical`
+gains `-PhysicalExpectation combat` (a moon press while the host holds a
+party member in the game's combat state - `UnitEntityData.JoinCombat`, no
+enemy, the group's leave timer kept at zero - must be refused for combat
+before dispatch with nothing spent; then the ordinary press reaches the
+lock) and `-PhysicalExpectation authoring` (caster, exact row, portrait add,
+same-portrait remove, re-add, retarget, provider change when a second caster
+is on screen, Undo, card focus, Escape leaves the focus, Escape closes).
+The launcher's outcome checks and their fixtures cover both. The launcher
+meta-test (`Test-RuntimeLauncherFileWhatIf.ps1`) passes all its layers with
+the three lab-wide purity windows stubbed (`PASS=13`); the windows run in the
+final complete gate.
+
+Strict-Instant blocker, native: not runnable on the 0.4.0 candidate. After
+WP6 no guarded fixture has an animated-only source (the advanced fixture's
+only ones were the Magic Circle variants; the standard party has Resistance,
+Aid Another and the Heal skill). The blocker, its WP2A deep link and the
+strict hybrid refusal are proven by the real compiler, gate, navigation and
+executor in `ExecutionPolicyTests`. Explicit Animated is exercised natively
+by the `sticky-touch-direct` animated casting run.
 
