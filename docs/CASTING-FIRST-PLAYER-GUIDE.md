@@ -107,10 +107,22 @@ plan itself could not be read).
 ## Reading a spell's full description
 
 Right-click a buff in the list, the selected buff's header, or a casting
-card: the game's own full description of that exact spell opens in a
-panel. Long descriptions scroll with the mouse wheel. **Escape** closes the
-description first, then the planner; the planner's Escape never opens the
-game's own menu. Reading descriptions never changes the plan.
+card: the game's own full description of that exact spell opens as a spell
+scroll, with the spell's name, a line with its duration (and whether you
+are reading the exact source you selected), and the description below.
+Long descriptions scroll with the mouse wheel; the wheel never moves the
+planner behind the scroll. **Escape** closes the description first, then
+the planner; the planner's Escape never opens the game's own menu.
+
+Clicking anywhere outside the scroll (on the dimmed planner) also closes
+the description, and that click does nothing else: it does not select,
+add or change anything underneath, and never reaches the game. To read
+another spell, right-click it once the description has closed. Reading
+descriptions never changes the plan.
+
+When the game's own parchment can be borrowed, the planner and the scroll
+are drawn on it; otherwise they keep the plain parchment colour. Both look
+and work the same way.
 
 ## Running a routine
 

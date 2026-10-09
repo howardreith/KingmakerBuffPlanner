@@ -3996,6 +3996,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.InspectOverflow = view.SpellInspectOverflowForRuntime;
                 _physicalRecord.InspectScrollBefore = view.SpellInspectScrollPositionForRuntime;
                 _physicalRecord.GraphScrollUnderInspectBefore = view.GraphScrollPositionForRuntime;
+                // What the frames above show (WP7): the paper each surface drew.
+                _physicalRecord.WorkspacePaperEvidence = view.WorkspacePaperEvidenceForRuntime;
+                _physicalRecord.InspectPaperEvidence = view.SpellInspectPaperEvidenceForRuntime;
                 Vector2? centre = view.SpellInspectPanelCentreForRuntime;
                 if (centre == null) return FinishPhysical("inspect-panel-not-on-screen");
                 // The wheel over the open description belongs to it: the
@@ -4410,6 +4413,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "inspectOpenAfterWheels", Nullable(record.InspectOpenAfterWheels) },
                 { "graphScrollUnderInspectBefore", Nullable(record.GraphScrollUnderInspectBefore) },
                 { "graphScrollUnderInspectAfter", Nullable(record.GraphScrollUnderInspectAfter) },
+                { "workspacePaperEvidence", record.WorkspacePaperEvidence },
+                { "inspectPaperEvidence", record.InspectPaperEvidence },
                 { "documentSignatureBeforeBrowse", record.DocumentSignatureBeforeBrowse },
                 { "documentSignatureAfterInspect", record.DocumentSignatureAfterInspect },
                 { "notes", new JArray(record.Notes.Cast<object>().ToArray()) },

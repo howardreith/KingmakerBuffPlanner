@@ -2,6 +2,34 @@
 
 # Architecture
 
+## 0.4.0 WP7 scroll paper and spell scroll
+
+The casting-first workspace and its right-click description are drawn on the
+game's own parchment sheet (`dialogue_backsheet`) with the game's scroll rule
+(`blockscroll_bottom`), borrowed at runtime; full record, references,
+provenance and qualification gaps in [VISUAL-THEME.md](VISUAL-THEME.md).
+
+- Donors: two capabilities of the existing native-theme machinery
+  (`ScrollPaper`, `ScrollRule`), bounded candidate paths under
+  `StaticCanvas/CharacterBuild`, validated by the Unity adapter against exact
+  `NativeSpriteContract`s; each fails alone and is recorded in the summary.
+- Unity-free logic: `NativeSpriteContract` (exact contract),
+  `ParchmentLayerGeometry` (layer scale `0.25 * spritePPU / canvasReferencePPU`,
+  anchors `0.5 -/+ 0.5/s`, drawn borders, corner-safe minimum),
+  `ParchmentRulePolicy`, `PlannerParchmentPalette` (measured paper, inks,
+  washes), and `SpellScrollModalState` / `SpellScrollContent` /
+  `SpellScrollLayout` (input policy, native text composition, hierarchy).
+- Unity adapters: `ParchmentSurface` (owned shadow + sheet layers, washes,
+  exact fallback), `ParchmentRule`, `SpellScrollBackdrop` (the outside-click
+  and wheel sink), wired by `PlannerNativeThemeSurface` bindings so a surface
+  registered late (the lazily built scroll) takes the current donors.
+- The view (`CastingWorkspaceScreenView`) only registers surfaces, washes and
+  rules and routes Escape, the backdrop click and the backdrop wheel through
+  `SpellScrollModalState`; no planner state, no persistence, no command.
+- Evidence: `[KBP-THEME] parchment ...` log line, the workspace presentation
+  evidence, and `workspacePaperEvidence` / `inspectPaperEvidence` in the
+  physical record (diagnostic only).
+
 ## 2026-09-06 failed human validation: routing diagnosis
 
 Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.

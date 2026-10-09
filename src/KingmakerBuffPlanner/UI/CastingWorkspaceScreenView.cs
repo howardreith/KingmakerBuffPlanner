@@ -34,9 +34,10 @@ namespace KingmakerBuffPlanner.UI
 
         private static readonly Color Ink = new Color(0.20f, 0.14f, 0.10f, 0.85f);
         private static readonly Color InkFaint = new Color(0.20f, 0.14f, 0.10f, 0.35f);
-        private static readonly Color Burgundy = new Color(0.55f, 0.13f, 0.08f, 1f);
-        private static readonly Color BlockedInk = new Color(0.72f, 0.26f, 0.12f, 0.95f);
-        private static readonly Color LegalInk = new Color(0.22f, 0.42f, 0.22f, 0.95f);
+        // The inks the contrast tests measure on the paper (WP7).
+        private static readonly Color Burgundy = KingmakerUiFactory.ToColor(PlannerParchmentPalette.Burgundy);
+        private static readonly Color BlockedInk = KingmakerUiFactory.ToColor(PlannerParchmentPalette.BlockedInk, 0.95f);
+        private static readonly Color LegalInk = KingmakerUiFactory.ToColor(PlannerParchmentPalette.LegalInk, 0.95f);
         private const float LineThickness = 2f;
         private const float SelectedLineThickness = 4f;
         private const float CorridorThickness = 24f;
@@ -50,11 +51,13 @@ namespace KingmakerBuffPlanner.UI
         private PlannerNativeThemeSurface _nativeTheme;
         private RectTransform _root;
         private RectTransform _frame;
+        // WP7: the frame's native scroll paper (exact fallback: the flat
+        // tint and outline above).
+        private ParchmentSurface _frameParchment;
         private int _uiLayer;
         private bool _disposed;
         private bool _importAnnounced;
         private float _reloadArmedUntil;
-        private string _pageArtEvidence = "page=fallback;not-attempted";
         private CastingGraphView _lastView;
         private GraphLayoutResult _lastLayout;
         private GraphLayoutMetrics _lastMetrics;
@@ -92,6 +95,7 @@ namespace KingmakerBuffPlanner.UI
         private Text _footerOnePass;
         private Text _footerResult;
         private Text _footerSave;
+        private Image _footerLedger;
         private Button _footerRecovery;
         private string _shownSaveState;
         private Button _modeButton;
@@ -101,15 +105,18 @@ namespace KingmakerBuffPlanner.UI
         // Right-click spell description panel (everyday-use v1.2): a
         // read-only, scrollable presentation of the exact concrete
         // variant's native localized description. It never authors,
-        // targets, casts or persists anything.
+        // targets, casts or persists anything. WP7 draws it as a spell
+        // scroll (title / meta / rule / body on the native paper) whose
+        // input policy is SpellScrollModalState.
+        private readonly SpellScrollModalState _inspectState = new SpellScrollModalState();
         private RectTransform _inspectRoot;
         private Text _inspectTitle;
         private Text _inspectMeta;
         private Text _inspectBody;
         private ScrollRect _inspectScroll;
         private RectTransform _inspectPanel;
-        private const float InspectPanelWidth = 760f;
-        private const float InspectPanelHeight = 520f;
+        private ParchmentSurface _inspectParchment;
+        private ParchmentRule _inspectRule;
 
         internal CastingWorkspaceScreenView(
             StaticCanvas nativeCanvas,
@@ -136,7 +143,19 @@ namespace KingmakerBuffPlanner.UI
             get { return _root == null ? null : _root.gameObject; }
         }
 
-        internal string PageArtEvidence { get { return _pageArtEvidence; } }
+        // Everyday-use v1.2's one continuous scroll (the two-page book art
+        // stays retired), now drawn on the native paper when its donor
+        // validates: which donors were borrowed and what every parchment
+        // surface and rule drew (WP7).
+        internal string PageArtEvidence
+        {
+            get { return "page=continuous-scroll;book-art-retired;" + WorkspacePaperEvidenceForRuntime; }
+        }
+
+        internal string WorkspacePaperEvidenceForRuntime
+        {
+            get { return _nativeTheme == null ? "parchment=unavailable" : _nativeTheme.ParchmentEvidence; }
+        }
 
         // The last rendered read model and geometry (runtime evidence only).
         internal CastingGraphView LastGraphForRuntime { get { return _lastView; } }
@@ -158,9 +177,9 @@ namespace KingmakerBuffPlanner.UI
             if (_disposed) return false;
             // The description panel is the innermost surface: Escape closes
             // it first, leaving the planner exactly as it was.
-            if (_inspectRoot != null && _inspectRoot.gameObject.activeSelf)
+            if (_inspectState.Handle(SpellScrollInput.Escape) == SpellScrollOutcome.Closed)
             {
-                CloseSpellInspect();
+                SyncSpellInspect();
                 return true;
             }
             if (_session.EditingFocusCastingId == null) return false;
@@ -531,14 +550,18 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.Stretch(_frame, 24, 24, 24, 60);
             // Everyday-use v1.2: one continuous scroll. The borrowed
             // two-page book sprite (with its central binding under the
-            // graph connections) is retired; the composed continuous
-            // native-compatible parchment below IS the writing surface.
-            _pageArtEvidence = ApplyContinuousScrollArt(_frame);
+            // graph connections) stays retired. WP7: the continuous
+            // writing surface is the native scroll paper, one sheet with no
+            // central fold, drawn under every lane; the flat tint and
+            // outline above remain its exact fallback.
+            _frameParchment = ParchmentSurface.Create(ParchmentSurfaces.WorkspaceFrame, _frame,
+                ParchmentSurfaces.WorkspaceFrameOutsets);
             BuildHeader(_frame);
             BuildCatalogue(_frame);
             BuildGraphArea(_frame);
             BuildInspector(_frame);
             BuildFooter(_frame);
+            ApplyScrollPaper();
             PropagateUiLayer();
         }
 
@@ -551,14 +574,35 @@ namespace KingmakerBuffPlanner.UI
             "ServiceWindow/CharacterScreen/BookBackground"
         };
 
-        // The continuous writing surface: the composed parchment frame with
-        // no central fold. A native continuous-paper donor may replace the
-        // composed tint when one is verified; nothing here mutates a donor.
-        private static string ApplyContinuousScrollArt(RectTransform frame)
+        // The frame's paper and its scroll rules. The lanes' flat wells and
+        // the footer ledger become light washes on the paper so the sheet
+        // shows through while each lane keeps its edge; the rules under the
+        // header and above the footer close the scroll's body (hidden
+        // without the paper, so a failed theme is exactly the flat look).
+        // Nothing here reads or mutates a donor: the theme surface hands the
+        // validated ScrollPaper/ScrollRule donors to these owned layers.
+        private void ApplyScrollPaper()
         {
-            string evidence = "page=continuous-scroll;book-art-retired";
-            Debug.Log("[KBP-THEME] workspace page art " + evidence);
-            return evidence;
+            foreach (ScrollRect lane in new[] { CatalogueScroll(), _graphScroll, _inspectorScroll })
+                if (lane != null)
+                    _frameParchment.AddWash(lane.GetComponent<Image>(), PlannerParchmentPalette.WellWashAlpha, true);
+            _frameParchment.AddWash(_footerLedger, PlannerParchmentPalette.LedgerWashAlpha, true);
+            // Between the header row (its controls end 41 units down) and
+            // the routine bar; and in the gap between the lanes (8.5% of the
+            // frame up) and the footer (7.8%).
+            ParchmentRule header = ParchmentRule.Create("HeaderRule", _frame, _frameParchment, false);
+            KingmakerUiFactory.SetAnchors(header.Rect, 0.028f, 1f, 0.972f, 1f);
+            header.Rect.anchoredPosition = new Vector2(0f, -45f);
+            ParchmentRule footer = ParchmentRule.Create("FooterRule", _frame, _frameParchment, false);
+            KingmakerUiFactory.SetAnchors(footer.Rect, 0.028f, 0.0815f, 0.972f, 0.0815f);
+            // The rules are part of the sheet: drawn right above the paper
+            // and beneath every control, so a crowded small screen covers
+            // them instead of striking through its routine tabs.
+            header.Rect.SetSiblingIndex(1);
+            footer.Rect.SetSiblingIndex(2);
+            _nativeTheme.RegisterParchment(_frameParchment);
+            _nativeTheme.RegisterRule(header);
+            _nativeTheme.RegisterRule(footer);
         }
 
         // ------------------------------------------------------------------
@@ -579,7 +623,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal bool SpellInspectOpen
         {
-            get { return _inspectRoot != null && _inspectRoot.gameObject.activeSelf; }
+            get { return _inspectState.IsOpen && _inspectRoot != null && _inspectRoot.gameObject.activeSelf; }
         }
 
         internal void ShowSpellInspect(string title, string description, string durationText,
@@ -587,31 +631,55 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed || _frame == null) return;
             if (_inspectRoot == null) BuildSpellInspect();
-            _inspectTitle.text = title ?? string.Empty;
-            string meta = (durationText ?? string.Empty).Trim();
-            _inspectMeta.text = (meta.Length == 0 ? string.Empty : meta + "  ·  ") +
-                (exactVariant ? "exact selected source" : "base spell — select a caster/source for exact values");
-            _inspectBody.text = string.IsNullOrWhiteSpace(description)
-                ? "The game provides no description for this spell."
-                : description;
-            _inspectRoot.gameObject.SetActive(true);
-            if (_inspectScroll != null) _inspectScroll.verticalNormalizedPosition = 1f;
+            _inspectState.Open(SpellScrollContent.Compose(title, description, durationText, exactVariant));
+            SpellScrollContent content = _inspectState.Content;
+            _inspectTitle.text = content.Title;
+            _inspectMeta.text = content.Meta;
+            // The exact native localized description, read-only (a Text,
+            // never an input), unaltered.
+            _inspectBody.text = content.Body;
+            SyncSpellInspect();
+            if (_inspectScroll != null)
+            {
+                _inspectScroll.StopMovement();
+                _inspectScroll.verticalNormalizedPosition = 1f;
+            }
             PropagateUiLayer();
         }
 
         internal void CloseSpellInspect()
         {
-            if (_inspectRoot != null) _inspectRoot.gameObject.SetActive(false);
+            _inspectState.Close();
+            SyncSpellInspect();
+        }
+
+        // The scroll's GameObject shows exactly the policy's open state.
+        private void SyncSpellInspect()
+        {
+            if (_inspectRoot != null && _inspectRoot.gameObject.activeSelf != _inspectState.IsOpen)
+                _inspectRoot.gameObject.SetActive(_inspectState.IsOpen);
+        }
+
+        private void SpellInspectInput(SpellScrollInput input)
+        {
+            if (_inspectState.Handle(input) == SpellScrollOutcome.Closed) SyncSpellInspect();
         }
 
         private void BuildSpellInspect()
         {
             _inspectRoot = KingmakerUiFactory.CreateRect("SpellInspect", _root);
-            KingmakerUiFactory.AddPanel(_inspectRoot, new Color(0f, 0f, 0f, 0.35f));
             KingmakerUiFactory.Stretch(_inspectRoot);
-            // The panel consumes every click over itself (a full-block
-            // graphic is already the background) so a right-click can never
-            // fall through to the graph beneath.
+            // Outside the scroll there is only the dimmed backdrop: it takes
+            // every press, click and wheel there (a click closes the
+            // description, SpellScrollModalState), so nothing falls through
+            // to the graph or the game. The scroll is the backdrop's sibling,
+            // so its own clicks never bubble to it.
+            RectTransform backdrop = KingmakerUiFactory.CreateRect("Backdrop", _inspectRoot);
+            KingmakerUiFactory.AddPanel(backdrop, new Color(0f, 0f, 0f, 0.35f));
+            KingmakerUiFactory.Stretch(backdrop);
+            SpellScrollBackdrop sink = backdrop.gameObject.AddComponent<SpellScrollBackdrop>();
+            sink.OutsideClick = () => SpellInspectInput(SpellScrollInput.ClickOutsideScroll);
+            sink.Wheel = () => SpellInspectInput(SpellScrollInput.WheelElsewhere);
             // A fixed-size panel centred on the dimmed overlay. SetAnchors'
             // offsets are edge insets, not a size: the earlier point anchor
             // with insets 760/520 gave the panel a negative width and no
@@ -620,33 +688,82 @@ namespace KingmakerBuffPlanner.UI
             // physical-cf-inspect.png); the Close button had the same fault.
             RectTransform panel = KingmakerUiFactory.CreateRect("Panel", _inspectRoot);
             KingmakerUiFactory.AddFramedPanel(panel, _theme.ParchmentPanel, _theme.GoldAccent, 2f);
-            CentreFixed(panel, new Vector2(0.5f, 0.5f), new Vector2(InspectPanelWidth, InspectPanelHeight),
-                Vector2.zero);
+            CentreFixed(panel, new Vector2(0.5f, 0.5f),
+                new Vector2(SpellScrollLayout.PanelWidth, SpellScrollLayout.PanelHeight), Vector2.zero);
             _inspectPanel = panel;
-            _inspectTitle = KingmakerUiFactory.CreateText("Title", panel, _theme, string.Empty, 20,
-                TextAnchor.MiddleLeft);
+            // WP7: the spell scroll - the native paper behind a centred
+            // title, the meta line, a scroll rule and the scrolling body.
+            _inspectParchment = ParchmentSurface.Create(ParchmentSurfaces.SpellScroll, panel,
+                ParchmentSurfaces.SpellScrollOutsets);
+            SpellScrollLayout layout = SpellScrollLayout.Compute(SpellScrollLayout.PanelWidth,
+                SpellScrollLayout.PanelHeight);
+            _inspectTitle = KingmakerUiFactory.CreateText("Title", panel, _theme, string.Empty,
+                SpellScrollLayout.TitleFontSize, TextAnchor.MiddleCenter);
             _inspectTitle.fontStyle = FontStyle.Bold;
-            KingmakerUiFactory.SetAnchors(_inspectTitle.rectTransform, 0f, 1f, 1f, 1f, 16f, 132f, -44f, 10f);
-            _inspectMeta = KingmakerUiFactory.CreateText("Meta", panel, _theme, string.Empty, 13,
-                TextAnchor.MiddleLeft);
-            _inspectMeta.color = _theme.MutedBrownText;
-            KingmakerUiFactory.SetAnchors(_inspectMeta.rectTransform, 0f, 1f, 1f, 1f, 16f, 16f, -68f, 46f);
+            _inspectTitle.color = KingmakerUiFactory.ToColor(PlannerParchmentPalette.HeadingInk);
+            _inspectTitle.resizeTextForBestFit = true;
+            _inspectTitle.resizeTextMinSize = SpellScrollLayout.TitleMinimumFontSize;
+            _inspectTitle.resizeTextMaxSize = SpellScrollLayout.TitleFontSize;
+            Place(_inspectTitle.rectTransform, layout.Title.X, layout.Title.Y, layout.Title.Width,
+                layout.Title.Height);
+            _inspectMeta = KingmakerUiFactory.CreateText("Meta", panel, _theme, string.Empty,
+                SpellScrollLayout.MetaFontSize, TextAnchor.MiddleCenter);
+            _inspectMeta.fontStyle = FontStyle.Italic;
+            _inspectMeta.color = KingmakerUiFactory.ToColor(PlannerParchmentPalette.MetaInk);
+            Place(_inspectMeta.rectTransform, layout.Meta.X, layout.Meta.Y, layout.Meta.Width, layout.Meta.Height);
+            _inspectRule = ParchmentRule.Create("Rule", panel, _inspectParchment, true);
+            RectTransform rule = _inspectRule.Rect;
+            rule.anchorMin = new Vector2(0f, 1f);
+            rule.anchorMax = new Vector2(0f, 1f);
+            rule.pivot = new Vector2(0.5f, 0.5f);
+            rule.sizeDelta = new Vector2(layout.Rule.Width, layout.Rule.Height);
+            rule.anchoredPosition = new Vector2(layout.Rule.X + layout.Rule.Width / 2f,
+                -(layout.Rule.Y + layout.Rule.Height / 2f));
             Button close = KingmakerUiFactory.CreateButton("Close", panel, _theme, "Close",
                 CloseSpellInspect);
-            CentreFixed(RectOf(close), new Vector2(1f, 1f), new Vector2(110f, 32f), new Vector2(-12f, -10f));
+            Place(RectOf(close), layout.Close.X, layout.Close.Y, layout.Close.Width, layout.Close.Height);
             // The description scrolls inside the planner's standard scroll
             // view: the content's height follows the wrapped text through the
-            // view's layout group, so long text can be wheeled through.
+            // view's layout group, so long text can be wheeled through; the
+            // bar appears only when the text overflows. The wheel over it
+            // reaches this ScrollRect first and stops there: the planner's
+            // scrolls beneath never see it.
             RectTransform content;
-            _inspectScroll = KingmakerUiFactory.CreateScrollView("Description", panel, _theme, out content);
-            KingmakerUiFactory.Stretch(RectOf(_inspectScroll), 12, 12, 12, 76);
+            _inspectScroll = KingmakerUiFactory.CreateScrollView("Description", panel, _theme, out content,
+                SpellScrollLayout.BodyScrollbarWidth);
+            _inspectScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            Place(RectOf(_inspectScroll), layout.Body.X, layout.Body.Y, layout.Body.Width, layout.Body.Height);
             ContentSizeFitter fitter = content.gameObject.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            _inspectBody = KingmakerUiFactory.CreateText("Body", content, _theme, string.Empty, 15,
-                TextAnchor.UpperLeft);
+            _inspectBody = KingmakerUiFactory.CreateText("Body", content, _theme, string.Empty,
+                SpellScrollLayout.BodyFontSize, TextAnchor.UpperLeft);
+            _inspectBody.color = KingmakerUiFactory.ToColor(PlannerParchmentPalette.PrimaryInk);
             _inspectBody.horizontalOverflow = HorizontalWrapMode.Wrap;
             _inspectBody.verticalOverflow = VerticalWrapMode.Overflow;
+            // On the paper the body sits straight on the sheet; the flat
+            // well and its outline are the exact fallback.
+            _inspectParchment.AddWash(RectOf(_inspectScroll).GetComponent<Image>(), 0f, false);
+            if (_nativeTheme != null)
+            {
+                _nativeTheme.RegisterParchment(_inspectParchment);
+                _nativeTheme.RegisterRule(_inspectRule);
+                // Built after the last rebuild pass: borrow the native fonts,
+                // button artwork and click sound now, not at the next refresh.
+                _nativeTheme.ApplyTo(_inspectRoot);
+            }
             _inspectRoot.gameObject.SetActive(false);
+        }
+
+        // What the open spell scroll drew and its input policy (runtime
+        // evidence only).
+        internal string SpellInspectPaperEvidenceForRuntime
+        {
+            get
+            {
+                if (_inspectParchment == null) return "spell-scroll=not-built";
+                return _inspectParchment.Evidence + "|" + _inspectRule.Evidence + "|input=" +
+                    SpellScrollModalState.OutsideClickPolicy;
+            }
         }
 
         // Fixed size at an anchor point: the pivot is the anchor, so the
@@ -1029,6 +1146,7 @@ namespace KingmakerBuffPlanner.UI
             Image ground = KingmakerUiFactory.AddFramedPanel(ledger, _theme.ParchmentRaised, _theme.GoldAccent);
             ground.raycastTarget = false;
             ledger.SetAsFirstSibling();
+            _footerLedger = ground;
             _footerResult.text = DescribeReadiness();
             ShowSaveState();
         }
@@ -1420,8 +1538,10 @@ namespace KingmakerBuffPlanner.UI
             string captured = casting.CastingId;
             RectTransform rect = Place(KingmakerUiFactory.CreateRect("Casting." + casting.CastingId, layer),
                 placement.Left.X, placement.Top, m.ChipWidth, m.ChipHeight);
-            Image background = KingmakerUiFactory.AddPanel(rect, casting.Selected
-                ? new Color(1f, 0.93f, 0.80f, 1f) : new Color(0.99f, 0.95f, 0.86f, 1f));
+            // Opaque on the paper too: the chip's state reads from its own
+            // ground, outline and status ink (contrast-tested, WP7).
+            Image background = KingmakerUiFactory.AddPanel(rect, KingmakerUiFactory.ToColor(casting.Selected
+                ? PlannerParchmentPalette.ChipGroundSelected : PlannerParchmentPalette.ChipGround));
             Outline outline = rect.gameObject.AddComponent<Outline>();
             outline.effectColor = casting.Selected ? Burgundy
                 : casting.Readiness == ResolvedCastingReadiness.Blocked ? BlockedInk : Ink;
