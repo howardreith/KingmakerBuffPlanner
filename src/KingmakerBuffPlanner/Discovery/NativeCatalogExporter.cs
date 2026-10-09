@@ -1,12 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Kingmaker.Blueprints;
+using Kingmaker.Blueprints.Facts;
 using Kingmaker.Blueprints.Items.Ecnchantments;
 using Kingmaker.Designers.Mechanics.Buffs;
+using Kingmaker.ElementsSystem;
 using Kingmaker.UnitLogic.Buffs.Blueprints;
 using Kingmaker.UnitLogic.FactLogic;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
+using Kingmaker.UnitLogic.Abilities.Components.CasterCheckers;
+using Kingmaker.UnitLogic.Abilities.Components.TargetCheckers;
+using Kingmaker.UnitLogic.Mechanics.Components;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.GameAdapters;
 using Newtonsoft.Json;
@@ -97,6 +103,7 @@ namespace KingmakerBuffPlanner.Discovery
                             .Where(v => !string.IsNullOrEmpty(v)).Distinct(StringComparer.Ordinal)
                             .OrderBy(v => v, StringComparer.Ordinal).ToArray(),
                         Effects = effects,
+                        SelfGatedFactIds = SelfGatedFactIds(ability),
                         RestorativeActions = scan.Diagnostics
                             .Where(d => d.Code == "restorative-action")
                             .Select(d => new NativeActionRecord
@@ -275,22 +282,8 @@ namespace KingmakerBuffPlanner.Discovery
                 AbilityComponentTypes = (ability.ComponentsArray ?? new BlueprintComponent[0])
                     .Where(c => c != null).Select(c => c.GetType().FullName)
                     .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToArray(),
-                Effects = (effects ?? new NativeEffectRecord[0]).Select(e => new NativeCandidateEffectFacts
-                {
-                    EffectId = e.EffectGuid,
-                    EffectName = e.EffectName,
-                    Kind = e.Kind,
-                    Target = e.Target,
-                    Harmful = e.Harmful,
-                    IsHiddenInUi = e.IsHiddenInUi,
-                    IsClassFeature = e.IsClassFeature,
-                    RemoveOnRest = e.RemoveOnRest,
-                    StayOnDeath = e.StayOnDeath,
-                    ComponentTypes = e.ComponentTypes,
-                    GrantedConditions = e.GrantedConditions,
-                    SourceContract = e.SourceContract,
-                    ActionPath = e.ActionPath
-                }).ToArray(),
+                Effects = (effects ?? new NativeEffectRecord[0]).Select(EffectFacts).ToArray(),
+                SelfGatedFactIds = SelfGatedFactIds(ability),
                 DiagnosticContracts = scanned.Select(d => d.NodeIdentity + "|" + d.Detail).ToArray(),
                 Diagnostics = scanned.Select(d => new NativeCandidateDiagnosticFacts
                 {
@@ -302,7 +295,128 @@ namespace KingmakerBuffPlanner.Discovery
             };
         }
 
+        private static NativeCandidateEffectFacts EffectFacts(NativeEffectRecord e)
+        {
+            return new NativeCandidateEffectFacts
+            {
+                EffectId = e.EffectGuid,
+                EffectName = e.EffectName,
+                Kind = e.Kind,
+                Target = e.Target,
+                Harmful = e.Harmful,
+                IsHiddenInUi = e.IsHiddenInUi,
+                IsClassFeature = e.IsClassFeature,
+                RemoveOnRest = e.RemoveOnRest,
+                StayOnDeath = e.StayOnDeath,
+                ComponentTypes = e.ComponentTypes,
+                GrantedConditions = e.GrantedConditions,
+                SourceContract = e.SourceContract,
+                ActionPath = e.ActionPath,
+                FactActions = (e.FactActions ?? new NativeFactActionsRecord[0]).Select(list =>
+                    new NativeCandidateFactActions
+                    {
+                        List = list.List,
+                        AppliedEffects = (list.AppliedEffects ?? new NativeEffectRecord[0])
+                            .Select(EffectFacts).ToArray(),
+                        Restorative = list.Restorative ?? new string[0],
+                        Offensive = list.Offensive ?? new string[0],
+                        Unrecognized = list.Unrecognized ?? new string[0]
+                    }).ToArray()
+            };
+        }
+
+        // The Call of the Wild hex lockout checker (exact contract: a
+        // BlueprintBuff[] CheckedBuffs field), read without a compile-time
+        // dependency (rc4 review finding 1).
+        internal const string CallOfTheWildHexLockout =
+            "CallOfTheWild.NewMechanics.AbilityTargetHasNoFactUnlessBuffsFromCaster";
+
+        // The facts an ability forbids its own target or caster to have, so
+        // it cannot be cast again while one is present (a cooldown or
+        // lockout when the ability also does something else).
+        internal static string[] SelfGatedFactIds(BlueprintAbility ability)
+        {
+            var ids = new SortedSet<string>(StringComparer.Ordinal);
+            BlueprintAbility delivery = ability.StickyTouch == null ? null : ability.StickyTouch.TouchDeliveryAbility;
+            foreach (BlueprintAbility owner in new[] { ability, delivery })
+            {
+                if (owner == null) continue;
+                foreach (BlueprintComponent component in owner.ComponentsArray ?? new BlueprintComponent[0])
+                {
+                    var target = component as AbilityTargetHasFact;
+                    if (target != null && target.Inverted) AddFacts(ids, target.CheckedFacts);
+                    var caster = component as AbilityCasterHasNoFacts;
+                    if (caster != null) AddFacts(ids, caster.Facts);
+                    if (component != null && component.GetType().FullName == CallOfTheWildHexLockout)
+                    {
+                        FieldInfo field = component.GetType().GetField("CheckedBuffs",
+                            BindingFlags.Instance | BindingFlags.Public);
+                        if (field != null && field.FieldType == typeof(BlueprintBuff[]))
+                            AddFacts(ids, (BlueprintBuff[])field.GetValue(component));
+                    }
+                }
+            }
+            return ids.ToArray();
+        }
+
+        private static void AddFacts(ISet<string> ids, IEnumerable<BlueprintUnitFact> facts)
+        {
+            foreach (BlueprintUnitFact fact in facts ?? new BlueprintUnitFact[0])
+                if (fact != null && !string.IsNullOrEmpty(fact.AssetGuid)) ids.Add(fact.AssetGuid);
+        }
+
+        // Exact native presentation-only actions: they change nothing but
+        // what is seen or heard.
+        private static bool IsPresentationOnly(string identity)
+        {
+            return (identity ?? string.Empty).StartsWith(
+                "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionSpawnFx,", StringComparison.Ordinal);
+        }
+
+        // What a buff's own AddFactContextActions do, read by the exact
+        // action graph adapter (rc4 review finding 1). Only the lists that do
+        // something are recorded.
+        private static NativeFactActionsRecord[] FactActions(BlueprintBuff buff)
+        {
+            var records = new List<NativeFactActionsRecord>();
+            foreach (AddFactContextActions component in (buff.ComponentsArray ?? new BlueprintComponent[0])
+                .OfType<AddFactContextActions>())
+            {
+                records.Add(FactActionList("Activated", component.Activated));
+                records.Add(FactActionList("NewRound", component.NewRound));
+                records.Add(FactActionList("Deactivated", component.Deactivated));
+            }
+            return records.Where(record => record.AppliedEffects.Length != 0 || record.Restorative.Length != 0 ||
+                record.Offensive.Length != 0 || record.Unrecognized.Length != 0).ToArray();
+        }
+
+        private static NativeFactActionsRecord FactActionList(string name, ActionList list)
+        {
+            DiscoveryScanResult scan = new ActionGraphScanner().Scan(
+                new KingmakerActionGraphAdapter().AdaptActions(list));
+            Func<string, string[]> identities = code => scan.Diagnostics
+                .Where(d => d.Code == code).Select(d => d.NodeIdentity)
+                .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToArray();
+            return new NativeFactActionsRecord
+            {
+                List = name,
+                AppliedEffects = GetEffects(scan.Expression, false),
+                Restorative = identities("restorative-action"),
+                Offensive = identities("offensive-action"),
+                Unrecognized = scan.Diagnostics
+                    .Where(d => d.Code != "restorative-action" && d.Code != "offensive-action" &&
+                        !IsPresentationOnly(d.NodeIdentity))
+                    .Select(d => d.Code + ":" + d.NodeIdentity)
+                    .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToArray()
+            };
+        }
+
         internal static NativeEffectRecord[] GetEffects(EffectExpression expression)
+        {
+            return GetEffects(expression, true);
+        }
+
+        private static NativeEffectRecord[] GetEffects(EffectExpression expression, bool withFactActions)
         {
             var leaves = new List<EffectLeafExpression>();
             CollectLeaves(expression, leaves);
@@ -316,6 +430,7 @@ namespace KingmakerBuffPlanner.Discovery
                 bool classFeature = false;
                 bool removeOnRest = false;
                 bool stayOnDeath = false;
+                NativeFactActionsRecord[] factActions = new NativeFactActionsRecord[0];
                 if (leaf.Kind == EffectKind.Buff || leaf.Kind == EffectKind.AreaBuff)
                 {
                     var buff = ResourcesLibrary.TryGetBlueprint<BlueprintBuff>(leaf.EffectId);
@@ -335,6 +450,7 @@ namespace KingmakerBuffPlanner.Discovery
                         classFeature = buff.IsClassFeature;
                         removeOnRest = buff.RemoveOnRest;
                         stayOnDeath = buff.StayOnDeath;
+                        if (withFactActions) factActions = FactActions(buff);
                     }
                 }
                 else if (leaf.Kind == EffectKind.WornItemEnchantment)
@@ -362,7 +478,8 @@ namespace KingmakerBuffPlanner.Discovery
                     ComponentTypes = componentTypes,
                     GrantedConditions = grantedConditions,
                     SourceContract = leaf.SourceContract,
-                    ActionPath = leaf.ActionPath
+                    ActionPath = leaf.ActionPath,
+                    FactActions = factActions
                 };
             }).OrderBy(e => e.ActionPath, StringComparer.Ordinal)
                 .ThenBy(e => e.EffectGuid, StringComparer.Ordinal).ToArray();
@@ -499,6 +616,9 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("liveDispositionReason", Order = 41)] public string LiveDispositionReason { get; set; }
         [JsonProperty("liveDispositionBefore040", Order = 42)] public string LiveDispositionBefore040 { get; set; }
         [JsonProperty("payloads", Order = 43)] public string[] Payloads { get; set; }
+        // rc4 (review finding 1): the facts the ability forbids its own
+        // target or caster to have (cooldowns and lockouts).
+        [JsonProperty("selfGatedFactIds", Order = 44)] public string[] SelfGatedFactIds { get; set; }
     }
 
     internal sealed class NativeEffectRecord
@@ -516,6 +636,17 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("sourceContract", Order = 11)] public string SourceContract { get; set; }
         [JsonProperty("actionPath", Order = 12)] public string ActionPath { get; set; }
         [JsonProperty("grantedConditions", Order = 13)] public string[] GrantedConditions { get; set; }
+        // rc4 (review finding 1): what the buff's own AddFactContextActions do.
+        [JsonProperty("factActions", Order = 14)] public NativeFactActionsRecord[] FactActions { get; set; }
+    }
+
+    internal sealed class NativeFactActionsRecord
+    {
+        [JsonProperty("list", Order = 1)] public string List { get; set; }
+        [JsonProperty("appliedEffects", Order = 2)] public NativeEffectRecord[] AppliedEffects { get; set; }
+        [JsonProperty("restorative", Order = 3)] public string[] Restorative { get; set; }
+        [JsonProperty("offensive", Order = 4)] public string[] Offensive { get; set; }
+        [JsonProperty("unrecognized", Order = 5)] public string[] Unrecognized { get; set; }
     }
 
     internal sealed class NativeActionRecord

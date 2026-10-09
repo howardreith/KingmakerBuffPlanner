@@ -20,6 +20,26 @@ namespace KingmakerBuffPlanner.Discovery
         public IReadOnlyList<NativeCandidateEffectFacts> Effects { get; set; }
         public IReadOnlyList<string> DiagnosticContracts { get; set; }
         public IReadOnlyList<NativeCandidateDiagnosticFacts> Diagnostics { get; set; }
+        // The facts the ability (or its sticky-touch delivery) forbids its own
+        // target or caster to have: AbilityTargetHasFact (Inverted),
+        // AbilityCasterHasNoFacts and Call of the Wild's
+        // AbilityTargetHasNoFactUnlessBuffsFromCaster (rc4 review finding 1).
+        public IReadOnlyList<string> SelfGatedFactIds { get; set; }
+    }
+
+    // One action list of a buff's own AddFactContextActions (Activated,
+    // NewRound or Deactivated), as the exact action graph adapter reads it
+    // (rc4 review finding 1).
+    public sealed class NativeCandidateFactActions
+    {
+        public string List { get; set; }
+        // The effects the list applies (their own facts; one level deep).
+        public IReadOnlyList<NativeCandidateEffectFacts> AppliedEffects { get; set; }
+        public IReadOnlyList<string> Restorative { get; set; }
+        public IReadOnlyList<string> Offensive { get; set; }
+        // Actions the adapter does not recognize; a hidden buff running one
+        // has unproved semantics.
+        public IReadOnlyList<string> Unrecognized { get; set; }
     }
 
     public sealed class NativeCandidateEffectFacts
@@ -40,6 +60,8 @@ namespace KingmakerBuffPlanner.Discovery
         public IReadOnlyList<string> GrantedConditions { get; set; }
         public string SourceContract { get; set; }
         public string ActionPath { get; set; }
+        // What the buff's own AddFactContextActions do (rc4).
+        public IReadOnlyList<NativeCandidateFactActions> FactActions { get; set; }
     }
 
     public sealed class NativeCandidateDiagnosticFacts
@@ -240,14 +262,36 @@ namespace KingmakerBuffPlanner.Discovery
             bool instantRestoration = AuditRules && (
                 diagnosticFacts.Any(d => IsInstantRestoration(d.Contract) || IsInstantRestoration(d.Detail)) ||
                 diagnostics.Any(IsInstantRestoration));
+            IReadOnlyList<string> selfGated = facts.SelfGatedFactIds ?? new string[0];
+            // rc4 (review finding 1): a buff the ability forbids itself to be
+            // recast over is a lockout only when the ability also does
+            // something else - another effect, or a restoration. Alone, it is
+            // the ability's own effect guarded against stacking.
+            bool lockout = AuditRules && (
+                safe.Any(e => !selfGated.Contains(e.EffectId ?? string.Empty)) ||
+                restorative.Count != 0 || instantRestoration);
             Func<NativeCandidateEffectFacts, bool> isMarker = effect =>
-                IsMarker(effect) || IsAuditMarker(effect, dynamicEnchantPool, instantRestoration);
+                IsMarker(effect) ||
+                IsAuditMarker(effect, selfGated, dynamicEnchantPool, instantRestoration, lockout);
             List<NativeCandidateEffectFacts> payloads = safe.Where(e => !isMarker(e)).ToList();
             if (hasOffensiveCarrier)
                 payloads.Clear();
             else if (offensive.Count != 0)
                 payloads = payloads.Where(effect => !offensive.Any(action =>
                     SameConditionalBranch(effect.ActionPath, action.ActionPath))).ToList();
+            // rc4: a hidden buff whose own actions the adapter cannot read is
+            // neither a proved marker nor a proved buff. When nothing else
+            // remains the source is unsupported, with its reason.
+            List<NativeCandidateEffectFacts> opaque = payloads.Where(IsOpaque).ToList();
+            if (opaque.Count != 0 && opaque.Count == payloads.Count)
+                return Unsupported("opaque-hidden-buff-actions",
+                    "The only remaining persistent effect is a hidden buff whose own actions are not understood (" +
+                    string.Join("; ", opaque.Select(e => (e.EffectName ?? e.EffectId) + ": " +
+                        string.Join(", ", (e.FactActions ?? new NativeCandidateFactActions[0])
+                            .SelectMany(list => list.Unrecognized ?? new string[0])
+                            .Distinct(StringComparer.Ordinal).ToArray())).ToArray()) +
+                    "); it is neither proved bookkeeping nor a proved buff.");
+            payloads = payloads.Where(e => !IsOpaque(e)).ToList();
             if (payloads.Count == 0)
             {
                 if (hasOffensiveCarrier || offensive.Count != 0)
@@ -255,13 +299,13 @@ namespace KingmakerBuffPlanner.Discovery
                         "Offensive delivery or damage semantics leave only hidden carrier, save, activation, or cleanup markers.");
                 if ((restorative.Count != 0 || instantRestoration) && safe.All(isMarker))
                     return Exclude("reactive-restoration-marker-only",
-                        "Exact restorative actions leave only hidden carrier, activation, cooldown, or cleanup marker buffs on every safe branch.");
+                        "Exact restorative actions leave only cooldown, lockout, tracking, enabling or side-effect buffs (hidden, or with no mechanics of their own) on every safe branch: the restoration is the ability's point.");
                 if (restorative.Count != 0)
                     return Exclude("restorative-action-without-substantive-buff",
                         "Exact restorative actions do not establish a substantive persistent beneficial state on a safe branch.");
                 if (safe.All(isMarker) && safe.Any(e => !e.IsHiddenInUi))
                     return Exclude("mechanics-free-marker-only",
-                        "The only persistent effects are cooldown, activation, or bookkeeping buffs with no mechanics of their own.");
+                        "The only persistent effects are lockout buffs the ability forbids itself to be recast over, or proved bookkeeping markers.");
                 if (safe.All(isMarker))
                     return Exclude("hidden-marker-only",
                         "Only hidden class-feature, activation, or cleanup marker effects were detected.");
@@ -364,6 +408,15 @@ namespace KingmakerBuffPlanner.Discovery
             "AddCondition", "BuffStatusCondition", "DoNotBenefitFromConcealment", "AddFactContextActions"
         }, StringComparer.Ordinal);
 
+        // Whether a buff's components only keep its books (no components at
+        // all included): such a buff has no mechanics of its own, so whatever
+        // it does is done by the blueprints that read it.
+        public static bool HasNoMechanicsOfItsOwn(IEnumerable<string> componentTypes)
+        {
+            return (componentTypes ?? new string[0]).All(value =>
+                BookkeepingComponents.Contains(ShortName(value)));
+        }
+
         private static string ShortName(string typeName)
         {
             if (string.IsNullOrEmpty(typeName)) return string.Empty;
@@ -386,35 +439,64 @@ namespace KingmakerBuffPlanner.Discovery
                 ConditionComponents.Contains(ShortName(value)));
         }
 
-        // The 0.4.0 marker rules (WP5). A buff blueprint whose components only
-        // keep its books has no effect of its own: a visible cooldown (the
-        // Heal skill's Treat Affliction / Treat Deadly Wounds cooldowns), an
-        // activation or selection marker, or a cosmetic buff - except the
-        // proven enchant-pool signal buff. A hidden buff whose components are
-        // bookkeeping plus on-apply or cleanup actions is a marker too, and so
-        // is any hidden buff beside an instantaneous heal, restoration,
-        // removal or dispel: the restoration is the ability's point, the
-        // hidden buff only tracks it.
-        private bool IsAuditMarker(NativeCandidateEffectFacts effect, bool dynamicEnchantPool,
-            bool instantRestoration)
+        // The 0.4.0 marker rules (WP5), as corrected after the rc4 lead review
+        // (finding 1). A buff with no mechanics of its own is NOT thereby a
+        // marker: its presence may be the state other blueprints act on
+        // (Targeted Bomb Admixture's buff has no components; the alchemist's
+        // bombs read it). A buff is a marker only when the facts prove it:
+        // - a lockout: the ability forbids its own recast while the buff is
+        //   present and also does something else (the Heal skill's Treat
+        //   Affliction / Treat Deadly Wounds cooldowns, the hex cooldowns
+        //   beside Battle Ward's ward buff);
+        // - beside an instantaneous heal, restoration, removal or dispel, a
+        //   hidden buff or one with no mechanics of its own (cooldowns,
+        //   trackers, one-round enablers, a restoration's side effect): the
+        //   restoration is the ability's point;
+        // - a hidden buff whose components only keep its books, remove buffs,
+        //   or run actions that apply nothing and do nothing unrecognized.
+        // A hidden buff whose own actions apply a beneficial buff carries that
+        // buff and is never a marker here; one whose actions are not
+        // understood is never a marker either (see IsOpaque).
+        private bool IsAuditMarker(NativeCandidateEffectFacts effect, IReadOnlyList<string> selfGated,
+            bool dynamicEnchantPool, bool instantRestoration, bool lockout)
         {
-            if (!AuditRules || effect == null) return false;
+            if (!AuditRules || effect == null || effect.Kind != "Buff") return false;
+            if (IsBeneficialCarrier(effect) || IsOpaque(effect)) return false;
+            if (lockout && selfGated.Contains(effect.EffectId ?? string.Empty)) return true;
             IReadOnlyList<string> components = effect.ComponentTypes ?? new string[0];
-            if (effect.Kind == "Buff" && !dynamicEnchantPool &&
-                components.All(value => BookkeepingComponents.Contains(ShortName(value))))
-                return true;
-            if (!effect.IsHiddenInUi) return false;
-            if (components.All(value => BookkeepingComponents.Contains(ShortName(value)) ||
-                    ShortName(value) == "AddFactContextActions" || ShortName(value) == "RemoveBuff"))
-                return true;
-            return instantRestoration;
+            bool mechanicsFree = !dynamicEnchantPool &&
+                components.All(value => BookkeepingComponents.Contains(ShortName(value)));
+            if (instantRestoration && (mechanicsFree || effect.IsHiddenInUi)) return true;
+            return effect.IsHiddenInUi &&
+                components.All(value => BookkeepingComponents.Contains(ShortName(value)) ||
+                    ShortName(value) == "AddFactContextActions" || ShortName(value) == "RemoveBuff");
+        }
+
+        // A buff whose own Activated or NewRound actions apply a buff that is
+        // neither harmful nor a harmful condition: it carries that buff.
+        private static bool IsBeneficialCarrier(NativeCandidateEffectFacts effect)
+        {
+            return (effect.FactActions ?? new NativeCandidateFactActions[0])
+                .Where(list => list.List == "Activated" || list.List == "NewRound")
+                .SelectMany(list => list.AppliedEffects ?? new NativeCandidateEffectFacts[0])
+                .Any(applied => applied.Harmful != true && !IsHarmfulCondition(applied));
+        }
+
+        // A hidden buff running an action the adapter does not recognize: its
+        // ongoing behaviour is not proved either way (rc4).
+        private bool IsOpaque(NativeCandidateEffectFacts effect)
+        {
+            return AuditRules && effect != null && effect.IsHiddenInUi && !IsBeneficialCarrier(effect) &&
+                (effect.FactActions ?? new NativeCandidateFactActions[0])
+                    .Any(list => (list.Unrecognized ?? new string[0]).Count != 0);
         }
 
         // Instantaneous restoration actions (no persistent state of their
         // own). Removing one buff is excluded: toggles remove their own.
         private static bool IsInstantRestoration(string value)
         {
-            return Contains(value, "ContextActionHealTarget") ||
+            return Contains(value, "ContextActionTreatDeadlyWounds") ||
+                Contains(value, "ContextActionHealTarget") ||
                 Contains(value, "ContextActionHealEnergyDrain") ||
                 Contains(value, "ContextActionHealStatDamage") ||
                 Contains(value, "ContextActionResurrect") ||
@@ -512,6 +594,14 @@ namespace KingmakerBuffPlanner.Discovery
             return new NativeCandidateAuditDecision(
                 "exclude", "excluded-by-definition", code + ": " + reason,
                 "PASS-excluded-by-definition");
+        }
+
+        // A source whose semantics are not proved: not offered, and reported
+        // with its precise reason (rc4).
+        private static NativeCandidateAuditDecision Unsupported(string code, string reason)
+        {
+            return new NativeCandidateAuditDecision(
+                "unsupported-with-reason", "none", code + ": " + reason, "FAIL-unsupported");
         }
 
         private static bool Contains(string value, string fragment)

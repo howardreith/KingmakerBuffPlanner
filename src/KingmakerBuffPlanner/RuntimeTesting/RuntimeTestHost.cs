@@ -540,6 +540,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 string catalogHash = null;
                 NativeCatalogAuditDocument catalogAudit = null;
                 string catalogAuditHash = null;
+                BlueprintReferenceDocument references = null;
+                string referencesHash = null;
                 HarmonyPatchInventory harmonyInventory = null;
                 string harmonyInventoryHash = null;
                 RuntimePerformanceProfile performanceProfile = null;
@@ -583,6 +585,33 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _request.EvidenceDirectory, "native-buff-catalog-audit.json");
                     AtomicFile.WriteUtf8(catalogAuditPath, Serialize(catalogAudit));
                     catalogAuditHash = Hashing.Sha256(catalogAuditPath);
+                    // rc4 (review finding 1): who reads each buff the audit's
+                    // decisions turn on - every buff with no mechanics of its
+                    // own in a source included before 0.4.0, and every effect
+                    // of a source the 0.4.0 rules removed or left unsupported.
+                    var referenceTargets = new Dictionary<string, KeyValuePair<string, string>>(StringComparer.Ordinal);
+                    foreach (NativeCatalogEntry entry in catalog.Abilities)
+                    {
+                        bool changed = (entry.IsCandidate && entry.DispositionBefore040 == "include" &&
+                                entry.Disposition != "include") ||
+                            (entry.LiveDispositionBefore040 == "include" && entry.LiveDisposition != "include");
+                        bool includedBefore = entry.LiveDispositionBefore040 == "include";
+                        foreach (NativeEffectRecord effect in entry.Effects ?? new NativeEffectRecord[0])
+                        {
+                            if (effect.Kind != "Buff" && effect.Kind != "AreaBuff") continue;
+                            bool flag = NativeCandidateClassifier.HasNoMechanicsOfItsOwn(effect.ComponentTypes);
+                            if ((!changed && !(includedBefore && flag)) ||
+                                referenceTargets.ContainsKey(effect.EffectGuid))
+                                continue;
+                            referenceTargets[effect.EffectGuid] = new KeyValuePair<string, string>(effect.EffectName,
+                                changed ? "an effect of a source the 0.4.0 rules removed or left unsupported"
+                                    : "a buff with no mechanics of its own in a source included before 0.4.0");
+                        }
+                    }
+                    references = BlueprintReferenceIndex.Build(_request.ProfileId, BuildInfo.Commit, referenceTargets);
+                    string referencesPath = Path.Combine(_request.EvidenceDirectory, "blueprint-references.json");
+                    AtomicFile.WriteUtf8(referencesPath, Serialize(references));
+                    referencesHash = Hashing.Sha256(referencesPath);
                     harmonyInventory = new HarmonyPatchInventoryExporter().Export(_request.ProfileId, harmony);
                     string harmonyInventoryPath = Path.Combine(
                         _request.EvidenceDirectory, "harmony-patch-inventory.json");
@@ -646,6 +675,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         : catalogAudit.Summary.Totals.LiveIncludedBefore040,
                     CatalogAuditLiveIncluded = catalogAudit == null ? 0 : catalogAudit.Summary.Totals.LiveIncluded,
                     CatalogAuditAddedCount = catalogAudit == null ? 0 : catalogAudit.Summary.AddedCount,
+                    CatalogReferencesSha256 = referencesHash,
+                    CatalogReferenceTargetCount = references == null ? 0 : references.Targets.Length,
+                    CatalogReferenceScannedCount = references == null ? 0 : references.ScannedBlueprints,
                     HarmonyPatchInventorySha256 = harmonyInventoryHash,
                     HarmonyPatchTargetCount = harmonyInventory == null ? 0 : harmonyInventory.TargetCount,
                     HarmonyPatchRecordCount = harmonyInventory == null ? 0 : harmonyInventory.PatchCount,

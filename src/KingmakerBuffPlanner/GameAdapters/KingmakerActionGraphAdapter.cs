@@ -29,6 +29,13 @@ namespace KingmakerBuffPlanner.GameAdapters
             return AdaptAbility(ability);
         }
 
+        // One action list of a buff's own components (AddFactContextActions),
+        // adapted exactly as an ability's actions are (rc4 review finding 1).
+        internal DiscoveryNode AdaptActions(ActionList list)
+        {
+            return AdaptList(list);
+        }
+
         private DiscoveryNode AdaptAbility(BlueprintAbility ability)
         {
             string id = ability.AssetGuid;
@@ -128,6 +135,14 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (action is ContextActionRandomize)
                 return AdaptExactActionListAlternatives(action, "m_Actions", "Action",
                     "ContextActionRandomize");
+            // Call of the Wild (rc4 review finding 1): RunActionsDependingOnContextValue
+            // runs exactly one of its "actions" lists, chosen by a context value
+            // (the Battle, Bone and Wind Ward and Draconic Resilience hexes apply
+            // their ward buff through it). Exact contract by type and field shape;
+            // optional, no compile-time dependency.
+            if (action.GetType().FullName == RunActionsDependingOnContextValue)
+                return AdaptExactActionListArrayAlternatives(action, "actions",
+                    "RunActionsDependingOnContextValue");
             var area = action as ContextActionSpawnAreaEffect;
             if (area != null && area.AreaEffect != null)
             {
@@ -164,6 +179,23 @@ namespace KingmakerBuffPlanner.GameAdapters
                 alternatives.Add(AdaptList((ActionList)actionField.GetValue(wrapper)));
             }
             return BuildAlternatives(alternatives, 0, contract);
+        }
+
+        internal const string RunActionsDependingOnContextValue =
+            "CallOfTheWild.NewMechanics.RunActionsDependingOnContextValue";
+
+        private DiscoveryNode AdaptExactActionListArrayAlternatives(
+            GameAction action, string arrayFieldName, string contract)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            FieldInfo arrayField = action.GetType().GetField(arrayFieldName, flags);
+            if (arrayField == null || arrayField.FieldType != typeof(ActionList[]))
+                return new DiscoveryNode(DiscoveryNodeKind.Unknown, DescribeType(action.GetType()),
+                    sourceContract: contract + ":ActionList-array-contract-missing");
+            ActionList[] lists = arrayField.GetValue(action) as ActionList[];
+            if (lists == null || lists.Length == 0)
+                return new DiscoveryNode(DiscoveryNodeKind.Empty, contract, sourceContract: contract);
+            return BuildAlternatives(lists.Select(AdaptList).ToArray(), 0, contract);
         }
 
         private static DiscoveryNode BuildAlternatives(
@@ -288,7 +320,10 @@ namespace KingmakerBuffPlanner.GameAdapters
                 name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuffsByDescriptor" ||
                 name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuffSingleStack" ||
                 name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveDeathDoor" ||
-                name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDispelMagic";
+                name == "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDispelMagic" ||
+                // Call of the Wild's Treat Deadly Wounds (rc4): heals hit points
+                // and ability damage at once (HealingMechanics source).
+                name == "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds";
         }
 
         private static string DescribeConditions(Conditional conditional)

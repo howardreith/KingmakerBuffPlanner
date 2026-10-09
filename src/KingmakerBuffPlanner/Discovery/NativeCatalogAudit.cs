@@ -114,6 +114,9 @@ namespace KingmakerBuffPlanner.Discovery
     {
         public const string Included = "included";
         public const string Removed = "removed-by-0.4.0-audit";
+        // Included before 0.4.0, now unsupported with a precise reason (its
+        // semantics are not proved either way; rc4 review finding 1).
+        public const string Unsupported = "unsupported-by-0.4.0-audit";
 
         public static NativeCatalogAuditSummary Summarize(IEnumerable<NativeCatalogAuditInput> inputs)
         {
@@ -190,7 +193,7 @@ namespace KingmakerBuffPlanner.Discovery
                 Provider = string.IsNullOrEmpty(input.FirstAccessibilitySource)
                     ? "live-only: reachable when a party member has it" : input.FirstAccessibilitySource,
                 Scope = staticScope ? "static" : "live-only",
-                Status = removed ? Removed : Included,
+                Status = removed ? (RemovedAsUnsupported(input) ? Unsupported : Removed) : Included,
                 InclusionRule = removed ? string.Empty : Code(reason),
                 PersistentBeneficialEffects = removed ? new NativeCatalogAuditEffect[0] : payloads,
                 TargetSemantics = removed ? string.Empty : string.Join(",", targets.ToArray()),
@@ -241,6 +244,12 @@ namespace KingmakerBuffPlanner.Discovery
         private static bool IsRemoved(NativeCatalogAuditInput value)
         {
             return (StaticBefore(value) && !StaticNow(value)) || (LiveBefore(value) && !LiveNow(value));
+        }
+
+        private static bool RemovedAsUnsupported(NativeCatalogAuditInput value)
+        {
+            return (StaticBefore(value) && !StaticNow(value)
+                ? value.Disposition : value.LiveDisposition) == "unsupported-with-reason";
         }
 
         private static string RemovalCode(NativeCatalogAuditInput value)

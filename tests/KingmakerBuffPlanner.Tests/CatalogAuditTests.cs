@@ -18,14 +18,11 @@ namespace KingmakerBuffPlanner.Tests
         {
             Run("catalog-ownership-multi-mod-inventories", () => TestMultiModOwnership(root));
             Run("catalog-audit-hideous-laughter-rider-excluded", TestAuditHideousLaughter);
-            Run("catalog-audit-treat-affliction-cooldown-excluded", TestAuditTreatAffliction);
-            Run("catalog-audit-treat-deadly-wounds-cooldown-excluded", TestAuditTreatDeadlyWounds);
             Run("catalog-audit-harmful-condition-touch-excluded", TestAuditDazingTouch);
-            Run("catalog-audit-restoration-tracker-excluded", TestAuditRestorationTracker);
-            Run("catalog-audit-hidden-marker-and-cooldown-excluded", TestAuditMarkers);
             Run("catalog-audit-legitimate-buffs-retained", TestAuditLegitimateBuffs);
             Run("catalog-audit-mixed-graphs-keep-only-understood-paths", TestAuditMixedGraphs);
             Run("catalog-audit-summary-counts-and-records", TestAuditSummary);
+            RunCatalogAdjudicationTests();
         }
 
         private static NativeCandidateEffectFacts AuditEffect(string id, string name, string target,
@@ -112,72 +109,6 @@ namespace KingmakerBuffPlanner.Tests
             ExpectAudit(facts, "hostile-ability-rider", "Hideous Laughter's Infectious Charms rider");
         }
 
-        // LoreReligionUseAbilityChild (e4af2b1a...): the Heal skill's Treat
-        // Affliction dispels and leaves a visible zero-component cooldown.
-        // Live discovery judges a party member's ability as reachable.
-        private static void TestAuditTreatAffliction()
-        {
-            const string dispel = "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDispelMagic, Assembly-CSharp, Version=0.0.0.0";
-            NativeCandidateEffectFacts cooldown = AuditEffect("b89dcf508d48da74f8dd5234e6a5eb84",
-                "LoreReligionCooldown", "CurrentTarget",
-                "e4af2b1a6c55435cacc9a305bba93431/0:ActionList/1:ContextActionApplyBuff", false);
-            cooldown.IsClassFeature = true;
-            ExpectAudit(new NativeCandidateAuditFacts
-            {
-                IsPlayerAccessible = true,
-                CanTargetSelf = true,
-                CanTargetFriends = true,
-                EffectOnAlly = "Helpful",
-                EffectOnEnemy = "None",
-                Range = "Touch",
-                Effects = new[] { cooldown },
-                DiagnosticContracts = new[] { dispel + "|restorative-action" },
-                Diagnostics = new[]
-                {
-                    new NativeCandidateDiagnosticFacts
-                    {
-                        Code = "restorative-action",
-                        Contract = dispel,
-                        Detail = "restorative-action",
-                        ActionPath = "e4af2b1a6c55435cacc9a305bba93431/0:ActionList/0:" + dispel
-                    }
-                }
-            }, "reactive-restoration-marker-only", "Treat Affliction's cooldown");
-        }
-
-        // TreatDeadlyWoundsHealSkillAbility (54c9837b...): the healing is a
-        // Call of the Wild action the scanner does not model; only the
-        // visible, component-free cooldown buff remains.
-        private static void TestAuditTreatDeadlyWounds()
-        {
-            const string action = "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds, CallOfTheWild, Version=1.0.0.0";
-            ExpectAudit(new NativeCandidateAuditFacts
-            {
-                IsPlayerAccessible = true,
-                CanTargetSelf = true,
-                CanTargetFriends = true,
-                EffectOnAlly = "Helpful",
-                EffectOnEnemy = "None",
-                Range = "Touch",
-                Effects = new[]
-                {
-                    AuditEffect("45b17e675f524da4b6a0198ac0427f79", "TreatDeadlyWoundsCooldown", "CurrentTarget",
-                        "54c9837b07de4afc9e86516b22c460bb/0:ActionList/1:ContextActionApplyBuff", false)
-                },
-                DiagnosticContracts = new[] { action + "|unsupported-action" },
-                Diagnostics = new[]
-                {
-                    new NativeCandidateDiagnosticFacts
-                    {
-                        Code = "unknown-node",
-                        Contract = action,
-                        Detail = "unsupported-action",
-                        ActionPath = "54c9837b07de4afc9e86516b22c460bb/0:ActionList/0:" + action
-                    }
-                }
-            }, "mechanics-free-marker-only", "Treat Deadly Wounds' cooldown");
-        }
-
         // EnchantmentSchoolBaseAbilityCast (7b3cb9ad...): a held touch whose
         // only payload dazes the touched creature; its buff forgets
         // m_Harmful, so 0.3.0 offered it as a self buff.
@@ -212,86 +143,6 @@ namespace KingmakerBuffPlanner.Tests
             facts.CanTargetEnemies = false;
             facts.IsStickyTouch = false;
             ExpectRetained(facts, "valid-beneficial-party-effect", "A buff with a condition side effect");
-        }
-
-        // A hidden tracking buff beside an instantaneous heal (Inspiring
-        // Recovery's check buff): the heal is the ability's point.
-        private static void TestAuditRestorationTracker()
-        {
-            const string heal = "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionHealTarget, Assembly-CSharp, Version=0.0.0.0";
-            ExpectAudit(new NativeCandidateAuditFacts
-            {
-                IsPlayerAccessible = true,
-                CanTargetSelf = true,
-                CanTargetFriends = true,
-                EffectOnAlly = "Helpful",
-                Range = "Touch",
-                Effects = new[]
-                {
-                    AuditEffect("dc9a8ddf45adbc74aaff7b309f232072", "InspiringRecoveryCheckBuff", "CurrentTarget",
-                        "788d72e7713cf90418ee1f38449416dc/0:ActionList/1:ContextActionApplyBuff", true,
-                        "Kingmaker.UnitLogic.Buffs.Components.AddStatBonusIfHasFact")
-                },
-                DiagnosticContracts = new[] { heal + "|restorative-action" },
-                Diagnostics = new[]
-                {
-                    new NativeCandidateDiagnosticFacts
-                    {
-                        Code = "restorative-action",
-                        Contract = heal,
-                        Detail = "restorative-action",
-                        ActionPath = "788d72e7713cf90418ee1f38449416dc/0:ActionList/0:" + heal
-                    }
-                }
-            }, "reactive-restoration-marker-only", "An instantaneous restoration's tracker");
-        }
-
-        private static void TestAuditMarkers()
-        {
-            // A hidden activation marker whose components only keep its books
-            // and run on-apply actions (UniqueBuff was not a 0.3.0 marker
-            // component).
-            ExpectAudit(new NativeCandidateAuditFacts
-            {
-                IsPlayerAccessible = true,
-                CanTargetSelf = true,
-                Effects = new[]
-                {
-                    AuditEffect("24afb2c948c731440a3aaf5411904c89", "TargetedBombAdmixtureBuff", "Caster",
-                        "root/0:ContextActionApplyBuff", true, "Kingmaker.Designers.Mechanics.Buffs.UniqueBuff",
-                        "Kingmaker.UnitLogic.Mechanics.Components.AddFactContextActions")
-                },
-                DiagnosticContracts = new string[0]
-            }, "hidden-marker-only", "A hidden activation marker");
-            // A visible hex cooldown (Battle Ward): bookkeeping only.
-            ExpectAudit(new NativeCandidateAuditFacts
-            {
-                IsPlayerAccessible = true,
-                CanTargetSelf = true,
-                CanTargetFriends = true,
-                EffectOnAlly = "Helpful",
-                Effects = new[]
-                {
-                    AuditEffect("a16cc3943b08420da6f50f036ed8b616", "SpiritWhispererBattleWardHexAbilityCooldownBuff",
-                        "CurrentTarget", "root/1:ContextActionApplyBuff", false,
-                        "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig")
-                },
-                DiagnosticContracts = new string[0]
-            }, "mechanics-free-marker-only", "A visible hex cooldown");
-            // The proven enchant-pool signal buff keeps its explicit adapter.
-            NativeCandidateAuditDecision pool = ExpectRetained(new NativeCandidateAuditFacts
-            {
-                IsPlayerAccessible = true,
-                CanTargetSelf = true,
-                Effects = new[]
-                {
-                    AuditEffect("signal", "ArcaneWeaponSignalBuff", "CurrentTarget", "root/0:ContextActionApplyBuff",
-                        false)
-                },
-                DiagnosticContracts = new[] { "ContextActionWeaponEnchantPool|unsupported-action" }
-            }, "valid-beneficial-self-effect", "The enchant-pool signal buff");
-            if (pool.SupportClass != "explicit-adapter")
-                throw new InvalidOperationException("The enchant-pool signal lost its explicit adapter.");
         }
 
         private static void TestAuditLegitimateBuffs()

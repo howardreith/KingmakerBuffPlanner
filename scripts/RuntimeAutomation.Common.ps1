@@ -682,6 +682,20 @@ function Assert-KbpRuntimeResult {
             [int]$totals.liveIncluded -gt [int]$totals.liveIncludedBefore040) {
             throw 'Native catalog audit does not reconcile with the catalog and the runtime result.'
         }
+        # rc4 (review finding 1): who reads the buffs the audit's decisions
+        # turn on - present, hashed, and reconciled with the runtime result.
+        $referencesPath = Join-Path $Request.evidenceDirectory 'blueprint-references.json'
+        if (-not (Test-Path -LiteralPath $referencesPath -PathType Leaf)) { throw 'Blueprint reference evidence is missing.' }
+        if ([string]$Result.catalogReferencesSha256 -cne (Get-KbpSha256 $referencesPath)) {
+            throw 'Blueprint reference evidence hash mismatch.'
+        }
+        $references = Read-KbpJson $referencesPath
+        if ([int]$references.schemaVersion -ne 1 -or [string]$references.profile -cne [string]$Request.profileId -or
+            [int]$references.scannedBlueprints -le 0 -or
+            [int]$references.scannedBlueprints -ne [int]$Result.catalogReferenceScannedCount -or
+            @($references.targets).Count -ne [int]$Result.catalogReferenceTargetCount) {
+            throw 'Blueprint reference evidence does not reconcile with the runtime result.'
+        }
         $harmonyPath = Join-Path $Request.evidenceDirectory 'harmony-patch-inventory.json'
         if (-not (Test-Path -LiteralPath $harmonyPath -PathType Leaf)) { throw 'Harmony patch inventory evidence is missing.' }
         if ($Result.harmonyPatchInventorySha256 -cne (Get-KbpSha256 $harmonyPath)) {
