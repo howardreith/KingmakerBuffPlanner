@@ -193,6 +193,12 @@ namespace KingmakerBuffPlanner.Tests
             Expect(ambiguous.Outcome == CastingGraphClickOutcome.Refused &&
                 ambiguous.Edit.Reason.StartsWith("exact-source-ambiguous", StringComparison.Ordinal) &&
                 session.Document.Castings.Single().CasterUnitId == "unit-cleric", "an ambiguous caster changed it");
+            // Its exact rows are now drawn (the graph draws rows for the
+            // chosen caster only) and the casting stays focused, so the
+            // player can click one; before 0.4.0 they stayed hidden.
+            CastingGraphCasterNode bardNode = session.BuildGraph(inputs).CasterById("unit-bard");
+            Expect(bardNode != null && bardNode.Selected && bardNode.Sources.Count == 2 &&
+                session.EditingFocusCastingId == one, "the ambiguous caster's exact rows were not shown");
             string bardLevel2 = GraphProviderKey("unit-bard", "book-bard", GraphAbilityA, "level-2");
             CastingGraphClickResult changed = session.ClickGraphSource(bardLevel2, inputs);
             PlannedCasting after = session.Document.Castings.Single();

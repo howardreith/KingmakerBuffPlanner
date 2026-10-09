@@ -119,8 +119,18 @@ namespace KingmakerBuffPlanner.UI
                 return Refused(AuthoringEditResult.Refuse("caster-not-capable:" + casterUnitId),
                     focused.CastingId);
             if (sources.Count > 1)
+            {
+                // The caster casts it in more than one way: show that
+                // caster's exact source rows (the graph draws rows for the
+                // chosen caster only) so the next click on one changes the
+                // provider. The focused casting is kept and unchanged.
+                ChooseDraftCaster(casterUnitId);
+                Draft.Ability = null;
+                Draft.SpellbookGuid = null;
+                _resolvedDraftKey = string.Empty;
                 return Refused(AuthoringEditResult.Refuse("exact-source-ambiguous:" + sources.Count),
                     focused.CastingId);
+            }
             return ChangeFocusedProvider(focused, sources[0]);
         }
 
