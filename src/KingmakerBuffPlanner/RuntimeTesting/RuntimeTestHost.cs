@@ -267,18 +267,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 candidates.FirstOrDefault() ?? current ?? _interactionTargets[0];
         }
 
-        // The focused inspector's retarget control for a unit. Its list opens
-        // through its own toggle only when closed (the toggle would close an
-        // open list).
+        // Retargets the focused casting the 0.4.0 way (WP3): a click on
+        // another recipient's portrait. The inspector's retarget list is
+        // gone.
         private static string InvokeRetarget(string unitId)
         {
-            string outcome = Invoke("Retarget." + unitId);
-            // Missing, or only a same-frame destroyed-pending copy: closed.
-            if (!outcome.StartsWith("control-missing", StringComparison.Ordinal) &&
-                !outcome.StartsWith("control-inactive", StringComparison.Ordinal)) return outcome;
-            string toggle = Invoke("ToggleRetargets");
-            if (toggle != WorkspaceControlOutcome.Invoked) return "toggle-" + toggle;
-            return Invoke("Retarget." + unitId);
+            return Invoke("Target." + unitId);
+        }
+
+        // WP3: a casting added through the graph stays focused, and with a
+        // casting focused a caster, source or portrait click edits that
+        // casting. The player's Done clears the focus before the next
+        // casting is configured; nothing to clear is a no-op.
+        private static string ClearGraphFocus(UI.CastingWorkspaceSession session)
+        {
+            if (session.EditingFocusCastingId == null) return WorkspaceControlOutcome.AlreadyReady;
+            return Invoke("DoneEditing");
         }
 
         // A focus change made directly on the session (not through a
@@ -5542,8 +5546,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     string siblingsBefore =
                         WorkspaceCastStepEvaluator.SiblingSignature(
                             session.Document.Castings, null);
-                    // The graph gesture: the caster, its exact source row, then
-                    // the target whose click adds the casting.
+                    // The graph gesture: Done on the casting the previous add
+                    // left focused, the caster, its exact source row, then the
+                    // target whose click adds the casting.
+                    string doneBefore = ClearGraphFocus(session);
+                    if (doneBefore != WorkspaceControlOutcome.AlreadyReady)
+                        _workspaceInteraction.AddNote("cast" + (index + 1) + "DoneBefore=" + doneBefore);
                     string casterClick = Invoke("Caster." + caster);
                     int row = UsableSourceRow(session, currentInputs, caster);
                     string sourceClick = row < 0 ? "control-missing:Provider." + caster + ".usable"
@@ -5600,6 +5608,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // Negative case: with NO caster chosen, a target click must
                     // be refused and leave the document untouched (review G4;
                     // the graph's analogue of an Add with nothing chosen).
+                    // Nothing may be focused, or the click would edit it.
+                    _workspaceInteraction.AddNote("refusedAddDoneBefore=" + ClearGraphFocus(session));
                     session.SelectCaster(null);
                     session.Draft.CasterUnitId = null;
                     session.Draft.Ability = null;
@@ -5647,7 +5657,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 if (_workspaceInteractionStep == 6)
                 {
-                    // Retarget through the FOCUSED inspector's real control.
+                    // Retarget the FOCUSED casting through its new recipient's
+                    // portrait (WP3).
                     string editId = _interactionCastIds.Count > 1
                         ? _interactionCastIds[1] : string.Empty;
                     // Another legal recipient for cast 2's source: neither the
