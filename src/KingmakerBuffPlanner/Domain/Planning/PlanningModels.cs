@@ -65,6 +65,12 @@ namespace KingmakerBuffPlanner.Domain.Planning
 
     public static class StickyTouchExecutionClassifier
     {
+        // The two instant sticky-touch reasons: a delivery that may also be
+        // aimed at enemies yet is a willing-target buff (WP6), and one that
+        // can only reach the caster or friends.
+        public const string WillingTargetReason = "supported-willing-target-sticky-touch-delivery";
+        public const string BeneficialReason = "supported-beneficial-sticky-touch-delivery";
+
         public static CastExecutionCapability Classify(
             bool isStickyTouch,
             bool hasDeliveryBlueprint,
@@ -102,9 +108,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 return AnimatedFallback("sticky-delivery-has-no-beneficial-unit-target");
             return new CastExecutionCapability(
                 CastExecutionStrategy.StickyTouchDeliveryRuleCast,
-                deliveryCanTargetEnemies
-                    ? "supported-willing-target-sticky-touch-delivery"
-                    : "supported-beneficial-sticky-touch-delivery");
+                deliveryCanTargetEnemies ? WillingTargetReason : BeneficialReason);
         }
 
         private static CastExecutionCapability AnimatedFallback(string reason)
