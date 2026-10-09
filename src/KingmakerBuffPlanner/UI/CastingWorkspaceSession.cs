@@ -209,6 +209,11 @@ namespace KingmakerBuffPlanner.UI
         public string ReviewReason { get; private set; }
         public CastingApplyDecision GateDecision { get; private set; }
         public CastingDispatchOutcome Dispatch { get; private set; }
+        public IReadOnlyList<CastingBlocker> BlockingCastings
+        {
+            get { return GateDecision == null ? (IReadOnlyList<CastingBlocker>)new CastingBlocker[0]
+                : GateDecision.BlockingCastings; }
+        }
     }
 
     // The primary casting-first workspace session: one connected controller
@@ -658,6 +663,7 @@ namespace KingmakerBuffPlanner.UI
 
         public void SelectBuff(string sourceId)
         {
+            LeaveProblemNavigation();
             string resolved = string.IsNullOrWhiteSpace(sourceId)
                 ? string.Empty : sourceId;
             if (!string.Equals(resolved, SelectedSourceId,
@@ -670,6 +676,7 @@ namespace KingmakerBuffPlanner.UI
 
         public void SelectRoutine(string routineId)
         {
+            LeaveProblemNavigation();
             if (_authoring.Document.Routines.All(
                     value => value.RoutineId != routineId))
                 throw new ArgumentException("Unknown routine.", "routineId");
@@ -680,6 +687,7 @@ namespace KingmakerBuffPlanner.UI
         // assignments and connections are untouched.
         public void SelectCaster(string casterUnitId)
         {
+            LeaveProblemNavigation();
             string resolved = string.IsNullOrWhiteSpace(casterUnitId)
                 ? null : casterUnitId;
             if (!string.Equals(resolved, SelectedCasterUnitId,
@@ -862,6 +870,7 @@ namespace KingmakerBuffPlanner.UI
 
         public void FocusCasting(string castingId)
         {
+            LeaveProblemNavigation();
             if (castingId != null &&
                 _authoring.Document.Castings.All(
                     value => value.CastingId != castingId))
@@ -1505,6 +1514,26 @@ namespace KingmakerBuffPlanner.UI
             string scopeRoutineId,
             CastingWorkspaceInputs inputs)
         {
+            // Every route enters through this boundary. A new attempt clears
+            // stale reveal state, then an ordinary casting-specific refusal
+            // focuses the first current blocker without authoring anything.
+            if (ProblemNavigation.Active) ClearGraphFocus();
+            else LeaveProblemNavigation();
+            WorkspaceApplyResult result = ApplyCore(mode, scopeRoutineId, inputs);
+            if (!result.Allowed && result.BlockingCastings.Count != 0 &&
+                mode == CastingApplyMode.Ordinary)
+            {
+                ProblemNavigation.Begin(result.GateDecision);
+                FocusCurrentProblem();
+            }
+            return result;
+        }
+
+        private WorkspaceApplyResult ApplyCore(
+            CastingApplyMode mode,
+            string scopeRoutineId,
+            CastingWorkspaceInputs inputs)
+        {
             if (_submissionInFlight)
                 return RefusedInFlight(null);
             if (LegacyImportBlocked)
@@ -1665,6 +1694,15 @@ namespace KingmakerBuffPlanner.UI
             string target = casting.TargetMode == CastingTargetMode.DirectTarget
                 ? UnitDisplayName(_lastInputs, casting.DirectTargetUnitId)
                 : "group";
+            if (casting.TargetMode != CastingTargetMode.DirectTarget && casting.Origin != null)
+            {
+                string originId = casting.Origin.IsCasterCentered
+                    ? casting.CasterUnitId : casting.Origin.AnchorUnitId;
+                if (!string.IsNullOrEmpty(originId) && _lastInputs != null &&
+                    _lastInputs.Snapshot != null && _lastInputs.Snapshot.Units.Any(unit =>
+                        unit != null && string.Equals(unit.UnitId, originId, StringComparison.Ordinal)))
+                    target = "centered on " + UnitDisplayName(_lastInputs, originId);
+            }
             return spell + " (" + UnitDisplayName(_lastInputs, casting.CasterUnitId) +
                 " -> " + target + ")";
         }
@@ -2276,6 +2314,7 @@ namespace KingmakerBuffPlanner.UI
 
         public CastingPlanLoadStatus Reload()
         {
+            LeaveProblemNavigation();
             CastingPlanLoadResult loaded = _repository.Load(CampaignId);
             LastReloadNote = null;
             // Re-review, then focused re-review: with no plan file on disk

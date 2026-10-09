@@ -84,6 +84,24 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        internal static string DescribeProblem(CastingWorkspaceSession session)
+        {
+            CastingProblemNavigation problems = session.ProblemNavigation;
+            if (!problems.Active) return string.Empty;
+            return session.RoutineDisplayName(problems.RoutineId) + " was not cast. Showing Problem " +
+                problems.Position + " of " + problems.Count + ": " +
+                session.CastingLabel(problems.Current.CastingId) + ". Not ready: " +
+                string.Join("; ", problems.Current.Reasons.Select(WorkspaceReasonText.Describe).ToArray()) + ".";
+        }
+
+        internal static string DescribeRefusal(string routineName, WorkspaceApplyResult result,
+            CastingWorkspaceSession session)
+        {
+            return result != null && result.BlockingCastings.Count != 0 &&
+                session != null && session.ProblemNavigation.Active
+                    ? DescribeProblem(session) : DescribeRefusal(routineName, result);
+        }
+
         // Refusals are explained in terms the player can act on; the exact
         // machine reason stays appended for the log and bug reports.
         internal static string DescribeRefusal(string routineName, WorkspaceApplyResult result)
@@ -222,6 +240,14 @@ namespace KingmakerBuffPlanner.UI
         // unsupported castings, import review): the planner opens on that
         // routine. Informational refusals (nothing to cast, a run already in
         // progress, casting unavailable in this session) do not.
+        // Casting-owned refusals open from structured state. Global results
+        // retain the product's established opening policy.
+        internal static bool OpensPlanner(WorkspaceApplyResult result)
+        {
+            return result != null && (result.BlockingCastings.Count != 0 ||
+                OpensPlanner(result.ReviewReason));
+        }
+
         internal static bool OpensPlanner(string reason)
         {
             string value = reason ?? string.Empty;

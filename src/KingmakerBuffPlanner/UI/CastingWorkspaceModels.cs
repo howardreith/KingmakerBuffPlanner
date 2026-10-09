@@ -723,6 +723,7 @@ namespace KingmakerBuffPlanner.UI
             string head = colon < 0 ? value : value.Substring(0, colon);
             switch (head)
             {
+                case "unresolved-saved-request": return "this casting is a Draft; finish its choices and mark it Ready";
                 case "caster-unresolved": return "no caster chosen";
                 case "caster-not-in-party": return "the caster is not in the party";
                 case "caster-not-capable": return "the caster cannot cast this";
