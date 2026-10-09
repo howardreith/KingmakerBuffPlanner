@@ -1,11 +1,10 @@
 # Kingmaker Buff Planner
 
-**Release:** `0.4.0` (owner-review candidate; the published release is
-`0.3.0`) — the casting-first planner: plan every cast explicitly (caster,
+**Release:** `0.4.1` — the casting-first planner: plan every cast explicitly (caster,
 exact spell source, target, enhancements) and edit castings directly in the
 graph, with autosave and one-click Long / Important / Short routines from the
 HUD that never run in combat. See the
-[0.4.0 release notes draft](docs/RELEASE-NOTES-DRAFT.md) and the
+[0.4.1 release notes](docs/RELEASE-NOTES-DRAFT.md) and the
 [player guide](docs/CASTING-FIRST-PLAYER-GUIDE.md).
 
 Kingmaker Buff Planner is a standalone Unity Mod Manager mod for **Pathfinder:
@@ -18,7 +17,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.4.0.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.4.1.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including

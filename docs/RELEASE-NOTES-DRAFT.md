@@ -1,8 +1,8 @@
-# Kingmaker Buff Planner 0.4.0 — owner-review candidate (draft)
+# Kingmaker Buff Planner 0.4.1
 
-**Draft for owner review. 0.4.0 is not tagged or released.**
-
-0.4.0 completes the casting-first planner's remaining work: the spellbook
+0.4.1 is the published release of the 0.4 work: the owner-accepted 0.4.0
+review build with the version advanced so Unity Mod Manager sees it as newer
+than that build. It completes the casting-first planner's remaining work: the spellbook
 button works, routines never run in combat, Instant mode is strict, castings
 are edited directly in the graph, the beneficial-buff catalogue is audited,
 Magic Circle against Alignment casts instantly, and the planner and the
@@ -69,12 +69,14 @@ save writes the enforced values. To roll back, restore the backup.
 
 ## Known limitations
 
-- The exact in-game qualification of this candidate and its limits are in
-  `docs/REMAINING-WORK-0.4.0-HANDOFF.md`.
+- The exact in-game qualification (of the 0.4.0 candidate rc4 `009b6dd`,
+  which 0.4.1 repeats with only the version number and documentation
+  advanced) and its limits are in `docs/REMAINING-WORK-0.4.0-HANDOFF.md`.
 - Instant mode's "Not Ready" for a casting that can only be cast animated has
   no in-game check: after the Magic Circle repair no test party has such a
   source (it is proven by the planner's own compiler and navigation tests).
 - Group re-centring by portrait click is checked in code, not in the game
   (the standard test party has no group spell).
 - At 1280x720 the catalogue's Spells / Abilities tab captions wrap.
-- The visual look (scroll paper) is the owner's judgement to accept.
+- Light and Daylight stay in the catalogue as utility buffs (they give
+  light and have no other mechanics).
