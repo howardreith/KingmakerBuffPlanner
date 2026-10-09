@@ -73,7 +73,9 @@ namespace KingmakerBuffPlanner.Domain.Planning
             bool deliveryCanTargetSelf,
             bool deliveryCanTargetFriends,
             bool deliveryCanTargetEnemies,
-            bool deliveryCanTargetPoint)
+            bool deliveryCanTargetPoint,
+            bool deliveryHelpfulToAllies = false,
+            bool deliveryHarmfulToEnemies = true)
         {
             if (!isStickyTouch)
                 return new CastExecutionCapability(
@@ -87,13 +89,22 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 return AnimatedFallback("sticky-delivery-target-anchor-unsupported");
             if (deliveryCanTargetPoint)
                 return AnimatedFallback("sticky-delivery-point-targeting-ambiguous");
-            if (deliveryCanTargetEnemies)
+            // WP6 (0.4.0): a delivery that may also be aimed at an enemy is
+            // still a willing-target buff when it is helpful to allies and
+            // not harmful to enemies (Magic Circle against Alignment: its
+            // ally branch applies the carrier). The planner aims it only at
+            // its own party, where the native touch attack auto-hits (the
+            // instant adapter checks that condition before every cast).
+            if (deliveryCanTargetEnemies &&
+                (!deliveryHelpfulToAllies || deliveryHarmfulToEnemies))
                 return AnimatedFallback("sticky-delivery-hostile-targeting-ambiguous");
             if (!deliveryCanTargetSelf && !deliveryCanTargetFriends)
                 return AnimatedFallback("sticky-delivery-has-no-beneficial-unit-target");
             return new CastExecutionCapability(
                 CastExecutionStrategy.StickyTouchDeliveryRuleCast,
-                "supported-beneficial-sticky-touch-delivery");
+                deliveryCanTargetEnemies
+                    ? "supported-willing-target-sticky-touch-delivery"
+                    : "supported-beneficial-sticky-touch-delivery");
         }
 
         private static CastExecutionCapability AnimatedFallback(string reason)

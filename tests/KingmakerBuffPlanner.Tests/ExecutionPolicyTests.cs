@@ -30,6 +30,8 @@ namespace KingmakerBuffPlanner.Tests
                 () => TestLegacyFallbackProfile(root));
             Run("execution-policy-strict-hybrid-never-starts-a-native-command",
                 TestStrictHybridExecutor);
+            Run("execution-policy-willing-target-touch-buff-is-instant",
+                () => TestWillingTargetTouchBuffInstant(root));
         }
 
         private sealed class CountingDispatchBoundary : ICastingDispatchBoundary
@@ -204,6 +206,43 @@ namespace KingmakerBuffPlanner.Tests
             if (session.Apply(CastingApplyMode.Ordinary, "long", PolicyInputs(inputs, true)).ReviewReason !=
                     CastingExecutionPolicy.CombatActive)
                 throw new InvalidOperationException("A stored combat choice let a routine run in combat.");
+        }
+
+        // WP6 (0.4.0): Magic Circle against Alignment. Its touch delivery may
+        // also be aimed at enemies, but it is helpful to allies and not
+        // harmful to enemies, so it classifies as an instant sticky-touch
+        // delivery: Ready in strict Instant, projected as that strategy and
+        // run by the instant executor with no native command. The previous
+        // classification (AnimatedFallback) is the strict-Instant blocker.
+        private static void TestWillingTargetTouchBuffInstant(string root)
+        {
+            CastExecutionCapability circle = StickyTouchExecutionClassifier.Classify(true, true, true,
+                true, true, true, true, false, true, false);
+            string dir = Path.Combine(root, "policy-willing-touch");
+            Directory.CreateDirectory(dir);
+            PartyProviderSnapshot snapshot;
+            CastingWorkspaceInputs inputs = PolicyInputs(WorkspaceInputs(out snapshot), false, "unit-wizard",
+                circle.Strategy, circle.Reason);
+            var dispatch = new CountingDispatchBoundary();
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign", dispatch);
+            Assert(AddDraftCasting(session, inputs, "unit-wizard", "unit-t2").Applied);
+            WorkspaceApplyResult run = session.Apply(CastingApplyMode.Ordinary, "long", inputs);
+            if (!run.Allowed || dispatch.Submissions != 1 ||
+                dispatch.LastProjection.Plan.Steps.Single().ExecutionStrategy !=
+                    CastExecutionStrategy.StickyTouchDeliveryRuleCast)
+                throw new InvalidOperationException("A willing-target touch buff did not run instantly: " +
+                    run.ReviewReason);
+            var animated = new AlwaysAnimatedRuntime();
+            var instant = new AlwaysInstantRuntime();
+            var report = new ExecutionReport(dispatch.LastProjection.Plan);
+            Drain(new HybridCastExecutor(instant, animated, false, true, null, null,
+                strictInstant: true).Execute(dispatch.LastProjection.Plan, report));
+            if (animated.StartCount != 0 || instant.FireCount != 1 || report.Confirmed != 1)
+                throw new InvalidOperationException("The touch buff started a native command in Instant.");
+            // The pre-0.4.0 classification is the strict blocker.
+            CastingWorkspaceInputs old = PolicyInputs(WorkspaceInputs(out snapshot), false, "unit-wizard");
+            if (session.CompileForRuntime(old, "long").Castings.Single().IsExecutable)
+                throw new InvalidOperationException("The animated-only classification was Ready in Instant.");
         }
 
         private static void TestStrictHybridExecutor()

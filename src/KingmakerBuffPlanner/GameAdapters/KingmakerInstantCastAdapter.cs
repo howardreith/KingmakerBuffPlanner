@@ -81,6 +81,10 @@ namespace KingmakerBuffPlanner.GameAdapters
                         sticky.ExecutionAbility, resolved.Target))
                     return CastRuntimeValidation.Fail(
                         "sticky-delivery-target-invalid");
+                string autoHit = KingmakerStickyTouchCastAdapter.AutoHitRefusal(
+                    resolved.Caster, resolved.Target == null ? null : resolved.Target.Unit);
+                if (autoHit != null)
+                    return CastRuntimeValidation.Fail("sticky-delivery-not-auto-hit:" + autoHit);
                 if (KingmakerStickyTouchCastAdapter.HasHeldTouch(
                         resolved.Caster, null))
                     return CastRuntimeValidation.Fail(
@@ -500,7 +504,27 @@ namespace KingmakerBuffPlanner.GameAdapters
                 delivery != null && delivery.CanTargetSelf,
                 delivery != null && delivery.CanTargetFriends,
                 delivery != null && delivery.CanTargetEnemies,
-                delivery != null && delivery.CanTargetPoint);
+                delivery != null && delivery.CanTargetPoint,
+                delivery != null && delivery.EffectOnAlly == AbilityEffectOnUnit.Helpful,
+                delivery == null || delivery.EffectOnEnemy == AbilityEffectOnUnit.Harmful);
+        }
+
+        // The native touch attack (RuleAttackRoll.OnTrigger, Kingmaker
+        // 2.1.7b) auto-hits the caster itself, or a touched unit that is not
+        // the caster's enemy, not of a neutral faction and not confused. A
+        // rule-cast delivery is only submitted when that holds, so the
+        // ally branch of the delivery is the one that runs and no attack is
+        // rolled. Null when it holds, otherwise the reason.
+        internal static string AutoHitRefusal(UnitEntityData caster, UnitEntityData target)
+        {
+            if (caster == null || target == null) return "touch-participant-missing";
+            if (caster == target) return null;
+            if (target.IsEnemy(caster)) return "touch-target-is-enemy";
+            if (target.Faction != null && target.Faction.Neutral) return "touch-target-neutral-faction";
+            if (target.Descriptor != null &&
+                target.Descriptor.State.HasCondition(Kingmaker.UnitLogic.UnitCondition.Confusion))
+                return "touch-target-confused";
+            return null;
         }
 
         internal static bool TryCreateDelivery(AbilityData source,
