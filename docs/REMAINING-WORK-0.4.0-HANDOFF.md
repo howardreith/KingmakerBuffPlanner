@@ -7,7 +7,7 @@ bulky evidence stays under the lab's `runtime-evidence\<runId>\`.
   `private\worktrees\KBP040`), created from `origin/main`
   `16f87ed1dc9b00b683ac7192f4ae8d95da7853fc` (WP2A merged, PR #4).
 - Public release: `v0.3.0`. No 0.4.0 tag, merge, or release is authorized.
-- Owner-review candidate: rc3 `c452e01b360f380b9ca9268e0be3ea05d1b288c6` (see the final report below).
+- Owner-review candidate: **rc4 `009b6ddab80a5e70d7469962986c38222961f4ba`** (lead-review fixes; see the rc4 report below). rc3 `c452e01b360f380b9ca9268e0be3ea05d1b288c6` is superseded; its report is kept as history.
 - Shell rule: run every gate/harness/launcher script through Windows
   PowerShell 5.1 as `powershell.exe -NoProfile -NonInteractive -Command
   "& .\scripts\Name.ps1 ..."`. Launched with `-File`, Test-RuntimeHarness
@@ -15,11 +15,298 @@ bulky evidence stays under the lab's `runtime-evidence\<runId>\`.
   `Get-FileHash`, which then returns nothing); the qualified WP2A head
   reproduces the same failure under `-File`.
 
-## Final consolidated report (0.4.0 owner-review candidate)
+## rc4 report (current owner-review candidate)
 
-Candidate: **`c452e01b360f380b9ca9268e0be3ea05d1b288c6`** (rc3), internal
-version 0.4.0. Not merged, not tagged, not released, not installed.
-Owner acceptance is pending for every package.
+Product candidate: **`009b6ddab80a5e70d7469962986c38222961f4ba`** (rc4), internal
+version 0.4.0. Not merged, not tagged, not released, not installed. Owner
+acceptance is pending for every package. rc4 answers the lead review of rc3
+(`c452e01`); the rc3 report below it is history.
+
+| Identity | Value |
+|---|---|
+| Exact product candidate commit | `009b6ddab80a5e70d7469962986c38222961f4ba` (rc4) |
+| Records-only branch head | the head of `codex/kingmaker-buff-planner-0.4.0` after this record (commits after `009b6dd` touch only `docs/`, `planning/` and the root records; no source, test, script, profile or version surface) |
+| Package identity | `KingmakerBuffPlanner-0.4.0.zip`, SHA-256 `4be8a0b7dbf150d762350a88aa6a00eafac391fe0ac0e541d85dd53618f63adb`; DLL `0e76977b81b30153912537c13cc5a67b336f7b1112fb73dcd1b0f3cc2ea651a3`; MVID `50fcbfc1-751c-4bb7-a283-bf2399c33b47` |
+| Complete-gate identity | `scripts\Test-SourceOnly.ps1` on worktree `KingmakerBuffPlanner-K044`, detached at `009b6dd`, clean (result under "Complete gate (rc4)") |
+
+### rc3 complete gate (historical)
+
+`scripts\Test-SourceOnly.ps1` on rc3 `c452e01` (worktree
+`KingmakerBuffPlanner-K042`, clean): **PASS**, exit 0, 05:56:26 -> 11:12:23
+(5 h 16 min): source validation 42/42; protocol (C#) 471/471; runtime harness
+filesystem 38/38; problem navigation evidence 23/23; spellbook entry evidence
+26/26; package validation 4/4 (`cc50fb3c...`); deployment WhatIf purity 5/5;
+launcher `-File` WhatIf purity 13/13; fixture inventory evidence 3/3;
+Restore-InstallLocal 16/16; guarded publisher gate 3/3; source-only suite 1/1.
+Log archived as `package-archive\0.4.0-rc3\test-sourceonly-gate.log`.
+Production code changed after it, so it is historical only.
+
+### Review findings and corrections
+
+**Finding 1 - WP5 removed genuine or opaque buffs.** The rc3 rule "every
+component only keeps the books" was also true of a buff with no components at
+all, and read that as "not a buff". rc4 (`7ccf0c9`, `009b6dd`):
+
+- drops that rule: a buff with no mechanics of its own stays a payload unless a
+  proved marker rule applies - its presence may be the state other blueprints
+  read (Targeted Bomb Admixture's buff has no components; 24 alchemist bomb
+  abilities read it through `ContextConditionCasterHasFact`);
+- proves markers instead: a **lockout** (the ability forbids its own recast over
+  the buff - `AbilityTargetHasFact` inverted, `AbilityCasterHasNoFacts`, Call of
+  the Wild `AbilityTargetHasNoFactUnlessBuffsFromCaster` - and also does
+  something else); beside an instantaneous **restoration**, a hidden buff or one
+  with no mechanics of its own; a **hidden bookkeeping** buff whose own actions
+  apply nothing and run nothing unrecognized;
+- reads what a buff's own `AddFactContextActions` do (`factActions` in the
+  export): a hidden buff whose actions apply a beneficial buff carries it; one
+  that runs an unrecognized action, or applies a beneficial buff only when it
+  ends, is **unproved** - unsupported with the reason, never assumed bookkeeping;
+- reads two exact Call of the Wild contracts: `RunActionsDependingOnContextValue`
+  (value-selected `ActionList[]` - Battle, Bone and Wind Ward and Draconic
+  Resilience now show their ward buff; the hex cooldown is the lockout) and
+  `ContextActionTreatDeadlyWounds` (a restoration);
+- adds `revival-target-only`: the native `AbilityTargetBreathOfLife` admits only a
+  dead or dying party member or an undead (its `CanTarget` IL) - Inspiring
+  Recovery revives, and its hidden check buff casts the morale buff only when it
+  ends (rc3 had excluded it for the wrong reason);
+- adds `blueprint-references.json` to the catalogue scenario: every blueprint
+  that reads each audited buff (81,292 / 104,383 / 108,808 blueprints walked in
+  native-only / call-of-the-wild / full-user, 0 failures).
+
+Per-entry adjudication of every rc3 removal (ability GUID, every persistent
+buff/effect GUID, components, action path, actual ongoing behaviour, final
+disposition, reason, adapter/override): `planning/CATALOG-AUDIT-0.4.0.md`.
+Result over the 125 entries rc3 removed: **50 restored** as genuine buffs
+(category 2: Targeted Bomb Admixture x3, Light x3, Daylight, Elemental Bastion,
+Battle / Bone / Wind Ward and Draconic Resilience hexes x14, Heaven's Leap mark
+x4, Venomous Strike x12, Activate School Understanding x8, Activate Cold Snap,
+Select Wild Flanking Partner, Gunslinger Deadeye and Breeze-Kissed), **75
+excluded** as not buffs (category 1: hostile riders and maneuvers x38, harmful
+conditions x6, restorations with their cooldown / tracker / enabler / side-effect
+buffs x26 - Treat Affliction x2, Treat Deadly Wounds, Counter Curse x14, Kinetic
+Healer x3, Regenerative Sinew x4, Warpriest channel x2 - and revivals x5 -
+Inspiring Recovery), **0 unsupported** (category 3). Adapters: the two exact
+Call of the Wild contracts above; no override was added. The adapter also
+**newly offers 20 Call of the Wild sources** whose only effects sat behind the
+wrapper (Air Barrier x6, Spirit Shield x2, Ice Armor, Armor of Bones, Time Sight
+x2, Gift of Claw and Horn x3, Mythmaker x6 - absent from rc3 and 0.3.0 under
+both rule sets), each a genuine buff. Light and Daylight are kept by deliberate
+product scope: verified light only (no mechanics; read by nothing but their own
+abilities) - excluding them is the owner's call. Regressions
+`catalog-adjudication-*` are generated from the rc4 export's exact facts; red
+under the rc3 rule (Targeted Bomb Admixture dropped as mechanics-free; a lone
+self-gated buff taken for a lockout) and without the revival rule (Inspiring
+Recovery unsupported as a delayed effect).
+
+**Finding 2 - Classic combat-refusal ordering** (`11b8d14`, evidence `e7bd532`).
+`PlannerUiSession.ExecuteRoutine` runs through `ClassicRoutineAdmission`: the
+running-routine guard, then the global refusal "Buff routines cannot run during
+combat." - before `Refresh()` (profile rebinding and saving), the preview and
+compiler, the review and partial-apply gates and any dispatch; `PrepareAndCast`
+keeps its final-boundary check for combat that begins while it prepares.
+Regression `execution-policy-classic-combat-refuses-before-preparation`: with
+combat active, zero refreshes, profile writes (no file exists), previews,
+review reads and spends, executor calls and resource spends; out of combat the
+same probe crosses each once; red under the pre-rc4 order
+(`refresh=1;profile-writes=1;previews=1`). Validate-Source pins the wiring (43
+assertions). Native evidence: the physical combat run now also drives the
+Classic route in the same held combat - `kbp040-rc4-combat-instant`: refused
+with that sentence, 0 yielded, 0 refreshes, 0 previews, execution report
+unchanged, not executing, Classic profile bytes unchanged, availability
+`99>99`, no effect, and the casting-first HUD press refused before dispatch.
+Exact route semantics: the casting-first routes refuse at Apply (before
+compile, persistence, authorization and submission); the casting-first HUD
+quick run first builds fresh discovery inputs (one Classic-session refresh,
+whose Classic saves are suppressed in casting-first mode). With that wording,
+"every route refuses before planning or saving" now holds.
+
+**Finding 3 - full-user ownership** (`77e6946`). Ownership is proved per staged
+mod by the mod's own inventory: the Call of the Wild library
+`loaded_blueprints.txt` (Call of the Wild, TweakOrTreat, ZFavoredClass,
+ProperFlanking2, BetterVendors; `AddAsset` records every blueprint it
+registers, literal GUIDs included) and the Kingmaker Gunslinger identifier
+manifest (`blueprints/blueprints.json`). A blueprint no inventory claims is
+native only when that is proved (native-only profile, or every staged mod
+declares an inventory); otherwise `unattributed`. The report resolves an
+unattributed entry to native only from the native-only catalogue of the same
+commit (`-NativeCatalogPath`) and fails if the regrouped counts do not
+reconcile. Regression `catalog-ownership-multi-mod-inventories` (the fixture's
+own formats and GUIDs; red under the rc3 index: native/native/native).
+Verified in `kbp040-rc4-catalog-full`: Call of the Wild's representatives
+(Dazzling Blade, Bless Weapon, Fortune) and Battle Ward are
+`call-of-the-wild`; all 14 Gunslinger abilities (`KMG_*`) are
+`kingmaker-gunslinger` and nothing else is; Targeted Bomb Admixture is
+`unattributed` in the game's JSON and native in the report.
+
+### Corrected counts and ownership (rc4, static before -> after / live before -> after)
+
+| Profile | Ownership | Static | Live |
+|---|---|---|---|
+| native-only | all (native) | 379 -> 376 | 516 -> 509 |
+| call-of-the-wild | all | 2355 -> 2311 | 3433 -> 3367 |
+| call-of-the-wild | call-of-the-wild | 1975 -> 1947 | 2891 -> 2844 |
+| call-of-the-wild | native (every staged mod declares an inventory) | 380 -> 364 | 542 -> 523 |
+| full-user | all | 2418 -> 2368 | 3510 -> 3436 |
+| full-user | call-of-the-wild | 1978 -> 1950 | 2896 -> 2848 |
+| full-user | kingmaker-gunslinger | 7 -> 6 | 14 -> 13 |
+| full-user | tweak-or-treat | 26 -> 24 | 32 -> 30 |
+| full-user | proper-flanking2 | 19 -> 19 | 19 -> 19 |
+| full-user | z-favored-class | 1 -> 1 | 1 -> 1 |
+| full-user | native (native-only reference) | 387 -> 368 | 548 -> 525 |
+| full-user | unattributed after the reference | 0 | 0 |
+
+Removed by the 0.4.0 rules (rc4): native-only 7 (harmful 3, hostile rider 2,
+restoration 1, revival 1); call-of-the-wild 66 (5 / 33 / 23 / 5); full-user 74
+(6 / 38 / 25 / 5). No entry is added by the rules (`addedCount` 0); "before"
+rose by 20 live entries in the two Call of the Wild profiles because the
+adapter reads more of the same content under both rule sets. rc3 for
+comparison: 379 -> 374 / 516 -> 505; 2355 -> 2268 / 3413 -> 3301; 2418 -> 2323 /
+3490 -> 3366, with every full-user entry wrongly "native". Optional-mod counts
+now cover proved ownership only (call-of-the-wild profile: 7,342 abilities,
+4,937 candidates, 1,947 included, 0 unsupported).
+
+### Testing
+
+- Focused, red/green: `execution-policy-classic-combat-refuses-before-preparation`
+  (mutation: prepare-then-check -> red); `catalog-ownership-multi-mod-inventories`
+  (mutation: the rc3 index -> red); `catalog-adjudication-*` x4 (mutations: the
+  rc3 rule -> 2 red; the revival rule disabled -> red); `physical-combat-judgement`
+  (Classic violations); `catalog-audit-*`.
+- Complete C# suite on rc4: **473/473**. Validate-Source **43/43**. Production
+  build clean (warnings are errors, level 4).
+- Pre-checks on `K044` before the campaign: runtime harness filesystem 38/38;
+  launcher `-File` WhatIf meta-test 13/13 (an out-of-tree copy with the
+  purity windows stubbed; the real windows run in the complete gate).
+- Complete `Test-SourceOnly.ps1` on rc4: under "Complete gate (rc4)".
+
+### Guarded runtime results (rc4 `009b6dd`, package `4be8a0b7...`)
+
+Every rc4 run below loaded exactly the frozen build (DLL `0e76977b...`, MVID
+`50fcbfc1-...`; freeze `runtime-backups\qualification-frozen\009b6dd...\FREEZE.json`).
+
+| Run | Result | Evidence |
+|---|---|---|
+| `kbp040-rc4-catalog-native` / `-cotw` / `-full` | PASS x3 | catalogue, audit, blueprint references; counts above |
+| `kbp040-rc4-combat-instant` | PASS | casting-first and Classic routes refused in held combat; nothing spent (Finding 2) |
+| `kbp040-rc4-sel-720` | PASS | planner on the scroll paper at 1280x720 with the rc4 catalogue |
+| `kbp040-rc4-authoring` | PASS | physical portrait add / remove / re-add / retarget / provider change / Undo / nested Escape |
+| `kbp040-rc4-spellbook` | PASS | physical spellbook handoff (owner display) |
+| `kbp040-rc4-sel-sticky` | PASS | Magic Circle selection on the advanced copy |
+| `kbp040-rc4-cast-sticky-instant` | PASS | Magic Circle Instant: `EffectConfirmed`, one spend by the source data, available `1>0`, `StickyTouchDeliveryRuleCast` |
+| `kbp040-rc4-cast-sticky-animated` | PASS | Magic Circle Animated: the native command path, same spend and effect |
+| `kbp040-rc4-wsqual` (+ `-02`), `-03` | FAIL x2 (foreground), then **PASS 95/95** (`-03`) | workspace semantics PASS in every attempt (3 casts / 2 casters exact, refused add clean, retarget, Undo, save, reopen with exact IDs and order, budget); the OS-input hover probes failed twice ("Kingmaker foreground activation failed") and passed in `-03` (35 samples, one owner, no ghost) |
+| `kbp040-rc4-combat-animated` (+ `-02`), `-03` | FAIL x2 (foreground), then **PASS** (`-03`) | `-03`: Animated mode - casting-first press refused before dispatch, Classic route refused with 0 yielded / 0 refreshes / 0 previews, report and profile unchanged, availability `99>99`, no effect; the two earlier attempts lost the foreground ("client bounds are invalid" / "foreground activation failed") |
+| `kbp040-rc4-sel-1080` (+ `-02`), `-03` | FAIL x2 (foreground), then **PASS 83/83** (`-03`) | `-03`: planner and spell scroll on the paper at 1920x1080 with the rc4 catalogue (`physical-cf-graph*.png`, `physical-cf-inspect*.png`) |
+| `kbp040-rc4p-*` (pre-candidate `7ccf0c9`, package `bfd32351...`) | PASS x4 | fact-gathering for the adjudication and the first native Classic evidence; not candidate evidence |
+
+The foreground failures are environmental: Windows refused foreground
+activation to the game while this desktop was in use around midday (the rc3
+campaign ran at 05:00-06:00 and had none; rc4's own sel-720, authoring and
+spellbook passed between failures). The harness refused to deliver input
+rather than send it elsewhere - its guard working. With the desktop idle (17:51-18:00) all three passed on the same frozen candidate (`-03`).
+
+### Remaining limitations (not native-qualified unless stated)
+
+- Strict-Instant unsupported-source deep-link: source/integration proof only (no
+  animated-only source in any guarded fixture after WP6).
+- Group re-centring and Share conditional visibility: source proof only (not in
+  the physical fixture; physical scenarios are not admitted on the advanced copy).
+- Human-reproduction catalogue: not run (its BagOfTricks fixture identity no
+  longer matches - the owner's profile).
+- 2560x1440 or an alternate in-game UI scale: not run (1920x1080 session display;
+  changing the scale would change the owner's game settings).
+- Pre-existing, not introduced by 0.4.0: Call of the Wild's Battlemind Link (x4)
+  applies `CasterBattlemindLinkBuff` through `ContextActionOnContextCaster`, which
+  the generic wrapper reads as the target's buff; its confirmation would expect
+  the caster's buff on the target. Unchanged since 0.1.x; a follow-up.
+- Light and Daylight: kept (utility light); the owner may choose a scope exclusion.
+
+### Safety
+
+- Disposable fixtures only (`KBP_AUTOMATION_WORKING` full-user; the owner-approved
+  advanced copy `KBP_ADVANCED_WORKING`); no save written; protected saves
+  compared and clean on every save-backed run.
+- Every run staged the candidate transactionally and restored `Mods` (and the
+  display registry values for windowed runs) byte-exact: all 56 mission
+  transactions are `Restored` with restoration verified; no deployment lock, no
+  staging left, no dispatcher claim. The candidate is not installed.
+- Casting allowances were written by `New-KbpRunAllowance.ps1` under this
+  mission's authority, one per run, for the frozen build. Two cast attempts were
+  refused by the launcher before launch (my script passed the allowance path
+  with doubled backslashes); the unconsumed allowances were then used as written.
+- No other lab's lease or process was touched; no guard, validator, allowlist or
+  assertion was weakened; no merge, tag, release or release asset; no
+  Gunslinger change.
+
+### Owner-review checklist (main game)
+
+Install the ZIP after backing up `Mods\KingmakerBuffPlanner` (with
+`UserSettings`) outside `Mods`; Unity Mod Manager should list 0.4.0.
+
+1. Open the spellbook (B) and click the Buff Planner button (below the window's
+   close button): the spellbook closes and the planner opens.
+2. Confirm the planner opens correctly on the scroll paper, all lanes readable.
+3. Pick a buff, a caster and its exact source row, click a recipient (one
+   casting, selected), then click the same recipient again: it is removed.
+4. Add a direct buff again and click another recipient: it moves (an occupied
+   or unreachable recipient is refused with the reason).
+5. Add a group buff, click another portrait (re-centres), then its centre
+   portrait (removes).
+6. Confirm the simplified sidebar: no Disable, Duplicate, Cast By or
+   required-recipient menus, no obsolete header text.
+7. Confirm Share Transmutation appears only for a Brown-Fur Transmuter source
+   that can use it.
+8. Start a fight and press a HUD routine - in the casting-first planner and in
+   the Classic planner: "Buff routines cannot run during combat."; nothing is
+   spent, nothing is saved.
+9. Compare Instant and Animated (Mode button): Instant casts at once; Animated
+   plays the normal casting.
+10. In Instant mode cast Magic Circle against Alignment on an ally: instant, the
+    slot spent once, the circle appears.
+11. Browse the buff catalogue for anything that is not a real buff.
+12. Confirm Hideous Laughter, Treat Affliction, Treat Deadly Wounds and
+    Inspiring Recovery are absent; confirm Targeted Bomb Admixture, the hex
+    wards (Battle / Bone / Wind Ward), Venomous Strike and Elemental Bastion are
+    present; decide whether Light and Daylight (utility light) belong.
+13. Inspect the parchment planner at your own resolution.
+14. Right-click a spell: the description is a spell scroll; the wheel scrolls
+    it; Escape or a click outside closes it.
+15. Run ordinary Long / Important / Short routines from the HUD.
+16. Make a casting Not Ready (for example remove its slot) and confirm Not Ready
+    navigation still focuses it.
+17. Use Undo, close and reopen the planner and reload the save: the plan persists.
+18. Report PASS or the exact defects.
+
+### Complete gate (rc4)
+
+`scripts\Test-SourceOnly.ps1` on rc4 - exactly
+`009b6ddab80a5e70d7469962986c38222961f4ba`, worktree
+`KingmakerBuffPlanner-K044`, clean - **PASS**, exit 0, 12:20:14 -> 17:50:59
+(5 h 31 min): source validation 43/43; protocol (C#) 473/473; runtime harness
+filesystem 38/38; problem navigation evidence 23/23; spellbook entry evidence
+26/26; package validation 4/4 (`4be8a0b7...`); deployment WhatIf purity 5/5;
+launcher `-File` WhatIf purity 13/13 (live purity windows); fixture inventory
+evidence 3/3; Restore-InstallLocal 16/16 (7 rollback cases); guarded publisher
+gate 3/3; source-only suite 1/1. Log archived as
+`package-archive\0.4.0-rc4\test-sourceonly-gate.log`. Release package: two
+`Build-Release.ps1` runs (each `deterministic=2`) produced byte-identical
+`4be8a0b7...` - the package every rc4 run loaded; archived with its manifest
+under `package-archive\0.4.0-rc4\`.
+
+### Publication
+
+Published through the project's guarded push helper
+(`codex-policy\Push-KingmakerBuffPlanner.ps1`, fast-forward only, clean tree)
+as `codex/kingmaker-buff-planner-0.4.0`: the mission branch
+`claude/kbp-complete-remaining-work-2026-10-09`, same commits - the helper
+admits only `codex/kingmaker-buff-planner*` names. Draft PR against `main`:
+recorded below once opened. Nothing is merged, tagged, released or installed.
+
+## rc3 report (superseded by rc4; kept as history)
+
+Candidate: `c452e01b360f380b9ca9268e0be3ea05d1b288c6` (rc3), internal
+version 0.4.0. Superseded by rc4 after the lead review (above); its WP5
+catalogue statements and counts are corrected there.
 
 ### A. Overall verdict
 
@@ -234,7 +521,7 @@ Install the ZIP after backing up `Mods\KingmakerBuffPlanner` (with
 
 ### Complete gate
 
-`scripts\Test-SourceOnly.ps1` on rc3 (worktree `KingmakerBuffPlanner-K042`, clean): RUNNING at the time of this record; the result is appended below when it completes.
+`scripts\Test-SourceOnly.ps1` on rc3 (worktree `KingmakerBuffPlanner-K042`, clean): PASS, exit 0 (05:56:26 -> 11:12:23); layer counts in the rc4 report's "rc3 complete gate (historical)".
 
 ## Package status (history)
 
@@ -396,6 +683,10 @@ added so the guarded casting harness can cast it on an ally in Instant and
 Animated on the advanced fixture.
 
 ## WP5 — beneficial-buff catalogue audit
+
+> rc4 corrects this package after the lead review (marker rules, the Call of
+> the Wild adapters, revivals, ownership): see the rc4 report at the top and
+> `planning/CATALOG-AUDIT-0.4.0.md`. The text below is the rc3-era record.
 
 Diagnosis (from the full-user catalogue export of `wp1-4480e15-core-01`):
 Hideous Laughter entered through Call of the Wild's Infectious Charms caster
