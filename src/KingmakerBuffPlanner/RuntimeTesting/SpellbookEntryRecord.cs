@@ -27,13 +27,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // After the physical click.
         public int NativeCloseInvocations { get; set; }
         public int OpenerInvocations { get; set; }
+        public int NativeReleases { get; set; }
         public int WorkspaceOpens { get; set; }
         public string HandoffState { get; set; }
         public string HandoffFailure { get; set; }
         public bool PlannerOpenAfterClick { get; set; }
         public bool InputLeaseHeldAfterClick { get; set; }
         public bool SpellbookShownAfterClick { get; set; }
-        public bool NativeOwnerActiveAfterClick { get; set; }
+        // The native service window itself, and whether the FullScreenUi
+        // mode now active is the planner's own input lease (the planner
+        // raises that mode and refuses to open while another owner holds
+        // it).
+        public bool ServiceWindowShownAfterClick { get; set; }
+        public bool PlannerOwnsFullScreenAfterClick { get; set; }
         public int PlannerRootsAfterClick { get; set; }
         public bool ButtonRestoredAfterRecovery { get; set; }
         public int OwnedButtonsAfterRecovery { get; set; }
@@ -127,7 +133,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     failures.Add("button-not-visible-and-topmost" + at);
                 if (cycle.Placement == null || !cycle.Placement.Contains("conflictFree=True"))
                     failures.Add("button-placement-conflicts" + at);
-                if (cycle.NativeCloseInvocations != 1 || cycle.OpenerInvocations != 1)
+                if (cycle.NativeCloseInvocations != 1 || cycle.OpenerInvocations != 1 ||
+                    cycle.NativeReleases != 1)
                     failures.Add("handoff-not-exactly-once" + at);
                 if (cycle.FaultInjected)
                 {
@@ -141,8 +148,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 else if (cycle.WorkspaceOpens != 1 || cycle.HandoffState != "Completed" ||
                     !cycle.PlannerOpenAfterClick || !cycle.InputLeaseHeldAfterClick ||
-                    cycle.SpellbookShownAfterClick || cycle.NativeOwnerActiveAfterClick ||
-                    cycle.PlannerRootsAfterClick != 1)
+                    cycle.SpellbookShownAfterClick || cycle.ServiceWindowShownAfterClick ||
+                    !cycle.PlannerOwnsFullScreenAfterClick || cycle.PlannerRootsAfterClick != 1)
                     failures.Add("planner-not-opened-once-after-native-close" + at);
                 if (!cycle.PlannerClosedAfterEscape || !cycle.InputLeaseReleasedAfterEscape ||
                     cycle.SpellbookShownAfterEscape || cycle.NativeOwnerActiveAfterEscape ||

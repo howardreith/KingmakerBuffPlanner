@@ -34,6 +34,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _spellbookCycleNumber;
         private int _spellbookCloseBefore;
         private int _spellbookOpenerBefore;
+        private int _spellbookReleasesBefore;
         private int _spellbookOpensBefore;
         private int _spellbookRunsBefore;
         private string _spellbookProfilePath;
@@ -114,6 +115,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 _spellbookCloseBefore = entry.NativeCloseInvocationsForRuntime;
                 _spellbookOpenerBefore = entry.OpenerInvocationsForRuntime;
+                _spellbookReleasesBefore = entry.NativeReleasesForRuntime;
                 _spellbookOpensBefore = BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime;
                 return RequestPhysical("sb-click-" + SpellbookEntryRecord.CycleSuffix(_spellbookCycleNumber),
                     "click", new Vector2(_spellbookCycle.ButtonX.Value, _spellbookCycle.ButtonY.Value),
@@ -208,18 +210,29 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             _spellbookCycle.NativeCloseInvocations = entry.NativeCloseInvocationsForRuntime - _spellbookCloseBefore;
             _spellbookCycle.OpenerInvocations = entry.OpenerInvocationsForRuntime - _spellbookOpenerBefore;
+            _spellbookCycle.NativeReleases = entry.NativeReleasesForRuntime - _spellbookReleasesBefore;
             _spellbookCycle.WorkspaceOpens = BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime - _spellbookOpensBefore;
             _spellbookCycle.HandoffState = entry.HandoffState.ToString();
             _spellbookCycle.HandoffFailure = entry.HandoffFailure;
             _spellbookCycle.PlannerOpenAfterClick = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
             _spellbookCycle.InputLeaseHeldAfterClick = BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
             _spellbookCycle.SpellbookShownAfterClick = NativeSpellbookShown();
-            _spellbookCycle.NativeOwnerActiveAfterClick = entry.NativeOwnerActiveForRuntime;
+            _spellbookCycle.ServiceWindowShownAfterClick = NativeServiceWindowShown();
+            _spellbookCycle.PlannerOwnsFullScreenAfterClick = Kingmaker.Game.Instance != null &&
+                Kingmaker.Game.Instance.IsModeActive(Kingmaker.GameModes.GameModeType.FullScreenUi) &&
+                BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
             _spellbookCycle.PlannerRootsAfterClick = BuffPlannerUiRoot.PlannerRootCountForRuntime();
             Button button = entry.OwnedButtonForRuntime;
             _spellbookCycle.ButtonRestoredAfterRecovery = button != null &&
                 button.gameObject.activeInHierarchy && button.IsInteractable();
             _spellbookCycle.OwnedButtonsAfterRecovery = OwnedSpellbookButtons();
+        }
+
+        private static bool NativeServiceWindowShown()
+        {
+            Kingmaker.Game game = Kingmaker.Game.Instance;
+            ServiceWindowController controller = game == null || game.UI == null ? null : game.UI.ServiceWindow;
+            return controller != null && controller.WindowTabs != null && controller.WindowTabs.IsShow;
         }
 
         private static bool NativeSpellbookShown()

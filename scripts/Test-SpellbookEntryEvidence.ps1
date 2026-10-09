@@ -28,12 +28,13 @@ function New-SpellbookEvidence {
             buttonWidth = 170; buttonHeight = 36; topmostHitIsOwned = $true
             topmostHitPath = 'StaticCanvas/ServiceWindow/BuffPlannerSpellbookButton/Label'
             placement = 'left-of-native-close;rect=0,0-1,1;conflictFree=True'; plannerOpenBeforeClick = $false
-            nativeCloseInvocations = 1; openerInvocations = 1
+            nativeCloseInvocations = 1; openerInvocations = 1; nativeReleases = 1
             workspaceOpens = if ($fault) { 0 } else { 1 }
             handoffState = if ($fault) { 'Failed' } else { 'Completed' }
             handoffFailure = if ($fault) { 'planner-open-refused' } else { '' }
             plannerOpenAfterClick = -not $fault; inputLeaseHeldAfterClick = -not $fault
-            spellbookShownAfterClick = $fault; nativeOwnerActiveAfterClick = $fault
+            spellbookShownAfterClick = $fault; serviceWindowShownAfterClick = $fault
+            plannerOwnsFullScreenAfterClick = -not $fault
             plannerRootsAfterClick = if ($fault) { 0 } else { 1 }
             buttonRestoredAfterRecovery = $fault; ownedButtonsAfterRecovery = if ($fault) { 1 } else { 0 }
             plannerClosedAfterEscape = $true; inputLeaseReleasedAfterEscape = $true
@@ -82,7 +83,9 @@ $cases = [ordered]@{
     'handoff-refused' = { param($r, $d) $r.cycles[0].nativeCloseInvocations = 0 }
     'planner-opened-twice' = { param($r, $d) $r.cycles[1].workspaceOpens = 2 }
     'spellbook-left-open-behind-planner' = { param($r, $d) $r.cycles[0].spellbookShownAfterClick = $true }
-    'fullscreen-veil-remains' = { param($r, $d) $r.cycles[0].nativeOwnerActiveAfterClick = $true }
+    'native-window-left-shown' = { param($r, $d) $r.cycles[0].serviceWindowShownAfterClick = $true }
+    'fullscreen-not-owned-by-planner' = { param($r, $d) $r.cycles[1].plannerOwnsFullScreenAfterClick = $false }
+    'opened-without-native-release' = { param($r, $d) $r.cycles[2].nativeReleases = 0 }
     'escape-opened-native-menu' = { param($r, $d) $r.cycles[2].nativeMenuOpenAfterEscape = $true }
     'lease-not-released' = { param($r, $d) $r.cycles[0].inputLeaseReleasedAfterEscape = $false }
     'failure-left-limbo' = { param($r, $d) $r.cycles[3].spellbookShownAfterClick = $false }
