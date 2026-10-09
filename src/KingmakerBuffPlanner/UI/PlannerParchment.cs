@@ -256,6 +256,8 @@ namespace KingmakerBuffPlanner.UI
 
         internal RectTransform Rect { get { return _rect; } }
         internal ParchmentRuleMode Mode { get { return _mode; } }
+        // Why the owning view placed or hid the rule (evidence only).
+        internal string Placement { get; set; }
 
         internal void Apply(Image ornament)
         {
@@ -293,7 +295,8 @@ namespace KingmakerBuffPlanner.UI
             get
             {
                 return _name + ":rule=" + _mode.ToString().ToLowerInvariant() +
-                    (_mode == ParchmentRuleMode.Ornament && _image.sprite != null ? "(" + _image.sprite.name + ")" : string.Empty);
+                    (_mode == ParchmentRuleMode.Ornament && _image.sprite != null ? "(" + _image.sprite.name + ")" : string.Empty) +
+                    (string.IsNullOrEmpty(Placement) ? string.Empty : ";placement=" + Placement);
             }
         }
     }

@@ -79,6 +79,7 @@ namespace KingmakerBuffPlanner.UI
         private Text _bannerDetail;
         private Text _guidance;
         private ScrollRect _graphScroll;
+        private ParchmentRule _headerRule;
         private RectTransform _graphViewport;
         private RectTransform _graphContent;
         // Inspector.
@@ -195,9 +196,26 @@ namespace KingmakerBuffPlanner.UI
 
         // One refresh renders the shared read models and, being an actual
         // presentation on screen, feeds the review coordinator.
+        // The header rule sits in the gap above the routine bar when there is
+        // one (ParchmentHeaderRule); re-placed on every refresh because the
+        // frame's height is only known once the canvas has laid it out.
+        private void PlaceHeaderRule()
+        {
+            if (_headerRule == null || _frame == null) return;
+            float height = _frame.rect.height;
+            if (height <= 0f) height = Screen.height - 84f;
+            float? offset = ParchmentHeaderRule.OffsetBelowTop(height);
+            _headerRule.Rect.gameObject.SetActive(offset.HasValue);
+            if (offset.HasValue) _headerRule.Rect.anchoredPosition = new Vector2(0f, -offset.Value);
+            _headerRule.Placement = offset.HasValue
+                ? "below-header:" + offset.Value.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
+                : "hidden:no-room-above-routines";
+        }
+
         internal void RefreshView()
         {
             if (_disposed) return;
+            PlaceHeaderRule();
             float cataloguePosition = CatalogueScroll() == null ? 1f
                 : CatalogueScroll().verticalNormalizedPosition;
             float inspectorPosition = _inspectorScroll == null ? 1f
@@ -593,7 +611,8 @@ namespace KingmakerBuffPlanner.UI
             // frame up) and the footer (7.8%).
             ParchmentRule header = ParchmentRule.Create("HeaderRule", _frame, _frameParchment, false);
             KingmakerUiFactory.SetAnchors(header.Rect, 0.028f, 1f, 0.972f, 1f);
-            header.Rect.anchoredPosition = new Vector2(0f, -45f);
+            _headerRule = header;
+            PlaceHeaderRule();
             ParchmentRule footer = ParchmentRule.Create("FooterRule", _frame, _frameParchment, false);
             KingmakerUiFactory.SetAnchors(footer.Rect, 0.028f, 0.0815f, 0.972f, 0.0815f);
             // The rules are part of the sheet: drawn right above the paper
@@ -894,7 +913,8 @@ namespace KingmakerBuffPlanner.UI
             _headerStatus.rectTransform.offsetMax = new Vector2(-110f, 0f);
             // Row 2, on the book's top edge: the routines.
             _routineBar = KingmakerUiFactory.CreateRect("RoutineBar", frame);
-            KingmakerUiFactory.SetAnchors(_routineBar, 0f, 0.900f, 1f, 0.950f, 52f, 52f, 0f, 0f);
+            KingmakerUiFactory.SetAnchors(_routineBar, 0f, 0.900f, 1f, ParchmentHeaderRule.RoutineBarTopAnchor,
+                52f, 52f, 0f, 0f);
         }
 
         private void BuildCatalogue(RectTransform frame)
