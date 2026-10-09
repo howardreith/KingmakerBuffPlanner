@@ -42,6 +42,7 @@
     <Compile Include="UndoHistoryTests.cs" />
     <Compile Include="EverydayUseWordingTests.cs" />
     <Compile Include="ShareQualificationDriverTests.cs" />
+    <Compile Include="StickyTouchQualificationTests.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\ShareCastingModifierAdapter.cs"><Link>GameAdapters\ShareCastingModifierAdapter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\EnhancementLeaseCleanup.cs"><Link>GameAdapters\EnhancementLeaseCleanup.cs</Link></Compile>
     <Compile Include="TestBuildInfo.cs" />

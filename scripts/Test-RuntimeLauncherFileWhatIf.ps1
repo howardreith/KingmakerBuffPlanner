@@ -282,7 +282,7 @@ if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-Qua
 }
 # Every recipe the host knows can be approved (the group recipe included).
 foreach ($knownRecipe in @('finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct',
-        'shared-personal', 'shared-powerful')) {
+        'shared-personal', 'shared-powerful', 'sticky-touch-direct')) {
     if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-QualificationFixtureJson @{ recipe = $knownRecipe }) `
             -RunId 'qual-bind-test' -BuildManifest $manifestFixture -Recipe $knownRecipe)) {
         throw "A $knownRecipe qualification allowance was refused by the build binding."
@@ -991,6 +991,17 @@ try {
         $sharedRequest.parameters | Add-Member -NotePropertyName qualificationRecipe -NotePropertyValue $sharedRecipe
         Write-KbpJsonAtomic $sharedRequestPath $sharedRequest
     }
+    # 0.4.0 WP6: a sticky-touch-direct selection (one forecast use step)
+    # writes allowances the launcher accepts in both modes, with a budget
+    # of its one casting and a purpose within the launcher's bound.
+    New-WriterSelection 'sticky-select' 'live-cast-qual-select' 'instant' @{ 'qual-outcome.json' = [ordered]@{
+        castingScenario = $false; violations = @()
+        selection = [ordered]@{ selected = $true; recipe = 'sticky-touch-direct'; castings = @('qual-cast-1') }
+        forecast = @([ordered]@{ name = 'use'; projectionId = ('a' * 64); castingIds = @('qual-cast-1') }) } }
+    $stickyRequestPath = Join-Path $writerEvidence 'sticky-select\runtime-request.json'
+    $stickyRequest = Read-KbpJson $stickyRequestPath
+    $stickyRequest.parameters | Add-Member -NotePropertyName qualificationRecipe -NotePropertyValue 'sticky-touch-direct'
+    Write-KbpJsonAtomic $stickyRequestPath $stickyRequest
     # H3: a cold-moon physical selection (typed seed evidence, digest record
     # whose cap is exactly its Long castings) gets a cf-physical allowance
     # the launcher accepts; an unseeded selection or a whole-plan cap is
@@ -1065,6 +1076,22 @@ try {
                 [int]$sharedWritten.maximumNativeSubmissions -ne 2 -or [string]$sharedWritten.recipe -cne $sharedRecipe) {
                 throw "The written $sharedRecipe ($sharedMode) allowance is not what the launcher accepts."
             }
+        }
+    }
+    foreach ($stickyMode in @('instant', 'animated')) {
+        $stickyPath = & $writerScript -Kind qualification -RunId "sticky-$stickyMode-run" `
+            -SelectionRunId 'sticky-select' -ExecutionMode $stickyMode @writerCommon | Select-Object -Last 1
+        $stickyJson = [IO.File]::ReadAllText($stickyPath)
+        $stickyWritten = $stickyJson | ConvertFrom-Json
+        if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson $stickyJson -RunId "sticky-$stickyMode-run" `
+                -BuildManifest $writerManifest -Recipe 'sticky-touch-direct' -ExecutionMode $stickyMode) -or
+            $null -ne (Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $stickyJson -ProfileId 'full-user' `
+                -CompatibilityIdentity ('e' * 64) -WorkingSaveSha256 ('9' * 64) -FixtureGameId 'game') -or
+            [int]$stickyWritten.maximumNativeSubmissions -ne 1 -or [string]$stickyWritten.recipe -cne 'sticky-touch-direct' -or
+            [string]$stickyWritten.executionMode -cne $stickyMode -or
+            ((@($stickyWritten.approvedProjectionIds) -join ',') -cne ('a' * 64)) -or
+            -not ([string]$stickyWritten.purpose).StartsWith("sticky-touch-direct casting-first qualification in $stickyMode mode")) {
+            throw "The written sticky-touch-direct ($stickyMode) allowance is not what the launcher accepts."
         }
     }
     $physPath = & $writerScript -Kind cf-physical -RunId 'phys-run' -SelectionRunId 'phys-select' -ExecutionMode instant @writerCommon |

@@ -151,8 +151,9 @@ namespace KingmakerBuffPlanner.Execution
         // for the focused enhanced casting before the edit and after it ("*"
         // marks a selected one).
         public IReadOnlyList<string> EnhancementOptions { get; set; } = new string[0];
-        // The ability-pool recipe: whether the Always recast edit was
-        // accepted (recorded; the exhausted plan may be refused either way).
+        // The single-use recipes (ability pool, touch): whether the Always
+        // recast edit was accepted (recorded; the exhausted plan may be
+        // refused either way).
         public bool? ExhaustedAccepted { get; set; }
         // The shared recipes (v1.2 E16-E20). The caster's native state - the
         // Arcane Reservoir and every activatable ability (Share and each
@@ -201,9 +202,14 @@ namespace KingmakerBuffPlanner.Execution
             get { return Selection != null && CastingQualificationRecipe.IsEnhancedRecipe(Selection.Recipe); }
         }
 
-        private bool IsAbilityPool
+        private bool IsSingleUse
         {
-            get { return Selection != null && Selection.Recipe == CastingQualificationRecipe.AbilityPoolDirect; }
+            get { return Selection != null && CastingQualificationRecipe.IsSingleUseRecipe(Selection.Recipe); }
+        }
+
+        private bool IsStickyTouch
+        {
+            get { return Selection != null && Selection.Recipe == CastingQualificationRecipe.StickyTouchDirect; }
         }
 
         public bool IsShared
@@ -222,7 +228,7 @@ namespace KingmakerBuffPlanner.Execution
             {
                 if (IsGroup) return GroupStepNames;
                 if (IsEnhanced) return EnhancedStepNames;
-                if (IsAbilityPool) return AbilityPoolStepNames;
+                if (IsSingleUse) return SingleUseStepNames;
                 if (IsShared) return SharedStepNames;
                 return HasDisableStep
                     ? StepNames.Concat(new[] { CastingQualificationForecast.Disable, CastingQualificationForecast.Recover })
@@ -279,7 +285,7 @@ namespace KingmakerBuffPlanner.Execution
             // so there the press must land while the first cast is in
             // progress (the stop waits for it to complete). The two-phase
             // recipes have no stop step.
-            if (!IsGroup && !IsEnhanced && !IsAbilityPool && !IsShared)
+            if (!IsGroup && !IsEnhanced && !IsSingleUse && !IsShared)
             {
                 if (StopPress == null) violations.Add("stop-press:none");
                 else if (!StopPressHandled) violations.Add("stop-press:not-handled:" + StopPress);
@@ -319,7 +325,8 @@ namespace KingmakerBuffPlanner.Execution
         // nothing.
         public static readonly string[] GroupStepNames = { "prime", "mixed" };
         public static readonly string[] EnhancedStepNames = { "plain", "enhanced" };
-        public static readonly string[] AbilityPoolStepNames = { "use", "repeat", "exhausted" };
+        // The single-use recipes (ability-pool-direct, sticky-touch-direct).
+        public static readonly string[] SingleUseStepNames = { "use", "repeat", "exhausted" };
         public static readonly string[] SharedStepNames = { "shared", "witness", "shortage" };
 
         // The shared casting run's own isolation and cost rules (v1.2
@@ -485,8 +492,10 @@ namespace KingmakerBuffPlanner.Execution
                 failure = MixedFailure(step, castings);
             else if (name == CastingQualificationForecast.Use)
             {
-                // The ability alone lands a new instance; its pool's single
-                // use is spent (judged with the resources below).
+                // The single-use casting alone lands a new instance; its
+                // source's single use is spent (judged with the resources
+                // below). A touch must also have gone the route its mode
+                // requires, with its spend reported and read natively.
                 if (step.Report.TerminalReason != "completed")
                     failure = "report:" + step.Report.TerminalReason;
                 else if (step.StateOf(first) != CastingOutcomeState.EffectConfirmed ||
@@ -494,6 +503,8 @@ namespace KingmakerBuffPlanner.Execution
                     failure = "states:" + States(step);
                 else if (step.TransitionOf(first) != "new-instance")
                     failure = "effects:" + string.Join(",", step.Transitions.ToArray());
+                else if (IsStickyTouch)
+                    failure = StickyRouteFailure(step, first) ?? StickySpendFailure(step, first);
             }
             else if (name == CastingQualificationForecast.Shared)
             {
@@ -596,20 +607,148 @@ namespace KingmakerBuffPlanner.Execution
             return null;
         }
 
-        // The ability-pool recipe's exhausted step: set to Always recast with
-        // its pool's single use spent, the casting is refused before
-        // anything is submitted, for want of the resource; the pool stays
-        // empty and the effect stays exactly as it was.
-        private static string ExhaustedFailure(CastingQualificationStepResult step, string casting)
+        // The single-use recipes' exhausted step: set to Always recast with
+        // its source's single use spent, the casting is refused before
+        // anything is submitted, for want of the resource; the source stays
+        // empty and the effect stays exactly as it was. A touch spell's
+        // refusal names exactly the source its use step reserved, as the
+        // compiler words it for that pool kind; its slot stays spent.
+        private string ExhaustedFailure(CastingQualificationStepResult step, string casting)
         {
             if (step.ApplyAllowed || step.Report != null) return "not-refused:" + step.ApplyReason;
             string reason = step.ApplyReason ?? string.Empty;
-            if (!reason.StartsWith("apply-refused:blocked-casting:" + casting + ":resource-pool-exhausted:", StringComparison.Ordinal))
+            if (IsStickyTouch ? !RefusedForTheSpentCast(reason, casting)
+                    : !reason.StartsWith("apply-refused:blocked-casting:" + casting + ":resource-pool-exhausted:",
+                        StringComparison.Ordinal))
                 return "refused-for-another-reason:" + reason;
             if (!step.Availability.SequenceEqual(new[] { casting + ":0>0" }))
                 return "resource:" + string.Join(",", step.Availability.ToArray());
             if (step.TransitionOf(casting) != "unchanged")
                 return "effects:" + string.Join(",", step.Transitions.ToArray());
+            if (IsStickyTouch)
+            {
+                // Exactly the slot the use step spent is read, spent on both
+                // sides (a spontaneous level reserves no slot).
+                CastStep use = ReservedStep(CastingQualificationForecast.Use, casting, false);
+                List<string> reserved = use == null || use.Reservation == null ? new List<string>()
+                    : use.Reservation.TokenIds.OrderBy(value => value, StringComparer.Ordinal).ToList();
+                if (step.UnreadTokenCastings.Contains(casting)) return "tokens:" + casting + ":unread";
+                List<CastingQualificationTokenReading> readings = step.TokenReadings
+                    .Where(reading => reading.CastingId == casting).ToList();
+                if (!readings.Select(reading => reading.TokenId).OrderBy(value => value, StringComparer.Ordinal)
+                        .SequenceEqual(reserved, StringComparer.Ordinal))
+                    return "tokens:" + casting + ":" + (readings.Count == 0 ? "unobserved" : "read-other-tokens");
+                CastingQualificationTokenReading changed = readings.FirstOrDefault(reading =>
+                    reading.Before != false || reading.After != false);
+                if (changed != null)
+                    return "tokens:" + casting + ":" + changed.TokenId + "=" +
+                        CastingQualificationTokenReading.State(changed.Before) + ">" +
+                        CastingQualificationTokenReading.State(changed.After);
+            }
+            return null;
+        }
+
+        // The compiler's refusal of a touch casting whose single cast is
+        // spent (ExplicitCastingCompiler.HasSpendableResources, as the gate
+        // names a casting's first reason): a prepared pool with no available
+        // slot of the spell is "prepared-slots-exhausted:<pool>"; a
+        // spontaneous level is "resource-pool-exhausted:<pool>:<left><<per
+        // cast>", with fewer units left than one cast needs. The pool is the
+        // one the use step reserved.
+        private bool RefusedForTheSpentCast(string reason, string casting)
+        {
+            CastStep use = ReservedStep(CastingQualificationForecast.Use, casting, false);
+            ResourceReservation reserved = use == null ? null : use.Reservation;
+            if (reserved == null || reserved.Unlimited) return false;
+            string blocked = "apply-refused:blocked-casting:" + casting + ":";
+            if (reserved.TokenIds.Count != 0)
+                return reason == blocked + "prepared-slots-exhausted:" + reserved.PoolKey;
+            string shortage = blocked + "resource-pool-exhausted:" + reserved.PoolKey + ":";
+            if (!reason.StartsWith(shortage, StringComparison.Ordinal)) return false;
+            string[] counts = reason.Substring(shortage.Length).Split('<');
+            int left;
+            int units;
+            return counts.Length == 2 &&
+                int.TryParse(counts[0], System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out left) &&
+                int.TryParse(counts[1], System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out units) &&
+                units == reserved.Units && left < units;
+        }
+
+        // sticky-touch-direct's route (0.4.0 WP6), from what the run report
+        // records of the cast. Instant: the instant engine's own record - the
+        // step ran as StickyTouchDeliveryRuleCast for the reason it was
+        // forecast with (not the provider's transaction); the rule was
+        // submitted and succeeded for the derived delivery (its own
+        // blueprint, not the carrier's); Spend() was invoked once, owned by
+        // the source data; no carrier or delivery command was created; and
+        // the touch transaction settled with no held touch and no delivery
+        // command left for that carrier and delivery (inspection and
+        // cleanup). Animated: the game's own command path (carrier, then the
+        // delivery it generates), whose spend completed, and no instant
+        // engine record. Null when it is.
+        private string StickyRouteFailure(CastingQualificationStepResult step, string castingId)
+        {
+            CastStep forecastStep = ReservedStep(step.Name, castingId, false);
+            if (forecastStep == null) return "route:unforecast";
+            if (forecastStep.ExecutionStrategy != CastExecutionStrategy.StickyTouchDeliveryRuleCast)
+                return "route:forecast-strategy:" + forecastStep.ExecutionStrategy;
+            CastingOutcomeEntry entry = step.Report.Entries.FirstOrDefault(value =>
+                string.Equals(value.CastingId, castingId, StringComparison.Ordinal));
+            string detail = entry == null ? null : entry.Detail;
+            if (string.IsNullOrEmpty(detail)) return "route:none";
+            if (ExecutionMode != "instant")
+                return detail.Contains("native-command-spend-completed") &&
+                    !detail.Contains(";rule-cast-submitted:")
+                        ? null : "route:native-command:" + detail;
+            string missing = new[]
+            {
+                ";rule-success:True;", ";umd-failed:False;", ";spend-invoked:True;", ";spend-failure:none;",
+                ";provider-direct:False;", ";spend-owner:source-ability-data;",
+                ";strategy:" + CastExecutionStrategy.StickyTouchDeliveryRuleCast + ";",
+                ";strategy-reason:" + forecastStep.ExecutionStrategyReason + ";",
+                ";rule-cast-submitted:true;", ";carrier-command-created:false;delivery-command-created:false;",
+                ";transaction-complete:True;transaction-state:held-touch:False;delivery-command-present:False;",
+                ";cleanup-complete:True;cleanup-state:held-touch:False;delivery-command-present:False;"
+            }.FirstOrDefault(value => !detail.Contains(value));
+            if (missing != null) return "route:instant-touch:" + missing.Trim(';') + ":" + detail;
+            string carrier = DetailField(detail, "carrier-guid");
+            string delivery = DetailField(detail, "delivery-guid");
+            if (string.IsNullOrEmpty(carrier) || string.IsNullOrEmpty(delivery) ||
+                string.Equals(carrier, delivery, StringComparison.Ordinal))
+                return "route:delivery-not-derived:" + carrier + ">" + delivery;
+            string settled = "held-touch:False;delivery-command-present:False;carrier-guid:" + carrier +
+                ";delivery-guid:" + delivery;
+            if (!detail.Contains(";transaction-state:" + settled) || !detail.Contains(";cleanup-state:" + settled))
+                return "route:settled-other-touch:" + detail;
+            return null;
+        }
+
+        // The first "<name>:<value>" field of a ";"-separated detail.
+        private static string DetailField(string detail, string name)
+        {
+            string marker = ";" + name + ":";
+            int start = detail.IndexOf(marker, StringComparison.Ordinal);
+            if (start < 0) return null;
+            start += marker.Length;
+            int end = detail.IndexOf(';', start);
+            return end < 0 ? detail.Substring(start) : detail.Substring(start, end - start);
+        }
+
+        // The touch's spend as the run reports it and fresh native reads show
+        // it: the executor reported the casting's (paid) resource spent, and
+        // its source's availability was read on both sides of the step (the
+        // exact drop of one cast, and for a prepared slot the reserved token
+        // turning spent, are judged with the resources).
+        private static string StickySpendFailure(CastingQualificationStepResult step, string castingId)
+        {
+            CastingOutcomeEntry entry = step.Report.Entries.FirstOrDefault(value =>
+                string.Equals(value.CastingId, castingId, StringComparison.Ordinal));
+            if (entry == null || !entry.ResourceSpent) return "spend:not-reported";
+            if (step.Availability.Count != 1 ||
+                !step.Availability[0].StartsWith(castingId + ":", StringComparison.Ordinal))
+                return "resource:unobserved:" + string.Join(",", step.Availability.ToArray());
             return null;
         }
 
@@ -1281,7 +1420,7 @@ namespace KingmakerBuffPlanner.Execution
             if (!_session.AcceptPresentedPlan(inputs)) { Fail("accept-refused"); return; }
             _startedMillis = _clock();
             _phase = group ? "prime" : twoPhase ? "plain"
-                : Recipe == CastingQualificationRecipe.AbilityPoolDirect ? "use" : "stop";
+                : CastingQualificationRecipe.IsSingleUseRecipe(Recipe) ? "use" : "stop";
         }
 
         // The shared recipe (v1.2 E18): the SHARED casting is authored
@@ -1665,7 +1804,7 @@ namespace KingmakerBuffPlanner.Execution
             return authored;
         }
 
-        // Ability-pool recipe: the casting is set to Always recast through
+        // Single-use recipes: the casting is set to Always recast through
         // the session's own recast command (the inspector's control), then
         // reviewed and accepted like any edit (the acceptance is recorded,
         // not required: the plan is blocked for want of the resource).
@@ -1995,7 +2134,7 @@ namespace KingmakerBuffPlanner.Execution
             // Only the exact no-op (every casting already active) continues.
             string failure = Record.StepFailure("repeat");
             if (failure != null) { Fail("step:" + failure); return; }
-            _phase = Recipe == CastingQualificationRecipe.AbilityPoolDirect ? "exhausted-edit" : "recast-edit";
+            _phase = CastingQualificationRecipe.IsSingleUseRecipe(Recipe) ? "exhausted-edit" : "recast-edit";
         }
 
         private void RecastEdit()

@@ -8921,6 +8921,11 @@ namespace KingmakerBuffPlanner.Tests
                 { "advanced-cast-with-allowance", set("live-cast-qual", "KBP_ADVANCED", true, "instant") },
                 { "select-finite-recipe", recipe(set("live-cast-qual-select", "KBP_ADVANCED", false, "instant"),
                     "finite-direct-mixed") },
+                // 0.4.0 WP6: the willing-target touch on the advanced copy.
+                { "select-sticky-touch-recipe", recipe(set("live-cast-qual-select", "KBP_ADVANCED", false, "instant"),
+                    "sticky-touch-direct") },
+                { "advanced-cast-sticky-touch-animated", recipe(set("live-cast-qual", "KBP_ADVANCED", true, "animated"),
+                    "sticky-touch-direct") },
                 { "cast-zero-cost-recipe", recipe(set("live-cast-qual", "KBP_AUTOMATION", true, "instant"),
                     "zero-cost-mixed") },
                 // A casting run in the mode its allowance approves.
