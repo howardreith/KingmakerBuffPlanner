@@ -72,8 +72,9 @@ namespace KingmakerBuffPlanner.Tests
                         "live intent.");
                 if (!string.Equals(check.ExecutionMode, session.ExecutionMode,
                         StringComparison.Ordinal) ||
-                    check.AllowAnimatedFallback != session.AllowAnimatedFallback ||
-                    check.OutOfCombatOnly != session.OutOfCombatOnly)
+                    check.ExecutionSettings.AllowAnimatedFallback !=
+                        session.ExecutionSettings.AllowAnimatedFallback ||
+                    check.ExecutionSettings.OutOfCombatOnly != session.ExecutionSettings.OutOfCombatOnly)
                     throw new InvalidOperationException(label + ": durable settings are not " +
                         "the live settings.");
             };
@@ -88,13 +89,14 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("edit after settings did not autosave: " +
                     session.AutosaveStatus + " dirty=" + session.IsDirty);
             verify("after add-1");
-            // Interleave the other direction and repeatedly.
-            session.SetAllowAnimatedFallback(false);
+            // Interleave the other direction and repeatedly (WP4: the mode
+            // is the remaining execution setting).
+            session.SetExecutionMode("instant");
             verify("after settings-2");
             if (!session.AddCastingForRuntime(LifecycleCasting("cast-2", "unit-t2")).Applied)
                 throw new InvalidOperationException("second authoring refused.");
             verify("after add-2");
-            session.SetOutOfCombatOnly(true);
+            session.SetExecutionMode("animated");
             verify("after settings-3");
             if (!session.AddCastingForRuntime(LifecycleCasting("cast-3", "unit-t3")).Applied)
                 throw new InvalidOperationException("third authoring refused.");
@@ -112,8 +114,8 @@ namespace KingmakerBuffPlanner.Tests
             if (fresh.Document.Castings.Count != 2 ||
                 fresh.Document.Castings.Any(value => value.CastingId == "cast-3"))
                 throw new InvalidOperationException("durable file is not the post-undo intent.");
-            if (fresh.ExecutionMode != "instant" || fresh.AllowAnimatedFallback ||
-                !fresh.OutOfCombatOnly)
+            if (fresh.ExecutionMode != "instant" || fresh.ExecutionSettings.AllowAnimatedFallback ||
+                !fresh.ExecutionSettings.OutOfCombatOnly)
                 throw new InvalidOperationException("durable settings are not the latest: " +
                     fresh.ExecutionMode);
             // Unchanged-setting no-ops stay harmless.

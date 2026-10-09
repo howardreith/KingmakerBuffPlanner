@@ -8,9 +8,20 @@ namespace KingmakerBuffPlanner.UI
     // native screen because no verified literal path is recorded yet; the
     // live inventory lane (see planning/Z-NATIVE-ASSIGNMENTS-STATUS.md) can
     // promote them to proven paths without changing any consumer.
+    // CandidatePath entries are literal paths decoded from the serialized
+    // in-game scene (UI_Ingame_Scene, StaticCanvas/CharacterBuild, unique at
+    // every segment) that this mod has not yet rendered live; the exact
+    // sprite contract, not the path, decides whether they are borrowed.
     internal static class NativeThemeResolver
     {
         internal const string PaperPath = "ServiceWindow/CharacterScreen/BookBackground";
+        // The character build's colour-selector sheet: the native
+        // DialogMessageBox paper (dialogue_backsheet), possibly inactive.
+        internal const string ScrollPaperPath =
+            "CharacterBuild/Body/Content/ClothColorSelector/PrimarySelectorPlace/ColorSelector/Background";
+        // The rule under the character build's Constitution description.
+        internal const string ScrollRulePath =
+            "CharacterBuild/Body/Content/RaceRightSide/Constitution/DescriptionView/Decor (1)";
         internal const string ButtonPath = "ServiceWindow/CharacterScreen/LevelBox/Button_LevelUp";
         internal const string OrnamentPath = "Party/Character/Highlight";
         internal const string CharacterScreenPath = "ServiceWindow/CharacterScreen";
@@ -132,6 +143,12 @@ namespace KingmakerBuffPlanner.UI
                     locator = new NativeThemeLocator(NativeThemeLocatorKind.BoundedScan,
                         "UICommon.UISound");
                     return source.SoundResource();
+                case NativeThemeCapability.ScrollPaper:
+                    locator = new NativeThemeLocator(NativeThemeLocatorKind.CandidatePath, ScrollPaperPath);
+                    return PathResource(owner, lookup, NativeThemeComponent.Image, ScrollPaperPath);
+                case NativeThemeCapability.ScrollRule:
+                    locator = new NativeThemeLocator(NativeThemeLocatorKind.CandidatePath, ScrollRulePath);
+                    return PathResource(owner, lookup, NativeThemeComponent.Image, ScrollRulePath);
                 default:
                     throw new ArgumentOutOfRangeException("capability");
             }

@@ -228,6 +228,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("saveChainNoUnexpectedWrite", Order = 198)] public bool SaveChainNoUnexpectedWrite { get; set; }
         [JsonProperty("saveChainSequences", Order = 199)] public string SaveChainSequences { get; set; }
         [JsonProperty("saveChainFingerprint", Order = 200)] public string SaveChainFingerprint { get; set; }
+        // The 0.4.0 catalogue audit (WP5), native-buff-catalog-audit.json.
+        [JsonProperty("catalogAuditSha256", Order = 201)] public string CatalogAuditSha256 { get; set; }
+        [JsonProperty("catalogAuditRecordCount", Order = 202)] public int CatalogAuditRecordCount { get; set; }
+        [JsonProperty("catalogAuditStaticIncludedBefore040", Order = 203)] public int CatalogAuditStaticIncludedBefore040 { get; set; }
+        [JsonProperty("catalogAuditStaticIncluded", Order = 204)] public int CatalogAuditStaticIncluded { get; set; }
+        [JsonProperty("catalogAuditLiveIncludedBefore040", Order = 205)] public int CatalogAuditLiveIncludedBefore040 { get; set; }
+        [JsonProperty("catalogAuditLiveIncluded", Order = 206)] public int CatalogAuditLiveIncluded { get; set; }
+        [JsonProperty("catalogAuditAddedCount", Order = 207)] public int CatalogAuditAddedCount { get; set; }
+        // rc4 (review finding 1): blueprint-references.json, who reads the
+        // buffs the audit's decisions turn on.
+        [JsonProperty("catalogReferencesSha256", Order = 208)] public string CatalogReferencesSha256 { get; set; }
+        [JsonProperty("catalogReferenceTargetCount", Order = 209)] public int CatalogReferenceTargetCount { get; set; }
+        [JsonProperty("catalogReferenceScannedCount", Order = 210)] public int CatalogReferenceScannedCount { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

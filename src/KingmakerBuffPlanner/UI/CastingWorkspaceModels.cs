@@ -5,6 +5,7 @@ using System.Linq;
 using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Providers;
+using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Planning;
 
 namespace KingmakerBuffPlanner.UI
@@ -762,8 +763,26 @@ namespace KingmakerBuffPlanner.UI
                 case "import-review-unresolved": return "imported: needs your review";
                 case "already-active": return "already active";
                 case "present-effect-not-sufficient": return "the active effect is weaker or about to expire";
+                case CastingExecutionPolicy.InstantRouteUnavailable:
+                    return "it cannot be cast instantly (" + InstantRouteCause(value) +
+                        "); switch the mode to Animated to cast it, or remove it";
                 default: return head.Length == 0 ? "not ready" : head.Replace('-', ' ');
             }
+        }
+
+        // instant-route-unavailable:<strategy>:<strategy reason>
+        private static string InstantRouteCause(string code)
+        {
+            string[] parts = code.Split(new[] { ':' }, 3);
+            string reason = parts.Length == 3 ? parts[2] : string.Empty;
+            if (reason.StartsWith("enhancement-native-command-required", StringComparison.Ordinal))
+                return "a chosen enhancement needs a normal cast";
+            if (reason.StartsWith("sticky-delivery", StringComparison.Ordinal) ||
+                reason.StartsWith("provider-direct-sticky-touch", StringComparison.Ordinal))
+                return "its touch delivery needs a normal cast";
+            if (reason.StartsWith("multiple-direct-cast-providers", StringComparison.Ordinal))
+                return "its enhancements need a normal cast together";
+            return "it needs a normal animated cast";
         }
 
         // A nested refusal ("targeting-modifier-unavailable:<id>:<reason>")

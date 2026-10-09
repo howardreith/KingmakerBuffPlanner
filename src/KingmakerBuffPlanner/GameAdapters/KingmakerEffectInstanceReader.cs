@@ -59,7 +59,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
         }
 
-        // After submission: every expected recipient reached by this attempt.
+        // After submission: a direct cast must reach its recipient; a group
+        // cast (WP3, 0.4.0) must reach at least one predicted recipient -
+        // whoever the native area actually affected - and a member outside
+        // the area is not a failure.
         internal static bool AppliedByThisAttempt(CastStep step, EffectBaseline baseline)
         {
             try
@@ -67,13 +70,17 @@ namespace KingmakerBuffPlanner.GameAdapters
                 if (step == null || baseline == null || step.ExpectedEffects == null) return false;
                 Dictionary<string, UnitEntityData> units = KingmakerAnimatedCastAdapter.CollectUnits();
                 HashSet<string> ids = ExpectedIds(step.ExpectedEffects);
+                Func<string, IEnumerable<ObservedEffectInstance>> readAfter = unitId =>
+                {
+                    UnitEntityData unit;
+                    return units.TryGetValue(unitId, out unit) && unit.Descriptor != null
+                        ? Instances(unit, ids) : null;
+                };
+                if (step.MassCast)
+                    return AppliedEffectJudgement.AnyReached(step.ExpectedRecipientUnitIds,
+                        step.ExpectedEffects, baseline, readAfter);
                 return AppliedEffectJudgement.AllReached(step.ExpectedRecipientUnitIds,
-                    step.ExpectedEffects, baseline, unitId =>
-                    {
-                        UnitEntityData unit;
-                        return units.TryGetValue(unitId, out unit) && unit.Descriptor != null
-                            ? Instances(unit, ids) : null;
-                    }, step.PreCoveredRecipientUnitIds);
+                    step.ExpectedEffects, baseline, readAfter, step.PreCoveredRecipientUnitIds);
             }
             catch (Exception) { return false; }
         }

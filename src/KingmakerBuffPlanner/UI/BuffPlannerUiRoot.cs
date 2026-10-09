@@ -48,6 +48,8 @@ namespace KingmakerBuffPlanner.UI
             get { return _castingSessions == null ? null : _castingSessions.Current; }
         }
         private CastingWorkspaceScreenView _castingWorkspace;
+        // Successful workspace opens (runtime evidence: one per handoff).
+        private int _castingWorkspaceOpens;
         private BuffPlannerSpellbookEntryController _spellbookEntry;
         private BuffPlannerQuickExecuteController _quick;
         private int _runtimeOpenCycles;
@@ -390,6 +392,18 @@ namespace KingmakerBuffPlanner.UI
         internal static bool IsScreenOpen
         {
             get { return _instance != null && _instance._screen != null && _instance._screen.IsOpen; }
+        }
+
+        // WP2B guarded spellbook scenario: the owned spellbook entry and the
+        // number of successful workspace opens (read-only evidence).
+        internal static BuffPlannerSpellbookEntryController SpellbookEntryForRuntime
+        {
+            get { return _instance == null ? null : _instance._spellbookEntry; }
+        }
+
+        internal static int CastingWorkspaceOpensForRuntime
+        {
+            get { return _instance == null ? 0 : _instance._castingWorkspaceOpens; }
         }
 
         // The casting-first workspace view is open. Distinct from
@@ -823,6 +837,48 @@ namespace KingmakerBuffPlanner.UI
         internal static QuickFlowDiagnostics QuickFlowForRuntime(string routineId)
         {
             return _instance == null ? null : _instance._diagnostics.GetFlow(routineId);
+        }
+
+        // rc4 review finding 2 (runtime evidence): the Classic route itself -
+        // the Classic session's ExecuteRoutine, not the casting-first quick
+        // run the HUD reaches in casting-first mode - pressed now, with what
+        // it touched: whether it yielded, refreshed, previewed, replaced its
+        // execution report, kept executing, or changed its profile file.
+        internal static ClassicCombatProbe ClassicCombatProbeForRuntime(string routineId)
+        {
+            if (_instance == null || _instance._session == null ||
+                Game.Instance == null || Game.Instance.Player == null)
+                return null;
+            PlannerUiSession session = _instance._session;
+            string profilePath = session.ClassicProfilePath(Game.Instance.Player.GameId);
+            Func<string> profileHash = () => System.IO.File.Exists(profilePath)
+                ? Hashing.Sha256(profilePath) : "absent";
+            string profileBefore = profileHash();
+            int refreshes = session.RefreshCount;
+            int previews = session.PreviewCount;
+            ExecutionReport report = session.LastExecutionReport;
+            QuickExecutionResult result = null;
+            int yielded = 0;
+            IEnumerator run = session.ExecuteRoutine(routineId, value => result = value, false);
+            try
+            {
+                while (yielded < 1000 && run.MoveNext()) yielded++;
+            }
+            finally
+            {
+                IDisposable disposable = run as IDisposable;
+                if (disposable != null) disposable.Dispose();
+            }
+            return new ClassicCombatProbe
+            {
+                Refusal = result == null ? "no-result" : result.Disposition + ":" + result.Message,
+                Yielded = yielded,
+                Refreshes = session.RefreshCount - refreshes,
+                Previews = session.PreviewCount - previews,
+                ReportChanged = !ReferenceEquals(report, session.LastExecutionReport),
+                ExecutingAfter = session.IsExecuting,
+                ProfileUnchanged = profileHash() == profileBefore
+            };
         }
 
         internal static QuickExecutionResult QuickResultForRuntime(string routineId)
@@ -1388,14 +1444,16 @@ namespace KingmakerBuffPlanner.UI
                 CastingFirstRoutineTooltip, () => CastingFirstActive);
             _spellbookEntry = new BuffPlannerSpellbookEntryController(
                 value => _log.Info(value),
-                () => OpenSetup(),
+                // A guarded runtime scenario may arm one simulated refusal
+                // to prove recovery; ordinary play never arms it.
+                () => !SpellbookHandoffFaults.ConsumeOpenRefusal() && OpenSetup(),
                 // Final review B6: in casting-first mode the planner that
                 // opens is the workspace, not the Classic screen.
                 () => (_screen != null && _screen.IsOpen) || _castingWorkspace != null,
                 PlannerUiTheme.Resolve(null),
                 () => (_screen != null && _screen.LifecycleState ==
                     PlannerScreenLifecycleState.Open) || _castingWorkspace != null,
-                RequestNativeEscapeVeil);
+                RecoverSpellbookHandoff);
             try
             {
                 _eventSubscription = EventBus.Subscribe((object)this);
@@ -1482,6 +1540,7 @@ namespace KingmakerBuffPlanner.UI
                 _workspaceInputLease = lease;
                 lease = null;
                 _castingWorkspace.RefreshView();
+                _castingWorkspaceOpens++;
                 _log.Info("[KBP-WORKSPACE] casting-first workspace opened;" +
                     "campaign=" + campaignId +
                     ";dispatch=" + workspaceSession.DispatchDisposition +
@@ -1572,7 +1631,9 @@ namespace KingmakerBuffPlanner.UI
                 _session.Model.EffectsBySource,
                 _session.Model.Enhancements,
                 ShareModifiersFor(_session.Model.Snapshot, _session.Model.Enhancements),
-                _session.ActiveEffects);
+                _session.ActiveEffects,
+                Game.Instance != null && Game.Instance.Player != null &&
+                    Game.Instance.Player.IsInCombat);
         }
 
         // The pure Share Transmutation modifier (everyday-use v1.2 §7,
@@ -1707,14 +1768,15 @@ namespace KingmakerBuffPlanner.UI
         }
 
         // The same executors and adapters the classic planner uses: animated
-        // native casting by default; Instant mode through the hybrid executor
-        // (animated only where a step requires a native command or the
-        // player allowed the animated fallback).
+        // native casting in the explicit Animated mode; Instant mode through
+        // the hybrid executor in strict mode (WP4: a step without an instant
+        // route is refused, never animated). Combat refusal is the enforced
+        // policy, not a setting.
         private ICastExecutor CreateCastingExecutor(ExecutionProfile settings)
         {
             if (!string.Equals(settings.Mode, "instant", StringComparison.Ordinal))
                 return new AnimatedCastExecutor(new KingmakerAnimatedCastAdapter(),
-                    settings.OutOfCombatOnly);
+                    CastingExecutionPolicy.OutOfCombatOnly);
             IEnumerable<CastEnhancementSnapshot> enhancements = _session.Model == null
                 ? new CastEnhancementSnapshot[0] : _session.Model.Enhancements;
             var nativeCommand = new HashSet<string>(enhancements
@@ -1722,11 +1784,12 @@ namespace KingmakerBuffPlanner.UI
                 .Select(value => value.EnhancementId), StringComparer.Ordinal);
             return new HybridCastExecutor(
                 new KingmakerInstantCastAdapter(_log.Info), new KingmakerAnimatedCastAdapter(),
-                settings.AllowAnimatedFallback, settings.OutOfCombatOnly,
+                CastingExecutionPolicy.AllowAnimatedFallback, CastingExecutionPolicy.OutOfCombatOnly,
                 step => step.EnhancementIds.Any(nativeCommand.Contains),
                 (index, step, animated, route) => _log.Info("[KBP-CF-ROUTE] step=" + index +
                     ";casting=" + step.AssignmentId + ";provider=" + step.Provider.Canonical +
-                    ";animated=" + animated + ";" + route + "."));
+                    ";animated=" + animated + ";" + route + "."),
+                strictInstant: true);
         }
 
         private void OnCastingRunCompleted(CastingRunReport report)
@@ -1831,24 +1894,26 @@ namespace KingmakerBuffPlanner.UI
                     ";free=" + entry.FreeCast + ";detail=" + entry.Detail + ".");
         }
 
-        private void RequestNativeEscapeVeil()
+        // WP2B: a failed spellbook handoff lands the player in a usable
+        // interface. A window that never closed is still the player's UI. A
+        // window that closed while the planner did not become usable gets
+        // any half-open planner disposed and the native spellbook reopened
+        // through the game's own open contract (IServiceWindowUIHandler,
+        // the same event the native HUD and hotkey raise), which restores
+        // the planner button with it.
+        private void RecoverSpellbookHandoff(SpellbookHandoffRecovery recovery, string failure)
         {
-            // Recovery after a failed handoff whose native spellbook already
-            // closed: land the player in a usable interface. No verified
-            // offline contract exists for re-opening the native spellbook,
-            // so recovery opens the planner itself through our own owned
-            // machinery (mode is free at this point) and logs the exact
-            // missing native contract rather than guessing an API.
-            _log.Info("[KBP-SPELLBOOK] recovery: opening planner directly; " +
-                "return-to-spellbook awaits a verified native reopen contract.");
-            try
+            if (recovery == SpellbookHandoffRecovery.KeepNativeWindow)
             {
-                OpenSetup();
+                _log.Info("[KBP-SPELLBOOK] recovery: native window still open;failure=" +
+                    failure + ".");
+                return;
             }
-            catch (Exception exception)
-            {
-                _log.Error("[KBP-SPELLBOOK] planner recovery open failed.", exception);
-            }
+            if (_castingWorkspace != null) CloseCastingWorkspace();
+            if (_screen != null && _screen.IsOpen) _screen.Close();
+            _log.Info("[KBP-SPELLBOOK] recovery: reopening native spellbook;failure=" +
+                failure + ".");
+            EventBus.RaiseEvent<IServiceWindowUIHandler>(handler => handler.HandleOpenSpellbook());
         }
 
         private bool PlayNativeSetupOpenSound()

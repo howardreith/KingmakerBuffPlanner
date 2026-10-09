@@ -1913,8 +1913,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Button _hotkey;
 
         internal PlannerSettingsView(RectTransform parent, PlannerUiTheme theme,
-            Action toggleMode, Action toggleCombat, Action toggleExisting,
-            Action toggleFallback, Action toggleHotkey, Action close)
+            Action toggleMode, Action toggleExisting, Action toggleHotkey, Action close)
         {
             Root = KingmakerUiFactory.CreateRect("SettingsPanel", parent);
             KingmakerUiFactory.SetAnchors(Root, 0.31f, 0.29f, 0.69f, 0.75f);
@@ -1926,9 +1925,11 @@ namespace KingmakerBuffPlanner.UI
             title.fontStyle = FontStyle.Bold;
             KingmakerUiFactory.SetAnchors(title.rectTransform, 0.06f, 0.84f, 0.94f, 0.97f);
             _mode = SettingButton("CastingMode", 0.68f, 0.81f, toggleMode, theme);
-            _combat = SettingButton("CombatUse", 0.53f, 0.66f, toggleCombat, theme);
+            // WP4: combat use and animated fallback are enforced policy; the
+            // two rows state it and never toggle anything.
+            _combat = SettingButton("CombatUse", 0.53f, 0.66f, null, theme);
             _existing = SettingButton("ExistingBuffs", 0.38f, 0.51f, toggleExisting, theme);
-            _fallback = SettingButton("Fallback", 0.23f, 0.36f, toggleFallback, theme);
+            _fallback = SettingButton("Fallback", 0.23f, 0.36f, null, theme);
             _hotkey = SettingButton("PlannerHotkey", 0.08f, 0.21f, toggleHotkey, theme);
             Button done = KingmakerUiFactory.CreateButton("SettingsDone", Root, theme,
                 CastingPanelLayoutContract.SettingsCloseLabel, () => close());
@@ -1950,9 +1951,9 @@ namespace KingmakerBuffPlanner.UI
         internal void Bind(PlannerSettingsViewModel model, bool interactable)
         {
             Set(_mode, "Casting mode: " + model.CastingMode, interactable);
-            Set(_combat, "Combat use: " + model.CombatUse, interactable);
+            Set(_combat, "Combat use: " + model.CombatUse, false);
             Set(_existing, "Existing buffs: " + model.ExistingBuffs, interactable);
-            Set(_fallback, "Fallback: " + model.Fallback, interactable);
+            Set(_fallback, "Fallback: " + model.Fallback, false);
             Set(_hotkey, "Planner hotkey: " + model.Hotkey, interactable);
         }
 
@@ -1960,7 +1961,7 @@ namespace KingmakerBuffPlanner.UI
             Action action, PlannerUiTheme theme)
         {
             Button button = KingmakerUiFactory.CreateButton(name, Root, theme,
-                string.Empty, () => action());
+                string.Empty, action == null ? null : new UnityEngine.Events.UnityAction(action));
             KingmakerUiFactory.SetAnchors((RectTransform)button.transform,
                 0.08f, minY, 0.92f, maxY);
             return button;

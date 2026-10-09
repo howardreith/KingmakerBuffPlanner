@@ -651,7 +651,7 @@ function Assert-KbpRuntimeResult {
         if ($Result.catalogSha256 -cne (Get-KbpSha256 $catalogPath)) { throw 'Native catalog hash mismatch.' }
         if ([int]$Result.catalogAbilityCount -le 0) { throw 'Native catalog is empty.' }
         $catalog = Read-KbpJson $catalogPath
-        if ([int]$catalog.schemaVersion -ne 4 -or
+        if ([int]$catalog.schemaVersion -ne 5 -or
             [string]$catalog.profile -cne [string]$Request.profileId -or
             [int]$catalog.abilityCount -ne [int]$Result.catalogAbilityCount -or
             @($catalog.abilities).Count -ne [int]$catalog.abilityCount) {
@@ -661,6 +661,41 @@ function Assert-KbpRuntimeResult {
             [string]::IsNullOrWhiteSpace([string]$_.expression.expressionType)
         })
         if ($missingExpressions.Count -ne 0) { throw 'Native catalog contains expressions without discriminators.' }
+        # The 0.4.0 catalogue audit (WP5): present, hashed, reconciled with the
+        # catalog's own audit summary, and it only ever removes entries.
+        $auditPath = Join-Path $Request.evidenceDirectory 'native-buff-catalog-audit.json'
+        if (-not (Test-Path -LiteralPath $auditPath -PathType Leaf)) { throw 'Native catalog audit evidence is missing.' }
+        if ([string]$Result.catalogAuditSha256 -cne (Get-KbpSha256 $auditPath)) { throw 'Native catalog audit hash mismatch.' }
+        $audit = Read-KbpJson $auditPath
+        $totals = $audit.summary.totals
+        $catalogTotals = $catalog.audit040.totals
+        if ([int]$audit.schemaVersion -ne 1 -or [string]$audit.profile -cne [string]$Request.profileId -or
+            @($audit.records).Count -ne [int]$Result.catalogAuditRecordCount -or
+            [int]$totals.staticIncluded -ne [int]$Result.catalogAuditStaticIncluded -or
+            [int]$totals.staticIncludedBefore040 -ne [int]$Result.catalogAuditStaticIncludedBefore040 -or
+            [int]$totals.liveIncluded -ne [int]$Result.catalogAuditLiveIncluded -or
+            [int]$totals.liveIncludedBefore040 -ne [int]$Result.catalogAuditLiveIncludedBefore040 -or
+            [int]$catalogTotals.staticIncluded -ne [int]$totals.staticIncluded -or
+            [int]$catalogTotals.liveIncluded -ne [int]$totals.liveIncluded -or
+            [int]$audit.summary.addedCount -ne 0 -or [int]$Result.catalogAuditAddedCount -ne 0 -or
+            [int]$totals.staticIncluded -gt [int]$totals.staticIncludedBefore040 -or
+            [int]$totals.liveIncluded -gt [int]$totals.liveIncludedBefore040) {
+            throw 'Native catalog audit does not reconcile with the catalog and the runtime result.'
+        }
+        # rc4 (review finding 1): who reads the buffs the audit's decisions
+        # turn on - present, hashed, and reconciled with the runtime result.
+        $referencesPath = Join-Path $Request.evidenceDirectory 'blueprint-references.json'
+        if (-not (Test-Path -LiteralPath $referencesPath -PathType Leaf)) { throw 'Blueprint reference evidence is missing.' }
+        if ([string]$Result.catalogReferencesSha256 -cne (Get-KbpSha256 $referencesPath)) {
+            throw 'Blueprint reference evidence hash mismatch.'
+        }
+        $references = Read-KbpJson $referencesPath
+        if ([int]$references.schemaVersion -ne 1 -or [string]$references.profile -cne [string]$Request.profileId -or
+            [int]$references.scannedBlueprints -le 0 -or
+            [int]$references.scannedBlueprints -ne [int]$Result.catalogReferenceScannedCount -or
+            @($references.targets).Count -ne [int]$Result.catalogReferenceTargetCount) {
+            throw 'Blueprint reference evidence does not reconcile with the runtime result.'
+        }
         $harmonyPath = Join-Path $Request.evidenceDirectory 'harmony-patch-inventory.json'
         if (-not (Test-Path -LiteralPath $harmonyPath -PathType Leaf)) { throw 'Harmony patch inventory evidence is missing.' }
         if ($Result.harmonyPatchInventorySha256 -cne (Get-KbpSha256 $harmonyPath)) {
@@ -859,7 +894,7 @@ function Get-KbpQualificationAllowanceBuildRefusal {
     if ([string]$allowance.dllSha256 -cne [string]$BuildManifest.dllSha256) { return 'dll' }
     if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
     if (@('zero-cost-mixed', 'finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct',
-            'shared-personal', 'shared-powerful') -cnotcontains [string]$allowance.recipe) { return 'recipe' }
+            'shared-personal', 'shared-powerful', 'sticky-touch-direct') -cnotcontains [string]$allowance.recipe) { return 'recipe' }
     if (-not [string]::IsNullOrEmpty($Recipe) -and [string]$allowance.recipe -cne $Recipe) { return 'recipe-differs' }
     if (@('instant', 'animated') -cnotcontains [string]$allowance.executionMode) { return 'execution-mode' }
     if (-not [string]::IsNullOrEmpty($ExecutionMode) -and [string]$allowance.executionMode -cne $ExecutionMode) {
@@ -1062,6 +1097,115 @@ function Assert-KbpProblemNavigationOutcome {
         }
     }
 }
+# WP2B: the guarded spellbook handoff, judged independently of the host.
+function Assert-KbpSpellbookEntryOutcome {
+    param([Parameter(Mandatory = $true)]$Request)
+    $directory = [string]$Request.evidenceDirectory
+    $path = Join-Path $directory 'physical-spellbook-entry.json'
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Physical spellbook evidence is missing.' }
+    $record = Read-KbpJson $path
+    $required = @('schemaVersion', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256', 'assemblyMvid',
+        'screenWidth', 'screenHeight', 'castingFirst', 'plannerClosedAtStart', 'openSpellsBinding',
+        'openSpellsVirtualKey', 'documentBefore', 'documentAfter', 'profileBeforeSha256', 'profileAfterSha256',
+        'resourcesBefore', 'resourcesAfter', 'effectsBefore', 'effectsAfter', 'runsStarted', 'faultArmed',
+        'movementCommands', 'abilityCommands', 'abilityTargetEvents', 'selectionUnchanged',
+        'acknowledged', 'failures', 'cycles', 'violations')
+    foreach ($key in $required) {
+        if ($null -eq $record.PSObject.Properties[$key]) { throw "Physical spellbook evidence is missing $key." }
+    }
+    if ([int]$record.schemaVersion -ne 1 -or [string]$record.runId -cne [string]$Request.runId -or
+        [string]$record.sourceCommit -cne [string]$Request.expectedCommit -or
+        [string]$record.packageSha256 -cne [string]$Request.expectedPackageSha256 -or
+        [string]$record.dllSha256 -cne [string]$Request.expectedDllSha256 -or
+        [string]$record.assemblyMvid -cnotmatch '^[0-9a-f-]{36}$' -or
+        @($record.failures).Count -ne 0 -or @($record.violations).Count -ne 0) {
+        throw 'Physical spellbook evidence does not match this candidate-bound request or has violations.'
+    }
+    $actions = @()
+    foreach ($suffix in @('1', '2', '3', 'fault')) {
+        $actions += @("sb-open-$suffix", "sb-click-$suffix", "sb-escape-$suffix")
+    }
+    $acknowledged = @($record.acknowledged | ForEach-Object { [string]$_ })
+    if (@($actions | Where-Object { $acknowledged -cnotcontains $_ }).Count -ne 0 -or
+        @($acknowledged | Where-Object { ($actions + @('sb-menu-close-1', 'sb-menu-close-2',
+            'sb-menu-close-3')) -cnotcontains $_ }).Count -ne 0) {
+        throw 'Physical spellbook actions are incomplete or unexpected.'
+    }
+    foreach ($action in $acknowledged) {
+        $ack = Read-KbpJson (Join-Path $directory ("physical-input-{0}.ack.json" -f $action))
+        $expectedAction = if ($action -like 'sb-open-*') { 'key' }
+            elseif ($action -like 'sb-click-*') { 'click' } else { 'key-escape' }
+        $failureProperty = $ack.PSObject.Properties['deliveryFailed']
+        $deliveryFailed = $null -ne $failureProperty -and [bool]$failureProperty.Value
+        if ($deliveryFailed -or [string]$ack.runId -cne [string]$Request.runId -or
+            [string]$ack.actionId -cne [string]$action -or [string]$ack.action -cne $expectedAction) {
+            throw "Physical spellbook action was not delivered with the expected identity: $action"
+        }
+    }
+    if (-not [bool]$record.castingFirst -or -not [bool]$record.plannerClosedAtStart -or
+        [int]$record.openSpellsVirtualKey -lt 0x41 -or [int]$record.openSpellsVirtualKey -gt 0x5A -or
+        -not [bool]$record.faultArmed) { throw 'Spellbook scenario did not start cold and armed.' }
+    if ([string]$record.documentBefore -cne [string]$record.documentAfter -or
+        [string]::IsNullOrEmpty([string]$record.profileBeforeSha256) -or
+        [string]$record.profileBeforeSha256 -cne [string]$record.profileAfterSha256 -or
+        [string]::IsNullOrEmpty([string]$record.resourcesBefore) -or
+        [string]$record.resourcesBefore -cne [string]$record.resourcesAfter -or
+        [string]::IsNullOrEmpty([string]$record.effectsBefore) -or
+        [string]$record.effectsBefore -cne [string]$record.effectsAfter -or [int]$record.runsStarted -ne 0) {
+        throw 'The spellbook handoff changed plan, persistence or native state.'
+    }
+    if ([int]$record.movementCommands -ne 0 -or [int]$record.abilityCommands -ne 0 -or
+        [int]$record.abilityTargetEvents -ne 0 -or -not [bool]$record.selectionUnchanged) {
+        throw 'Spellbook gestures leaked into the game world.'
+    }
+    $cycles = @($record.cycles)
+    if ($cycles.Count -ne 4) { throw 'Spellbook cycle evidence is incomplete.' }
+    for ($index = 0; $index -lt 4; $index++) {
+        $cycle = $cycles[$index]
+        $fault = $index -eq 3
+        $suffix = if ($fault) { 'fault' } else { [string]($index + 1) }
+        if ([int]$cycle.cycle -ne ($index + 1) -or [bool]$cycle.faultInjected -ne $fault -or
+            -not [bool]$cycle.spellbookShown -or -not [bool]$cycle.buttonAttached -or
+            -not [bool]$cycle.buttonInteractable -or [bool]$cycle.plannerOpenBeforeClick -or
+            [int]$cycle.ownedButtonCount -ne 1 -or [int]$cycle.listenerCount -ne 1 -or
+            -not [bool]$cycle.topmostHitIsOwned -or [string]$cycle.placement -cnotlike '*conflictFree=True*' -or
+            $null -eq $cycle.buttonX -or [double]$cycle.buttonX -le 0 -or
+            [double]$cycle.buttonX -ge [int]$record.screenWidth -or $null -eq $cycle.buttonY -or
+            [double]$cycle.buttonY -le 0 -or [double]$cycle.buttonY -ge [int]$record.screenHeight -or
+            [int]$cycle.nativeCloseInvocations -ne 1 -or [int]$cycle.openerInvocations -ne 1 -or
+            [int]$cycle.nativeReleases -ne 1) {
+            throw "Spellbook cycle $suffix did not offer one topmost button and hand off exactly once."
+        }
+        if ($fault) {
+            if ([int]$cycle.workspaceOpens -ne 0 -or [string]$cycle.handoffState -cne 'Failed' -or
+                [string]$cycle.handoffFailure -cne 'planner-open-refused' -or
+                [bool]$cycle.plannerOpenAfterClick -or [bool]$cycle.inputLeaseHeldAfterClick -or
+                -not [bool]$cycle.spellbookShownAfterClick -or -not [bool]$cycle.buttonRestoredAfterRecovery -or
+                [int]$cycle.ownedButtonsAfterRecovery -ne 1) {
+                throw 'The simulated handoff failure did not recover to the native spellbook.'
+            }
+        }
+        elseif ([int]$cycle.workspaceOpens -ne 1 -or [string]$cycle.handoffState -cne 'Completed' -or
+            -not [bool]$cycle.plannerOpenAfterClick -or -not [bool]$cycle.inputLeaseHeldAfterClick -or
+            [bool]$cycle.spellbookShownAfterClick -or [bool]$cycle.serviceWindowShownAfterClick -or
+            -not [bool]$cycle.plannerOwnsFullScreenAfterClick -or [int]$cycle.plannerRootsAfterClick -ne 1) {
+            throw "Spellbook cycle $suffix did not open the planner exactly once after the native close."
+        }
+        if (-not [bool]$cycle.plannerClosedAfterEscape -or -not [bool]$cycle.inputLeaseReleasedAfterEscape -or
+            [bool]$cycle.spellbookShownAfterEscape -or [bool]$cycle.nativeOwnerActiveAfterEscape -or
+            [bool]$cycle.nativeMenuOpenAfterEscape -or [int]$cycle.ownedButtonsAfterEscape -ne 0 -or
+            [int]$cycle.plannerRootsAfterEscape -ne 0) {
+            throw "Spellbook cycle $suffix Escape did not return a usable game interface."
+        }
+        foreach ($shot in @("spellbook-$suffix-open.png", "spellbook-$suffix-after-click.png")) {
+            $shotPath = Join-Path $directory $shot
+            if (-not (Test-Path -LiteralPath $shotPath -PathType Leaf) -or (Get-Item -LiteralPath $shotPath).Length -lt 1024) {
+                throw "Physical spellbook screenshot is missing: $shot"
+            }
+        }
+    }
+}
+
 function Assert-KbpScenarioOutcome {
     param([Parameter(Mandatory = $true)]$Request)
     $scenario = [string]$Request.scenario
@@ -1190,6 +1334,11 @@ function Assert-KbpScenarioOutcome {
         Assert-KbpProblemNavigationOutcome -Request $Request
         return
     }
+    if ($scenario -ceq 'live-workspace-physical' -and
+        [string]$Request.parameters.physicalExpectation -ceq 'spellbook') {
+        Assert-KbpSpellbookEntryOutcome -Request $Request
+        return
+    }
     if ($scenario -ceq 'live-workspace-physical') {
         $path = Join-Path $directory 'physical-workspace.json'
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Physical workspace evidence is missing.' }
@@ -1200,10 +1349,23 @@ function Assert-KbpScenarioOutcome {
         # Escape-menu veil closes, reverse wheel recovery) are allowed beside
         # it and every requested action is still checked for its
         # acknowledgement below.
+        $expectation = [string]$Request.parameters.physicalExpectation
+        if ([string]::IsNullOrEmpty($expectation)) { $expectation = 'cast' }
         $expected = @('cf-moon', 'cf-routine-short', 'cf-wheel', 'cf-right-click', 'cf-inspect-wheel', 'cf-long-wheel',
             'cf-escape-inspect', 'cf-escape-close')
         $conditional = @('cf-menu-close-1', 'cf-menu-close-2', 'cf-menu-close-3',
             'cf-wheel-back-1', 'cf-wheel-back-2')
+        # 0.4.0: the combat run presses the moon in combat first; the
+        # authoring run replaces the browse and description gestures with
+        # the direct graph gestures (the tile click and the provider change
+        # happen only when their controls are on screen).
+        if ($expectation -ceq 'combat') { $expected = @('cf-moon-combat') + $expected }
+        if ($expectation -ceq 'authoring') {
+            $expected = @('cf-moon', 'auth-caster', 'auth-source', 'auth-add', 'auth-remove', 'auth-readd',
+                'auth-retarget', 'auth-undo', 'auth-focus', 'auth-escape-focus', 'cf-escape-close')
+            $conditional = @('cf-menu-close-1', 'cf-menu-close-2', 'cf-menu-close-3', 'auth-tile',
+                'auth-provider-caster', 'auth-provider-source', 'auth-undo-retarget')
+        }
         $acknowledged = @($record.acknowledged | ForEach-Object { [string]$_ })
         if ([string]$record.runId -cne [string]$Request.runId -or @($record.violations).Count -ne 0 -or
             @($record.failures).Count -ne 0 -or -not [bool]$record.openedPhysically -or
@@ -1215,8 +1377,6 @@ function Assert-KbpScenarioOutcome {
         # The moon-run contract: the record judges the expectation this
         # request set; a selection run was refused BY THE LOCK and never
         # ran, a cast run ran Long once under its consumed grant.
-        $expectation = [string]$Request.parameters.physicalExpectation
-        if ([string]::IsNullOrEmpty($expectation)) { $expectation = 'cast' }
         if ([string]$record.moonExpectation -cne $expectation) {
             throw "The physical run judged another moon expectation: $($record.moonExpectation) (expected $expectation)."
         }
@@ -1230,12 +1390,69 @@ function Assert-KbpScenarioOutcome {
             [bool]$record.escMenuOpenAfterClose) {
             throw "The physical run's moon press was not a cold, closed-editor press with a clean close: $path"
         }
+        # 0.4.0 (WP4) re-read from the raw record: the in-combat press found
+        # the party in combat it was not in before, was refused with the
+        # combat message before any dispatch, started nothing, opened
+        # nothing, spent and landed nothing, and the state was cleared
+        # before the ordinary press.
+        if ($expectation -ceq 'combat') {
+            $combatKeys = @('combatInCombatBefore', 'combatAtPress', 'combatRunStarted', 'combatEditorOpened',
+                'combatDispatchRefusals', 'combatRefusal', 'combatAvailability', 'combatEffectAfter',
+                'combatClearedBeforeMoon', 'classicCombatRefusal', 'classicCombatYielded', 'classicCombatRefreshes',
+                'classicCombatPreviews', 'classicCombatReportChanged', 'classicCombatExecuting',
+                'classicCombatProfileUnchanged')
+            $names = @($record.PSObject.Properties | ForEach-Object Name)
+            $availability = ([string]$record.combatAvailability).Split('>')
+            if (@($combatKeys | Where-Object { $names -cnotcontains $_ }).Count -ne 0 -or
+                $null -eq $record.combatInCombatBefore -or [bool]$record.combatInCombatBefore -or
+                $null -eq $record.combatAtPress -or -not [bool]$record.combatAtPress -or
+                $null -eq $record.combatRunStarted -or [bool]$record.combatRunStarted -or
+                $null -eq $record.combatEditorOpened -or [bool]$record.combatEditorOpened -or
+                $null -eq $record.combatDispatchRefusals -or [int]$record.combatDispatchRefusals -ne 0 -or
+                ([string]$record.combatRefusal).IndexOf('Buff routines cannot run during combat.', [StringComparison]::Ordinal) -lt 0 -or
+                $availability.Count -ne 2 -or $availability[0] -cne $availability[1] -or
+                $null -eq $record.combatEffectAfter -or [bool]$record.combatEffectAfter -or
+                $null -eq $record.combatClearedBeforeMoon -or -not [bool]$record.combatClearedBeforeMoon) {
+                throw "The physical combat press was not refused for combat before dispatch with nothing spent: $path"
+            }
+            # rc4 review finding 2: the Classic route in the same combat was
+            # refused at its admission - nothing yielded, refreshed, previewed,
+            # reported, left executing, or written.
+            if (([string]$record.classicCombatRefusal).IndexOf('Buff routines cannot run during combat.', [StringComparison]::Ordinal) -lt 0 -or
+                $null -eq $record.classicCombatYielded -or [int]$record.classicCombatYielded -ne 0 -or
+                $null -eq $record.classicCombatRefreshes -or [int]$record.classicCombatRefreshes -ne 0 -or
+                $null -eq $record.classicCombatPreviews -or [int]$record.classicCombatPreviews -ne 0 -or
+                $null -eq $record.classicCombatReportChanged -or [bool]$record.classicCombatReportChanged -or
+                $null -eq $record.classicCombatExecuting -or [bool]$record.classicCombatExecuting -or
+                $null -eq $record.classicCombatProfileUnchanged -or -not [bool]$record.classicCombatProfileUnchanged) {
+                throw "The Classic route was not refused for combat before any preparation: $path"
+            }
+        }
+        # 0.4.0 (WP3) re-read: every direct graph gesture did what the
+        # contract says, a provider change (when exercised) kept the target
+        # and was undone, the edits saved themselves, and Escape left the
+        # focused casting before it closed the planner.
+        if ($expectation -ceq 'authoring') {
+            $flags = @('authoringBuffSelected', 'authoringAdded', 'authoringRemoved', 'authoringReadded',
+                'authoringRetargeted', 'authoringUndoRestored', 'authoringFocusedBeforeEscape',
+                'authoringEscapeClearedFocus', 'authoringOpenAfterFirstEscape', 'authoringDurable')
+            $names = @($record.PSObject.Properties | ForEach-Object Name)
+            $notTrue = @($flags | Where-Object { $names -cnotcontains $_ -or $null -eq $record.$_ -or -not [bool]$record.$_ })
+            $provider = $null -ne $record.authoringProviderChanged
+            if ($notTrue.Count -ne 0 -or
+                $null -eq $record.authoringCountBefore -or $null -eq $record.authoringCountAfter -or
+                [int]$record.authoringCountAfter -ne [int]$record.authoringCountBefore + 1 -or
+                ($provider -and (-not [bool]$record.authoringProviderChanged -or
+                    -not [bool]$record.authoringProviderKeptTarget -or -not [bool]$record.authoringProviderUndone))) {
+                throw "The physical authoring gestures did not all behave as the direct-manipulation contract says ($($notTrue -join ', ')): $path"
+            }
+        }
         # E05/E06 re-read from the raw record. D11: the earlier record judged
         # only that the description panel was active while it rendered at a
         # negative size. Now: a panel of real size on screen, titled, showing
         # exactly the chip's own native description; the physical wheel over
         # it scrolled the long native text, never closed it and never moved
-        # the graph beneath.
+        # the graph beneath. (Not part of an authoring run.)
         $inspectKeys = @('screen', 'inspectPanelWidth', 'inspectPanelHeight', 'inspectTitle', 'inspectTitleNative',
             'inspectBodyChars', 'seedShortCastings', 'routineSelected', 'graphOverflow', 'graphWheelEvidence',
             'inspectExpectedChars', 'inspectBodyNative', 'inspectOverflow', 'inspectScrollBefore',
@@ -1243,20 +1460,23 @@ function Assert-KbpScenarioOutcome {
             'inspectOpenAfterWheels', 'graphScrollUnderInspectBefore', 'graphScrollUnderInspectAfter')
         $recordNames = @($record.PSObject.Properties | ForEach-Object Name)
         $missingInspect = @($inspectKeys | Where-Object { $recordNames -cnotcontains $_ })
+        if ($expectation -ceq 'authoring') { $missingInspect = @() }
         if ($missingInspect.Count -ne 0) {
             throw "The physical run's description evidence is unread ($($missingInspect -join ', ')): $path"
         }
         $screenParts = ([string]$record.screen).Split('x')
-        if ($screenParts.Count -ne 2 -or $null -eq $record.inspectPanelWidth -or $null -eq $record.inspectPanelHeight -or
+        if ($expectation -cne 'authoring' -and (
+            $screenParts.Count -ne 2 -or $null -eq $record.inspectPanelWidth -or $null -eq $record.inspectPanelHeight -or
             [double]$record.inspectPanelWidth -lt 0.25 * [double]$screenParts[0] -or
             [double]$record.inspectPanelHeight -lt 0.25 * [double]$screenParts[1] -or
             [string]::IsNullOrWhiteSpace([string]$record.inspectTitle) -or
             $null -eq $record.inspectTitleNative -or -not [bool]$record.inspectTitleNative -or
             $null -eq $record.inspectBodyNative -or -not [bool]$record.inspectBodyNative -or
-            [int]$record.inspectExpectedChars -le 0 -or [int]$record.inspectBodyChars -ne [int]$record.inspectExpectedChars) {
+            [int]$record.inspectExpectedChars -le 0 -or [int]$record.inspectBodyChars -ne [int]$record.inspectExpectedChars)) {
             throw "The physical run's description was not visibly the chip's native text: $path"
         }
-        if ([int]$record.longProbeChars -le 0 -or [double]$record.longProbeOverflow -le 1 -or
+        if ($expectation -cne 'authoring' -and (
+            [int]$record.longProbeChars -le 0 -or [double]$record.longProbeOverflow -le 1 -or
             $null -eq $record.longScrollBefore -or $null -eq $record.longScrollAfter -or
             [double]$record.longScrollAfter -ge [double]$record.longScrollBefore - 0.001 -or
             ([double]$record.inspectOverflow -gt 1 -and ($null -eq $record.inspectScrollBefore -or
@@ -1264,18 +1484,19 @@ function Assert-KbpScenarioOutcome {
                 [double]$record.inspectScrollAfter -ge [double]$record.inspectScrollBefore - 0.001)) -or
             $null -eq $record.inspectOpenAfterWheels -or -not [bool]$record.inspectOpenAfterWheels -or
             $null -eq $record.graphScrollUnderInspectBefore -or $null -eq $record.graphScrollUnderInspectAfter -or
-            [Math]::Abs([double]$record.graphScrollUnderInspectAfter - [double]$record.graphScrollUnderInspectBefore) -ge 0.001) {
+            [Math]::Abs([double]$record.graphScrollUnderInspectAfter - [double]$record.graphScrollUnderInspectBefore) -ge 0.001)) {
             throw "The physical run's description did not scroll its own long content in isolation: $path"
         }
         # D13: the continuous scroll REALLY scrolled - the Short tab (seeded
         # to overflow) was selected by the physical click and the wheel moved
         # the overflowing graph (every earlier run's graph fitted).
-        if (@($record.seedShortCastings).Count -lt 14 -or $null -eq $record.routineSelected -or
+        if ($expectation -cne 'authoring' -and (
+            @($record.seedShortCastings).Count -lt 14 -or $null -eq $record.routineSelected -or
             -not [bool]$record.routineSelected -or -not [bool]$record.graphOverflow -or
-            [string]$record.graphWheelEvidence -cne 'scrolled') {
+            [string]$record.graphWheelEvidence -cne 'scrolled')) {
             throw "The physical run's continuous scroll did not overflow and scroll under the physical wheel: $path"
         }
-        if ($expectation -ceq 'select') {
+        if ($expectation -ceq 'select' -or $expectation -ceq 'combat' -or $expectation -ceq 'authoring') {
             if ([bool]$record.moonRunStarted -or
                 -not ([string]$record.moonRefusal -like 'native-submission-disabled*')) {
                 throw "A physical selection run was not refused by the session lock: $path"

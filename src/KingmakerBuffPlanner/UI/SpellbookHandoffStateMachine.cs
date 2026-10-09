@@ -12,12 +12,45 @@ namespace KingmakerBuffPlanner.UI
         Failed
     }
 
+    // What a failed handoff does to land the player in a usable interface.
+    internal enum SpellbookHandoffRecovery
+    {
+        // The native window never closed: it is still the player's UI.
+        KeepNativeWindow,
+        // The native window closed but the planner did not become usable:
+        // dispose any half-open planner and reopen the native spellbook
+        // through the game's own open contract.
+        ReopenNativeSpellbook
+    }
+
     // Deterministic handoff transitions. The Unity side only feeds
     // observations in; every bounded wait and rollback decision lives here so
     // it is provable without the game.
     internal sealed class SpellbookHandoffStateMachine
     {
         internal const int MaximumWaitFrames = 90;
+
+        // WP2B: a click is admitted only when the handoff can actually run.
+        // Every route closes the native window through its own close
+        // affordance first; there is no direct-open path that would leave
+        // the spellbook open underneath the planner. Returns null when
+        // admitted, otherwise the exact refusal reason for the log.
+        internal static string Admit(bool handoffActive, bool gameAvailable,
+            bool plannerOpen, bool nativeCloseUsable)
+        {
+            if (handoffActive) return "handoff-active";
+            if (!gameAvailable) return "no-game";
+            if (plannerOpen) return "planner-already-open";
+            if (!nativeCloseUsable) return "native-close-affordance-missing";
+            return null;
+        }
+
+        internal static SpellbookHandoffRecovery RecoveryFor(string failure)
+        {
+            return string.Equals(failure, "mode-release-timeout", StringComparison.Ordinal)
+                ? SpellbookHandoffRecovery.KeepNativeWindow
+                : SpellbookHandoffRecovery.ReopenNativeSpellbook;
+        }
 
         internal SpellbookHandoffState State { get; private set; }
         internal int WaitedFrames { get; private set; }
@@ -33,11 +66,13 @@ namespace KingmakerBuffPlanner.UI
         }
 
         // True exactly once when native ownership has been released and the
-        // planner opener should be invoked.
-        internal bool ObserveRelease(bool fullScreenUiActive)
+        // planner opener should be invoked. The caller reports the native
+        // owner as active while either the FullScreenUi mode or the native
+        // window itself is still shown.
+        internal bool ObserveRelease(bool nativeOwnerActive)
         {
             if (State != SpellbookHandoffState.WaitingModeRelease) return false;
-            if (!fullScreenUiActive)
+            if (!nativeOwnerActive)
             {
                 State = SpellbookHandoffState.OpeningPlanner;
                 return true;

@@ -664,6 +664,24 @@ if ($executionSource.Contains('CastExecutionStatus.Fired') -or $sessionSource.Co
 }
 $assertions++
 
+# WP4 (0.4.0, rc4 review): a Classic run is admitted through
+# ClassicRoutineAdmission, whose combat refusal precedes everything
+# PrepareAndCast does (refresh, preview, review, dispatch); the second,
+# final-boundary combat check stays inside PrepareAndCast after the refresh.
+$admissionSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\ClassicRoutineAdmission.cs') -Raw
+$admitAt = $sessionSource.IndexOf('return ClassicRoutineAdmission.Run(', [StringComparison]::Ordinal)
+$prepareAt = $sessionSource.IndexOf('private IEnumerator PrepareAndCast(', [StringComparison]::Ordinal)
+$refreshAt = if ($prepareAt -ge 0) { $sessionSource.IndexOf('Refresh();', $prepareAt, [StringComparison]::Ordinal) } else { -1 }
+$finalCombatAt = if ($prepareAt -ge 0) { $sessionSource.IndexOf('if (CombatNow())', $prepareAt, [StringComparison]::Ordinal) } else { -1 }
+$admissionCombatAt = $admissionSource.IndexOf('if (combatActive())', [StringComparison]::Ordinal)
+$admissionPrepareAt = $admissionSource.IndexOf('prepareAndCast();', [StringComparison]::Ordinal)
+if ($admitAt -lt 0 -or $prepareAt -lt $admitAt -or $refreshAt -lt 0 -or $finalCombatAt -lt $refreshAt -or
+    $admissionCombatAt -lt 0 -or $admissionPrepareAt -lt $admissionCombatAt -or
+    -not $sessionSource.Contains('combat refused before preparation')) {
+    throw 'The Classic run must refuse combat in its admission, before PrepareAndCast refreshes, previews, reviews or dispatches.'
+}
+$assertions++
+
 $inputSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\KingmakerPlannerInputBoundary.cs') -Raw
 if (-not $inputSource.Contains('IFullScreenUIHandler') -or
     -not $inputSource.Contains('GameModeType.FullScreenUi') -or

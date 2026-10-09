@@ -190,29 +190,6 @@ namespace KingmakerBuffPlanner.UI
             return new CastingGraphEditResult(result, result.Applied ? casting.CastingId : null, false);
         }
 
-        // An explicit parallel casting: the focused casting copied as a new
-        // record (same caster, source, target, enhancements and policy) at
-        // the end of its routine, then focused. The original is unchanged.
-        public CastingGraphEditResult DuplicateFocusedCasting()
-        {
-            LeaveProblemNavigation();
-            PlannedCasting focused = FocusedCasting();
-            if (focused == null) return GraphRefusal("no-editing-focus");
-            // A copy is fresh intent: no import provenance travels with it,
-            // and a record that could not be Ready itself starts as a Draft.
-            bool unresolved = focused.CasterUnitId == null || (focused.Provenance != null &&
-                focused.Provenance.UnresolvedReviewItems.Count != 0);
-            CastingAuthoringState state = unresolved ? CastingAuthoringState.Draft : focused.State;
-            var copy = new PlannedCasting(NextCastingId(), focused.RoutineId, 0,
-                focused.SourceId, focused.Ability, focused.CasterUnitId, focused.SpellbookGuid,
-                focused.TargetMode, focused.DirectTargetUnitId, focused.Origin,
-                focused.RequiredCoverageUnitIds, focused.TargetingModifiers, focused.Enhancements,
-                focused.ExistingEffectPolicy, focused.IgnoredPresenceMarkers, state, null);
-            AuthoringEditResult result = _authoring.AddCasting(copy);
-            if (result.Applied) EditingFocusCastingId = copy.CastingId;
-            return new CastingGraphEditResult(result, result.Applied ? copy.CastingId : null, false);
-        }
-
         // Adds or removes one enhancement on the FOCUSED casting only. Only a
         // verified enhancement of that casting's own caster that applies to
         // its exact source can be added; an incompatible one (a second rod) is
@@ -272,8 +249,8 @@ namespace KingmakerBuffPlanner.UI
         }
 
         // Moves the focused casting to another recipient: a direct casting to
-        // another target, a group casting to another origin (its required
-        // coverage is kept).
+        // another target, a group casting to another origin. Portrait clicks
+        // reach it through ClickGraphRecipient, which judges legality first.
         public AuthoringEditResult RetargetFocusedCasting(string unitId)
         {
             PlannedCasting focused = FocusedCasting();
@@ -288,26 +265,6 @@ namespace KingmakerBuffPlanner.UI
             return SetFocusedTargeting(
                 casterCentred ? CastingTargetMode.CasterCenteredOrigin : CastingTargetMode.AnchoredOrigin,
                 null, casterCentred ? null : unitId, focused.RequiredCoverageUnitIds);
-        }
-
-        // Group castings: marks one unit as intended (required) coverage, or
-        // stops requiring it. Coverage is intent; predicted beneficiaries are
-        // derived and never become castings.
-        public AuthoringEditResult SetFocusedCoverage(string unitId, bool required)
-        {
-            PlannedCasting focused = FocusedCasting();
-            if (focused == null) return AuthoringEditResult.Refuse("no-editing-focus");
-            if (focused.TargetMode == CastingTargetMode.DirectTarget)
-                return AuthoringEditResult.Refuse("targeting-mode-unsupported");
-            List<string> coverage = focused.RequiredCoverageUnitIds
-                .Where(value => !string.Equals(value, unitId, StringComparison.Ordinal)).ToList();
-            if (required) coverage.Add(unitId);
-            if (coverage.Count == focused.RequiredCoverageUnitIds.Count &&
-                coverage.All(focused.RequiredCoverageUnitIds.Contains))
-                return AuthoringEditResult.Refuse("coverage-unchanged");
-            return SetFocusedTargeting(focused.TargetMode, null,
-                focused.Origin == null || focused.Origin.IsCasterCentered ? null : focused.Origin.AnchorUnitId,
-                coverage);
         }
 
         // ------------------------------------------------------------------
@@ -327,7 +284,8 @@ namespace KingmakerBuffPlanner.UI
             RefreshProblemNavigation(routineGate);
             CastingForecast onePass = _forecast.ForecastOnePass(
                 _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
-                inputs.EffectsBySource, inputs.Enhancements, inputs.TargetingModifiers);
+                inputs.EffectsBySource, inputs.Enhancements, inputs.TargetingModifiers,
+                StrictInstant);
             RefreshPoolLabels(inputs);
             if (EditingFocusCastingId != null && FocusedCasting() == null)
                 EditingFocusCastingId = null;
@@ -826,13 +784,11 @@ namespace KingmakerBuffPlanner.UI
             }
             string coverageText = string.Empty;
             if (focused.TargetMode != CastingTargetMode.DirectTarget && resolved != null)
-                coverageText = "Reaches " + resolved.PredictedBeneficiaryUnitIds.Count + ": " +
+                // WP3: read-only information; whoever the area reaches when
+                // it is cast is affected and nobody is required.
+                coverageText = "Expected to reach " + resolved.PredictedBeneficiaryUnitIds.Count + ": " +
                     string.Join(", ", resolved.PredictedBeneficiaryUnitIds.Select(nameOf).ToArray()) +
-                    (resolved.RequiredCoverageUnitIds.Count == 0 ? " · no recipients marked as required"
-                        : " · required: " + string.Join(", ", resolved.RequiredCoverageUnitIds.Select(nameOf).ToArray())) +
-                    (resolved.CoverageGaps.Count == 0 ? string.Empty
-                        : " · MISSED: " + string.Join(", ", resolved.CoverageGaps.Select(gap => nameOf(gap.UnitId)).ToArray()) +
-                          " (outside the predicted area; no second casting is added for them)");
+                    " (whoever is in the area when it is cast)";
             CastingOutcomeEntry lastRun = LastRunReport == null ? null : LastRunReport.Entries
                 .FirstOrDefault(entry => string.Equals(entry.CastingId, focused.CastingId, StringComparison.Ordinal));
             ProviderPlanningOption inspectOption = option;
@@ -1044,6 +1000,10 @@ namespace KingmakerBuffPlanner.UI
                 bool available = ApplyGraphTargetingModifiers(
                     new[] { new TargetingModifierSelection(modifier.ModifierId, true, null) },
                     inputs, intent, option, out refusal) != null;
+                // WP3 (0.4.0): a caster and exact source with no such
+                // mechanism get no row and no explanation. A selected one
+                // that is no longer available stays visible as repair intent.
+                if (!isSelected && !available && MechanismAbsent(refusal)) continue;
                 string title = modifier.ModifierId;
                 string detail = string.Empty;
                 string cost = string.Empty;
@@ -1068,6 +1028,21 @@ namespace KingmakerBuffPlanner.UI
                     cost, isSelected, available, available ? string.Empty : refusal));
             }
             return rows;
+        }
+
+        // The modifier does not apply to this caster and exact source at all
+        // (as opposed to applying but being blocked right now): the caster
+        // lacks the feature, the exact spell is not one it supports, or the
+        // spell already reaches others.
+        private static bool MechanismAbsent(string refusal)
+        {
+            string[] parts = (refusal ?? string.Empty).Split(':');
+            string inner = parts.Length >= 3 && parts[0] == "targeting-modifier-unavailable"
+                ? parts[2] : parts.Length == 2 && parts[0] == "targeting-modifier-unavailable"
+                    ? "unregistered" : parts[0];
+            return inner == "unregistered" || inner == "share-feature-unavailable" ||
+                inner == "share-source-not-supported" || inner == "share-not-needed" ||
+                inner == "share-source-unresolved";
         }
 
         // ------------------------------------------------------------------
@@ -1151,9 +1126,13 @@ namespace KingmakerBuffPlanner.UI
         private PlannedCasting ExistingCastingFor(string sourceId, string routineId, string unitId,
             bool group)
         {
+            // Routine order: duplicates an earlier version left are shown,
+            // and removed, one at a time and always in the same order.
             List<PlannedCasting> same = _authoring.Document.Castings.Where(casting => casting != null &&
                 string.Equals(casting.SourceId, sourceId, StringComparison.Ordinal) &&
-                string.Equals(casting.RoutineId, routineId, StringComparison.Ordinal)).ToList();
+                string.Equals(casting.RoutineId, routineId, StringComparison.Ordinal))
+                .OrderBy(casting => casting.Order).ThenBy(casting => casting.CastingId, StringComparer.Ordinal)
+                .ToList();
             if (!group)
                 return same.FirstOrDefault(casting => casting.TargetMode == CastingTargetMode.DirectTarget &&
                     string.Equals(casting.DirectTargetUnitId, unitId, StringComparison.Ordinal));
@@ -1165,8 +1144,8 @@ namespace KingmakerBuffPlanner.UI
                 unitId, StringComparison.Ordinal));
             if (centred != null || groups.Count == 0 || _lastInputs == null) return centred;
             // A unit a group casting of this buff already reaches is shown
-            // that casting; a second group cast is only added explicitly
-            // (Duplicate), never by clicking a covered member.
+            // that casting; clicking a covered member never adds a second
+            // group cast.
             ExplicitCastingPlan plan = Compile(_lastInputs, routineId, false);
             return groups.FirstOrDefault(casting =>
             {
