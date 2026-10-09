@@ -52,9 +52,12 @@ param(
     # published) or 'cast' (the allowance arms a single-use grant and the
     # press runs Long once), or 'problems' (a late-Draft fixture refuses
     # before dispatch and physically reveals/navigates the blockers).
-    # Problems never takes or arms a casting allowance.
+    # Problems never takes or arms a casting allowance. 'spellbook' opens
+    # the native spellbook with the game's own key binding, clicks the owned
+    # Buff Planner button and closes the planner with Escape (three cycles
+    # and one simulated recovery); it never takes a casting allowance.
     # Only valid with -Scenario live-workspace-physical.
-    [ValidateSet('cast', 'select', 'problems')][string]$PhysicalExpectation = 'cast',
+    [ValidateSet('cast', 'select', 'problems', 'spellbook')][string]$PhysicalExpectation = 'cast',
     # Fixture family: the approved automation pair (default) or the
     # owner-designated advanced copy. The advanced copy is loaded only by
     # non-casting scenarios and only when it matches its guarded bootstrap
@@ -878,7 +881,7 @@ public static class KbpPhysicalInput {
                 $deliveryDetail = $null
                 # Typing and the focus cycle are never repeated: a retry
                 # after a partial delivery would change what was delivered.
-                $singleShot = @('type', 'focus-cycle', 'hotkey') -ccontains [string]$physical.action
+                $singleShot = @('type', 'focus-cycle', 'hotkey', 'key') -ccontains [string]$physical.action
                 $maxAttempts = if ($singleShot) { 1 } else { 3 }
                 for ($attempt = 1; $attempt -le $maxAttempts -and -not $delivered; $attempt++) {
                     try {
@@ -890,6 +893,16 @@ public static class KbpPhysicalInput {
                             [KbpPhysicalInput]::KeyUp([byte]0x42)
                             [KbpPhysicalInput]::KeyUp([byte]0x10)
                             [KbpPhysicalInput]::KeyUp([byte]0x11)
+                        } elseif ([string]$physical.action -eq 'key') {
+                            # One unmodified letter key (the game's own
+                            # binding, e.g. the spellbook): A-Z only.
+                            $virtualKey = [int]$physical.vk
+                            if ($virtualKey -lt 0x41 -or $virtualKey -gt 0x5A) {
+                                throw "Physical key requests accept only A-Z: $virtualKey"
+                            }
+                            [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]$virtualKey)
+                            Start-Sleep -Milliseconds 100
+                            [KbpPhysicalInput]::KeyUp([byte]$virtualKey)
                         } elseif ([string]$physical.action -eq 'key-escape') {
                             [KbpPhysicalInput]::KeyDown($process.MainWindowHandle, [byte]0x1B)
                             Start-Sleep -Milliseconds 100

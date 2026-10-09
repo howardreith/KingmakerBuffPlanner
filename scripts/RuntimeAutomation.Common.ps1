@@ -1062,6 +1062,114 @@ function Assert-KbpProblemNavigationOutcome {
         }
     }
 }
+# WP2B: the guarded spellbook handoff, judged independently of the host.
+function Assert-KbpSpellbookEntryOutcome {
+    param([Parameter(Mandatory = $true)]$Request)
+    $directory = [string]$Request.evidenceDirectory
+    $path = Join-Path $directory 'physical-spellbook-entry.json'
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Physical spellbook evidence is missing.' }
+    $record = Read-KbpJson $path
+    $required = @('schemaVersion', 'runId', 'sourceCommit', 'packageSha256', 'dllSha256', 'assemblyMvid',
+        'screenWidth', 'screenHeight', 'castingFirst', 'plannerClosedAtStart', 'openSpellsBinding',
+        'openSpellsVirtualKey', 'documentBefore', 'documentAfter', 'profileBeforeSha256', 'profileAfterSha256',
+        'resourcesBefore', 'resourcesAfter', 'effectsBefore', 'effectsAfter', 'runsStarted', 'faultArmed',
+        'movementCommands', 'abilityCommands', 'abilityTargetEvents', 'selectionUnchanged',
+        'acknowledged', 'failures', 'cycles', 'violations')
+    foreach ($key in $required) {
+        if ($null -eq $record.PSObject.Properties[$key]) { throw "Physical spellbook evidence is missing $key." }
+    }
+    if ([int]$record.schemaVersion -ne 1 -or [string]$record.runId -cne [string]$Request.runId -or
+        [string]$record.sourceCommit -cne [string]$Request.expectedCommit -or
+        [string]$record.packageSha256 -cne [string]$Request.expectedPackageSha256 -or
+        [string]$record.dllSha256 -cne [string]$Request.expectedDllSha256 -or
+        [string]$record.assemblyMvid -cnotmatch '^[0-9a-f-]{36}$' -or
+        @($record.failures).Count -ne 0 -or @($record.violations).Count -ne 0) {
+        throw 'Physical spellbook evidence does not match this candidate-bound request or has violations.'
+    }
+    $actions = @()
+    foreach ($suffix in @('1', '2', '3', 'fault')) {
+        $actions += @("sb-open-$suffix", "sb-click-$suffix", "sb-escape-$suffix")
+    }
+    $acknowledged = @($record.acknowledged | ForEach-Object { [string]$_ })
+    if (@($actions | Where-Object { $acknowledged -cnotcontains $_ }).Count -ne 0 -or
+        @($acknowledged | Where-Object { ($actions + @('sb-menu-close-1', 'sb-menu-close-2',
+            'sb-menu-close-3')) -cnotcontains $_ }).Count -ne 0) {
+        throw 'Physical spellbook actions are incomplete or unexpected.'
+    }
+    foreach ($action in $acknowledged) {
+        $ack = Read-KbpJson (Join-Path $directory ("physical-input-{0}.ack.json" -f $action))
+        $expectedAction = if ($action -like 'sb-open-*') { 'key' }
+            elseif ($action -like 'sb-click-*') { 'click' } else { 'key-escape' }
+        $failureProperty = $ack.PSObject.Properties['deliveryFailed']
+        $deliveryFailed = $null -ne $failureProperty -and [bool]$failureProperty.Value
+        if ($deliveryFailed -or [string]$ack.runId -cne [string]$Request.runId -or
+            [string]$ack.actionId -cne [string]$action -or [string]$ack.action -cne $expectedAction) {
+            throw "Physical spellbook action was not delivered with the expected identity: $action"
+        }
+    }
+    if (-not [bool]$record.castingFirst -or -not [bool]$record.plannerClosedAtStart -or
+        [int]$record.openSpellsVirtualKey -lt 0x41 -or [int]$record.openSpellsVirtualKey -gt 0x5A -or
+        -not [bool]$record.faultArmed) { throw 'Spellbook scenario did not start cold and armed.' }
+    if ([string]$record.documentBefore -cne [string]$record.documentAfter -or
+        [string]::IsNullOrEmpty([string]$record.profileBeforeSha256) -or
+        [string]$record.profileBeforeSha256 -cne [string]$record.profileAfterSha256 -or
+        [string]::IsNullOrEmpty([string]$record.resourcesBefore) -or
+        [string]$record.resourcesBefore -cne [string]$record.resourcesAfter -or
+        [string]::IsNullOrEmpty([string]$record.effectsBefore) -or
+        [string]$record.effectsBefore -cne [string]$record.effectsAfter -or [int]$record.runsStarted -ne 0) {
+        throw 'The spellbook handoff changed plan, persistence or native state.'
+    }
+    if ([int]$record.movementCommands -ne 0 -or [int]$record.abilityCommands -ne 0 -or
+        [int]$record.abilityTargetEvents -ne 0 -or -not [bool]$record.selectionUnchanged) {
+        throw 'Spellbook gestures leaked into the game world.'
+    }
+    $cycles = @($record.cycles)
+    if ($cycles.Count -ne 4) { throw 'Spellbook cycle evidence is incomplete.' }
+    for ($index = 0; $index -lt 4; $index++) {
+        $cycle = $cycles[$index]
+        $fault = $index -eq 3
+        $suffix = if ($fault) { 'fault' } else { [string]($index + 1) }
+        if ([int]$cycle.cycle -ne ($index + 1) -or [bool]$cycle.faultInjected -ne $fault -or
+            -not [bool]$cycle.spellbookShown -or -not [bool]$cycle.buttonAttached -or
+            -not [bool]$cycle.buttonInteractable -or [bool]$cycle.plannerOpenBeforeClick -or
+            [int]$cycle.ownedButtonCount -ne 1 -or [int]$cycle.listenerCount -ne 1 -or
+            -not [bool]$cycle.topmostHitIsOwned -or [string]$cycle.placement -cnotlike '*conflictFree=True*' -or
+            $null -eq $cycle.buttonX -or [double]$cycle.buttonX -le 0 -or
+            [double]$cycle.buttonX -ge [int]$record.screenWidth -or $null -eq $cycle.buttonY -or
+            [double]$cycle.buttonY -le 0 -or [double]$cycle.buttonY -ge [int]$record.screenHeight -or
+            [int]$cycle.nativeCloseInvocations -ne 1 -or [int]$cycle.openerInvocations -ne 1) {
+            throw "Spellbook cycle $suffix did not offer one topmost button and hand off exactly once."
+        }
+        if ($fault) {
+            if ([int]$cycle.workspaceOpens -ne 0 -or [string]$cycle.handoffState -cne 'Failed' -or
+                [string]$cycle.handoffFailure -cne 'planner-open-refused' -or
+                [bool]$cycle.plannerOpenAfterClick -or [bool]$cycle.inputLeaseHeldAfterClick -or
+                -not [bool]$cycle.spellbookShownAfterClick -or -not [bool]$cycle.buttonRestoredAfterRecovery -or
+                [int]$cycle.ownedButtonsAfterRecovery -ne 1) {
+                throw 'The simulated handoff failure did not recover to the native spellbook.'
+            }
+        }
+        elseif ([int]$cycle.workspaceOpens -ne 1 -or [string]$cycle.handoffState -cne 'Completed' -or
+            -not [bool]$cycle.plannerOpenAfterClick -or -not [bool]$cycle.inputLeaseHeldAfterClick -or
+            [bool]$cycle.spellbookShownAfterClick -or [bool]$cycle.nativeOwnerActiveAfterClick -or
+            [int]$cycle.plannerRootsAfterClick -ne 1) {
+            throw "Spellbook cycle $suffix did not open the planner exactly once after the native close."
+        }
+        if (-not [bool]$cycle.plannerClosedAfterEscape -or -not [bool]$cycle.inputLeaseReleasedAfterEscape -or
+            [bool]$cycle.spellbookShownAfterEscape -or [bool]$cycle.nativeOwnerActiveAfterEscape -or
+            [bool]$cycle.nativeMenuOpenAfterEscape -or [int]$cycle.ownedButtonsAfterEscape -ne 0 -or
+            [int]$cycle.plannerRootsAfterEscape -ne 0) {
+            throw "Spellbook cycle $suffix Escape did not return a usable game interface."
+        }
+        foreach ($shot in @("spellbook-$suffix-open.png", "spellbook-$suffix-after-click.png")) {
+            $shotPath = Join-Path $directory $shot
+            if (-not (Test-Path -LiteralPath $shotPath -PathType Leaf) -or (Get-Item -LiteralPath $shotPath).Length -lt 1024) {
+                throw "Physical spellbook screenshot is missing: $shot"
+            }
+        }
+    }
+}
+
 function Assert-KbpScenarioOutcome {
     param([Parameter(Mandatory = $true)]$Request)
     $scenario = [string]$Request.scenario
@@ -1188,6 +1296,11 @@ function Assert-KbpScenarioOutcome {
     if ($scenario -ceq 'live-workspace-physical' -and
         [string]$Request.parameters.physicalExpectation -ceq 'problems') {
         Assert-KbpProblemNavigationOutcome -Request $Request
+        return
+    }
+    if ($scenario -ceq 'live-workspace-physical' -and
+        [string]$Request.parameters.physicalExpectation -ceq 'spellbook') {
+        Assert-KbpSpellbookEntryOutcome -Request $Request
         return
     }
     if ($scenario -ceq 'live-workspace-physical') {
