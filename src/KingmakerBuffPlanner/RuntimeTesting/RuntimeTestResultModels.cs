@@ -236,6 +236,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("catalogAuditLiveIncludedBefore040", Order = 205)] public int CatalogAuditLiveIncludedBefore040 { get; set; }
         [JsonProperty("catalogAuditLiveIncluded", Order = 206)] public int CatalogAuditLiveIncluded { get; set; }
         [JsonProperty("catalogAuditAddedCount", Order = 207)] public int CatalogAuditAddedCount { get; set; }
+        // rc4 (review finding 1): blueprint-references.json, who reads the
+        // buffs the audit's decisions turn on.
+        [JsonProperty("catalogReferencesSha256", Order = 208)] public string CatalogReferencesSha256 { get; set; }
+        [JsonProperty("catalogReferenceTargetCount", Order = 209)] public int CatalogReferenceTargetCount { get; set; }
+        [JsonProperty("catalogReferenceScannedCount", Order = 210)] public int CatalogReferenceScannedCount { get; set; }
     }
 
     internal sealed class RuntimeTestAssertion

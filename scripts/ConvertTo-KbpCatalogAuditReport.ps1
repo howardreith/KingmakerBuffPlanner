@@ -169,15 +169,16 @@ foreach ($entry in $audits) {
 }
 foreach ($entry in $audits) {
     $records = @($entry.Audit.records)
-    $removed = @($records | Where-Object { $_.status -ceq 'removed-by-0.4.0-audit' })
+    $removed = @($records | Where-Object { $_.status -ceq 'removed-by-0.4.0-audit' -or $_.status -ceq 'unsupported-by-0.4.0-audit' })
     $included = @($records | Where-Object { $_.status -ceq 'included' })
     $lines.Add('')
-    $lines.Add("## $($entry.Audit.profile): removed ($($removed.Count))")
+    $lines.Add("## $($entry.Audit.profile): removed or unsupported ($($removed.Count))")
     $lines.Add('')
-    $lines.Add('| Name | Blueprint | Ownership | Source kind | Scope | Exclusion reason |')
-    $lines.Add('| --- | --- | --- | --- | --- | --- |')
+    $lines.Add('| Name | Blueprint | Ownership | Source kind | Scope | Status | Reason |')
+    $lines.Add('| --- | --- | --- | --- | --- | --- | --- |')
     foreach ($record in $removed) {
-        $lines.Add("| $(Format-KbpCell $record.displayName) | ``$($record.abilityGuid)`` ($(Format-KbpCell $record.internalName)) | $(Get-KbpReportedOwner $record ([string]$entry.Audit.profile)) | $($record.sourceKind) | $($record.scope) | $(Format-KbpCell $record.exclusionReason) |")
+        $status = if ($record.status -ceq 'unsupported-by-0.4.0-audit') { 'unsupported' } else { 'excluded' }
+        $lines.Add("| $(Format-KbpCell $record.displayName) | ``$($record.abilityGuid)`` ($(Format-KbpCell $record.internalName)) | $(Get-KbpReportedOwner $record ([string]$entry.Audit.profile)) | $($record.sourceKind) | $($record.scope) | $status | $(Format-KbpCell $record.exclusionReason) |")
     }
     $lines.Add('')
     $lines.Add("## $($entry.Audit.profile): included ($($included.Count))")
