@@ -74,6 +74,12 @@ the slowness came from the planner's over-conservative classification and
 Planner. No Gunslinger change is made or required, and the planner still has
 no compile-time Gunslinger dependency.
 
+Qualification: the guarded recipe `sticky-touch-direct`
+(`docs/CASTING-QUALIFICATION-REQUEST.md`) casts such a touch once on an ally
+in each mode, judges the route each mode must take, the single spent cast,
+the no-op repeat and the refusal for want of the cast. It is prepared, not
+run: no runtime qualification is claimed yet.
+
 ## 0.0.18 sticky-touch transaction boundary
 
 Provider capability and configured mode are now separate. Every `CastStep`
