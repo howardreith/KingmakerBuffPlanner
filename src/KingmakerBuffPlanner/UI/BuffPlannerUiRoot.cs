@@ -48,6 +48,8 @@ namespace KingmakerBuffPlanner.UI
             get { return _castingSessions == null ? null : _castingSessions.Current; }
         }
         private CastingWorkspaceScreenView _castingWorkspace;
+        // Successful workspace opens (runtime evidence: one per handoff).
+        private int _castingWorkspaceOpens;
         private BuffPlannerSpellbookEntryController _spellbookEntry;
         private BuffPlannerQuickExecuteController _quick;
         private int _runtimeOpenCycles;
@@ -390,6 +392,18 @@ namespace KingmakerBuffPlanner.UI
         internal static bool IsScreenOpen
         {
             get { return _instance != null && _instance._screen != null && _instance._screen.IsOpen; }
+        }
+
+        // WP2B guarded spellbook scenario: the owned spellbook entry and the
+        // number of successful workspace opens (read-only evidence).
+        internal static BuffPlannerSpellbookEntryController SpellbookEntryForRuntime
+        {
+            get { return _instance == null ? null : _instance._spellbookEntry; }
+        }
+
+        internal static int CastingWorkspaceOpensForRuntime
+        {
+            get { return _instance == null ? 0 : _instance._castingWorkspaceOpens; }
         }
 
         // The casting-first workspace view is open. Distinct from
@@ -1388,14 +1402,16 @@ namespace KingmakerBuffPlanner.UI
                 CastingFirstRoutineTooltip, () => CastingFirstActive);
             _spellbookEntry = new BuffPlannerSpellbookEntryController(
                 value => _log.Info(value),
-                () => OpenSetup(),
+                // A guarded runtime scenario may arm one simulated refusal
+                // to prove recovery; ordinary play never arms it.
+                () => !SpellbookHandoffFaults.ConsumeOpenRefusal() && OpenSetup(),
                 // Final review B6: in casting-first mode the planner that
                 // opens is the workspace, not the Classic screen.
                 () => (_screen != null && _screen.IsOpen) || _castingWorkspace != null,
                 PlannerUiTheme.Resolve(null),
                 () => (_screen != null && _screen.LifecycleState ==
                     PlannerScreenLifecycleState.Open) || _castingWorkspace != null,
-                RequestNativeEscapeVeil);
+                RecoverSpellbookHandoff);
             try
             {
                 _eventSubscription = EventBus.Subscribe((object)this);
@@ -1482,6 +1498,7 @@ namespace KingmakerBuffPlanner.UI
                 _workspaceInputLease = lease;
                 lease = null;
                 _castingWorkspace.RefreshView();
+                _castingWorkspaceOpens++;
                 _log.Info("[KBP-WORKSPACE] casting-first workspace opened;" +
                     "campaign=" + campaignId +
                     ";dispatch=" + workspaceSession.DispatchDisposition +
@@ -1831,24 +1848,26 @@ namespace KingmakerBuffPlanner.UI
                     ";free=" + entry.FreeCast + ";detail=" + entry.Detail + ".");
         }
 
-        private void RequestNativeEscapeVeil()
+        // WP2B: a failed spellbook handoff lands the player in a usable
+        // interface. A window that never closed is still the player's UI. A
+        // window that closed while the planner did not become usable gets
+        // any half-open planner disposed and the native spellbook reopened
+        // through the game's own open contract (IServiceWindowUIHandler,
+        // the same event the native HUD and hotkey raise), which restores
+        // the planner button with it.
+        private void RecoverSpellbookHandoff(SpellbookHandoffRecovery recovery, string failure)
         {
-            // Recovery after a failed handoff whose native spellbook already
-            // closed: land the player in a usable interface. No verified
-            // offline contract exists for re-opening the native spellbook,
-            // so recovery opens the planner itself through our own owned
-            // machinery (mode is free at this point) and logs the exact
-            // missing native contract rather than guessing an API.
-            _log.Info("[KBP-SPELLBOOK] recovery: opening planner directly; " +
-                "return-to-spellbook awaits a verified native reopen contract.");
-            try
+            if (recovery == SpellbookHandoffRecovery.KeepNativeWindow)
             {
-                OpenSetup();
+                _log.Info("[KBP-SPELLBOOK] recovery: native window still open;failure=" +
+                    failure + ".");
+                return;
             }
-            catch (Exception exception)
-            {
-                _log.Error("[KBP-SPELLBOOK] planner recovery open failed.", exception);
-            }
+            if (_castingWorkspace != null) CloseCastingWorkspace();
+            if (_screen != null && _screen.IsOpen) _screen.Close();
+            _log.Info("[KBP-SPELLBOOK] recovery: reopening native spellbook;failure=" +
+                failure + ".");
+            EventBus.RaiseEvent<IServiceWindowUIHandler>(handler => handler.HandleOpenSpellbook());
         }
 
         private bool PlayNativeSetupOpenSound()

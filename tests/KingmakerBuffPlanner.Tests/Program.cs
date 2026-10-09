@@ -25,6 +25,8 @@ namespace KingmakerBuffPlanner.Tests
     {
         private static int _passed;
         private static bool _blockedNavigationOnly;
+        // Focused iteration: "--only <prefix> [<prefix>...]" runs matching tests.
+        private static string[] _onlyPrefixes;
         private static readonly List<string> Failures = new List<string>();
         private static string _protocolEvidenceRoot;
 
@@ -33,7 +35,10 @@ namespace KingmakerBuffPlanner.Tests
             try
             {
                 _blockedNavigationOnly = args.SequenceEqual(new[] { "--blocked-navigation" });
-                if (args.Length != 0 && !_blockedNavigationOnly)
+                if (!_blockedNavigationOnly && args.Length >= 2 &&
+                        string.Equals(args[0], "--only", StringComparison.Ordinal))
+                    _onlyPrefixes = args.Skip(1).ToArray();
+                else if (args.Length != 0 && !_blockedNavigationOnly)
                     throw new ArgumentException("Unknown test suite.");
                 return RunAll();
             }
@@ -437,6 +442,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunUndoHistoryTests(root);
                 RunEverydayUseWordingTests(root);
                 RunShareQualificationDriverTests(root);
+                RunSpellbookEntryTests();
             }
             finally
             {
@@ -9532,6 +9538,9 @@ namespace KingmakerBuffPlanner.Tests
         private static void Run(string name, Action action)
         {
             if (_blockedNavigationOnly && !name.StartsWith("blocked-navigation-", StringComparison.Ordinal))
+                return;
+            if (_onlyPrefixes != null &&
+                    !_onlyPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal)))
                 return;
             try
             {
