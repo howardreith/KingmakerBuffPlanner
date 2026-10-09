@@ -28,6 +28,18 @@ Four exact representative assertions cover distinct discovery paths:
 
 Runs `20260811T2241040368066Z-native-buff-catalog` and `20260811T2242392501436Z-native-buff-catalog` each passed 26/26 assertions. Their 120 MB catalogs are byte-identical at SHA-256 `7b54f3f9f6d90d339c4cabeedb04c9d15bcb4d51d8e7d830150a18ab6eced659`.
 
+0.4.0 (WP5) representative update: the profile now asserts Dazzling Blade
+(`0027cbfe...`, automatic `ContextActionApplyBuff`), Bless Weapon
+(`151b1f36...`, `ContextActionEnchantWornItem`) and Fortune
+(`986017ba...`, the witch hex, a bounded generic-reflection wrapper).
+Regenerative Sinew: Restoration (`03963bcf...`) is deliberately excluded by
+the 0.4.0 catalogue audit (an instantaneous stat-damage heal beside a
+cooldown buff: `reactive-restoration-marker-only`). Globe of Invulnerability
+(`4421fff3...`) had already been excluded since the 0.0.17 area-recipient
+contract (`ambiguous-area-recipient`), so the profile's catalogue check was
+stale before 0.4.0; no Call of the Wild source with a spawned area-effect
+buff is currently included, so that path has no representative.
+
 ## Harmony inventory
 
 Both runs emitted the same ordered inventory: SHA-256 `a883dd60218a1f9e989a4e6b03d99318242d401d33f914cd6c068f767b308427`, 207 target methods and 228 patch records. Owners are CallOfTheWild (225 records), UnityModManager (2), and UnityModManager.UI (1). Each record includes patch kind, sequence, Harmony index, priority, owner, before/after constraints, patch method, and target method. There are zero multi-owner targets and zero Buff Planner overlaps because Buff Planner applies no Harmony patches.
