@@ -157,6 +157,29 @@ namespace KingmakerBuffPlanner.UI
         internal const float HairlineHeight = 2f;
     }
 
+    // Where the rule under the workspace header sits: centred in the gap
+    // between the header row (its controls end 41 units below the frame's
+    // top) and the routine bar (its top at 95% of the frame's height). The
+    // routine bar follows the frame's height and the header does not, so on
+    // a short frame the gap closes (1280x720 and 1600x900); there the rule
+    // is hidden instead of striking through the routine tabs
+    // (kbp040-wp7-sel-720-01).
+    internal static class ParchmentHeaderRule
+    {
+        internal const float HeaderControlsBottom = 41f;
+        internal const float RoutineBarTopAnchor = 0.95f;
+        internal const float MinimumGap = 6f;
+
+        // Units below the frame's top for the rule's centre, or null.
+        internal static float? OffsetBelowTop(float frameHeight)
+        {
+            if (float.IsNaN(frameHeight) || float.IsInfinity(frameHeight) || frameHeight <= 0f) return null;
+            float routineTop = frameHeight * (1f - RoutineBarTopAnchor);
+            if (routineTop - HeaderControlsBottom < MinimumGap) return null;
+            return (HeaderControlsBottom + routineTop) / 2f;
+        }
+    }
+
     // The owned surfaces that carry the paper, and how far the sheet reaches
     // past each one. The outsets put the sheet's baked shadow margin and its
     // darker folded top/bottom bands (about 4-28 units at 0.25 units per

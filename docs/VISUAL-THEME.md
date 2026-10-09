@@ -110,7 +110,11 @@ reddish brown and the paper only in the margins
 (`ParchmentSurfaces.WashKeepsOutline`, regression
 `wp7-translucent-wash-drops-its-outline`). Two rules sit under the header row and
 in the gap above the footer, drawn right above the paper and beneath every
-control. Casting chips keep their opaque grounds, and chips, caster and source
+control. The header rule is centred in the gap between the header row and
+the routine bar, which follows the frame's height; when that gap is under 6
+units (1600x900 and 1280x720) the rule is hidden rather than striking through
+the routine tabs (`ParchmentHeaderRule`, first seen in
+`kbp040-wp7-sel-720-01`). Casting chips keep their opaque grounds, and chips, caster and source
 rows and target cards keep their own grounds, outlines and state inks
 unchanged, so selected and blocked states read exactly as before.
 

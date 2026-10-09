@@ -25,6 +25,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("wp7-inks-stay-legible-on-the-paper", TestInksStayLegibleOnThePaper);
             Run("wp7-workspace-wires-the-scroll-paper", TestWorkspaceWiresTheScrollPaper);
             Run("wp7-translucent-wash-drops-its-outline", TestTranslucentWashDropsItsOutline);
+            Run("wp7-header-rule-only-where-there-is-room", TestHeaderRuleOnlyWhereThereIsRoom);
         }
 
         private static NativeSpriteFacts PaperFacts(string name = "dialogue_backsheet", float width = 858f,
@@ -433,6 +434,29 @@ namespace KingmakerBuffPlanner.Tests
             string adapter = UiSource("PlannerParchment.cs");
             Expect(adapter.Contains("ParchmentSurfaces.WashKeepsOutline(Native, wash.PaperAlpha,"),
                 "the wash adapter does not apply the outline policy");
+        }
+
+        // Regression for kbp040-wp7-sel-720-01: the header rule, placed 45
+        // units below the frame's top, struck through the routine tabs at
+        // 1280x720 because the routine bar follows the frame's height. Frame
+        // heights are the live ones (screen height minus 84).
+        private static void TestHeaderRuleOnlyWhereThereIsRoom()
+        {
+            float? hd = ParchmentHeaderRule.OffsetBelowTop(996f);
+            float? qhd = ParchmentHeaderRule.OffsetBelowTop(1356f);
+            Expect(hd.HasValue && hd.Value > ParchmentHeaderRule.HeaderControlsBottom + 2f &&
+                hd.Value < 996f * (1f - ParchmentHeaderRule.RoutineBarTopAnchor) - 2f,
+                "at 1920x1080 the rule is not between the header row and the routine bar");
+            Expect(qhd.HasValue && qhd.Value > hd.Value, "at 2560x1440 the rule does not follow the routine bar");
+            Expect(!ParchmentHeaderRule.OffsetBelowTop(636f).HasValue &&
+                !ParchmentHeaderRule.OffsetBelowTop(816f).HasValue,
+                "at 1280x720 or 1600x900 the rule would strike through the routine tabs");
+            Expect(!ParchmentHeaderRule.OffsetBelowTop(0f).HasValue &&
+                !ParchmentHeaderRule.OffsetBelowTop(float.NaN).HasValue, "an unmeasured frame placed the rule");
+            string view = UiSource("CastingWorkspaceScreenView.cs");
+            Expect(view.Contains("ParchmentHeaderRule.RoutineBarTopAnchor,") &&
+                SourceBlock(view, "internal void RefreshView()").Contains("PlaceHeaderRule();"),
+                "the routine bar and the header rule do not share one placement rule");
         }
 
         private static void TestWorkspaceWiresTheScrollPaper()
