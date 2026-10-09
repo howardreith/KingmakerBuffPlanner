@@ -29,7 +29,6 @@ namespace KingmakerBuffPlanner.UI
             internal float PaperAlpha;
             internal Outline Outline;
             internal bool OutlineFallback;
-            internal bool KeepOutline;
         }
 
         private readonly string _name;
@@ -88,7 +87,7 @@ namespace KingmakerBuffPlanner.UI
         // A flat ground drawn over the paper (a lane's well, the footer
         // ledger) that becomes a light wash while the paper is native and
         // gets its exact previous colour back on fallback.
-        internal void AddWash(Image image, float paperAlpha, bool keepOutline)
+        internal void AddWash(Image image, float paperAlpha)
         {
             if (image == null) return;
             Outline outline = image.GetComponent<Outline>();
@@ -98,8 +97,7 @@ namespace KingmakerBuffPlanner.UI
                 Fallback = image.color,
                 PaperAlpha = paperAlpha,
                 Outline = outline,
-                OutlineFallback = outline != null && outline.enabled,
-                KeepOutline = keepOutline
+                OutlineFallback = outline != null && outline.enabled
             };
             _washes.Add(wash);
             ApplyWash(wash);
@@ -154,7 +152,8 @@ namespace KingmakerBuffPlanner.UI
             wash.Image.color = Native
                 ? new Color(fallback.r, fallback.g, fallback.b, wash.PaperAlpha) : fallback;
             if (wash.Outline != null)
-                wash.Outline.enabled = Native ? wash.KeepOutline && wash.OutlineFallback : wash.OutlineFallback;
+                wash.Outline.enabled = ParchmentSurfaces.WashKeepsOutline(Native, wash.PaperAlpha,
+                    wash.OutlineFallback);
         }
 
         // What was drawn, for the theme log and the runtime evidence.

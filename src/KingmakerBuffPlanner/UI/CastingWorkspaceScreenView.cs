@@ -576,7 +576,8 @@ namespace KingmakerBuffPlanner.UI
 
         // The frame's paper and its scroll rules. The lanes' flat wells and
         // the footer ledger become light washes on the paper so the sheet
-        // shows through while each lane keeps its edge; the rules under the
+        // shows through (a translucent wash drops its Outline, which would
+        // otherwise fill it - ParchmentSurfaces.WashKeepsOutline); the rules under the
         // header and above the footer close the scroll's body (hidden
         // without the paper, so a failed theme is exactly the flat look).
         // Nothing here reads or mutates a donor: the theme surface hands the
@@ -585,8 +586,8 @@ namespace KingmakerBuffPlanner.UI
         {
             foreach (ScrollRect lane in new[] { CatalogueScroll(), _graphScroll, _inspectorScroll })
                 if (lane != null)
-                    _frameParchment.AddWash(lane.GetComponent<Image>(), PlannerParchmentPalette.WellWashAlpha, true);
-            _frameParchment.AddWash(_footerLedger, PlannerParchmentPalette.LedgerWashAlpha, true);
+                    _frameParchment.AddWash(lane.GetComponent<Image>(), PlannerParchmentPalette.WellWashAlpha);
+            _frameParchment.AddWash(_footerLedger, PlannerParchmentPalette.LedgerWashAlpha);
             // Between the header row (its controls end 41 units down) and
             // the routine bar; and in the gap between the lanes (8.5% of the
             // frame up) and the footer (7.8%).
@@ -742,7 +743,7 @@ namespace KingmakerBuffPlanner.UI
             _inspectBody.verticalOverflow = VerticalWrapMode.Overflow;
             // On the paper the body sits straight on the sheet; the flat
             // well and its outline are the exact fallback.
-            _inspectParchment.AddWash(RectOf(_inspectScroll).GetComponent<Image>(), 0f, false);
+            _inspectParchment.AddWash(RectOf(_inspectScroll).GetComponent<Image>(), 0f);
             if (_nativeTheme != null)
             {
                 _nativeTheme.RegisterParchment(_inspectParchment);
