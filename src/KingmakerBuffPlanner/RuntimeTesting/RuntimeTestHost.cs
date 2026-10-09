@@ -3679,6 +3679,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // closes the inspect first and the workspace second.
         private bool UpdatePhysicalCastingFirst(CastingWorkspaceScreenView view, double settled)
         {
+            if (_physicalStep >= CombatStartStep && _physicalStep < CombatStartStep + 10)
+                return UpdateCombatPress(view, settled);
+            if (_physicalStep >= AuthoringStartStep && _physicalStep < AuthoringStartStep + 30)
+                return UpdatePhysicalAuthoring(view, settled);
             if (_physicalStep == 100)
             {
                 // A stale dismissal escape from the launcher can leave the
@@ -3787,7 +3791,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         { "importantCastings", new JArray(_physicalRecord.SeedImportantCastings.Cast<object>().ToArray()) },
                         { "shortCastings", new JArray(_physicalRecord.SeedShortCastings.Cast<object>().ToArray()) }
                     }.ToString(Formatting.Indented) + Environment.NewLine);
-                if (_physicalRecord.MoonExpectation != "select")
+                if (_physicalRecord.MoonExpectation == "cast")
                 {
                     // The run-bound allowance binds this exact stored plan,
                     // build, fixture and save; the grant it arms is the ONLY
@@ -3808,11 +3812,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.LongEffectBefore = SeedEffectActive(inputs, _physicalSeedLong);
                 _physicalRecord.ImportantEffectBefore = SeedEffectActive(inputs, _physicalSeedImportant);
                 _physicalLongAvailableBefore = SeedCastsAvailable(inputs, _physicalSeedLong);
-                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "physical-cf-moon-before.png"));
-                _physicalRunsBeforeMoon = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
-                _physicalMoonEditorSeen = false;
-                return RequestPhysical("cf-moon", "click",
-                    BuffPlannerUiRoot.HudButtonCenterForRuntime("long"), null, 102);
+                // 0.4.0 (WP4): a combat run presses the moon in combat first.
+                if (_physicalRecord.MoonExpectation == "combat")
+                {
+                    _physicalStep = CombatStartStep;
+                    return false;
+                }
+                return PressColdMoon();
             }
             if (_physicalStep == 102)
             {
@@ -3895,6 +3901,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 BuffPlannerUiRoot.BeginPhysicalInputProbe();
                 _physicalRecord.DocumentSignatureBeforeBrowse =
                     BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                // 0.4.0 (WP3): an authoring run performs the direct graph
+                // gestures instead of the browse and description gestures.
+                if (_physicalRecord.MoonExpectation == "authoring")
+                {
+                    _physicalStep = AuthoringStartStep;
+                    return false;
+                }
                 // D13: the Short tab (its castings overflow the graph) is
                 // clicked physically; selecting a routine is browsing only.
                 Vector2? tab = view.ScreenPointForRuntime("routine:short");
@@ -4076,10 +4089,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalModeBefore = GameModeName();
                 _physicalRecord.CastingFirst = BuffPlannerUiRoot.CastingFirstActiveForRuntime;
                 object expectation;
-                _physicalRecord.MoonExpectation =
-                    _request.Parameters.TryGetValue("physicalExpectation", out expectation) &&
-                        string.Equals(expectation as string, "select", StringComparison.Ordinal)
-                        ? "select" : "cast";
+                _physicalRecord.MoonExpectation = NormalizedMoonExpectation(
+                    _request.Parameters.TryGetValue("physicalExpectation", out expectation)
+                        ? expectation as string : null);
                 // Casting-first: the isolation probe covers the planner's own
                 // gestures (step 3 on), not the moon run's legitimate casts.
                 if (!_physicalRecord.CastingFirst) BuffPlannerUiRoot.BeginPhysicalInputProbe();
@@ -4315,6 +4327,36 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "moonRunStarted", record.MoonRunStarted },
                 { "moonWorkspaceStayedClosed", record.MoonWorkspaceStayedClosed },
                 { "moonExpectation", record.MoonExpectation },
+                { "combatUnitId", record.CombatUnitId },
+                { "combatInCombatBefore", Nullable(record.CombatInCombatBefore) },
+                { "combatHeldUpdates", record.CombatHeldUpdates },
+                { "combatAtPress", Nullable(record.CombatAtPress) },
+                { "combatRunStarted", Nullable(record.CombatRunStarted) },
+                { "combatEditorOpened", Nullable(record.CombatEditorOpened) },
+                { "combatDispatchRefusals", Nullable(record.CombatDispatchRefusals) },
+                { "combatRefusal", record.CombatRefusal },
+                { "combatAvailability", record.CombatAvailability },
+                { "combatEffectAfter", Nullable(record.CombatEffectAfter) },
+                { "combatClearedBeforeMoon", Nullable(record.CombatClearedBeforeMoon) },
+                { "authoringRoutine", record.AuthoringRoutine },
+                { "authoringSource", record.AuthoringSource },
+                { "authoringCaster", record.AuthoringCaster },
+                { "authoringTargets", record.AuthoringTargets },
+                { "authoringBuffSelected", Nullable(record.AuthoringBuffSelected) },
+                { "authoringCountBefore", Nullable(record.AuthoringCountBefore) },
+                { "authoringCountAfter", Nullable(record.AuthoringCountAfter) },
+                { "authoringAdded", Nullable(record.AuthoringAdded) },
+                { "authoringRemoved", Nullable(record.AuthoringRemoved) },
+                { "authoringReadded", Nullable(record.AuthoringReadded) },
+                { "authoringRetargeted", Nullable(record.AuthoringRetargeted) },
+                { "authoringProviderChanged", Nullable(record.AuthoringProviderChanged) },
+                { "authoringProviderKeptTarget", Nullable(record.AuthoringProviderKeptTarget) },
+                { "authoringProviderUndone", Nullable(record.AuthoringProviderUndone) },
+                { "authoringUndoRestored", Nullable(record.AuthoringUndoRestored) },
+                { "authoringFocusedBeforeEscape", Nullable(record.AuthoringFocusedBeforeEscape) },
+                { "authoringEscapeClearedFocus", Nullable(record.AuthoringEscapeClearedFocus) },
+                { "authoringOpenAfterFirstEscape", Nullable(record.AuthoringOpenAfterFirstEscape) },
+                { "authoringDurable", Nullable(record.AuthoringDurable) },
                 { "moonRefusal", record.MoonRefusal },
                 { "moonAllowanceStatus", record.MoonAllowanceStatus },
                 { "moonGrantDescribe", record.MoonGrantDescribe },

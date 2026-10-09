@@ -516,12 +516,20 @@ try {
         'cf-escape-inspect', 'cf-escape-close')
     $physicalKinds = @{ 'cf-moon' = 'click'; 'cf-routine-short' = 'click'; 'cf-wheel' = 'wheel'
         'cf-right-click' = 'rightclick'; 'cf-inspect-wheel' = 'wheel'; 'cf-long-wheel' = 'wheel'
-        'cf-escape-inspect' = 'key-escape'; 'cf-escape-close' = 'key-escape' }
+        'cf-escape-inspect' = 'key-escape'; 'cf-escape-close' = 'key-escape'; 'cf-moon-combat' = 'click'
+        'auth-caster' = 'click'; 'auth-source' = 'click'; 'auth-add' = 'click'; 'auth-remove' = 'click'
+        'auth-readd' = 'click'; 'auth-retarget' = 'click'; 'auth-undo' = 'click'; 'auth-focus' = 'click'
+        'auth-escape-focus' = 'key-escape' }
+    $authoringActions = @('cf-moon', 'auth-caster', 'auth-source', 'auth-add', 'auth-remove', 'auth-readd',
+        'auth-retarget', 'auth-undo', 'auth-focus', 'auth-escape-focus', 'cf-escape-close')
     function New-PhysicalOutcomeCase([string]$Name, [string]$Expectation, [scriptblock]$Tamper,
         [string]$ExpectedScreen = '1920x1080') {
         $directory = Join-Path $outcomeRoot $Name
         New-Item -ItemType Directory -Path $directory | Out-Null
-        foreach ($id in $physicalActions) {
+        $runActions = if ($Expectation -ceq 'authoring') { $authoringActions }
+            elseif ($Expectation -ceq 'combat') { @('cf-moon-combat') + $physicalActions }
+            else { $physicalActions }
+        foreach ($id in $runActions) {
             $sent = [ordered]@{ schemaVersion = 1; runId = 'physical-run'; actionId = $id; action = $physicalKinds[$id] }
             Write-KbpJsonAtomic (Join-Path $directory "physical-input-$id.json") $sent
             Write-KbpJsonAtomic (Join-Path $directory "physical-input-$id.ack.json") ([ordered]@{
@@ -532,7 +540,7 @@ try {
             runId = 'physical-run'; kingmakerProcessId = 4242; plannerHotkeySentAtUtc = '2026-09-24T00:00:00Z' })
         $record = [ordered]@{ schemaVersion = 1; runId = 'physical-run'; expectedScreen = '1920x1080'
             screen = '1920x1080'; openedPhysically = $true; castingFirst = $true
-            moonExpectation = $Expectation; acknowledged = $physicalActions; failures = @(); violations = @()
+            moonExpectation = $Expectation; acknowledged = $runActions; failures = @(); violations = @()
             coldSessionBeforeMoon = $true; editorNeverOpenedBeforeMoon = $true
             seedLongCastings = @('seed-long-1'); seedImportantCastings = @('seed-important-1')
             moonWorkspaceStayedClosed = $true; escMenuOpenAfterClose = $false
@@ -543,9 +551,25 @@ try {
             inspectOverflow = -250; inspectScrollBefore = 1.0; inspectScrollAfter = 1.0
             longProbeChars = 6100; longProbeOverflow = 2400; longScrollBefore = 1.0; longScrollAfter = 0.92
             inspectOpenAfterWheels = $true; graphScrollUnderInspectBefore = 0.7; graphScrollUnderInspectAfter = 0.7 }
-        if ($Expectation -ceq 'select') {
+        if ($Expectation -ceq 'select' -or $Expectation -ceq 'combat' -or $Expectation -ceq 'authoring') {
             $record.moonRunStarted = $false
             $record.moonRefusal = 'native-submission-disabled:runtime-test-session:live-workspace-physical:cf-grant-absent;Refused'
+        }
+        if ($Expectation -ceq 'combat') {
+            $record.combatInCombatBefore = $false; $record.combatAtPress = $true; $record.combatRunStarted = $false
+            $record.combatEditorOpened = $false; $record.combatDispatchRefusals = 0
+            $record.combatRefusal = 'Refused:Buff routines cannot run during combat.'
+            $record.combatAvailability = '99>99'; $record.combatEffectAfter = $false
+            $record.combatClearedBeforeMoon = $true
+        }
+        if ($Expectation -ceq 'authoring') {
+            foreach ($flag in @('authoringBuffSelected', 'authoringAdded', 'authoringRemoved', 'authoringReadded',
+                    'authoringRetargeted', 'authoringUndoRestored', 'authoringFocusedBeforeEscape',
+                    'authoringEscapeClearedFocus', 'authoringOpenAfterFirstEscape', 'authoringDurable')) {
+                $record[$flag] = $true
+            }
+            $record.authoringCountBefore = 16; $record.authoringCountAfter = 17
+            $record.authoringProviderChanged = $null
         }
         else {
             $record.moonRunStarted = $true
@@ -568,12 +592,36 @@ try {
     }
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-good' 'select' $null)
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-cast-good' 'cast' $null)
+    Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-combat-good' 'combat' $null)
+    Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-authoring-good' 'authoring' $null)
     # Owner display (no -DisplayMode): beta-3c1c5d4ar13-phys-sel-01 passed
     # in game and the judge threw reading the absent expectedScreen.
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-owner-select' 'select' $null '')
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-owner-cast' 'cast' $null '')
     $physicalOutcomeCases = [ordered]@{
         'missing-ack' = @('select', { param($d) Remove-Item -LiteralPath (Join-Path $d 'physical-input-cf-wheel.ack.json') })
+        # 0.4.0 (WP4/WP3).
+        'combat-not-refused-for-combat' = @('combat', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.combatRefusal = 'Refused:Casting is locked.'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'combat-reached-dispatch' = @('combat', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.combatDispatchRefusals = 1; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'combat-spent' = @('combat', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.combatAvailability = '99>98'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'combat-not-in-combat' = @('combat', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.combatAtPress = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'combat-press-missing' = @('combat', { param($d) Remove-Item -LiteralPath (Join-Path $d 'physical-input-cf-moon-combat.ack.json') })
+        'authoring-retarget-failed' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.authoringRetargeted = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'authoring-provider-not-undone' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.authoringProviderChanged = $true; $r | Add-Member -NotePropertyName authoringProviderKeptTarget -NotePropertyValue $true -Force
+            $r | Add-Member -NotePropertyName authoringProviderUndone -NotePropertyValue $false -Force
+            Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'authoring-escape-closed-first' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.authoringOpenAfterFirstEscape = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'authoring-count' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.authoringCountAfter = 18; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'authoring-browse-request' = @('authoring', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-wheel.json') ([ordered]@{
+            schemaVersion = 1; runId = 'physical-run'; actionId = 'cf-wheel'; action = 'wheel' }) })
         'failed-ack' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-moon.ack.json') ([ordered]@{
             schemaVersion = 1; runId = 'physical-run'; actionId = 'cf-moon'; action = 'click'; deliveryFailed = $true }) })
         'other-action' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-right-click.ack.json') ([ordered]@{

@@ -56,8 +56,15 @@ param(
     # the native spellbook with the game's own key binding, clicks the owned
     # Buff Planner button and closes the planner with Escape (three cycles
     # and one simulated recovery); it never takes a casting allowance.
+    # 'combat' (0.4.0, WP4) is a selection run whose first moon press happens
+    # while the host holds a party member in the game's combat state: it
+    # must be refused for combat before dispatch, then the ordinary press is
+    # refused by the lock. 'authoring' (0.4.0, WP3) is a selection run that
+    # then performs the direct graph gestures (add, same-portrait remove,
+    # retarget, provider change, Undo, nested Escape) through the OS
+    # pointer. Neither takes a casting allowance.
     # Only valid with -Scenario live-workspace-physical.
-    [ValidateSet('cast', 'select', 'problems', 'spellbook')][string]$PhysicalExpectation = 'cast',
+    [ValidateSet('cast', 'select', 'problems', 'spellbook', 'combat', 'authoring')][string]$PhysicalExpectation = 'cast',
     # Fixture family: the approved automation pair (default) or the
     # owner-designated advanced copy. The advanced copy is loaded only by
     # non-casting scenarios and only when it matches its guarded bootstrap

@@ -36,6 +36,7 @@
     <Compile Include="ExecutionPolicyTests.cs" />
     <Compile Include="DirectManipulationTests.cs" />
     <Compile Include="CatalogAuditTests.cs" />
+    <Compile Include="PolicyAuthoringPhysicalTests.cs" />
     <Compile Include="AutosaveLifecycleTests.cs" />
     <Compile Include="SharePlanningTests.cs" />
     <Compile Include="UndoHistoryTests.cs" />

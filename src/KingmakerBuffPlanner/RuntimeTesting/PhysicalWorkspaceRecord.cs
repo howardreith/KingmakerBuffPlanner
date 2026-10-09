@@ -38,6 +38,27 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             "cf-escape-inspect", "cf-escape-close"
         };
 
+        // 0.4.0 (WP3) authoring run: the cold press, then the direct graph
+        // gestures in place of the browse and description gestures. The tile
+        // click (when the tile is on screen) and the provider change (when a
+        // second caster of the buff is on screen) are conditional.
+        public static readonly string[] AuthoringActions =
+        {
+            "cf-moon", "auth-caster", "auth-source", "auth-add", "auth-remove", "auth-readd", "auth-retarget",
+            "auth-undo", "auth-focus", "auth-escape-focus", "cf-escape-close"
+        };
+
+        // The actions this run's expectation requires acknowledged.
+        public IEnumerable<string> ExpectedCastingActions
+        {
+            get
+            {
+                if (MoonExpectation == "authoring") return AuthoringActions;
+                if (MoonExpectation == "combat") return new[] { "cf-moon-combat" }.Concat(CastingActions);
+                return CastingActions;
+            }
+        }
+
         // Parallel Short castings the run seeds so the graph overflows
         // (chips are 56 px apart; the graph viewport is ~705 px at 1080p).
         public const int GraphOverflowCastings = 14;
@@ -110,6 +131,46 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // armed; the press must be REFUSED by the session lock and the
         // approved plan digest is published for the allowance).
         public string MoonExpectation { get; set; }
+        // 0.4.0 (WP4) combat run: the party member held in combat (no enemy;
+        // the group's leave timer kept at zero), whether the party was in
+        // combat before the stimulus and at the press, how many updates held
+        // it, and the press's outcome: no run, the editor never opened, no
+        // dispatch refusal (the combat refusal precedes the native boundary),
+        // the player-facing refusal, the Long source's availability
+        // ("before>after") and effect, and the state cleared before the
+        // ordinary selection press.
+        public string CombatUnitId { get; set; }
+        public bool? CombatInCombatBefore { get; set; }
+        public int CombatHeldUpdates { get; set; }
+        public bool? CombatAtPress { get; set; }
+        public bool? CombatRunStarted { get; set; }
+        public bool? CombatEditorOpened { get; set; }
+        public int? CombatDispatchRefusals { get; set; }
+        public string CombatRefusal { get; set; }
+        public string CombatAvailability { get; set; }
+        public bool? CombatEffectAfter { get; set; }
+        public bool? CombatClearedBeforeMoon { get; set; }
+        // 0.4.0 (WP3) authoring run: the chosen buff, caster and recipients
+        // ("A,B") in the shown routine, and each gesture's observed result.
+        public string AuthoringRoutine { get; set; }
+        public string AuthoringSource { get; set; }
+        public string AuthoringCaster { get; set; }
+        public string AuthoringTargets { get; set; }
+        public bool? AuthoringBuffSelected { get; set; }
+        public int? AuthoringCountBefore { get; set; }
+        public int? AuthoringCountAfter { get; set; }
+        public bool? AuthoringAdded { get; set; }
+        public bool? AuthoringRemoved { get; set; }
+        public bool? AuthoringReadded { get; set; }
+        public bool? AuthoringRetargeted { get; set; }
+        public bool? AuthoringProviderChanged { get; set; }
+        public bool? AuthoringProviderKeptTarget { get; set; }
+        public bool? AuthoringProviderUndone { get; set; }
+        public bool? AuthoringUndoRestored { get; set; }
+        public bool? AuthoringFocusedBeforeEscape { get; set; }
+        public bool? AuthoringEscapeClearedFocus { get; set; }
+        public bool? AuthoringOpenAfterFirstEscape { get; set; }
+        public bool? AuthoringDurable { get; set; }
         // The refusal the moon press produced (selection runs), and the
         // allowance/grant evidence (cast runs).
         public string MoonRefusal { get; set; }
@@ -285,7 +346,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (LongEffectBefore != false || ImportantEffectBefore != false)
                 violations.Add("moon:effects-present-before:long=" + LongEffectBefore + ";important=" +
                     ImportantEffectBefore);
-            if (MoonExpectation == "select")
+            if (MoonExpectation == "select" || MoonExpectation == "combat" || MoonExpectation == "authoring")
             {
                 // No grant exists, so the press must be refused BY THE LOCK
                 // (a run without an allowance would be a native-casting lock
@@ -328,6 +389,61 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return violations;
         }
 
+        // 0.4.0 (WP4): the press in combat was refused for combat, before
+        // anything reached the native boundary, and changed nothing; the
+        // state was cleared before the ordinary press (judged by
+        // MoonViolations as a selection press).
+        internal IList<string> CombatViolations()
+        {
+            var violations = new List<string>();
+            if (CombatInCombatBefore != false)
+                violations.Add("combat:party-already-in-combat:" + (CombatInCombatBefore == null ? "unread" : "true"));
+            if (CombatAtPress != true) violations.Add("combat:not-in-combat-at-press");
+            if (CombatRunStarted != false) violations.Add("combat:run-started");
+            if (CombatEditorOpened != false) violations.Add("combat:editor-opened");
+            if (CombatDispatchRefusals != 0)
+                violations.Add("combat:reached-dispatch:" + (CombatDispatchRefusals == null ? "unread"
+                    : CombatDispatchRefusals.ToString()));
+            if (string.IsNullOrEmpty(CombatRefusal) ||
+                CombatRefusal.IndexOf(UI.CastingRunPresentation.CombatRefusalText, StringComparison.Ordinal) < 0)
+                violations.Add("combat:not-refused-for-combat:" + (CombatRefusal ?? "none"));
+            string[] availability = (CombatAvailability ?? string.Empty).Split('>');
+            if (availability.Length != 2 || availability[0] != availability[1])
+                violations.Add("combat:resource-changed:" + (CombatAvailability ?? "unread"));
+            if (CombatEffectAfter != false) violations.Add("combat:effect-landed");
+            if (CombatClearedBeforeMoon != true) violations.Add("combat:not-cleared-before-moon");
+            return violations;
+        }
+
+        // 0.4.0 (WP3): each physical graph gesture did exactly what the
+        // direct-manipulation contract says, the edits saved themselves, and
+        // Escape left the focused casting before it closed the planner. The
+        // provider change is judged when it was exercised.
+        internal IList<string> AuthoringViolations()
+        {
+            var violations = new List<string>();
+            if (string.IsNullOrEmpty(AuthoringSource) || (AuthoringTargets ?? string.Empty).Split(',').Length != 2)
+                violations.Add("authoring:not-chosen");
+            if (AuthoringBuffSelected != true) violations.Add("authoring:buff-not-selected");
+            if (AuthoringAdded != true) violations.Add("authoring:add");
+            if (AuthoringRemoved != true) violations.Add("authoring:same-portrait-remove");
+            if (AuthoringReadded != true) violations.Add("authoring:readd");
+            if (AuthoringRetargeted != true) violations.Add("authoring:retarget");
+            if (AuthoringProviderChanged.HasValue &&
+                (AuthoringProviderChanged != true || AuthoringProviderKeptTarget != true ||
+                 AuthoringProviderUndone != true))
+                violations.Add("authoring:provider-change:changed=" + AuthoringProviderChanged + ";kept=" +
+                    AuthoringProviderKeptTarget + ";undone=" + AuthoringProviderUndone);
+            if (AuthoringUndoRestored != true) violations.Add("authoring:undo");
+            if (AuthoringFocusedBeforeEscape != true) violations.Add("authoring:card-focus");
+            if (AuthoringEscapeClearedFocus != true || AuthoringOpenAfterFirstEscape != true)
+                violations.Add("authoring:escape-did-not-leave-focus-first");
+            if (AuthoringDurable != true) violations.Add("authoring:not-saved");
+            if (AuthoringCountBefore == null || AuthoringCountAfter != AuthoringCountBefore + 1)
+                violations.Add("authoring:count:" + AuthoringCountBefore + ">" + AuthoringCountAfter);
+            return violations;
+        }
+
         public IList<string> Violations()
         {
             var violations = new List<string>(Failures);
@@ -337,23 +453,28 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!OpenedPhysically) violations.Add("workspace-opened-programmatically");
             if (CastingFirst)
             {
-                foreach (string action in CastingActions)
+                foreach (string action in ExpectedCastingActions)
                     if (!Acknowledged.Contains(action))
                         violations.Add("unacknowledged:" + action);
                 violations.AddRange(MoonViolations());
-                // D13: the continuous scroll must really scroll - a graph
-                // that fits is no longer an acceptable outcome here.
-                if (SeedShortCastings.Count < GraphOverflowCastings)
-                    violations.Add("graph-seed:short=" + SeedShortCastings.Count);
-                if (RoutineSelected != true) violations.Add("routine-tab:not-selected");
-                if (GraphWheelEvidence != "scrolled") violations.Add("graph-scroll:" + GraphWheelEvidence);
-                if (!InspectOpened) violations.Add("inspect:not-opened");
-                else violations.AddRange(InspectViolations());
-                if (!InspectClosedByEscape) violations.Add("inspect:not-closed");
-                if (DocumentSignatureBeforeBrowse == null ||
-                    DocumentSignatureAfterInspect == null ||
-                    DocumentSignatureBeforeBrowse != DocumentSignatureAfterInspect)
-                    violations.Add("inspect:document-mutated");
+                if (MoonExpectation == "combat") violations.AddRange(CombatViolations());
+                if (MoonExpectation == "authoring") violations.AddRange(AuthoringViolations());
+                else
+                {
+                    // D13: the continuous scroll must really scroll - a graph
+                    // that fits is no longer an acceptable outcome here.
+                    if (SeedShortCastings.Count < GraphOverflowCastings)
+                        violations.Add("graph-seed:short=" + SeedShortCastings.Count);
+                    if (RoutineSelected != true) violations.Add("routine-tab:not-selected");
+                    if (GraphWheelEvidence != "scrolled") violations.Add("graph-scroll:" + GraphWheelEvidence);
+                    if (!InspectOpened) violations.Add("inspect:not-opened");
+                    else violations.AddRange(InspectViolations());
+                    if (!InspectClosedByEscape) violations.Add("inspect:not-closed");
+                    if (DocumentSignatureBeforeBrowse == null ||
+                        DocumentSignatureAfterInspect == null ||
+                        DocumentSignatureBeforeBrowse != DocumentSignatureAfterInspect)
+                        violations.Add("inspect:document-mutated");
+                }
                 // The final state (E06/E12): the planner took its closing
                 // Escape (the game's menu is not open; the game is back in
                 // the mode it was in before the planner opened), its input
