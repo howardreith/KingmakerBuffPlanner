@@ -186,6 +186,22 @@ exact steps and the package checksum.
 
 ## What has been checked in the game
 
+0.4.0 (candidate `c452e01b`, guarded runs `kbp040-rc3-*` on 2026-10-09, disposable
+test campaigns only; full record in `docs/REMAINING-WORK-0.4.0-HANDOFF.md`):
+
+| What | Checked in the game |
+| --- | --- |
+| Spellbook Buff Planner button | Yes: opened the planner three times from the native spellbook, closed with Escape; a simulated failure reopened the spellbook |
+| Routines during combat | Yes, Instant and Animated: refused with "Buff routines cannot run during combat.", nothing spent, nothing opened; the next press after combat behaved normally |
+| Direct graph editing | Yes (mouse): add, same-portrait remove, move, change caster, Undo, Escape leaves the selection then closes; edits saved themselves. Group re-centring and Share visibility: not in the test party (checked in code) |
+| Magic Circle against Alignment | Yes, Instant and Animated: cast on an ally, slot spent once, circle confirmed, nothing left held |
+| Buff catalogue | Yes: Light and the Heal skill's Treat Affliction / Treat Deadly Wounds no longer listed; catalogue exports before/after for three mod profiles |
+| Scroll paper and spell scroll | Yes at 1920x1080 and 1280x720 windowed; the description scrolls on its own; Escape closes it first, never the game menu |
+| Instant "Not Ready" for an animated-only casting | No: no test party has such a source after the Magic Circle repair (checked in code) |
+
+0.3.0 and earlier:
+
+
 Every row below was observed by a guarded run of the qualified candidate
 (source commit `8d7681d0`, batch r15, 2026-10-03) on disposable test
 campaigns, never an ordinary save; the 0.2.0 and 0.3.0 release commits add only the

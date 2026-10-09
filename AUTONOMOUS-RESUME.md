@@ -1,3 +1,16 @@
+# Autonomous resume — 0.4.0 owner-review candidate, 2026-10-09
+
+Current: the 0.4.0 release train is complete through an owner-review
+candidate. Branch `claude/kbp-complete-remaining-work-2026-10-09` (worktree
+`private/worktrees/KBP040`), published for review as
+`codex/kingmaker-buff-planner-0.4.0`. Candidate rc3
+`c452e01b360f380b9ca9268e0be3ea05d1b288c6`, version 0.4.0, package
+`cc50fb3c7629bc8cf3a03467780e72f2f0f1ec787cd83b1ce54e8de31a59b480`. Every
+record, run id, identity and the owner checklist are in
+`docs/REMAINING-WORK-0.4.0-HANDOFF.md`. Next action: the owner's review;
+no merge, tag or release without his authorization. The WP2A snapshot
+below is historical.
+
 # Autonomous resume — WP2A qualification freeze, 2026-10-08T22:37Z
 
 This is a dated pre-qualification checkpoint. Before resuming, read
