@@ -299,8 +299,10 @@ Published through the project's guarded push helper
 (`codex-policy\Push-KingmakerBuffPlanner.ps1`, fast-forward only, clean tree)
 as `codex/kingmaker-buff-planner-0.4.0`: the mission branch
 `claude/kbp-complete-remaining-work-2026-10-09`, same commits - the helper
-admits only `codex/kingmaker-buff-planner*` names. Draft PR against `main`:
-recorded below once opened. Nothing is merged, tagged, released or installed.
+admits only `codex/kingmaker-buff-planner*` names. Guarded push PASS at the
+records head `ea6164c` (from `d358c38`, fast-forward). Draft PR against `main`:
+https://github.com/howardreith/KingmakerBuffPlanner/pull/5 (#5, draft, opened at
+`ea6164c`). Nothing is merged, tagged, released or installed.
 
 ## rc3 report (superseded by rc4; kept as history)
 
