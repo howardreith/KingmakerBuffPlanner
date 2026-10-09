@@ -9,11 +9,27 @@ be instant" controls.
 **Never during combat.** Every routine route (HUD buttons, the planner's Run,
 Ready Casts Only, the Classic planner) refuses while `Player.IsInCombat` is
 true with the single global message `Buff routines cannot run during combat.`
-The refusal happens at the shared `CastingWorkspaceSession.Apply` boundary,
-before compilation, persistence flush, authorization, projection, or native
-submission; it names and focuses no casting and never opens the planner. A
-new press after combat ends runs normally. The executors keep their
-per-step combat refusal (always on) for a combat that starts mid-run.
+It names and focuses no casting and never opens the planner; a new press
+after combat ends runs normally. The executors keep their per-step combat
+refusal (always on) for a combat that starts mid-run. Where each route
+refuses, exactly:
+
+- Casting-first (the workspace's Run and Ready Casts Only, and the HUD quick
+  run in casting-first mode): at the shared `CastingWorkspaceSession.Apply`
+  boundary, before compilation, persistence flush, authorization, projection
+  and native submission. The HUD quick run first builds fresh discovery inputs
+  (one read of the party through the Classic session's refresh, whose Classic
+  saves are suppressed while casting-first is active).
+- Classic (`PlannerUiSession.ExecuteRoutine`; rc4 lead review, finding 2):
+  through `ClassicRoutineAdmission`, right after the "another routine is
+  executing" guard - before the refresh (profile rebinding and saving), the
+  preview and compiler, the review and partial-apply gates and any dispatch.
+  `PrepareAndCast` checks combat again at its final boundary, for combat that
+  began while the run prepared. Regression
+  `execution-policy-classic-combat-refuses-before-preparation`; runtime
+  evidence: the physical combat run drives the Classic route in the same held
+  combat and records that it yielded, refreshed, previewed, reported and
+  wrote nothing (`classicCombat*` in `physical-workspace.json`).
 
 **Strict Instant.** In Instant mode a casting runs only through a qualified
 instant rule-cast route (`DirectRuleCast`, `StickyTouchDeliveryRuleCast`,

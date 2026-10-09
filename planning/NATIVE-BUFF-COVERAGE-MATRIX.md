@@ -15,9 +15,30 @@ name or GUID is consulted and no override was added.
 | Hostile ability rider | an effect on the caster or current target of an ability aimed at enemies (can target enemies and not allies, or harmful to enemies and not helpful to allies) | `hostile-ability-rider` (or `offensive-carrier-only` when the ability is an offensive carrier) | Hideous Laughter's Call of the Wild Infectious Charms caster rider |
 | Save-gated effect | an effect that lands only on a failed saving throw | `save-gated-effect` | the non-ally branch of Magic Circle (its ally branch stays the payload) |
 | Harmful condition | a buff that changes its bearer's faction, or whose only mechanics impose a harmful `UnitCondition` (read from `AddCondition` / `BuffStatusCondition`) | `harmful-only` | Dazing Touch (`DazeBuff`, Dazed) |
-| Mechanics-free buff | a buff whose components only keep its books (rank, descriptor, uniqueness, stored context, cleanup) - cooldowns, activation markers, cosmetic buffs; the proven enchant-pool signal buff is exempt | `mechanics-free-marker-only` / `reactive-restoration-marker-only` | the Heal skill's Treat Affliction and Treat Deadly Wounds cooldowns, Light |
-| Hidden bookkeeping marker | a hidden buff of bookkeeping plus on-apply/cleanup actions | `hidden-marker-only` | Targeted Bomb Admixture |
-| Restoration tracker | a hidden buff beside an instantaneous heal, restoration, removal or dispel | `reactive-restoration-marker-only` | Inspiring Recovery's check buff |
+| Lockout (rc4) | a buff the ability forbids its own target or caster to have (`AbilityTargetHasFact` inverted, `AbilityCasterHasNoFacts`, Call of the Wild `AbilityTargetHasNoFactUnlessBuffsFromCaster`) when the ability also does something else | not a payload; `mechanics-free-marker-only` only when nothing else remains | the hex cooldown beside Battle Ward's ward buff |
+| Restoration marker | beside an instantaneous heal, restoration, removal or dispel: a hidden buff, or one with no mechanics of its own (cooldowns, trackers, one-round enablers, a restoration's side effect) | `reactive-restoration-marker-only` | Treat Affliction / Treat Deadly Wounds cooldowns, Kinetic Healer's Burn Offload, Counter Curse, the Warpriest channel's Repose enabler |
+| Hidden bookkeeping marker | a hidden buff whose components keep its books, remove buffs, or run `AddFactContextActions` that apply nothing and run nothing unrecognized | `hidden-marker-only` | - |
+| Opaque hidden buff (rc4) | a hidden buff whose own `AddFactContextActions` run an action the exact adapter does not recognize, when nothing else remains | `unsupported-with-reason: opaque-hidden-buff-actions` (unsupported, not excluded) | - |
+
+**rc4 correction (lead review, finding 1).** The rc3 rules also removed any
+buff "whose components only keep its books" - including a buff with no
+components at all. That is not proof that a buff is not a buff: its presence
+may be the state other blueprints act on (Targeted Bomb Admixture's visible
+buff has no components; the alchemist's bombs read it). rc4 removes that rule;
+a buff with no mechanics of its own stays a payload unless one of the proved
+marker rules above applies. A hidden buff whose own actions apply a beneficial
+buff carries it and is never a marker under these rules. Light and Daylight
+are utility buffs (light, no combat statistic) and are kept: excluding them
+would be a product-scope decision for the owner, not a structural fact.
+Discovery also reads two exact Call of the Wild contracts:
+`RunActionsDependingOnContextValue` (value-selected `ActionList[]`
+alternatives; the Battle/Bone/Wind Ward and Draconic Resilience hexes apply
+their ward buff through it) and `ContextActionTreatDeadlyWounds` (a
+restoration). Each catalogue entry records the facts its ability forbids
+itself (`selfGatedFactIds`) and each effect buff its own fact actions
+(`factActions`); `blueprint-references.json` lists the blueprints that read
+each buff with no mechanics of its own (diagnostic evidence). The per-entry
+adjudication of every rc3 removal is in `planning/CATALOG-AUDIT-0.4.0.md`.
 
 Conditional alternatives are preserved: a mixed graph keeps only the payloads
 on a branch the rules understand (Magic Circle's ally branch); a buff on the
@@ -34,9 +55,12 @@ qualification status, exclusion reason). The harness verifies its hash,
 reconciles its counts with the catalog and the result, and refuses an audit
 that adds entries. `scripts/ConvertTo-KbpCatalogAuditReport.ps1` renders the
 human-readable report. Regressions: `catalog-audit-*` (Hideous Laughter,
-Treat Affliction, Treat Deadly Wounds, Dazing Touch, restoration tracker,
-markers, legitimate self / ally / party / ability / item buffs, mixed
-graphs, audit summary). Per-profile before/after counts are recorded in
+Dazing Touch, legitimate self / ally / party / ability / item buffs, mixed
+graphs, audit summary), `catalog-adjudication-*` (rc4: the exact exported
+facts of Targeted Bomb Admixture, Light, Daylight, Elemental Bastion,
+Venomous Strike, School Understanding, Battle Ward, Treat Affliction, Treat
+Deadly Wounds, Burn Offload, Counter Curse, the Warpriest channel and
+Inspiring Recovery) and `catalog-ownership-multi-mod-inventories`. Per-profile before/after counts are recorded in
 `docs/REMAINING-WORK-0.4.0-HANDOFF.md` once the guarded runs exist.
 
 ## 2026-09-06 failed human validation: routing diagnosis

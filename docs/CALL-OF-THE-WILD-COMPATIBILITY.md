@@ -40,6 +40,20 @@ contract (`ambiguous-area-recipient`), so the profile's catalogue check was
 stale before 0.4.0; no Call of the Wild source with a spawned area-effect
 buff is currently included, so that path has no representative.
 
+0.4.0 rc4 (lead review, finding 3): ownership is proved per staged mod by the
+mod's own inventory - every Call of the Wild library `loaded_blueprints.txt`
+(Call of the Wild, TweakOrTreat, ZFavoredClass, ProperFlanking2,
+BetterVendors; `AddAsset` records every blueprint it registers, literal GUIDs
+included) and the Kingmaker Gunslinger identifier manifest
+(`blueprints/blueprints.json`, runtime generation disallowed). A blueprint
+no inventory claims is native only when that is proved (the native-only
+profile, or every staged mod declares an inventory, as in this profile);
+otherwise - the full-user profile stages mods that declare none - it is
+`unattributed`. The optional counts asserted above cover proved mod
+ownership only. `ConvertTo-KbpCatalogAuditReport.ps1 -NativeCatalogPath`
+resolves an unattributed entry to native only when the native-only catalogue
+of the same generator commit lists it.
+
 ## Harmony inventory
 
 Both runs emitted the same ordered inventory: SHA-256 `a883dd60218a1f9e989a4e6b03d99318242d401d33f914cd6c068f767b308427`, 207 target methods and 228 patch records. Owners are CallOfTheWild (225 records), UnityModManager (2), and UnityModManager.UI (1). Each record includes patch kind, sequence, Harmony index, priority, owner, before/after constraints, patch method, and target method. There are zero multi-owner targets and zero Buff Planner overlaps because Buff Planner applies no Harmony patches.
