@@ -248,23 +248,40 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         }
 
         // Another legal recipient for the focused casting: neither its caster
-        // nor its current recipient, preferably one no other casting reaches.
+        // nor its current recipient, preferably one with no casting of the buff
+        // in the routine (WP3: a recipient holds at most one, so a portrait
+        // that already has one refuses the move), then one no other scripted
+        // casting reaches.
         private string GraphRetarget(UI.CastingWorkspaceSession session, CastingWorkspaceInputs inputs,
             string castingId)
         {
             UI.CastingGraphView graph = session.BuildGraph(inputs);
-            Domain.Authoring.PlannedCasting casting = session.Document.Castings.FirstOrDefault(value =>
-                value != null && string.Equals(value.CastingId, castingId, StringComparison.Ordinal));
+            List<string> candidates = RetargetCandidates(session, graph, castingId);
+            Domain.Authoring.PlannedCasting casting = CastingById(session, castingId);
+            string current = casting == null ? null : casting.DirectTargetUnitId;
+            return candidates.FirstOrDefault(unit => IsFreeRecipient(graph, unit)) ??
+                candidates.FirstOrDefault(unit => !_interactionCastTargets.Contains(unit)) ??
+                candidates.FirstOrDefault() ?? current ?? _interactionTargets[0];
+        }
+
+        private List<string> RetargetCandidates(UI.CastingWorkspaceSession session, UI.CastingGraphView graph,
+            string castingId)
+        {
+            Domain.Authoring.PlannedCasting casting = CastingById(session, castingId);
             string caster = casting == null ? null : casting.CasterUnitId;
             string current = casting == null ? null : casting.DirectTargetUnitId;
-            List<string> candidates = (graph.Inspector != null &&
+            return (graph.Inspector != null &&
                     string.Equals(graph.Inspector.CastingId, castingId, StringComparison.Ordinal)
                     ? graph.Inspector.Retargets.Select(target => target.UnitId)
                     : _interactionTargets)
                 .Where(unit => !string.Equals(unit, caster, StringComparison.Ordinal) &&
                     !string.Equals(unit, current, StringComparison.Ordinal)).ToList();
-            return candidates.FirstOrDefault(unit => !_interactionCastTargets.Contains(unit)) ??
-                candidates.FirstOrDefault() ?? current ?? _interactionTargets[0];
+        }
+
+        private static bool IsFreeRecipient(UI.CastingGraphView graph, string unitId)
+        {
+            UI.CastingGraphTargetNode node = graph.TargetById(unitId);
+            return node != null && node.CastingIds.Count == 0;
         }
 
         // Retargets the focused casting the 0.4.0 way (WP3): a click on
@@ -5708,6 +5725,26 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // portrait (WP3).
                     string editId = _interactionCastIds.Count > 1
                         ? _interactionCastIds[1] : string.Empty;
+                    // WP3: a recipient holds at most one casting of a buff in
+                    // a routine. With every legal recipient taken (three
+                    // castings in a three-member party) the move has nowhere
+                    // to go, so the third casting is removed first the
+                    // player's way - its card, then its recipient's portrait -
+                    // and cast 2 then moves to the freed recipient.
+                    UI.CastingGraphView before = session.BuildGraph(currentInputs);
+                    if (!RetargetCandidates(session, before, editId).Any(unit => IsFreeRecipient(before, unit)) &&
+                        _interactionCastIds.Count > 2)
+                    {
+                        string thirdId = _interactionCastIds[2];
+                        Domain.Authoring.PlannedCasting third = CastingById(session, thirdId);
+                        string focusThird = Invoke("Casting." + thirdId);
+                        string removeThird = third == null ? "missing"
+                            : Invoke("Target." + third.DirectTargetUnitId);
+                        bool removed = CastingById(session, thirdId) == null;
+                        string refocus = Invoke("Casting." + editId);
+                        _workspaceInteraction.AddNote("retargetFreedRecipient=" + thirdId + ";focus=" + focusThird +
+                            ";remove=" + removeThird + ";removed=" + removed + ";refocus=" + refocus);
+                    }
                     // Another legal recipient for cast 2's source: neither the
                     // caster nor its current recipient; the re-edit reuses it.
                     _interactionRetarget = GraphRetarget(session, currentInputs, editId);
