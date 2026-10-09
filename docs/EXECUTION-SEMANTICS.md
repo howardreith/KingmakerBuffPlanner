@@ -1,5 +1,39 @@
 # Execution Semantics
 
+## 0.4.0 execution policy (current contract)
+
+Two rules are enforced policy, no longer player settings. They supersede the
+0.3.0 "Cast only out of combat" and "Instant mode: animate buffs that cannot
+be instant" controls.
+
+**Never during combat.** Every routine route (HUD buttons, the planner's Run,
+Ready Casts Only, the Classic planner) refuses while `Player.IsInCombat` is
+true with the single global message `Buff routines cannot run during combat.`
+The refusal happens at the shared `CastingWorkspaceSession.Apply` boundary,
+before compilation, persistence flush, authorization, projection, or native
+submission; it names and focuses no casting and never opens the planner. A
+new press after combat ends runs normally. The executors keep their
+per-step combat refusal (always on) for a combat that starts mid-run.
+
+**Strict Instant.** In Instant mode a casting runs only through a qualified
+instant rule-cast route (`DirectRuleCast`, `StickyTouchDeliveryRuleCast`,
+`ProviderDirectRuleCast`). The compiler marks a casting whose effective
+strategy is `AnimatedFallback` or `NativeCommandRequired` Blocked with
+`instant-route-unavailable:<strategy>:<reason>` while Instant is selected, so
+the gate reports it as a casting-specific blocker and Not Ready navigation
+(WP2A) focuses it; nothing is spent. An already-active skip casts nothing and
+stays a skip. The hybrid executor runs in strict mode and refuses such a step
+before any native work if one ever reaches it. The explicit **Animated** mode
+(the mode button) runs every casting through the normal native command.
+
+**Stored 0.3.0 preferences.** The `outOfCombatOnly` and
+`allowAnimatedFallback` fields remain in the schema because every earlier
+reader requires them. A loaded value is read but not honoured
+(`LegacyExecutionPreferencesOverridden` records that it differed); loading
+writes nothing, and the next deliberate save writes the enforced values
+(`true`/`false`), rotating the previous file into the `.bak` chain. A rolled
+back 0.3.0 reads those values and therefore the same strict behaviour.
+
 ## 0.0.18 sticky-touch transaction boundary
 
 Provider capability and configured mode are now separate. Every `CastStep`
