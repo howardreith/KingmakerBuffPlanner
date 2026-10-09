@@ -102,6 +102,16 @@ game's own menu. Reading descriptions never changes the plan.
   the refusal names the reason. **Ready Casts Only** runs the ready
   castings and lists what it left out; it never waives a required
   enhancement.
+- **Never during combat (0.4.0).** A routine pressed while the party is in
+  combat is refused with "Buff routines cannot run during combat." Nothing
+  is spent and no casting is singled out; press again once combat is over.
+  This is no longer a setting.
+- **Instant or Animated (0.4.0).** The planner's **Mode** button chooses.
+  Instant never falls back to a normal animated cast: a casting that cannot
+  be cast instantly is Not Ready while Instant is chosen, and the planner
+  shows it with the reason. Choose **Animated** to cast it with the game's
+  normal casting. The old "animate buffs that cannot be instant" checkbox is
+  gone.
 - **Already active.** "Skip if already active" (the default) skips a
   casting only when its recipient already has an effect at least as good;
   a weaker or expiring effect is recast, and the card says why.
