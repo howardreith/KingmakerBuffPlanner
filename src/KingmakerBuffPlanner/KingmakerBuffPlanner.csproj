@@ -270,6 +270,10 @@
     <Compile Include="UI\ControlCaptionFit.cs" />
     <Compile Include="UI\PlannerNativeTheme.cs" />
     <Compile Include="UI\PlannerNativeThemeSurface.cs" />
+    <Compile Include="UI\NativeSpriteContract.cs" />
+    <Compile Include="UI\ParchmentTreatment.cs" />
+    <Compile Include="UI\PlannerParchmentPalette.cs" />
+    <Compile Include="UI\PlannerParchment.cs" />
     <Compile Include="$(IntermediateOutputPath)BuildInfo.Generated.cs" />
   </ItemGroup>
   <ItemGroup>

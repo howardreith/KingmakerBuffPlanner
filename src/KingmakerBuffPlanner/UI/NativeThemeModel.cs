@@ -16,7 +16,11 @@ namespace KingmakerBuffPlanner.UI
         Input,
         Scrollbar,
         Ornament,
-        Sound
+        Sound,
+        // WP7: the casting-first planner's scroll paper and scroll rule,
+        // each held to an exact native sprite contract (NativeSpriteContract).
+        ScrollPaper,
+        ScrollRule
     }
 
     internal enum NativeThemeComponent
