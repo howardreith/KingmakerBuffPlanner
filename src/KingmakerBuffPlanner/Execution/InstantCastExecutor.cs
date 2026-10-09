@@ -174,7 +174,14 @@ namespace KingmakerBuffPlanner.Execution
                                         yield return null;
                                         if (result.Succeeded && !observed)
                                             observed = _runtime.EffectsObserved(step);
-                                        completion = InspectCompletion(step);
+                                        // A settled transaction stays the
+                                        // record: the runtime forgets a
+                                        // settled touch, so inspecting it
+                                        // again while the effect lands would
+                                        // report a generic settlement instead
+                                        // (kbp040-rc1-cast-sticky-instant).
+                                        if (!completion.Complete)
+                                            completion = InspectCompletion(step);
                                     }
                                     InstantCastCompletion cleanup = completion;
                                     if (!completion.Complete)

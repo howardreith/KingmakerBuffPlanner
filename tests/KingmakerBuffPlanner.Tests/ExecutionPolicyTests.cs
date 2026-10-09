@@ -32,6 +32,8 @@ namespace KingmakerBuffPlanner.Tests
                 TestStrictHybridExecutor);
             Run("execution-policy-willing-target-touch-buff-is-instant",
                 () => TestWillingTargetTouchBuffInstant(root));
+            Run("execution-policy-settled-touch-detail-survives-confirmation",
+                () => TestSettledTouchDetailSurvives(root));
         }
 
         private sealed class CountingDispatchBoundary : ICastingDispatchBoundary
@@ -243,6 +245,64 @@ namespace KingmakerBuffPlanner.Tests
             CastingWorkspaceInputs old = PolicyInputs(WorkspaceInputs(out snapshot), false, "unit-wizard");
             if (session.CompileForRuntime(old, "long").Castings.Single().IsExecutable)
                 throw new InvalidOperationException("The animated-only classification was Ready in Instant.");
+        }
+
+        // Regression for kbp040-rc1-cast-sticky-instant: the touch settled at
+        // the first inspection (no held touch, no delivery command), the
+        // runtime forgot the transaction, and while the buff landed a frame
+        // later the executor inspected again and recorded the generic
+        // "ordinary-rule-cast-settled" instead - the run's own record lost
+        // the proof that the touch had settled.
+        private static void TestSettledTouchDetailSurvives(string root)
+        {
+            string dir = Path.Combine(root, "policy-settled-touch");
+            Directory.CreateDirectory(dir);
+            PartyProviderSnapshot snapshot;
+            CastExecutionCapability touch = StickyTouchExecutionClassifier.Classify(true, true, true,
+                true, true, true, true, false, true, false);
+            CastingWorkspaceInputs inputs = PolicyInputs(WorkspaceInputs(out snapshot), false, "unit-wizard",
+                touch.Strategy, touch.Reason);
+            var dispatch = new CountingDispatchBoundary();
+            var session = new CastingWorkspaceSession(dir, "workspace-campaign", dispatch);
+            Assert(AddDraftCasting(session, inputs, "unit-wizard", "unit-t2").Applied);
+            Assert(session.Apply(CastingApplyMode.Ordinary, "long", inputs).Allowed);
+            CastPlan plan = dispatch.LastProjection.Plan;
+            var runtime = new SettlingTouchRuntime();
+            var report = new ExecutionReport(plan);
+            Drain(new InstantCastExecutor(runtime, false).Execute(plan, report));
+            CastExecutionRecord confirmed = report.Records.SingleOrDefault(record =>
+                record.Status == CastExecutionStatus.EffectConfirmed);
+            if (confirmed == null || runtime.Inspections != 1 ||
+                !confirmed.Detail.Contains(";transaction-state:" + SettlingTouchRuntime.SettledDetail) ||
+                !confirmed.Detail.Contains(";cleanup-state:" + SettlingTouchRuntime.SettledDetail) ||
+                confirmed.Detail.Contains("ordinary-rule-cast-settled"))
+                throw new InvalidOperationException("The settled touch's record was replaced: " +
+                    (confirmed == null ? "no confirmation" : confirmed.Detail) + ";inspections=" + runtime.Inspections);
+        }
+
+        private sealed class SettlingTouchRuntime : IInstantCastRuntimeAdapter
+        {
+            internal const string SettledDetail =
+                "held-touch:False;delivery-command-present:False;carrier-guid:carrier;delivery-guid:delivery";
+            private int _observations;
+            internal int Inspections;
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step) { return CastRuntimeValidation.Pass(); }
+            public InstantCastResult Fire(CastStep step)
+            {
+                // The rule's buff lands on a later tick: not observed yet.
+                return new InstantCastResult(true, true, false, true, "rule-success;rule-cast-submitted:true");
+            }
+            public bool EffectsObserved(CastStep step) { return ++_observations >= 2; }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            {
+                // The first inspection settles the touch and the runtime
+                // forgets it; any later one can only say "ordinary".
+                return ++Inspections == 1 ? InstantCastCompletion.Settled(SettledDetail)
+                    : InstantCastCompletion.Settled("ordinary-rule-cast-settled");
+            }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("ordinary-rule-cast-no-cleanup-required"); }
         }
 
         private static void TestStrictHybridExecutor()
