@@ -256,6 +256,8 @@
     <Compile Include="UI\AssignmentEligibility.cs" />
     <Compile Include="UI\SpellbookHandoffStateMachine.cs" />
     <Compile Include="UI\SpellbookWindowLocator.cs" />
+    <Compile Include="UI\SpellbookEntryPlacement.cs" />
+    <Compile Include="UI\SpellbookHandoffFaults.cs" />
     <Compile Include="UI\BuffPlannerSpellbookEntryController.cs" />
     <Compile Include="UI\NativeThemeModel.cs" />
     <Compile Include="UI\NativeThemeDonorLookup.cs" />

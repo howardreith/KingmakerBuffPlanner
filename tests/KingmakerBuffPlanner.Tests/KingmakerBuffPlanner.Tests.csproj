@@ -32,6 +32,7 @@
     <Compile Include="ProductionExecutionTests.cs" />
     <Compile Include="CastingGraphTests.cs" />
     <Compile Include="BlockedNavigationTests.cs" />
+    <Compile Include="SpellbookEntryTests.cs" />
     <Compile Include="AutosaveLifecycleTests.cs" />
     <Compile Include="SharePlanningTests.cs" />
     <Compile Include="UndoHistoryTests.cs" />
@@ -135,6 +136,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\AssignmentEligibility.cs"><Link>UI\AssignmentEligibility.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SpellbookHandoffStateMachine.cs"><Link>UI\SpellbookHandoffStateMachine.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SpellbookWindowLocator.cs"><Link>UI\SpellbookWindowLocator.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\SpellbookEntryPlacement.cs"><Link>UI\SpellbookEntryPlacement.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeModel.cs"><Link>UI\NativeThemeModel.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeDonorLookup.cs"><Link>UI\NativeThemeDonorLookup.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeThemeResolver.cs"><Link>UI\NativeThemeResolver.cs</Link></Compile>
