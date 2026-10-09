@@ -1,7 +1,6 @@
-# Buff Planner: player guide (0.4.0)
+# Buff Planner: player guide (0.4.1)
 
-This guide describes the casting-first planner of 0.4.0 (an owner-review candidate; 0.3.0 is the
-published release). It is
+This guide describes the casting-first planner of 0.4.1. It is
 the only normal planner: there is
 no Save button, no Accept Plan step and no Classic switch in the planner.
 "What has been checked in the game" at the end says exactly which parts a
@@ -178,24 +177,25 @@ it is resolved.
 
 Install archive-first: back up the whole `Mods\KingmakerBuffPlanner` folder
 (including `UserSettings`) outside the `Mods` folder before replacing it,
-then confirm Unity Mod Manager lists version 0.4.0 (its log line
-`[KBP-BOOT] Main.Load exited;version=0.4.0;commit=<commit>` names the
+then confirm Unity Mod Manager lists version 0.4.1 (its log line
+`[KBP-BOOT] Main.Load exited;version=0.4.1;commit=<commit>` names the
 release commit). To roll back, copy the new `UserSettings` outside `Mods`,
 delete the new folder and copy your backup back. The release notes give the
 exact steps and the package checksum.
 
 ## What has been checked in the game
 
-0.4.0 (candidate `c452e01b`, guarded runs `kbp040-rc3-*` on 2026-10-09, disposable
-test campaigns only; full record in `docs/REMAINING-WORK-0.4.0-HANDOFF.md`):
+0.4.1 (the owner-accepted 0.4.0 candidate rc4 `009b6dd` - 0.4.1 adds only the version
+number and documentation - guarded runs `kbp040-rc4-*` on 2026-10-09, disposable test
+campaigns only; full record in `docs/REMAINING-WORK-0.4.0-HANDOFF.md`):
 
 | What | Checked in the game |
 | --- | --- |
 | Spellbook Buff Planner button | Yes: opened the planner three times from the native spellbook, closed with Escape; a simulated failure reopened the spellbook |
-| Routines during combat | Yes, Instant and Animated: refused with "Buff routines cannot run during combat.", nothing spent, nothing opened; the next press after combat behaved normally |
+| Routines during combat | Yes, Instant and Animated, casting-first and Classic: refused with "Buff routines cannot run during combat.", nothing spent, saved or opened; the next press after combat behaved normally |
 | Direct graph editing | Yes (mouse): add, same-portrait remove, move, change caster, Undo, Escape leaves the selection then closes; edits saved themselves. Group re-centring and Share visibility: not in the test party (checked in code) |
 | Magic Circle against Alignment | Yes, Instant and Animated: cast on an ally, slot spent once, circle confirmed, nothing left held |
-| Buff catalogue | Yes: Light and the Heal skill's Treat Affliction / Treat Deadly Wounds no longer listed; catalogue exports before/after for three mod profiles |
+| Buff catalogue | Yes: catalogue exports before/after for three mod profiles; Hideous Laughter, the Heal skill's Treat Affliction / Treat Deadly Wounds and Inspiring Recovery no longer listed; Targeted Bomb Admixture, Light, Daylight, Elemental Bastion and Call of the Wild's hex wards listed; every removal adjudicated in `planning/CATALOG-AUDIT-0.4.0.md` |
 | Scroll paper and spell scroll | Yes at 1920x1080 and 1280x720 windowed; the description scrolls on its own; Escape closes it first, never the game menu |
 | Instant "Not Ready" for an animated-only casting | No: no test party has such a source after the Magic Circle repair (checked in code) |
 
