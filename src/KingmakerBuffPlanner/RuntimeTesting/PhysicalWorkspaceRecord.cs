@@ -150,6 +150,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public string CombatAvailability { get; set; }
         public bool? CombatEffectAfter { get; set; }
         public bool? CombatClearedBeforeMoon { get; set; }
+        // rc4 review finding 2: the Classic route pressed in the same held
+        // combat - refused at its admission, before any preparation.
+        public string ClassicCombatRefusal { get; set; }
+        public int? ClassicCombatYielded { get; set; }
+        public int? ClassicCombatRefreshes { get; set; }
+        public int? ClassicCombatPreviews { get; set; }
+        public bool? ClassicCombatReportChanged { get; set; }
+        public bool? ClassicCombatExecuting { get; set; }
+        public bool? ClassicCombatProfileUnchanged { get; set; }
         // 0.4.0 (WP3) authoring run: the chosen buff, caster and recipients
         // ("A,B") in the shown routine, and each gesture's observed result.
         public string AuthoringRoutine { get; set; }
@@ -419,6 +428,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 violations.Add("combat:resource-changed:" + (CombatAvailability ?? "unread"));
             if (CombatEffectAfter != false) violations.Add("combat:effect-landed");
             if (CombatClearedBeforeMoon != true) violations.Add("combat:not-cleared-before-moon");
+            if (string.IsNullOrEmpty(ClassicCombatRefusal) ||
+                ClassicCombatRefusal.IndexOf(UI.CastingRunPresentation.CombatRefusalText, StringComparison.Ordinal) < 0)
+                violations.Add("combat:classic-not-refused-for-combat:" + (ClassicCombatRefusal ?? "none"));
+            if (ClassicCombatYielded != 0)
+                violations.Add("combat:classic-yielded:" + (ClassicCombatYielded == null ? "unread" : ClassicCombatYielded.ToString()));
+            if (ClassicCombatRefreshes != 0)
+                violations.Add("combat:classic-refreshed:" + (ClassicCombatRefreshes == null ? "unread" : ClassicCombatRefreshes.ToString()));
+            if (ClassicCombatPreviews != 0)
+                violations.Add("combat:classic-previewed:" + (ClassicCombatPreviews == null ? "unread" : ClassicCombatPreviews.ToString()));
+            if (ClassicCombatReportChanged != false) violations.Add("combat:classic-report-changed");
+            if (ClassicCombatExecuting != false) violations.Add("combat:classic-executing");
+            if (ClassicCombatProfileUnchanged != true) violations.Add("combat:classic-profile-changed");
             return violations;
         }
 

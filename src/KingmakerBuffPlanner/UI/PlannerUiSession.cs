@@ -121,8 +121,20 @@ namespace KingmakerBuffPlanner.UI
             get { return _activeEffects; }
         }
 
+        // Runtime evidence (rc4 review finding 2): how often the Classic
+        // session refreshed (rebinding and possibly saving its profile) and
+        // previewed a plan, so a combat press can prove it did neither.
+        internal int RefreshCount { get; private set; }
+        internal int PreviewCount { get; private set; }
+
+        internal string ClassicProfilePath(string campaignId)
+        {
+            return _profiles.GetProfilePath(campaignId);
+        }
+
         internal void Refresh()
         {
+            RefreshCount++;
             try
             {
                 if (Game.Instance == null || Game.Instance.Player == null ||
@@ -331,6 +343,7 @@ namespace KingmakerBuffPlanner.UI
         }
         internal RoutinePlanResult PreviewRoutine(string routineId)
         {
+            PreviewCount++;
             if (Model == null || _snapshot == null || _activeEffects == null ||
                 _effects == null || _providerOptions == null)
                 throw new InvalidOperationException("A campaign planner snapshot is required.");

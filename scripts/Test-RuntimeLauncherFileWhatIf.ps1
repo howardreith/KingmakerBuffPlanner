@@ -561,6 +561,10 @@ try {
             $record.combatRefusal = 'Refused:Buff routines cannot run during combat.'
             $record.combatAvailability = '99>99'; $record.combatEffectAfter = $false
             $record.combatClearedBeforeMoon = $true
+            $record.classicCombatRefusal = 'Refused:Buff routines cannot run during combat.'
+            $record.classicCombatYielded = 0; $record.classicCombatRefreshes = 0; $record.classicCombatPreviews = 0
+            $record.classicCombatReportChanged = $false; $record.classicCombatExecuting = $false
+            $record.classicCombatProfileUnchanged = $true
         }
         if ($Expectation -ceq 'authoring') {
             foreach ($flag in @('authoringBuffSelected', 'authoringAdded', 'authoringRemoved', 'authoringReadded',
@@ -610,6 +614,9 @@ try {
         'combat-not-in-combat' = @('combat', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
             $r.combatAtPress = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'combat-press-missing' = @('combat', { param($d) Remove-Item -LiteralPath (Join-Path $d 'physical-input-cf-moon-combat.ack.json') })
+        # rc4 review finding 2: the Classic route prepared before refusing.
+        'combat-classic-prepared' = @('combat', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.classicCombatRefreshes = 1; $r.classicCombatPreviews = 1; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'authoring-retarget-failed' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
             $r.authoringRetargeted = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'authoring-provider-not-undone' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')

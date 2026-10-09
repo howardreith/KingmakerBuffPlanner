@@ -839,6 +839,48 @@ namespace KingmakerBuffPlanner.UI
             return _instance == null ? null : _instance._diagnostics.GetFlow(routineId);
         }
 
+        // rc4 review finding 2 (runtime evidence): the Classic route itself -
+        // the Classic session's ExecuteRoutine, not the casting-first quick
+        // run the HUD reaches in casting-first mode - pressed now, with what
+        // it touched: whether it yielded, refreshed, previewed, replaced its
+        // execution report, kept executing, or changed its profile file.
+        internal static ClassicCombatProbe ClassicCombatProbeForRuntime(string routineId)
+        {
+            if (_instance == null || _instance._session == null ||
+                Game.Instance == null || Game.Instance.Player == null)
+                return null;
+            PlannerUiSession session = _instance._session;
+            string profilePath = session.ClassicProfilePath(Game.Instance.Player.GameId);
+            Func<string> profileHash = () => System.IO.File.Exists(profilePath)
+                ? Hashing.Sha256(profilePath) : "absent";
+            string profileBefore = profileHash();
+            int refreshes = session.RefreshCount;
+            int previews = session.PreviewCount;
+            ExecutionReport report = session.LastExecutionReport;
+            QuickExecutionResult result = null;
+            int yielded = 0;
+            IEnumerator run = session.ExecuteRoutine(routineId, value => result = value, false);
+            try
+            {
+                while (yielded < 1000 && run.MoveNext()) yielded++;
+            }
+            finally
+            {
+                IDisposable disposable = run as IDisposable;
+                if (disposable != null) disposable.Dispose();
+            }
+            return new ClassicCombatProbe
+            {
+                Refusal = result == null ? "no-result" : result.Disposition + ":" + result.Message,
+                Yielded = yielded,
+                Refreshes = session.RefreshCount - refreshes,
+                Previews = session.PreviewCount - previews,
+                ReportChanged = !ReferenceEquals(report, session.LastExecutionReport),
+                ExecutingAfter = session.IsExecuting,
+                ProfileUnchanged = profileHash() == profileBefore
+            };
+        }
+
         internal static QuickExecutionResult QuickResultForRuntime(string routineId)
         {
             QuickExecutionResult result;

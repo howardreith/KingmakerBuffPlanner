@@ -117,6 +117,13 @@ namespace KingmakerBuffPlanner.Tests
                 record.CombatAvailability = "99>99";
                 record.CombatEffectAfter = false;
                 record.CombatClearedBeforeMoon = true;
+                record.ClassicCombatRefusal = "Refused:" + CastingRunPresentation.CombatRefusalText;
+                record.ClassicCombatYielded = 0;
+                record.ClassicCombatRefreshes = 0;
+                record.ClassicCombatPreviews = 0;
+                record.ClassicCombatReportChanged = false;
+                record.ClassicCombatExecuting = false;
+                record.ClassicCombatProfileUnchanged = true;
                 return record;
             };
             if (!good().ExpectedCastingActions.SequenceEqual(new[] { "cf-moon-combat" }
@@ -139,6 +146,15 @@ namespace KingmakerBuffPlanner.Tests
                 { "combat:resource-changed:unread", r => r.CombatAvailability = null },
                 { "combat:effect-landed", r => r.CombatEffectAfter = true },
                 { "combat:not-cleared-before-moon", r => r.CombatClearedBeforeMoon = false },
+                // rc4 review finding 2: the Classic route in the same combat.
+                { "combat:classic-not-refused-for-combat:no-result", r => r.ClassicCombatRefusal = "no-result" },
+                { "combat:classic-yielded:1", r => r.ClassicCombatYielded = 1 },
+                { "combat:classic-refreshed:1", r => r.ClassicCombatRefreshes = 1 },
+                { "combat:classic-refreshed:unread", r => r.ClassicCombatRefreshes = null },
+                { "combat:classic-previewed:1", r => r.ClassicCombatPreviews = 1 },
+                { "combat:classic-report-changed", r => r.ClassicCombatReportChanged = true },
+                { "combat:classic-executing", r => r.ClassicCombatExecuting = true },
+                { "combat:classic-profile-changed", r => r.ClassicCombatProfileUnchanged = false },
                 // The ordinary press after combat must still reach the lock.
                 { "moon:not-refused-by-lock:combat-active", r => r.MoonRefusal = "combat-active" },
                 { "moon:run-without-grant", r => r.MoonRunStarted = true }
