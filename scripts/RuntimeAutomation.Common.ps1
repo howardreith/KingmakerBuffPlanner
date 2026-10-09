@@ -1335,10 +1335,23 @@ function Assert-KbpScenarioOutcome {
         # Escape-menu veil closes, reverse wheel recovery) are allowed beside
         # it and every requested action is still checked for its
         # acknowledgement below.
+        $expectation = [string]$Request.parameters.physicalExpectation
+        if ([string]::IsNullOrEmpty($expectation)) { $expectation = 'cast' }
         $expected = @('cf-moon', 'cf-routine-short', 'cf-wheel', 'cf-right-click', 'cf-inspect-wheel', 'cf-long-wheel',
             'cf-escape-inspect', 'cf-escape-close')
         $conditional = @('cf-menu-close-1', 'cf-menu-close-2', 'cf-menu-close-3',
             'cf-wheel-back-1', 'cf-wheel-back-2')
+        # 0.4.0: the combat run presses the moon in combat first; the
+        # authoring run replaces the browse and description gestures with
+        # the direct graph gestures (the tile click and the provider change
+        # happen only when their controls are on screen).
+        if ($expectation -ceq 'combat') { $expected = @('cf-moon-combat') + $expected }
+        if ($expectation -ceq 'authoring') {
+            $expected = @('cf-moon', 'auth-caster', 'auth-source', 'auth-add', 'auth-remove', 'auth-readd',
+                'auth-retarget', 'auth-undo', 'auth-focus', 'auth-escape-focus', 'cf-escape-close')
+            $conditional = @('cf-menu-close-1', 'cf-menu-close-2', 'cf-menu-close-3', 'auth-tile',
+                'auth-provider-caster', 'auth-provider-source', 'auth-undo-retarget')
+        }
         $acknowledged = @($record.acknowledged | ForEach-Object { [string]$_ })
         if ([string]$record.runId -cne [string]$Request.runId -or @($record.violations).Count -ne 0 -or
             @($record.failures).Count -ne 0 -or -not [bool]$record.openedPhysically -or
@@ -1350,8 +1363,6 @@ function Assert-KbpScenarioOutcome {
         # The moon-run contract: the record judges the expectation this
         # request set; a selection run was refused BY THE LOCK and never
         # ran, a cast run ran Long once under its consumed grant.
-        $expectation = [string]$Request.parameters.physicalExpectation
-        if ([string]::IsNullOrEmpty($expectation)) { $expectation = 'cast' }
         if ([string]$record.moonExpectation -cne $expectation) {
             throw "The physical run judged another moon expectation: $($record.moonExpectation) (expected $expectation)."
         }
@@ -1365,12 +1376,55 @@ function Assert-KbpScenarioOutcome {
             [bool]$record.escMenuOpenAfterClose) {
             throw "The physical run's moon press was not a cold, closed-editor press with a clean close: $path"
         }
+        # 0.4.0 (WP4) re-read from the raw record: the in-combat press found
+        # the party in combat it was not in before, was refused with the
+        # combat message before any dispatch, started nothing, opened
+        # nothing, spent and landed nothing, and the state was cleared
+        # before the ordinary press.
+        if ($expectation -ceq 'combat') {
+            $combatKeys = @('combatInCombatBefore', 'combatAtPress', 'combatRunStarted', 'combatEditorOpened',
+                'combatDispatchRefusals', 'combatRefusal', 'combatAvailability', 'combatEffectAfter',
+                'combatClearedBeforeMoon')
+            $names = @($record.PSObject.Properties | ForEach-Object Name)
+            $availability = ([string]$record.combatAvailability).Split('>')
+            if (@($combatKeys | Where-Object { $names -cnotcontains $_ }).Count -ne 0 -or
+                $null -eq $record.combatInCombatBefore -or [bool]$record.combatInCombatBefore -or
+                $null -eq $record.combatAtPress -or -not [bool]$record.combatAtPress -or
+                $null -eq $record.combatRunStarted -or [bool]$record.combatRunStarted -or
+                $null -eq $record.combatEditorOpened -or [bool]$record.combatEditorOpened -or
+                $null -eq $record.combatDispatchRefusals -or [int]$record.combatDispatchRefusals -ne 0 -or
+                ([string]$record.combatRefusal).IndexOf('Buff routines cannot run during combat.', [StringComparison]::Ordinal) -lt 0 -or
+                $availability.Count -ne 2 -or $availability[0] -cne $availability[1] -or
+                $null -eq $record.combatEffectAfter -or [bool]$record.combatEffectAfter -or
+                $null -eq $record.combatClearedBeforeMoon -or -not [bool]$record.combatClearedBeforeMoon) {
+                throw "The physical combat press was not refused for combat before dispatch with nothing spent: $path"
+            }
+        }
+        # 0.4.0 (WP3) re-read: every direct graph gesture did what the
+        # contract says, a provider change (when exercised) kept the target
+        # and was undone, the edits saved themselves, and Escape left the
+        # focused casting before it closed the planner.
+        if ($expectation -ceq 'authoring') {
+            $flags = @('authoringBuffSelected', 'authoringAdded', 'authoringRemoved', 'authoringReadded',
+                'authoringRetargeted', 'authoringUndoRestored', 'authoringFocusedBeforeEscape',
+                'authoringEscapeClearedFocus', 'authoringOpenAfterFirstEscape', 'authoringDurable')
+            $names = @($record.PSObject.Properties | ForEach-Object Name)
+            $notTrue = @($flags | Where-Object { $names -cnotcontains $_ -or $null -eq $record.$_ -or -not [bool]$record.$_ })
+            $provider = $null -ne $record.authoringProviderChanged
+            if ($notTrue.Count -ne 0 -or
+                $null -eq $record.authoringCountBefore -or $null -eq $record.authoringCountAfter -or
+                [int]$record.authoringCountAfter -ne [int]$record.authoringCountBefore + 1 -or
+                ($provider -and (-not [bool]$record.authoringProviderChanged -or
+                    -not [bool]$record.authoringProviderKeptTarget -or -not [bool]$record.authoringProviderUndone))) {
+                throw "The physical authoring gestures did not all behave as the direct-manipulation contract says ($($notTrue -join ', ')): $path"
+            }
+        }
         # E05/E06 re-read from the raw record. D11: the earlier record judged
         # only that the description panel was active while it rendered at a
         # negative size. Now: a panel of real size on screen, titled, showing
         # exactly the chip's own native description; the physical wheel over
         # it scrolled the long native text, never closed it and never moved
-        # the graph beneath.
+        # the graph beneath. (Not part of an authoring run.)
         $inspectKeys = @('screen', 'inspectPanelWidth', 'inspectPanelHeight', 'inspectTitle', 'inspectTitleNative',
             'inspectBodyChars', 'seedShortCastings', 'routineSelected', 'graphOverflow', 'graphWheelEvidence',
             'inspectExpectedChars', 'inspectBodyNative', 'inspectOverflow', 'inspectScrollBefore',
@@ -1378,20 +1432,23 @@ function Assert-KbpScenarioOutcome {
             'inspectOpenAfterWheels', 'graphScrollUnderInspectBefore', 'graphScrollUnderInspectAfter')
         $recordNames = @($record.PSObject.Properties | ForEach-Object Name)
         $missingInspect = @($inspectKeys | Where-Object { $recordNames -cnotcontains $_ })
+        if ($expectation -ceq 'authoring') { $missingInspect = @() }
         if ($missingInspect.Count -ne 0) {
             throw "The physical run's description evidence is unread ($($missingInspect -join ', ')): $path"
         }
         $screenParts = ([string]$record.screen).Split('x')
-        if ($screenParts.Count -ne 2 -or $null -eq $record.inspectPanelWidth -or $null -eq $record.inspectPanelHeight -or
+        if ($expectation -cne 'authoring' -and (
+            $screenParts.Count -ne 2 -or $null -eq $record.inspectPanelWidth -or $null -eq $record.inspectPanelHeight -or
             [double]$record.inspectPanelWidth -lt 0.25 * [double]$screenParts[0] -or
             [double]$record.inspectPanelHeight -lt 0.25 * [double]$screenParts[1] -or
             [string]::IsNullOrWhiteSpace([string]$record.inspectTitle) -or
             $null -eq $record.inspectTitleNative -or -not [bool]$record.inspectTitleNative -or
             $null -eq $record.inspectBodyNative -or -not [bool]$record.inspectBodyNative -or
-            [int]$record.inspectExpectedChars -le 0 -or [int]$record.inspectBodyChars -ne [int]$record.inspectExpectedChars) {
+            [int]$record.inspectExpectedChars -le 0 -or [int]$record.inspectBodyChars -ne [int]$record.inspectExpectedChars)) {
             throw "The physical run's description was not visibly the chip's native text: $path"
         }
-        if ([int]$record.longProbeChars -le 0 -or [double]$record.longProbeOverflow -le 1 -or
+        if ($expectation -cne 'authoring' -and (
+            [int]$record.longProbeChars -le 0 -or [double]$record.longProbeOverflow -le 1 -or
             $null -eq $record.longScrollBefore -or $null -eq $record.longScrollAfter -or
             [double]$record.longScrollAfter -ge [double]$record.longScrollBefore - 0.001 -or
             ([double]$record.inspectOverflow -gt 1 -and ($null -eq $record.inspectScrollBefore -or
@@ -1399,18 +1456,19 @@ function Assert-KbpScenarioOutcome {
                 [double]$record.inspectScrollAfter -ge [double]$record.inspectScrollBefore - 0.001)) -or
             $null -eq $record.inspectOpenAfterWheels -or -not [bool]$record.inspectOpenAfterWheels -or
             $null -eq $record.graphScrollUnderInspectBefore -or $null -eq $record.graphScrollUnderInspectAfter -or
-            [Math]::Abs([double]$record.graphScrollUnderInspectAfter - [double]$record.graphScrollUnderInspectBefore) -ge 0.001) {
+            [Math]::Abs([double]$record.graphScrollUnderInspectAfter - [double]$record.graphScrollUnderInspectBefore) -ge 0.001)) {
             throw "The physical run's description did not scroll its own long content in isolation: $path"
         }
         # D13: the continuous scroll REALLY scrolled - the Short tab (seeded
         # to overflow) was selected by the physical click and the wheel moved
         # the overflowing graph (every earlier run's graph fitted).
-        if (@($record.seedShortCastings).Count -lt 14 -or $null -eq $record.routineSelected -or
+        if ($expectation -cne 'authoring' -and (
+            @($record.seedShortCastings).Count -lt 14 -or $null -eq $record.routineSelected -or
             -not [bool]$record.routineSelected -or -not [bool]$record.graphOverflow -or
-            [string]$record.graphWheelEvidence -cne 'scrolled') {
+            [string]$record.graphWheelEvidence -cne 'scrolled')) {
             throw "The physical run's continuous scroll did not overflow and scroll under the physical wheel: $path"
         }
-        if ($expectation -ceq 'select') {
+        if ($expectation -ceq 'select' -or $expectation -ceq 'combat' -or $expectation -ceq 'authoring') {
             if ([bool]$record.moonRunStarted -or
                 -not ([string]$record.moonRefusal -like 'native-submission-disabled*')) {
                 throw "A physical selection run was not refused by the session lock: $path"

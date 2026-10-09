@@ -303,6 +303,8 @@ namespace KingmakerBuffPlanner.UI
                 rect = _inspectorContent.Find("ProblemNext") as RectTransform;
             else if (part == "problem-previous" && _inspectorContent != null)
                 rect = _inspectorContent.Find("ProblemPrevious") as RectTransform;
+            else if (part == "undo")
+                rect = _undoButton == null ? null : _undoButton.transform as RectTransform;
             else if (part != null && _graphContent != null)
             {
                 if (part.StartsWith("caster:", StringComparison.Ordinal))
