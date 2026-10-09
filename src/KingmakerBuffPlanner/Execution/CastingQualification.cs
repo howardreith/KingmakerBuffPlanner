@@ -271,13 +271,26 @@ namespace KingmakerBuffPlanner.Execution
         // the shared reservoir's COMBINED demand and lands the enhanced
         // result on the ally.
         public const string SharedPowerful = "shared-powerful";
+        // The willing-target touch qualification (0.4.0 WP6): one touch buff
+        // delivered to an ally through the sticky-touch route (instant: the
+        // touch transaction; animated: the game's two-stage command) from a
+        // spellbook source holding a single cast.
+        public const string StickyTouchDirect = "sticky-touch-direct";
         public const string RoutineId = "long";
 
         public static bool IsKnown(string recipe)
         {
             return recipe == ZeroCostMixed || recipe == FiniteDirectMixed || recipe == GroupMixed ||
                 recipe == EnhancedDirect || recipe == AbilityPoolDirect || recipe == RodExtendDirect ||
-                IsSharedRecipe(recipe);
+                recipe == StickyTouchDirect || IsSharedRecipe(recipe);
+        }
+
+        // The recipes that cast ONE casting whose source holds a single use
+        // (an ability pool's, or a touch spell's single cast) through the use,
+        // repeat and exhausted steps.
+        public static bool IsSingleUseRecipe(string recipe)
+        {
+            return recipe == AbilityPoolDirect || recipe == StickyTouchDirect;
         }
 
         public static bool IsSharedRecipe(string recipe)
@@ -292,11 +305,11 @@ namespace KingmakerBuffPlanner.Execution
             return recipe == EnhancedDirect || recipe == RodExtendDirect;
         }
 
-        // The castings a selected recipe holds at least (the ability-pool
-        // recipe casts one ability; the others need two).
+        // The castings a selected recipe holds at least (the single-use
+        // recipes cast one casting; the others need two).
         public static int MinimumCastings(string recipe)
         {
-            return recipe == AbilityPoolDirect ? 1 : 2;
+            return IsSingleUseRecipe(recipe) ? 1 : 2;
         }
 
         // The recipes that cast their first casting alone and then add the
@@ -329,7 +342,7 @@ namespace KingmakerBuffPlanner.Execution
 
         public static int ForecastSteps(string recipe)
         {
-            if (recipe == AbilityPoolDirect) return 1;
+            if (IsSingleUseRecipe(recipe)) return 1;
             if (IsTwoPhase(recipe)) return 2;
             return HasDisableStep(recipe) ? 5 : 3;
         }
@@ -343,6 +356,7 @@ namespace KingmakerBuffPlanner.Execution
             if (recipe == EnhancedDirect) return SelectEnhancedDirect(inputs, campaignId);
             if (recipe == AbilityPoolDirect) return SelectAbilityPool(inputs, campaignId);
             if (recipe == RodExtendDirect) return SelectRodExtend(inputs, campaignId);
+            if (recipe == StickyTouchDirect) return SelectStickyTouch(inputs, campaignId);
             if (recipe == SharedPersonal) return SelectSharedPersonal(inputs, campaignId);
             if (recipe == SharedPowerful) return SelectSharedPersonal(inputs, campaignId,
                 combined: true);
@@ -1225,6 +1239,217 @@ namespace KingmakerBuffPlanner.Execution
                 null, considered, rejections, AbilityPoolDirect);
         }
 
+        // sticky-touch-direct (0.4.0 WP6, Magic Circle against Alignment's
+        // shape): one touch buff - a plain spellbook spell whose carrier holds
+        // a touch, classified for the instant sticky-touch route - from a
+        // finite source holding exactly one cast (one prepared slot, or a
+        // spontaneous level with one cast left), on a party member other than
+        // the caster that lacks it (a self cast omits the delivery, so it
+        // would not exercise the touch). A willing-target delivery (it may
+        // also be aimed at enemies; WP6) is preferred over one that can only
+        // reach friends. use - it is cast, spending that cast; repeat - it is
+        // active, so nothing is cast; exhausted - set to Always recast, it is
+        // refused before anything is submitted, for want of the cast.
+        public static CastingQualificationSelection SelectStickyTouch(
+            CastingWorkspaceInputs inputs, string campaignId)
+        {
+            if (inputs == null) throw new ArgumentNullException("inputs");
+            var rejections = new List<string>();
+            Action<string> reject = value =>
+            {
+                if (rejections.Count < MaximumRecordedRejections) rejections.Add(value);
+            };
+            var pools = inputs.Snapshot.ResourcePools.ToDictionary(
+                pool => pool.PoolKey, pool => pool, StringComparer.Ordinal);
+            var targetable = new HashSet<string>(inputs.Snapshot.Units
+                .Where(unit => unit.TargetValidation.Alive && unit.TargetValidation.Conscious &&
+                    unit.TargetValidation.Friendly && unit.TargetValidation.Targetable)
+                .Select(unit => unit.UnitId), StringComparer.Ordinal);
+            var pets = new HashSet<string>(inputs.Snapshot.Units.Where(unit => unit.IsPet)
+                .Select(unit => unit.UnitId), StringComparer.Ordinal);
+            int considered = 0;
+            foreach (ProviderPlanningOption option in inputs.ProviderOptions
+                .Where(value => value != null && value.Provider != null && IsStickyTouchCarrier(value))
+                .OrderBy(value => IsWillingTargetTouch(value) ? 0 : 1)
+                .ThenBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal))
+            {
+                considered++;
+                ProviderSnapshot provider = option.Provider;
+                AbilityKey ability = provider.Key.Ability;
+                string key = provider.Key.Canonical;
+                ResourcePoolSnapshot pool;
+                if (option.ExecutionStrategy != CastExecutionStrategy.StickyTouchDeliveryRuleCast)
+                {
+                    reject(key + "|strategy:" + option.ExecutionStrategy + ":" + option.ExecutionStrategyReason);
+                    continue;
+                }
+                if (ability.SourceKind != SourceKind.Spellbook || ability.MetamagicMask != 0 ||
+                    !string.IsNullOrEmpty(ability.SpecialSourceId))
+                { reject(key + "|not-plain-spellbook"); continue; }
+                if (!pools.TryGetValue(provider.ResourcePoolKey, out pool) ||
+                    (pool.Kind != ResourcePoolKind.PreparedSlots && pool.Kind != ResourcePoolKind.SpontaneousLevel))
+                { reject(key + "|not-finite-spellbook-pool"); continue; }
+                string sourceId = SingleCastProbeSelector.SourceIdFor(inputs.EffectsBySource, ability);
+                if (sourceId == null) { reject(key + "|effect-shape:no-source"); continue; }
+                EffectExpression expected = inputs.EffectsBySource[sourceId];
+                string shape = StickyTouchShapeRefusal(expected);
+                if (shape != null)
+                {
+                    reject(key + "|effect-shape:" + shape + ":" + CastingCapabilityInventory.Structure(expected));
+                    continue;
+                }
+                int casts = CastsAvailable(inputs, provider, 2);
+                if (casts != 1)
+                {
+                    reject(key + "|pool-not-single-cast:" + casts.ToString(CultureInfo.InvariantCulture));
+                    continue;
+                }
+                string caster = provider.Key.CasterUnitId;
+                List<string> others = option.ReachableTargetIds
+                    .Where(unit => !string.Equals(unit, caster, StringComparison.Ordinal)).ToList();
+                if (others.Count == 0) { reject(key + "|self-only"); continue; }
+                // A pet is an ally too; a party member keeps the observation
+                // simple.
+                string ally = others
+                    .Where(unit => targetable.Contains(unit) && !EffectActive(inputs.LiveEffects, unit, expected))
+                    .OrderBy(unit => pets.Contains(unit) ? 1 : 0)
+                    .ThenBy(unit => unit, StringComparer.Ordinal)
+                    .FirstOrDefault();
+                if (ally == null) { reject(key + "|no-fresh-ally"); continue; }
+                var castings = new List<PlannedCasting>
+                {
+                    new PlannedCasting(CastingIds[0], RoutineId, 0, sourceId, ability, caster,
+                        provider.Key.SpellbookGuid, CastingTargetMode.DirectTarget, ally, null, null,
+                        null, null, ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready,
+                        null)
+                };
+                var coverage = new List<string>
+                {
+                    "sticky-touch", IsWillingTargetTouch(option) ? "willing-target" : "beneficial",
+                    pool.Kind == ResourcePoolKind.PreparedSlots ? "prepared" : "spontaneous",
+                    "single-cast", "ally"
+                };
+                var selection = new CastingQualificationSelection(null, sourceId, ability, castings,
+                    considered, rejections, StickyTouchDirect, coverage);
+                IReadOnlyList<CastingQualificationStepForecast> forecast =
+                    CastingQualificationForecast.Forecast(selection, inputs, campaignId);
+                if (forecast.Count != 1 || forecast[0].Projection == null ||
+                    !forecast[0].CastingIds.SequenceEqual(new[] { CastingIds[0] }))
+                {
+                    reject(key + "|not-executable:" + (forecast.Count == 0 ? "none" : forecast[0].Refusal ?? "partial"));
+                    continue;
+                }
+                // The projection itself must carry the touch route, for the
+                // reason the option was classified with.
+                CastStep use = forecast[0].Projection.Plan.Steps[0];
+                if (use.ExecutionStrategy != CastExecutionStrategy.StickyTouchDeliveryRuleCast ||
+                    use.ExecutionStrategyReason != option.ExecutionStrategyReason)
+                {
+                    reject(key + "|route-not-forecast:" + use.ExecutionStrategy + ":" + use.ExecutionStrategyReason);
+                    continue;
+                }
+                return selection;
+            }
+            return new CastingQualificationSelection("no-eligible-qualification-recipe", null, null,
+                null, considered, rejections, StickyTouchDirect);
+        }
+
+        // A spellbook spell whose carrier holds a touch: classified for the
+        // instant sticky-touch route, or sent to the fallback by the touch's
+        // own classification (every such reason, the classifier's and the
+        // option builder's, begins "sticky-delivery-").
+        internal static bool IsStickyTouchCarrier(ProviderPlanningOption option)
+        {
+            return option.ExecutionStrategy == CastExecutionStrategy.StickyTouchDeliveryRuleCast ||
+                (option.ExecutionStrategyReason ?? string.Empty).StartsWith("sticky-delivery-",
+                    StringComparison.Ordinal);
+        }
+
+        private static bool IsWillingTargetTouch(ProviderPlanningOption option)
+        {
+            return option.ExecutionStrategy == CastExecutionStrategy.StickyTouchDeliveryRuleCast &&
+                option.ExecutionStrategyReason == StickyTouchExecutionClassifier.WillingTargetReason;
+        }
+
+        // The ally / non-ally split ContextConditionIsAlly makes (the action
+        // graph adapter names a condition by its operation and the full names
+        // of its condition types, comma separated).
+        internal const string AllyConditionType = "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionIsAlly";
+
+        // sticky-touch-direct's effect shape. The planner confirms a touch
+        // cast through the buff the touched unit receives: the source's
+        // expected effect is complete when either branch of a condition is
+        // present, and a cast confirms only with a new or refreshed instance
+        // of one of its buffs (AppliedEffectJudgement). So the shape must
+        // make that buff what the ally branch applies: every effect the
+        // source names is a buff on the touched unit (no caster, pet, party
+        // or area recipient, no enchantment), nothing unmodeled appears
+        // anywhere (damage, healing, removal, an unknown action), and there
+        // is either no condition (a touch that only buffs) or exactly one, a
+        // single ContextConditionIsAlly, whose two branches apply the same
+        // buffs (Magic Circle against Alignment: the ally branch applies the
+        // carrier; the other branch applies it after a failed Will save). The
+        // adapter's condition contract does not record a negated condition,
+        // so only equal branches make the confirmed buff the ally branch's
+        // whichever way the condition reads. IsPlainCurrentTargetBuff is not
+        // loosened for this: the touch's delivery is another ability, and a
+        // save's empty "succeeded" list is not nothing for a plain buff.
+        // Null when the shape holds, otherwise why not.
+        internal static string StickyTouchShapeRefusal(EffectExpression expected)
+        {
+            if (expected == null) return "none";
+            var conditions = new List<ConditionalEffectExpression>();
+            string refusal = StickyTouchShapeWalk(expected, conditions);
+            if (refusal != null) return refusal;
+            if (!CastingQualificationForecast.Leaves(expected).Any()) return "no-buff";
+            if (conditions.Count > 1) return "more-than-one-condition";
+            if (conditions.Count == 0) return null;
+            ConditionalEffectExpression split = conditions[0];
+            string contract = split.ConditionContract ?? string.Empty;
+            int colon = contract.IndexOf(':');
+            if (colon < 0 || contract.Substring(colon + 1) != AllyConditionType)
+                return "condition-not-ally-split";
+            var ally = new HashSet<string>(CastingQualificationForecast.Leaves(split.WhenTrue)
+                .Select(leaf => leaf.EffectId), StringComparer.Ordinal);
+            if (ally.Count == 0 || !ally.SetEquals(CastingQualificationForecast.Leaves(split.WhenFalse)
+                    .Select(leaf => leaf.EffectId)))
+                return "ally-branches-differ";
+            return null;
+        }
+
+        private static string StickyTouchShapeWalk(EffectExpression expression,
+            List<ConditionalEffectExpression> conditions)
+        {
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null)
+                return leaf.Kind == EffectKind.Buff && leaf.Target == EffectTarget.CurrentTarget
+                    ? null : "leaf:" + leaf.Kind + ":" + leaf.Target;
+            var empty = expression as EmptyEffectExpression;
+            if (empty != null) return empty.IsNoAction ? null : "unmodeled-action";
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+            {
+                foreach (EffectExpression child in sequence.Children)
+                {
+                    string refusal = StickyTouchShapeWalk(child, conditions);
+                    if (refusal != null) return refusal;
+                }
+                return null;
+            }
+            var referenced = expression as ReferencedAbilityExpression;
+            if (referenced != null) return StickyTouchShapeWalk(referenced.Child, conditions);
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                conditions.Add(conditional);
+                return StickyTouchShapeWalk(conditional.WhenTrue, conditions) ??
+                    StickyTouchShapeWalk(conditional.WhenFalse, conditions);
+            }
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null) return "targeted:" + targeted.Target;
+            return "unknown:" + expression.GetType().Name;
+        }
+
         // rod-extend-direct (the next iteration after rc5: a metamagic rod as a
         // per-casting enhancement): one plain direct buff with a caster-level
         // duration that an Extend rod applies to, cast twice by the rod's
@@ -1571,9 +1796,10 @@ namespace KingmakerBuffPlanner.Execution
                 return ForecastTwoPhase(selection, inputs, campaignId, Plain, Enhanced);
             if (CastingQualificationRecipe.IsSharedRecipe(selection.Recipe))
                 return ForecastTwoPhase(selection, inputs, campaignId, Shared, Witness);
-            // ability-pool-direct: only the use step casts (the repeat and the
-            // exhausted step are refused before submission).
-            if (selection.Recipe == CastingQualificationRecipe.AbilityPoolDirect)
+            // The single-use recipes (ability-pool-direct, sticky-touch-direct):
+            // only the use step casts (the repeat and the exhausted step are
+            // refused before submission).
+            if (CastingQualificationRecipe.IsSingleUseRecipe(selection.Recipe))
                 return new ReadOnlyCollection<CastingQualificationStepForecast>(new[]
                 {
                     Project(Use, BuildDocument(campaignId, selection.Castings), inputs, inputs.LiveEffects)
