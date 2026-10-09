@@ -571,7 +571,7 @@ try {
             $record.authoringCountBefore = 16; $record.authoringCountAfter = 17
             $record.authoringProviderChanged = $null
         }
-        else {
+        if ($Expectation -ceq 'cast') {
             $record.moonRunStarted = $true
             $record.moonGrantConsumed = $true
             $record.moonGrantAttempts = 1
@@ -912,6 +912,16 @@ $launcherActionsBlock = [regex]::Match((Get-Content -LiteralPath (Join-Path $PSS
 $launcherActions = @([regex]::Matches($launcherActionsBlock, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
 if ($recordActions.Count -ne 8 -or ($recordActions -join ',') -cne ($launcherActions -join ',')) {
     throw "The launcher's judged physical actions differ from the record's: $($launcherActions -join ',')"
+}
+# 0.4.0 (WP3): the authoring run's judged gestures are the record's
+# AuthoringActions, in order.
+$authoringBlock = [regex]::Match($recordSource, 'public static readonly string\[\] AuthoringActions =\s*\{([^}]*)\}').Groups[1].Value
+$recordAuthoring = @([regex]::Matches($authoringBlock, '"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+$launcherAuthoringBlock = [regex]::Match((Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1') -Raw),
+    'if \(\$expectation -ceq ''authoring''\) \{\s*\$expected = @\(([^)]*)\)').Groups[1].Value
+$launcherAuthoring = @([regex]::Matches($launcherAuthoringBlock, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+if ($recordAuthoring.Count -ne 11 -or ($recordAuthoring -join ',') -cne ($launcherAuthoring -join ',')) {
+    throw "The launcher's judged authoring gestures differ from the record's: $($launcherAuthoring -join ',')"
 }
 # The allowance writer (review C5): what it writes from recorded selection
 # evidence is exactly what the launcher's own checks accept, bound to the
