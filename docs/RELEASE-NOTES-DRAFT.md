@@ -50,18 +50,23 @@ outside `Mods` before installing. 0.4.1 plans load unchanged apart from the
 two one-time changes above, each of which keeps the earlier file. To roll
 back, restore the backup.
 
-## Not checked in the game
+## Checked in the game, and not
 
-The automated in-game checks use disposable test campaigns only. These are
-not covered yet:
-- No test party has a ninja, so a real Shadow Clone cast has not been made in
-  the game. The ability's card, legality and plan are proven against its
-  native blueprint.
-- No mutable test party has a prepared caster, so un-preparing and spending a
-  prepared slot are proven against the game's own spellbook code, not in the
-  game.
-- The automation proves that the opening sound is posted exactly once per open
-  through the game's own sound system. Hearing it is the owner's check.
+The automated in-game checks use disposable test campaigns only.
+- **Checked:** removing a spell from a spontaneous caster's book removed
+  exactly its castings, with the notice. Spending all of another caster's
+  slots removed nothing. The new paper, table and opening sound were checked
+  on the same build.
+- **Not checked:**
+  - No test party has a ninja, so a real Shadow Clone cast has not been made
+    in the game. The ability's card, legality and plan are proven against its
+    native blueprint.
+  - No mutable test party has a prepared caster. Un-preparing, spending the
+    last prepared slot and pending rest are proven against the game's own
+    spellbook code; please try them (the handoff's owner test list).
+  - The automation proves that the opening sound is posted exactly once per
+    open through the game's own sound system. Hearing it is the owner's
+    check.
 
 The exact record is in the 0.4.2 handoff.
 
