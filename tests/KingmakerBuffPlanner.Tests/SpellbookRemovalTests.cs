@@ -56,6 +56,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("spellbook-removal-undo-idempotence-and-restart", () => TestUndoIdempotenceRestart(root));
             Run("spellbook-removal-save-failure-blocks-the-run", () => TestRemovalSaveFailure(root));
             Run("spellbook-removal-archive-failure-blocks-the-run", () => TestRemovalArchiveFailure(root));
+            Run("spellbook-removal-archive-obligation-survives-recovery", () => TestRemovalArchiveObligationRecovery(root));
             Run("spellbook-removal-leaves-no-stale-problem-focus", () => TestRemovalProblemNavigation(root));
             Run("spellbook-removal-physical-judgement", TestPhysicalRemovalJudgement);
             Run("spellbook-removal-exact-launcher-request-admission", TestRemovalRequestAdmission);
@@ -1158,6 +1159,89 @@ namespace KingmakerBuffPlanner.Tests
             Expect(session.RetryFailedSave() && File.ReadAllBytes(archive).SequenceEqual(original) &&
                 new CastingWorkspaceSession(dir, RemovalCampaign).Document.Castings.Count == 2,
                 "the healed archive did not keep the exact original before the save");
+        }
+
+        // PR #7 review R1: the mandatory pre-removal archive is an obligation
+        // of the intent, not of the session object. The archive fails (its
+        // name is taken; the plan file stays writable), the session is torn
+        // down through the production owner, and a REPLACEMENT session
+        // adopts the intent from the recovery store while the obstruction
+        // remains: it must not write the pruned plan without the archive,
+        // must stay non-durable and must refuse native dispatch; once the
+        // archive can be written, the retry archives the exact original
+        // before the pruned plan becomes durable.
+        private static void TestRemovalArchiveObligationRecovery(string root)
+        {
+            string dir = RemovalDir(root, "archive-recovery", RemovalDocument());
+            string primary = new CastingPlanRepository(dir).GetProfilePath(RemovalCampaign);
+            byte[] original = File.ReadAllBytes(primary);
+            string archive = Path.Combine(Path.GetDirectoryName(primary),
+                Path.GetFileNameWithoutExtension(primary) + CastingPlanRepository.SpellbookRemovalArchiveLabel + ".orig");
+            Directory.CreateDirectory(archive);
+            var store = new CastingWorkspaceRecoveryStore();
+            var messages = new List<string>();
+            Func<string, CastingWorkspaceSession> factory = id => store.Adopt(dir, id,
+                pending => new CastingWorkspaceSession(dir, id, new DisabledCastingDispatchBoundary(), null, null, pending),
+                () => new CastingWorkspaceSession(dir, id, new DisabledCastingDispatchBoundary()));
+            var owner = new CastingSessionOwner(factory, store, messages.Add);
+            CastingWorkspaceSession session;
+            Expect(owner.Ensure(RemovalCampaign, out session) == null, "the owner refused the campaign");
+            WorkspaceApplyResult first = session.Apply(CastingApplyMode.Ordinary, "long",
+                RemovalInputs(new RemovalParty(), MindBlankRemoved()));
+            Expect(first.SpellbookReconciliation.Applied && !first.SpellbookReconciliation.Durable &&
+                !first.Allowed && File.ReadAllBytes(primary).SequenceEqual(original),
+                "the unarchived removal was saved or allowed: " + first.ReviewReason);
+            owner.Release("root-teardown");
+            Expect(store.HasPending(dir, RemovalCampaign), "the unarchived intent was not handed to recovery");
+            PendingSessionRecovery captured = store.Peek(dir, RemovalCampaign);
+            Expect(captured.ModPath == dir && captured.CampaignId == RemovalCampaign &&
+                captured.ArchiveObligations.SequenceEqual(new[] { CastingPlanRepository.SpellbookRemovalArchiveLabel }),
+                "the captured intent does not carry its archive obligation: " +
+                    string.Join(",", captured.ArchiveObligations.ToArray()));
+            // An obligation this build cannot honour refuses the adoption and
+            // keeps the only recoverable copy in its store.
+            var foreignStore = new CastingWorkspaceRecoveryStore();
+            foreignStore.Register(new PendingSessionRecovery(dir, RemovalCampaign, captured.Document,
+                captured.UiSettings, captured.ExecutionSettings, captured.AutosaveStatus,
+                new[] { ".pre-unknown-obligation" }));
+            bool refused = false;
+            try
+            {
+                foreignStore.Adopt(dir, RemovalCampaign,
+                    pending => new CastingWorkspaceSession(dir, RemovalCampaign,
+                        new DisabledCastingDispatchBoundary(), null, null, pending),
+                    () => new CastingWorkspaceSession(dir, RemovalCampaign, new DisabledCastingDispatchBoundary()));
+            }
+            catch (ArgumentException) { refused = true; }
+            Expect(refused && foreignStore.HasPending(dir, RemovalCampaign) &&
+                File.ReadAllBytes(primary).SequenceEqual(original),
+                "an unknown archive obligation was adopted or dropped");
+            session = null;
+            var replacement = new CastingSessionOwner(factory, store, messages.Add);
+            CastingWorkspaceSession revived;
+            Expect(replacement.Ensure(RemovalCampaign, out revived) == null, "the replacement owner refused");
+            Expect(File.ReadAllBytes(primary).SequenceEqual(original),
+                "recovery wrote the pruned plan without the mandatory archive");
+            Expect(revived.PendingArchiveObligations.SequenceEqual(
+                    new[] { CastingPlanRepository.SpellbookRemovalArchiveLabel }) && !store.HasPending(dir, RemovalCampaign),
+                "the replacement session does not owe the archive");
+            Expect(revived.Document.Castings.Count == 2 && revived.IsDirty &&
+                revived.AutosaveStatus.StartsWith("save-failed", StringComparison.Ordinal),
+                "the recovered unarchived intent looks durable: " + revived.AutosaveStatus);
+            Expect(!revived.RetryFailedSave() && File.ReadAllBytes(primary).SequenceEqual(original),
+                "a retry under the obstruction wrote without the archive");
+            WorkspaceApplyResult blocked = revived.Apply(CastingApplyMode.Ordinary, "long",
+                RemovalInputs(new RemovalParty(), MindBlankRemoved()));
+            Expect(!blocked.Allowed && blocked.Dispatch == null &&
+                blocked.ReviewReason.StartsWith("persistence-failed", StringComparison.Ordinal),
+                "an undurable recovered plan was let through: " + blocked.ReviewReason);
+            Directory.Delete(archive);
+            Expect(revived.RetryFailedSave(), "the healed retry did not save");
+            Expect(File.ReadAllBytes(archive).SequenceEqual(original),
+                "the archive is not the exact original plan");
+            Expect(new CastingWorkspaceSession(dir, RemovalCampaign).Document.Castings.Count == 2 &&
+                !revived.IsDirty && revived.AutosaveStatus == "saved" && revived.PendingArchiveObligations.Count == 0,
+                "the pruned plan is not durable after the archive");
         }
 
         // WP2A: a blocked run focused a stale Mind Blank casting ("Problem 1

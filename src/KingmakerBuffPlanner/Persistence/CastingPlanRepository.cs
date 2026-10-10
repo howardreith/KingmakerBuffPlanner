@@ -168,8 +168,10 @@ namespace KingmakerBuffPlanner.Persistence
         // (read back and compared). Null when there is no primary yet.
         internal string ArchiveRetiredSemanticsOnce(string campaignId)
         {
-            return ArchivePrimaryOnce(campaignId, ".pre-0.4.0");
+            return ArchivePrimaryOnce(campaignId, RetiredSemanticsArchiveLabel);
         }
+
+        internal const string RetiredSemanticsArchiveLabel = ".pre-0.4.0";
 
         // 0.4.2: before the first write that moves class/fact abilities to
         // their own catalogue identity, the exact primary is archived (a

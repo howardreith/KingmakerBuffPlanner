@@ -49,6 +49,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("shadow-clone-absent-without-owner-or-optional-mod", TestShadowCloneAbsent);
             Run("shadow-clone-saved-under-shared-identity-migrates-once",
                 () => TestShadowCloneSavedIdentityMigrates(root));
+            Run("shadow-clone-identity-archive-obligation-survives-recovery",
+                () => TestShadowCloneArchiveObligationRecovery(root));
             Run("class-ability-identity-keeps-spells-aggregated", TestClassAbilityIdentityRule);
             Run("classic-mirror-image-never-plans-shadow-clone", TestClassicKeepsShadowCloneSeparate);
         }
@@ -363,6 +365,87 @@ namespace KingmakerBuffPlanner.Tests
                 reloaded.Document.Castings.Single(value => value.CastingId == "cast-clone").SourceId ==
                     "ability|" + ShadowCloneGuid,
                 "the migration was not durable or not idempotent");
+        }
+
+        // PR #7 review R1: the one-time pre-migration archive survives a
+        // recovery handoff. The recovered document is already normalized,
+        // so the replacement session cannot rediscover the obligation from
+        // it; it must arrive with the captured intent.
+        private static void TestShadowCloneArchiveObligationRecovery(string root)
+        {
+            const string campaign = "campaign:shadow-clone-recovery";
+            string dir = Path.Combine(root, "shadow-clone-archive-recovery");
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            Directory.CreateDirectory(dir);
+            string shared = MirrorImageSourceId();
+            var stale = new PlannedCasting("cast-clone", "long", 0, shared, ShadowCloneAbility,
+                "unit-ninja", null, CastingTargetMode.DirectTarget, "unit-ninja", null, null, null,
+                null, ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null);
+            var document = new CastingPlanDocument(campaign, new[]
+            {
+                new RoutineDefinition("long", "Long"), new RoutineDefinition("important", "Important"),
+                new RoutineDefinition("short", "Short")
+            }, new[] { stale });
+            var repository = new CastingPlanRepository(dir);
+            repository.Save(CastingPlanProfile.FromDocument(document, UiProfile.Default(),
+                ExecutionProfile.Default()));
+            string primary = repository.GetProfilePath(campaign);
+            byte[] original = File.ReadAllBytes(primary);
+            string archive = Path.Combine(Path.GetDirectoryName(primary),
+                Path.GetFileNameWithoutExtension(primary) + CastingPlanRepository.SourceIdentityArchiveLabel + ".orig");
+            Directory.CreateDirectory(archive);
+            var store = new CastingWorkspaceRecoveryStore();
+            var messages = new List<string>();
+            Func<string, CastingWorkspaceSession> factory = id => store.Adopt(dir, id,
+                pending => new CastingWorkspaceSession(dir, id, new DisabledCastingDispatchBoundary(), null, null, pending),
+                () => new CastingWorkspaceSession(dir, id, new DisabledCastingDispatchBoundary()));
+            var owner = new CastingSessionOwner(factory, store, messages.Add);
+            CastingWorkspaceSession session;
+            Expect(owner.Ensure(campaign, out session) == null && session.MigratedSourceIdentityCount == 1,
+                "the stale identity was not migrated on load");
+            var extra = new PlannedCasting("cast-extra", "short", 0, shared, MirrorImageAbility,
+                "unit-wizard", "wizard-book", CastingTargetMode.DirectTarget, "unit-wizard", null, null, null,
+                null, ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null);
+            Expect(session.AddCastingForRuntime(extra).Applied, "the edit was refused");
+            Expect(session.IsDirty && File.ReadAllBytes(primary).SequenceEqual(original),
+                "the migrated plan was saved without its archive");
+            owner.Release("root-teardown");
+            Expect(store.HasPending(dir, campaign), "the unarchived intent was not handed to recovery");
+            PendingSessionRecovery captured = store.Peek(dir, campaign);
+            Expect(captured.ModPath == dir && captured.CampaignId == campaign &&
+                captured.ArchiveObligations.SequenceEqual(new[] { CastingPlanRepository.SourceIdentityArchiveLabel }),
+                "the captured intent does not carry its archive obligation: " +
+                    string.Join(",", captured.ArchiveObligations.ToArray()));
+            session = null;
+            var replacement = new CastingSessionOwner(factory, store, messages.Add);
+            CastingWorkspaceSession revived;
+            Expect(replacement.Ensure(campaign, out revived) == null, "the replacement owner refused");
+            Expect(File.ReadAllBytes(primary).SequenceEqual(original),
+                "recovery wrote the migrated plan without the mandatory archive");
+            Expect(revived.PendingArchiveObligations.SequenceEqual(
+                    new[] { CastingPlanRepository.SourceIdentityArchiveLabel }) && revived.MigratedSourceIdentityCount == 0,
+                "the replacement session does not owe the archive");
+            Expect(revived.IsDirty && revived.AutosaveStatus.StartsWith("save-failed", StringComparison.Ordinal) &&
+                revived.Document.Castings.Single(value => value.CastingId == "cast-clone").SourceId ==
+                    "ability|" + ShadowCloneGuid,
+                "the recovered unarchived intent looks durable or lost its migration: " + revived.AutosaveStatus);
+            Expect(!revived.RetryFailedSave() && File.ReadAllBytes(primary).SequenceEqual(original),
+                "a retry under the obstruction wrote without the archive");
+            WorkspaceApplyResult blocked = revived.Apply(CastingApplyMode.Ordinary, "long",
+                ShadowCloneInputs(BuildShadowCloneParty(true)));
+            Expect(!blocked.Allowed && blocked.Dispatch == null &&
+                blocked.ReviewReason.StartsWith("persistence-failed", StringComparison.Ordinal),
+                "an undurable recovered plan was let through: " + blocked.ReviewReason);
+            Directory.Delete(archive);
+            Expect(revived.RetryFailedSave() && revived.PendingArchiveObligations.Count == 0,
+                "the healed retry did not save");
+            Expect(File.ReadAllBytes(archive).SequenceEqual(original),
+                "the archive is not the exact pre-migration plan");
+            var reloaded = new CastingWorkspaceSession(dir, campaign);
+            Expect(reloaded.MigratedSourceIdentityCount == 0 && reloaded.Document.Castings.Count == 2 &&
+                reloaded.Document.Castings.Single(value => value.CastingId == "cast-clone").SourceId ==
+                    "ability|" + ShadowCloneGuid,
+                "the migrated plan is not durable after the archive");
         }
 
         private static void TestClassAbilityIdentityRule()
