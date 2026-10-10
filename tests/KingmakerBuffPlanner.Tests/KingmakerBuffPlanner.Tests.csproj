@@ -45,6 +45,7 @@
     <Compile Include="ShareQualificationDriverTests.cs" />
     <Compile Include="StickyTouchQualificationTests.cs" />
     <Compile Include="ParchmentThemeTests.cs" />
+    <Compile Include="ShadowCloneCatalogueTests.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\ShareCastingModifierAdapter.cs"><Link>GameAdapters\ShareCastingModifierAdapter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\EnhancementLeaseCleanup.cs"><Link>GameAdapters\EnhancementLeaseCleanup.cs</Link></Compile>
     <Compile Include="TestBuildInfo.cs" />
@@ -100,6 +101,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ResourceLedger.cs"><Link>Planning\ResourceLedger.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\RoutinePlanService.cs"><Link>Planning\RoutinePlanService.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingAuthoringService.cs"><Link>Planning\CastingAuthoringService.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingSourceIdentityMigration.cs"><Link>Planning\CastingSourceIdentityMigration.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ExplicitCastingCompiler.cs"><Link>Planning\ExplicitCastingCompiler.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingBudget.cs"><Link>Planning\CastingBudget.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingForecast.cs"><Link>Planning\CastingForecast.cs</Link></Compile>

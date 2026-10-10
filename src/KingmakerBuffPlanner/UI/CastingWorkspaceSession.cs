@@ -385,10 +385,31 @@ namespace KingmakerBuffPlanner.UI
         // unsaved, and no instance ever carries two subscriptions.
         private void ReplaceAuthoring(CastingAuthoringService replacement)
         {
+            if (replacement == null) throw new ArgumentNullException("replacement");
+            // 0.4.2: every adopted document (load, reload, import, recovery)
+            // carries class/fact abilities under their own catalogue
+            // identity; the stored bytes are archived once before the next
+            // write replaces them (SaveProfile).
+            int migrated;
+            CastingPlanDocument normalized = CastingSourceIdentityMigration.Normalize(
+                replacement.Document, out migrated);
+            if (migrated != 0)
+            {
+                replacement = new CastingAuthoringService(normalized);
+                MigratedSourceIdentityCount += migrated;
+                _sourceIdentityMigrationPending = true;
+            }
             if (_authoring != null) _authoring.DocumentChanged -= OnDocumentChangedForAutosave;
-            _authoring = replacement ?? throw new ArgumentNullException("replacement");
+            _authoring = replacement;
             _authoring.DocumentChanged += OnDocumentChangedForAutosave;
         }
+
+        // Saved castings this session moved to their ability's own
+        // catalogue identity (0.4.2), and whether the stored file still
+        // awaits its one exact archive.
+        public int MigratedSourceIdentityCount { get; private set; }
+        private bool _sourceIdentityMigrationPending;
+        public string SourceIdentityArchivePath { get; private set; }
 
         private void OnDocumentChangedForAutosave(CastingPlanDocument document, int revision)
         {
@@ -455,6 +476,12 @@ namespace KingmakerBuffPlanner.UI
             {
                 RetiredSemanticsArchivePath = _repository.ArchiveRetiredSemanticsOnce(CampaignId);
                 _retiredSemanticsPending = false;
+            }
+            if (_sourceIdentityMigrationPending)
+            {
+                SourceIdentityArchivePath = _repository.ArchivePrimaryOnce(
+                    CampaignId, CastingPlanRepository.SourceIdentityArchiveLabel);
+                _sourceIdentityMigrationPending = false;
             }
             _repository.Save(CastingPlanProfile.FromDocument(
                 _authoring.Document, _uiSettings, _executionSettings));

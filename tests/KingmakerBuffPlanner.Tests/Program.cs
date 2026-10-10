@@ -449,6 +449,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunCatalogAuditTests(root);
                 RunPolicyAuthoringPhysicalTests(root);
                 RunParchmentThemeTests();
+                RunShadowCloneCatalogueTests(root);
             }
             finally
             {

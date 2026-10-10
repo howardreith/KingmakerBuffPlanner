@@ -1350,6 +1350,8 @@ namespace KingmakerBuffPlanner.UI
                     if (source == null)
                         source = ResolveUnambiguousVariant(assignment);
                     if (source == null)
+                        source = ResolveOwnAbilityEntry(assignment);
+                    if (source == null)
                     {
                         rebound.Add(assignment);
                         continue;
@@ -1400,6 +1402,18 @@ namespace KingmakerBuffPlanner.UI
                 .OrderBy(child => child.Order)
                 .ThenBy(child => child.AssignmentId, StringComparer.Ordinal))
                 casting.Order = order++;
+        }
+
+        // 0.4.2: an assignment saved under an effect aggregate whose own
+        // ability is a class/fact ability now belongs to that ability's own
+        // entry (its persisted ability names it exactly; nothing is guessed).
+        private SetupSourceRow ResolveOwnAbilityEntry(SourceAssignmentProfile assignment)
+        {
+            if (!EffectAggregateIdentity.IsAggregate(assignment.SourceId) ||
+                assignment.Ability == null) return null;
+            string own = CatalogSourceIdentity.DerivableFor(assignment.Ability.ToKey());
+            return own == null || !CatalogSourceIdentity.IsAbility(own) ? null
+                : Sources.FirstOrDefault(item => item.SourceId == own);
         }
 
         private SetupSourceRow ResolveUnambiguousVariant(SourceAssignmentProfile assignment)
