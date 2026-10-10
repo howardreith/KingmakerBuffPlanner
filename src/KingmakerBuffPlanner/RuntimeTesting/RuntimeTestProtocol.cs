@@ -522,8 +522,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (!IsPhysicalWorkspaceScenario(request.Scenario))
                         throw new InvalidDataException("physical-expectation-only-with-physical");
                     string expectation = request.Parameters["physicalExpectation"] as string;
-                    if (expectation != "select" && expectation != "cast" && expectation != "problems" &&
-                        expectation != "spellbook" && expectation != "combat" && expectation != "authoring")
+                    if (expectation == null || Array.IndexOf(PhysicalExpectations, expectation) < 0)
                         throw new InvalidDataException("physical-expectation");
                 }
                 bool hasCfAllowance = request.Parameters.ContainsKey("cfAllowance");
@@ -632,6 +631,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // names, real SHA-256 values, distinct files, and a valid mode.
         // allowanceBound: the request carries a run-bound casting allowance,
         // the only way a casting scenario may load the advanced copy.
+        // Every physical expectation the launcher may send (its -PhysicalExpectation
+        // ValidateSet, checked for parity by the tests). 0.4.2 defect
+        // kbp042-removal-01: "removal" was added to the launcher and the host
+        // but not here, so the host rejected the request at boot and the
+        // launcher timed out at the main menu.
+        internal static readonly string[] PhysicalExpectations =
+            { "cast", "select", "problems", "spellbook", "combat", "authoring", "removal" };
+
         private static void ValidateLiveSaveParameters(
             RuntimeTestRequest request, int expectedTotal, bool allowanceBound = false)
         {
