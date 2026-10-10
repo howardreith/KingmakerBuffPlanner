@@ -116,9 +116,11 @@ namespace KingmakerBuffPlanner.Domain.Providers
             string instabilityReason,
             IEnumerable<SpellbookMembershipFact> books,
             IEnumerable<KeyValuePair<string, string>> abilityNames = null,
-            Func<string, string> nameResolver = null)
+            Func<string, string> nameResolver = null,
+            Func<string, bool> spellResolver = null)
         {
             _nameResolver = nameResolver;
+            _spellResolver = spellResolver;
             Stable = stable;
             InstabilityReason = stable ? string.Empty : instabilityReason ?? "unstable";
             var list = stable ? (books ?? new SpellbookMembershipFact[0])
@@ -136,6 +138,26 @@ namespace KingmakerBuffPlanner.Domain.Providers
         }
 
         private readonly Func<string, string> _nameResolver;
+        private readonly Func<string, bool> _spellResolver;
+
+        // Whether the running game knows the spell at all. A spell whose
+        // blueprint does not resolve (its mod is not loaded) cannot be held
+        // by any book, so its absence proves nothing. Without a resolver
+        // (Unity-free fixtures) every spell resolves; a resolver that throws
+        // is an unknown, never a proof.
+        public bool SpellResolves(string baseAbilityGuid)
+        {
+            if (string.IsNullOrWhiteSpace(baseAbilityGuid)) return false;
+            if (_spellResolver == null) return true;
+            try
+            {
+                return _spellResolver(baseAbilityGuid);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
 
         // The spell's localized name for the notice: the observed names,
         // then the game's own blueprint name; null when neither is known.

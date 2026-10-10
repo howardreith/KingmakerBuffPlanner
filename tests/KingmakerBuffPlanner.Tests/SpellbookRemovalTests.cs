@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Newtonsoft.Json.Linq;
 using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Identity;
@@ -54,8 +55,152 @@ namespace KingmakerBuffPlanner.Tests
             Run("spellbook-removal-variant-and-metamagic-identity", () => TestVariantMetamagicIdentity(root));
             Run("spellbook-removal-undo-idempotence-and-restart", () => TestUndoIdempotenceRestart(root));
             Run("spellbook-removal-save-failure-blocks-the-run", () => TestRemovalSaveFailure(root));
+            Run("spellbook-removal-archive-failure-blocks-the-run", () => TestRemovalArchiveFailure(root));
             Run("spellbook-removal-leaves-no-stale-problem-focus", () => TestRemovalProblemNavigation(root));
             Run("spellbook-removal-physical-judgement", TestPhysicalRemovalJudgement);
+            Run("spellbook-removal-exact-launcher-request-admission", TestRemovalRequestAdmission);
+            Run("spellbook-removal-request-routes-to-the-removal-press", TestRemovalRequestRouting);
+        }
+
+        // kbp042-removal-01: the exact request the launcher serialized for the
+        // first removal run (Fixtures/, byte-identical to the run's
+        // runtime-request.json, SHA-256 ab541d58...), which the host rejected
+        // at boot with "invalid-request:physical-expectation". Only the run
+        // identity, evidence directory and build identity are rebound to
+        // this test build; every parameter is the launcher's own. The
+        // production reader (TryReadWithinRoot: JSON contract, duplicate
+        // keys, scenario, live-save family, parameter count, allowance
+        // rules, evidence binding) admits it, and every narrowing it
+        // enforced before still holds for removal.
+        private static void TestRemovalRequestAdmission()
+        {
+            string fixture = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "tests",
+                "KingmakerBuffPlanner.Tests", "Fixtures", "kbp042-removal-01-runtime-request.json"));
+            JObject launcher = JObject.Parse(fixture);
+            JObject parameters = (JObject)launcher["parameters"];
+            if ((string)launcher["scenario"] != "live-workspace-physical" ||
+                (string)parameters["physicalExpectation"] != "removal" || parameters.Count != 10 ||
+                parameters["cfAllowance"] != null || (string)parameters["workingSaveName"] != "KBP_AUTOMATION_WORKING")
+                throw new InvalidOperationException("The fixture is not the launcher's removal request.");
+            int serial = 0;
+            Func<Action<JObject>, string> admit = mutation =>
+            {
+                serial++;
+                string directory = Path.Combine(_protocolEvidenceRoot, "rm-admit-" + serial);
+                Directory.CreateDirectory(directory);
+                JObject request = (JObject)launcher.DeepClone();
+                request["runId"] = "rm-admit-" + serial;
+                request["evidenceDirectory"] = directory;
+                request["expectedCommit"] = BuildInfo.Commit;
+                request["expectedModVersion"] = BuildInfo.Version;
+                if (mutation != null) mutation(request);
+                string path = Path.Combine(directory, "runtime-request.json");
+                File.WriteAllText(path, request.ToString());
+                string rejection;
+                RuntimeTestRequest read = ReadProtocol(
+                    new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+                if (read == null && rejection.Length == 0) throw new InvalidOperationException("No verdict.");
+                return read == null ? rejection : string.Empty;
+            };
+            string accepted = admit(null);
+            if (accepted.Length != 0)
+                throw new InvalidOperationException("The launcher's removal request is rejected: " + accepted);
+            var narrowed = new List<KeyValuePair<string, Action<JObject>>>();
+            Action<string, Action<JObject>> refuse = (reason, mutation) =>
+                narrowed.Add(new KeyValuePair<string, Action<JObject>>(reason, mutation));
+            // The expectation exists only on the physical scenario: on the
+            // display-bound qualification scenario it is named; on another
+            // live scenario it is an unlisted parameter.
+            refuse("invalid-request:physical-expectation-only-with-physical", r =>
+                {
+                    r["scenario"] = "live-workspace-qual";
+                    r["parameters"]["expectedScreen"] = "1920x1080";
+                });
+            refuse("invalid-request:live-save-parameters", r => r["scenario"] = "live-workspace-qual");
+            foreach (KeyValuePair<string, Action<JObject>> shape in new Dictionary<string, Action<JObject>>
+            {
+                // Unknown values stay rejected.
+                { "invalid-request:physical-expectation", r => r["parameters"]["physicalExpectation"] = "remove" },
+                { "invalid-request:scenario", r => r["scenario"] = "live-workspace-removal" },
+                // Removal casts nothing: a casting allowance is refused.
+                { "invalid-request:cf-allowance-only-with-cast-expectation",
+                    r => r["parameters"]["cfAllowance"] = "{}" },
+                // The approved disposable family only, never another save.
+                { "invalid-request:live-save-names",
+                    r => r["parameters"]["workingSaveName"] = "Felix main campaign" },
+                { "invalid-request:live-save-family-scenario", r =>
+                    {
+                        r["parameters"]["workingSaveName"] = "KBP_ADVANCED_WORKING";
+                        r["parameters"]["baselineSaveName"] = "KBP_ADVANCED_BASELINE";
+                    } },
+                { "invalid-request:live-save-hash:workingSha256", r => r["parameters"]["workingSha256"] = "x" },
+                { "invalid-request:live-save-files-not-distinct",
+                    r => r["parameters"]["workingFileName"] = r["parameters"]["baselineFileName"] },
+                // No smuggled parameter, none missing.
+                { "invalid-request:live-save-parameters", r => r["parameters"]["removalSpell"] = "any" },
+                // The loaded build must be the build the request names.
+                { "invalid-request:commit-mismatch", r => r["expectedCommit"] = "0b4b5a084f15213f83c40b0190b5dfcae723445a" },
+                { "invalid-request:profile-mod-expectation",
+                    r => ((JArray)r["expectedOptionalMods"]).RemoveAt(0) }
+            })
+                narrowed.Add(shape);
+            foreach (KeyValuePair<string, Action<JObject>> shape in narrowed)
+            {
+                string rejection = admit(shape.Value);
+                if (rejection != shape.Key)
+                    throw new InvalidOperationException("Removal admission did not refuse with " + shape.Key +
+                        ": " + (rejection.Length == 0 ? "accepted" : rejection));
+            }
+            string missing = admit(r => ((JObject)r["parameters"]).Remove("executionMode"));
+            if (missing != "invalid-request:live-save-parameters")
+                throw new InvalidOperationException("A removal request without its execution mode was " +
+                    (missing.Length == 0 ? "accepted" : missing));
+            // An evidence directory that already holds a result is a reused run.
+            string reused = admit(r => File.WriteAllText(Path.Combine((string)r["evidenceDirectory"],
+                "runtime-result.json"), "{}"));
+            if (reused != "invalid-request:run-id-reused")
+                throw new InvalidOperationException("A reused removal run was " +
+                    (reused.Length == 0 ? "accepted" : reused));
+        }
+
+        // The admitted request reaches the removal press and nothing else:
+        // the moon expectation is "removal" (never the allowance-bound cast
+        // run), the problems and spellbook routes do not claim it, the
+        // Unity-bound host sends step 101 to the removal press and only the
+        // cast branch arms a casting grant; the press edits the books through
+        // the game's own RemoveSpell and spend and then presses the moon.
+        private static void TestRemovalRequestRouting()
+        {
+            if (RuntimeTestProtocol.MoonExpectationFor("removal") != "removal" ||
+                RuntimeTestProtocol.MoonExpectationFor("remove") != "cast" ||
+                RuntimeTestProtocol.MoonExpectationFor("select") != "select")
+                throw new InvalidOperationException("The removal expectation is not routed as removal.");
+            string runtime = Path.Combine(FindRepositoryRoot(), "src", "KingmakerBuffPlanner", "RuntimeTesting");
+            string host = File.ReadAllText(Path.Combine(runtime, "RuntimeTestHost.cs")).Replace("\r\n", "\n");
+            string press = File.ReadAllText(Path.Combine(runtime, "RuntimeSpellbookRemovalHost.cs"))
+                .Replace("\r\n", "\n");
+            string problems = File.ReadAllText(Path.Combine(runtime, "RuntimeProblemNavigationHost.cs"));
+            string spellbook = File.ReadAllText(Path.Combine(runtime, "RuntimeSpellbookEntryHost.cs"));
+            if (problems.IndexOf("\"removal\"", StringComparison.Ordinal) >= 0 ||
+                spellbook.IndexOf("\"removal\"", StringComparison.Ordinal) >= 0)
+                throw new InvalidOperationException("Another physical route claims the removal expectation.");
+            int castBranch = host.IndexOf("if (_physicalRecord.MoonExpectation == \"cast\")", StringComparison.Ordinal);
+            int arm = host.IndexOf("ArmCastingFirstGrant(", StringComparison.Ordinal);
+            int removalBranch = host.IndexOf("if (_physicalRecord.MoonExpectation == \"removal\")\n" +
+                "                {\n                    _physicalStep = RemovalStartStep;", StringComparison.Ordinal);
+            int dispatch = host.IndexOf("if (_physicalStep >= RemovalStartStep && _physicalStep < RemovalStartStep + 10)\n" +
+                "                return UpdateRemovalPress(view, settled);", StringComparison.Ordinal);
+            if (castBranch < 0 || arm < castBranch || removalBranch < arm || dispatch < 0 ||
+                host.IndexOf("ArmCastingFirstGrant(", arm + 1, StringComparison.Ordinal) >= 0)
+                throw new InvalidOperationException("The host does not route removal to its press, or a grant " +
+                    "can be armed outside the cast branch.");
+            int remove = press.IndexOf("knownBook.RemoveSpell(knownSpell);", StringComparison.Ordinal);
+            int spend = press.IndexOf("spendable.SpendFromSpellbook();", StringComparison.Ordinal);
+            int moon = press.IndexOf("return PressColdMoon();", StringComparison.Ordinal);
+            if (remove < 0 || spend < remove || moon < spend ||
+                press.IndexOf("ArmCastingFirstGrant", StringComparison.Ordinal) >= 0 ||
+                press.IndexOf("Memorize(", StringComparison.Ordinal) >= 0)
+                throw new InvalidOperationException("The removal press does not remove, spend, then press.");
         }
 
         // The native "removal" run's Unity-free judgement: a selection press
@@ -456,6 +601,21 @@ namespace KingmakerBuffPlanner.Tests
             Expect(decision.Kept["cast-mb-sayan"] == SpellbookRemovalReconciliation.StillMember &&
                 decision.Kept["cast-heroism"] == SpellbookRemovalReconciliation.StillMember,
                 "castings whose spell the book still holds are not kept as such");
+            // Exact book: Felix's second book still holds Mind Blank; only the
+            // casting bound to the book that dropped it goes.
+            CastingPlanDocument twoBooks = RemovalDocument(RemovalCasting("cast-mb-felix-book2", "short",
+                MindBlankAbility, "unit-felix", "book-felix-2", "unit-tias"));
+            SpellbookReconciliationDecision byBook = SpellbookRemovalReconciliation.Decide(twoBooks,
+                new PartySpellbookMembership(true, null, new[]
+                {
+                    Book("unit-felix", "book-felix", SpellbookMembershipKind.Prepared, Held(HeroismAbility)),
+                    Book("unit-felix", "book-felix-2", SpellbookMembershipKind.Prepared, Held(MindBlankAbility)),
+                    Book("unit-leinna", "book-leinna", SpellbookMembershipKind.Prepared, Held(MindBlankAbility)),
+                    Book("unit-sayan", "book-sayan", SpellbookMembershipKind.Known, Held(MindBlankAbility))
+                }), null);
+            Expect(byBook.Removals.Select(value => value.CastingId).SequenceEqual(new[] { "cast-mb-felix" }) &&
+                byBook.Kept["cast-mb-felix-book2"] == SpellbookRemovalReconciliation.StillMember,
+                "the removal was not scoped to the exact book");
             Expect(SpellbookRemovalReconciliation.Decide(document, null, null).Removals.Count == 0 &&
                 SpellbookRemovalReconciliation.Decide(document,
                     PartySpellbookMembership.Unstable("loading-in-process"), null).Removals.Count == 0,
@@ -608,7 +768,15 @@ namespace KingmakerBuffPlanner.Tests
                 Case("optional-mod-contracts-missing", RemovalInputs(party, Status(
                     SpellbookMembershipStatus.RoleNotProven, "optional-spellbook-contracts-incomplete"))),
                 Case("book-unreadable", RemovalInputs(party, Status(SpellbookMembershipStatus.Unreadable,
-                    "read-failed:NullReferenceException")))
+                    "read-failed:NullReferenceException"))),
+                // The spellbook (a service window) is open mid-edit: the
+                // adapter's own reason; nothing is concluded until it closes.
+                Case("spellbook-open-mid-edit", RemovalInputs(party,
+                    PartySpellbookMembership.Unstable("native-service-window-open"))),
+                // The mod that provides the spell is not loaded: the books
+                // read completely without it, which proves nothing.
+                Case("spell-mod-not-loaded", RemovalInputs(party, new PartySpellbookMembership(true, null,
+                    MindBlankRemoved().Books, null, null, guid => guid != MindBlankGuid)))
             };
             int caseIndex = 0;
             foreach (KeyValuePair<string, CastingWorkspaceInputs> item in cases)
@@ -774,6 +942,32 @@ namespace KingmakerBuffPlanner.Tests
             Expect(session.RetryFailedSave(), "the healed storage did not take the removal");
             Expect(new CastingWorkspaceSession(dir, RemovalCampaign).Document.Castings.Count == 2,
                 "the removal is not durable after the retry");
+        }
+
+        // Only the pre-removal archive fails (its name is taken by a
+        // directory; the plan file itself stays writable): the archive
+        // failure fails the save, so the plan on disk is unchanged and the
+        // pruned plan never reaches the boundary; once the archive can be
+        // written the retry archives the exact original and saves.
+        private static void TestRemovalArchiveFailure(string root)
+        {
+            string dir = RemovalDir(root, "archive-failure", RemovalDocument());
+            string primary = new CastingPlanRepository(dir).GetProfilePath(RemovalCampaign);
+            byte[] original = File.ReadAllBytes(primary);
+            string archive = Path.Combine(Path.GetDirectoryName(primary),
+                Path.GetFileNameWithoutExtension(primary) + CastingPlanRepository.SpellbookRemovalArchiveLabel + ".orig");
+            Directory.CreateDirectory(archive);
+            var session = new CastingWorkspaceSession(dir, RemovalCampaign);
+            WorkspaceApplyResult result = session.Apply(CastingApplyMode.Ordinary, "long",
+                RemovalInputs(new RemovalParty(), MindBlankRemoved()));
+            Expect(result.SpellbookReconciliation.Applied && !result.SpellbookReconciliation.Durable &&
+                !result.Allowed && result.ReviewReason.StartsWith("persistence-failed", StringComparison.Ordinal) &&
+                result.Dispatch == null && File.ReadAllBytes(primary).SequenceEqual(original),
+                "an unarchived removal was saved or reached the boundary: " + result.ReviewReason);
+            Directory.Delete(archive);
+            Expect(session.RetryFailedSave() && File.ReadAllBytes(archive).SequenceEqual(original) &&
+                new CastingWorkspaceSession(dir, RemovalCampaign).Document.Castings.Count == 2,
+                "the healed archive did not keep the exact original before the save");
         }
 
         // WP2A: a blocked run focused a stale Mind Blank casting ("Problem 1

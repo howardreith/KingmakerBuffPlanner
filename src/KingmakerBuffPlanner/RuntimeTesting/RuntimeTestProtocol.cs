@@ -639,6 +639,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal static readonly string[] PhysicalExpectations =
             { "cast", "select", "problems", "spellbook", "combat", "authoring", "removal" };
 
+        // The moon expectation the casting-first physical sequence judges
+        // (problems and spellbook runs are routed before it): anything not
+        // named here is the allowance-bound cast run.
+        internal static string MoonExpectationFor(string physicalExpectation)
+        {
+            return physicalExpectation == "select" || physicalExpectation == "combat" ||
+                physicalExpectation == "authoring" || physicalExpectation == "removal"
+                ? physicalExpectation : "cast";
+        }
+
         private static void ValidateLiveSaveParameters(
             RuntimeTestRequest request, int expectedTotal, bool allowanceBound = false)
         {
