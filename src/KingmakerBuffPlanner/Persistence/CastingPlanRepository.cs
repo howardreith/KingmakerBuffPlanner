@@ -168,10 +168,25 @@ namespace KingmakerBuffPlanner.Persistence
         // (read back and compared). Null when there is no primary yet.
         internal string ArchiveRetiredSemanticsOnce(string campaignId)
         {
+            return ArchivePrimaryOnce(campaignId, ".pre-0.4.0");
+        }
+
+        // 0.4.2: before the first write that moves class/fact abilities to
+        // their own catalogue identity, the exact primary is archived (a
+        // downgrade can restore it).
+        internal const string SourceIdentityArchiveLabel = ".pre-0.4.2-source-identity";
+
+        // The exact stored primary, archived beside it under one label
+        // (read back and compared; an archive holding other bytes is never
+        // overwritten). Null when there is no primary yet.
+        internal string ArchivePrimaryOnce(string campaignId, string label)
+        {
+            if (string.IsNullOrWhiteSpace(label))
+                throw new ArgumentException("Archive label is required.", "label");
             string primary = GetProfilePath(campaignId);
             if (!File.Exists(primary)) return null;
             return AtomicFile.WriteExactArchive(_settingsDirectory,
-                Path.GetFileNameWithoutExtension(primary) + ".pre-0.4.0",
+                Path.GetFileNameWithoutExtension(primary) + label,
                 File.ReadAllBytes(primary));
         }
 

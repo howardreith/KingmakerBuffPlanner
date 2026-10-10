@@ -183,6 +183,7 @@
     <Compile Include="Planning\ResourceLedger.cs" />
     <Compile Include="Planning\RoutinePlanService.cs" />
     <Compile Include="Planning\CastingAuthoringService.cs" />
+    <Compile Include="Planning\CastingSourceIdentityMigration.cs" />
     <Compile Include="Planning\ExplicitCastingCompiler.cs" />
     <Compile Include="Planning\CastingBudget.cs" />
     <Compile Include="Planning\CastingForecast.cs" />

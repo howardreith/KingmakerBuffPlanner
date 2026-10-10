@@ -305,6 +305,17 @@ namespace KingmakerBuffPlanner.Domain.Authoring
                 IgnoredPresenceMarkers, State, Provenance);
         }
 
+        // 0.4.2 identity migration: the catalogue entry a casting belongs
+        // to; the exact ability, caster, book and all intent stay.
+        public PlannedCasting WithSourceId(string sourceId)
+        {
+            return new PlannedCasting(CastingId, RoutineId, Order, sourceId,
+                Ability, CasterUnitId, SpellbookGuid, TargetMode,
+                DirectTargetUnitId, Origin, RequiredCoverageUnitIds,
+                TargetingModifiers, Enhancements, ExistingEffectPolicy,
+                IgnoredPresenceMarkers, State, Provenance);
+        }
+
         public PlannedCasting WithState(CastingAuthoringState state)
         {
             return new PlannedCasting(CastingId, RoutineId, Order, SourceId,
