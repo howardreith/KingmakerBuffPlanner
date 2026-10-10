@@ -1,5 +1,21 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-10 0.4.2 PR #7 review corrections
+
+- R1 (`5d033b8`): failed mandatory archive + recovery handoff -> the
+  replacement session saved without the archive (pending flags not
+  captured; recovered documents are already pruned/normalized). Fixed by
+  carrying `ArchiveObligations` in `PendingSessionRecovery` and restoring
+  them before the first write. Red on f60904e, green after.
+- R2 (`7a0842f`): Classic rebinding matched the old shared aggregate before
+  the persisted ability, turning a legacy Shadow Clone assignment into
+  Mirror Image. Exact class-ability identity first; unresolved stays under
+  `ability|<guid>`. Red 3/4 on the reviewed file, green after.
+- C# 511/0; `kbp042-removal-06` PASS on `7a0842f`; Complete gate PASS on 7a0842f (exit 0, Source-only suite PASS=1 FAIL=0, 5 h 58 min).
+- Rejected theory: "the unresolved Shadow Clone assignment can keep the old
+  aggregate id" - RoutinePlanService would still match it to Mirror Image's
+  providers; it is rewritten to its exact `ability|` identity.
+
 ## 2026-10-10 0.4.2 owner-test candidate (final)
 
 - Tested product commit `e9a4c5e`; Complete gate PASS (exit 0, Source-only suite PASS=1 FAIL=0, 5 h 42 min).

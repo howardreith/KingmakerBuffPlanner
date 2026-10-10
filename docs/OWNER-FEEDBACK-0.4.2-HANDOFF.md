@@ -2,8 +2,8 @@
 
 This is the follow-up to the owner's 0.4.1 feedback (prompt
 `Claude_KBP_041_Followup_Prompt.md`, screenshots `references/01..05`, and the
-continuation instructions of 2026-10-10). It produced a **local owner-test
-candidate**. Nothing was merged, tagged, published, released or permanently
+continuation instructions of 2026-10-10), corrected after the PR #7 review of
+2026-10-10 (R1, R2). It produced a **local owner-test candidate**. Nothing was merged, tagged, published, released or permanently
 installed. No main, owner or protected save was touched, and no unrelated
 process was stopped.
 
@@ -14,15 +14,93 @@ process was stopped.
 | Base | v0.4.1, main `ab62462fa62c2e7a13a4c33a7a2947cd11b77b6d` (no later `main` commits to preserve) |
 | Branch | `codex/kingmaker-buff-planner-041-owner-polish` |
 | Version | 0.4.2 (`Version.props`, `Info.json`, assembly 0.4.2.0) |
-| **Tested product commit** | `e9a4c5ed3d34825aa0332cb3d64067b206e29070` |
+| **Tested product commit** | `7a0842f1ee5a343b98e5499ef7726bb321e41f40` (after the PR #7 review corrections) |
 | Owner-test package | `artifacts\release\0.4.2\KingmakerBuffPlanner-0.4.2.zip` in the worktree (local only; with `release-manifest.json`) |
-| Package SHA-256 | `3f3d55af66aa33be94e28a50fa7247a78c5fb006ac292237617fa847326b3463` (two deterministic builds) |
-| DLL SHA-256 | `b3f5023d74f539d5aa4452b7b0f43f64e69930b5f561fc9e4aff0b72498e7e0a` |
-| DLL MVID | `bcb3d03e-6bc9-48a3-8ff9-4b98dfb6f1c1` |
-| Native runs on these bytes | `kbp042-removal-05` and `kbp042-paper-02`: local-runtime package `3f3d55af66aa33be94e28a50fa7247a78c5fb006ac292237617fa847326b3463`, DLL `b3f5023d74f539d5aa4452b7b0f43f64e69930b5f561fc9e4aff0b72498e7e0a`, MVID `bcb3d03e-6bc9-48a3-8ff9-4b98dfb6f1c1` |
-| Complete gate | `scripts\Test-SourceOnly.ps1` (unchanged) on the clean tested commit `e9a4c5e`: **exit 0**, `Source-only suite: PASS=1 FAIL=0`, 2026-10-10 05:05:55Z to 10:47:57Z (5 h 42 min) |
+| Package SHA-256 | `0adad29d9d79568efa79fc3c2cb11cdfffe3d7b82384099bbd0cf7fe4ae0d98a` (two deterministic builds) |
+| DLL SHA-256 | `43343cef94c43c1b452e30ed131687a83eaef99ed6263b6d2842aafabee54605` |
+| DLL MVID | `8a298e56-0fd1-4d4e-9b82-195691247e7d` |
+| Native run on these bytes | `kbp042-removal-06` (the no-input removal reconciliation), PASS |
+| Paper and sound evidence | `kbp042-paper-02`, run on the previous candidate `e9a4c5e`. The paper, table and sound code is identical between `e9a4c5e` and `7a0842f` (empty diff over those files), but that run did **not** execute the corrected bytes |
+| Complete gate | `scripts\Test-SourceOnly.ps1` (unchanged) on the clean tested commit `7a0842f`: **exit 0**, `Source-only suite: PASS=1 FAIL=0`, 2026-10-10 13:20:42Z to 19:18:31Z (5 h 58 min) |
+| Previous candidate | `e9a4c5e` (package `3f3d55af...`): its gate and native runs stand as evidence of those bytes only; see "Previous candidate" below |
 | Records | later commits on the branch change records and documentation only; the package contains no documentation, and the candidate was built at the tested product commit |
 | Draft PR | [#7](https://github.com/howardreith/KingmakerBuffPlanner/pull/7) (draft, base `main`) |
+
+## PR #7 review corrections
+
+**R1: archive obligations through session recovery** (`5d033b8`).
+- **Root cause:** `ReconcileSpellbookRemovals` (and the source-identity
+  migration on load) set a pending-archive flag. When the mandatory archive
+  failed while the primary file stayed writable, `CaptureRecovery` handed the
+  edited document and settings to the recovery store, but not the
+  obligation. The replacement session adopted the already pruned or
+  normalized document, from which the flag cannot be rediscovered, and its
+  first `PersistNow("recovery")` saved without the archive.
+- **Correction:** `PendingSessionRecovery.ArchiveObligations` carries the
+  outstanding archive labels: retired 0.3.0 semantics, the 0.4.2 source
+  identity, and a spellbook removal. The retired-semantics archive had the
+  same gap.
+  - The labels live inside the recovery entry, which is keyed and validated
+    by mod path and campaign.
+  - The adopting session restores them before its first write, so
+    `SaveProfile`, still the single writer, archives first or fails.
+  - An unknown obligation refuses the adoption and keeps the entry in the
+    store.
+  - Archive names and the exact read-back checks are unchanged, and no UI
+    state is captured.
+- **Regressions** (real files, production `CastingSessionOwner` and recovery
+  store):
+  - `spellbook-removal-archive-obligation-survives-recovery`;
+  - `shadow-clone-identity-archive-obligation-survives-recovery`.
+
+  Each one obstructs the archive name while the primary stays writable,
+  then: edit, failed save, teardown capture, and replacement adoption under
+  the obstruction. It asserts:
+  - the primary bytes are unchanged;
+  - the obligation is captured and still owed;
+  - the replacement session is non-durable;
+  - the run is refused (`persistence-failed`, no dispatch).
+
+  With the obstruction removed, the retry writes the exact original archive
+  before the updated plan is durable.
+- **Red** on the reviewed head `f60904e`: "recovery wrote the pruned plan
+  without the mandatory archive" and "recovery wrote the migrated plan
+  without the mandatory archive" (`artifacts\pr7-r1-red.log`). Green after
+  the fix. The ordinary recovery, campaign-isolation and lifecycle suites
+  stay green (`failed-flush-intent-has-a-reachable-recovery-owner`,
+  `recovery-preservation-never-drops-intent`,
+  `persistence-round-trip-gaps-and-campaign-isolation`, and others).
+
+**R2: exact class-ability identity first in Classic rebinding** (`7a0842f`).
+- **Root cause:** `PlannerSetupModel.RebindLegacyAssignments` resolved the
+  old source id first and consulted the persisted ability only when that
+  failed. A Classic Shadow Clone assignment saved before 0.4.2 holds the old
+  shared effect aggregate, which Mirror Image's spell entry still carries. So
+  the lookup succeeded, and the assignment's ability was overwritten with
+  Mirror Image.
+- **Correction:** an assignment whose persisted ability is a class or fact
+  ability (its identity derives to `ability|<guid>`) is resolved by that
+  exact entry first. If the ability is not available, the assignment stays
+  unresolved under its own exact identity: never the equivalent spell, and
+  never the old aggregate, which `RoutinePlanService` would still match to
+  the spell's providers. Spells and variants keep the existing path. Child
+  identities, pins, targets, enhancements, policy, markers and relative
+  order are kept. There is no display-name case.
+- **Regressions** (legacy Classic profiles, production `PlannerSetupModel`,
+  `RoutinePlanService` and `ProfileRepository`):
+  - `classic-legacy-shadow-clone-rebinds-to-its-own-ability`;
+  - `classic-legacy-shadow-clone-never-becomes-mirror-image`;
+  - `classic-legacy-mirror-image-stays-the-spell`;
+  - `classic-legacy-rebinding-saves-and-reopens-idempotently`.
+- **Red** against the reviewed `PlannerSetupModel.cs`: 3 of 4 fail, rewritten
+  to Mirror Image `0|3e4ab69a...`. The Mirror Image case passes before and
+  after (`artifacts\pr7-r2-red.log`).
+
+**Verification:**
+- complete C# suite PASS=511 FAIL=0 (`artifacts\pr7-full-csharp.log`);
+- source validation 43/0;
+- `kbp042-removal-06` PASS on the corrected bytes;
+- the complete gate once on `7a0842f` (below).
 
 ## Commits (product series, oldest first)
 
@@ -40,9 +118,12 @@ process was stopped.
 | `9e57be0` | B (evidence) | The removal run proves the reconciled plan, kept intent, blocker and resources |
 | `0f2a24d` | B (evidence) | The removal run fits the approved fixture (kbp042-removal-02) |
 | `e9a4c5e` | B (evidence) | `live-workspace-removal`: the reconciliation without OS input |
+| `5d033b8` | B/A (review R1) | Carry outstanding archive obligations through session recovery |
+| `7a0842f` | A (review R2) | A saved class ability rebinds by its exact ability, never the old aggregate |
 
 Documentation and records commits: `6788780` (0.4.2 docs), `5284b5d` (interim
-checkpoint), and the final records commit that adds this report.
+checkpoint), `aa053bb` (final records for `e9a4c5e`), `f60904e` (publication),
+and the review-correction records commit that updates this report.
 
 ## A. Shadow Clone
 
@@ -101,7 +182,12 @@ classifier change or compile-time dependency.
 - `shadow-clone-absent-without-owner-or-optional-mod`;
 - `shadow-clone-saved-under-shared-identity-migrates-once`;
 - `class-ability-identity-keeps-spells-aggregated`;
-- `classic-mirror-image-never-plans-shadow-clone`.
+- `classic-mirror-image-never-plans-shadow-clone`;
+- review R2: `classic-legacy-shadow-clone-rebinds-to-its-own-ability`,
+  `classic-legacy-shadow-clone-never-becomes-mirror-image`,
+  `classic-legacy-mirror-image-stays-the-spell`,
+  `classic-legacy-rebinding-saves-and-reopens-idempotently`, and review R1
+  `shadow-clone-identity-archive-obligation-survives-recovery`.
 
 With the new rule disabled, 6 of the 7 fail with "Shadow Clone is not in the
 buff list: Mirror Image".
@@ -196,7 +282,7 @@ the complete gate. Each new case was confirmed red under its mutation.
 | Cold-load reconciliation of already-stale records | `spellbook-removal-cold-load-hud-first` (the owner's two Mind Blank castings, Felix and Leinna, retired on the first HUD press before the gate) |
 | Exact caster, book and variant scope | `spellbook-removal-decision-table` (another caster's equivalent spell; two books on one caster), `spellbook-removal-variant-and-metamagic-identity` |
 | Absent caster, missing mod, incomplete discovery: no deletion | `spellbook-removal-uncertainty-never-deletes` (membership not read, loading, run in progress, combat, caster absent, caster unavailable, optional-mod contracts missing, book unreadable, spellbook open, spell's mod not loaded) |
-| Archive or save failure blocks the run | `spellbook-removal-save-failure-blocks-the-run`, `spellbook-removal-archive-failure-blocks-the-run` |
+| Archive or save failure blocks the run | `spellbook-removal-save-failure-blocks-the-run`, `spellbook-removal-archive-failure-blocks-the-run`, `spellbook-removal-archive-obligation-survives-recovery` (review R1: also through session recovery) |
 | Undo is not immediately re-pruned by the same observation | `spellbook-removal-undo-idempotence-and-restart` |
 | Idempotence, and cleared Not Ready navigation | `spellbook-removal-undo-idempotence-and-restart`, `spellbook-removal-leaves-no-stale-problem-focus` |
 | One compound, undoable edit | `spellbook-removal-compound-authoring-edit` |
@@ -205,7 +291,21 @@ the complete gate. Each new case was confirmed red under its mutation.
 | Routing to the removal press | `spellbook-removal-request-routes-to-the-removal-press` |
 | Run verdicts | `spellbook-removal-physical-judgement`, `spellbook-removal-no-input-scenario-judgement`, `spellbook-removal-no-input-scenario-admission-and-routing` |
 
-**Native evidence: `kbp042-removal-05`, PASS.** This is the
+**Native evidence on the tested bytes: `kbp042-removal-06`, PASS** (commit
+`7a0842f`, package `0adad29d...`). It repeats `-05` below with an
+identical outcome:
+- the same native removal and spend;
+- exactly `rm-known-important` and `rm-known-long` removed, applied, durable
+  and archived;
+- the notice shown;
+- the reconciled Long plan `seed-long-1`, refused by the lock;
+- the Draft still blocks, intent and pools unchanged, and the planner
+  closed.
+
+Evidence hashes: `removal-reconcile.json` `baff8c22...`, `runtime-result.json`
+`02c10fe9...`, `physical-removal-notice.png` `8d11340c...`.
+
+**Native evidence on the previous candidate: `kbp042-removal-05`, PASS.** This is the
 `live-workspace-removal` scenario on the approved automation fixture, at the
 tested product commit.
 - **Fixture:** `KBP_AUTOMATION_WORKING` loaded once (gameId `df33d1ff...`),
@@ -364,8 +464,9 @@ the spell scroll `SpellScroll:paper=native-sheet;sprite=Card_Big;unitsPerTexel=0
 | `kbp042-removal-02` | `9e57be0` | live-workspace-physical `removal` | FAIL: fixture mismatch, before any edit | verified | clean |
 | `kbp042-removal-03` | `0f2a24d` | live-workspace-physical `removal` | FAIL: foreground refused | verified | clean |
 | `kbp042-removal-04` | `0f2a24d` | live-workspace-physical `removal` | FAIL: foreground refused | verified | clean |
-| **`kbp042-removal-05`** | **`e9a4c5e`** | **live-workspace-removal** | **PASS, complete** | verified | clean |
-| **`kbp042-paper-02`** | **`e9a4c5e`** | **live-advanced-inspect (Automation), 1920x1080** | **PASS, complete** | verified | clean |
+| `kbp042-removal-05` | `e9a4c5e` (previous candidate) | live-workspace-removal | PASS, complete | verified | clean |
+| `kbp042-paper-02` | `e9a4c5e` (previous candidate; paper and sound code unchanged since) | live-advanced-inspect (Automation), 1920x1080 | PASS, complete | verified | clean |
+| **`kbp042-removal-06`** | **`7a0842f` (tested candidate)** | **live-workspace-removal** | **PASS, complete** | verified | clean |
 
 After every run:
 - the transaction reads `Restored`;
@@ -387,21 +488,22 @@ window or process was touched.
 ## Gate and candidate identity
 
 `scripts\Test-SourceOnly.ps1`, unchanged, was run once on the clean tested product commit
-`e9a4c5ed3d34825aa0332cb3d64067b206e29070`. It used the repository-required invocation,
+`7a0842f1ee5a343b98e5499ef7726bb321e41f40`, after both review corrections had stabilized.
+It used the repository-required invocation,
 `powershell.exe -NoProfile -NonInteractive -Command "& .\scripts\Test-SourceOnly.ps1"`
-(Windows PowerShell 5.1), from 2026-10-10 05:05:55Z to 10:47:57Z (5 h 42 min).
+(Windows PowerShell 5.1), from 2026-10-10 13:20:42Z to 19:18:31Z (5 h 58 min).
 Result: **exit 0**, `Source-only suite: PASS=1 FAIL=0`.
-Log: `artifacts\kbp042-source-gate-e9a4c5e.log` (SHA-256
-`e233d870847a8a4f519b2549c8be78dd147e2a2f56dbb01bc6250510fc17d532`).
+Log: `artifacts\kbp042-source-gate-7a0842f.log` (SHA-256
+`cbbc4fd98021e9debf452896f7c591ddae71b0c7c4da3093375b22d17fc4b531`).
 
 | Suite | Result |
 | --- | --- |
 | Source validation | PASS=43 FAIL=0 |
-| Protocol (C#) tests | PASS=505 FAIL=0 |
+| Protocol (C#) tests | PASS=511 FAIL=0 |
 | Runtime harness filesystem tests | PASS=38 FAIL=0 |
 | Problem navigation evidence | PASS=23 FAIL=0 |
 | Spellbook entry evidence | PASS=26 FAIL=0 |
-| Package validation | PASS=4 FAIL=0 (package `3f3d55af...`) |
+| Package validation | PASS=4 FAIL=0 (package `0adad29d...`) |
 | Deployment WhatIf purity | PASS=5 FAIL=0 |
 | Launcher -File WhatIf purity | PASS=13 FAIL=0 |
 | Fixture inventory evidence | PASS=3 FAIL=0 |
@@ -412,18 +514,26 @@ Log: `artifacts\kbp042-source-gate-e9a4c5e.log` (SHA-256
 The log's one "cannot be read ... being used by another process" message comes from the
 runtime harness's deliberate game-held-entry case; that suite passed 38/38.
 
-**Candidate.** `scripts\Build-Release.ps1` was run at `e9a4c5e` on a clean tree, with two
+**Candidate.** `scripts\Build-Release.ps1` was run at `7a0842f` on a clean tree, with two
 deterministic builds. It produced `artifacts\release\0.4.2\KingmakerBuffPlanner-0.4.2.zip`:
 
-- package SHA-256 `3f3d55af66aa33be94e28a50fa7247a78c5fb006ac292237617fa847326b3463`;
-- DLL SHA-256 `b3f5023d74f539d5aa4452b7b0f43f64e69930b5f561fc9e4aff0b72498e7e0a`;
-- MVID `bcb3d03e-6bc9-48a3-8ff9-4b98dfb6f1c1`;
+- package SHA-256 `0adad29d9d79568efa79fc3c2cb11cdfffe3d7b82384099bbd0cf7fe4ae0d98a`;
+- DLL SHA-256 `43343cef94c43c1b452e30ed131687a83eaef99ed6263b6d2842aafabee54605`;
+- MVID `8a298e56-0fd1-4d4e-9b82-195691247e7d`;
 - `publicationStatus: local-only`.
 
-These bytes are identical to the local-runtime package that `kbp042-removal-05` and
-`kbp042-paper-02` ran, so the native evidence is evidence of exactly this candidate.
+These bytes are identical to the local-runtime package that `kbp042-removal-06` ran.
 Later commits change records and documentation only. The package holds no
 documentation, and the candidate is not rebuilt from them.
+
+### Previous candidate (`e9a4c5e`, superseded by the review corrections)
+
+The complete gate passed on `e9a4c5e`: exit 0, `Source-only suite: PASS=1 FAIL=0`,
+C# 505/0, 2026-10-10 05:05:55Z to 10:47:57Z (`artifacts\kbp042-source-gate-e9a4c5e.log`).
+Its candidate was package `3f3d55af66aa33be94e28a50fa7247a78c5fb006ac292237617fa847326b3463`,
+DLL `b3f5023d74f539d5aa4452b7b0f43f64e69930b5f561fc9e4aff0b72498e7e0a` and MVID
+`bcb3d03e-6bc9-48a3-8ff9-4b98dfb6f1c1`, run natively by `kbp042-removal-05` and
+`kbp042-paper-02`. That gate and those runs did **not** execute the corrected bytes.
 
 ## NOT RUN
 
@@ -452,6 +562,7 @@ fast-forward only, remote verified.
   "0.4.2 owner-test candidate: Shadow Clone, spellbook removal, native paper
   and sound": draft, open, base `main`, head `aa053bb`. This publication
   record is pushed on top of it the same way.
+- **Review corrections:** `5d033b8` (R1), `7a0842f` (R2) and the records commit that updates this report were pushed fast-forward on top of `f60904e` through the same guarded helper. PR #7 is updated in place; no replacement PR was opened.
 - The PR must not be merged without the owner's decision. There is no tag
   and no release.
 
