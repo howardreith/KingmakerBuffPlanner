@@ -235,6 +235,12 @@ namespace KingmakerBuffPlanner.Tests
                 record.RemovalNotice = "Removed 2 Heroism castings: no longer known in Linzi's spellbook. Undo available.";
                 record.RemovalFooter = record.RemovalNotice;
                 record.RemovalNoticeShown = true;
+                record.RemovalLongPlan.AddRange(record.SeedLongCastings);
+                record.RemovalSpentReadiness = "Blocked:pool-exhausted";
+                record.RemovalIntentKept = true;
+                record.RemovalIntentDiff = string.Empty;
+                record.RemovalPoolsBefore = "unit-linzi|spontaneous|1=0;unit-tartuccio|spontaneous|1=3";
+                record.RemovalPoolsAfter = record.RemovalPoolsBefore;
                 return record;
             };
             if (!good().ExpectedCastingActions.SequenceEqual(PhysicalWorkspaceRecord.CastingActions))
@@ -257,7 +263,17 @@ namespace KingmakerBuffPlanner.Tests
                 { "removal:not-archived", r => r.RemovalArchived = false },
                 { "removal:notice:none", r => r.RemovalNotice = null },
                 { "removal:notice-not-shown:none", r => { r.RemovalNoticeShown = false; r.RemovalFooter = null; } },
-                { "moon:not-refused-by-lock:none", r => r.MoonRefusal = null }
+                { "moon:not-refused-by-lock:none", r => r.MoonRefusal = null },
+                // The ordinary run must have evaluated the reconciled plan.
+                { "removal:long-plan:seed-long-1,rm-known-long", r => r.RemovalLongPlan.Add("rm-known-long") },
+                // The exhausted spell's casting is not waived.
+                { "removal:spent-not-blocking:Ready:", r => r.RemovalSpentReadiness = "Ready:" },
+                { "removal:spent-not-blocking:AlreadySatisfied:", r => r.RemovalSpentReadiness = "AlreadySatisfied:" },
+                { "removal:spent-not-blocking:absent", r => r.RemovalSpentReadiness = "absent" },
+                { "removal:intent-changed:changed:seed-important-1",
+                    r => { r.RemovalIntentKept = false; r.RemovalIntentDiff = "changed:seed-important-1"; } },
+                { "removal:resources-changed-by-press",
+                    r => r.RemovalPoolsAfter = "unit-linzi|spontaneous|1=0;unit-tartuccio|spontaneous|1=2" }
             };
             foreach (KeyValuePair<string, Action<PhysicalWorkspaceRecord>> shape in shapes)
             {

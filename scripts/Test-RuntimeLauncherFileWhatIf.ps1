@@ -577,6 +577,9 @@ try {
                 @($record.seedShortCastings) + @('rm-spent-important'))
             $record.removalNotice = "Removed 2 Heroism castings: no longer known in Linzi's spellbook. Undo available."
             $record.removalNoticeShown = $true
+            $record.removalLongPlan = @('seed-long-1'); $record.removalSpentReadiness = 'Blocked:pool-exhausted'
+            $record.removalIntentKept = $true; $record.removalIntentDiff = ''
+            $record.removalPoolsBefore = 'unit-linzi|spontaneous|1=0'; $record.removalPoolsAfter = 'unit-linzi|spontaneous|1=0'
         }
         if ($Expectation -ceq 'authoring') {
             foreach ($flag in @('authoringBuffSelected', 'authoringAdded', 'authoringRemoved', 'authoringReadded',
@@ -662,6 +665,15 @@ try {
             $r.removalArchived = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'removal-evidence-unread' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
             $r.PSObject.Properties.Remove('removalStored'); Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-unreconciled-plan' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.removalLongPlan = @('seed-long-1', 'rm-known-long'); Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-blocker-waived' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.removalSpentReadiness = 'Ready:'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-intent-changed' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.removalIntentKept = $false; $r.removalIntentDiff = 'changed:seed-important-1'
+            Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-resources-spent' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.removalPoolsAfter = 'unit-linzi|spontaneous|1=1'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'removal-lock-not-reached' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
             $r.moonRefusal = 'persistence-failed:io'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'authoring-browse-request' = @('authoring', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-wheel.json') ([ordered]@{
