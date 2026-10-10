@@ -2,6 +2,70 @@
 
 # Architecture
 
+## 0.4.2 owner-feedback follow-up (Shadow Clone, spellbook removal, native paper and sound)
+
+**A. Class-ability source identity.** A catalogue source used to be the
+effect-fingerprint aggregate (`effect|sha256`) for every ability, and the
+workspace tested membership by reference against the aggregate's
+representative instance. A class ability whose effect equals a spell's
+(Call of the Wild's Ninja Shadow Clone applies the vanilla Mirror Image buff)
+therefore had no card of its own and could not be planned. Now
+`CatalogSourceIdentity.For` returns `ability|<base guid>` for every non-spellbook
+source (variants keep `variant|base|child`). Spells keep the effect aggregate,
+so equal-effect spells still share a card. The rule is structural: there is no
+name list, forced provider or blueprint change. `RoutinePlanService` matches
+through the same function. `CastingSourceIdentityMigration` (Unity-free)
+rewrites a stored class-ability casting's stale effect identity once.
+`CastingPlanRepository.ArchivePrimaryOnce` keeps the exact pre-0.4.2 file
+(`.pre-0.4.2-source-identity`) before the first save.
+
+**B. Spellbook removal reconciliation.** These pieces are layered as below:
+
+- Game adapter `KingmakerSpellbookMembershipAdapter`: a read-only snapshot of
+  native membership. Prepared books use `GetAllMemorizedSpells`, whose
+  `Spell` survives a spend and is cleared only by forget/clear. Spontaneous
+  books use known, special and custom spells. Each book is marked `Complete`,
+  `Unreadable`, `RoleNotProven` or `CasterUnavailable`. The whole party is
+  `Unstable` while loading, with no player, or while a service window is open.
+- Domain: `PartySpellbookMembership` and `SpellbookMembershipFact`, keyed by
+  base spell and metamagic mask, with copies and a digest.
+- Planning: `SpellbookRemovalReconciliation.Decide`. This pure decision table
+  removes a casting only when its exact caster's exact book was observed
+  `Complete` and no longer holds the spell. It keeps the casting when the
+  spell is still a member (a spent slot or zero resources leave it a member),
+  when the book is unobserved or uncertain, when the caster or book is
+  missing, or when the casting was restored by Undo under the same observation.
+- Authoring: `CastingAuthoringService.RemoveCastings` makes one compound
+  command (one history entry, one autosave, one Undo).
+- Session: `CastingWorkspaceSession.ReconcileSpellbookRemovals` runs at the
+  idle boundaries only: when the planner opens, and in `Apply` before the
+  gate on every route, the HUD included. It never runs during a run or in
+  combat, nor while the stored plan is unresolved. The pre-removal file is
+  archived once (`.pre-spellbook-removal`). An unsaved removal refuses the run
+  until it is durable. The notice names the spell, the reason and the casters,
+  with "Undo available.".
+- Nothing deletes inside a render or a discovery loop, and the persistence
+  schema is unchanged.
+
+**C. Native paper and sound.** These are two new native-theme capabilities.
+`SheetPaper` is `Card_Big`, the service-window page, and `TableBackdrop` is
+the service-window table. Both are validated by exact `NativeSpriteContract`s,
+which gain `RequireSliced` and `SizeTolerance`. `ParchmentSheetGeometry`
+(Unity-free) slices the borderless card through a planner-owned sprite over
+the game's texture, with density scaled by screen height. The 0.4.0 scroll
+paper is the second tier, and the flat look the third. `ParchmentBackdrop`
+draws the table untinted. The opening sound is `UISoundType.CharacterScreenOpen`
+(Wwise `JournalOpen`), gated by the Unity-free `WorkspaceOpenSoundCue`, with
+one cue per successful open. Full record: [VISUAL-THEME.md](VISUAL-THEME.md).
+
+Runtime evidence: `NativePaperReferenceCapture` and `PaperSoundEvidence`
+(native references and open-cue counts in the same session), and the
+physical expectation `removal` (`RuntimeSpellbookRemovalHost`). The removal
+run uses the game's own `Spellbook.RemoveSpell` and
+`AbilityData.SpendFromSpellbook` on the disposable automation fixture, in
+memory only. The host's request validation and the launcher share one
+expectation list, held equal by `physical-expectation-launcher-host-parity`.
+
 ## 0.4.0 WP7 scroll paper and spell scroll
 
 The casting-first workspace and its right-click description are drawn on the
