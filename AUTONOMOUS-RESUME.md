@@ -1,3 +1,26 @@
+# Autonomous resume — 0.4.2 owner-feedback follow-up, 2026-10-10 (interim)
+
+Mission: `Claude_KBP_041_Followup_Prompt.md` (A Shadow Clone, B spellbook
+removal, C native paper and sound). Branch
+`codex/kingmaker-buff-planner-041-owner-polish`, worktree
+`repo/KingmakerBuffPlanner-OP042`, base v0.4.1 `ab62462`. Version 0.4.2.
+Product commits `88f0b87`..`eb80b14`, docs `6788780`; this checkpoint is a
+records commit on top. Interim checks at `eb80b14`: unit PASS=500 FAIL=0,
+Validate-Source 43/0, launcher meta-test 13/0 (scratch copy, purity windows
+stubbed). Runs: `kbp042-donors-01/02`, `kbp042-paper-01` PASS (restored,
+saves clean); `kbp042-removal-01` FAIL before start (host rejected the new
+expectation; fixed `eb80b14`; restored, saves clean). Its shell was reaped
+for low memory (steamwebhelper ~10 GB); the launcher itself finished.
+Full record: `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`.
+Next action (needs the owner's go-ahead after the memory-pressure reap):
+Build-Local at HEAD, then
+`Invoke-KingmakerRuntimeTest.ps1 -Scenario live-workspace-physical -PhysicalExpectation removal -FixtureFamily Automation -CompatibilityProfileId full-user -RunId kbp042-removal-02 -TimeoutSeconds 1200`
+(WhatIf first, idle desktop); then the complete unchanged
+`scripts\Test-SourceOnly.ps1` on the final product commit, Build-Release,
+identity (package/DLL SHA-256, MVID) into the handoff, guarded push through
+`codex-policy\Push-KingmakerBuffPlanner.ps1`, draft PR. No merge, tag,
+publication or permanent install.
+
 # Autonomous resume — 0.4.0 owner-review candidate, 2026-10-09
 
 Current: the 0.4.0 release train is complete through an owner-review
