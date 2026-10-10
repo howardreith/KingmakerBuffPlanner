@@ -9,7 +9,8 @@ are records only. Package 3f3d55af66aa33be94e28a50fa7247a78c5fb006ac292237617fa8
 MVID bcb3d03e-6bc9-48a3-8ff9-4b98dfb6f1c1. Complete gate PASS (exit 0, Source-only suite PASS=1 FAIL=0, 5 h 42 min).
 Native: `kbp042-removal-05` PASS (no-input removal reconciliation),
 `kbp042-paper-02` PASS (paper and open cue) on the tested bytes; earlier attempts
-`-01`..`-04` kept as recorded. Guarded push and a draft PR against main follow (publication record).
+`-01`..`-04` kept as recorded. Pushed through the guarded helper (`aa053bb`, then this
+publication record); draft PR #7 against main.
 Full record: `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`.
 Next action: the owner's test of the candidate. No merge, tag, release or
 permanent install without the owner's authorization.

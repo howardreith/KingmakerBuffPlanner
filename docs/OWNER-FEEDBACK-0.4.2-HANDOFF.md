@@ -22,7 +22,7 @@ process was stopped.
 | Native runs on these bytes | `kbp042-removal-05` and `kbp042-paper-02`: local-runtime package `3f3d55af66aa33be94e28a50fa7247a78c5fb006ac292237617fa847326b3463`, DLL `b3f5023d74f539d5aa4452b7b0f43f64e69930b5f561fc9e4aff0b72498e7e0a`, MVID `bcb3d03e-6bc9-48a3-8ff9-4b98dfb6f1c1` |
 | Complete gate | `scripts\Test-SourceOnly.ps1` (unchanged) on the clean tested commit `e9a4c5e`: **exit 0**, `Source-only suite: PASS=1 FAIL=0`, 2026-10-10 05:05:55Z to 10:47:57Z (5 h 42 min) |
 | Records | later commits on the branch change records and documentation only; the package contains no documentation, and the candidate was built at the tested product commit |
-| Draft PR | see "Branch and draft PR" |
+| Draft PR | [#7](https://github.com/howardreith/KingmakerBuffPlanner/pull/7) (draft, base `main`) |
 
 ## Commits (product series, oldest first)
 
@@ -444,9 +444,16 @@ documentation, and the candidate is not rebuilt from them.
 
 Branch `codex/kingmaker-buff-planner-041-owner-polish` is pushed only through the guarded
 helper `codex-policy\Push-KingmakerBuffPlanner.ps1`: `-WhatIf` first, clean tree,
-fast-forward only, remote verified. A draft PR is opened against `main`; its link is
-recorded in the publication commit that follows this report. The PR must not be
-merged without the owner's decision.
+fast-forward only, remote verified.
+
+- **Guarded push:** `Guarded push PASS: codex/kingmaker-buff-planner-041-owner-polish aa053bb9b0418eefe6361a1e674ec9f831050366`
+  (the remote head was verified with `ls-remote`).
+- **Draft PR:** [#7](https://github.com/howardreith/KingmakerBuffPlanner/pull/7),
+  "0.4.2 owner-test candidate: Shadow Clone, spellbook removal, native paper
+  and sound": draft, open, base `main`, head `aa053bb`. This publication
+  record is pushed on top of it the same way.
+- The PR must not be merged without the owner's decision. There is no tag
+  and no release.
 
 ## Owner test list
 
