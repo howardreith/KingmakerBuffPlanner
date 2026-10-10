@@ -4591,7 +4591,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "removalFooter", record.RemovalFooter },
                 { "removalNoticeShown", record.RemovalNoticeShown },
                 { "removalLongPlan", new JArray(record.RemovalLongPlan.Cast<object>().ToArray()) },
-                { "removalSpentReadiness", record.RemovalSpentReadiness },
+                { "removalBlockerReadiness", record.RemovalBlockerReadiness },
                 { "removalIntentKept", record.RemovalIntentKept },
                 { "removalIntentDiff", record.RemovalIntentDiff },
                 { "removalPoolsBefore", record.RemovalPoolsBefore },

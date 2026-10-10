@@ -568,16 +568,18 @@ try {
             $record.classicCombatProfileUnchanged = $true
         }
         if ($Expectation -ceq 'removal') {
-            $record.removalAuthored = @('rm-known-long', 'rm-known-important', 'rm-spent-important')
+            $record.removalAuthored = @('rm-known-long', 'rm-known-important', 'rm-other-book', 'rm-spent-important',
+                'rm-unrelated-draft')
+            $record.removalKnownCaster = 'unit-linzi'; $record.removalSpentCaster = 'unit-tartuccio'
             $record.removalKnownBefore = $true; $record.removalKnownAfter = $false
             $record.removalSpentSlotsBefore = 4; $record.removalSpentSlotsAfter = 0; $record.removalSpentKnownAfter = $true
             $record.removalStatus = 'Applied'; $record.removalDurable = $true
             $record.removalRemoved = @('rm-known-important', 'rm-known-long'); $record.removalArchived = $true
             $record.removalStored = @(@($record.seedLongCastings) + @($record.seedImportantCastings) +
-                @($record.seedShortCastings) + @('rm-spent-important'))
-            $record.removalNotice = "Removed 2 Heroism castings: no longer known in Linzi's spellbook. Undo available."
+                @($record.seedShortCastings) + @('rm-other-book', 'rm-spent-important', 'rm-unrelated-draft'))
+            $record.removalNotice = "Removed 2 Light castings: no longer known in Linzi's spellbook. Undo available."
             $record.removalNoticeShown = $true
-            $record.removalLongPlan = @('seed-long-1'); $record.removalSpentReadiness = 'Blocked:pool-exhausted'
+            $record.removalLongPlan = @('seed-long-1'); $record.removalBlockerReadiness = 'Draft:caster-not-chosen'
             $record.removalIntentKept = $true; $record.removalIntentDiff = ''
             $record.removalPoolsBefore = 'unit-linzi|spontaneous|1=0'; $record.removalPoolsAfter = 'unit-linzi|spontaneous|1=0'
         }
@@ -645,7 +647,7 @@ try {
             $r.authoringCountAfter = 18; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         # 0.4.2 (B): the native removal run.
         'removal-spent-removed' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
-            $r.removalRemoved = @('rm-known-important', 'rm-known-long', 'rm-spent-important')
+            $r.removalRemoved = @('rm-known-important', 'rm-known-long', 'rm-other-book')
             Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'removal-not-native' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
             $r.removalKnownAfter = $true; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
@@ -668,7 +670,9 @@ try {
         'removal-unreconciled-plan' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
             $r.removalLongPlan = @('seed-long-1', 'rm-known-long'); Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'removal-blocker-waived' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
-            $r.removalSpentReadiness = 'Ready:'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+            $r.removalBlockerReadiness = 'Ready:'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-same-caster' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.removalSpentCaster = $r.removalKnownCaster; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'removal-intent-changed' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
             $r.removalIntentKept = $false; $r.removalIntentDiff = 'changed:seed-important-1'
             Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })

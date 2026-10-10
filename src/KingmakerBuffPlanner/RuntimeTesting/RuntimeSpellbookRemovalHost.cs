@@ -23,22 +23,31 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 {
     // 0.4.2 (B) physical expectation "removal" of live-workspace-physical, a
     // selection run (no casting allowance; the session lock refuses the
-    // press): after the cold seed, castings are authored for two spells of
-    // the approved automation fixture's spontaneous casters; one spell is
-    // removed from its caster's book through the game's own Spellbook
-    // .RemoveSpell (the retraining boundary: known, special and custom lists
-    // and any memorized slot), and every slot of the other's level is spent
-    // through AbilityData.SpendFromSpellbook (the game's own spend). The cold
-    // HUD moon press then reconciles before its gate: exactly the removed
-    // spell's castings must go (one archived, saved, undoable edit with its
-    // notice) while the spent spell's casting stays. Nothing is saved to the
-    // game; the in-memory book changes end with the session.
+    // press), shaped to the approved automation fixture: its spontaneous
+    // bard and sorcerer both know the same spellbook buffs (the cantrips
+    // Resistance and Light; no level 1+ buff is known, so no buff's own pool
+    // can be exhausted here). After the cold seed:
+    // - spell S (known by two books A and B, not a seed spell on A) gets two
+    //   castings on book A, one on book B (same spell, other book), another
+    //   spell T gets one on book B, and an unrelated Draft casting is added;
+    // - S is removed from book A through the game's own Spellbook.RemoveSpell
+    //   (the retraining boundary: known, special and custom lists and any
+    //   memorized slot);
+    // - every slot of book B's lowest slotted level is spent through the
+    //   game's own AbilityData.SpendFromSpellbook (a real resource spend on
+    //   the book whose castings must stay).
+    // The cold HUD moon press then reconciles before its gate: exactly book
+    // A's two S castings go (one archived, saved, undoable edit with its
+    // notice); book B's castings, the Draft and every seed stay. Nothing is
+    // saved to the game; the in-memory book changes end with the session.
     internal sealed partial class RuntimeTestHost
     {
         private const int RemovalStartStep = 300;
         internal const string RemovalKnownLong = "rm-known-long";
         internal const string RemovalKnownImportant = "rm-known-important";
+        internal const string RemovalOtherBook = "rm-other-book";
         internal const string RemovalSpentImportant = "rm-spent-important";
+        internal const string RemovalUnrelatedDraft = "rm-unrelated-draft";
         // The saved intent of every casting just before the press (persisted
         // form, order excluded) and each routine's casting order.
         private Dictionary<string, string> _removalIntentBefore;
@@ -51,37 +60,38 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 ? null : Kingmaker.Game.Instance.Player.GameId;
             CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
             if (campaign == null || inputs == null) return FinishPhysical("removal:no-campaign-or-inputs");
-            ProviderPlanningOption known = null;
-            ProviderPlanningOption spent = null;
             // The cold seeds (Long, Important and the Short overflow) keep
             // their spells: the removal must take exactly its own castings.
             var seeds = new HashSet<string>(StringComparer.Ordinal);
             foreach (PlannedCasting seed in new[] { _physicalSeedLong, _physicalSeedImportant })
                 if (seed != null) seeds.Add(seed.CasterUnitId + "|" + seed.Ability.BaseAbilityGuid);
-            foreach (ProviderPlanningOption option in RemovalCandidates(inputs, seeds))
-            {
-                if (known == null) { known = option; continue; }
-                if (option.Provider.Key.Ability.BaseAbilityGuid != known.Provider.Key.Ability.BaseAbilityGuid)
-                {
-                    spent = option;
-                    break;
-                }
-            }
-            if (known == null || spent == null) return FinishPhysical("removal:no-two-spontaneous-buffs");
-            Spellbook knownBook = NativeBook(known.Provider.Key);
-            Spellbook spentBook = NativeBook(spent.Provider.Key);
-            BlueprintAbility knownSpell = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(
-                known.Provider.Key.Ability.BaseAbilityGuid);
-            if (knownBook == null || spentBook == null || knownSpell == null)
+            ProviderPlanningOption removed, otherBook, kept;
+            if (!ChooseRemovalOptions(inputs, seeds, out removed, out otherBook, out kept))
+                return FinishPhysical("removal:no-spell-known-by-two-spontaneous-books");
+            Spellbook removalBook = NativeBook(removed.Provider.Key);
+            Spellbook spentBook = NativeBook(otherBook.Provider.Key);
+            BlueprintAbility removedSpell = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(
+                removed.Provider.Key.Ability.BaseAbilityGuid);
+            BlueprintAbility keptSpell = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(
+                kept.Provider.Key.Ability.BaseAbilityGuid);
+            if (removalBook == null || spentBook == null || removedSpell == null || keptSpell == null)
                 return FinishPhysical("removal:native-book-or-spell-unresolved");
             // Author the dependent castings through the production boundary.
             var earlier = new CastingWorkspaceSession(_modEntry.Path, campaign,
                 new DisabledCastingDispatchBoundary());
+            PlannedCasting keptCasting = RemovalCasting(inputs, RemovalSpentImportant, "important", kept);
             var authored = new List<PlannedCasting>
             {
-                RemovalCasting(inputs, RemovalKnownLong, "long", known),
-                RemovalCasting(inputs, RemovalKnownImportant, "important", known),
-                RemovalCasting(inputs, RemovalSpentImportant, "important", spent)
+                RemovalCasting(inputs, RemovalKnownLong, "long", removed),
+                RemovalCasting(inputs, RemovalKnownImportant, "important", removed),
+                RemovalCasting(inputs, RemovalOtherBook, "important", otherBook),
+                keptCasting,
+                // An unrelated blocker: a Draft (no caster chosen) that the
+                // reconciliation must neither remove nor waive.
+                keptCasting == null ? null : new PlannedCasting(RemovalUnrelatedDraft, "important", 0,
+                    keptCasting.SourceId, keptCasting.Ability, null, null, CastingTargetMode.DirectTarget,
+                    keptCasting.DirectTargetUnitId, null, null, null, null, ExistingEffectPolicy.SkipAlreadyActive,
+                    null, CastingAuthoringState.Draft, null)
             };
             foreach (PlannedCasting casting in authored)
             {
@@ -90,33 +100,39 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (!added.Applied) return FinishPhysical("removal:authoring-refused:" + added.Reason);
                 _physicalRecord.RemovalAuthored.Add(casting.CastingId);
             }
-            _physicalRecord.RemovalKnownCaster = known.Provider.Key.CasterUnitId;
-            _physicalRecord.RemovalKnownBook = known.Provider.Key.SpellbookGuid;
-            _physicalRecord.RemovalKnownSpell = known.Provider.Key.Ability.BaseAbilityGuid;
-            _physicalRecord.RemovalKnownName = known.Provider.DisplayName;
-            _physicalRecord.RemovalSpentCaster = spent.Provider.Key.CasterUnitId;
-            _physicalRecord.RemovalSpentBook = spent.Provider.Key.SpellbookGuid;
-            _physicalRecord.RemovalSpentSpell = spent.Provider.Key.Ability.BaseAbilityGuid;
-            _physicalRecord.RemovalSpentName = spent.Provider.DisplayName;
-            // The native edits.
-            _physicalRecord.RemovalKnownBefore = knownBook.IsKnown(knownSpell);
-            knownBook.RemoveSpell(knownSpell);
-            _physicalRecord.RemovalKnownAfter = knownBook.IsKnown(knownSpell);
-            int level = spent.Provider.SpellLevel;
+            _physicalRecord.RemovalKnownCaster = removed.Provider.Key.CasterUnitId;
+            _physicalRecord.RemovalKnownBook = removed.Provider.Key.SpellbookGuid;
+            _physicalRecord.RemovalKnownSpell = removed.Provider.Key.Ability.BaseAbilityGuid;
+            _physicalRecord.RemovalKnownName = removed.Provider.DisplayName;
+            _physicalRecord.RemovalSpentCaster = otherBook.Provider.Key.CasterUnitId;
+            _physicalRecord.RemovalSpentBook = otherBook.Provider.Key.SpellbookGuid;
+            // Native edit 1: S leaves book A through the game's own removal.
+            _physicalRecord.RemovalKnownBefore = removalBook.IsKnown(removedSpell);
+            removalBook.RemoveSpell(removedSpell);
+            _physicalRecord.RemovalKnownAfter = removalBook.IsKnown(removedSpell);
+            // Native edit 2: every slot of book B's lowest slotted level is
+            // spent through the game's own spend, with a spell that level
+            // holds (whatever it is: the spend, not the spell, is the point).
+            int level = Enumerable.Range(1, Math.Max(0, spentBook.MaxSpellLevel))
+                .FirstOrDefault(value => spentBook.GetSpontaneousSlots(value) > 0);
+            AbilityData spendable = level < 1 ? null : spentBook.GetKnownSpells(level)
+                .Concat(spentBook.GetSpecialSpells(level))
+                .FirstOrDefault(data => data != null && data.Blueprint != null);
+            if (spendable == null) return FinishPhysical("removal:no-slotted-spell-to-spend");
             _physicalRecord.RemovalSpentLevel = level;
+            _physicalRecord.RemovalSpentSpell = spendable.Blueprint.AssetGuid;
+            _physicalRecord.RemovalSpentName = spendable.Blueprint.Name;
             _physicalRecord.RemovalSpentSlotsBefore = spentBook.GetSpontaneousSlots(level);
-            AbilityData spendable = spentBook.GetKnownSpells(level).Concat(spentBook.GetCustomSpells(level))
-                .FirstOrDefault(data => data != null && data.Blueprint != null &&
-                    data.Blueprint.AssetGuid == spent.Provider.Key.Ability.BaseAbilityGuid);
-            if (spendable == null) return FinishPhysical("removal:spent-spell-not-known");
             for (int guard = 0; guard < 32 && spentBook.GetSpontaneousSlots(level) > 0; guard++)
                 spendable.SpendFromSpellbook();
             _physicalRecord.RemovalSpentSlotsAfter = spentBook.GetSpontaneousSlots(level);
-            _physicalRecord.RemovalSpentKnownAfter = spentBook.IsKnown(spendable.Blueprint);
-            _physicalRecord.AddNote("removal:removed=" + known.Provider.DisplayName + "@" +
-                known.Provider.Key.CasterUnitId + ";spent=" + spent.Provider.DisplayName + "@" +
-                spent.Provider.Key.CasterUnitId + ";level=" + level + ";boundary=Spellbook.RemoveSpell," +
-                "AbilityData.SpendFromSpellbook");
+            // Book B still holds both of its planned spells.
+            _physicalRecord.RemovalSpentKnownAfter = spentBook.IsKnown(removedSpell) && spentBook.IsKnown(keptSpell);
+            _physicalRecord.AddNote("removal:removed=" + removed.Provider.DisplayName + "@" +
+                removed.Provider.Key.CasterUnitId + "/" + removed.Provider.Key.SpellbookGuid +
+                ";otherBook=" + otherBook.Provider.Key.CasterUnitId + "/" + otherBook.Provider.Key.SpellbookGuid +
+                ";kept=" + kept.Provider.DisplayName + ";spent=" + spendable.Blueprint.Name + "@level" + level +
+                ";boundary=Spellbook.RemoveSpell,AbilityData.SpendFromSpellbook");
             // What the press must leave alone: the saved intent of every other
             // casting, and every resource pool (read after the deliberate
             // spend, so the press itself must change nothing).
@@ -129,27 +145,61 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return PressColdMoon();
         }
 
-        // Spontaneous spellbook buffs of level 1+ (the fixture's bard and
-        // sorcerer) with a remaining slot and a legal recipient, other than
-        // the cold seeds' spells on the seeds' casters, in a stable order.
-        private static IEnumerable<ProviderPlanningOption> RemovalCandidates(CastingWorkspaceInputs inputs,
-            ISet<string> seeds)
+        // Plain spontaneous spellbook buffs with a legal recipient, in a
+        // stable order (the fixture's bard and sorcerer).
+        private static List<ProviderPlanningOption> SpontaneousBuffOptions(CastingWorkspaceInputs inputs)
         {
-            var pools = inputs.Snapshot.ResourcePools.ToDictionary(pool => pool.PoolKey, StringComparer.Ordinal);
+            var spontaneous = new HashSet<string>(inputs.Snapshot.ResourcePools
+                .Where(pool => pool.Kind == ResourcePoolKind.SpontaneousLevel)
+                .Select(pool => pool.PoolKey.Substring(0, pool.PoolKey.LastIndexOf('|'))), StringComparer.Ordinal);
             return inputs.ProviderOptions.Where(option =>
+                    option.Provider.Key.Ability.SourceKind == SourceKind.Spellbook &&
+                    string.IsNullOrEmpty(option.Provider.Key.Ability.VariantGuid) &&
+                    option.Provider.Key.Ability.MetamagicMask == 0 &&
+                    !string.IsNullOrEmpty(option.Provider.Key.SpellbookGuid) &&
+                    spontaneous.Contains(option.Provider.Key.CasterUnitId + "|spellbook|" +
+                        option.Provider.Key.SpellbookGuid) &&
+                    FreeTarget(inputs, option) != null)
+                .OrderBy(option => option.Provider.Key.Canonical, StringComparer.Ordinal).ToList();
+        }
+
+        // S: a spell two spontaneous books know; A: the first of them where S
+        // is not a seed spell (its S castings are removed); B: another book
+        // knowing S (its S casting stays, its slots are spent); T: another
+        // spell book B knows that is not a seed spell there (its casting stays).
+        private static bool ChooseRemovalOptions(CastingWorkspaceInputs inputs, ISet<string> seeds,
+            out ProviderPlanningOption removed, out ProviderPlanningOption otherBook,
+            out ProviderPlanningOption kept)
+        {
+            removed = otherBook = kept = null;
+            List<ProviderPlanningOption> options = SpontaneousBuffOptions(inputs);
+            foreach (var spell in options.GroupBy(option => option.Provider.Key.Ability.BaseAbilityGuid)
+                .OrderBy(group => group.Key, StringComparer.Ordinal))
+            {
+                List<ProviderPlanningOption> books = spell
+                    .GroupBy(option => option.Provider.Key.CasterUnitId + "|" + option.Provider.Key.SpellbookGuid)
+                    .Select(group => group.First()).ToList();
+                if (books.Count < 2) continue;
+                foreach (ProviderPlanningOption a in books)
                 {
-                    ProviderSnapshot provider = option.Provider;
-                    ResourcePoolSnapshot pool;
-                    return provider.Key.Ability.SourceKind == SourceKind.Spellbook &&
-                        string.IsNullOrEmpty(provider.Key.Ability.VariantGuid) &&
-                        provider.Key.Ability.MetamagicMask == 0 && provider.SpellLevel >= 1 &&
-                        !seeds.Contains(provider.Key.CasterUnitId + "|" + provider.Key.Ability.BaseAbilityGuid) &&
-                        !string.IsNullOrEmpty(provider.Key.SpellbookGuid) &&
-                        pools.TryGetValue(provider.ResourcePoolKey, out pool) &&
-                        pool.Kind == ResourcePoolKind.SpontaneousLevel && pool.Remaining > 0 &&
-                        FreeTarget(inputs, option) != null;
-                })
-                .OrderBy(option => option.Provider.Key.Canonical, StringComparer.Ordinal);
+                    if (seeds.Contains(a.Provider.Key.CasterUnitId + "|" + spell.Key)) continue;
+                    foreach (ProviderPlanningOption b in books.Where(value => value != a &&
+                        value.Provider.Key.CasterUnitId != a.Provider.Key.CasterUnitId))
+                    {
+                        ProviderPlanningOption t = options.FirstOrDefault(value =>
+                            value.Provider.Key.CasterUnitId == b.Provider.Key.CasterUnitId &&
+                            value.Provider.Key.SpellbookGuid == b.Provider.Key.SpellbookGuid &&
+                            value.Provider.Key.Ability.BaseAbilityGuid != spell.Key &&
+                            !seeds.Contains(b.Provider.Key.CasterUnitId + "|" + value.Provider.Key.Ability.BaseAbilityGuid));
+                        if (t == null) continue;
+                        removed = a;
+                        otherBook = b;
+                        kept = t;
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         // A reachable recipient without the effect, so the casting's
@@ -215,11 +265,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             _physicalRecord.RemovalIntentKept = _physicalRecord.RemovalIntentDiff.Length == 0;
             // The ordinary run evaluates the reconciled plan: Long holds
             // exactly what is left (the lock refused it after its gate), and
-            // the exhausted spell's casting still blocks in its own routine.
+            // the unrelated Draft still blocks in its own routine.
             CastingWorkspaceInputs after = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
             if (after == null || session == null)
             {
-                _physicalRecord.RemovalSpentReadiness = "no-inputs-or-session-after-press";
+                _physicalRecord.RemovalBlockerReadiness = "no-inputs-or-session-after-press";
                 return;
             }
             _physicalRecord.RemovalPoolsAfter = PoolSignature(after);
@@ -227,10 +277,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     .Where(value => value.RoutineId == "long")
                     .OrderBy(value => value.CastingId, StringComparer.Ordinal))
                 _physicalRecord.RemovalLongPlan.Add(casting.CastingId);
-            ResolvedCasting spentCasting = session.CompileForRuntime(after, "important").Castings
-                .FirstOrDefault(value => value.CastingId == RemovalSpentImportant);
-            _physicalRecord.RemovalSpentReadiness = spentCasting == null ? "absent"
-                : spentCasting.Readiness + ":" + string.Join(",", spentCasting.ReadinessReasons.ToArray());
+            ResolvedCasting blocker = session.CompileForRuntime(after, "important").Castings
+                .FirstOrDefault(value => value.CastingId == RemovalUnrelatedDraft);
+            _physicalRecord.RemovalBlockerReadiness = blocker == null ? "absent"
+                : blocker.Readiness + ":" + string.Join(",", blocker.ReadinessReasons.ToArray());
         }
 
         // Every pool's remaining uses, in a stable order.

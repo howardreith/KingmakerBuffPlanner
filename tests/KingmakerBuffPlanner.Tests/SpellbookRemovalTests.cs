@@ -194,7 +194,7 @@ namespace KingmakerBuffPlanner.Tests
                 host.IndexOf("ArmCastingFirstGrant(", arm + 1, StringComparison.Ordinal) >= 0)
                 throw new InvalidOperationException("The host does not route removal to its press, or a grant " +
                     "can be armed outside the cast branch.");
-            int remove = press.IndexOf("knownBook.RemoveSpell(knownSpell);", StringComparison.Ordinal);
+            int remove = press.IndexOf("removalBook.RemoveSpell(removedSpell);", StringComparison.Ordinal);
             int spend = press.IndexOf("spendable.SpendFromSpellbook();", StringComparison.Ordinal);
             int moon = press.IndexOf("return PressColdMoon();", StringComparison.Ordinal);
             if (remove < 0 || spend < remove || moon < spend ||
@@ -220,7 +220,10 @@ namespace KingmakerBuffPlanner.Tests
                 record.DocumentSignatureBeforeBrowse = "castings=17;revision=1";
                 record.DocumentSignatureAfterInspect = "castings=17;revision=1";
                 WithVisibleDescription(record);
-                record.RemovalAuthored.AddRange(new[] { "rm-known-long", "rm-known-important", "rm-spent-important" });
+                record.RemovalAuthored.AddRange(new[] { "rm-known-long", "rm-known-important", "rm-other-book",
+                    "rm-spent-important", "rm-unrelated-draft" });
+                record.RemovalKnownCaster = "unit-linzi";
+                record.RemovalSpentCaster = "unit-tartuccio";
                 record.RemovalKnownBefore = true;
                 record.RemovalKnownAfter = false;
                 record.RemovalSpentSlotsBefore = 4;
@@ -231,12 +234,13 @@ namespace KingmakerBuffPlanner.Tests
                 record.RemovalRemoved.AddRange(new[] { "rm-known-important", "rm-known-long" });
                 record.RemovalArchived = true;
                 record.RemovalStored.AddRange(record.SeedLongCastings.Concat(record.SeedImportantCastings)
-                    .Concat(record.SeedShortCastings).Concat(new[] { "rm-spent-important" }));
-                record.RemovalNotice = "Removed 2 Heroism castings: no longer known in Linzi's spellbook. Undo available.";
+                    .Concat(record.SeedShortCastings).Concat(new[] { "rm-other-book", "rm-spent-important",
+                        "rm-unrelated-draft" }));
+                record.RemovalNotice = "Removed 2 Light castings: no longer known in Linzi's spellbook. Undo available.";
                 record.RemovalFooter = record.RemovalNotice;
                 record.RemovalNoticeShown = true;
                 record.RemovalLongPlan.AddRange(record.SeedLongCastings);
-                record.RemovalSpentReadiness = "Blocked:pool-exhausted";
+                record.RemovalBlockerReadiness = "Draft:caster-not-chosen";
                 record.RemovalIntentKept = true;
                 record.RemovalIntentDiff = string.Empty;
                 record.RemovalPoolsBefore = "unit-linzi|spontaneous|1=0;unit-tartuccio|spontaneous|1=3";
@@ -250,15 +254,16 @@ namespace KingmakerBuffPlanner.Tests
                     string.Join("|", good().Violations().ToArray()));
             var shapes = new Dictionary<string, Action<PhysicalWorkspaceRecord>>
             {
-                { "removal:authored:2", r => r.RemovalAuthored.RemoveAt(2) },
+                { "removal:authored:4", r => r.RemovalAuthored.RemoveAt(4) },
+                { "removal:other-book-not-another-caster", r => r.RemovalSpentCaster = "unit-linzi" },
                 { "removal:native-remove:True>True", r => r.RemovalKnownAfter = true },
                 { "removal:native-spend:4>1;known=True", r => r.RemovalSpentSlotsAfter = 1 },
                 { "removal:native-spend:4>0;known=False", r => r.RemovalSpentKnownAfter = false },
                 { "removal:outcome:Unchanged;durable=True", r => r.RemovalStatus = "Unchanged" },
                 { "removal:outcome:Applied;durable=False", r => r.RemovalDurable = false },
-                // The spent spell's casting must never go with it.
-                { "removal:removed:rm-known-important,rm-known-long,rm-spent-important",
-                    r => r.RemovalRemoved.Add("rm-spent-important") },
+                // The other book's and the spent book's castings never go with it.
+                { "removal:removed:rm-known-important,rm-known-long,rm-other-book",
+                    r => r.RemovalRemoved.Add("rm-other-book") },
                 { "removal:removed:rm-known-long", r => r.RemovalRemoved.RemoveAt(0) },
                 { "removal:not-archived", r => r.RemovalArchived = false },
                 { "removal:notice:none", r => r.RemovalNotice = null },
@@ -266,10 +271,9 @@ namespace KingmakerBuffPlanner.Tests
                 { "moon:not-refused-by-lock:none", r => r.MoonRefusal = null },
                 // The ordinary run must have evaluated the reconciled plan.
                 { "removal:long-plan:seed-long-1,rm-known-long", r => r.RemovalLongPlan.Add("rm-known-long") },
-                // The exhausted spell's casting is not waived.
-                { "removal:spent-not-blocking:Ready:", r => r.RemovalSpentReadiness = "Ready:" },
-                { "removal:spent-not-blocking:AlreadySatisfied:", r => r.RemovalSpentReadiness = "AlreadySatisfied:" },
-                { "removal:spent-not-blocking:absent", r => r.RemovalSpentReadiness = "absent" },
+                // The unrelated blocker is not waived.
+                { "removal:blocker-waived:Ready:", r => r.RemovalBlockerReadiness = "Ready:" },
+                { "removal:blocker-waived:absent", r => r.RemovalBlockerReadiness = "absent" },
                 { "removal:intent-changed:changed:seed-important-1",
                     r => { r.RemovalIntentKept = false; r.RemovalIntentDiff = "changed:seed-important-1"; } },
                 { "removal:resources-changed-by-press",
@@ -289,6 +293,8 @@ namespace KingmakerBuffPlanner.Tests
                 {
                     r => r.RemovalStored.Add("rm-known-long"),
                     r => r.RemovalStored.Remove("rm-spent-important"),
+                    r => r.RemovalStored.Remove("rm-other-book"),
+                    r => r.RemovalStored.Remove("rm-unrelated-draft"),
                     r => r.RemovalStored.Remove("seed-short-3")
                 })
             {
