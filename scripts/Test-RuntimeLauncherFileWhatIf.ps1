@@ -190,7 +190,8 @@ $familyCases = @(
     @{ Name = 'advanced-bootstrap'; Args = @('-Scenario', 'live-ui-bootstrap', '-FixtureFamily', 'Advanced', '-WhatIf') },
     @{ Name = 'advanced-smoke'; Args = @('-Scenario', 'mod-load-smoke', '-FixtureFamily', 'Advanced', '-WhatIf') },
     @{ Name = 'advanced-reload'; Args = @('-Scenario', 'live-workspace-reload', '-FixtureFamily', 'Advanced', '-TimeoutSeconds', '600', '-WhatIf') },
-    @{ Name = 'advanced-import'; Args = @('-Scenario', 'live-workspace-import', '-FixtureFamily', 'Advanced', '-WhatIf') }
+    @{ Name = 'advanced-import'; Args = @('-Scenario', 'live-workspace-import', '-FixtureFamily', 'Advanced', '-WhatIf') },
+    @{ Name = 'advanced-removal'; Args = @('-Scenario', 'live-workspace-removal', '-FixtureFamily', 'Advanced', '-TimeoutSeconds', '600', '-WhatIf') }
 )
 foreach ($case in $familyCases) {
     $ErrorActionPreference = 'Continue'
@@ -522,6 +523,25 @@ try {
         'auth-escape-focus' = 'key-escape' }
     $authoringActions = @('cf-moon', 'auth-caster', 'auth-source', 'auth-add', 'auth-remove', 'auth-readd',
         'auth-retarget', 'auth-undo', 'auth-focus', 'auth-escape-focus', 'cf-escape-close')
+    # The removal evidence of a clean run (the physical "removal" expectation
+    # and live-workspace-removal share it).
+    $setRemovalGood = {
+        param($record)
+        $record.removalAuthored = @('rm-known-long', 'rm-known-important', 'rm-other-book', 'rm-spent-important',
+            'rm-unrelated-draft')
+        $record.removalKnownCaster = 'unit-linzi'; $record.removalSpentCaster = 'unit-tartuccio'
+        $record.removalKnownBefore = $true; $record.removalKnownAfter = $false
+        $record.removalSpentSlotsBefore = 4; $record.removalSpentSlotsAfter = 0; $record.removalSpentKnownAfter = $true
+        $record.removalStatus = 'Applied'; $record.removalDurable = $true
+        $record.removalRemoved = @('rm-known-important', 'rm-known-long'); $record.removalArchived = $true
+        $record.removalStored = @(@($record.seedLongCastings) + @($record.seedImportantCastings) +
+            @($record.seedShortCastings) + @('rm-other-book', 'rm-spent-important', 'rm-unrelated-draft'))
+        $record.removalNotice = "Removed 2 Light castings: no longer known in Linzi's spellbook. Undo available."
+        $record.removalNoticeShown = $true
+        $record.removalLongPlan = @('seed-long-1'); $record.removalBlockerReadiness = 'Draft:caster-not-chosen'
+        $record.removalIntentKept = $true; $record.removalIntentDiff = ''
+        $record.removalPoolsBefore = 'unit-linzi|spontaneous|1=0'; $record.removalPoolsAfter = 'unit-linzi|spontaneous|1=0'
+    }
     function New-PhysicalOutcomeCase([string]$Name, [string]$Expectation, [scriptblock]$Tamper,
         [string]$ExpectedScreen = '1920x1080') {
         $directory = Join-Path $outcomeRoot $Name
@@ -567,22 +587,7 @@ try {
             $record.classicCombatReportChanged = $false; $record.classicCombatExecuting = $false
             $record.classicCombatProfileUnchanged = $true
         }
-        if ($Expectation -ceq 'removal') {
-            $record.removalAuthored = @('rm-known-long', 'rm-known-important', 'rm-other-book', 'rm-spent-important',
-                'rm-unrelated-draft')
-            $record.removalKnownCaster = 'unit-linzi'; $record.removalSpentCaster = 'unit-tartuccio'
-            $record.removalKnownBefore = $true; $record.removalKnownAfter = $false
-            $record.removalSpentSlotsBefore = 4; $record.removalSpentSlotsAfter = 0; $record.removalSpentKnownAfter = $true
-            $record.removalStatus = 'Applied'; $record.removalDurable = $true
-            $record.removalRemoved = @('rm-known-important', 'rm-known-long'); $record.removalArchived = $true
-            $record.removalStored = @(@($record.seedLongCastings) + @($record.seedImportantCastings) +
-                @($record.seedShortCastings) + @('rm-other-book', 'rm-spent-important', 'rm-unrelated-draft'))
-            $record.removalNotice = "Removed 2 Light castings: no longer known in Linzi's spellbook. Undo available."
-            $record.removalNoticeShown = $true
-            $record.removalLongPlan = @('seed-long-1'); $record.removalBlockerReadiness = 'Draft:caster-not-chosen'
-            $record.removalIntentKept = $true; $record.removalIntentDiff = ''
-            $record.removalPoolsBefore = 'unit-linzi|spontaneous|1=0'; $record.removalPoolsAfter = 'unit-linzi|spontaneous|1=0'
-        }
+        if ($Expectation -ceq 'removal') { & $setRemovalGood $record }
         if ($Expectation -ceq 'authoring') {
             foreach ($flag in @('authoringBuffSelected', 'authoringAdded', 'authoringRemoved', 'authoringReadded',
                     'authoringRetargeted', 'authoringUndoRestored', 'authoringFocusedBeforeEscape',
@@ -768,6 +773,53 @@ try {
             runId = 'physical-run'; kingmakerProcessId = 4242 }) })
         'ack-other-process' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-moon.ack.json') ([ordered]@{
             schemaVersion = 1; runId = 'physical-run'; actionId = 'cf-moon'; action = 'click'; processId = 7; text = $null }) })
+    }
+    # 0.4.2 (B): the no-input removal scenario's own record.
+    function New-RemovalScenarioOutcomeCase([string]$Name, [scriptblock]$Tamper) {
+        $directory = Join-Path $outcomeRoot $Name
+        New-Item -ItemType Directory -Path $directory | Out-Null
+        $record = [ordered]@{ schemaVersion = 1; runId = 'removal-run'
+            press = 'BuffPlannerUiRoot.PressRoutineForRuntime(long)'
+            coldSessionBeforeMoon = $true; editorNeverOpenedBeforeMoon = $true
+            seedLongCastings = @('seed-long-1'); seedImportantCastings = @(); seedShortCastings = @()
+            moonRunStarted = $false; moonRunsStarted = 0
+            moonRefusal = 'native-submission-disabled:runtime-test-session:live-workspace-removal;Refused:Casting is locked.'
+            moonWorkspaceStayedClosed = $true; removalWorkspaceClosed = $true
+            notes = @(); failures = @(); violations = @() }
+        & $setRemovalGood $record
+        Write-KbpJsonAtomic (Join-Path $directory 'removal-reconcile.json') $record
+        if ($null -ne $Tamper) { & $Tamper $directory }
+        return [ordered]@{ runId = 'removal-run'; scenario = 'live-workspace-removal'; evidenceDirectory = $directory
+            parameters = [ordered]@{} }
+    }
+    Assert-KbpScenarioOutcome -Request (New-RemovalScenarioOutcomeCase 'removal-scenario-good' $null)
+    $removalScenarioCases = [ordered]@{
+        'removal-scenario-missing' = { param($d) Remove-Item -LiteralPath (Join-Path $d 'removal-reconcile.json') }
+        'removal-scenario-ran' = { param($d) $r = Read-KbpJson (Join-Path $d 'removal-reconcile.json')
+            $r.moonRunStarted = $true; Write-KbpJsonAtomic (Join-Path $d 'removal-reconcile.json') $r }
+        'removal-scenario-not-locked' = { param($d) $r = Read-KbpJson (Join-Path $d 'removal-reconcile.json')
+            $r.moonRefusal = 'persistence-failed:io'; Write-KbpJsonAtomic (Join-Path $d 'removal-reconcile.json') $r }
+        'removal-scenario-other-press' = { param($d) $r = Read-KbpJson (Join-Path $d 'removal-reconcile.json')
+            $r.press = 'os-click'; Write-KbpJsonAtomic (Join-Path $d 'removal-reconcile.json') $r }
+        'removal-scenario-not-cold' = { param($d) $r = Read-KbpJson (Join-Path $d 'removal-reconcile.json')
+            $r.editorNeverOpenedBeforeMoon = $false; Write-KbpJsonAtomic (Join-Path $d 'removal-reconcile.json') $r }
+        'removal-scenario-left-open' = { param($d) $r = Read-KbpJson (Join-Path $d 'removal-reconcile.json')
+            $r.removalWorkspaceClosed = $false; Write-KbpJsonAtomic (Join-Path $d 'removal-reconcile.json') $r }
+        'removal-scenario-other-book-removed' = { param($d) $r = Read-KbpJson (Join-Path $d 'removal-reconcile.json')
+            $r.removalRemoved = @('rm-known-important', 'rm-known-long', 'rm-other-book')
+            Write-KbpJsonAtomic (Join-Path $d 'removal-reconcile.json') $r }
+        'removal-scenario-resources-spent' = { param($d) $r = Read-KbpJson (Join-Path $d 'removal-reconcile.json')
+            $r.removalPoolsAfter = 'unit-linzi|spontaneous|1=1'; Write-KbpJsonAtomic (Join-Path $d 'removal-reconcile.json') $r }
+        'removal-scenario-violation' = { param($d) $r = Read-KbpJson (Join-Path $d 'removal-reconcile.json')
+            $r.violations = @('removal:notice:none'); Write-KbpJsonAtomic (Join-Path $d 'removal-reconcile.json') $r }
+    }
+    foreach ($case in $removalScenarioCases.Keys) {
+        $refusal = $null
+        try { Assert-KbpScenarioOutcome -Request (New-RemovalScenarioOutcomeCase $case $removalScenarioCases[$case]) }
+        catch { $refusal = $_.Exception.Message }
+        if ($null -eq $refusal -or $refusal -notlike '*emoval*') {
+            throw "Removal scenario outcome case $case was not refused by the launcher's check: $refusal"
+        }
     }
     foreach ($case in $physicalOutcomeCases.Keys) {
         $caseRequest = New-PhysicalOutcomeCase $case $physicalOutcomeCases[$case][0] $physicalOutcomeCases[$case][1]

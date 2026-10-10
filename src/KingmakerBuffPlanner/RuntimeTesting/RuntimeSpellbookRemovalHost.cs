@@ -12,6 +12,7 @@ using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
+using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.UI;
@@ -60,6 +61,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 ? null : Kingmaker.Game.Instance.Player.GameId;
             CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
             if (campaign == null || inputs == null) return FinishPhysical("removal:no-campaign-or-inputs");
+            string failure = PrepareRemoval(campaign, inputs);
+            if (failure != null) return FinishPhysical(failure);
+            CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "physical-removal-before-moon.png"));
+            return PressColdMoon();
+        }
+
+        // The castings, the native book edits and the before-press snapshots
+        // shared by both removal runs; null when ready to press.
+        private string PrepareRemoval(string campaign, CastingWorkspaceInputs inputs)
+        {
             // The cold seeds (Long, Important and the Short overflow) keep
             // their spells: the removal must take exactly its own castings.
             var seeds = new HashSet<string>(StringComparer.Ordinal);
@@ -67,7 +78,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (seed != null) seeds.Add(seed.CasterUnitId + "|" + seed.Ability.BaseAbilityGuid);
             ProviderPlanningOption removed, otherBook, kept;
             if (!ChooseRemovalOptions(inputs, seeds, out removed, out otherBook, out kept))
-                return FinishPhysical("removal:no-spell-known-by-two-spontaneous-books");
+                return "removal:no-spell-known-by-two-spontaneous-books";
             Spellbook removalBook = NativeBook(removed.Provider.Key);
             Spellbook spentBook = NativeBook(otherBook.Provider.Key);
             BlueprintAbility removedSpell = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(
@@ -75,7 +86,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             BlueprintAbility keptSpell = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(
                 kept.Provider.Key.Ability.BaseAbilityGuid);
             if (removalBook == null || spentBook == null || removedSpell == null || keptSpell == null)
-                return FinishPhysical("removal:native-book-or-spell-unresolved");
+                return "removal:native-book-or-spell-unresolved";
             // Author the dependent castings through the production boundary.
             var earlier = new CastingWorkspaceSession(_modEntry.Path, campaign,
                 new DisabledCastingDispatchBoundary());
@@ -95,9 +106,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             };
             foreach (PlannedCasting casting in authored)
             {
-                if (casting == null) return FinishPhysical("removal:no-legal-target");
+                if (casting == null) return "removal:no-legal-target";
                 AuthoringEditResult added = earlier.AddCastingForRuntime(casting);
-                if (!added.Applied) return FinishPhysical("removal:authoring-refused:" + added.Reason);
+                if (!added.Applied) return "removal:authoring-refused:" + added.Reason;
                 _physicalRecord.RemovalAuthored.Add(casting.CastingId);
             }
             _physicalRecord.RemovalKnownCaster = removed.Provider.Key.CasterUnitId;
@@ -118,7 +129,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             AbilityData spendable = level < 1 ? null : spentBook.GetKnownSpells(level)
                 .Concat(spentBook.GetSpecialSpells(level))
                 .FirstOrDefault(data => data != null && data.Blueprint != null);
-            if (spendable == null) return FinishPhysical("removal:no-slotted-spell-to-spend");
+            if (spendable == null) return "removal:no-slotted-spell-to-spend";
             _physicalRecord.RemovalSpentLevel = level;
             _physicalRecord.RemovalSpentSpell = spendable.Blueprint.AssetGuid;
             _physicalRecord.RemovalSpentName = spendable.Blueprint.Name;
@@ -137,12 +148,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             // casting, and every resource pool (read after the deliberate
             // spend, so the press itself must change nothing).
             CastingWorkspaceInputs edited = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
-            if (edited == null) return FinishPhysical("removal:no-inputs-after-native-edits");
+            if (edited == null) return "removal:no-inputs-after-native-edits";
             _physicalRecord.RemovalPoolsBefore = PoolSignature(edited);
             if (!StoredIntent(campaign, out _removalIntentBefore, out _removalOrderBefore))
-                return FinishPhysical("removal:stored-intent-unreadable-before-press");
-            CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "physical-removal-before-moon.png"));
-            return PressColdMoon();
+                return "removal:stored-intent-unreadable-before-press";
+            return null;
         }
 
         // Plain spontaneous spellbook buffs with a legal recipient, in a
@@ -233,6 +243,177 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 value != null && value.UniqueId == key.CasterUnitId);
             return unit == null || unit.Descriptor == null ? null : unit.Descriptor.Spellbooks.FirstOrDefault(
                 book => book != null && book.Blueprint != null && book.Blueprint.AssetGuid == key.SpellbookGuid);
+        }
+
+        // ---- live-workspace-removal (no synthetic input) ----------------
+        private const int RemovalScenarioPrePhase = 140;
+        private const int RemovalScenarioOpenPhase = 141;
+        private int _removalScenarioStep;
+        private System.Diagnostics.Stopwatch _removalScenarioClock;
+        private bool _removalScenarioWritten;
+
+        // Before the planner ever opens: the cold Long seed, the removal
+        // castings and native edits, then the Long routine pressed through
+        // the HUD's own routine entry (the call the HUD button makes), and
+        // the press's outcome once it has settled.
+        private bool UpdateRemovalScenarioBeforeOpen()
+        {
+            if (_removalScenarioStep == 0)
+            {
+                _physicalRecord.MoonExpectation = "removal";
+                _physicalRecord.ColdSessionBeforeMoon = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime() == null;
+                _physicalRecord.EditorNeverOpenedBeforeMoon = !BuffPlannerUiRoot.IsCastingWorkspaceOpen &&
+                    BuffPlannerUiRoot.CastingWorkspaceViewForRuntime == null && !_workspaceProgrammaticOpen;
+                string campaign = Kingmaker.Game.Instance == null || Kingmaker.Game.Instance.Player == null
+                    ? null : Kingmaker.Game.Instance.Player.GameId;
+                CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+                if (campaign == null || inputs == null) return FinishRemovalScenario("removal:no-campaign-or-inputs");
+                var earlier = new CastingWorkspaceSession(_modEntry.Path, campaign, new DisabledCastingDispatchBoundary());
+                if (earlier.Document.Castings.Count != 0)
+                    return FinishRemovalScenario("cold-seed:plan-already-held:" + earlier.Document.Castings.Count);
+                PlannedCasting seed = ColdSeedCasting(inputs, "long", new HashSet<string>(StringComparer.Ordinal));
+                if (seed == null) return FinishRemovalScenario("cold-seed:no-free-option-or-target:long");
+                AuthoringEditResult added = earlier.AddCastingForRuntime(seed);
+                if (!added.Applied) return FinishRemovalScenario("cold-seed:refused:long:" + added.Reason);
+                _physicalSeedLong = seed;
+                _physicalRecord.SeedLongCastings.Add(seed.CastingId);
+                _physicalRecord.AddNote("cold-seed:long:" + seed.CasterUnitId + ">" + seed.DirectTargetUnitId +
+                    ";source=" + seed.SourceId);
+                string failure = PrepareRemoval(campaign, inputs);
+                if (failure != null) return FinishRemovalScenario(failure);
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "removal-before-press.png"));
+                _physicalRunsBeforeMoon = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
+                _physicalMoonEditorSeen = false;
+                _physicalRecord.AddNote("removal-press:BuffPlannerUiRoot.PressRoutineForRuntime(long);no-os-input");
+                if (!BuffPlannerUiRoot.PressRoutineForRuntime("long"))
+                    return FinishRemovalScenario("removal:press-not-accepted");
+                _removalScenarioClock = System.Diagnostics.Stopwatch.StartNew();
+                _removalScenarioStep = 1;
+                return false;
+            }
+            if (BuffPlannerUiRoot.IsCastingWorkspaceOpen) _physicalMoonEditorSeen = true;
+            double settled = _removalScenarioClock.Elapsed.TotalSeconds;
+            if (settled < 3) return false;
+            bool started = BuffPlannerUiRoot.CastingRunsStartedForRuntime > _physicalRunsBeforeMoon;
+            if (started && BuffPlannerUiRoot.IsCastingRunActive && settled < 60) return false;
+            _physicalRecord.MoonRunStarted = started;
+            _physicalRecord.MoonRunsStarted = BuffPlannerUiRoot.CastingRunsStartedForRuntime - _physicalRunsBeforeMoon;
+            _physicalRecord.MoonWorkspaceStayedClosed = !_physicalMoonEditorSeen &&
+                !BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+            if (!started) _physicalRecord.MoonRefusal = LongPressRefusal();
+            RecordRemovalAfterMoon();
+            CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "removal-after-press.png"));
+            // Phase 22 opens the planner through the production path.
+            _removalScenarioStep = 0;
+            _liveUiPhase = 22;
+            return false;
+        }
+
+        // The planner is open: its footer must name the removal; then the
+        // production close releases the input lease.
+        private bool UpdateRemovalScenarioOpened()
+        {
+            if (_removalScenarioStep == 0)
+            {
+                _removalScenarioClock = System.Diagnostics.Stopwatch.StartNew();
+                _removalScenarioStep = 1;
+                return false;
+            }
+            if (_removalScenarioStep == 1)
+            {
+                if (_removalScenarioClock.ElapsedMilliseconds < 1500) return false;
+                RecordRemovalNotice(BuffPlannerUiRoot.CastingWorkspaceViewForRuntime);
+                _removalScenarioClock = System.Diagnostics.Stopwatch.StartNew();
+                _removalScenarioStep = 2;
+                return false;
+            }
+            // The engine capture lands at the end of a later frame.
+            if (_removalScenarioClock.ElapsedMilliseconds < 1000) return false;
+            ProbeWorkspaceCloseResult closed = CloseProbeWorkspace();
+            _physicalRecord.RemovalWorkspaceClosed = closed.Closed && closed.InputLeaseReleased &&
+                string.IsNullOrEmpty(closed.Failure);
+            _liveInitialCatalogEvidence = "removal-scenario;workspaceRoot=active;legacyScreen=closed";
+            _workspaceInteractionEvidence = "removal;press=routine-entry;no-os-input";
+            _workspaceReopenEvidence = "removal;no-reopen-claim";
+            return FinishRemovalScenario(null);
+        }
+
+        private bool FinishRemovalScenario(string failure)
+        {
+            if (failure != null) _physicalRecord.Failures.Add(failure);
+            var record = new JObject
+            {
+                { "schemaVersion", 1 },
+                { "runId", _request.RunId },
+                { "press", "BuffPlannerUiRoot.PressRoutineForRuntime(long)" },
+                { "coldSessionBeforeMoon", Nullable(_physicalRecord.ColdSessionBeforeMoon) },
+                { "editorNeverOpenedBeforeMoon", Nullable(_physicalRecord.EditorNeverOpenedBeforeMoon) },
+                { "seedLongCastings", new JArray(_physicalRecord.SeedLongCastings.Cast<object>().ToArray()) },
+                { "seedImportantCastings", new JArray(_physicalRecord.SeedImportantCastings.Cast<object>().ToArray()) },
+                { "seedShortCastings", new JArray(_physicalRecord.SeedShortCastings.Cast<object>().ToArray()) },
+                { "moonRunStarted", _physicalRecord.MoonRunStarted },
+                { "moonRunsStarted", Nullable(_physicalRecord.MoonRunsStarted) },
+                { "moonRefusal", _physicalRecord.MoonRefusal },
+                { "moonWorkspaceStayedClosed", _physicalRecord.MoonWorkspaceStayedClosed },
+                { "removalWorkspaceClosed", _physicalRecord.RemovalWorkspaceClosed },
+                { "notes", new JArray(_physicalRecord.Notes.Cast<object>().ToArray()) },
+                { "failures", new JArray(_physicalRecord.Failures.Cast<object>().ToArray()) },
+                { "violations", new JArray(_physicalRecord.RemovalScenarioViolations().Cast<object>().ToArray()) }
+            };
+            AddRemovalFields(record, _physicalRecord);
+            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "removal-reconcile.json"),
+                record.ToString(Formatting.Indented) + Environment.NewLine);
+            _removalScenarioWritten = true;
+            _completed = true;
+            return true;
+        }
+
+        // The removal evidence, written alike by the physical record and the
+        // no-input scenario's record.
+        private static void AddRemovalFields(JObject target, PhysicalWorkspaceRecord record)
+        {
+            target["removalAuthored"] = new JArray(record.RemovalAuthored.Cast<object>().ToArray());
+            target["removalKnownCaster"] = record.RemovalKnownCaster;
+            target["removalKnownBook"] = record.RemovalKnownBook;
+            target["removalKnownSpell"] = record.RemovalKnownSpell;
+            target["removalKnownName"] = record.RemovalKnownName;
+            target["removalKnownBefore"] = Nullable(record.RemovalKnownBefore);
+            target["removalKnownAfter"] = Nullable(record.RemovalKnownAfter);
+            target["removalSpentCaster"] = record.RemovalSpentCaster;
+            target["removalSpentBook"] = record.RemovalSpentBook;
+            target["removalSpentSpell"] = record.RemovalSpentSpell;
+            target["removalSpentName"] = record.RemovalSpentName;
+            target["removalSpentLevel"] = Nullable(record.RemovalSpentLevel);
+            target["removalSpentSlotsBefore"] = Nullable(record.RemovalSpentSlotsBefore);
+            target["removalSpentSlotsAfter"] = Nullable(record.RemovalSpentSlotsAfter);
+            target["removalSpentKnownAfter"] = Nullable(record.RemovalSpentKnownAfter);
+            target["removalStatus"] = record.RemovalStatus;
+            target["removalNotice"] = record.RemovalNotice;
+            target["removalDurable"] = record.RemovalDurable;
+            target["removalRemoved"] = new JArray(record.RemovalRemoved.Cast<object>().ToArray());
+            target["removalArchived"] = record.RemovalArchived;
+            target["removalStored"] = new JArray(record.RemovalStored.Cast<object>().ToArray());
+            target["removalFooter"] = record.RemovalFooter;
+            target["removalNoticeShown"] = record.RemovalNoticeShown;
+            target["removalLongPlan"] = new JArray(record.RemovalLongPlan.Cast<object>().ToArray());
+            target["removalBlockerReadiness"] = record.RemovalBlockerReadiness;
+            target["removalIntentKept"] = record.RemovalIntentKept;
+            target["removalIntentDiff"] = record.RemovalIntentDiff;
+            target["removalPoolsBefore"] = record.RemovalPoolsBefore;
+            target["removalPoolsAfter"] = record.RemovalPoolsAfter;
+        }
+
+        // A refused Long press: the boundary's own machine reason (the lock)
+        // plus the player-facing disposition and message.
+        private static string LongPressRefusal()
+        {
+            QuickExecutionResult refused = BuffPlannerUiRoot.QuickResultForRuntime("long");
+            CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+            IReadOnlyList<string> dispatchRefusals = session == null
+                ? new List<string>() : session.DispatchRefusalsForRuntime;
+            string machine = dispatchRefusals.Count == 0
+                ? "no-dispatch-refusal" : dispatchRefusals[dispatchRefusals.Count - 1];
+            return machine + ";" + (refused == null ? "no-result" : refused.Disposition + ":" + refused.Message);
         }
 
         // After the cold press: what the reconciliation at the HUD boundary

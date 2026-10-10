@@ -60,6 +60,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("spellbook-removal-physical-judgement", TestPhysicalRemovalJudgement);
             Run("spellbook-removal-exact-launcher-request-admission", TestRemovalRequestAdmission);
             Run("spellbook-removal-request-routes-to-the-removal-press", TestRemovalRequestRouting);
+            Run("spellbook-removal-no-input-scenario-judgement", TestRemovalScenarioJudgement);
+            Run("spellbook-removal-no-input-scenario-admission-and-routing", TestRemovalScenarioAdmissionAndRouting);
         }
 
         // kbp042-removal-01: the exact request the launcher serialized for the
@@ -121,7 +123,7 @@ namespace KingmakerBuffPlanner.Tests
             {
                 // Unknown values stay rejected.
                 { "invalid-request:physical-expectation", r => r["parameters"]["physicalExpectation"] = "remove" },
-                { "invalid-request:scenario", r => r["scenario"] = "live-workspace-removal" },
+                { "invalid-request:scenario", r => r["scenario"] = "live-workspace-retrain" },
                 // Removal casts nothing: a casting allowance is refused.
                 { "invalid-request:cf-allowance-only-with-cast-expectation",
                     r => r["parameters"]["cfAllowance"] = "{}" },
@@ -194,13 +196,179 @@ namespace KingmakerBuffPlanner.Tests
                 host.IndexOf("ArmCastingFirstGrant(", arm + 1, StringComparison.Ordinal) >= 0)
                 throw new InvalidOperationException("The host does not route removal to its press, or a grant " +
                     "can be armed outside the cast branch.");
-            int remove = press.IndexOf("removalBook.RemoveSpell(removedSpell);", StringComparison.Ordinal);
-            int spend = press.IndexOf("spendable.SpendFromSpellbook();", StringComparison.Ordinal);
-            int moon = press.IndexOf("return PressColdMoon();", StringComparison.Ordinal);
-            if (remove < 0 || spend < remove || moon < spend ||
+            int pressStart = press.IndexOf("private bool UpdateRemovalPress(", StringComparison.Ordinal);
+            int prepareStart = press.IndexOf("private string PrepareRemoval(", StringComparison.Ordinal);
+            int prepared = press.IndexOf("string failure = PrepareRemoval(campaign, inputs);", pressStart < 0 ? 0 : pressStart,
+                StringComparison.Ordinal);
+            int moon = press.IndexOf("return PressColdMoon();", pressStart < 0 ? 0 : pressStart, StringComparison.Ordinal);
+            int remove = press.IndexOf("removalBook.RemoveSpell(removedSpell);", prepareStart < 0 ? 0 : prepareStart,
+                StringComparison.Ordinal);
+            int spend = press.IndexOf("spendable.SpendFromSpellbook();", prepareStart < 0 ? 0 : prepareStart,
+                StringComparison.Ordinal);
+            if (pressStart < 0 || prepareStart < pressStart || prepared < pressStart || moon < prepared ||
+                moon > prepareStart || remove < prepareStart || spend < remove ||
                 press.IndexOf("ArmCastingFirstGrant", StringComparison.Ordinal) >= 0 ||
                 press.IndexOf("Memorize(", StringComparison.Ordinal) >= 0)
                 throw new InvalidOperationException("The removal press does not remove, spend, then press.");
+        }
+
+        // live-workspace-removal (no synthetic input; kbp042-removal-03/04
+        // could not take the foreground): the same removal evidence plus a
+        // cold press refused by the lock with nothing run or opened, and the
+        // planner closed again.
+        private static void TestRemovalScenarioJudgement()
+        {
+            Func<PhysicalWorkspaceRecord> good = () =>
+            {
+                var record = new PhysicalWorkspaceRecord
+                {
+                    MoonExpectation = "removal", ColdSessionBeforeMoon = true, EditorNeverOpenedBeforeMoon = true,
+                    MoonRunStarted = false, MoonWorkspaceStayedClosed = true, RemovalWorkspaceClosed = true,
+                    MoonRefusal = "native-submission-disabled:runtime-test-session;Refused:Casting is locked."
+                };
+                record.SeedLongCastings.Add("seed-long-1");
+                record.RemovalAuthored.AddRange(new[] { "rm-known-long", "rm-known-important", "rm-other-book",
+                    "rm-spent-important", "rm-unrelated-draft" });
+                record.RemovalKnownCaster = "unit-tartuccio";
+                record.RemovalSpentCaster = "unit-linzi";
+                record.RemovalKnownBefore = true;
+                record.RemovalKnownAfter = false;
+                record.RemovalSpentSlotsBefore = 2;
+                record.RemovalSpentSlotsAfter = 0;
+                record.RemovalSpentKnownAfter = true;
+                record.RemovalStatus = "Applied";
+                record.RemovalDurable = true;
+                record.RemovalRemoved.AddRange(new[] { "rm-known-important", "rm-known-long" });
+                record.RemovalArchived = true;
+                record.RemovalStored.AddRange(new[] { "seed-long-1", "rm-other-book", "rm-spent-important",
+                    "rm-unrelated-draft" });
+                record.RemovalNotice = "Removed 2 Resistance castings: no longer known in Tartuccio's spellbook. " +
+                    "Undo available.";
+                record.RemovalFooter = record.RemovalNotice;
+                record.RemovalNoticeShown = true;
+                record.RemovalLongPlan.Add("seed-long-1");
+                record.RemovalBlockerReadiness = "Draft:caster-not-chosen";
+                record.RemovalIntentKept = true;
+                record.RemovalIntentDiff = string.Empty;
+                record.RemovalPoolsBefore = "unit-linzi|spellbook|book-linzi|spontaneous-1=0";
+                record.RemovalPoolsAfter = record.RemovalPoolsBefore;
+                return record;
+            };
+            if (good().RemovalScenarioViolations().Count != 0)
+                throw new InvalidOperationException("A clean removal scenario was refused: " +
+                    string.Join("|", good().RemovalScenarioViolations().ToArray()));
+            var shapes = new Dictionary<string, Action<PhysicalWorkspaceRecord>>
+            {
+                { "moon:run-without-grant", r => r.MoonRunStarted = true },
+                { "moon:not-refused-by-lock:persistence-failed:io", r => r.MoonRefusal = "persistence-failed:io" },
+                { "moon:editor-opened", r => r.MoonWorkspaceStayedClosed = false },
+                { "moon:not-cold:session=True;editor=False", r => r.EditorNeverOpenedBeforeMoon = false },
+                { "moon:seed:long=0", r => { r.SeedLongCastings.Clear(); r.RemovalLongPlan.Clear(); } },
+                { "removal:workspace-not-closed", r => r.RemovalWorkspaceClosed = false },
+                { "removal:removed:rm-known-important,rm-known-long,rm-other-book",
+                    r => r.RemovalRemoved.Add("rm-other-book") },
+                { "removal:notice-not-shown:none", r => { r.RemovalNoticeShown = false; r.RemovalFooter = null; } },
+                { "removal:resources-changed-by-press",
+                    r => r.RemovalPoolsAfter = "unit-linzi|spellbook|book-linzi|spontaneous-1=1" }
+            };
+            foreach (KeyValuePair<string, Action<PhysicalWorkspaceRecord>> shape in shapes)
+            {
+                PhysicalWorkspaceRecord bad = good();
+                shape.Value(bad);
+                if (!bad.RemovalScenarioViolations().Contains(shape.Key))
+                    throw new InvalidOperationException("Removal scenario judgement missed " + shape.Key + ": " +
+                        string.Join("|", bad.RemovalScenarioViolations().ToArray()));
+            }
+        }
+
+        // The scenario is a no-input workspace scenario on the automation
+        // family only, admitted with exactly the live-save contract, never
+        // with a physical expectation or a casting allowance; the host runs
+        // the removal and the press before the planner ever opens, presses
+        // through the HUD's own routine entry (never OS input) and reads the
+        // notice in the opened planner.
+        private static void TestRemovalScenarioAdmissionAndRouting()
+        {
+            const string scenario = "live-workspace-removal";
+            if (!RuntimeTestProtocol.IsRemovalScenario(scenario) || !RuntimeTestProtocol.IsWorkspaceScenario(scenario) ||
+                !RuntimeTestProtocol.IsNoInputWorkspaceScenario(scenario) ||
+                RuntimeTestProtocol.IsPhysicalWorkspaceScenario(scenario) ||
+                RuntimeTestProtocol.IsAdvancedFamilyScenario(scenario) ||
+                RuntimeTestProtocol.IsCastingQualificationScenario(scenario))
+                throw new InvalidOperationException("The removal scenario is classified wrongly.");
+            JObject launcher = JObject.Parse(File.ReadAllText(Path.Combine(FindRepositoryRoot(), "tests",
+                "KingmakerBuffPlanner.Tests", "Fixtures", "kbp042-removal-01-runtime-request.json")));
+            int serial = 0;
+            Func<Action<JObject>, string> admit = mutation =>
+            {
+                serial++;
+                string directory = Path.Combine(_protocolEvidenceRoot, "rm-scenario-" + serial);
+                Directory.CreateDirectory(directory);
+                JObject request = (JObject)launcher.DeepClone();
+                request["runId"] = "rm-scenario-" + serial;
+                request["scenario"] = scenario;
+                request["evidenceDirectory"] = directory;
+                request["expectedCommit"] = BuildInfo.Commit;
+                request["expectedModVersion"] = BuildInfo.Version;
+                ((JObject)request["parameters"]).Remove("physicalExpectation");
+                if (mutation != null) mutation(request);
+                string path = Path.Combine(directory, "runtime-request.json");
+                File.WriteAllText(path, request.ToString());
+                string rejection;
+                RuntimeTestRequest read = ReadProtocol(
+                    new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+                return read == null ? rejection : string.Empty;
+            };
+            string accepted = admit(null);
+            if (accepted.Length != 0)
+                throw new InvalidOperationException("The removal scenario request is rejected: " + accepted);
+            var refused = new List<KeyValuePair<string, Action<JObject>>>
+            {
+                // No physical expectation and no casting allowance: both are
+                // parameters outside its exact live-save contract.
+                new KeyValuePair<string, Action<JObject>>("invalid-request:live-save-parameters",
+                    r => r["parameters"]["physicalExpectation"] = "removal"),
+                new KeyValuePair<string, Action<JObject>>("invalid-request:live-save-parameters",
+                    r => r["parameters"]["cfAllowance"] = "{}"),
+                new KeyValuePair<string, Action<JObject>>("invalid-request:live-save-family-scenario", r =>
+                    {
+                        r["parameters"]["workingSaveName"] = "KBP_ADVANCED_WORKING";
+                        r["parameters"]["baselineSaveName"] = "KBP_ADVANCED_BASELINE";
+                    }),
+                new KeyValuePair<string, Action<JObject>>("invalid-request:live-save-names",
+                    r => r["parameters"]["workingSaveName"] = "Felix main campaign")
+            };
+            foreach (KeyValuePair<string, Action<JObject>> shape in refused)
+            {
+                string rejection = admit(shape.Value);
+                if (rejection != shape.Key)
+                    throw new InvalidOperationException("Removal scenario admission did not refuse with " +
+                        shape.Key + ": " + (rejection.Length == 0 ? "accepted" : rejection));
+            }
+            string runtime = Path.Combine(FindRepositoryRoot(), "src", "KingmakerBuffPlanner", "RuntimeTesting");
+            string host = File.ReadAllText(Path.Combine(runtime, "RuntimeTestHost.cs")).Replace("\r\n", "\n");
+            string press = File.ReadAllText(Path.Combine(runtime, "RuntimeSpellbookRemovalHost.cs"))
+                .Replace("\r\n", "\n");
+            int seed = host.IndexOf("if (RuntimeTestProtocol.IsImportScenario(_request.Scenario)) SeedClassicPlanForImport();",
+                StringComparison.Ordinal);
+            int beforeOpen = host.IndexOf("_liveUiPhase = RemovalScenarioPrePhase;", StringComparison.Ordinal);
+            int open = host.IndexOf("_liveUiPhase = 22;", seed < 0 ? 0 : seed, StringComparison.Ordinal);
+            if (seed < 0 || beforeOpen < seed || open < beforeOpen ||
+                host.IndexOf("_liveUiPhase = RemovalScenarioOpenPhase;", StringComparison.Ordinal) < 0 ||
+                host.IndexOf("return UpdateRemovalScenarioBeforeOpen();", StringComparison.Ordinal) < 0 ||
+                host.IndexOf("return UpdateRemovalScenarioOpened();", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException("The host does not route the removal scenario before the open.");
+            int scenarioStart = press.IndexOf("private bool UpdateRemovalScenarioBeforeOpen()", StringComparison.Ordinal);
+            int scenarioEnd = press.IndexOf("private static void AddRemovalFields(", StringComparison.Ordinal);
+            string scenarioCode = scenarioStart < 0 || scenarioEnd < scenarioStart ? string.Empty
+                : press.Substring(scenarioStart, scenarioEnd - scenarioStart);
+            int prepare = scenarioCode.IndexOf("PrepareRemoval(campaign, inputs);", StringComparison.Ordinal);
+            int routine = scenarioCode.IndexOf("BuffPlannerUiRoot.PressRoutineForRuntime(\"long\")", StringComparison.Ordinal);
+            if (prepare < 0 || routine < prepare || scenarioCode.IndexOf("RequestPhysical(", StringComparison.Ordinal) >= 0 ||
+                scenarioCode.IndexOf("PressColdMoon", StringComparison.Ordinal) >= 0 ||
+                scenarioCode.IndexOf("ArmCastingFirstGrant", StringComparison.Ordinal) >= 0)
+                throw new InvalidOperationException("The removal scenario does not prepare and then press through " +
+                    "the routine entry without OS input.");
         }
 
         // The native "removal" run's Unity-free judgement: a selection press

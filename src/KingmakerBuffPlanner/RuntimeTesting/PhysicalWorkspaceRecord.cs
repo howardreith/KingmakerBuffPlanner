@@ -178,6 +178,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public string RemovalIntentDiff { get; set; }
         public string RemovalPoolsBefore { get; set; }
         public string RemovalPoolsAfter { get; set; }
+        // live-workspace-removal: the opened planner closed again (lease released).
+        public bool RemovalWorkspaceClosed { get; set; }
 
         public string CombatUnitId { get; set; }
         public bool? CombatInCombatBefore { get; set; }
@@ -552,6 +554,25 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!RemovalIntentKept) violations.Add("removal:intent-changed:" + (RemovalIntentDiff ?? "unread"));
             if (string.IsNullOrEmpty(RemovalPoolsBefore) || RemovalPoolsAfter != RemovalPoolsBefore)
                 violations.Add("removal:resources-changed-by-press");
+            return violations;
+        }
+
+        // live-workspace-removal: a cold press (no planner session, editor
+        // never opened) of a stored Long seed, refused by the lock with
+        // nothing run or opened; the removal evidence; the planner closed.
+        public IList<string> RemovalScenarioViolations()
+        {
+            var violations = new List<string>(Failures);
+            if (ColdSessionBeforeMoon != true || EditorNeverOpenedBeforeMoon != true)
+                violations.Add("moon:not-cold:session=" + ColdSessionBeforeMoon + ";editor=" + EditorNeverOpenedBeforeMoon);
+            if (SeedLongCastings.Count == 0) violations.Add("moon:seed:long=0");
+            if (MoonRunStarted) violations.Add("moon:run-without-grant");
+            else if (string.IsNullOrEmpty(MoonRefusal) ||
+                MoonRefusal.IndexOf("native-submission-disabled", StringComparison.Ordinal) < 0)
+                violations.Add("moon:not-refused-by-lock:" + (MoonRefusal ?? "none"));
+            if (!MoonWorkspaceStayedClosed) violations.Add("moon:editor-opened");
+            violations.AddRange(RemovalViolations());
+            if (!RemovalWorkspaceClosed) violations.Add("removal:workspace-not-closed");
             return violations;
         }
 
