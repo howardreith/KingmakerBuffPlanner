@@ -16,6 +16,9 @@
 - Rejected theory: "the desktop was in use" for -04 - idle 345 s; the
   foreground window was this session's terminal console.
 - kbp042-paper-02 re-bound the paper/sound evidence to the tested bytes.
+- Candidate: Build-Release at e9a4c5e, package 3f3d55af..., DLL b3f5023d...,
+  MVID bcb3d03e-... (byte-identical to the -05/paper-02 package). Guarded push
+  `aa053bb` (PASS, remote verified); draft PR #7 against main.
 
 ## 2026-10-10 0.4.2 owner-feedback follow-up (interim)
 
