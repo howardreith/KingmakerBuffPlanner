@@ -1,6 +1,7 @@
-# Buff Planner: player guide (0.4.1)
+# Buff Planner: player guide (0.4.2)
 
-This guide describes the casting-first planner of 0.4.1. It is
+This guide describes the casting-first planner of 0.4.2 (an owner-test
+build; 0.4.1 is the published release). It is
 the only normal planner: there is
 no Save button, no Accept Plan step and no Classic switch in the planner.
 "What has been checked in the game" at the end says exactly which parts a
@@ -17,6 +18,8 @@ guarded in-game run has observed at this build, and which have not.
   Classic inside the game. Your classic plan file is never changed.
 - New and unset profiles start in the casting-first planner with **Instant**
   casting. An explicit **Animated** choice from an earlier version is kept.
+- The planner opens on the game's own aged page over its table and plays the
+  game's paper sound once, as the character sheet and the journal do (0.4.2).
 
 ## The first open after upgrading
 
@@ -39,7 +42,9 @@ one target (or one group origin), and its own enhancements. Nothing is
 expanded, merged or substituted behind your back.
 
 1. Pick a buff in the list on the left (search, or the All / Spells /
-   Abilities / Other tabs).
+   Abilities / Other tabs). Spells with the same effect share one buff; every
+   class ability is its own buff (0.4.2), so the Ninja's Shadow Clone is
+   listed under Abilities beside, not inside, Mirror Image.
 2. Pick a caster in the left lane. When the caster can cast the buff in
    more than one way, pick the exact source row (spellbook and level, item
    or ability); each row says what the whole plan leaves of that pool.
@@ -103,6 +108,27 @@ If a save fails, the footer says why, your edits stay in the planner, the
 last good file on disk is kept, and runs refuse until the newest edit is
 saved. The footer then offers **Retry save** (or **Reload** when the stored
 plan itself could not be read).
+
+## When a spell leaves a spellbook
+
+If you remove a spell from a caster's spellbook, the castings that depended
+on it are removed too (0.4.2). Removing means retraining it away for a
+spontaneous caster, or un-preparing the last prepared copy for a prepared
+caster. This happens the next time you open the planner or press a routine,
+with the spellbook closed. The edit saves itself, and the footer says what
+it did, for example: "Removed 2 Mind Blank castings: no longer prepared in
+Felix's and Leinna's spellbooks. Undo available." **Undo** brings them back,
+and they then stay until that spellbook changes again. The plan from before
+the first such removal is kept beside it (`*.pre-spellbook-removal`).
+
+Nothing is ever removed for:
+- a spent slot or a caster with no uses left (the spell is still in the book);
+- a caster who is dead, unconscious or out of the party;
+- loading;
+- a spellbook the planner could not read with certainty;
+- combat, or a running routine.
+
+Another prepared copy of the spell keeps its castings.
 
 ## Reading a spell's full description
 
@@ -177,13 +203,25 @@ it is resolved.
 
 Install archive-first: back up the whole `Mods\KingmakerBuffPlanner` folder
 (including `UserSettings`) outside the `Mods` folder before replacing it,
-then confirm Unity Mod Manager lists version 0.4.1 (its log line
-`[KBP-BOOT] Main.Load exited;version=0.4.1;commit=<commit>` names the
+then confirm Unity Mod Manager lists version 0.4.2 (its log line
+`[KBP-BOOT] Main.Load exited;version=0.4.2;commit=<commit>` names the
 release commit). To roll back, copy the new `UserSettings` outside `Mods`,
 delete the new folder and copy your backup back. The release notes give the
 exact steps and the package checksum.
 
 ## What has been checked in the game
+
+0.4.2 (owner-test build; guarded runs `kbp042-*` on 2026-10-09/10, disposable
+test campaigns only; full record in `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`):
+
+| What | Checked in the game |
+| --- | --- |
+| Aged page, table and ink | Yes at 1920x1200 (`kbp042-paper-01`): the game's own page (`Card_Big`) and table resolved and drew untinted; the inventory, character sheet and map were captured in the same session for comparison; the spell description is on the same page |
+| Opening sound | The game's paper sound was posted once per open: 1/1 on opening, still 1/1 after two refreshes and the spell description, 2/2 and 3/3 after two close-and-reopen cycles. Whether it is audible: the owner's check |
+| Castings of a spell removed from a spellbook | Not yet: the first guarded run (`kbp042-removal-01`) never started (the in-game request check did not know the new scenario; fixed and regressed). The rule is proven in code against the game's own spellbook code, including the stale Mind Blank castings |
+| Spent slot / zero uses keep castings | Proven in code; in the game together with the removal run (not yet) |
+| Un-preparing a prepared spell | No: no mutable test party has a prepared caster (proven against the game's own spellbook code) |
+| Shadow Clone | No: no test party has a ninja. Its card, legality and plan are proven against the ability's own native blueprint |
 
 0.4.1 (the owner-accepted 0.4.0 candidate rc4 `009b6dd` - 0.4.1 adds only the version
 number and documentation - guarded runs `kbp040-rc4-*` on 2026-10-09, disposable test

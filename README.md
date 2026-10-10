@@ -4,8 +4,11 @@
 exact spell source, target, enhancements) and edit castings directly in the
 graph, with autosave and one-click Long / Important / Short routines from the
 HUD that never run in combat. See the
-[0.4.1 release notes](docs/RELEASE-NOTES-DRAFT.md) and the
-[player guide](docs/CASTING-FIRST-PLAYER-GUIDE.md).
+[release notes](docs/RELEASE-NOTES-DRAFT.md) and the
+[player guide](docs/CASTING-FIRST-PLAYER-GUIDE.md). `0.4.2` is a local
+owner-test build of three fixes from the owner's 0.4.1 feedback (Shadow Clone
+in the catalogue, castings of spells removed from a spellbook, and the game's
+own aged paper and opening sound); it is not published.
 
 Kingmaker Buff Planner is a standalone Unity Mod Manager mod for **Pathfinder:
 Kingmaker Enhanced Plus Edition 2.1.7b**.
