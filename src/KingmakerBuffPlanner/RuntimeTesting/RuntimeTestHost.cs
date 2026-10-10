@@ -1121,7 +1121,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             "closed;lease released", "closed=True;lease=released")
                         : RuntimeTestAssertion.Fail("inspection-workspace-closed",
                             "closed;lease released", "not-closed-or-lease-held"));
-                    if (!_inspectionWritten || !noSubmission || !_inspectionWorkspaceClosed)
+                    // 0.4.2: one native paper-opening cue per planner open.
+                    bool oneCue = _paperEvidence != null && _paperEvidence.OneCuePerOpen;
+                    result.Assertions.Add(oneCue
+                        ? RuntimeTestAssertion.Pass("paper042-one-open-cue-per-open",
+                            "openSounds == opens at every cycle", "opens=" +
+                                BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime + ";sounds=" +
+                                BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime)
+                        : RuntimeTestAssertion.Fail("paper042-one-open-cue-per-open",
+                            "openSounds == opens at every cycle", "opens=" +
+                                BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime + ";sounds=" +
+                                BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime));
+                    if (!_inspectionWritten || !noSubmission || !_inspectionWorkspaceClosed || !oneCue)
                     {
                         result.Status = "FAIL";
                         result.Stage = "inspection-validation";
@@ -2346,6 +2357,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _liveUiPhase = 0;
                 return false;
             }
+            if (_liveUiPhase == 22 && RuntimeTestProtocol.IsInspectionScenario(_request.Scenario) &&
+                !_nativeReferences.Done)
+            {
+                // 0.4.2: the native reference screens in this same session,
+                // before the planner opens (read-only; evidence only).
+                _nativeReferences.Tick(_request.EvidenceDirectory, CaptureScreenshot);
+                return false;
+            }
             if (_liveUiPhase == 22)
             {
                 // Control frame was already captured before the hotkey
@@ -3307,6 +3326,126 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // runtime-test session lock keeps the casting boundary refusing).
         private bool UpdateInspection()
         {
+            if (_inspectionStep == 0)
+            {
+                CollectInspection();
+                BeginPaperSoundEvidence();
+                _inspectionStep = 1;
+                return false;
+            }
+            return UpdatePaperSoundEvidence();
+        }
+
+        // 0.4.2 evidence in the same session: the planner's paper, backdrop
+        // and spell scroll as drawn, the open cue per open (two refreshes in
+        // between must add none), two close/reopen cycles, and the read-only
+        // spellbook membership the reconciliation would see. Read-only.
+        private void BeginPaperSoundEvidence()
+        {
+            _paperEvidence = new PaperSoundEvidence(_request.RunId);
+            _paperEvidence.NativeReferences(_nativeReferences, _request.EvidenceDirectory);
+            CastingWorkspaceScreenView view = BuffPlannerUiRoot.CastingWorkspaceViewForRuntime;
+            _paperEvidence.Record["workspacePaper"] = view == null ? "no-view" : view.WorkspacePaperEvidenceForRuntime;
+            _paperEvidence.Record["backdrop"] = view == null ? "no-view" : view.BackdropEvidenceForRuntime;
+            _paperEvidence.Cycle("first-open", BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime,
+                BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime);
+            if (view != null)
+            {
+                view.RefreshView();
+                view.RefreshView();
+            }
+            _paperEvidence.Cycle("after-two-refreshes", BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime,
+                BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime);
+            try
+            {
+                _paperEvidence.Record["spellbookMembership"] = PaperSoundEvidence.Membership(
+                    new KingmakerSpellbookMembershipAdapter().Capture());
+            }
+            catch (Exception exception)
+            {
+                _paperEvidence.Record["spellbookMembership"] = "read-failed:" + exception.GetType().Name;
+            }
+            ProviderSnapshot described = null;
+            try
+            {
+                CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
+                described = inputs == null ? null : inputs.Snapshot.Providers.FirstOrDefault(provider =>
+                    !string.IsNullOrWhiteSpace(provider.Description));
+            }
+            catch (Exception) { described = null; }
+            if (view != null && described != null)
+                view.ShowSpellInspect("#1 " + described.DisplayName, described.Description,
+                    described.DurationText, true);
+            _paperEvidence.Record["spellScrollOpened"] = view != null && view.SpellInspectOpen;
+            _inspectionClock = Stopwatch.StartNew();
+        }
+
+        private bool UpdatePaperSoundEvidence()
+        {
+            CastingWorkspaceScreenView view = BuffPlannerUiRoot.CastingWorkspaceViewForRuntime;
+            if (_inspectionStep == 1)
+            {
+                if (_inspectionClock.ElapsedMilliseconds < 1500) return false;
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "spell-scroll.png"));
+                _inspectionStep = 2;
+                _inspectionClock = Stopwatch.StartNew();
+                return false;
+            }
+            if (_inspectionStep == 2)
+            {
+                // The engine capture lands at the end of a later frame.
+                if (_inspectionClock.ElapsedMilliseconds < 1000) return false;
+                _paperEvidence.Record["spellScrollPaper"] = view == null ? "no-view"
+                    : view.SpellInspectPaperEvidenceForRuntime;
+                if (view != null) view.CloseSpellInspect();
+                _paperEvidence.Cycle("after-spell-scroll", BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime,
+                    BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime);
+                CloseProbeWorkspace();
+                _inspectionStep = 3;
+                return false;
+            }
+            if (_inspectionStep == 3)
+            {
+                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen) return false;
+                if (_inspectionReopens >= 2)
+                {
+                    _inspectionStep = 5;
+                    return false;
+                }
+                BuffPlannerUiRoot.HandlePlannerHotkey();
+                _inspectionClock = Stopwatch.StartNew();
+                _inspectionStep = 4;
+                return false;
+            }
+            if (_inspectionStep == 4)
+            {
+                if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen && _inspectionClock.ElapsedMilliseconds < 8000)
+                    return false;
+                if (_inspectionClock.ElapsedMilliseconds < 1000) return false;
+                _inspectionReopens++;
+                _paperEvidence.Cycle("reopen-" + _inspectionReopens, BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime,
+                    BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime);
+                CloseProbeWorkspace();
+                _inspectionStep = 3;
+                return false;
+            }
+            ProbeWorkspaceCloseResult closed = CloseProbeWorkspace();
+            _inspectionWorkspaceClosed = closed.Closed && closed.InputLeaseReleased &&
+                string.IsNullOrEmpty(closed.Failure);
+            _paperEvidence.Record["oneCuePerOpen"] = _paperEvidence.OneCuePerOpen;
+            _paperEvidence.Write(_request.EvidenceDirectory);
+            _log.Info("[KBP-PAPER-SOUND] evidence written;oneCuePerOpen=" + _paperEvidence.OneCuePerOpen +
+                ";opens=" + BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime + ";sounds=" +
+                BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime + ".");
+            _liveInitialCatalogEvidence = "inspection-scenario;workspaceRoot=active;legacyScreen=closed";
+            _workspaceInteractionEvidence = "inspection;no-authoring";
+            _workspaceReopenEvidence = "inspection;reopened=" + _inspectionReopens;
+            _completed = true;
+            return true;
+        }
+
+        private void CollectInspection()
+        {
             CastingWorkspaceInputs inputs = null;
             try { inputs = BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime(); }
             catch (Exception exception)
@@ -3357,14 +3496,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _log.Error("[KBP-INSPECT] collection failed.", exception);
                 }
             }
-            ProbeWorkspaceCloseResult closed = CloseProbeWorkspace();
-            _inspectionWorkspaceClosed = closed.Closed && closed.InputLeaseReleased &&
-                string.IsNullOrEmpty(closed.Failure);
-            _liveInitialCatalogEvidence = "inspection-scenario;workspaceRoot=active;legacyScreen=closed";
-            _workspaceInteractionEvidence = "inspection;no-authoring";
-            _workspaceReopenEvidence = "inspection;no-reopen-claim";
-            _completed = true;
-            return true;
         }
 
         // Mission section 11 (first-open import in game): before the first
@@ -3578,6 +3709,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _importFailure;
 
         private bool _inspectionWritten;
+        // 0.4.2 evidence (inspection scenario).
+        private readonly NativePaperReferenceCapture _nativeReferences = new NativePaperReferenceCapture();
+        private PaperSoundEvidence _paperEvidence;
+        private int _inspectionStep;
+        private int _inspectionReopens;
+        private Stopwatch _inspectionClock;
         private bool _inspectionWorkspaceClosed;
         private int _inspectionStartedRuns = -1;
         private string _inspectionDisposition = string.Empty;
