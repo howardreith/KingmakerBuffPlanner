@@ -104,6 +104,12 @@ namespace KingmakerBuffPlanner.UI
                     case NativeThemeCapability.ScrollRule:
                         RequireContract((Image)values[0], NativeSpriteContract.ScrollRule);
                         break;
+                    case NativeThemeCapability.SheetPaper:
+                        RequireContract((Image)values[0], NativeSpriteContract.SheetPaper);
+                        break;
+                    case NativeThemeCapability.TableBackdrop:
+                        RequireContract((Image)values[0], NativeSpriteContract.TableBackdrop);
+                        break;
                     case NativeThemeCapability.Paper:
                     case NativeThemeCapability.Ornament:
                         RequireSlicedSprite((Image)values[0]);

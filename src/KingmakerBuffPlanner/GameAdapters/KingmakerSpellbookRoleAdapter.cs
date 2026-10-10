@@ -37,6 +37,21 @@ namespace KingmakerBuffPlanner.GameAdapters
                     Relationship(book.Blueprint, Contracts.KnownFromMemorization))).ToArray());
         }
 
+        // 0.4.2 (B): the role rules are proven only when every optional
+        // contract they read is available - always without Call of the
+        // Wild (native books only), and with it only when all three pinned
+        // contracts resolved. A missing contract proves no membership.
+        internal static bool OptionalContractsComplete
+        {
+            get
+            {
+                bool optionalLoaded = AppDomain.CurrentDomain.GetAssemblies().Any(assembly =>
+                    string.Equals(assembly.GetName().Name, OptionalAssembly, StringComparison.Ordinal));
+                return !optionalLoaded || (Contracts.CannotUseSpells != null &&
+                    Contracts.CompanionSpellbook != null && Contracts.KnownFromMemorization != null);
+            }
+        }
+
         internal bool IsIncluded(Spellbook spellbook, IEnumerable<Spellbook> ownedSpellbooks)
         {
             if (spellbook == null || spellbook.Blueprint == null) return false;

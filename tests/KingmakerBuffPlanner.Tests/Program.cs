@@ -449,6 +449,8 @@ namespace KingmakerBuffPlanner.Tests
                 RunCatalogAuditTests(root);
                 RunPolicyAuthoringPhysicalTests(root);
                 RunParchmentThemeTests();
+                RunShadowCloneCatalogueTests(root);
+                RunSpellbookRemovalTests(root);
             }
             finally
             {
@@ -5145,6 +5147,9 @@ namespace KingmakerBuffPlanner.Tests
             ThemeNode spellbook = serviceWindow.Add("SpellBook");
             spellbook.Add("Scrollbar Vertical",
                 Comp(NativeThemeComponent.Scrollbar, new ThemeToken()));
+            // 0.4.2: the Journal's card sheet and the service windows' table.
+            serviceWindow.Add("Journal").Add("Cart", Comp(NativeThemeComponent.Image, new ThemeToken()));
+            serviceWindow.Add("Background", Comp(NativeThemeComponent.Image, new ThemeToken()));
             ThemeNode party = owner.Add("Party");
             ThemeNode partyCharacter = party.Add("Character");
             partyCharacter.Add("Highlight", Comp(NativeThemeComponent.Image, new ThemeToken()));

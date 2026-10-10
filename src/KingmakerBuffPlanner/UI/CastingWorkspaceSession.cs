@@ -27,11 +27,15 @@ namespace KingmakerBuffPlanner.UI
             IEnumerable<CastEnhancementSnapshot> enhancements,
             IEnumerable<ICastingTargetingModifier> targetingModifiers = null,
             ActiveEffectSnapshot liveEffects = null,
-            bool combatActive = false)
+            bool combatActive = false,
+            PartySpellbookMembership spellbookMembership = null,
+            bool runActive = false)
         {
             Snapshot = snapshot ?? throw new ArgumentNullException("snapshot");
             LiveEffects = liveEffects;
             CombatActive = combatActive;
+            SpellbookMembership = spellbookMembership;
+            RunActive = runActive;
             ProviderOptions = (providerOptions ?? new ProviderPlanningOption[0])
                 .Where(value => value != null).ToList();
             EffectsBySource = effectsBySource ??
@@ -53,6 +57,12 @@ namespace KingmakerBuffPlanner.UI
         public ActiveEffectSnapshot LiveEffects { get; private set; }
         // WP4: the party is in combat now; every routine refuses globally.
         public bool CombatActive { get; private set; }
+        // 0.4.2 (B): what each party spellbook holds, read natively with the
+        // fresh discovery a run or an open uses; null when not read (render
+        // refreshes), which never authorizes a removal.
+        public PartySpellbookMembership SpellbookMembership { get; private set; }
+        // A run is executing (its plan is immutable): no reconciliation.
+        public bool RunActive { get; private set; }
     }
 
     // The boundary between the reviewed casting plan and native submission.
@@ -202,6 +212,10 @@ namespace KingmakerBuffPlanner.UI
             Projection = projection;
         }
 
+        // 0.4.2 (B): what the spellbook reconciliation did at this attempt's
+        // boundary, before the gate saw the plan (never null after Apply).
+        public SpellbookReconciliationOutcome SpellbookReconciliation { get; internal set; }
+
         // The exact executor steps an allowed decision projects to (one per
         // approved casting); null when the decision never reached
         // projection. Present even while native dispatch is disabled, so
@@ -289,6 +303,11 @@ namespace KingmakerBuffPlanner.UI
                 LoadSourcePath = _repository.GetProfilePath(campaignId);
                 LastReloadNote = "recovered-pending:" + recovery.AutosaveStatus;
                 ReplaceAuthoring(new CastingAuthoringService(recovery.Document));
+                // PR #7 review R1: the archives the intent still owes are
+                // restored before the first write below (the recovered
+                // document is already normalized and pruned, so they cannot
+                // be rediscovered from it).
+                RestoreArchiveObligations(recovery.ArchiveObligations);
                 _uiSettings = new UiProfile
                 {
                     Scale = recovery.UiSettings.Scale,
@@ -385,10 +404,31 @@ namespace KingmakerBuffPlanner.UI
         // unsaved, and no instance ever carries two subscriptions.
         private void ReplaceAuthoring(CastingAuthoringService replacement)
         {
+            if (replacement == null) throw new ArgumentNullException("replacement");
+            // 0.4.2: every adopted document (load, reload, import, recovery)
+            // carries class/fact abilities under their own catalogue
+            // identity; the stored bytes are archived once before the next
+            // write replaces them (SaveProfile).
+            int migrated;
+            CastingPlanDocument normalized = CastingSourceIdentityMigration.Normalize(
+                replacement.Document, out migrated);
+            if (migrated != 0)
+            {
+                replacement = new CastingAuthoringService(normalized);
+                MigratedSourceIdentityCount += migrated;
+                _sourceIdentityMigrationPending = true;
+            }
             if (_authoring != null) _authoring.DocumentChanged -= OnDocumentChangedForAutosave;
-            _authoring = replacement ?? throw new ArgumentNullException("replacement");
+            _authoring = replacement;
             _authoring.DocumentChanged += OnDocumentChangedForAutosave;
         }
+
+        // Saved castings this session moved to their ability's own
+        // catalogue identity (0.4.2), and whether the stored file still
+        // awaits its one exact archive.
+        public int MigratedSourceIdentityCount { get; private set; }
+        private bool _sourceIdentityMigrationPending;
+        public string SourceIdentityArchivePath { get; private set; }
 
         private void OnDocumentChangedForAutosave(CastingPlanDocument document, int revision)
         {
@@ -456,6 +496,13 @@ namespace KingmakerBuffPlanner.UI
                 RetiredSemanticsArchivePath = _repository.ArchiveRetiredSemanticsOnce(CampaignId);
                 _retiredSemanticsPending = false;
             }
+            if (_sourceIdentityMigrationPending)
+            {
+                SourceIdentityArchivePath = _repository.ArchivePrimaryOnce(
+                    CampaignId, CastingPlanRepository.SourceIdentityArchiveLabel);
+                _sourceIdentityMigrationPending = false;
+            }
+            ArchiveBeforeSpellbookReconciliation();
             _repository.Save(CastingPlanProfile.FromDocument(
                 _authoring.Document, _uiSettings, _executionSettings));
         }
@@ -502,7 +549,36 @@ namespace KingmakerBuffPlanner.UI
         {
             return new PendingSessionRecovery(_modPath, CampaignId,
                 _authoring.Document, _uiSettings, _executionSettings,
-                _autosaveStatus ?? AutosaveStatus);
+                _autosaveStatus ?? AutosaveStatus, PendingArchiveObligations);
+        }
+
+        // The mandatory pre-write archives this session still owes, in the
+        // order SaveProfile performs them (each flag clears only after its
+        // archive was written and read back exact).
+        public IReadOnlyList<string> PendingArchiveObligations
+        {
+            get
+            {
+                var labels = new List<string>();
+                if (_retiredSemanticsPending) labels.Add(CastingPlanRepository.RetiredSemanticsArchiveLabel);
+                if (_sourceIdentityMigrationPending) labels.Add(CastingPlanRepository.SourceIdentityArchiveLabel);
+                if (_spellbookArchivePending) labels.Add(CastingPlanRepository.SpellbookRemovalArchiveLabel);
+                return labels.AsReadOnly();
+            }
+        }
+
+        // An obligation this build does not know cannot be honoured: the
+        // adoption fails and the recovery entry stays in its store.
+        private void RestoreArchiveObligations(IEnumerable<string> labels)
+        {
+            foreach (string label in labels ?? new string[0])
+            {
+                if (label == CastingPlanRepository.RetiredSemanticsArchiveLabel) _retiredSemanticsPending = true;
+                else if (label == CastingPlanRepository.SourceIdentityArchiveLabel) _sourceIdentityMigrationPending = true;
+                else if (label == CastingPlanRepository.SpellbookRemovalArchiveLabel) _spellbookArchivePending = true;
+                else throw new ArgumentException("Unknown archive obligation in the recovered intent: " + label,
+                    "recovery");
+            }
         }
 
         // Passive save state for the footer (v1.2 §2): "saved" for the
@@ -1538,7 +1614,18 @@ namespace KingmakerBuffPlanner.UI
             // focuses the first current blocker without authoring anything.
             if (ProblemNavigation.Active) ClearGraphFocus();
             else LeaveProblemNavigation();
-            WorkspaceApplyResult result = ApplyCore(mode, scopeRoutineId, inputs);
+            // 0.4.2 (B): a deliberate spellbook removal observed now retires
+            // its dependent castings BEFORE the gate compiles the plan, on
+            // every route (HUD-first included). A removal that could not be
+            // saved gets one more flush, then refuses the run: a pruned plan
+            // is never cast while it is not durable.
+            SpellbookReconciliationOutcome reconciliation = ReconcileSpellbookRemovals(inputs);
+            if (reconciliation.Applied && !IntentIsDurable) PersistNow("run-flush");
+            WorkspaceApplyResult result = reconciliation.Applied && !IntentIsDurable
+                ? new WorkspaceApplyResult(false,
+                    "persistence-failed:" + (_autosaveStatus ?? "unknown"), null, null)
+                : ApplyCore(mode, scopeRoutineId, inputs);
+            result.SpellbookReconciliation = reconciliation;
             if (!result.Allowed && result.BlockingCastings.Count != 0 &&
                 mode == CastingApplyMode.Ordinary)
             {
@@ -2269,7 +2356,10 @@ namespace KingmakerBuffPlanner.UI
 
         public bool Undo()
         {
-            return _authoring.Undo();
+            int revision = _authoring.CurrentRevision;
+            bool undone = _authoring.Undo();
+            if (undone) NoteUndoForSpellbookReconciliation(revision);
+            return undone;
         }
 
         // ------------------------------------------------------------------

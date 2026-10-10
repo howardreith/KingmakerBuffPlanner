@@ -218,7 +218,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 IsInspectionScenario(scenario) ||
                 IsQualificationScenario(scenario) ||
                 IsClassicCastScenario(scenario) ||
-                IsPhysicalWorkspaceScenario(scenario);
+                IsPhysicalWorkspaceScenario(scenario) ||
+                IsRemovalScenario(scenario);
         }
 
         // Physical input in the casting-first workspace (mission batch 3,
@@ -363,7 +364,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             return IsManualWorkspaceScenario(scenario) || IsProbeScenario(scenario) ||
                 IsInspectionScenario(scenario) || IsQualificationScenario(scenario) ||
-                IsImportScenario(scenario) || IsClassicCastScenario(scenario);
+                IsImportScenario(scenario) || IsClassicCastScenario(scenario) ||
+                IsRemovalScenario(scenario);
+        }
+
+        // 0.4.2 (B): the spellbook-removal reconciliation with zero synthetic
+        // input, for a desktop where the game cannot take the foreground
+        // (kbp042-removal-03/04: a console window held it and the physical
+        // run refused to deliver). The automation fixture only: a cold Long
+        // seed, the physical "removal" expectation's castings and native
+        // book edits (the game's own RemoveSpell and spend), then the Long
+        // routine pressed through the HUD's own routine entry while the
+        // planner has never been opened, the planner opened through the
+        // production path, its notice read and the planner closed. Nothing
+        // is cast: the runtime-test session lock refuses the press.
+        internal static bool IsRemovalScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-workspace-removal", StringComparison.Ordinal);
         }
 
         internal const int ProbeRunDeadlineSeconds = 60;
@@ -522,8 +539,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (!IsPhysicalWorkspaceScenario(request.Scenario))
                         throw new InvalidDataException("physical-expectation-only-with-physical");
                     string expectation = request.Parameters["physicalExpectation"] as string;
-                    if (expectation != "select" && expectation != "cast" && expectation != "problems" &&
-                        expectation != "spellbook" && expectation != "combat" && expectation != "authoring")
+                    if (expectation == null || Array.IndexOf(PhysicalExpectations, expectation) < 0)
                         throw new InvalidDataException("physical-expectation");
                 }
                 bool hasCfAllowance = request.Parameters.ContainsKey("cfAllowance");
@@ -627,11 +643,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             ValidateLiveSaveParameters(request, automaticExact.Length);
         }
 
+        // Every physical expectation the launcher may send (its -PhysicalExpectation
+        // ValidateSet, checked for parity by the tests). 0.4.2 defect
+        // kbp042-removal-01: "removal" was added to the launcher and the host
+        // but not here, so the host rejected the request at boot and the
+        // launcher timed out at the main menu.
+        internal static readonly string[] PhysicalExpectations =
+            { "cast", "select", "problems", "spellbook", "combat", "authoring", "removal" };
+
+        // The moon expectation the casting-first physical sequence judges
+        // (problems and spellbook runs are routed before it): anything not
+        // named here is the allowance-bound cast run.
+        internal static string MoonExpectationFor(string physicalExpectation)
+        {
+            return physicalExpectation == "select" || physicalExpectation == "combat" ||
+                physicalExpectation == "authoring" || physicalExpectation == "removal"
+                ? physicalExpectation : "cast";
+        }
+
         // The guarded live-save contract shared by every scenario that
         // stages the WORKING campaign (reviews I4): exact keys, required
         // names, real SHA-256 values, distinct files, and a valid mode.
         // allowanceBound: the request carries a run-bound casting allowance,
         // the only way a casting scenario may load the advanced copy.
+
         private static void ValidateLiveSaveParameters(
             RuntimeTestRequest request, int expectedTotal, bool allowanceBound = false)
         {

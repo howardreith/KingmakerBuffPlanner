@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using KingmakerBuffPlanner.RuntimeTesting;
 using KingmakerBuffPlanner.UI;
 
@@ -14,13 +16,14 @@ namespace KingmakerBuffPlanner.Tests
         private static void RunPolicyAuthoringPhysicalTests(string root)
         {
             Run("physical-combat-and-authoring-requests", () => TestPolicyAuthoringRequests(root));
+            Run("physical-expectation-launcher-host-parity", () => TestPhysicalExpectationParity(root));
             Run("physical-combat-judgement", TestPhysicalCombatJudgement);
             Run("physical-authoring-judgement", TestPhysicalAuthoringJudgement);
         }
 
         private static void TestPolicyAuthoringRequests(string root)
         {
-            foreach (string expectation in new[] { "combat", "authoring" })
+            foreach (string expectation in new[] { "combat", "authoring", "removal" })
             {
                 string path = WriteRequest(root, "physical-" + expectation, o =>
                 {
@@ -68,6 +71,76 @@ namespace KingmakerBuffPlanner.Tests
                     rejection.IndexOf("cf-allowance-only-with-cast-expectation", StringComparison.Ordinal) < 0)
                     throw new InvalidOperationException("A " + expectation + " request accepted a casting allowance.");
             }
+        }
+
+        // The launcher's -PhysicalExpectation ValidateSet and the host's
+        // request validation accept exactly the same values, and every one
+        // of them parses at boot (kbp042-removal-01: the host rejected the
+        // new "removal" request and the launcher timed out at the menu).
+        private static void TestPhysicalExpectationParity(string root)
+        {
+            string launcher = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "scripts",
+                "Invoke-KingmakerRuntimeTest.ps1"));
+            Match set = Regex.Match(launcher,
+                @"\[ValidateSet\(([^)]*)\)\]\[string\]\$PhysicalExpectation\b");
+            if (!set.Success) throw new InvalidOperationException("The launcher's expectation set was not found.");
+            string[] launcherValues = Regex.Matches(set.Groups[1].Value, "'([^']+)'").Cast<Match>()
+                .Select(value => value.Groups[1].Value).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+            string[] hostValues = RuntimeTestProtocol.PhysicalExpectations
+                .OrderBy(value => value, StringComparer.Ordinal).ToArray();
+            if (!launcherValues.SequenceEqual(hostValues))
+                throw new InvalidOperationException("Launcher and host expectations differ: " +
+                    string.Join(",", launcherValues) + " vs " + string.Join(",", hostValues));
+            foreach (string expectation in launcherValues)
+            {
+                string path = WriteRequest(root, "parity-" + expectation, o =>
+                {
+                    o["scenario"] = "live-workspace-physical";
+                    var parameters = new Dictionary<string, object>
+                    {
+                        { "workingSaveName", "KBP_AUTOMATION_WORKING" },
+                        { "workingFileName", "Manual_305_KBP_AUTOMATION_WORKING.zks" },
+                        { "workingSha256", new string('a', 64) },
+                        { "baselineSaveName", "KBP_AUTOMATION_BASELINE" },
+                        { "baselineFileName", "Manual_304_KBP_AUTOMATION_BASELINE.zks" },
+                        { "baselineSha256", new string('b', 64) },
+                        { "expectedGameName", "Yadmila" },
+                        { "expectedGameId", "3d556254-8ba9-4e9f-8d11-755eecd0b661" },
+                        { "executionMode", "animated" },
+                        { "physicalExpectation", expectation }
+                    };
+                    if (expectation == "cast") parameters["cfAllowance"] = "{}";
+                    o["parameters"] = parameters;
+                });
+                string rejection;
+                RuntimeTestRequest request = ReadProtocol(
+                    new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection);
+                if (request == null || rejection.Length != 0)
+                    throw new InvalidOperationException("The launcher's " + expectation +
+                        " request is rejected by the host: " + rejection);
+            }
+            string unknown = WriteRequest(root, "parity-unknown", o =>
+            {
+                o["scenario"] = "live-workspace-physical";
+                o["parameters"] = new Dictionary<string, object>
+                {
+                    { "workingSaveName", "KBP_AUTOMATION_WORKING" },
+                    { "workingFileName", "Manual_305_KBP_AUTOMATION_WORKING.zks" },
+                    { "workingSha256", new string('a', 64) },
+                    { "baselineSaveName", "KBP_AUTOMATION_BASELINE" },
+                    { "baselineFileName", "Manual_304_KBP_AUTOMATION_BASELINE.zks" },
+                    { "baselineSha256", new string('b', 64) },
+                    { "expectedGameName", "Yadmila" },
+                    { "expectedGameId", "3d556254-8ba9-4e9f-8d11-755eecd0b661" },
+                    { "executionMode", "animated" },
+                    { "physicalExpectation", "remove" }
+                };
+            });
+            string unknownRejection;
+            if (ReadProtocol(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, unknown },
+                    out unknownRejection) != null ||
+                unknownRejection.IndexOf("physical-expectation", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException("An unknown expectation was accepted.");
         }
 
         // A clean selection press (refused by the lock, nothing landed) with

@@ -22,9 +22,12 @@ namespace KingmakerBuffPlanner.UI
         private readonly List<RectTransform> _paperSurfaces = new List<RectTransform>();
         private readonly List<ParchmentSurface> _parchments = new List<ParchmentSurface>();
         private readonly List<ParchmentRule> _rules = new List<ParchmentRule>();
+        private readonly List<ParchmentBackdrop> _backdrops = new List<ParchmentBackdrop>();
         private readonly List<string> _diagnostics = new List<string>();
         private Image _scrollPaperDonor;
         private Image _scrollRuleDonor;
+        private Image _sheetPaperDonor;
+        private Image _tableBackdropDonor;
         private string _parchmentLogged;
         private string _summary = string.Empty;
 
@@ -67,7 +70,15 @@ namespace KingmakerBuffPlanner.UI
         {
             if (surface == null || _parchments.Contains(surface)) return;
             _parchments.Add(surface);
-            surface.Apply(_scrollPaperDonor, PaperUnavailableReason());
+            surface.Apply(_sheetPaperDonor, _scrollPaperDonor, PaperUnavailableReason(), Screen.height);
+        }
+
+        // 0.4.2: the planner's full-screen blocker shows the native table.
+        internal void RegisterBackdrop(ParchmentBackdrop backdrop)
+        {
+            if (backdrop == null || _backdrops.Contains(backdrop)) return;
+            _backdrops.Add(backdrop);
+            backdrop.Apply(_tableBackdropDonor, Failure(NativeThemeCapability.TableBackdrop));
         }
 
         internal void RegisterRule(ParchmentRule rule)
@@ -85,11 +96,14 @@ namespace KingmakerBuffPlanner.UI
             {
                 var parts = new List<string>
                 {
+                    "sheetPaper=" + CapabilityEvidence(NativeThemeCapability.SheetPaper),
                     "scrollPaper=" + CapabilityEvidence(NativeThemeCapability.ScrollPaper),
-                    "scrollRule=" + CapabilityEvidence(NativeThemeCapability.ScrollRule)
+                    "scrollRule=" + CapabilityEvidence(NativeThemeCapability.ScrollRule),
+                    "tableBackdrop=" + CapabilityEvidence(NativeThemeCapability.TableBackdrop)
                 };
                 foreach (ParchmentSurface surface in _parchments) parts.Add(surface.Evidence);
                 foreach (ParchmentRule rule in _rules) parts.Add(rule.Evidence);
+                foreach (ParchmentBackdrop backdrop in _backdrops) parts.Add(backdrop.Evidence);
                 return string.Join("|", parts.ToArray());
             }
         }
@@ -103,16 +117,24 @@ namespace KingmakerBuffPlanner.UI
 
         private string PaperUnavailableReason()
         {
-            if (_scrollPaperDonor != null) return null;
-            string failure = _theme == null ? null : _theme.Resources.Failure(NativeThemeCapability.ScrollPaper);
-            return failure ?? "not-applied";
+            if (_scrollPaperDonor != null || _sheetPaperDonor != null) return null;
+            return "sheet: " + (Failure(NativeThemeCapability.SheetPaper) ?? "not-applied") +
+                "; scroll: " + (Failure(NativeThemeCapability.ScrollPaper) ?? "not-applied");
+        }
+
+        private string Failure(NativeThemeCapability capability)
+        {
+            return _theme == null ? "no theme" : _theme.Resources.Failure(capability);
         }
 
         private void RefreshParchment()
         {
             string reason = PaperUnavailableReason();
-            foreach (ParchmentSurface surface in _parchments) surface.Apply(_scrollPaperDonor, reason);
+            foreach (ParchmentSurface surface in _parchments)
+                surface.Apply(_sheetPaperDonor, _scrollPaperDonor, reason, Screen.height);
             foreach (ParchmentRule rule in _rules) rule.Apply(_scrollRuleDonor);
+            foreach (ParchmentBackdrop backdrop in _backdrops)
+                backdrop.Apply(_tableBackdropDonor, Failure(NativeThemeCapability.TableBackdrop));
         }
 
         // Logged once per distinct outcome after a whole binding pass (never
@@ -168,6 +190,12 @@ namespace KingmakerBuffPlanner.UI
             _bindings.Add(NativeThemeCapability.ScrollRule,
                 components => { _scrollRuleDonor = (Image)components[0]; RefreshParchment(); },
                 delegate { _scrollRuleDonor = null; RefreshParchment(); });
+            _bindings.Add(NativeThemeCapability.SheetPaper,
+                components => { _sheetPaperDonor = (Image)components[0]; RefreshParchment(); },
+                delegate { _sheetPaperDonor = null; RefreshParchment(); });
+            _bindings.Add(NativeThemeCapability.TableBackdrop,
+                components => { _tableBackdropDonor = (Image)components[0]; RefreshParchment(); },
+                delegate { _tableBackdropDonor = null; RefreshParchment(); });
             if (_theme.Resources.AvailableCount != NativeThemeResolution.Capabilities.Length)
                 Record("native theme resolved partially at attach;native=" +
                     _nativeLookupRoot.GetInstanceID() + ";summary=" +

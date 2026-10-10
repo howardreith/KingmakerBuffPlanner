@@ -19,7 +19,8 @@ namespace KingmakerBuffPlanner.UI
     {
         internal PendingSessionRecovery(string modPath, string campaignId,
             CastingPlanDocument document, UiProfile uiSettings,
-            ExecutionProfile executionSettings, string autosaveStatus)
+            ExecutionProfile executionSettings, string autosaveStatus,
+            IEnumerable<string> archiveObligations = null)
         {
             if (string.IsNullOrWhiteSpace(modPath))
                 throw new ArgumentException("Absolute mod path is required.", "modPath");
@@ -31,6 +32,8 @@ namespace KingmakerBuffPlanner.UI
             UiSettings = uiSettings ?? UiProfile.Default();
             ExecutionSettings = executionSettings ?? ExecutionProfile.Default();
             AutosaveStatus = autosaveStatus ?? string.Empty;
+            ArchiveObligations = (archiveObligations ?? new string[0])
+                .Where(value => !string.IsNullOrEmpty(value)).ToList().AsReadOnly();
         }
 
         public string ModPath { get; private set; }
@@ -41,6 +44,12 @@ namespace KingmakerBuffPlanner.UI
         // Why the intent is here (the failed flush's last status), for
         // honest reporting when it is adopted or inspected.
         public string AutosaveStatus { get; private set; }
+        // PR #7 review R1: the mandatory pre-write archives the intent still
+        // owes (CastingPlanRepository archive labels: retired 0.3.0
+        // semantics, the 0.4.2 source-identity migration, a spellbook
+        // removal). The adopting session restores them before its first
+        // write, so recovery can never turn a failed archive into a save.
+        public IReadOnlyList<string> ArchiveObligations { get; private set; }
     }
 
     // Process-wide (or test-scoped) recovery registry keyed by the exact

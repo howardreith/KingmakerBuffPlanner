@@ -71,8 +71,24 @@ namespace KingmakerBuffPlanner.UI
         internal static readonly NativeSpriteContract ScrollRule = new NativeSpriteContract(
             "blockscroll_bottom", 147f, 11f, 20f, 0f, 20f, 0f, 200f);
 
+        // 0.4.2: the native card sheet behind the Journal, the character
+        // screen's right page and the settings and character-build cards
+        // (Card_Big: 2048x1567 texture, sprite rect height 1566.8, 84.28 PPU,
+        // no nine-slice border, drawn Simple and untinted by the game; read
+        // live at StaticCanvas/ServiceWindow/Journal/Cart, runtime
+        // kbp042-donors-02). The planner draws it as its own nine-slice over
+        // the same texture (ParchmentSheetGeometry), never edits it.
+        internal static readonly NativeSpriteContract SheetPaper = new NativeSpriteContract(
+            "Card_Big", 2048f, 1566.8f, 0f, 0f, 0f, 0f, 84.27984f, false, 0.1f);
+
+        // The dark wood table every native service window lies on (drawn
+        // Simple and untinted at StaticCanvas/ServiceWindow/Background).
+        internal static readonly NativeSpriteContract TableBackdrop = new NativeSpriteContract(
+            "ServiceWindow_TableBackGruond_3840_2022", 2048f, 1024f, 0f, 0f, 0f, 0f, 100f, false);
+
         internal NativeSpriteContract(string name, float width, float height, float borderLeft,
-            float borderBottom, float borderRight, float borderTop, float pixelsPerUnit)
+            float borderBottom, float borderRight, float borderTop, float pixelsPerUnit,
+            bool requireSliced = true, float sizeTolerance = Tolerance)
         {
             if (string.IsNullOrEmpty(name)) throw new ArgumentException("A sprite contract needs a name.", "name");
             if (pixelsPerUnit <= 0f) throw new ArgumentOutOfRangeException("pixelsPerUnit");
@@ -84,7 +100,16 @@ namespace KingmakerBuffPlanner.UI
             BorderRight = borderRight;
             BorderTop = borderTop;
             PixelsPerUnit = pixelsPerUnit;
+            RequireSliced = requireSliced;
+            SizeTolerance = sizeTolerance;
         }
+
+        // The donor Image must draw it Sliced (a sheet the game slices);
+        // false for art the game draws Simple.
+        internal bool RequireSliced { get; private set; }
+        // A sprite rect may be fractional (Card_Big's height is 1566.8):
+        // the size is matched within this many pixels.
+        internal float SizeTolerance { get; private set; }
 
         internal string Name { get; private set; }
         internal float Width { get; private set; }
@@ -103,8 +128,8 @@ namespace KingmakerBuffPlanner.UI
             if (!string.Equals(facts.Name, Name, StringComparison.Ordinal))
                 return "sprite name is " + facts.Describe() + ", expected '" + Name + "'";
             if (!facts.HasTexture) return "sprite has no texture: " + facts.Describe();
-            if (!facts.Sliced) return "donor image is not Sliced: " + facts.Describe();
-            if (!Same(facts.Width, Width) || !Same(facts.Height, Height))
+            if (RequireSliced && !facts.Sliced) return "donor image is not Sliced: " + facts.Describe();
+            if (!Same(facts.Width, Width, SizeTolerance) || !Same(facts.Height, Height, SizeTolerance))
                 return "sprite size changed: " + facts.Describe() + ", expected " +
                     NativeSpriteFacts.Number(Width) + "x" + NativeSpriteFacts.Number(Height);
             if (!Same(facts.BorderLeft, BorderLeft) || !Same(facts.BorderBottom, BorderBottom) ||
@@ -118,9 +143,9 @@ namespace KingmakerBuffPlanner.UI
             return null;
         }
 
-        private static bool Same(float actual, float expected)
+        private static bool Same(float actual, float expected, float tolerance = Tolerance)
         {
-            return !float.IsNaN(actual) && Math.Abs(actual - expected) <= Tolerance;
+            return !float.IsNaN(actual) && Math.Abs(actual - expected) <= tolerance;
         }
     }
 }

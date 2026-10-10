@@ -1,3 +1,15 @@
+# Autonomous blockers — 0.4.2 owner-test candidate, 2026-10-10
+
+Open items (details in `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`): owner
+acceptance of the candidate; no fixture has a Ninja (native Shadow Clone cast)
+or a mutable prepared caster (native prepared-spell removal, spend, pending
+rest); the automation fixture knows no level 1+ spontaneous buff (native
+exhaustion of a buff's own pool); OS-input physical runs cannot take the game
+foreground while a console window owns it (the harness refuses synthetic
+input; `live-workspace-removal` proves the reconciliation without input);
+audible verification of the opening sound. The 0.4.0 section below is
+historical.
+
 # Autonomous blockers — 0.4.0 owner-review candidate, 2026-10-09
 
 Open items for rc4 (details in `docs/REMAINING-WORK-0.4.0-HANDOFF.md`):
