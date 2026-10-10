@@ -7,26 +7,35 @@ using UnityEngine.UI;
 namespace KingmakerBuffPlanner.UI
 {
     // The native paper drawn under one owned surface (the workspace frame,
-    // the spell scroll). The donor sheet is only read: its sprite and
-    // material are shown by two owned Images - a soft shadow silhouette and
-    // the sheet - inside a bounds rect that reaches the surface's outsets,
-    // each scaled by ParchmentLayerGeometry so the nine-slice borders draw
-    // at 0.25 canvas units per sprite pixel. Both reject raycasts and ignore
-    // layout; the surface's own Image stays its hit surface. When the donor
-    // is missing or rejected, or the canvas cannot be measured, every owned
-    // change is undone and the surface shows exactly its previous flat tint
-    // and outline again.
+    // the spell scroll). 0.4.2: the paper is the native card sheet
+    // (Card_Big) when it validates - drawn untinted, as the game draws it,
+    // through a planner-owned nine-slice sprite over the same texture
+    // (ParchmentSheetGeometry) - else the 0.4.1 scroll sheet
+    // (dialogue_backsheet, layer-scaled by ParchmentLayerGeometry), else the
+    // surface's previous flat tint and outline exactly. Donors are only
+    // read. Two owned Images draw it - a soft shadow silhouette and the
+    // sheet - inside a bounds rect that reaches the surface's outsets; both
+    // reject raycasts and ignore layout; the surface's own Image stays its
+    // hit surface.
     //
-    // The layer scale lives on the layers' own transforms: a pass that
-    // resets localScale (KingmakerUiFactory.ForceLayoutAndSnap) must never
-    // run over a parchment surface; Apply re-asserts the scale.
+    // The scroll sheet's layer scale lives on the layers' own transforms: a
+    // pass that resets localScale (KingmakerUiFactory.ForceLayoutAndSnap)
+    // must never run over a parchment surface; Apply re-asserts the scale.
     internal sealed class ParchmentSurface
     {
+        private enum Paper
+        {
+            Fallback,
+            Scroll,
+            Sheet
+        }
+
         private sealed class Wash
         {
             internal Image Image;
             internal Color Fallback;
             internal float PaperAlpha;
+            internal float SheetAlpha;
             internal Outline Outline;
             internal bool OutlineFallback;
         }
@@ -38,20 +47,28 @@ namespace KingmakerBuffPlanner.UI
         private readonly Outline _outline;
         private readonly bool _outlineFallback;
         private readonly ParchmentInsets _outsets;
+        private readonly ParchmentInsets _sheetOutsets;
+        private readonly float _sheetUnitsPerTexel;
         private readonly RectTransform _bounds;
         private readonly Image _hit;
         private readonly Image _shadow;
         private readonly Image _paper;
         private readonly List<Wash> _washes = new List<Wash>();
+        private Paper _mode = Paper.Fallback;
         private ParchmentLayerGeometry _geometry;
+        private ParchmentSheetGeometry _sheetGeometry;
+        private ParchmentInsets _drawnOutsets;
         private string _spriteName;
         private string _fallbackReason = "not-applied";
 
-        private ParchmentSurface(string name, RectTransform surface, ParchmentInsets outsets)
+        private ParchmentSurface(string name, RectTransform surface, ParchmentInsets outsets,
+            ParchmentInsets sheetOutsets, float sheetUnitsPerTexel)
         {
             _name = name;
             _surface = surface;
             _outsets = outsets;
+            _sheetOutsets = sheetOutsets;
+            _sheetUnitsPerTexel = sheetUnitsPerTexel;
             _ground = surface.GetComponent<Image>();
             _groundFallback = _ground == null ? Color.clear : _ground.color;
             _outline = surface.GetComponent<Outline>();
@@ -61,8 +78,7 @@ namespace KingmakerBuffPlanner.UI
             _bounds.anchorMin = Vector2.zero;
             _bounds.anchorMax = Vector2.one;
             _bounds.pivot = new Vector2(0.5f, 0.5f);
-            _bounds.offsetMin = new Vector2(-outsets.Left, -outsets.Bottom);
-            _bounds.offsetMax = new Vector2(outsets.Right, outsets.Top);
+            SetBounds(outsets);
             _bounds.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
             // While the sheet shows, its visible edge beyond the surface is
             // part of the surface: a click there lands on the sheet (and is
@@ -75,19 +91,23 @@ namespace KingmakerBuffPlanner.UI
             _paper = Layer("ParchmentSheet");
         }
 
-        internal static ParchmentSurface Create(string name, RectTransform surface, ParchmentInsets outsets)
+        internal static ParchmentSurface Create(string name, RectTransform surface, ParchmentInsets outsets,
+            ParchmentInsets sheetOutsets, float sheetUnitsPerTexel)
         {
             if (surface == null) throw new ArgumentNullException("surface");
-            return new ParchmentSurface(name, surface, outsets);
+            return new ParchmentSurface(name, surface, outsets, sheetOutsets, sheetUnitsPerTexel);
         }
 
-        internal bool Native { get { return _geometry != null; } }
+        internal bool Native { get { return _mode != Paper.Fallback; } }
+        internal bool NativeSheet { get { return _mode == Paper.Sheet; } }
         internal string Name { get { return _name; } }
 
         // A flat ground drawn over the paper (a lane's well, the footer
-        // ledger) that becomes a light wash while the paper is native and
-        // gets its exact previous colour back on fallback.
-        internal void AddWash(Image image, float paperAlpha)
+        // ledger): a light wash of its own colour on the scroll sheet, a
+        // wash at sheetAlpha on the native card sheet (0: the lane is the
+        // sheet itself, as in the native screens), and its exact previous
+        // colour back on fallback.
+        internal void AddWash(Image image, float paperAlpha, float sheetAlpha)
         {
             if (image == null) return;
             Outline outline = image.GetComponent<Outline>();
@@ -96,6 +116,7 @@ namespace KingmakerBuffPlanner.UI
                 Image = image,
                 Fallback = image.color,
                 PaperAlpha = paperAlpha,
+                SheetAlpha = sheetAlpha,
                 Outline = outline,
                 OutlineFallback = outline != null && outline.enabled
             };
@@ -103,29 +124,70 @@ namespace KingmakerBuffPlanner.UI
             ApplyWash(wash);
         }
 
-        internal void Apply(Image donor, string unavailableReason)
+        internal void Apply(Image sheetDonor, Image scrollDonor, string unavailableReason, float screenHeight)
         {
-            if (donor == null || donor.sprite == null)
+            float reference = ReferencePixelsPerUnit(_surface);
+            string sheetFailure = null;
+            if (sheetDonor != null && sheetDonor.sprite != null && sheetDonor.sprite.texture != null)
+            {
+                ParchmentSheetGeometry sheet = ParchmentSheetGeometry.For(_sheetUnitsPerTexel, screenHeight,
+                    reference);
+                Sprite sliced = sheet.Valid ? PlannerSheetSprites.For(sheetDonor.sprite, sheet) : null;
+                if (sliced != null)
+                {
+                    ShowSheet(sheetDonor, sliced, sheet);
+                    return;
+                }
+                sheetFailure = sheet.Valid ? "sheet sprite could not be sliced" : sheet.Failure;
+            }
+            if (scrollDonor == null || scrollDonor.sprite == null)
             {
                 Fallback(string.IsNullOrEmpty(unavailableReason) ? "donor unavailable" : unavailableReason);
                 return;
             }
             ParchmentLayerGeometry geometry = ParchmentLayerGeometry.For(NativeSpriteContract.ScrollPaper,
-                ReferencePixelsPerUnit(_surface));
+                reference);
             if (!geometry.Valid)
             {
                 Fallback(geometry.Failure);
                 return;
             }
+            _mode = Paper.Scroll;
             _geometry = geometry;
+            _sheetGeometry = null;
+            _spriteName = scrollDonor.sprite.name;
+            _fallbackReason = sheetFailure ?? string.Empty;
+            SetBounds(_outsets);
+            Show(_shadow, scrollDonor.sprite, scrollDonor.material, geometry.AnchorMin, geometry.AnchorMax,
+                geometry.Scale, new Vector2(ParchmentSurfaces.ShadowOffsetX, ParchmentSurfaces.ShadowOffsetY),
+                KingmakerUiFactory.ToColor(PlannerParchmentPalette.Shadow, PlannerParchmentPalette.ShadowAlpha));
+            Show(_paper, scrollDonor.sprite, scrollDonor.material, geometry.AnchorMin, geometry.AnchorMax,
+                geometry.Scale, Vector2.zero, Color.white);
+            YieldSurface();
+        }
+
+        private void ShowSheet(Image donor, Sprite sliced, ParchmentSheetGeometry sheet)
+        {
+            _mode = Paper.Sheet;
+            _geometry = null;
+            _sheetGeometry = sheet;
             _spriteName = donor.sprite.name;
-            Show(_shadow, donor, geometry, new Vector2(ParchmentSurfaces.ShadowOffsetX,
-                ParchmentSurfaces.ShadowOffsetY), KingmakerUiFactory.ToColor(PlannerParchmentPalette.Shadow,
-                PlannerParchmentPalette.ShadowAlpha));
-            Show(_paper, donor, geometry, Vector2.zero, Color.white);
+            _fallbackReason = string.Empty;
+            SetBounds(sheet.Scaled(_sheetOutsets));
+            Show(_shadow, sliced, donor.material, 0f, 1f, 1f,
+                new Vector2(ParchmentSurfaces.SheetShadowOffsetX * sheet.ScreenScale,
+                    ParchmentSurfaces.SheetShadowOffsetY * sheet.ScreenScale),
+                KingmakerUiFactory.ToColor(PlannerParchmentPalette.Shadow, PlannerParchmentPalette.SheetShadowAlpha));
+            // Untinted, exactly as the game draws its card.
+            Show(_paper, sliced, donor.material, 0f, 1f, 1f, Vector2.zero, Color.white);
+            YieldSurface();
+        }
+
+        // The surface keeps its hit area (alpha 0 still raycasts); only the
+        // flat tint and the outline drawn for flat panels yield.
+        private void YieldSurface()
+        {
             _hit.raycastTarget = true;
-            // The surface keeps its hit area (alpha 0 still raycasts); only
-            // the flat tint and the outline drawn for flat panels yield.
             if (_ground != null)
                 _ground.color = new Color(_groundFallback.r, _groundFallback.g, _groundFallback.b, 0f);
             if (_outline != null) _outline.enabled = false;
@@ -134,9 +196,12 @@ namespace KingmakerBuffPlanner.UI
 
         private void Fallback(string reason)
         {
+            _mode = Paper.Fallback;
             _geometry = null;
+            _sheetGeometry = null;
             _spriteName = null;
             _fallbackReason = reason;
+            SetBounds(_outsets);
             Hide(_shadow);
             Hide(_paper);
             _hit.raycastTarget = false;
@@ -145,15 +210,24 @@ namespace KingmakerBuffPlanner.UI
             foreach (Wash wash in _washes) ApplyWash(wash);
         }
 
+        private void SetBounds(ParchmentInsets outsets)
+        {
+            _drawnOutsets = outsets;
+            _bounds.offsetMin = new Vector2(-outsets.Left, -outsets.Bottom);
+            _bounds.offsetMax = new Vector2(outsets.Right, outsets.Top);
+        }
+
         private void ApplyWash(Wash wash)
         {
             if (wash.Image == null) return;
             Color fallback = wash.Fallback;
-            wash.Image.color = Native
-                ? new Color(fallback.r, fallback.g, fallback.b, wash.PaperAlpha) : fallback;
+            float alpha = _mode == Paper.Sheet ? wash.SheetAlpha : wash.PaperAlpha;
+            if (_mode == Paper.Sheet)
+                wash.Image.color = KingmakerUiFactory.ToColor(PlannerParchmentPalette.SheetWash, alpha);
+            else
+                wash.Image.color = Native ? new Color(fallback.r, fallback.g, fallback.b, alpha) : fallback;
             if (wash.Outline != null)
-                wash.Outline.enabled = ParchmentSurfaces.WashKeepsOutline(Native, wash.PaperAlpha,
-                    wash.OutlineFallback);
+                wash.Outline.enabled = ParchmentSurfaces.WashKeepsOutline(Native, alpha, wash.OutlineFallback);
         }
 
         // What was drawn, for the theme log and the runtime evidence.
@@ -163,10 +237,13 @@ namespace KingmakerBuffPlanner.UI
             {
                 if (!Native) return _name + ":paper=fallback(" + _fallbackReason + ")";
                 Rect rect = _surface.rect;
-                return _name + ":paper=native;sprite=" + _spriteName + ";" +
-                    _geometry.Describe(rect.width + _outsets.Left + _outsets.Right,
-                        rect.height + _outsets.Bottom + _outsets.Top) +
-                    ";outsets=" + _outsets.Describe() + ";washes=" + _washes.Count;
+                float width = rect.width + _drawnOutsets.Left + _drawnOutsets.Right;
+                float height = rect.height + _drawnOutsets.Bottom + _drawnOutsets.Top;
+                return _name + (_mode == Paper.Sheet
+                    ? ":paper=native-sheet;sprite=" + _spriteName + ";" + _sheetGeometry.Describe(width, height)
+                    : ":paper=native;sprite=" + _spriteName + ";" + _geometry.Describe(width, height) +
+                        (string.IsNullOrEmpty(_fallbackReason) ? string.Empty : ";sheet=" + _fallbackReason)) +
+                    ";outsets=" + _drawnOutsets.Describe() + ";washes=" + _washes.Count;
             }
         }
 
@@ -179,19 +256,19 @@ namespace KingmakerBuffPlanner.UI
             return image;
         }
 
-        private static void Show(Image layer, Image donor, ParchmentLayerGeometry geometry, Vector2 offset,
-            Color tint)
+        private static void Show(Image layer, Sprite sprite, Material material, float anchorMin, float anchorMax,
+            float scale, Vector2 offset, Color tint)
         {
             RectTransform rect = layer.rectTransform;
-            rect.anchorMin = new Vector2(geometry.AnchorMin, geometry.AnchorMin);
-            rect.anchorMax = new Vector2(geometry.AnchorMax, geometry.AnchorMax);
+            rect.anchorMin = new Vector2(anchorMin, anchorMin);
+            rect.anchorMax = new Vector2(anchorMax, anchorMax);
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
             rect.anchoredPosition = offset;
-            rect.localScale = new Vector3(geometry.Scale, geometry.Scale, 1f);
-            layer.sprite = donor.sprite;
-            layer.material = donor.material;
+            rect.localScale = new Vector3(scale, scale, 1f);
+            layer.sprite = sprite;
+            layer.material = material;
             layer.type = Image.Type.Sliced;
             layer.fillCenter = true;
             layer.preserveAspect = false;
@@ -214,6 +291,82 @@ namespace KingmakerBuffPlanner.UI
             Canvas[] canvases = transform == null ? null : transform.GetComponentsInParent<Canvas>(true);
             return canvases == null || canvases.Length == 0 ? 0f : canvases[0].referencePixelsPerUnit;
         }
+    }
+
+    // 0.4.2: the planner-owned nine-slice sprites over the native card's
+    // texture, one per texture and density, kept for the life of the game
+    // (a handful of tiny objects; the texture itself stays the game's and is
+    // never copied). The native sprite is only read.
+    internal static class PlannerSheetSprites
+    {
+        private const int MaximumEntries = 8;
+        private static readonly Dictionary<string, Sprite> Cache = new Dictionary<string, Sprite>();
+
+        internal static Sprite For(Sprite native, ParchmentSheetGeometry geometry)
+        {
+            if (native == null || native.texture == null || geometry == null || !geometry.Valid) return null;
+            Rect rect = native.rect;
+            if (rect.width < ParchmentSheetGeometry.SliceLeft + ParchmentSheetGeometry.SliceRight + 2f ||
+                rect.height < ParchmentSheetGeometry.SliceBottom + ParchmentSheetGeometry.SliceTop + 2f)
+                return null;
+            string key = native.texture.GetInstanceID() + "|" +
+                geometry.SpritePixelsPerUnit.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+            Sprite cached;
+            if (Cache.TryGetValue(key, out cached) && cached != null) return cached;
+            if (Cache.Count >= MaximumEntries)
+            {
+                foreach (Sprite stale in Cache.Values)
+                    if (stale != null) UnityEngine.Object.Destroy(stale);
+                Cache.Clear();
+            }
+            Sprite sliced = Sprite.Create(native.texture, rect, new Vector2(0.5f, 0.5f),
+                geometry.SpritePixelsPerUnit, 0, SpriteMeshType.FullRect,
+                new Vector4(ParchmentSheetGeometry.SliceLeft, ParchmentSheetGeometry.SliceBottom,
+                    ParchmentSheetGeometry.SliceRight, ParchmentSheetGeometry.SliceTop));
+            sliced.name = "KBP-sheet:" + native.name;
+            Cache[key] = sliced;
+            return sliced;
+        }
+    }
+
+    // 0.4.2: the ground behind the planner. The game lays its service
+    // windows on a dark wood table (ServiceWindow/Background); the planner's
+    // full-screen blocker shows the same table, untinted and opaque, when
+    // that donor validates, so the sheet's worn edges sit on native wood.
+    // Otherwise the blocker keeps exactly its previous dimming tint. It
+    // stays the planner's full-screen raycast blocker either way.
+    internal sealed class ParchmentBackdrop
+    {
+        private readonly Image _image;
+        private readonly Color _fallback;
+        private string _evidence = "backdrop=fallback(not-applied)";
+
+        internal ParchmentBackdrop(Image image)
+        {
+            _image = image ?? throw new ArgumentNullException("image");
+            _fallback = image.color;
+        }
+
+        internal void Apply(Image donor, string unavailableReason)
+        {
+            if (donor != null && donor.sprite != null && donor.sprite.texture != null)
+            {
+                _image.sprite = donor.sprite;
+                _image.material = donor.material;
+                _image.type = Image.Type.Simple;
+                _image.preserveAspect = false;
+                _image.color = Color.white;
+                _evidence = "backdrop=native;sprite=" + donor.sprite.name;
+                return;
+            }
+            _image.sprite = null;
+            _image.material = null;
+            _image.color = _fallback;
+            _evidence = "backdrop=fallback(" + (string.IsNullOrEmpty(unavailableReason)
+                ? "donor unavailable" : unavailableReason) + ")";
+        }
+
+        internal string Evidence { get { return _evidence; } }
     }
 
     // One scroll rule: the native blockscroll ornament when its donor

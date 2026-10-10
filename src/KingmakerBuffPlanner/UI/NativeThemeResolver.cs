@@ -22,6 +22,11 @@ namespace KingmakerBuffPlanner.UI
         // The rule under the character build's Constitution description.
         internal const string ScrollRulePath =
             "CharacterBuild/Body/Content/RaceRightSide/Constitution/DescriptionView/Decor (1)";
+        // 0.4.2: the Journal's card sheet (Card_Big) and the service windows'
+        // table, both read live in the in-game StaticCanvas (runtime
+        // kbp042-donors-02) and not yet rendered by this mod before 0.4.2.
+        internal const string SheetPaperPath = "ServiceWindow/Journal/Cart";
+        internal const string TableBackdropPath = "ServiceWindow/Background";
         internal const string ButtonPath = "ServiceWindow/CharacterScreen/LevelBox/Button_LevelUp";
         internal const string OrnamentPath = "Party/Character/Highlight";
         internal const string CharacterScreenPath = "ServiceWindow/CharacterScreen";
@@ -149,6 +154,12 @@ namespace KingmakerBuffPlanner.UI
                 case NativeThemeCapability.ScrollRule:
                     locator = new NativeThemeLocator(NativeThemeLocatorKind.CandidatePath, ScrollRulePath);
                     return PathResource(owner, lookup, NativeThemeComponent.Image, ScrollRulePath);
+                case NativeThemeCapability.SheetPaper:
+                    locator = new NativeThemeLocator(NativeThemeLocatorKind.CandidatePath, SheetPaperPath);
+                    return PathResource(owner, lookup, NativeThemeComponent.Image, SheetPaperPath);
+                case NativeThemeCapability.TableBackdrop:
+                    locator = new NativeThemeLocator(NativeThemeLocatorKind.CandidatePath, TableBackdropPath);
+                    return PathResource(owner, lookup, NativeThemeComponent.Image, TableBackdropPath);
                 default:
                     throw new ArgumentOutOfRangeException("capability");
             }
