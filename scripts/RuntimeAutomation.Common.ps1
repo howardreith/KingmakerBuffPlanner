@@ -1447,6 +1447,42 @@ function Assert-KbpScenarioOutcome {
                 throw "The physical authoring gestures did not all behave as the direct-manipulation contract says ($($notTrue -join ', ')): $path"
             }
         }
+        # 0.4.2 (B) re-read from the raw record: the spell removed through
+        # the game's own RemoveSpell (known before, not after) took exactly
+        # its own two castings in one archived, saved edit whose notice the
+        # opened planner shows; the spell whose level was spent to zero
+        # through the game's own spend stayed known and kept its casting;
+        # every cold seed is still stored.
+        if ($expectation -ceq 'removal') {
+            $removalKeys = @('removalAuthored', 'removalKnownBefore', 'removalKnownAfter', 'removalSpentSlotsBefore',
+                'removalSpentSlotsAfter', 'removalSpentKnownAfter', 'removalStatus', 'removalDurable', 'removalRemoved',
+                'removalArchived', 'removalStored', 'removalNotice', 'removalNoticeShown')
+            $names = @($record.PSObject.Properties | ForEach-Object Name)
+            $missingRemoval = @($removalKeys | Where-Object { $names -cnotcontains $_ })
+            if ($missingRemoval.Count -ne 0) {
+                throw "The physical removal evidence is unread ($($missingRemoval -join ', ')): $path"
+            }
+            $removed = @($record.removalRemoved | ForEach-Object { [string]$_ })
+            $stored = @($record.removalStored | ForEach-Object { [string]$_ })
+            $seeds = @(@($record.seedLongCastings) + @($record.seedImportantCastings) + @($record.seedShortCastings) |
+                ForEach-Object { [string]$_ })
+            if (@($record.removalAuthored).Count -ne 3 -or
+                $null -eq $record.removalKnownBefore -or -not [bool]$record.removalKnownBefore -or
+                $null -eq $record.removalKnownAfter -or [bool]$record.removalKnownAfter -or
+                $null -eq $record.removalSpentSlotsBefore -or [int]$record.removalSpentSlotsBefore -le 0 -or
+                $null -eq $record.removalSpentSlotsAfter -or [int]$record.removalSpentSlotsAfter -ne 0 -or
+                $null -eq $record.removalSpentKnownAfter -or -not [bool]$record.removalSpentKnownAfter -or
+                [string]$record.removalStatus -cne 'Applied' -or -not [bool]$record.removalDurable -or
+                ($removed -join ',') -cne 'rm-known-important,rm-known-long' -or
+                $stored -ccontains 'rm-known-long' -or $stored -ccontains 'rm-known-important' -or
+                $stored -cnotcontains 'rm-spent-important' -or
+                @($seeds | Where-Object { $stored -cnotcontains $_ }).Count -ne 0 -or
+                -not [bool]$record.removalArchived -or
+                ([string]$record.removalNotice).IndexOf('no longer known', [StringComparison]::Ordinal) -lt 0 -or
+                -not [bool]$record.removalNoticeShown) {
+                throw "The physical removal run did not retire exactly the removed spell's castings, durably, with its notice shown: $path"
+            }
+        }
         # E05/E06 re-read from the raw record. D11: the earlier record judged
         # only that the description panel was active while it rendered at a
         # negative size. Now: a panel of real size on screen, titled, showing
@@ -1496,7 +1532,8 @@ function Assert-KbpScenarioOutcome {
             [string]$record.graphWheelEvidence -cne 'scrolled')) {
             throw "The physical run's continuous scroll did not overflow and scroll under the physical wheel: $path"
         }
-        if ($expectation -ceq 'select' -or $expectation -ceq 'combat' -or $expectation -ceq 'authoring') {
+        if ($expectation -ceq 'select' -or $expectation -ceq 'combat' -or $expectation -ceq 'authoring' -or
+            $expectation -ceq 'removal') {
             if ([bool]$record.moonRunStarted -or
                 -not ([string]$record.moonRefusal -like 'native-submission-disabled*')) {
                 throw "A physical selection run was not refused by the session lock: $path"

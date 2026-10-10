@@ -139,6 +139,7 @@
     <Compile Include="RuntimeTesting\BlueprintReferenceIndex.cs" />
     <Compile Include="RuntimeTesting\NativePaperDonorInventory.cs" />
     <Compile Include="RuntimeTesting\NativePaperReferenceCapture.cs" />
+    <Compile Include="RuntimeTesting\RuntimeSpellbookRemovalHost.cs" />
     <Compile Include="Persistence\PersistenceMessages.cs" />
     <Compile Include="RuntimeTesting\PhysicalWorkspaceRecord.cs" />
     <Compile Include="RuntimeTesting\ProblemNavigationRecord.cs" />

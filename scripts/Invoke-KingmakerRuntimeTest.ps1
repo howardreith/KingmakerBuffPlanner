@@ -62,9 +62,14 @@ param(
     # refused by the lock. 'authoring' (0.4.0, WP3) is a selection run that
     # then performs the direct graph gestures (add, same-portrait remove,
     # retarget, provider change, Undo, nested Escape) through the OS
-    # pointer. Neither takes a casting allowance.
+    # pointer. Neither takes a casting allowance. 'removal' (0.4.2, B) is a
+    # selection run that, before the cold press, removes one spontaneous
+    # spell from its caster's book through the game's own RemoveSpell and
+    # spends every slot of another spell's level through the game's own
+    # spend (in memory; nothing is saved to the game): the press must
+    # retire exactly the removed spell's castings and keep the spent one's.
     # Only valid with -Scenario live-workspace-physical.
-    [ValidateSet('cast', 'select', 'problems', 'spellbook', 'combat', 'authoring')][string]$PhysicalExpectation = 'cast',
+    [ValidateSet('cast', 'select', 'problems', 'spellbook', 'combat', 'authoring', 'removal')][string]$PhysicalExpectation = 'cast',
     # Fixture family: the approved automation pair (default) or the
     # owner-designated advanced copy. The advanced copy is loaded only by
     # non-casting scenarios and only when it matches its guarded bootstrap

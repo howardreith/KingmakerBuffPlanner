@@ -3709,6 +3709,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _importFailure;
 
         private bool _inspectionWritten;
+        private const int NativeReferenceStep = 8;
+        private UiInputIsolationProbeResult _physicalIsolationBeforeReferences;
         // 0.4.2 evidence (inspection scenario).
         private readonly NativePaperReferenceCapture _nativeReferences = new NativePaperReferenceCapture();
         private PaperSoundEvidence _paperEvidence;
@@ -3882,6 +3884,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 return UpdateCombatPress(view, settled);
             if (_physicalStep >= AuthoringStartStep && _physicalStep < AuthoringStartStep + 30)
                 return UpdatePhysicalAuthoring(view, settled);
+            if (_physicalStep >= RemovalStartStep && _physicalStep < RemovalStartStep + 10)
+                return UpdateRemovalPress(view, settled);
+            if (_physicalStep == NativeReferenceStep)
+            {
+                // 0.4.2: the native reference screens in this same session,
+                // display and resolution, after the planner closed.
+                if (!_nativeReferences.Tick(_request.EvidenceDirectory, CaptureScreenshot)) return false;
+                var evidence = new PaperSoundEvidence(_request.RunId);
+                evidence.NativeReferences(_nativeReferences, _request.EvidenceDirectory);
+                evidence.Cycle("physical-run", BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime,
+                    BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime);
+                evidence.Record["workspacePaper"] = _physicalRecord.WorkspacePaperEvidence;
+                evidence.Record["spellScrollPaper"] = _physicalRecord.InspectPaperEvidence;
+                evidence.Record["oneCuePerOpen"] = evidence.OneCuePerOpen;
+                evidence.Write(_request.EvidenceDirectory);
+                return FinishPhysical(null);
+            }
             if (_physicalStep == 100)
             {
                 // A stale dismissal escape from the launcher can leave the
@@ -4017,6 +4036,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _physicalStep = CombatStartStep;
                     return false;
                 }
+                // 0.4.2 (B): a removal run edits the native books first.
+                if (_physicalRecord.MoonExpectation == "removal")
+                {
+                    _physicalStep = RemovalStartStep;
+                    return false;
+                }
                 return PressColdMoon();
             }
             if (_physicalStep == 102)
@@ -4082,6 +4107,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _physicalRecord.MoonGrantConsumed = _physicalGrant.Consumed;
                     _physicalRecord.MoonGrantAttempts = _physicalGrant.Attempts;
                 }
+                if (_physicalRecord.MoonExpectation == "removal") RecordRemovalAfterMoon();
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "physical-cf-moon-after.png"));
                 // Now, and only now, the launcher's planner hotkey: the
                 // editor opens physically for the browse/inspect gestures.
@@ -4100,6 +4126,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 BuffPlannerUiRoot.BeginPhysicalInputProbe();
                 _physicalRecord.DocumentSignatureBeforeBrowse =
                     BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                if (_physicalRecord.MoonExpectation == "removal") RecordRemovalNotice(view);
                 // 0.4.0 (WP3): an authoring run performs the direct graph
                 // gestures instead of the browse and description gestures.
                 if (_physicalRecord.MoonExpectation == "authoring")
@@ -4268,6 +4295,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.EscMenuOpenAfterClose = BuffPlannerUiRoot.NativeEscMenuOpenForRuntime;
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
                     "physical-cf-closed.png"));
+                // 0.4.2: selection and removal runs end with the native
+                // reference screens of this same session.
+                if (_physicalRecord.MoonExpectation == "select" || _physicalRecord.MoonExpectation == "removal")
+                {
+                    // The isolation claim covers the planner's input only:
+                    // it ends here, before the game's own screens open.
+                    _physicalIsolationBeforeReferences = BuffPlannerUiRoot.EndPhysicalInputProbe();
+                    _physicalStep = NativeReferenceStep;
+                    return false;
+                }
                 return FinishPhysical(null);
             }
             return false;
@@ -4453,7 +4490,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.MoonGrantConsumed = _physicalGrant.Consumed;
                 _physicalRecord.MoonGrantAttempts = _physicalGrant.Attempts;
             }
-            UiInputIsolationProbeResult isolation = BuffPlannerUiRoot.EndPhysicalInputProbe();
+            UiInputIsolationProbeResult isolation = _physicalIsolationBeforeReferences ??
+                BuffPlannerUiRoot.EndPhysicalInputProbe();
             if (isolation != null)
             {
                 _physicalRecord.PlayerCommands = isolation.PlayerCommandCount;
@@ -4529,6 +4567,29 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "moonRunStarted", record.MoonRunStarted },
                 { "moonWorkspaceStayedClosed", record.MoonWorkspaceStayedClosed },
                 { "moonExpectation", record.MoonExpectation },
+                { "removalAuthored", new JArray(record.RemovalAuthored.Cast<object>().ToArray()) },
+                { "removalKnownCaster", record.RemovalKnownCaster },
+                { "removalKnownBook", record.RemovalKnownBook },
+                { "removalKnownSpell", record.RemovalKnownSpell },
+                { "removalKnownName", record.RemovalKnownName },
+                { "removalKnownBefore", Nullable(record.RemovalKnownBefore) },
+                { "removalKnownAfter", Nullable(record.RemovalKnownAfter) },
+                { "removalSpentCaster", record.RemovalSpentCaster },
+                { "removalSpentBook", record.RemovalSpentBook },
+                { "removalSpentSpell", record.RemovalSpentSpell },
+                { "removalSpentName", record.RemovalSpentName },
+                { "removalSpentLevel", Nullable(record.RemovalSpentLevel) },
+                { "removalSpentSlotsBefore", Nullable(record.RemovalSpentSlotsBefore) },
+                { "removalSpentSlotsAfter", Nullable(record.RemovalSpentSlotsAfter) },
+                { "removalSpentKnownAfter", Nullable(record.RemovalSpentKnownAfter) },
+                { "removalStatus", record.RemovalStatus },
+                { "removalNotice", record.RemovalNotice },
+                { "removalDurable", record.RemovalDurable },
+                { "removalRemoved", new JArray(record.RemovalRemoved.Cast<object>().ToArray()) },
+                { "removalArchived", record.RemovalArchived },
+                { "removalStored", new JArray(record.RemovalStored.Cast<object>().ToArray()) },
+                { "removalFooter", record.RemovalFooter },
+                { "removalNoticeShown", record.RemovalNoticeShown },
                 { "combatUnitId", record.CombatUnitId },
                 { "combatInCombatBefore", Nullable(record.CombatInCombatBefore) },
                 { "combatHeldUpdates", record.CombatHeldUpdates },

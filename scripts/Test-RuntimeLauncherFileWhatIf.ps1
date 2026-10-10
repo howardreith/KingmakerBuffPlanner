@@ -551,7 +551,8 @@ try {
             inspectOverflow = -250; inspectScrollBefore = 1.0; inspectScrollAfter = 1.0
             longProbeChars = 6100; longProbeOverflow = 2400; longScrollBefore = 1.0; longScrollAfter = 0.92
             inspectOpenAfterWheels = $true; graphScrollUnderInspectBefore = 0.7; graphScrollUnderInspectAfter = 0.7 }
-        if ($Expectation -ceq 'select' -or $Expectation -ceq 'combat' -or $Expectation -ceq 'authoring') {
+        if ($Expectation -ceq 'select' -or $Expectation -ceq 'combat' -or $Expectation -ceq 'authoring' -or
+            $Expectation -ceq 'removal') {
             $record.moonRunStarted = $false
             $record.moonRefusal = 'native-submission-disabled:runtime-test-session:live-workspace-physical:cf-grant-absent;Refused'
         }
@@ -565,6 +566,17 @@ try {
             $record.classicCombatYielded = 0; $record.classicCombatRefreshes = 0; $record.classicCombatPreviews = 0
             $record.classicCombatReportChanged = $false; $record.classicCombatExecuting = $false
             $record.classicCombatProfileUnchanged = $true
+        }
+        if ($Expectation -ceq 'removal') {
+            $record.removalAuthored = @('rm-known-long', 'rm-known-important', 'rm-spent-important')
+            $record.removalKnownBefore = $true; $record.removalKnownAfter = $false
+            $record.removalSpentSlotsBefore = 4; $record.removalSpentSlotsAfter = 0; $record.removalSpentKnownAfter = $true
+            $record.removalStatus = 'Applied'; $record.removalDurable = $true
+            $record.removalRemoved = @('rm-known-important', 'rm-known-long'); $record.removalArchived = $true
+            $record.removalStored = @(@($record.seedLongCastings) + @($record.seedImportantCastings) +
+                @($record.seedShortCastings) + @('rm-spent-important'))
+            $record.removalNotice = "Removed 2 Heroism castings: no longer known in Linzi's spellbook. Undo available."
+            $record.removalNoticeShown = $true
         }
         if ($Expectation -ceq 'authoring') {
             foreach ($flag in @('authoringBuffSelected', 'authoringAdded', 'authoringRemoved', 'authoringReadded',
@@ -598,6 +610,7 @@ try {
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-cast-good' 'cast' $null)
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-combat-good' 'combat' $null)
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-authoring-good' 'authoring' $null)
+    Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-removal-good' 'removal' $null)
     # Owner display (no -DisplayMode): beta-3c1c5d4ar13-phys-sel-01 passed
     # in game and the judge threw reading the absent expectedScreen.
     Assert-KbpScenarioOutcome -Request (New-PhysicalOutcomeCase 'physical-owner-select' 'select' $null '')
@@ -627,6 +640,30 @@ try {
             $r.authoringOpenAfterFirstEscape = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'authoring-count' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
             $r.authoringCountAfter = 18; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        # 0.4.2 (B): the native removal run.
+        'removal-spent-removed' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.removalRemoved = @('rm-known-important', 'rm-known-long', 'rm-spent-important')
+            Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-not-native' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.removalKnownAfter = $true; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-not-spent' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.removalSpentSlotsAfter = 1; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-not-durable' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.removalDurable = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-seed-lost' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.removalStored = @($r.removalStored | Where-Object { $_ -cne 'seed-short-3' })
+            Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-still-stored' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.removalStored = @($r.removalStored) + @('rm-known-long')
+            Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-notice-hidden' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.removalNoticeShown = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-unarchived' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.removalArchived = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-evidence-unread' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.PSObject.Properties.Remove('removalStored'); Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'removal-lock-not-reached' = @('removal', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.moonRefusal = 'persistence-failed:io'; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'authoring-browse-request' = @('authoring', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-wheel.json') ([ordered]@{
             schemaVersion = 1; runId = 'physical-run'; actionId = 'cf-wheel'; action = 'wheel' }) })
         'failed-ack' = @('select', { param($d) Write-KbpJsonAtomic (Join-Path $d 'physical-input-cf-moon.ack.json') ([ordered]@{

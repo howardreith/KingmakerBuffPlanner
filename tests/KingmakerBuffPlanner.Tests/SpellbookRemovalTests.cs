@@ -10,6 +10,7 @@ using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.Planning;
+using KingmakerBuffPlanner.RuntimeTesting;
 using KingmakerBuffPlanner.UI;
 
 namespace KingmakerBuffPlanner.Tests
@@ -54,6 +55,88 @@ namespace KingmakerBuffPlanner.Tests
             Run("spellbook-removal-undo-idempotence-and-restart", () => TestUndoIdempotenceRestart(root));
             Run("spellbook-removal-save-failure-blocks-the-run", () => TestRemovalSaveFailure(root));
             Run("spellbook-removal-leaves-no-stale-problem-focus", () => TestRemovalProblemNavigation(root));
+            Run("spellbook-removal-physical-judgement", TestPhysicalRemovalJudgement);
+        }
+
+        // The native "removal" run's Unity-free judgement: a selection press
+        // (refused by the lock) whose reconciliation took exactly the
+        // natively removed spell's castings and kept the fully spent one's.
+        private static void TestPhysicalRemovalJudgement()
+        {
+            Func<PhysicalWorkspaceRecord> good = () =>
+            {
+                PhysicalWorkspaceRecord record = SelectionPressRecord("removal");
+                record.Acknowledged.AddRange(record.ExpectedCastingActions);
+                record.GraphOverflow = true;
+                record.GraphScrollBefore = 1f;
+                record.GraphScrollAfter = 0.4f;
+                record.InspectOpened = true;
+                record.InspectClosedByEscape = true;
+                record.DocumentSignatureBeforeBrowse = "castings=17;revision=1";
+                record.DocumentSignatureAfterInspect = "castings=17;revision=1";
+                WithVisibleDescription(record);
+                record.RemovalAuthored.AddRange(new[] { "rm-known-long", "rm-known-important", "rm-spent-important" });
+                record.RemovalKnownBefore = true;
+                record.RemovalKnownAfter = false;
+                record.RemovalSpentSlotsBefore = 4;
+                record.RemovalSpentSlotsAfter = 0;
+                record.RemovalSpentKnownAfter = true;
+                record.RemovalStatus = "Applied";
+                record.RemovalDurable = true;
+                record.RemovalRemoved.AddRange(new[] { "rm-known-important", "rm-known-long" });
+                record.RemovalArchived = true;
+                record.RemovalStored.AddRange(record.SeedLongCastings.Concat(record.SeedImportantCastings)
+                    .Concat(record.SeedShortCastings).Concat(new[] { "rm-spent-important" }));
+                record.RemovalNotice = "Removed 2 Heroism castings: no longer known in Linzi's spellbook. Undo available.";
+                record.RemovalFooter = record.RemovalNotice;
+                record.RemovalNoticeShown = true;
+                return record;
+            };
+            if (!good().ExpectedCastingActions.SequenceEqual(PhysicalWorkspaceRecord.CastingActions))
+                throw new InvalidOperationException("The removal run requests gestures beyond the selection run's.");
+            if (good().Violations().Count != 0)
+                throw new InvalidOperationException("A clean removal run was refused: " +
+                    string.Join("|", good().Violations().ToArray()));
+            var shapes = new Dictionary<string, Action<PhysicalWorkspaceRecord>>
+            {
+                { "removal:authored:2", r => r.RemovalAuthored.RemoveAt(2) },
+                { "removal:native-remove:True>True", r => r.RemovalKnownAfter = true },
+                { "removal:native-spend:4>1;known=True", r => r.RemovalSpentSlotsAfter = 1 },
+                { "removal:native-spend:4>0;known=False", r => r.RemovalSpentKnownAfter = false },
+                { "removal:outcome:Unchanged;durable=True", r => r.RemovalStatus = "Unchanged" },
+                { "removal:outcome:Applied;durable=False", r => r.RemovalDurable = false },
+                // The spent spell's casting must never go with it.
+                { "removal:removed:rm-known-important,rm-known-long,rm-spent-important",
+                    r => r.RemovalRemoved.Add("rm-spent-important") },
+                { "removal:removed:rm-known-long", r => r.RemovalRemoved.RemoveAt(0) },
+                { "removal:not-archived", r => r.RemovalArchived = false },
+                { "removal:notice:none", r => r.RemovalNotice = null },
+                { "removal:notice-not-shown:none", r => { r.RemovalNoticeShown = false; r.RemovalFooter = null; } },
+                { "moon:not-refused-by-lock:none", r => r.MoonRefusal = null }
+            };
+            foreach (KeyValuePair<string, Action<PhysicalWorkspaceRecord>> shape in shapes)
+            {
+                PhysicalWorkspaceRecord bad = good();
+                shape.Value(bad);
+                if (!bad.Violations().Contains(shape.Key))
+                    throw new InvalidOperationException("Removal judgement missed " + shape.Key + ": " +
+                        string.Join("|", bad.Violations().ToArray()));
+            }
+            // The stored plan after the press: a removed casting still there,
+            // the spent casting or a cold seed missing.
+            foreach (Action<PhysicalWorkspaceRecord> stored in new Action<PhysicalWorkspaceRecord>[]
+                {
+                    r => r.RemovalStored.Add("rm-known-long"),
+                    r => r.RemovalStored.Remove("rm-spent-important"),
+                    r => r.RemovalStored.Remove("seed-short-3")
+                })
+            {
+                PhysicalWorkspaceRecord bad = good();
+                stored(bad);
+                if (!bad.Violations().Any(value => value.StartsWith("removal:stored:", StringComparison.Ordinal)))
+                    throw new InvalidOperationException("Removal judgement missed a stored-plan defect: " +
+                        string.Join("|", bad.Violations().ToArray()));
+            }
         }
 
         // ---- fixtures ---------------------------------------------------
