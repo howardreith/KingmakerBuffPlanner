@@ -53,6 +53,11 @@ namespace KingmakerBuffPlanner.Tests
                 () => TestShadowCloneArchiveObligationRecovery(root));
             Run("class-ability-identity-keeps-spells-aggregated", TestClassAbilityIdentityRule);
             Run("classic-mirror-image-never-plans-shadow-clone", TestClassicKeepsShadowCloneSeparate);
+            Run("classic-legacy-shadow-clone-rebinds-to-its-own-ability", TestClassicLegacyShadowCloneRebinds);
+            Run("classic-legacy-shadow-clone-never-becomes-mirror-image", TestClassicLegacyShadowCloneWithoutNinja);
+            Run("classic-legacy-mirror-image-stays-the-spell", TestClassicLegacyMirrorImageStays);
+            Run("classic-legacy-rebinding-saves-and-reopens-idempotently",
+                () => TestClassicLegacyRebindingIdempotent(root));
         }
 
         // The native expression shape both abilities export: the ability
@@ -472,6 +477,167 @@ namespace KingmakerBuffPlanner.Tests
 
         // Classic planning (RoutinePlanService) resolves an entry's members
         // by the same identity: the Mirror Image entry never spends ki.
+        // PR #7 review R2: a Classic profile saved before 0.4.2 holds the
+        // Ninja's Shadow Clone under the old shared effect aggregate (Mirror
+        // Image's id). Its persisted exact ability decides where it belongs;
+        // the spell's entry, which still carries that aggregate, must never
+        // capture it. The child casting assignment keeps its pins, target,
+        // enhancements and order; the assignment its policy and markers.
+        private const string LegacyCloneChild = "ca-clone";
+        private const string LegacyCloneSecondChild = "ca-clone-2";
+
+        private static BuffPlannerProfile LegacyClassicProfile(string campaign, bool shadowClone, string ninjaProvider)
+        {
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault(campaign);
+            AbilityKey ability = shadowClone ? ShadowCloneAbility : MirrorImageAbility;
+            profile.Routines.Single(routine => routine.RoutineId == "long").Assignments.Add(new SourceAssignmentProfile
+            {
+                SourceId = MirrorImageSourceId(),
+                Ability = AbilityKeyProfile.FromKey(ability),
+                ExistingEffectPolicy = ExistingEffectPolicy.Overwrite,
+                IgnoredPresenceMarkers = new List<string> { "marker-legacy" },
+                CastingAssignments = new List<CastingAssignmentProfile>
+                {
+                    new CastingAssignmentProfile
+                    {
+                        AssignmentId = LegacyCloneSecondChild, Order = 7,
+                        CasterUnitId = shadowClone ? "unit-ninja" : "unit-wizard",
+                        SpellbookGuid = shadowClone ? null : "wizard-book",
+                        ProviderKey = ninjaProvider,
+                        TargetUnitIds = new List<string> { shadowClone ? "unit-ninja" : "unit-wizard" },
+                        Enhancements = new List<EnhancementSelectionProfile>()
+                    },
+                    new CastingAssignmentProfile
+                    {
+                        AssignmentId = LegacyCloneChild, Order = 3,
+                        CasterUnitId = shadowClone ? "unit-ninja" : "unit-wizard",
+                        SpellbookGuid = shadowClone ? null : "wizard-book",
+                        ProviderKey = ninjaProvider,
+                        TargetUnitIds = new List<string> { shadowClone ? "unit-ninja" : "unit-wizard" },
+                        Enhancements = new List<EnhancementSelectionProfile>()
+                    }
+                }
+            });
+            return profile;
+        }
+
+        private static SourceAssignmentProfile LongAssignment(BuffPlannerProfile profile)
+        {
+            return profile.Routines.Single(routine => routine.RoutineId == "long").Assignments.Single();
+        }
+
+        // Child identities, pins, targets and enhancements stay; their
+        // relative order stays (a changed routine is renumbered densely).
+        private static void ExpectLegacyChildKept(SourceAssignmentProfile assignment, string caster, string book,
+            string provider, string target)
+        {
+            List<CastingAssignmentProfile> children = assignment.CastingAssignments
+                .OrderBy(child => child.Order).ToList();
+            Expect(children.Select(child => child.AssignmentId)
+                    .SequenceEqual(new[] { LegacyCloneChild, LegacyCloneSecondChild }) &&
+                children.All(child => child.CasterUnitId == caster && child.SpellbookGuid == book &&
+                    child.ProviderKey == provider && child.TargetUnitIds.SequenceEqual(new[] { target }) &&
+                    child.Enhancements.Count == 0) &&
+                assignment.ExistingEffectPolicy == ExistingEffectPolicy.Overwrite &&
+                assignment.IgnoredPresenceMarkers.SequenceEqual(new[] { "marker-legacy" }),
+                "the legacy assignment's other intent was not preserved");
+        }
+
+        private static RoutinePlanResult PlanLong(BuffPlannerProfile profile, ShadowCloneParty party,
+            PlannerSetupModel model)
+        {
+            return new RoutinePlanService().Plan(profile, "long", party.Snapshot, new ActiveEffectSnapshot(null),
+                model.EffectsBySource.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
+                party.Options);
+        }
+
+        // 1. Ninja and wizard present: Shadow Clone moves to its own entry,
+        // stays Shadow Clone, and plans on the Ninja's own ki provider.
+        private static void TestClassicLegacyShadowCloneRebinds()
+        {
+            ShadowCloneParty party = BuildShadowCloneParty(true);
+            BuffPlannerProfile profile = LegacyClassicProfile("legacy-clone-1", true, party.Ninja.Key.Canonical);
+            var model = new PlannerSetupModel(profile, party.Snapshot, new ActiveEffectSnapshot(null),
+                party.Effects, party.Options, ignored => { });
+            SourceAssignmentProfile assignment = LongAssignment(profile);
+            Expect(assignment.SourceId == "ability|" + ShadowCloneGuid &&
+                assignment.Ability.ToKey().Equals(ShadowCloneAbility) && model.AssignmentMigrationApplied,
+                "the legacy Shadow Clone assignment was not rebound to its own ability: " + assignment.SourceId +
+                    " / " + assignment.Ability.ToKey().Canonical);
+            ExpectLegacyChildKept(assignment, "unit-ninja", null, party.Ninja.Key.Canonical, "unit-ninja");
+            RoutinePlanResult plan = PlanLong(profile, party, model);
+            Expect(plan.Plan.Steps.Count >= 1 && plan.Plan.Steps.All(step => step.Provider.Equals(party.Ninja.Key)),
+                "the rebound Shadow Clone did not plan exactly the Ninja's own ability");
+        }
+
+        // 2. Only Mirror Image available: the assignment keeps its exact
+        // ability under its own identity, unresolved; it is never rewritten
+        // to the spell and never plans through the wizard's spell.
+        private static void TestClassicLegacyShadowCloneWithoutNinja()
+        {
+            ShadowCloneParty party = BuildShadowCloneParty(false);
+            BuffPlannerProfile profile = LegacyClassicProfile("legacy-clone-2", true,
+                "unit-ninja||" + ShadowCloneAbility.Canonical + "|");
+            string pinned = LongAssignment(profile).CastingAssignments.First().ProviderKey;
+            var model = new PlannerSetupModel(profile, party.Snapshot, new ActiveEffectSnapshot(null),
+                party.Effects, party.Options, ignored => { });
+            SourceAssignmentProfile assignment = LongAssignment(profile);
+            Expect(assignment.Ability.ToKey().Equals(ShadowCloneAbility) &&
+                assignment.SourceId == "ability|" + ShadowCloneGuid &&
+                model.Sources.All(source => source.SourceId != assignment.SourceId),
+                "the unavailable Shadow Clone assignment was rewritten or resolved to another entry: " +
+                    assignment.SourceId + " / " + assignment.Ability.ToKey().Canonical);
+            ExpectLegacyChildKept(assignment, "unit-ninja", null, pinned, "unit-ninja");
+            RoutinePlanResult plan = PlanLong(profile, party, model);
+            Expect(!plan.Plan.Steps.Any(step => step.Provider.Equals(party.Wizard.Key)),
+                "the Shadow Clone assignment silently planned the wizard's Mirror Image");
+        }
+
+        // 3. An old Mirror Image assignment with both providers present stays
+        // the spell aggregate and never acquires the Ninja's ki provider.
+        private static void TestClassicLegacyMirrorImageStays()
+        {
+            ShadowCloneParty party = BuildShadowCloneParty(true);
+            BuffPlannerProfile profile = LegacyClassicProfile("legacy-mirror", false, party.Wizard.Key.Canonical);
+            var model = new PlannerSetupModel(profile, party.Snapshot, new ActiveEffectSnapshot(null),
+                party.Effects, party.Options, ignored => { });
+            SourceAssignmentProfile assignment = LongAssignment(profile);
+            Expect(assignment.SourceId == MirrorImageSourceId() &&
+                assignment.Ability.ToKey().Equals(MirrorImageAbility),
+                "the Mirror Image assignment left the spell aggregate: " + assignment.SourceId);
+            ExpectLegacyChildKept(assignment, "unit-wizard", "wizard-book", party.Wizard.Key.Canonical, "unit-wizard");
+            RoutinePlanResult plan = PlanLong(profile, party, model);
+            Expect(plan.Plan.Steps.Count >= 1 && plan.Plan.Steps.All(step => step.Provider.Equals(party.Wizard.Key)),
+                "the Mirror Image assignment did not plan exactly the wizard's spell");
+        }
+
+        // 4. The rebinding saves through the real profile repository, and a
+        // reopened profile is unchanged and needs no second migration.
+        private static void TestClassicLegacyRebindingIdempotent(string root)
+        {
+            string dir = Path.Combine(root, "legacy-clone-reopen");
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            Directory.CreateDirectory(dir);
+            var repository = new ProfileRepository(dir);
+            ShadowCloneParty party = BuildShadowCloneParty(true);
+            BuffPlannerProfile profile = LegacyClassicProfile("legacy-clone-reopen", true, party.Ninja.Key.Canonical);
+            repository.Save(profile);
+            BuffPlannerProfile loaded = repository.Load("legacy-clone-reopen").Profile;
+            int saves = 0;
+            var first = new PlannerSetupModel(loaded, party.Snapshot, new ActiveEffectSnapshot(null),
+                party.Effects, party.Options, value => { saves++; repository.Save(value); });
+            Expect(first.AssignmentMigrationApplied && saves == 1, "the rebinding was not saved once");
+            string migrated = Newtonsoft.Json.JsonConvert.SerializeObject(LongAssignment(loaded));
+            BuffPlannerProfile reopened = repository.Load("legacy-clone-reopen").Profile;
+            var second = new PlannerSetupModel(reopened, party.Snapshot, new ActiveEffectSnapshot(null),
+                party.Effects, party.Options, value => { saves++; repository.Save(value); });
+            Expect(!second.AssignmentMigrationApplied && saves == 1 &&
+                Newtonsoft.Json.JsonConvert.SerializeObject(LongAssignment(reopened)) == migrated &&
+                LongAssignment(reopened).SourceId == "ability|" + ShadowCloneGuid,
+                "the reopened profile was migrated again or changed");
+            ExpectLegacyChildKept(LongAssignment(reopened), "unit-ninja", null, party.Ninja.Key.Canonical, "unit-ninja");
+        }
+
         private static void TestClassicKeepsShadowCloneSeparate()
         {
             ShadowCloneParty party = BuildShadowCloneParty(true);

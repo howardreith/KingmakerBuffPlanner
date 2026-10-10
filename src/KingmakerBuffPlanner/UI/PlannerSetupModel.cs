@@ -1345,12 +1345,34 @@ namespace KingmakerBuffPlanner.UI
                 foreach (SourceAssignmentProfile assignment in routine.Assignments)
                 {
                     SetupSourceRow source;
-                    if (!sourceByLegacyId.TryGetValue(assignment.SourceId, out source))
-                        source = Sources.FirstOrDefault(item => item.SourceId == assignment.SourceId);
-                    if (source == null)
-                        source = ResolveUnambiguousVariant(assignment);
-                    if (source == null)
-                        source = ResolveOwnAbilityEntry(assignment);
+                    // PR #7 review R2: a class/fact ability is resolved by its
+                    // persisted exact ability first - never through the old
+                    // effect aggregate, which an equivalent spell (Mirror
+                    // Image for Shadow Clone) still carries. Unavailable, it
+                    // stays unresolved under its own identity.
+                    string own = OwnAbilityIdentity(assignment);
+                    if (own != null)
+                    {
+                        source = Sources.FirstOrDefault(item => item.SourceId == own);
+                        if (source == null)
+                        {
+                            if (assignment.SourceId != own)
+                            {
+                                assignment.SourceId = own;
+                                changed = true;
+                                routineChanged = true;
+                            }
+                            rebound.Add(assignment);
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        if (!sourceByLegacyId.TryGetValue(assignment.SourceId, out source))
+                            source = Sources.FirstOrDefault(item => item.SourceId == assignment.SourceId);
+                        if (source == null)
+                            source = ResolveUnambiguousVariant(assignment);
+                    }
                     if (source == null)
                     {
                         rebound.Add(assignment);
@@ -1404,16 +1426,15 @@ namespace KingmakerBuffPlanner.UI
                 casting.Order = order++;
         }
 
-        // 0.4.2: an assignment saved under an effect aggregate whose own
-        // ability is a class/fact ability now belongs to that ability's own
-        // entry (its persisted ability names it exactly; nothing is guessed).
-        private SetupSourceRow ResolveOwnAbilityEntry(SourceAssignmentProfile assignment)
+        // 0.4.2: the own catalogue identity (ability|<guid>) of an assignment
+        // whose persisted ability is a class/fact ability, derived from that
+        // exact ability alone (nothing is guessed); null for spells and
+        // variants, which keep their aggregate or variant identity.
+        private static string OwnAbilityIdentity(SourceAssignmentProfile assignment)
         {
-            if (!EffectAggregateIdentity.IsAggregate(assignment.SourceId) ||
-                assignment.Ability == null) return null;
+            if (assignment.Ability == null) return null;
             string own = CatalogSourceIdentity.DerivableFor(assignment.Ability.ToKey());
-            return own == null || !CatalogSourceIdentity.IsAbility(own) ? null
-                : Sources.FirstOrDefault(item => item.SourceId == own);
+            return own != null && CatalogSourceIdentity.IsAbility(own) ? own : null;
         }
 
         private SetupSourceRow ResolveUnambiguousVariant(SourceAssignmentProfile assignment)
