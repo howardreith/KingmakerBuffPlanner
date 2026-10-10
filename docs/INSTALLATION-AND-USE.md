@@ -10,7 +10,7 @@
 
 1. Exit Kingmaker and back up the whole `Mods\KingmakerBuffPlanner` folder (including `UserSettings`) outside `Mods`.
 2. Extract the release ZIP into Kingmaker's `Mods` directory. The resulting path must be `Mods\KingmakerBuffPlanner\Info.json`.
-3. Start Kingmaker through Steam in the normal way and confirm Unity Mod Manager lists `KingmakerBuffPlanner` once, with the version of the ZIP you installed (0.4.1, or 0.4.2 for the owner-test build).
+3. Start Kingmaker through Steam in the normal way and confirm Unity Mod Manager lists `KingmakerBuffPlanner` once, with the version of the ZIP you installed (0.4.3).
 4. Load a campaign. Open the planner with the HUD's gear button or Ctrl+Shift+B.
 
 Do not copy game DLLs, Harmony, Unity Mod Manager, Call of the Wild, or another mod into the Kingmaker Buff Planner folder.
@@ -27,4 +27,4 @@ Exit the game before replacing the mod folder. To preserve settings across a man
 
 ## Qualification boundary
 
-0.4.2 is a local owner-test build; its source gate, guarded in-game runs and the checks that remain the owner's are in `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`. 0.4.1 is the owner-accepted 0.4.0 candidate (rc4 `009b6dd`) with only the version number and documentation advanced; its qualification (the full source-only gate and guarded in-game runs on disposable test campaigns, with what each run did and did not cover) is recorded with exact run ids in `docs/REMAINING-WORK-0.4.0-HANDOFF.md`; earlier qualification is in `docs/E01-E27-ACCEPTANCE-MATRIX.md` and `docs/QUALIFICATION.md`. Routines never run during combat, and Instant mode never falls back to an animated cast.
+0.4.3 is the owner-accepted 0.4.2 build (`7a0842f`) with only the version number and documentation advanced; its source gate, guarded in-game runs and what they did not cover are in `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`. 0.4.1 is the owner-accepted 0.4.0 candidate (rc4 `009b6dd`) with only the version number and documentation advanced; its qualification (the full source-only gate and guarded in-game runs on disposable test campaigns, with what each run did and did not cover) is recorded with exact run ids in `docs/REMAINING-WORK-0.4.0-HANDOFF.md`; earlier qualification is in `docs/E01-E27-ACCEPTANCE-MATRIX.md` and `docs/QUALIFICATION.md`. Routines never run during combat, and Instant mode never falls back to an animated cast.

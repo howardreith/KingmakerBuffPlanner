@@ -1,14 +1,13 @@
 # Kingmaker Buff Planner
 
-**Release:** `0.4.1` — the casting-first planner: plan every cast explicitly (caster,
+**Release:** `0.4.3` — the casting-first planner: plan every cast explicitly (caster,
 exact spell source, target, enhancements) and edit castings directly in the
 graph, with autosave and one-click Long / Important / Short routines from the
 HUD that never run in combat. See the
 [release notes](docs/RELEASE-NOTES-DRAFT.md) and the
-[player guide](docs/CASTING-FIRST-PLAYER-GUIDE.md). `0.4.2` is a local
-owner-test build of three fixes from the owner's 0.4.1 feedback (Shadow Clone
-in the catalogue, castings of spells removed from a spellbook, and the game's
-own aged paper and opening sound); it is not published.
+[player guide](docs/CASTING-FIRST-PLAYER-GUIDE.md). 0.4.3 adds Shadow Clone to
+the catalogue, retires castings of spells removed from a spellbook, and draws
+the planner on the game's own aged paper with its opening sound.
 
 Kingmaker Buff Planner is a standalone Unity Mod Manager mod for **Pathfinder:
 Kingmaker Enhanced Plus Edition 2.1.7b**.
@@ -20,7 +19,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.4.1.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.4.3.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including
