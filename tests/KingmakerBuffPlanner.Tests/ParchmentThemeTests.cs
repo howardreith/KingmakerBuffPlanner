@@ -26,6 +26,11 @@ namespace KingmakerBuffPlanner.Tests
             Run("wp7-workspace-wires-the-scroll-paper", TestWorkspaceWiresTheScrollPaper);
             Run("wp7-translucent-wash-drops-its-outline", TestTranslucentWashDropsItsOutline);
             Run("wp7-header-rule-only-where-there-is-room", TestHeaderRuleOnlyWhereThereIsRoom);
+            Run("paper-042-native-sheet-and-table-contracts", TestNativeSheetAndTableContracts);
+            Run("paper-042-sheet-and-table-resolve-and-fall-back", TestNativeSheetAndTableResolve);
+            Run("paper-042-sheet-geometry-keeps-native-edges", TestSheetGeometryKeepsNativeEdges);
+            Run("paper-042-sheet-is-drawn-untinted-on-the-table", TestSheetWiringInSource);
+            Run("sound-042-one-native-paper-cue-per-open", TestWorkspaceOpenSoundCue);
         }
 
         private static NativeSpriteFacts PaperFacts(string name = "dialogue_backsheet", float width = 858f,
@@ -95,7 +100,8 @@ namespace KingmakerBuffPlanner.Tests
         {
             var source = new FixtureThemeSource();
             ThemeNode owner = BuildDonorHierarchy(source);
-            ThemeNode paperNode = FindByName(owner, "Background");
+            // The colour selector's sheet (ServiceWindow/Background is the 0.4.2 table).
+            ThemeNode paperNode = FindByName(owner, "ColorSelector").Children.Single(node => node.Name == "Background");
             ThemeNode ruleNode = FindByName(owner, "Decor (1)");
             var facts = new Dictionary<object, NativeSpriteFacts>
             {
@@ -375,9 +381,15 @@ namespace KingmakerBuffPlanner.Tests
                 { "legal", PlannerParchmentPalette.LegalInk },
                 { "meta", PlannerParchmentPalette.MetaInk }
             };
+            // 0.4.2: the native card is darker than the 0.4.1 sheet, so the
+            // inks are held to explicit thresholds on every paper the
+            // planner can show: the native card, the 0.4.1 scroll sheet
+            // fallback, and the flat fallback ground.
             foreach (KeyValuePair<string, UiRgb> ink in inks)
-                Expect(UiContrast.Ratio(ink.Value, paper) >= UiContrast.Ratio(ink.Value, before),
-                    "the paper lowers the " + ink.Key + " ink's contrast below the flat look's");
+                foreach (UiRgb ground in new[] { paper, PlannerParchmentPalette.ScrollPaperWritingArea, before })
+                    Expect(UiContrast.Ratio(ink.Value, ground) >= PlannerParchmentPalette.BodyTextMinimum,
+                        "the " + ink.Key + " ink is below 4.5:1 on a paper the planner shows: " +
+                        UiContrast.Ratio(ink.Value, ground).ToString("0.00"));
             Expect(UiContrast.Ratio(PlannerParchmentPalette.PrimaryInk, paper) >= PlannerParchmentPalette.PreferredBodyText &&
                 UiContrast.Ratio(PlannerParchmentPalette.PrimaryInk, darkest) >= PlannerParchmentPalette.BodyTextMinimum,
                 "body ink is not comfortably legible on the paper");
@@ -402,9 +414,9 @@ namespace KingmakerBuffPlanner.Tests
             // The palette is the factory theme's own inks, not a copy that
             // drifted from what the planner draws.
             string factory = UiSource("KingmakerUiFactory.cs");
-            Expect(factory.Contains("internal Color DarkBrownText = new Color(0.235f, 0.22f, 0.188f, 1f);") &&
-                factory.Contains("internal Color MutedBrownText = new Color(0.541f, 0.392f, 0.271f, 1f);") &&
-                factory.Contains("internal Color GoldAccent = new Color(0.588f, 0.243f, 0.106f, 1f);") &&
+            Expect(factory.Contains("internal Color DarkBrownText = new Color(0.16f, 0.14f, 0.11f, 1f);") &&
+                factory.Contains("internal Color MutedBrownText = new Color(0.38f, 0.26f, 0.16f, 1f);") &&
+                factory.Contains("internal Color GoldAccent = new Color(0.52f, 0.20f, 0.08f, 1f);") &&
                 factory.Contains("internal Color ParchmentPanel = new Color(0.965f, 0.890f, 0.725f, 0.88f);"),
                 "the measured palette no longer matches the factory theme");
         }
@@ -432,8 +444,12 @@ namespace KingmakerBuffPlanner.Tests
                 !ParchmentSurfaces.WashKeepsOutline(false, PlannerParchmentPalette.WellWashAlpha, false),
                 "the fallback did not restore the panel's own Outline");
             string adapter = UiSource("PlannerParchment.cs");
-            Expect(adapter.Contains("ParchmentSurfaces.WashKeepsOutline(Native, wash.PaperAlpha,"),
-                "the wash adapter does not apply the outline policy");
+            Expect(adapter.Contains("ParchmentSurfaces.WashKeepsOutline(Native, alpha, wash.OutlineFallback)") &&
+                adapter.Contains("float alpha = _mode == Paper.Sheet ? wash.SheetAlpha : wash.PaperAlpha;"),
+                "the wash adapter does not apply the outline policy to the alpha it draws");
+            Expect(!ParchmentSurfaces.WashKeepsOutline(true, PlannerParchmentPalette.SheetWellWashAlpha, true) &&
+                !ParchmentSurfaces.WashKeepsOutline(true, PlannerParchmentPalette.SheetLedgerWashAlpha, true),
+                "a wash on the native card kept an Outline that fills it");
         }
 
         // Regression for kbp040-wp7-sel-720-01: the header rule, placed 45
@@ -491,6 +507,250 @@ namespace KingmakerBuffPlanner.Tests
             Expect(surface.Contains("_bindings.Add(NativeThemeCapability.ScrollPaper,") &&
                 surface.Contains("delegate { _scrollPaperDonor = null; RefreshParchment(); });"),
                 "the scroll paper has no exact fallback binding");
+        }
+
+        private static NativeSpriteFacts SheetFacts(string name = "Card_Big", float width = 2048f,
+            float height = 1566.8f, float pixelsPerUnit = 84.27984f, bool sliced = false, bool texture = true,
+            float border = 0f)
+        {
+            return new NativeSpriteFacts(name, width, height, border, border, border, border, pixelsPerUnit,
+                sliced, texture);
+        }
+
+        private static NativeSpriteFacts TableFacts(string name = "ServiceWindow_TableBackGruond_3840_2022",
+            float width = 2048f, float height = 1024f, float pixelsPerUnit = 100f)
+        {
+            return new NativeSpriteFacts(name, width, height, 0f, 0f, 0f, 0f, pixelsPerUnit, false, true);
+        }
+
+        // 0.4.2: the native card sheet and table are held to their exact
+        // live contracts (runtime kbp042-donors-02). The game draws both
+        // Simple, so a Sliced draw is not required of them (the planner
+        // draws the card as its own nine-slice); everything else is exact.
+        private static void TestNativeSheetAndTableContracts()
+        {
+            NativeSpriteContract sheet = NativeSpriteContract.SheetPaper;
+            NativeSpriteContract table = NativeSpriteContract.TableBackdrop;
+            Expect(sheet.Failure(SheetFacts()) == null && sheet.Failure(SheetFacts(sliced: true)) == null &&
+                sheet.Failure(SheetFacts(height: 1566.79f)) == null,
+                "the verified Card_Big sheet was rejected");
+            Expect(table.Failure(TableFacts()) == null, "the verified table was rejected");
+            var rejected = new Dictionary<string, NativeSpriteFacts>
+            {
+                { "sprite name", SheetFacts(name: "Card_Small") },
+                { "no texture", SheetFacts(texture: false) },
+                { "size changed", SheetFacts(width: 1166f) },
+                { "size changed ", SheetFacts(height: 1567.2f) },
+                { "nine-slice border changed", SheetFacts(border: 20f) },
+                { "pixels per unit", SheetFacts(pixelsPerUnit: 100f) }
+            };
+            foreach (KeyValuePair<string, NativeSpriteFacts> pair in rejected)
+            {
+                string failure = sheet.Failure(pair.Value);
+                Expect(failure != null && failure.IndexOf(pair.Key.Trim(), StringComparison.Ordinal) >= 0,
+                    "a changed card sheet was accepted or the refusal is unnamed: " + pair.Value.Describe());
+            }
+            Expect(table.Failure(TableFacts(name: "Map_back")) != null &&
+                table.Failure(TableFacts(width: 1922f)) != null && table.Failure(TableFacts(pixelsPerUnit: 50f)) != null &&
+                sheet.Failure(TableFacts()) != null && table.Failure(SheetFacts()) != null,
+                "the table contract accepts other art");
+            // The 0.4.1 scroll sheet keeps its Sliced requirement.
+            Expect(NativeSpriteContract.ScrollPaper.Failure(PaperFacts(sliced: false)) != null &&
+                NativeSpriteContract.ScrollPaper.Failure(PaperFacts(height: 551.05f)) != null,
+                "the scroll sheet contract was loosened");
+        }
+
+        // Both donors resolve from their recorded live paths, are validated
+        // with their exact contracts, and fall back alone.
+        private static void TestNativeSheetAndTableResolve()
+        {
+            var source = new FixtureThemeSource();
+            ThemeNode owner = BuildDonorHierarchy(source);
+            ThemeNode cart = FindByName(owner, "Cart");
+            ThemeNode table = FindByName(owner, "ServiceWindow").Children.Single(node => node.Name == "Background");
+            var facts = new Dictionary<object, NativeSpriteFacts>
+            {
+                { cart.Components[NativeThemeComponent.Image][0], SheetFacts() },
+                { table.Components[NativeThemeComponent.Image][0], TableFacts() }
+            };
+            source.ValidateHook = (capability, components) =>
+            {
+                NativeSpriteContract contract = capability == NativeThemeCapability.SheetPaper
+                    ? NativeSpriteContract.SheetPaper
+                    : capability == NativeThemeCapability.TableBackdrop ? NativeSpriteContract.TableBackdrop : null;
+                if (contract == null) return;
+                NativeSpriteFacts read;
+                string failure = contract.Failure(facts.TryGetValue(components[0], out read) ? read : null);
+                if (failure != null) throw new InvalidOperationException(failure);
+            };
+            NativeThemeResolution resolved = NativeThemeResolver.Resolve(owner, source);
+            Expect(resolved.IsAvailable(NativeThemeCapability.SheetPaper) &&
+                resolved.IsAvailable(NativeThemeCapability.TableBackdrop) &&
+                ReferenceEquals(resolved.Get(NativeThemeCapability.SheetPaper).Nodes[0], cart) &&
+                ReferenceEquals(resolved.Get(NativeThemeCapability.TableBackdrop).Nodes[0], table) &&
+                resolved.Summary.Contains("SheetPaper=ok(candidate)") &&
+                resolved.Summary.Contains("TableBackdrop=ok(candidate)"),
+                "the card sheet or table did not resolve from its live path: " + resolved.Summary);
+            Expect(NativeThemeResolver.SheetPaperPath == "ServiceWindow/Journal/Cart" &&
+                NativeThemeResolver.TableBackdropPath == "ServiceWindow/Background",
+                "the recorded live donor paths changed");
+            facts[cart.Components[NativeThemeComponent.Image][0]] = SheetFacts(name: "Card_Small");
+            NativeThemeResolution changed = NativeThemeResolver.Resolve(owner, source);
+            Expect(!changed.IsAvailable(NativeThemeCapability.SheetPaper) &&
+                changed.Failure(NativeThemeCapability.SheetPaper).Contains("sprite name") &&
+                NativeThemeResolution.Capabilities.All(capability =>
+                    capability == NativeThemeCapability.SheetPaper || changed.IsAvailable(capability)),
+                "a changed card sheet was borrowed or dropped another capability: " + changed.Summary);
+        }
+
+        // The card drawn as the planner's own nine-slice: borders of the
+        // planner slice at the screen-scaled density, the sprite density
+        // Unity needs for them, outsets that keep the visible edge zones off
+        // the text, corners that fit every supported surface, and a writing
+        // area never drawn above one pixel per texel at 1920-wide screens.
+        private static void TestSheetGeometryKeepsNativeEdges()
+        {
+            ParchmentSheetGeometry hd = ParchmentSheetGeometry.For(ParchmentSurfaces.FrameSheetUnitsPerTexel, 1080f, 100f);
+            Expect(hd.Valid && Near(hd.ScreenScale, 1f) && Near(hd.UnitsPerTexel, 0.5f) &&
+                Near(hd.SpritePixelsPerUnit, 200f) && Near(hd.Borders.Left, 60f) && Near(hd.Borders.Bottom, 65f) &&
+                Near(hd.Borders.Right, 65f) && Near(hd.Borders.Top, 55f),
+                "the 1080p sheet is not the planner slice at 0.5 units per texel: " + hd.Describe(0f, 0f));
+            // Unity's sliced border: b texels * refPPU / spritePPU units.
+            Expect(Near(ParchmentLayerGeometry.DrawnUnits(ParchmentSheetGeometry.SliceLeft, hd.SpritePixelsPerUnit,
+                100f, 1f), hd.Borders.Left), "the sheet density does not draw the planned border");
+            ParchmentSheetGeometry owner = ParchmentSheetGeometry.For(ParchmentSurfaces.FrameSheetUnitsPerTexel, 1200f, 100f);
+            ParchmentSheetGeometry small = ParchmentSheetGeometry.For(ParchmentSurfaces.FrameSheetUnitsPerTexel, 720f, 100f);
+            ParchmentSheetGeometry huge = ParchmentSheetGeometry.For(ParchmentSurfaces.FrameSheetUnitsPerTexel, 4320f, 100f);
+            Expect(owner.ScreenScale > 1.1f && owner.ScreenScale < 1.12f && Near(small.ScreenScale, 0.666667f) &&
+                Near(huge.ScreenScale, ParchmentSheetGeometry.MaximumScreenScale) &&
+                Near(ParchmentSheetGeometry.For(0.5f, 300f, 100f).ScreenScale, ParchmentSheetGeometry.MinimumScreenScale),
+                "the density does not follow the screen height within its bounds");
+            foreach (float reference in new[] { 50f, 100f, 200f })
+                Expect(Near(ParchmentSheetGeometry.For(0.5f, 1080f, reference).Borders.Top, 55f),
+                    "the sheet borders depend on the canvas reference " + reference);
+            ParchmentInsets frameOutsets = ParchmentSurfaces.WorkspaceFrameSheetOutsets;
+            foreach (ParchmentSheetGeometry geometry in new[] { small, hd, owner })
+            {
+                ParchmentInsets outsets = geometry.Scaled(frameOutsets);
+                // The visible edge zones end within a few units of the
+                // frame's edge, under its outer margin, never under text.
+                Expect(geometry.EdgeZones.Left - outsets.Left <= 2f && geometry.EdgeZones.Right - outsets.Right <= 2f &&
+                    geometry.EdgeZones.Bottom - outsets.Bottom <= 6f && geometry.EdgeZones.Top - outsets.Top <= 0f,
+                    "the sheet's edge zone reaches into the frame's text: " + geometry.Describe(0f, 0f));
+            }
+            // Corner-safe at the smallest supported frame (1280x720) and the
+            // spell scroll at its fixed size.
+            ParchmentInsets smallOutsets = small.Scaled(frameOutsets);
+            Expect(small.DrawsUndistorted(1232f + smallOutsets.Left + smallOutsets.Right,
+                636f + smallOutsets.Bottom + smallOutsets.Top), "the 1280x720 frame squashes the sheet corners");
+            ParchmentSheetGeometry scroll = ParchmentSheetGeometry.For(ParchmentSurfaces.ScrollSheetUnitsPerTexel, 1200f, 100f);
+            ParchmentInsets scrollOutsets = scroll.Scaled(ParchmentSurfaces.SpellScrollSheetOutsets);
+            Expect(scroll.DrawsUndistorted(SpellScrollLayout.PanelWidth + scrollOutsets.Left + scrollOutsets.Right,
+                    SpellScrollLayout.PanelHeight + scrollOutsets.Bottom + scrollOutsets.Top) &&
+                scroll.MinimumWidth < 0.4f * SpellScrollLayout.PanelWidth &&
+                scroll.EdgeZones.Top - scrollOutsets.Top <= 0f && scroll.EdgeZones.Bottom - scrollOutsets.Bottom <= 6f,
+                "the spell scroll's sheet corners are squashed, oversized or under its text");
+            // The writing area (2048 minus the slice columns) is drawn at no
+            // more than one pixel per texel across a 1920-wide frame.
+            float centreTexels = 2048f - ParchmentSheetGeometry.SliceLeft - ParchmentSheetGeometry.SliceRight;
+            foreach (ParchmentSheetGeometry geometry in new[] { hd, owner })
+            {
+                ParchmentInsets outsets = geometry.Scaled(frameOutsets);
+                float drawn = 1872f + outsets.Left + outsets.Right - geometry.MinimumWidth;
+                Expect(drawn / centreTexels <= 1.05f, "the card's grain is enlarged across the frame: " +
+                    (drawn / centreTexels).ToString("0.000"));
+            }
+            foreach (float bad in new[] { 0f, float.NaN, -2f })
+                Expect(!ParchmentSheetGeometry.For(0.5f, 1080f, bad).Valid &&
+                    !ParchmentSheetGeometry.For(0.5f, bad, 100f).Valid &&
+                    !ParchmentSheetGeometry.For(bad, 1080f, 100f).Valid, "an unusable input drew the sheet");
+        }
+
+        // Unity-bound wiring, checked in source: the card is drawn untinted
+        // through the planner-owned slice, preferred over the scroll sheet
+        // with the flat look as the last fallback; the backdrop is the native
+        // table with its tint as fallback; the donors are exact-validated.
+        private static void TestSheetWiringInSource()
+        {
+            string adapter = UiSource("PlannerParchment.cs");
+            Expect(adapter.Contains("Show(_paper, sliced, donor.material, 0f, 1f, 1f, Vector2.zero, Color.white);") &&
+                adapter.Contains("Sprite.Create(native.texture, rect, new Vector2(0.5f, 0.5f),") &&
+                adapter.Contains("geometry.SpritePixelsPerUnit, 0, SpriteMeshType.FullRect,") &&
+                adapter.IndexOf("ShowSheet(sheetDonor, sliced, sheet);", StringComparison.Ordinal) <
+                    adapter.IndexOf("ParchmentLayerGeometry.For(NativeSpriteContract.ScrollPaper,", StringComparison.Ordinal),
+                "the card is not preferred, untinted, through the planner-owned slice");
+            Expect(adapter.Contains("_image.color = Color.white;") && adapter.Contains("_image.color = _fallback;"),
+                "the backdrop does not draw the table untinted with its tint as fallback");
+            string theme = UiSource("PlannerNativeTheme.cs");
+            Expect(theme.Contains("RequireContract((Image)values[0], NativeSpriteContract.SheetPaper);") &&
+                theme.Contains("RequireContract((Image)values[0], NativeSpriteContract.TableBackdrop);"),
+                "the card sheet or table is not held to its exact contract");
+            string surface = UiSource("PlannerNativeThemeSurface.cs");
+            Expect(surface.Contains("delegate { _sheetPaperDonor = null; RefreshParchment(); });") &&
+                surface.Contains("delegate { _tableBackdropDonor = null; RefreshParchment(); });"),
+                "the card sheet or table has no exact fallback binding");
+            string view = UiSource("CastingWorkspaceScreenView.cs");
+            Expect(view.Contains("_backdrop = new ParchmentBackdrop(blocker.GetComponent<Image>());") &&
+                view.Contains("_nativeTheme.RegisterBackdrop(_backdrop);") &&
+                view.Contains("ParchmentSurfaces.FrameSheetUnitsPerTexel") &&
+                view.Contains("ParchmentSurfaces.ScrollSheetUnitsPerTexel"),
+                "the workspace does not take the card sheet and the table");
+        }
+
+        // One native paper cue per successful closed->open transition: never
+        // for an open of an already open planner, a pending retry, a failed
+        // open, or anything after; a missing or failing sound player is
+        // fail-soft and never counted as played.
+        private static void TestWorkspaceOpenSoundCue()
+        {
+            int posted = 0;
+            bool available = true;
+            bool throws = false;
+            var cue = new WorkspaceOpenSoundCue(() =>
+            {
+                if (throws) throw new InvalidOperationException("audio engine down");
+                if (!available) return false;
+                posted++;
+                return true;
+            });
+            // Hotkey, HUD, spellbook handoff and blocked-run auto-open all
+            // reach the same open path: one transition, one cue.
+            Expect(cue.BeginOpen(false) && cue.CompleteOpen(true) && posted == 1 && cue.PlayedCount == 1,
+                "a successful open did not post exactly one cue");
+            Expect(!cue.BeginOpen(true) && !cue.CompleteOpen(true) && posted == 1,
+                "opening an already open planner posted a cue");
+            // Closed again; a second open posts a second cue.
+            Expect(cue.BeginOpen(false) && cue.CompleteOpen(true) && posted == 2, "a reopen did not post its cue");
+            // A retry while an open is pending begins nothing new.
+            Expect(cue.BeginOpen(false) && !cue.BeginOpen(false) && cue.CompleteOpen(true) && posted == 3,
+                "a pending open's retry posted twice");
+            // A failed open posts nothing and leaves no pending transition.
+            Expect(cue.BeginOpen(false) && !cue.CompleteOpen(false) && posted == 3 && !cue.CompleteOpen(true) &&
+                posted == 3, "a failed open posted a cue");
+            cue.BeginOpen(false);
+            cue.Cancel();
+            Expect(!cue.CompleteOpen(true) && posted == 3, "a cancelled open posted a cue");
+            available = false;
+            Expect(cue.BeginOpen(false) && !cue.CompleteOpen(true) && cue.UnavailableCount == 1 && cue.PlayedCount == 3,
+                "an unavailable player was counted as played");
+            available = true;
+            throws = true;
+            Expect(cue.BeginOpen(false) && !cue.CompleteOpen(true) && cue.LastFailure != null &&
+                cue.PlayedCount == 3, "a failing player was not fail-soft");
+            // The workspace open path is the only caller: begin before the
+            // view exists, complete after it rendered, cancel on every
+            // failure path; the native event is the character sheet's.
+            string root = UiSource("BuffPlannerUiRoot.cs");
+            string open = SourceBlock(root, "private bool OpenCastingWorkspace()");
+            Expect(open != null &&
+                open.Contains("if (!_workspaceOpenSound.BeginOpen(_castingWorkspace != null)) return false;") &&
+                open.IndexOf("_castingWorkspace.RefreshView();", StringComparison.Ordinal) <
+                    open.IndexOf("EmitWorkspaceOpenSound();", StringComparison.Ordinal) &&
+                open.Split(new[] { "_workspaceOpenSound.Cancel();" }, StringSplitOptions.None).Length == 4,
+                "the workspace open path does not bind the cue to the transition");
+            Expect(root.Split(new[] { "EmitWorkspaceOpenSound();" }, StringSplitOptions.None).Length == 2 &&
+                root.Contains("Game.Instance.UI.Common.UISound.Play(UISoundType.CharacterScreenOpen);"),
+                "the cue is posted elsewhere or is not the native character-sheet event");
         }
 
         private static bool Near(float actual, float expected)

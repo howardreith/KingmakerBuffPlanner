@@ -51,6 +51,16 @@ namespace KingmakerBuffPlanner.UI
         private CastingWorkspaceScreenView _castingWorkspace;
         // Successful workspace opens (runtime evidence: one per handoff).
         private int _castingWorkspaceOpens;
+        // 0.4.2: one native paper-opening sound per successful open.
+        private WorkspaceOpenSoundCue _workspaceOpenSoundCue;
+        private WorkspaceOpenSoundCue _workspaceOpenSound
+        {
+            get
+            {
+                return _workspaceOpenSoundCue ??
+                    (_workspaceOpenSoundCue = new WorkspaceOpenSoundCue(PlayNativeSetupOpenSound));
+            }
+        }
         private BuffPlannerSpellbookEntryController _spellbookEntry;
         private BuffPlannerQuickExecuteController _quick;
         private int _runtimeOpenCycles;
@@ -405,6 +415,28 @@ namespace KingmakerBuffPlanner.UI
         internal static int CastingWorkspaceOpensForRuntime
         {
             get { return _instance == null ? 0 : _instance._castingWorkspaceOpens; }
+        }
+
+        // Native opening sounds the workspace posted (runtime evidence: one
+        // per successful closed->open transition).
+        internal static int CastingWorkspaceOpenSoundsForRuntime
+        {
+            get
+            {
+                return _instance == null || _instance._workspaceOpenSoundCue == null
+                    ? 0 : _instance._workspaceOpenSoundCue.PlayedCount;
+            }
+        }
+
+        private void EmitWorkspaceOpenSound()
+        {
+            bool played = _workspaceOpenSound.CompleteOpen(_castingWorkspace != null);
+            _log.Info(played
+                ? "[KBP-WORKSPACE-SOUND] event=CharacterScreenOpen(Wwise JournalOpen);" +
+                    "transition=closed-to-open;opens=" + _castingWorkspaceOpens +
+                    ";played=" + _workspaceOpenSound.PlayedCount + "."
+                : "[KBP-WORKSPACE-SOUND] unavailable;transition=closed-to-open;failure=" +
+                    (_workspaceOpenSound.LastFailure ?? "ui-sound-manager-missing") + ".");
         }
 
         // The casting-first workspace view is open. Distinct from
@@ -1504,12 +1536,13 @@ namespace KingmakerBuffPlanner.UI
         // automated test session; see NativeCastingSessionPolicy).
         private bool OpenCastingWorkspace()
         {
-            if (_castingWorkspace != null) return false;
+            if (!_workspaceOpenSound.BeginOpen(_castingWorkspace != null)) return false;
             BuffPlannerInputLease lease = null;
             try
             {
                 if (StaticCanvas.Instance == null)
                 {
+                    _workspaceOpenSound.Cancel();
                     LogUiUnavailable("casting-workspace: campaign UI unavailable");
                     return false;
                 }
@@ -1526,6 +1559,7 @@ namespace KingmakerBuffPlanner.UI
                     // Unresolved/transitional campaign identity must not
                     // bind arbitrary work to an unknown-campaign fallback
                     // (review G3) — and must not leak an acquired lease.
+                    _workspaceOpenSound.Cancel();
                     LogUiUnavailable(
                         "casting-workspace: campaign identity unresolved (" + unresolved + ")");
                     return false;
@@ -1560,10 +1594,12 @@ namespace KingmakerBuffPlanner.UI
                         ? workspaceSession.MigrationStatus.Value.ToString() : "not-attempted") +
                     (workspaceSession.ImportReport == null ? string.Empty
                         : ";imported=" + workspaceSession.ImportReport.ResultingCastingCount));
+                EmitWorkspaceOpenSound();
                 return true;
             }
             catch (Exception exception)
             {
+                _workspaceOpenSound.Cancel();
                 if (lease != null) lease.Dispose();
                 CloseCastingWorkspace();
                 _log.Error("[KBP-WORKSPACE] open failed.", exception);

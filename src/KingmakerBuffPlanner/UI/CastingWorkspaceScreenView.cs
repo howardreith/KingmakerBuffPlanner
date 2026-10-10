@@ -54,6 +54,8 @@ namespace KingmakerBuffPlanner.UI
         // WP7: the frame's native scroll paper (exact fallback: the flat
         // tint and outline above).
         private ParchmentSurface _frameParchment;
+        // 0.4.2: the full-screen blocker showing the native table.
+        private ParchmentBackdrop _backdrop;
         private int _uiLayer;
         private bool _disposed;
         private bool _importAnnounced;
@@ -563,6 +565,10 @@ namespace KingmakerBuffPlanner.UI
             RectTransform blocker = KingmakerUiFactory.CreateRect("Blocker", _root);
             KingmakerUiFactory.AddPanel(blocker, new Color(0f, 0f, 0f, 0.55f));
             KingmakerUiFactory.Stretch(blocker);
+            // 0.4.2: the blocker shows the native table the game's own
+            // windows lie on (its dimming tint is the exact fallback).
+            _backdrop = new ParchmentBackdrop(blocker.GetComponent<Image>());
+            _nativeTheme.RegisterBackdrop(_backdrop);
             _frame = KingmakerUiFactory.CreateRect("Frame", _root);
             KingmakerUiFactory.AddFramedPanel(_frame, _theme.ParchmentPanel, _theme.GoldAccent, 2f);
             KingmakerUiFactory.Stretch(_frame, 24, 24, 24, 60);
@@ -573,7 +579,8 @@ namespace KingmakerBuffPlanner.UI
             // central fold, drawn under every lane; the flat tint and
             // outline above remain its exact fallback.
             _frameParchment = ParchmentSurface.Create(ParchmentSurfaces.WorkspaceFrame, _frame,
-                ParchmentSurfaces.WorkspaceFrameOutsets);
+                ParchmentSurfaces.WorkspaceFrameOutsets, ParchmentSurfaces.WorkspaceFrameSheetOutsets,
+                ParchmentSurfaces.FrameSheetUnitsPerTexel);
             BuildHeader(_frame);
             BuildCatalogue(_frame);
             BuildGraphArea(_frame);
@@ -604,8 +611,10 @@ namespace KingmakerBuffPlanner.UI
         {
             foreach (ScrollRect lane in new[] { CatalogueScroll(), _graphScroll, _inspectorScroll })
                 if (lane != null)
-                    _frameParchment.AddWash(lane.GetComponent<Image>(), PlannerParchmentPalette.WellWashAlpha);
-            _frameParchment.AddWash(_footerLedger, PlannerParchmentPalette.LedgerWashAlpha);
+                    _frameParchment.AddWash(lane.GetComponent<Image>(), PlannerParchmentPalette.WellWashAlpha,
+                        PlannerParchmentPalette.SheetWellWashAlpha);
+            _frameParchment.AddWash(_footerLedger, PlannerParchmentPalette.LedgerWashAlpha,
+                PlannerParchmentPalette.SheetLedgerWashAlpha);
             // Between the header row (its controls end 41 units down) and
             // the routine bar; and in the gap between the lanes (8.5% of the
             // frame up) and the footer (7.8%).
@@ -714,7 +723,8 @@ namespace KingmakerBuffPlanner.UI
             // WP7: the spell scroll - the native paper behind a centred
             // title, the meta line, a scroll rule and the scrolling body.
             _inspectParchment = ParchmentSurface.Create(ParchmentSurfaces.SpellScroll, panel,
-                ParchmentSurfaces.SpellScrollOutsets);
+                ParchmentSurfaces.SpellScrollOutsets, ParchmentSurfaces.SpellScrollSheetOutsets,
+                ParchmentSurfaces.ScrollSheetUnitsPerTexel);
             SpellScrollLayout layout = SpellScrollLayout.Compute(SpellScrollLayout.PanelWidth,
                 SpellScrollLayout.PanelHeight);
             _inspectTitle = KingmakerUiFactory.CreateText("Title", panel, _theme, string.Empty,
@@ -762,7 +772,7 @@ namespace KingmakerBuffPlanner.UI
             _inspectBody.verticalOverflow = VerticalWrapMode.Overflow;
             // On the paper the body sits straight on the sheet; the flat
             // well and its outline are the exact fallback.
-            _inspectParchment.AddWash(RectOf(_inspectScroll).GetComponent<Image>(), 0f);
+            _inspectParchment.AddWash(RectOf(_inspectScroll).GetComponent<Image>(), 0f, 0f);
             if (_nativeTheme != null)
             {
                 _nativeTheme.RegisterParchment(_inspectParchment);
@@ -776,6 +786,12 @@ namespace KingmakerBuffPlanner.UI
 
         // What the open spell scroll drew and its input policy (runtime
         // evidence only).
+        // What the planner's backdrop drew (runtime evidence only).
+        internal string BackdropEvidenceForRuntime
+        {
+            get { return _backdrop == null ? "backdrop=not-built" : _backdrop.Evidence; }
+        }
+
         internal string SpellInspectPaperEvidenceForRuntime
         {
             get

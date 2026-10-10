@@ -609,6 +609,61 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
+    // 0.4.2: the casting-first planner's paper-opening cue. Exactly one
+    // native sound per successful closed->open transition, whatever opened
+    // it (hotkey, HUD setup, spellbook handoff, blocked-run auto-open): an
+    // open of an already open planner never begins a transition, a failed
+    // open cancels it silently, and nothing else (refresh, editing,
+    // scrolling, retries, theme resolution) reaches the cue. The sound is
+    // the game's own (UISoundType.CharacterScreenOpen, the Wwise event
+    // "JournalOpen" the character sheet, spellbook and journal post when
+    // they show), played through its UI sound manager so volume and mute
+    // stay the player's; an unavailable or failing player is fail-soft.
+    public sealed class WorkspaceOpenSoundCue
+    {
+        private readonly SetupOpenSoundGate _gate = new SetupOpenSoundGate();
+        private readonly Func<bool> _play;
+
+        public WorkspaceOpenSoundCue(Func<bool> play)
+        {
+            _play = play ?? throw new ArgumentNullException("play");
+        }
+
+        public int PlayedCount { get; private set; }
+        public int UnavailableCount { get; private set; }
+        public string LastFailure { get; private set; }
+
+        public bool BeginOpen(bool alreadyOpen)
+        {
+            return !alreadyOpen && _gate.BeginHiddenToVisible();
+        }
+
+        // True only when the sound was actually posted for this transition.
+        public bool CompleteOpen(bool opened)
+        {
+            if (!_gate.CompleteVisible(opened))
+            {
+                _gate.Cancel();
+                return false;
+            }
+            bool played;
+            try { played = _play(); }
+            catch (Exception exception)
+            {
+                LastFailure = exception.GetType().Name + ":" + exception.Message;
+                played = false;
+            }
+            if (played) PlayedCount++;
+            else UnavailableCount++;
+            return played;
+        }
+
+        public void Cancel()
+        {
+            _gate.Cancel();
+        }
+    }
+
     public enum QuickExecutionDisposition
     {
         Completed,
