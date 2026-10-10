@@ -1,8 +1,9 @@
-# Kingmaker Buff Planner 0.4.2 (owner-test candidate)
+# Kingmaker Buff Planner 0.4.3
 
-0.4.2 is a local owner-test build. It follows up the owner's feedback on 0.4.1
-with three fixes. It is not published: 0.4.1 stays the published release
-until the owner accepts this build.
+0.4.3 is the published release of the owner-accepted 0.4.2 build (commit
+`7a0842f`, including the fixes from its review), with the version advanced so
+Unity Mod Manager sees it as newer than that build. It follows up the owner's
+feedback on 0.4.1 with three fixes.
 
 ## What changed
 
@@ -30,7 +31,7 @@ until the owner accepts this build.
   - a spellbook could not be read with certainty;
   - the party is in combat or a routine is running.
   Stale castings such as the earlier Mind Blank ones are cleared on the first
-  open with 0.4.2, provided the spell is no longer in those spellbooks and
+  open with 0.4.3, provided the spell is no longer in those spellbooks and
   their casters are in the party, alive and conscious.
 - **Native paper and opening sound.** The planner and the spell description
   are now drawn on the same aged page the game uses for its inventory,
@@ -63,12 +64,12 @@ The automated in-game checks use disposable test campaigns only.
     native blueprint.
   - No mutable test party has a prepared caster. Un-preparing, spending the
     last prepared slot and pending rest are proven against the game's own
-    spellbook code; please try them (the handoff's owner test list).
+    spellbook code, not in the game.
   - The automation proves that the opening sound is posted exactly once per
     open through the game's own sound system. Hearing it is the owner's
     check.
 
-The exact record is in the 0.4.2 handoff.
+The exact record is in `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`.
 
 ---
 
