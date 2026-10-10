@@ -143,7 +143,7 @@ function New-KbpRuntimeRequest {
         [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
         [hashtable]$Parameters = @{},
-        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical')][string]$Scenario = 'mod-load-smoke')
+        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal')][string]$Scenario = 'mod-load-smoke')
     # This ValidateSet must equal the launcher's -Scenario set exactly
     # (Test-RuntimeHarness builds a request for every launcher scenario).
     return [ordered]@{
@@ -1206,6 +1206,65 @@ function Assert-KbpSpellbookEntryOutcome {
     }
 }
 
+# 0.4.2 (B), re-read from a raw removal record (the physical "removal"
+# expectation and live-workspace-removal alike): spell S removed from
+# book A through the game's own RemoveSpell (known before, not after) took
+# exactly its own two castings in one archived, saved edit whose notice the
+# opened planner shows; book B (another caster) was spent to zero through
+# the game's own spend and kept S and T and their castings; the unrelated
+# Draft and every seed stayed; the ordinary run evaluated the reconciled
+# plan; every other intent, blocker and resource pool was unchanged.
+function Assert-KbpRemovalEvidence {
+    param([Parameter(Mandatory = $true)]$Record, [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Label)
+    $removalKeys = @('removalAuthored', 'removalKnownBefore', 'removalKnownAfter', 'removalSpentSlotsBefore',
+        'removalSpentSlotsAfter', 'removalSpentKnownAfter', 'removalStatus', 'removalDurable', 'removalRemoved',
+        'removalArchived', 'removalStored', 'removalNotice', 'removalNoticeShown', 'removalLongPlan',
+        'removalBlockerReadiness', 'removalIntentKept', 'removalIntentDiff', 'removalPoolsBefore',
+        'removalPoolsAfter')
+    $names = @($record.PSObject.Properties | ForEach-Object Name)
+    $missingRemoval = @($removalKeys | Where-Object { $names -cnotcontains $_ })
+    if ($missingRemoval.Count -ne 0) {
+        throw "The $Label evidence is unread ($($missingRemoval -join ', ')): $path"
+    }
+    $removed = @($record.removalRemoved | ForEach-Object { [string]$_ })
+    $stored = @($record.removalStored | ForEach-Object { [string]$_ })
+    $seeds = @(@($record.seedLongCastings) + @($record.seedImportantCastings) + @($record.seedShortCastings) |
+        ForEach-Object { [string]$_ })
+    if (@($record.removalAuthored).Count -ne 5 -or
+        [string]::IsNullOrEmpty([string]$record.removalKnownCaster) -or
+        [string]$record.removalKnownCaster -ceq [string]$record.removalSpentCaster -or
+        $null -eq $record.removalKnownBefore -or -not [bool]$record.removalKnownBefore -or
+        $null -eq $record.removalKnownAfter -or [bool]$record.removalKnownAfter -or
+        $null -eq $record.removalSpentSlotsBefore -or [int]$record.removalSpentSlotsBefore -le 0 -or
+        $null -eq $record.removalSpentSlotsAfter -or [int]$record.removalSpentSlotsAfter -ne 0 -or
+        $null -eq $record.removalSpentKnownAfter -or -not [bool]$record.removalSpentKnownAfter -or
+        [string]$record.removalStatus -cne 'Applied' -or -not [bool]$record.removalDurable -or
+        ($removed -join ',') -cne 'rm-known-important,rm-known-long' -or
+        $stored -ccontains 'rm-known-long' -or $stored -ccontains 'rm-known-important' -or
+        $stored -cnotcontains 'rm-spent-important' -or $stored -cnotcontains 'rm-other-book' -or
+        $stored -cnotcontains 'rm-unrelated-draft' -or
+        @($seeds | Where-Object { $stored -cnotcontains $_ }).Count -ne 0 -or
+        -not [bool]$record.removalArchived -or
+        ([string]$record.removalNotice).IndexOf('no longer known', [StringComparison]::Ordinal) -lt 0 -or
+        -not [bool]$record.removalNoticeShown) {
+        throw "The $Label did not retire exactly the removed spell's castings, durably, with its notice shown: $path"
+    }
+    # The ordinary run evaluated the reconciled plan (Long holds
+    # exactly the seed), the unrelated Draft still blocks, every other
+    # casting kept its saved intent and order, and the press changed
+    # no resource pool.
+    $longPlan = @($record.removalLongPlan | ForEach-Object { [string]$_ } | Sort-Object)
+    $seedLong = @($record.seedLongCastings | ForEach-Object { [string]$_ } | Sort-Object)
+    if (($longPlan -join ',') -cne ($seedLong -join ',') -or
+        -not ([string]$record.removalBlockerReadiness).StartsWith('Draft:', [StringComparison]::Ordinal) -or
+        -not [bool]$record.removalIntentKept -or
+        [string]::IsNullOrEmpty([string]$record.removalPoolsBefore) -or
+        [string]$record.removalPoolsAfter -cne [string]$record.removalPoolsBefore) {
+        throw "The $Label's press did not evaluate the reconciled plan with every other intent, blocker and resource unchanged: $path"
+    }
+}
+
 function Assert-KbpScenarioOutcome {
     param([Parameter(Mandatory = $true)]$Request)
     $scenario = [string]$Request.scenario
@@ -1334,6 +1393,26 @@ function Assert-KbpScenarioOutcome {
         Assert-KbpProblemNavigationOutcome -Request $Request
         return
     }
+    # 0.4.2 (B): the no-input removal scenario - a cold Long press through
+    # the HUD's own routine entry, refused by the session lock, then the
+    # removal evidence, and the planner closed with its lease released.
+    if ($scenario -ceq 'live-workspace-removal') {
+        $path = Join-Path $directory 'removal-reconcile.json'
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Removal scenario evidence is missing.' }
+        $record = Read-KbpJson $path
+        if ([string]$record.runId -cne [string]$Request.runId -or @($record.violations).Count -ne 0 -or
+            @($record.failures).Count -ne 0 -or
+            [string]$record.press -cne 'BuffPlannerUiRoot.PressRoutineForRuntime(long)' -or
+            $null -eq $record.coldSessionBeforeMoon -or -not [bool]$record.coldSessionBeforeMoon -or
+            $null -eq $record.editorNeverOpenedBeforeMoon -or -not [bool]$record.editorNeverOpenedBeforeMoon -or
+            @($record.seedLongCastings).Count -lt 1 -or [bool]$record.moonRunStarted -or
+            -not ([string]$record.moonRefusal -like 'native-submission-disabled*') -or
+            -not [bool]$record.moonWorkspaceStayedClosed -or -not [bool]$record.removalWorkspaceClosed) {
+            throw "The removal scenario run is inconsistent with a PASS: $path"
+        }
+        Assert-KbpRemovalEvidence -Record $record -Path $path -Label 'removal scenario run'
+        return
+    }
     if ($scenario -ceq 'live-workspace-physical' -and
         [string]$Request.parameters.physicalExpectation -ceq 'spellbook') {
         Assert-KbpSpellbookEntryOutcome -Request $Request
@@ -1447,59 +1526,9 @@ function Assert-KbpScenarioOutcome {
                 throw "The physical authoring gestures did not all behave as the direct-manipulation contract says ($($notTrue -join ', ')): $path"
             }
         }
-        # 0.4.2 (B) re-read from the raw record: the spell removed through
-        # the game's own RemoveSpell (known before, not after) took exactly
-        # its own two castings in one archived, saved edit whose notice the
-        # opened planner shows; the spell whose level was spent to zero
-        # through the game's own spend stayed known and kept its casting;
-        # every cold seed is still stored.
+        # 0.4.2 (B) re-read from the raw record (Assert-KbpRemovalEvidence).
         if ($expectation -ceq 'removal') {
-            $removalKeys = @('removalAuthored', 'removalKnownBefore', 'removalKnownAfter', 'removalSpentSlotsBefore',
-                'removalSpentSlotsAfter', 'removalSpentKnownAfter', 'removalStatus', 'removalDurable', 'removalRemoved',
-                'removalArchived', 'removalStored', 'removalNotice', 'removalNoticeShown', 'removalLongPlan',
-                'removalBlockerReadiness', 'removalIntentKept', 'removalIntentDiff', 'removalPoolsBefore',
-                'removalPoolsAfter')
-            $names = @($record.PSObject.Properties | ForEach-Object Name)
-            $missingRemoval = @($removalKeys | Where-Object { $names -cnotcontains $_ })
-            if ($missingRemoval.Count -ne 0) {
-                throw "The physical removal evidence is unread ($($missingRemoval -join ', ')): $path"
-            }
-            $removed = @($record.removalRemoved | ForEach-Object { [string]$_ })
-            $stored = @($record.removalStored | ForEach-Object { [string]$_ })
-            $seeds = @(@($record.seedLongCastings) + @($record.seedImportantCastings) + @($record.seedShortCastings) |
-                ForEach-Object { [string]$_ })
-            if (@($record.removalAuthored).Count -ne 5 -or
-                [string]::IsNullOrEmpty([string]$record.removalKnownCaster) -or
-                [string]$record.removalKnownCaster -ceq [string]$record.removalSpentCaster -or
-                $null -eq $record.removalKnownBefore -or -not [bool]$record.removalKnownBefore -or
-                $null -eq $record.removalKnownAfter -or [bool]$record.removalKnownAfter -or
-                $null -eq $record.removalSpentSlotsBefore -or [int]$record.removalSpentSlotsBefore -le 0 -or
-                $null -eq $record.removalSpentSlotsAfter -or [int]$record.removalSpentSlotsAfter -ne 0 -or
-                $null -eq $record.removalSpentKnownAfter -or -not [bool]$record.removalSpentKnownAfter -or
-                [string]$record.removalStatus -cne 'Applied' -or -not [bool]$record.removalDurable -or
-                ($removed -join ',') -cne 'rm-known-important,rm-known-long' -or
-                $stored -ccontains 'rm-known-long' -or $stored -ccontains 'rm-known-important' -or
-                $stored -cnotcontains 'rm-spent-important' -or $stored -cnotcontains 'rm-other-book' -or
-                $stored -cnotcontains 'rm-unrelated-draft' -or
-                @($seeds | Where-Object { $stored -cnotcontains $_ }).Count -ne 0 -or
-                -not [bool]$record.removalArchived -or
-                ([string]$record.removalNotice).IndexOf('no longer known', [StringComparison]::Ordinal) -lt 0 -or
-                -not [bool]$record.removalNoticeShown) {
-                throw "The physical removal run did not retire exactly the removed spell's castings, durably, with its notice shown: $path"
-            }
-            # The ordinary run evaluated the reconciled plan (Long holds
-            # exactly the seed), the unrelated Draft still blocks, every other
-            # casting kept its saved intent and order, and the press changed
-            # no resource pool.
-            $longPlan = @($record.removalLongPlan | ForEach-Object { [string]$_ } | Sort-Object)
-            $seedLong = @($record.seedLongCastings | ForEach-Object { [string]$_ } | Sort-Object)
-            if (($longPlan -join ',') -cne ($seedLong -join ',') -or
-                -not ([string]$record.removalBlockerReadiness).StartsWith('Draft:', [StringComparison]::Ordinal) -or
-                -not [bool]$record.removalIntentKept -or
-                [string]::IsNullOrEmpty([string]$record.removalPoolsBefore) -or
-                [string]$record.removalPoolsAfter -cne [string]$record.removalPoolsBefore) {
-                throw "The physical removal run's press did not evaluate the reconciled plan with every other intent, blocker and resource unchanged: $path"
-            }
+            Assert-KbpRemovalEvidence -Record $record -Path $path -Label 'physical removal run'
         }
         # E05/E06 re-read from the raw record. D11: the earlier record judged
         # only that the description panel was active while it rendered at a
@@ -1881,12 +1910,12 @@ function Get-KbpProtectedSavePolicy {
     $strict = $FixtureFamily -ceq 'Advanced' -or
         @('live-cast-qual', 'live-cast-qual-select', 'live-advanced-inspect', 'live-cast-probe',
             'live-workspace-reload', 'live-workspace-import', 'live-classic-select',
-            'live-classic-cast', 'live-workspace-physical') -ccontains $Scenario
+            'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal') -ccontains $Scenario
     return [pscustomobject]@{
         allowedChanged = if ($strict) { @() } else { @($WorkingFileName) }
         newFilesBlocking = $FixtureFamily -ceq 'Advanced' -or
             @('live-cast-qual', 'live-cast-probe', 'live-workspace-reload', 'live-workspace-import',
-                'live-classic-cast', 'live-workspace-physical') -ccontains $Scenario
+                'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal') -ccontains $Scenario
     }
 }
 

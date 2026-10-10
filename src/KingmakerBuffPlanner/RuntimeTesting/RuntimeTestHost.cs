@@ -1095,6 +1095,37 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         result.Stage = "import-validation";
                     }
                 }
+                else if (RuntimeTestProtocol.IsRemovalScenario(_request.Scenario))
+                {
+                    // Removal acceptance (Unity-free rules in
+                    // PhysicalWorkspaceRecord.RemovalScenarioViolations): the
+                    // reconciliation retired exactly the removed spell's
+                    // castings, the press was refused by the lock, nothing
+                    // ran, and the planner closed with its lease released.
+                    IList<string> violations = _physicalRecord.RemovalScenarioViolations();
+                    bool noSubmission = UI.NativeCastingSessionPolicy.Locked &&
+                        BuffPlannerUiRoot.CastingRunsStartedForRuntime == 0;
+                    result.Assertions.Add(_removalScenarioWritten && violations.Count == 0
+                        ? RuntimeTestAssertion.Pass("removal-reconcile",
+                            "removed castings of the natively removed spell only; archived, saved, notice shown",
+                            "removed=" + string.Join(",", _physicalRecord.RemovalRemoved.ToArray()) +
+                                ";stored=" + _physicalRecord.RemovalStored.Count)
+                        : RuntimeTestAssertion.Fail("removal-reconcile",
+                            "removed castings of the natively removed spell only; archived, saved, notice shown",
+                            (_removalScenarioWritten ? string.Empty : "record-not-written|") +
+                                string.Join("|", violations.ToArray())));
+                    result.Assertions.Add(noSubmission
+                        ? RuntimeTestAssertion.Pass("removal-no-native-submission", "session locked;0 runs",
+                            "locked=True;runs=0")
+                        : RuntimeTestAssertion.Fail("removal-no-native-submission", "session locked;0 runs",
+                            "locked=" + UI.NativeCastingSessionPolicy.Locked + ";runs=" +
+                                BuffPlannerUiRoot.CastingRunsStartedForRuntime));
+                    if (!_removalScenarioWritten || violations.Count != 0 || !noSubmission)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "removal-validation";
+                    }
+                }
                 else if (RuntimeTestProtocol.IsInspectionScenario(_request.Scenario))
                 {
                     // Inspection acceptance: evidence written, nothing
@@ -2329,6 +2360,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     _liveHotkeyMarkerWritten = true;
                     if (RuntimeTestProtocol.IsImportScenario(_request.Scenario)) SeedClassicPlanForImport();
+                    if (RuntimeTestProtocol.IsRemovalScenario(_request.Scenario))
+                    {
+                        // The removal and the press happen before the planner
+                        // ever opens; phase 22 opens it afterwards.
+                        _liveUiPhase = RemovalScenarioPrePhase;
+                        return false;
+                    }
                     _log.Info("[KBP-MANUAL] control frame consumed; opening the " +
                         "candidate programmatically with no input request.");
                     _liveUiPhase = 22;
@@ -2500,6 +2538,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveUiPhase = 90;
                         return false;
                     }
+                    if (RuntimeTestProtocol.IsRemovalScenario(_request.Scenario))
+                    {
+                        // Removal: read the notice the opened planner shows, close.
+                        _liveUiPhase = RemovalScenarioOpenPhase;
+                        return false;
+                    }
                     if (RuntimeTestProtocol.IsClassicCastScenario(_request.Scenario))
                     {
                         // Classic: back to the Classic planner and its routes.
@@ -2542,6 +2586,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_liveUiPhase == 90)
             {
                 return UpdateImport();
+            }
+            if (_liveUiPhase == RemovalScenarioPrePhase)
+            {
+                return UpdateRemovalScenarioBeforeOpen();
+            }
+            if (_liveUiPhase == RemovalScenarioOpenPhase)
+            {
+                return UpdateRemovalScenarioOpened();
             }
             if (_liveUiPhase == 55)
             {
@@ -4066,14 +4118,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // The press produced a refusal: the boundary's own machine
                     // reason (the lock) plus the player-facing disposition and
                     // message are the evidence.
-                    UI.QuickExecutionResult refused = BuffPlannerUiRoot.QuickResultForRuntime("long");
-                    UI.CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
-                    IReadOnlyList<string> dispatchRefusals = session == null
-                        ? new List<string>() : session.DispatchRefusalsForRuntime;
-                    string machine = dispatchRefusals.Count == 0
-                        ? "no-dispatch-refusal" : dispatchRefusals[dispatchRefusals.Count - 1];
-                    _physicalRecord.MoonRefusal = machine + ";" +
-                        (refused == null ? "no-result" : refused.Disposition + ":" + refused.Message);
+                    _physicalRecord.MoonRefusal = LongPressRefusal();
                     _physicalRecord.AddNote("moon-refused:" + _physicalRecord.MoonRefusal);
                 }
                 else
@@ -4527,7 +4572,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             _physicalPublished = true;
             PhysicalWorkspaceRecord record = _physicalRecord;
-            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "physical-workspace.json"), new JObject
+            var published = new JObject
             {
                 { "schemaVersion", 1 },
                 { "runId", _request.RunId },
@@ -4567,35 +4612,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "moonRunStarted", record.MoonRunStarted },
                 { "moonWorkspaceStayedClosed", record.MoonWorkspaceStayedClosed },
                 { "moonExpectation", record.MoonExpectation },
-                { "removalAuthored", new JArray(record.RemovalAuthored.Cast<object>().ToArray()) },
-                { "removalKnownCaster", record.RemovalKnownCaster },
-                { "removalKnownBook", record.RemovalKnownBook },
-                { "removalKnownSpell", record.RemovalKnownSpell },
-                { "removalKnownName", record.RemovalKnownName },
-                { "removalKnownBefore", Nullable(record.RemovalKnownBefore) },
-                { "removalKnownAfter", Nullable(record.RemovalKnownAfter) },
-                { "removalSpentCaster", record.RemovalSpentCaster },
-                { "removalSpentBook", record.RemovalSpentBook },
-                { "removalSpentSpell", record.RemovalSpentSpell },
-                { "removalSpentName", record.RemovalSpentName },
-                { "removalSpentLevel", Nullable(record.RemovalSpentLevel) },
-                { "removalSpentSlotsBefore", Nullable(record.RemovalSpentSlotsBefore) },
-                { "removalSpentSlotsAfter", Nullable(record.RemovalSpentSlotsAfter) },
-                { "removalSpentKnownAfter", Nullable(record.RemovalSpentKnownAfter) },
-                { "removalStatus", record.RemovalStatus },
-                { "removalNotice", record.RemovalNotice },
-                { "removalDurable", record.RemovalDurable },
-                { "removalRemoved", new JArray(record.RemovalRemoved.Cast<object>().ToArray()) },
-                { "removalArchived", record.RemovalArchived },
-                { "removalStored", new JArray(record.RemovalStored.Cast<object>().ToArray()) },
-                { "removalFooter", record.RemovalFooter },
-                { "removalNoticeShown", record.RemovalNoticeShown },
-                { "removalLongPlan", new JArray(record.RemovalLongPlan.Cast<object>().ToArray()) },
-                { "removalBlockerReadiness", record.RemovalBlockerReadiness },
-                { "removalIntentKept", record.RemovalIntentKept },
-                { "removalIntentDiff", record.RemovalIntentDiff },
-                { "removalPoolsBefore", record.RemovalPoolsBefore },
-                { "removalPoolsAfter", record.RemovalPoolsAfter },
                 { "combatUnitId", record.CombatUnitId },
                 { "combatInCombatBefore", Nullable(record.CombatInCombatBefore) },
                 { "combatHeldUpdates", record.CombatHeldUpdates },
@@ -4693,7 +4709,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "notes", new JArray(record.Notes.Cast<object>().ToArray()) },
                 { "failures", new JArray(record.Failures.Cast<object>().ToArray()) },
                 { "violations", new JArray(record.Violations().Cast<object>().ToArray()) }
-            }.ToString(Formatting.Indented) + Environment.NewLine);
+            };
+            AddRemovalFields(published, record);
+            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "physical-workspace.json"),
+                published.ToString(Formatting.Indented) + Environment.NewLine);
             _log.Info("[KBP-PHYSICAL] published;violations=" + string.Join("|", record.Violations().ToArray()) +
                 ";notes=" + string.Join("|", record.Notes.ToArray()) + ".");
         }
