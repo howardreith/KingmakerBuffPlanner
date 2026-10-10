@@ -74,6 +74,7 @@ namespace KingmakerBuffPlanner.Planning
         public const string BookNotObserved = "book-not-observed";
         public const string StillMember = "still-held-by-the-book";
         public const string UndoRestored = "undo-restored-same-observation";
+        public const string SpellUnresolved = "spell-not-in-this-game";
 
         public static SpellbookReconciliationDecision Decide(
             CastingPlanDocument document,
@@ -135,6 +136,13 @@ namespace KingmakerBuffPlanner.Planning
             if (book.Copies(member) > 0)
             {
                 reason = StillMember;
+                return null;
+            }
+            // A missing mod is not a removal: a spell the running game does
+            // not know cannot be in any book.
+            if (!membership.SpellResolves(casting.Ability.BaseAbilityGuid))
+            {
+                reason = SpellUnresolved;
                 return null;
             }
             string observation = casting.CasterUnitId + "|" + casting.SpellbookGuid + "|" +

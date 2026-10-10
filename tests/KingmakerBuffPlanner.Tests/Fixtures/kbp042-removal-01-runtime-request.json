@@ -1,0 +1,121 @@
+{
+    "schemaVersion":  1,
+    "enabled":  true,
+    "runId":  "kbp042-removal-01",
+    "scenario":  "live-workspace-physical",
+    "profileId":  "full-user",
+    "expectedModVersion":  "0.4.2",
+    "expectedCommit":  "0b4b5a084f15213f83c40b0190b5dfcae723445a",
+    "evidenceDirectory":  "C:\\Dev\\KingmakerBuffPlannerLab\\runtime-evidence\\kbp042-removal-01",
+    "expectedPackageSha256":  "350e1c8ce4f8dce8c3e99371885ff58b054455e49d204d4cfe9fd757319f8594",
+    "expectedDllSha256":  "189fc5e891926b4fe54b7dc2974b5ef5da99ade3e57029cf4d7f8b815a5ed89e",
+    "timeoutSeconds":  1200,
+    "exitAfterCompletion":  true,
+    "expectedOptionalMods":  [
+                                 {
+                                     "ummId":  "BagOfTricks",
+                                     "version":  "1.16.4",
+                                     "assemblyName":  "BagOfTricks.dll",
+                                     "assemblySha256":  "d03626594ece0f339aeef03ec7259684af7ddeb8b2edf41936f144848059a0e6"
+                                 },
+                                 {
+                                     "ummId":  "BetterVendors",
+                                     "version":  "2.0.8",
+                                     "assemblyName":  "BetterVendors.dll",
+                                     "assemblySha256":  "8843509852964d9016d2996a3050bfbe6f068360c4f2f6b8ff7f6440ca712009"
+                                 },
+                                 {
+                                     "ummId":  "CallOfTheWild",
+                                     "version":  "1.14.4c-2.1",
+                                     "assemblyName":  "CallOfTheWild.dll",
+                                     "assemblySha256":  "4ebf8e1ed3e66ffed72ea33ea325595629423dacd5bffa23e3c9109144b26915"
+                                 },
+                                 {
+                                     "ummId":  "CheatMenu",
+                                     "version":  "1.2.3",
+                                     "assemblyName":  "CheatMenu.dll",
+                                     "assemblySha256":  "7d659eb092073ab9e059414f8bfbdfe46991cede56b394f58f7ea2bcc1ff0845"
+                                 },
+                                 {
+                                     "ummId":  "CraftMagicItems",
+                                     "version":  "2.1.0",
+                                     "assemblyName":  "CraftMagicItems.dll",
+                                     "assemblySha256":  "f7c06f32f18932e67bd8e36fa380bf593ec1e88a262c9f9ddb0812bc1d8b209a"
+                                 },
+                                 {
+                                     "ummId":  "EddicKingmakerRespec",
+                                     "version":  "1.0",
+                                     "assemblyName":  "EddicKingmakerRespec.dll",
+                                     "assemblySha256":  "385c1ed87b5acb70092875ce28527cefb5698c64b61d3f706a27dc37161fc4d6"
+                                 },
+                                 {
+                                     "ummId":  "KingmakerBugfixes",
+                                     "version":  "1.3.3",
+                                     "assemblyName":  "KingmakerBugfixes.dll",
+                                     "assemblySha256":  "87888cbe4ca1b62e151560a8697bf07073dff4446a2e2bc522fac1804b63dca1"
+                                 },
+                                 {
+                                     "ummId":  "KingmakerDiceRoller",
+                                     "version":  "0.1.6",
+                                     "assemblyName":  "KingmakerDiceRoller.dll",
+                                     "assemblySha256":  "e2803d3f70ac168d52de27a075b36e6562c7209e709d02c62485f7ded0b13092"
+                                 },
+                                 {
+                                     "ummId":  "KingmakerGunslinger",
+                                     "version":  "0.0.133",
+                                     "assemblyName":  "KingmakerGunslinger.dll",
+                                     "assemblySha256":  "f03a0a67ba9c790fb578ec6f61d24aea81ea80e0f49a18827d0ea44e2bb5060b"
+                                 },
+                                 {
+                                     "ummId":  "KingmakerLastAzlantiPreserver",
+                                     "version":  "0.1.1",
+                                     "assemblyName":  "KingmakerLastAzlantiPreserver.dll",
+                                     "assemblySha256":  "5be7a3691fbdde8ea4d351d8a7aee6adb78a5b401c9ac896435748ba99c0e85b"
+                                 },
+                                 {
+                                     "ummId":  "ProperFlanking2",
+                                     "version":  "1.2.3-2.1",
+                                     "assemblyName":  "ProperFlanking20.dll",
+                                     "assemblySha256":  "b12baf538f0568b51c3b0e26d8d061d0cc3ad61a18b3e63c8b008c439b8a2666"
+                                 },
+                                 {
+                                     "ummId":  "RacesUnleashed",
+                                     "version":  "1.0.11",
+                                     "assemblyName":  "RacesUnleashed.dll",
+                                     "assemblySha256":  "6d18168cb90ffe60931addc8ee11e42b3ef647ef0e6d4b7ce8980d44659f4cb0"
+                                 },
+                                 {
+                                     "ummId":  "SkipIntro",
+                                     "version":  "1.3.1",
+                                     "assemblyName":  "SkipIntro.dll",
+                                     "assemblySha256":  "39802e09decb9a8c6665f97e4f347bd1d9a3acd4bfed2c98f2c72fb28ecc093a"
+                                 },
+                                 {
+                                     "ummId":  "TweakOrTreat",
+                                     "version":  "1.1.0",
+                                     "assemblyName":  "TweakOrTreat.dll",
+                                     "assemblySha256":  "a518324e15632aba46d6c467b156a31e9afd282e9827dee3e79ad14673852b92"
+                                 },
+                                 {
+                                     "ummId":  "ZFavoredClass",
+                                     "version":  "1.3.1",
+                                     "assemblyName":  "ZFavoredClass.dll",
+                                     "assemblySha256":  "dcd3adf98d1a04c30d772381e7c56ce4beff35a98bcea165aff206a2f0aac26c"
+                                 }
+                             ],
+    "expectedBlueprintGuids":  [
+
+                               ],
+    "parameters":  {
+                       "workingSaveName":  "KBP_AUTOMATION_WORKING",
+                       "baselineSaveName":  "KBP_AUTOMATION_BASELINE",
+                       "expectedGameId":  "df33d1ff-4ec8-4707-bfa0-5e059bf9a049",
+                       "workingFileName":  "Manual_305_KBP_AUTOMATION_WORKING.zks",
+                       "executionMode":  "instant",
+                       "expectedGameName":  "Hedwirg",
+                       "baselineFileName":  "Manual_304_KBP_AUTOMATION_BASELINE.zks",
+                       "physicalExpectation":  "removal",
+                       "baselineSha256":  "f13de02d7c59a70a34d335a413f0d90fc7e63cdcb327224ecf5885ed6e1f8300",
+                       "workingSha256":  "eded233c784fd658ddf2c46b2b54d5a310c39bff62506f0324b0f35c045bbec7"
+                   }
+}

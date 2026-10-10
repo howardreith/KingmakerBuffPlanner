@@ -39,7 +39,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 var books = new List<SpellbookMembershipFact>();
                 foreach (UnitEntityData unit in PartyUnits())
                     books.AddRange(ReadUnit(unit, contractsComplete));
-                return new PartySpellbookMembership(true, null, books, null, AbilityName);
+                return new PartySpellbookMembership(true, null, books, null, AbilityName, SpellResolves);
             }
             catch (Exception exception)
             {
@@ -151,6 +151,12 @@ namespace KingmakerBuffPlanner.GameAdapters
             string baseGuid = blueprint.Parent == null ? blueprint.AssetGuid : blueprint.Parent.AssetGuid;
             int metamagic = spell.MetamagicData == null ? 0 : (int)spell.MetamagicData.MetamagicMask;
             return SpellbookMembershipFact.MemberKey(baseGuid, metamagic);
+        }
+
+        // Whether the running game knows the spell (its mod is loaded).
+        private static bool SpellResolves(string guid)
+        {
+            return ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(guid) != null;
         }
 
         // The localized name of a removed spell, for the player's notice.
