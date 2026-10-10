@@ -155,6 +155,12 @@ namespace KingmakerBuffPlanner.UI
             get { return "page=continuous-scroll;book-art-retired;" + WorkspacePaperEvidenceForRuntime; }
         }
 
+        // The footer's result line as the player reads it (runtime evidence).
+        internal string FooterResultTextForRuntime
+        {
+            get { return _footerResult == null ? null : _footerResult.text; }
+        }
+
         internal string WorkspacePaperEvidenceForRuntime
         {
             get { return _nativeTheme == null ? "parchment=unavailable" : _nativeTheme.ParchmentEvidence; }

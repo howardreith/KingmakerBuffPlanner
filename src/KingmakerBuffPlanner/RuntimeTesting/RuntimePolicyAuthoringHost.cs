@@ -65,7 +65,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private static string NormalizedMoonExpectation(string value)
         {
-            return value == "select" || value == "combat" || value == "authoring" ? value : "cast";
+            return value == "select" || value == "combat" || value == "authoring" || value == "removal"
+                ? value : "cast";
         }
 
         private void HoldCombat()
