@@ -168,6 +168,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public List<string> RemovalStored { get; } = new List<string>();
         public string RemovalFooter { get; set; }
         public bool RemovalNoticeShown { get; set; }
+        // The reconciled plan the ordinary run evaluated, the exhausted
+        // spell's casting still blocking, every other casting's saved intent
+        // and order unchanged, and no resource pool changed by the press.
+        public List<string> RemovalLongPlan { get; } = new List<string>();
+        public string RemovalSpentReadiness { get; set; }
+        public bool RemovalIntentKept { get; set; }
+        public string RemovalIntentDiff { get; set; }
+        public string RemovalPoolsBefore { get; set; }
+        public string RemovalPoolsAfter { get; set; }
 
         public string CombatUnitId { get; set; }
         public bool? CombatInCombatBefore { get; set; }
@@ -530,6 +539,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 RemovalNotice.IndexOf("Undo available.", StringComparison.Ordinal) < 0)
                 violations.Add("removal:notice:" + (RemovalNotice ?? "none"));
             if (!RemovalNoticeShown) violations.Add("removal:notice-not-shown:" + (RemovalFooter ?? "none"));
+            if (!RemovalLongPlan.OrderBy(id => id, StringComparer.Ordinal).SequenceEqual(
+                    SeedLongCastings.OrderBy(id => id, StringComparer.Ordinal)))
+                violations.Add("removal:long-plan:" + string.Join(",", RemovalLongPlan.ToArray()));
+            if (RemovalSpentReadiness == null ||
+                !RemovalSpentReadiness.StartsWith("Blocked:", StringComparison.Ordinal))
+                violations.Add("removal:spent-not-blocking:" + (RemovalSpentReadiness ?? "none"));
+            if (!RemovalIntentKept) violations.Add("removal:intent-changed:" + (RemovalIntentDiff ?? "unread"));
+            if (string.IsNullOrEmpty(RemovalPoolsBefore) || RemovalPoolsAfter != RemovalPoolsBefore)
+                violations.Add("removal:resources-changed-by-press");
             return violations;
         }
 

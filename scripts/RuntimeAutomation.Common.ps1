@@ -1456,7 +1456,9 @@ function Assert-KbpScenarioOutcome {
         if ($expectation -ceq 'removal') {
             $removalKeys = @('removalAuthored', 'removalKnownBefore', 'removalKnownAfter', 'removalSpentSlotsBefore',
                 'removalSpentSlotsAfter', 'removalSpentKnownAfter', 'removalStatus', 'removalDurable', 'removalRemoved',
-                'removalArchived', 'removalStored', 'removalNotice', 'removalNoticeShown')
+                'removalArchived', 'removalStored', 'removalNotice', 'removalNoticeShown', 'removalLongPlan',
+                'removalSpentReadiness', 'removalIntentKept', 'removalIntentDiff', 'removalPoolsBefore',
+                'removalPoolsAfter')
             $names = @($record.PSObject.Properties | ForEach-Object Name)
             $missingRemoval = @($removalKeys | Where-Object { $names -cnotcontains $_ })
             if ($missingRemoval.Count -ne 0) {
@@ -1481,6 +1483,19 @@ function Assert-KbpScenarioOutcome {
                 ([string]$record.removalNotice).IndexOf('no longer known', [StringComparison]::Ordinal) -lt 0 -or
                 -not [bool]$record.removalNoticeShown) {
                 throw "The physical removal run did not retire exactly the removed spell's castings, durably, with its notice shown: $path"
+            }
+            # The ordinary run evaluated the reconciled plan (Long holds
+            # exactly the seed), the exhausted spell's casting still blocks,
+            # every other casting kept its saved intent and order, and the
+            # press changed no resource pool.
+            $longPlan = @($record.removalLongPlan | ForEach-Object { [string]$_ } | Sort-Object)
+            $seedLong = @($record.seedLongCastings | ForEach-Object { [string]$_ } | Sort-Object)
+            if (($longPlan -join ',') -cne ($seedLong -join ',') -or
+                -not ([string]$record.removalSpentReadiness).StartsWith('Blocked:', [StringComparison]::Ordinal) -or
+                -not [bool]$record.removalIntentKept -or
+                [string]::IsNullOrEmpty([string]$record.removalPoolsBefore) -or
+                [string]$record.removalPoolsAfter -cne [string]$record.removalPoolsBefore) {
+                throw "The physical removal run's press did not evaluate the reconciled plan with every other intent, blocker and resource unchanged: $path"
             }
         }
         # E05/E06 re-read from the raw record. D11: the earlier record judged

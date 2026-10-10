@@ -12,8 +12,11 @@ using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
+using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.UI;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 namespace KingmakerBuffPlanner.RuntimeTesting
@@ -36,6 +39,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal const string RemovalKnownLong = "rm-known-long";
         internal const string RemovalKnownImportant = "rm-known-important";
         internal const string RemovalSpentImportant = "rm-spent-important";
+        // The saved intent of every casting just before the press (persisted
+        // form, order excluded) and each routine's casting order.
+        private Dictionary<string, string> _removalIntentBefore;
+        private Dictionary<string, List<string>> _removalOrderBefore;
 
         private bool UpdateRemovalPress(CastingWorkspaceScreenView view, double settled)
         {
@@ -110,6 +117,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 known.Provider.Key.CasterUnitId + ";spent=" + spent.Provider.DisplayName + "@" +
                 spent.Provider.Key.CasterUnitId + ";level=" + level + ";boundary=Spellbook.RemoveSpell," +
                 "AbilityData.SpendFromSpellbook");
+            // What the press must leave alone: the saved intent of every other
+            // casting, and every resource pool (read after the deliberate
+            // spend, so the press itself must change nothing).
+            CastingWorkspaceInputs edited = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+            if (edited == null) return FinishPhysical("removal:no-inputs-after-native-edits");
+            _physicalRecord.RemovalPoolsBefore = PoolSignature(edited);
+            if (!StoredIntent(campaign, out _removalIntentBefore, out _removalOrderBefore))
+                return FinishPhysical("removal:stored-intent-unreadable-before-press");
             CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "physical-removal-before-moon.png"));
             return PressColdMoon();
         }
@@ -132,20 +147,31 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         !string.IsNullOrEmpty(provider.Key.SpellbookGuid) &&
                         pools.TryGetValue(provider.ResourcePoolKey, out pool) &&
                         pool.Kind == ResourcePoolKind.SpontaneousLevel && pool.Remaining > 0 &&
-                        SingleCastProbeSelector.SourceIdFor(inputs.EffectsBySource, provider.Key.Ability) != null &&
-                        (option.ReachableTargetIds ?? new string[0]).Any();
+                        FreeTarget(inputs, option) != null;
                 })
                 .OrderBy(option => option.Provider.Key.Canonical, StringComparer.Ordinal);
+        }
+
+        // A reachable recipient without the effect, so the casting's
+        // readiness is about its caster and resources, never "already
+        // satisfied"; null when the option has none (or no catalogue source).
+        private static string FreeTarget(CastingWorkspaceInputs inputs, ProviderPlanningOption option)
+        {
+            string source = SingleCastProbeSelector.SourceIdFor(inputs.EffectsBySource, option.Provider.Key.Ability);
+            if (source == null) return null;
+            return (option.ReachableTargetIds ?? new string[0])
+                .Where(value => !CastingQualificationRecipe.EffectActive(inputs.LiveEffects, value,
+                    inputs.EffectsBySource[source]))
+                .OrderBy(value => value, StringComparer.Ordinal).FirstOrDefault();
         }
 
         private static PlannedCasting RemovalCasting(CastingWorkspaceInputs inputs, string id, string routine,
             ProviderPlanningOption option)
         {
-            string target = (option.ReachableTargetIds ?? new string[0])
-                .OrderBy(value => value, StringComparer.Ordinal).FirstOrDefault();
+            string source = SingleCastProbeSelector.SourceIdFor(inputs.EffectsBySource, option.Provider.Key.Ability);
+            string target = FreeTarget(inputs, option);
             if (target == null) return null;
-            return new PlannedCasting(id, routine, 0,
-                SingleCastProbeSelector.SourceIdFor(inputs.EffectsBySource, option.Provider.Key.Ability),
+            return new PlannedCasting(id, routine, 0, source,
                 option.Provider.Key.Ability, option.Provider.Key.CasterUnitId, option.Provider.Key.SpellbookGuid,
                 CastingTargetMode.DirectTarget, target, null, null, null, null,
                 ExistingEffectPolicy.SkipAlreadyActive, null, CastingAuthoringState.Ready, null);
@@ -178,6 +204,101 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             var stored = new CastingWorkspaceSession(_modEntry.Path, campaign, new DisabledCastingDispatchBoundary());
             foreach (PlannedCasting casting in stored.Document.Castings)
                 _physicalRecord.RemovalStored.Add(casting.CastingId);
+            // Every casting the press did not remove keeps its saved intent
+            // and its place in its routine.
+            Dictionary<string, string> intentAfter;
+            Dictionary<string, List<string>> orderAfter;
+            _physicalRecord.RemovalIntentDiff = !StoredIntent(campaign, out intentAfter, out orderAfter)
+                ? "stored-intent-unreadable-after-press"
+                : IntentDiff(_removalIntentBefore, _removalOrderBefore, intentAfter, orderAfter,
+                    new HashSet<string>(_physicalRecord.RemovalRemoved, StringComparer.Ordinal));
+            _physicalRecord.RemovalIntentKept = _physicalRecord.RemovalIntentDiff.Length == 0;
+            // The ordinary run evaluates the reconciled plan: Long holds
+            // exactly what is left (the lock refused it after its gate), and
+            // the exhausted spell's casting still blocks in its own routine.
+            CastingWorkspaceInputs after = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+            if (after == null || session == null)
+            {
+                _physicalRecord.RemovalSpentReadiness = "no-inputs-or-session-after-press";
+                return;
+            }
+            _physicalRecord.RemovalPoolsAfter = PoolSignature(after);
+            foreach (ResolvedCasting casting in session.CompileForRuntime(after, "long").Castings
+                    .Where(value => value.RoutineId == "long")
+                    .OrderBy(value => value.CastingId, StringComparer.Ordinal))
+                _physicalRecord.RemovalLongPlan.Add(casting.CastingId);
+            ResolvedCasting spentCasting = session.CompileForRuntime(after, "important").Castings
+                .FirstOrDefault(value => value.CastingId == RemovalSpentImportant);
+            _physicalRecord.RemovalSpentReadiness = spentCasting == null ? "absent"
+                : spentCasting.Readiness + ":" + string.Join(",", spentCasting.ReadinessReasons.ToArray());
+        }
+
+        // Every pool's remaining uses, in a stable order.
+        private static string PoolSignature(CastingWorkspaceInputs inputs)
+        {
+            return string.Join(";", inputs.Snapshot.ResourcePools
+                .OrderBy(pool => pool.PoolKey, StringComparer.Ordinal)
+                .Select(pool => pool.PoolKey + "=" + pool.Remaining).ToArray());
+        }
+
+        // The stored plan as the planner wrote it: each casting's persisted
+        // JSON without its order, and each routine's casting ids by order.
+        private bool StoredIntent(string campaign, out Dictionary<string, string> intent,
+            out Dictionary<string, List<string>> order)
+        {
+            intent = new Dictionary<string, string>(StringComparer.Ordinal);
+            order = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            try
+            {
+                string path = new CastingPlanRepository(_modEntry.Path).GetProfilePath(campaign);
+                JArray castings = JObject.Parse(File.ReadAllText(path))["castings"] as JArray;
+                if (castings == null) return false;
+                var placed = new List<KeyValuePair<string, JObject>>();
+                foreach (JObject casting in castings.OfType<JObject>())
+                {
+                    string id = (string)casting["castingId"];
+                    if (string.IsNullOrEmpty(id)) return false;
+                    var copy = (JObject)casting.DeepClone();
+                    copy.Remove("order");
+                    intent[id] = copy.ToString(Formatting.None);
+                    placed.Add(new KeyValuePair<string, JObject>(id, casting));
+                }
+                foreach (var routine in placed.GroupBy(value => (string)value.Value["routineId"] ?? string.Empty))
+                    order[routine.Key] = routine.OrderBy(value => (int)value.Value["order"])
+                        .Select(value => value.Key).ToList();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                _physicalRecord.AddNote("removal:stored-intent-read-failed:" + exception.GetType().Name);
+                return false;
+            }
+        }
+
+        // Empty when every casting not removed is unchanged (persisted
+        // intent and relative routine order); otherwise the first difference.
+        internal static string IntentDiff(Dictionary<string, string> before,
+            Dictionary<string, List<string>> orderBefore, Dictionary<string, string> after,
+            Dictionary<string, List<string>> orderAfter, ISet<string> removed)
+        {
+            if (before == null || orderBefore == null) return "no-intent-before";
+            foreach (KeyValuePair<string, string> casting in before)
+            {
+                if (removed.Contains(casting.Key)) continue;
+                string now;
+                if (!after.TryGetValue(casting.Key, out now)) return "lost:" + casting.Key;
+                if (now != casting.Value) return "changed:" + casting.Key;
+            }
+            foreach (string id in after.Keys)
+                if (!before.ContainsKey(id)) return "added:" + id;
+            foreach (KeyValuePair<string, List<string>> routine in orderBefore)
+            {
+                List<string> kept = routine.Value.Where(id => !removed.Contains(id)).ToList();
+                List<string> now;
+                if (!orderAfter.TryGetValue(routine.Key, out now)) now = new List<string>();
+                if (!kept.SequenceEqual(now)) return "reordered:" + routine.Key;
+            }
+            return string.Empty;
         }
 
         // The planner opened after the press: its footer names the removal
