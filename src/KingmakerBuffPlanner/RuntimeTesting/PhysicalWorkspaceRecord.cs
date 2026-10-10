@@ -139,6 +139,48 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // the player-facing refusal, the Long source's availability
         // ("before>after") and effect, and the state cleared before the
         // ordinary selection press.
+        // 0.4.2 (B) "removal": spell S removed from book A through the game's
+        // own RemoveSpell (known before, not after); book B (another caster
+        // knowing S) with its lowest slotted level spent to zero through the
+        // game's own spend (the spell spent with, slots before and after,
+        // S and T still known); the castings authored, what the HUD press
+        // removed, what the stored plan holds after it, the archive, the
+        // notice and whether the opened planner's footer shows it.
+        public List<string> RemovalAuthored { get; } = new List<string>();
+        public string RemovalKnownCaster { get; set; }
+        public string RemovalKnownBook { get; set; }
+        public string RemovalKnownSpell { get; set; }
+        public string RemovalKnownName { get; set; }
+        public bool? RemovalKnownBefore { get; set; }
+        public bool? RemovalKnownAfter { get; set; }
+        public string RemovalSpentCaster { get; set; }
+        public string RemovalSpentBook { get; set; }
+        public string RemovalSpentSpell { get; set; }
+        public string RemovalSpentName { get; set; }
+        public int? RemovalSpentLevel { get; set; }
+        public int? RemovalSpentSlotsBefore { get; set; }
+        public int? RemovalSpentSlotsAfter { get; set; }
+        public bool? RemovalSpentKnownAfter { get; set; }
+        public string RemovalStatus { get; set; }
+        public string RemovalNotice { get; set; }
+        public bool RemovalDurable { get; set; }
+        public List<string> RemovalRemoved { get; } = new List<string>();
+        public bool RemovalArchived { get; set; }
+        public List<string> RemovalStored { get; } = new List<string>();
+        public string RemovalFooter { get; set; }
+        public bool RemovalNoticeShown { get; set; }
+        // The reconciled plan the ordinary run evaluated, the exhausted
+        // spell's casting still blocking, every other casting's saved intent
+        // and order unchanged, and no resource pool changed by the press.
+        public List<string> RemovalLongPlan { get; } = new List<string>();
+        public string RemovalBlockerReadiness { get; set; }
+        public bool RemovalIntentKept { get; set; }
+        public string RemovalIntentDiff { get; set; }
+        public string RemovalPoolsBefore { get; set; }
+        public string RemovalPoolsAfter { get; set; }
+        // live-workspace-removal: the opened planner closed again (lease released).
+        public bool RemovalWorkspaceClosed { get; set; }
+
         public string CombatUnitId { get; set; }
         public bool? CombatInCombatBefore { get; set; }
         public int CombatHeldUpdates { get; set; }
@@ -362,7 +404,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (LongEffectBefore != false || ImportantEffectBefore != false)
                 violations.Add("moon:effects-present-before:long=" + LongEffectBefore + ";important=" +
                     ImportantEffectBefore);
-            if (MoonExpectation == "select" || MoonExpectation == "combat" || MoonExpectation == "authoring")
+            if (MoonExpectation == "select" || MoonExpectation == "combat" || MoonExpectation == "authoring" ||
+                MoonExpectation == "removal")
             {
                 // No grant exists, so the press must be refused BY THE LOCK
                 // (a run without an allowance would be a native-casting lock
@@ -472,6 +515,67 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return violations;
         }
 
+        // 0.4.2 (B): the native removal took exactly the removed spell's
+        // castings (one archived, saved edit with its notice, shown in the
+        // planner) while the spell whose slots were all spent kept its own.
+        private IEnumerable<string> RemovalViolations()
+        {
+            var violations = new List<string>();
+            var expectedRemoved = new[] { "rm-known-important", "rm-known-long" };
+            var expectedKept = new[] { "rm-other-book", "rm-spent-important", "rm-unrelated-draft" };
+            if (RemovalAuthored.Count != 5) violations.Add("removal:authored:" + RemovalAuthored.Count);
+            if (string.IsNullOrEmpty(RemovalKnownCaster) || RemovalKnownCaster == RemovalSpentCaster)
+                violations.Add("removal:other-book-not-another-caster");
+            if (RemovalKnownBefore != true || RemovalKnownAfter != false)
+                violations.Add("removal:native-remove:" + RemovalKnownBefore + ">" + RemovalKnownAfter);
+            if (RemovalSpentSlotsBefore == null || RemovalSpentSlotsBefore <= 0 || RemovalSpentSlotsAfter != 0 ||
+                RemovalSpentKnownAfter != true)
+                violations.Add("removal:native-spend:" + RemovalSpentSlotsBefore + ">" + RemovalSpentSlotsAfter +
+                    ";known=" + RemovalSpentKnownAfter);
+            if (RemovalStatus != "Applied" || !RemovalDurable)
+                violations.Add("removal:outcome:" + (RemovalStatus ?? "none") + ";durable=" + RemovalDurable);
+            if (!RemovalRemoved.SequenceEqual(expectedRemoved))
+                violations.Add("removal:removed:" + string.Join(",", RemovalRemoved.ToArray()));
+            if (RemovalStored.Any(id => expectedRemoved.Contains(id)) || expectedKept.Any(id => !RemovalStored.Contains(id)) ||
+                SeedLongCastings.Concat(SeedImportantCastings).Concat(SeedShortCastings)
+                    .Any(id => !RemovalStored.Contains(id)))
+                violations.Add("removal:stored:" + string.Join(",", RemovalStored.ToArray()));
+            if (!RemovalArchived) violations.Add("removal:not-archived");
+            if (RemovalNotice == null || RemovalNotice.IndexOf("no longer known", StringComparison.Ordinal) < 0 ||
+                RemovalNotice.IndexOf("Undo available.", StringComparison.Ordinal) < 0)
+                violations.Add("removal:notice:" + (RemovalNotice ?? "none"));
+            if (!RemovalNoticeShown) violations.Add("removal:notice-not-shown:" + (RemovalFooter ?? "none"));
+            if (!RemovalLongPlan.OrderBy(id => id, StringComparer.Ordinal).SequenceEqual(
+                    SeedLongCastings.OrderBy(id => id, StringComparer.Ordinal)))
+                violations.Add("removal:long-plan:" + string.Join(",", RemovalLongPlan.ToArray()));
+            if (RemovalBlockerReadiness == null ||
+                !RemovalBlockerReadiness.StartsWith("Draft:", StringComparison.Ordinal))
+                violations.Add("removal:blocker-waived:" + (RemovalBlockerReadiness ?? "none"));
+            if (!RemovalIntentKept) violations.Add("removal:intent-changed:" + (RemovalIntentDiff ?? "unread"));
+            if (string.IsNullOrEmpty(RemovalPoolsBefore) || RemovalPoolsAfter != RemovalPoolsBefore)
+                violations.Add("removal:resources-changed-by-press");
+            return violations;
+        }
+
+        // live-workspace-removal: a cold press (no planner session, editor
+        // never opened) of a stored Long seed, refused by the lock with
+        // nothing run or opened; the removal evidence; the planner closed.
+        public IList<string> RemovalScenarioViolations()
+        {
+            var violations = new List<string>(Failures);
+            if (ColdSessionBeforeMoon != true || EditorNeverOpenedBeforeMoon != true)
+                violations.Add("moon:not-cold:session=" + ColdSessionBeforeMoon + ";editor=" + EditorNeverOpenedBeforeMoon);
+            if (SeedLongCastings.Count == 0) violations.Add("moon:seed:long=0");
+            if (MoonRunStarted) violations.Add("moon:run-without-grant");
+            else if (string.IsNullOrEmpty(MoonRefusal) ||
+                MoonRefusal.IndexOf("native-submission-disabled", StringComparison.Ordinal) < 0)
+                violations.Add("moon:not-refused-by-lock:" + (MoonRefusal ?? "none"));
+            if (!MoonWorkspaceStayedClosed) violations.Add("moon:editor-opened");
+            violations.AddRange(RemovalViolations());
+            if (!RemovalWorkspaceClosed) violations.Add("removal:workspace-not-closed");
+            return violations;
+        }
+
         public IList<string> Violations()
         {
             var violations = new List<string>(Failures);
@@ -486,6 +590,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         violations.Add("unacknowledged:" + action);
                 violations.AddRange(MoonViolations());
                 if (MoonExpectation == "combat") violations.AddRange(CombatViolations());
+                if (MoonExpectation == "removal") violations.AddRange(RemovalViolations());
                 if (MoonExpectation == "authoring") violations.AddRange(AuthoringViolations());
                 else
                 {

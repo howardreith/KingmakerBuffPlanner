@@ -1,4 +1,121 @@
-# Visual theme: the scroll paper and the spell scroll (0.4.0 WP7)
+# Visual theme: the scroll paper and the spell scroll (0.4.0 WP7, 0.4.2 aged sheet)
+
+## 0.4.2: the aged service-window sheet, the table and the opening sound
+
+The owner's 0.4.1 feedback: the planner's paper was too bright, too clean and
+too regular next to the game's own inventory and character pages, and it
+opened silently. 0.4.2 changes only the paper, the backdrop, the inks and the
+opening sound. Layout, controls, input and every planner state are unchanged.
+
+**Donors (runtime only; nothing shipped).** Run `kbp042-donors-02` listed the
+paper sprites drawn by the native screens the owner compared against
+(`native-paper-donors.json`, lab evidence only):
+
+| Capability | Path under `StaticCanvas` | Exact contract | Drawn as |
+| --- | --- | --- | --- |
+| `SheetPaper` (new) | `ServiceWindow/Journal/Cart` | `Card_Big`, 2048x1566.8 (texture 2048x1567), no sprite border, 84.27984 pixels per unit, drawn Simple by the game, size tolerance 0.1 | The workspace frame's sheet and the spell scroll's sheet. The same sprite is the page of the character sheet (`CharacterScreen/Menu/Background`), the journal, the settings and the character build |
+| `TableBackdrop` (new) | `ServiceWindow/Background` | `ServiceWindow_TableBackGruond_3840_2022` (the asset's own spelling), 2048x1024, no border, 100 pixels per unit, Simple | The dimmed full-screen backdrop behind the planner, untinted, as the service windows draw it |
+| `ScrollPaper` (0.4.0) | unchanged | `dialogue_backsheet` | Second tier: used only when `SheetPaper` is missing or rejected (the exact 0.4.1 look) |
+| `ScrollRule` (0.4.0) | unchanged | `blockscroll_bottom` | The rules, unchanged |
+
+**Drawing the sheet.** `Card_Big` has no sprite border, so the planner does
+not stretch the game's sprite. It creates its own sliced sprite over the
+game's texture (`PlannerSheetSprites`, one per density, cached): full rect,
+slice L120/B130/R130/T110 texels (wide enough to keep the corner folds whole),
+and pixels per unit chosen so that one texel draws as `unitsPerTexel` canvas
+units. `ParchmentSheetGeometry` (Unity-free, unit-tested) computes:
+
+```text
+screenScale   = clamp(screenHeight / 1080, 0.65, 1.35)
+unitsPerTexel = density * screenScale          (frame 0.5, spell scroll 0.35)
+spritePPU     = canvasReferencePPU / unitsPerTexel
+borders       = slice * unitsPerTexel
+edge zones    = (40, 56, 40, 12) texels * unitsPerTexel   (shadow margin + layered edges)
+outsets       = base outsets * screenScale     (frame 20/24/20/10, scroll 14/17/14/7)
+```
+
+The sheet is drawn untinted (white), so its own aged tone, worn and irregular
+edges, layered under-sheets and shading show as the game draws them. A soft
+shadow silhouette sits at (3,-5) at alpha 0.45. Unlike 0.4.0's fixed screen
+size, the edge now scales with the screen height, as the native pages do.
+At the owner's 1920x1200 the frame logs
+`Frame:paper=native-sheet;sprite=Card_Big;unitsPerTexel=0.556;screenScale=1.111;refPPU=100.0;spritePPU=180.0;borders=66.7/72.2/72.2/61.1;edges=22.2/31.1/22.2/6.7;size=1916x1154;undistorted=true;outsets=22.2/26.7/22.2/11.1;washes=4`
+(`kbp042-paper-01`).
+
+**Washes and inks.** On the sheet, the lane wells and the budget ledger drop
+their washes (alpha 0), because the aged paper is the ground. The washes keep
+their 0.4.0 behaviour on the second-tier scroll paper and the flat fallback.
+`PlannerParchmentPalette` records the sheet's measured writing area (206,190,160)
+and darkest interior (173,154,122). It darkens the inks to the native page
+browns: body (0.16,0.14,0.11), secondary (0.38,0.26,0.16), heading
+(0.52,0.20,0.08), burgundy selection (0.40,0.06,0.10), blocked (0.59,0.13,0.03),
+legal (0.15,0.34,0.15) and meta (0.36,0.24,0.15). The chip grounds are
+(0.93,0.89,0.80) and (0.96,0.88,0.74). The contrast floors of
+`wp7-inks-stay-legible-on-the-paper` are kept with explicit thresholds and
+checked against the darker sheet (`paper-042-*` tests).
+
+**Measured result (same session, same display, `kbp042-paper-01` at
+1920x1200).** These are mean luma values of the writing areas:
+
+| Surface | Top of the page | Lower / right of the page |
+| --- | --- | --- |
+| 0.4.1 planner (`dialogue_backsheet`) | about 224 | about 224 (flat) |
+| 0.4.2 planner (`Card_Big`) | about 195 | about 171-176 |
+| Native inventory / character pages | about 205 | about 159-165 |
+
+The planner is now in the native pages' range and carries the same top-to-bottom
+shading. The native reference screens (`native-inventory.png`,
+`native-character.png`, `native-map.png`) are captured in the same session,
+right before the planner opens (`NativePaperReferenceCapture`, opened through
+the game's own service-window handler and closed with its own Close button).
+
+**Opening sound.** The planner posts the game's own UI sound
+`UISoundType.CharacterScreenOpen` through `UISoundManager`. This is the Wwise
+event `JournalOpen`, the paper/book sound the native character screen,
+spellbook and journal post when they open (`ServiceWindowTabs.PlayShowSound`;
+the table maps CharacterScreenOpen, SpellbookOpen and JournalOpen to
+`JournalOpen`). No sound file is shipped. `WorkspaceOpenSoundCue`
+(Unity-free) gives exactly one cue per successful open: it is armed when an
+open starts, cancelled on each of the three failure paths, and emitted only
+after the planner is open. A refresh, a reopen request while the planner is
+already open, and the spell scroll post nothing. The game log records
+`[KBP-WORKSPACE-SOUND] event=CharacterScreenOpen(Wwise JournalOpen);transition=closed-to-open;opens=N;played=N.`
+(or `unavailable;...;failure=...`), and
+`paper-sound-evidence.json` records the counts per cycle:
+`kbp042-paper-01` shows 1/1, 1/1 after two refreshes, 1/1 after the spell scroll,
+then 2/2 and 3/3 after two close-and-reopen cycles. The automation proves the
+event call and its count, not what reaches the speakers. Hearing it is the
+owner's check.
+
+**Provenance.** Unchanged in kind: no Owlcat image or sound is in the
+repository or the package. The sheet, table and sound are the running game's
+own objects, referenced at runtime. The donor PNGs and screenshots written by
+the runtime evidence (`runtime-evidence/kbp042-*`) stay in the lab and are
+never committed or redistributed. The palette numbers above are measurements
+only.
+
+**Fallback.** Each capability fails alone. If `SheetPaper` is missing, rejected
+or unmeasurable, the surfaces use the 0.4.1 scroll paper. If that is missing
+too, they use the exact flat look. If `TableBackdrop` is missing, the backdrop
+gets back its exact dim tint. A sound that cannot be posted is counted
+(`UnavailableCount`, `LastFailure`) and never blocks the open.
+
+**Final build.** `kbp042-paper-02` (1920x1080) repeated the inspection on the
+tested product commit `e9a4c5e`:
+- `Frame:paper=native-sheet;sprite=Card_Big;unitsPerTexel=0.500;screenScale=1.000;borders=60.0/65.0/65.0/55.0;size=1912x1030;undistorted=true`;
+- the spell scroll at `unitsPerTexel=0.350`;
+- `backdrop=native`;
+- open cues 1/1, 1/1, 1/1, 2/2, 3/3;
+- native references captured in the same session.
+
+`kbp042-removal-05` shows the planner on the page with the removal notice
+(`physical-removal-notice.png`).
+
+**Still for the owner to judge in the game:** whether the aged sheet and table
+read as native at their usual resolution, and that the opening sound is
+audible and is the expected paper sound.
+
+## 0.4.0 WP7 (the scroll paper, now the second tier)
 
 The casting-first planner is drawn on the game's own parchment sheet, and the
 right-click spell description is a spell scroll on the same paper. Nothing

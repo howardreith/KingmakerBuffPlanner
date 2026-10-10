@@ -1,3 +1,37 @@
+# Autonomous resume — 0.4.2 owner-test candidate after PR #7 review, 2026-10-10
+
+Mission: `Claude_KBP_041_Followup_Prompt.md`, the owner's continuation of
+2026-10-10, and the PR #7 review (R1 archive obligations through session
+recovery, R2 exact class-ability identity first in Classic rebinding). Branch
+`codex/kingmaker-buff-planner-041-owner-polish`, worktree `repo/KingmakerBuffPlanner-OP042`,
+base v0.4.1 `ab62462`. Version 0.4.2. Tested product commit
+`7a0842f1ee5a343b98e5499ef7726bb321e41f40` (R1 `5d033b8`, R2 `7a0842f`); later commits
+are records only. Package 0adad29d9d79568efa79fc3c2cb11cdfffe3d7b82384099bbd0cf7fe4ae0d98a, DLL 43343cef94c43c1b452e30ed131687a83eaef99ed6263b6d2842aafabee54605,
+MVID 8a298e56-0fd1-4d4e-9b82-195691247e7d. Complete gate PASS on 7a0842f (exit 0, Source-only suite PASS=1 FAIL=0, 5 h 58 min).
+Native on these bytes: `kbp042-removal-06` PASS. Paper and sound: `kbp042-paper-02`
+on the previous candidate `e9a4c5e` (that code unchanged since; not re-run).
+Draft PR #7 updated through the guarded helper. Full record:
+`docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`.
+Next action: the owner's test of the candidate. No merge, tag, release or
+permanent install without the owner's authorization.
+
+# Autonomous resume — 0.4.2 owner-test candidate (e9a4c5e, superseded), 2026-10-10
+
+Mission: `Claude_KBP_041_Followup_Prompt.md` plus the owner's continuation
+instructions of 2026-10-10 (A Shadow Clone, B spellbook removal, C native paper
+and sound). Branch `codex/kingmaker-buff-planner-041-owner-polish`, worktree
+`repo/KingmakerBuffPlanner-OP042`, base v0.4.1 `ab62462`. Version 0.4.2.
+Tested product commit `e9a4c5ed3d34825aa0332cb3d64067b206e29070`; later commits
+are records only. Package 3f3d55af66aa33be94e28a50fa7247a78c5fb006ac292237617fa847326b3463, DLL b3f5023d74f539d5aa4452b7b0f43f64e69930b5f561fc9e4aff0b72498e7e0a,
+MVID bcb3d03e-6bc9-48a3-8ff9-4b98dfb6f1c1. Complete gate PASS (exit 0, Source-only suite PASS=1 FAIL=0, 5 h 42 min).
+Native: `kbp042-removal-05` PASS (no-input removal reconciliation),
+`kbp042-paper-02` PASS (paper and open cue) on the tested bytes; earlier attempts
+`-01`..`-04` kept as recorded. Pushed through the guarded helper (`aa053bb`, then this
+publication record); draft PR #7 against main.
+Full record: `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`.
+Next action: the owner's test of the candidate. No merge, tag, release or
+permanent install without the owner's authorization.
+
 # Autonomous resume — 0.4.0 owner-review candidate, 2026-10-09
 
 Current: the 0.4.0 release train is complete through an owner-review

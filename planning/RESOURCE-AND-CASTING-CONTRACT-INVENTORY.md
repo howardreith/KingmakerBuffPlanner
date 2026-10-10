@@ -1,5 +1,26 @@
 # Resource and Casting Contract Inventory
 
+## 0.4.2 spellbook membership (removal reconciliation)
+
+The removal reconciliation depends on the Kingmaker 2.1.7b contracts below
+(Assembly-CSharp MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`), pinned from the
+installed IL by `spellbook-removal-native-contract-2-1-7b`:
+
+| Native member | Contract used |
+| --- | --- |
+| `Spellbook.Memorize` | fills a slot's `Spell` and sets `Available=false` until rest |
+| `Spellbook.Spend` (via `AbilityData.SpendFromSpellbook`) | clears only `Available` (prepared) or decrements the level's spontaneous slots |
+| `Spellbook.ForgetMemorized` -> `SpellSlot.Clear` -> `ClearInternal` | sets `Spell=null` |
+| `Spellbook.GetAllMemorizedSpells` | filters on `Spell` only (spent and pending-rest slots stay members) |
+| `Spellbook.RemoveSpell` | removes the spell from the known, custom and special lists and clears its memorized slots |
+| `Spellbook.GetKnownSpells`, `GetSpecialSpells`, `GetCustomSpells` | the spontaneous membership (custom = metamagic) |
+
+The membership key is the base ability (a variant's parent) plus the
+metamagic mask, read the same way as the provider keys. A spell whose
+blueprint does not resolve (its mod is not loaded) is never treated as
+removed. Native proof: `kbp042-removal-05` (spontaneous removal and spend);
+prepared-slot behaviour is unit-proven only (no mutable prepared caster).
+
 ## 2026-09-06 failed human validation: routing diagnosis
 
 Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.

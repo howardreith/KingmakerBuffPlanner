@@ -9,6 +9,7 @@ using Kingmaker.UI.Common;
 using Kingmaker.UI.Selection;
 using Kingmaker.PubSubSystem;
 using KingmakerBuffPlanner.Domain.Planning;
+using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
 using KingmakerBuffPlanner.GameAdapters;
 using KingmakerBuffPlanner.Infrastructure;
@@ -50,6 +51,16 @@ namespace KingmakerBuffPlanner.UI
         private CastingWorkspaceScreenView _castingWorkspace;
         // Successful workspace opens (runtime evidence: one per handoff).
         private int _castingWorkspaceOpens;
+        // 0.4.2: one native paper-opening sound per successful open.
+        private WorkspaceOpenSoundCue _workspaceOpenSoundCue;
+        private WorkspaceOpenSoundCue _workspaceOpenSound
+        {
+            get
+            {
+                return _workspaceOpenSoundCue ??
+                    (_workspaceOpenSoundCue = new WorkspaceOpenSoundCue(PlayNativeSetupOpenSound));
+            }
+        }
         private BuffPlannerSpellbookEntryController _spellbookEntry;
         private BuffPlannerQuickExecuteController _quick;
         private int _runtimeOpenCycles;
@@ -404,6 +415,28 @@ namespace KingmakerBuffPlanner.UI
         internal static int CastingWorkspaceOpensForRuntime
         {
             get { return _instance == null ? 0 : _instance._castingWorkspaceOpens; }
+        }
+
+        // Native opening sounds the workspace posted (runtime evidence: one
+        // per successful closed->open transition).
+        internal static int CastingWorkspaceOpenSoundsForRuntime
+        {
+            get
+            {
+                return _instance == null || _instance._workspaceOpenSoundCue == null
+                    ? 0 : _instance._workspaceOpenSoundCue.PlayedCount;
+            }
+        }
+
+        private void EmitWorkspaceOpenSound()
+        {
+            bool played = _workspaceOpenSound.CompleteOpen(_castingWorkspace != null);
+            _log.Info(played
+                ? "[KBP-WORKSPACE-SOUND] event=CharacterScreenOpen(Wwise JournalOpen);" +
+                    "transition=closed-to-open;opens=" + _castingWorkspaceOpens +
+                    ";played=" + _workspaceOpenSound.PlayedCount + "."
+                : "[KBP-WORKSPACE-SOUND] unavailable;transition=closed-to-open;failure=" +
+                    (_workspaceOpenSound.LastFailure ?? "ui-sound-manager-missing") + ".");
         }
 
         // The casting-first workspace view is open. Distinct from
@@ -1225,9 +1258,15 @@ namespace KingmakerBuffPlanner.UI
                     0, 0, 0));
                 return true;
             }
+            LogSpellbookReconciliation("run:" + routineId, result.SpellbookReconciliation);
+            bool reconciled = result.SpellbookReconciliation != null &&
+                result.SpellbookReconciliation.Applied;
+            if (reconciled && _castingWorkspace != null)
+                _castingWorkspace.ShowNotice(result.SpellbookReconciliation.Notice);
             if (!result.Allowed)
             {
                 string refusal = CastingRunPresentation.DescribeRefusal(name, result, session);
+                if (reconciled) refusal = result.SpellbookReconciliation.Notice + " " + refusal;
                 _log.Info("[KBP-CF-RUN] refused;routine=" + routineId + ";mode=" + mode +
                     ";reason=" + result.ReviewReason + ".");
                 session.RecordAttempt(refusal);
@@ -1497,12 +1536,13 @@ namespace KingmakerBuffPlanner.UI
         // automated test session; see NativeCastingSessionPolicy).
         private bool OpenCastingWorkspace()
         {
-            if (_castingWorkspace != null) return false;
+            if (!_workspaceOpenSound.BeginOpen(_castingWorkspace != null)) return false;
             BuffPlannerInputLease lease = null;
             try
             {
                 if (StaticCanvas.Instance == null)
                 {
+                    _workspaceOpenSound.Cancel();
                     LogUiUnavailable("casting-workspace: campaign UI unavailable");
                     return false;
                 }
@@ -1519,6 +1559,7 @@ namespace KingmakerBuffPlanner.UI
                     // Unresolved/transitional campaign identity must not
                     // bind arbitrary work to an unknown-campaign fallback
                     // (review G3) — and must not leak an acquired lease.
+                    _workspaceOpenSound.Cancel();
                     LogUiUnavailable(
                         "casting-workspace: campaign identity unresolved (" + unresolved + ")");
                     return false;
@@ -1539,7 +1580,11 @@ namespace KingmakerBuffPlanner.UI
                         : () => SwitchPlannerFromScreen(PlannerMode.Classic));
                 _workspaceInputLease = lease;
                 lease = null;
+                SpellbookReconciliationOutcome reconciliation =
+                    ReconcileSpellbookOnOpen(workspaceSession);
                 _castingWorkspace.RefreshView();
+                if (reconciliation != null && reconciliation.Applied)
+                    _castingWorkspace.ShowNotice(reconciliation.Notice);
                 _castingWorkspaceOpens++;
                 _log.Info("[KBP-WORKSPACE] casting-first workspace opened;" +
                     "campaign=" + campaignId +
@@ -1549,10 +1594,12 @@ namespace KingmakerBuffPlanner.UI
                         ? workspaceSession.MigrationStatus.Value.ToString() : "not-attempted") +
                     (workspaceSession.ImportReport == null ? string.Empty
                         : ";imported=" + workspaceSession.ImportReport.ResultingCastingCount));
+                EmitWorkspaceOpenSound();
                 return true;
             }
             catch (Exception exception)
             {
+                _workspaceOpenSound.Cancel();
                 if (lease != null) lease.Dispose();
                 CloseCastingWorkspace();
                 _log.Error("[KBP-WORKSPACE] open failed.", exception);
@@ -1620,10 +1667,13 @@ namespace KingmakerBuffPlanner.UI
             _session.Refresh();
             if (_session.Model == null)
                 throw new InvalidOperationException(_session.Status ?? "discovery failed");
-            return CurrentCastingInputs();
+            // 0.4.2 (B): the native spellbook contents are read with the same
+            // fresh pass (runs and opens only, never a render refresh).
+            return CurrentCastingInputs(new KingmakerSpellbookMembershipAdapter().Capture());
         }
 
-        private CastingWorkspaceInputs CurrentCastingInputs()
+        private CastingWorkspaceInputs CurrentCastingInputs(
+            PartySpellbookMembership spellbookMembership = null)
         {
             return new CastingWorkspaceInputs(
                 _session.Model.Snapshot,
@@ -1633,7 +1683,42 @@ namespace KingmakerBuffPlanner.UI
                 ShareModifiersFor(_session.Model.Snapshot, _session.Model.Enhancements),
                 _session.ActiveEffects,
                 Game.Instance != null && Game.Instance.Player != null &&
-                    Game.Instance.Player.IsInCombat);
+                    Game.Instance.Player.IsInCombat,
+                spellbookMembership,
+                _castingHost != null && _castingHost.IsRunning);
+        }
+
+        // 0.4.2 (B): bounded evidence of every reconciliation boundary.
+        private void LogSpellbookReconciliation(string boundary,
+            SpellbookReconciliationOutcome outcome)
+        {
+            if (outcome == null) return;
+            if (outcome.Applied)
+                _log.Info("[KBP-SPELLBOOK-RECONCILE] applied;boundary=" + boundary +
+                    ";removed=" + string.Join(",", outcome.RemovedCastingIds.ToArray()) +
+                    ";durable=" + outcome.Durable + ";notice=" + outcome.Notice);
+            else
+                _log.Info("[KBP-SPELLBOOK-RECONCILE] " + outcome.Status.ToString().ToLowerInvariant() +
+                    ";boundary=" + boundary + ";reason=" + outcome.Reason +
+                    ";kept=" + (outcome.Decision == null ? 0 : outcome.Decision.Kept.Count) + ".");
+        }
+
+        // A closed->open transition is an idle boundary: an observed
+        // deliberate spellbook removal retires its saved castings before the
+        // first render. A failed fresh read leaves the plan untouched.
+        private SpellbookReconciliationOutcome ReconcileSpellbookOnOpen(
+            CastingWorkspaceSession session)
+        {
+            CastingWorkspaceInputs inputs;
+            try { inputs = BuildFreshCastingWorkspaceInputs(); }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-SPELLBOOK-RECONCILE] open read unavailable; plan unchanged.", exception);
+                return null;
+            }
+            SpellbookReconciliationOutcome outcome = session.ReconcileSpellbookRemovals(inputs);
+            LogSpellbookReconciliation("open", outcome);
+            return outcome;
         }
 
         // The pure Share Transmutation modifier (everyday-use v1.2 §7,

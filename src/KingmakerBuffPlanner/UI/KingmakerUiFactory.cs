@@ -45,13 +45,13 @@ namespace KingmakerBuffPlanner.UI
         internal Color ParchmentPanel = new Color(0.965f, 0.890f, 0.725f, 0.88f);
         internal Color ParchmentRaised = new Color(0.985f, 0.925f, 0.795f, 0.96f);
         internal Color ServiceSurface = new Color(0.965f, 0.865f, 0.665f, 0.70f);
-        internal Color DarkBrownText = new Color(0.235f, 0.22f, 0.188f, 1f);
-        internal Color MutedBrownText = new Color(0.541f, 0.392f, 0.271f, 1f);
+        internal Color DarkBrownText = new Color(0.16f, 0.14f, 0.11f, 1f);
+        internal Color MutedBrownText = new Color(0.38f, 0.26f, 0.16f, 1f);
         // Warm ivory (PlannerButtonPalette.Caption): the light-cream caption it
         // replaces measured 3.0:1 on the lighter stone.
         internal Color ButtonText = new Color(0.980f, 0.955f, 0.870f, 1f);
         internal Color BurgundyPrimary = new Color(0.493f, 0.168f, 0.098f, 1f);
-        internal Color GoldAccent = new Color(0.588f, 0.243f, 0.106f, 1f);
+        internal Color GoldAccent = new Color(0.52f, 0.20f, 0.08f, 1f);
         internal Color GreenSuccess = new Color(0.329f, 0.569f, 0.357f, 1f);
         internal Color AmberWarning = new Color(0.82f, 0.62f, 0.20f, 1f);
         internal Color RedFailure = new Color(0.843f, 0.475f, 0.412f, 1f);

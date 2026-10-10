@@ -1,6 +1,6 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical')][string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
@@ -62,9 +62,14 @@ param(
     # refused by the lock. 'authoring' (0.4.0, WP3) is a selection run that
     # then performs the direct graph gestures (add, same-portrait remove,
     # retarget, provider change, Undo, nested Escape) through the OS
-    # pointer. Neither takes a casting allowance.
+    # pointer. Neither takes a casting allowance. 'removal' (0.4.2, B) is a
+    # selection run that, before the cold press, removes one spontaneous
+    # spell from its caster's book through the game's own RemoveSpell and
+    # spends every slot of another spell's level through the game's own
+    # spend (in memory; nothing is saved to the game): the press must
+    # retire exactly the removed spell's castings and keep the spent one's.
     # Only valid with -Scenario live-workspace-physical.
-    [ValidateSet('cast', 'select', 'problems', 'spellbook', 'combat', 'authoring')][string]$PhysicalExpectation = 'cast',
+    [ValidateSet('cast', 'select', 'problems', 'spellbook', 'combat', 'authoring', 'removal')][string]$PhysicalExpectation = 'cast',
     # Fixture family: the approved automation pair (default) or the
     # owner-designated advanced copy. The advanced copy is loaded only by
     # non-casting scenarios and only when it matches its guarded bootstrap
@@ -240,8 +245,10 @@ if (($Scenario -ceq 'live-cast-qual' -or $Scenario -ceq 'live-cast-qual-select')
 # and has a 60 s run deadline after boot and load; the harness wait must
 # cover them, or it would abandon a live run with the Mods folder
 # unrestored.
+# 0.4.2: live-workspace-removal (no synthetic input) needs the same boot/load
+# budget plus its short press, open and close sequence.
 if (($Scenario -ceq 'live-cast-probe' -or $Scenario -ceq 'live-cast-probe-select' -or
-        $Scenario -ceq 'live-workspace-reload') -and
+        $Scenario -ceq 'live-workspace-reload' -or $Scenario -ceq 'live-workspace-removal') -and
     $TimeoutSeconds -lt 600) {
     throw "TimeoutSeconds must be at least 600 for $Scenario (boot/load plus the probe's world wait and deadline); got $TimeoutSeconds."
 }
@@ -283,7 +290,8 @@ $savePair = if ($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-work
     $Scenario -ceq 'live-cast-probe-select' -or $Scenario -ceq 'live-cast-probe' -or
     $Scenario -ceq 'live-advanced-inspect' -or $Scenario -ceq 'live-cast-qual-select' -or
     $Scenario -ceq 'live-cast-qual' -or $Scenario -ceq 'live-classic-select' -or
-    $Scenario -ceq 'live-classic-cast' -or $Scenario -ceq 'live-workspace-physical') {
+    $Scenario -ceq 'live-classic-cast' -or $Scenario -ceq 'live-workspace-physical' -or
+    $Scenario -ceq 'live-workspace-removal') {
     Get-KbpDisposableSavePair -Family $FixtureFamily } else { $null }
 $advancedBinding = if ($FixtureFamily -ceq 'Advanced') { Assert-KbpAdvancedFixtureBinding -Pair $savePair } else { $null }
 $advancedInspectionRunId = if ($FixtureFamily -ceq 'Advanced' -and $Scenario -ceq 'live-cast-qual') {

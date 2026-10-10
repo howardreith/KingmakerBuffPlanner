@@ -1095,6 +1095,37 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         result.Stage = "import-validation";
                     }
                 }
+                else if (RuntimeTestProtocol.IsRemovalScenario(_request.Scenario))
+                {
+                    // Removal acceptance (Unity-free rules in
+                    // PhysicalWorkspaceRecord.RemovalScenarioViolations): the
+                    // reconciliation retired exactly the removed spell's
+                    // castings, the press was refused by the lock, nothing
+                    // ran, and the planner closed with its lease released.
+                    IList<string> violations = _physicalRecord.RemovalScenarioViolations();
+                    bool noSubmission = UI.NativeCastingSessionPolicy.Locked &&
+                        BuffPlannerUiRoot.CastingRunsStartedForRuntime == 0;
+                    result.Assertions.Add(_removalScenarioWritten && violations.Count == 0
+                        ? RuntimeTestAssertion.Pass("removal-reconcile",
+                            "removed castings of the natively removed spell only; archived, saved, notice shown",
+                            "removed=" + string.Join(",", _physicalRecord.RemovalRemoved.ToArray()) +
+                                ";stored=" + _physicalRecord.RemovalStored.Count)
+                        : RuntimeTestAssertion.Fail("removal-reconcile",
+                            "removed castings of the natively removed spell only; archived, saved, notice shown",
+                            (_removalScenarioWritten ? string.Empty : "record-not-written|") +
+                                string.Join("|", violations.ToArray())));
+                    result.Assertions.Add(noSubmission
+                        ? RuntimeTestAssertion.Pass("removal-no-native-submission", "session locked;0 runs",
+                            "locked=True;runs=0")
+                        : RuntimeTestAssertion.Fail("removal-no-native-submission", "session locked;0 runs",
+                            "locked=" + UI.NativeCastingSessionPolicy.Locked + ";runs=" +
+                                BuffPlannerUiRoot.CastingRunsStartedForRuntime));
+                    if (!_removalScenarioWritten || violations.Count != 0 || !noSubmission)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "removal-validation";
+                    }
+                }
                 else if (RuntimeTestProtocol.IsInspectionScenario(_request.Scenario))
                 {
                     // Inspection acceptance: evidence written, nothing
@@ -1121,7 +1152,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             "closed;lease released", "closed=True;lease=released")
                         : RuntimeTestAssertion.Fail("inspection-workspace-closed",
                             "closed;lease released", "not-closed-or-lease-held"));
-                    if (!_inspectionWritten || !noSubmission || !_inspectionWorkspaceClosed)
+                    // 0.4.2: one native paper-opening cue per planner open.
+                    bool oneCue = _paperEvidence != null && _paperEvidence.OneCuePerOpen;
+                    result.Assertions.Add(oneCue
+                        ? RuntimeTestAssertion.Pass("paper042-one-open-cue-per-open",
+                            "openSounds == opens at every cycle", "opens=" +
+                                BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime + ";sounds=" +
+                                BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime)
+                        : RuntimeTestAssertion.Fail("paper042-one-open-cue-per-open",
+                            "openSounds == opens at every cycle", "opens=" +
+                                BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime + ";sounds=" +
+                                BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime));
+                    if (!_inspectionWritten || !noSubmission || !_inspectionWorkspaceClosed || !oneCue)
                     {
                         result.Status = "FAIL";
                         result.Stage = "inspection-validation";
@@ -2236,6 +2278,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _nativeUiContract = NativeUiContractProbe.Capture();
                     AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
                         "native-ui-contract.json"), Serialize(_nativeUiContract));
+                    // 0.4.2 diagnostic: paper donor geometry, previews and
+                    // the native UI sound table (evidence only; fail-soft).
+                    try
+                    {
+                        _log.Info("[KBP-PAPER-DONORS] " +
+                            NativePaperDonorInventory.CaptureTo(_request.EvidenceDirectory));
+                    }
+                    catch (Exception donorException)
+                    {
+                        _log.Error("[KBP-PAPER-DONORS] capture failed: " +
+                            donorException.Message, donorException);
+                    }
                     _log.Info("[KBP-UI-THEME] captured exact native campaign visual contract;" +
                         "visuals=" + _nativeUiContract.Visuals.Count + ";fonts=" +
                         _nativeUiContract.Fonts.Count + ";portraits=" +
@@ -2306,6 +2360,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     _liveHotkeyMarkerWritten = true;
                     if (RuntimeTestProtocol.IsImportScenario(_request.Scenario)) SeedClassicPlanForImport();
+                    if (RuntimeTestProtocol.IsRemovalScenario(_request.Scenario))
+                    {
+                        // The removal and the press happen before the planner
+                        // ever opens; phase 22 opens it afterwards.
+                        _liveUiPhase = RemovalScenarioPrePhase;
+                        return false;
+                    }
                     _log.Info("[KBP-MANUAL] control frame consumed; opening the " +
                         "candidate programmatically with no input request.");
                     _liveUiPhase = 22;
@@ -2332,6 +2393,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _hotkeyRequestedAtUpdate = _uiSmokeUpdates;
                 _log.Info("[KBP-BOOT] runtime requests physical planner hotkey;binding=Ctrl+Shift+B;marker=hotkey-ready.json;controlCapturedFirst=True.");
                 _liveUiPhase = 0;
+                return false;
+            }
+            if (_liveUiPhase == 22 && RuntimeTestProtocol.IsInspectionScenario(_request.Scenario) &&
+                !_nativeReferences.Done)
+            {
+                // 0.4.2: the native reference screens in this same session,
+                // before the planner opens (read-only; evidence only).
+                _nativeReferences.Tick(_request.EvidenceDirectory, CaptureScreenshot);
                 return false;
             }
             if (_liveUiPhase == 22)
@@ -2469,6 +2538,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveUiPhase = 90;
                         return false;
                     }
+                    if (RuntimeTestProtocol.IsRemovalScenario(_request.Scenario))
+                    {
+                        // Removal: read the notice the opened planner shows, close.
+                        _liveUiPhase = RemovalScenarioOpenPhase;
+                        return false;
+                    }
                     if (RuntimeTestProtocol.IsClassicCastScenario(_request.Scenario))
                     {
                         // Classic: back to the Classic planner and its routes.
@@ -2511,6 +2586,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_liveUiPhase == 90)
             {
                 return UpdateImport();
+            }
+            if (_liveUiPhase == RemovalScenarioPrePhase)
+            {
+                return UpdateRemovalScenarioBeforeOpen();
+            }
+            if (_liveUiPhase == RemovalScenarioOpenPhase)
+            {
+                return UpdateRemovalScenarioOpened();
             }
             if (_liveUiPhase == 55)
             {
@@ -3295,6 +3378,126 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // runtime-test session lock keeps the casting boundary refusing).
         private bool UpdateInspection()
         {
+            if (_inspectionStep == 0)
+            {
+                CollectInspection();
+                BeginPaperSoundEvidence();
+                _inspectionStep = 1;
+                return false;
+            }
+            return UpdatePaperSoundEvidence();
+        }
+
+        // 0.4.2 evidence in the same session: the planner's paper, backdrop
+        // and spell scroll as drawn, the open cue per open (two refreshes in
+        // between must add none), two close/reopen cycles, and the read-only
+        // spellbook membership the reconciliation would see. Read-only.
+        private void BeginPaperSoundEvidence()
+        {
+            _paperEvidence = new PaperSoundEvidence(_request.RunId);
+            _paperEvidence.NativeReferences(_nativeReferences, _request.EvidenceDirectory);
+            CastingWorkspaceScreenView view = BuffPlannerUiRoot.CastingWorkspaceViewForRuntime;
+            _paperEvidence.Record["workspacePaper"] = view == null ? "no-view" : view.WorkspacePaperEvidenceForRuntime;
+            _paperEvidence.Record["backdrop"] = view == null ? "no-view" : view.BackdropEvidenceForRuntime;
+            _paperEvidence.Cycle("first-open", BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime,
+                BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime);
+            if (view != null)
+            {
+                view.RefreshView();
+                view.RefreshView();
+            }
+            _paperEvidence.Cycle("after-two-refreshes", BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime,
+                BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime);
+            try
+            {
+                _paperEvidence.Record["spellbookMembership"] = PaperSoundEvidence.Membership(
+                    new KingmakerSpellbookMembershipAdapter().Capture());
+            }
+            catch (Exception exception)
+            {
+                _paperEvidence.Record["spellbookMembership"] = "read-failed:" + exception.GetType().Name;
+            }
+            ProviderSnapshot described = null;
+            try
+            {
+                CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
+                described = inputs == null ? null : inputs.Snapshot.Providers.FirstOrDefault(provider =>
+                    !string.IsNullOrWhiteSpace(provider.Description));
+            }
+            catch (Exception) { described = null; }
+            if (view != null && described != null)
+                view.ShowSpellInspect("#1 " + described.DisplayName, described.Description,
+                    described.DurationText, true);
+            _paperEvidence.Record["spellScrollOpened"] = view != null && view.SpellInspectOpen;
+            _inspectionClock = Stopwatch.StartNew();
+        }
+
+        private bool UpdatePaperSoundEvidence()
+        {
+            CastingWorkspaceScreenView view = BuffPlannerUiRoot.CastingWorkspaceViewForRuntime;
+            if (_inspectionStep == 1)
+            {
+                if (_inspectionClock.ElapsedMilliseconds < 1500) return false;
+                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "spell-scroll.png"));
+                _inspectionStep = 2;
+                _inspectionClock = Stopwatch.StartNew();
+                return false;
+            }
+            if (_inspectionStep == 2)
+            {
+                // The engine capture lands at the end of a later frame.
+                if (_inspectionClock.ElapsedMilliseconds < 1000) return false;
+                _paperEvidence.Record["spellScrollPaper"] = view == null ? "no-view"
+                    : view.SpellInspectPaperEvidenceForRuntime;
+                if (view != null) view.CloseSpellInspect();
+                _paperEvidence.Cycle("after-spell-scroll", BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime,
+                    BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime);
+                CloseProbeWorkspace();
+                _inspectionStep = 3;
+                return false;
+            }
+            if (_inspectionStep == 3)
+            {
+                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen) return false;
+                if (_inspectionReopens >= 2)
+                {
+                    _inspectionStep = 5;
+                    return false;
+                }
+                BuffPlannerUiRoot.HandlePlannerHotkey();
+                _inspectionClock = Stopwatch.StartNew();
+                _inspectionStep = 4;
+                return false;
+            }
+            if (_inspectionStep == 4)
+            {
+                if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen && _inspectionClock.ElapsedMilliseconds < 8000)
+                    return false;
+                if (_inspectionClock.ElapsedMilliseconds < 1000) return false;
+                _inspectionReopens++;
+                _paperEvidence.Cycle("reopen-" + _inspectionReopens, BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime,
+                    BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime);
+                CloseProbeWorkspace();
+                _inspectionStep = 3;
+                return false;
+            }
+            ProbeWorkspaceCloseResult closed = CloseProbeWorkspace();
+            _inspectionWorkspaceClosed = closed.Closed && closed.InputLeaseReleased &&
+                string.IsNullOrEmpty(closed.Failure);
+            _paperEvidence.Record["oneCuePerOpen"] = _paperEvidence.OneCuePerOpen;
+            _paperEvidence.Write(_request.EvidenceDirectory);
+            _log.Info("[KBP-PAPER-SOUND] evidence written;oneCuePerOpen=" + _paperEvidence.OneCuePerOpen +
+                ";opens=" + BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime + ";sounds=" +
+                BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime + ".");
+            _liveInitialCatalogEvidence = "inspection-scenario;workspaceRoot=active;legacyScreen=closed";
+            _workspaceInteractionEvidence = "inspection;no-authoring";
+            _workspaceReopenEvidence = "inspection;reopened=" + _inspectionReopens;
+            _completed = true;
+            return true;
+        }
+
+        private void CollectInspection()
+        {
             CastingWorkspaceInputs inputs = null;
             try { inputs = BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime(); }
             catch (Exception exception)
@@ -3345,14 +3548,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _log.Error("[KBP-INSPECT] collection failed.", exception);
                 }
             }
-            ProbeWorkspaceCloseResult closed = CloseProbeWorkspace();
-            _inspectionWorkspaceClosed = closed.Closed && closed.InputLeaseReleased &&
-                string.IsNullOrEmpty(closed.Failure);
-            _liveInitialCatalogEvidence = "inspection-scenario;workspaceRoot=active;legacyScreen=closed";
-            _workspaceInteractionEvidence = "inspection;no-authoring";
-            _workspaceReopenEvidence = "inspection;no-reopen-claim";
-            _completed = true;
-            return true;
         }
 
         // Mission section 11 (first-open import in game): before the first
@@ -3566,6 +3761,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _importFailure;
 
         private bool _inspectionWritten;
+        private const int NativeReferenceStep = 8;
+        private UiInputIsolationProbeResult _physicalIsolationBeforeReferences;
+        // 0.4.2 evidence (inspection scenario).
+        private readonly NativePaperReferenceCapture _nativeReferences = new NativePaperReferenceCapture();
+        private PaperSoundEvidence _paperEvidence;
+        private int _inspectionStep;
+        private int _inspectionReopens;
+        private Stopwatch _inspectionClock;
         private bool _inspectionWorkspaceClosed;
         private int _inspectionStartedRuns = -1;
         private string _inspectionDisposition = string.Empty;
@@ -3733,6 +3936,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 return UpdateCombatPress(view, settled);
             if (_physicalStep >= AuthoringStartStep && _physicalStep < AuthoringStartStep + 30)
                 return UpdatePhysicalAuthoring(view, settled);
+            if (_physicalStep >= RemovalStartStep && _physicalStep < RemovalStartStep + 10)
+                return UpdateRemovalPress(view, settled);
+            if (_physicalStep == NativeReferenceStep)
+            {
+                // 0.4.2: the native reference screens in this same session,
+                // display and resolution, after the planner closed.
+                if (!_nativeReferences.Tick(_request.EvidenceDirectory, CaptureScreenshot)) return false;
+                var evidence = new PaperSoundEvidence(_request.RunId);
+                evidence.NativeReferences(_nativeReferences, _request.EvidenceDirectory);
+                evidence.Cycle("physical-run", BuffPlannerUiRoot.CastingWorkspaceOpensForRuntime,
+                    BuffPlannerUiRoot.CastingWorkspaceOpenSoundsForRuntime);
+                evidence.Record["workspacePaper"] = _physicalRecord.WorkspacePaperEvidence;
+                evidence.Record["spellScrollPaper"] = _physicalRecord.InspectPaperEvidence;
+                evidence.Record["oneCuePerOpen"] = evidence.OneCuePerOpen;
+                evidence.Write(_request.EvidenceDirectory);
+                return FinishPhysical(null);
+            }
             if (_physicalStep == 100)
             {
                 // A stale dismissal escape from the launcher can leave the
@@ -3868,6 +4088,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _physicalStep = CombatStartStep;
                     return false;
                 }
+                // 0.4.2 (B): a removal run edits the native books first.
+                if (_physicalRecord.MoonExpectation == "removal")
+                {
+                    _physicalStep = RemovalStartStep;
+                    return false;
+                }
                 return PressColdMoon();
             }
             if (_physicalStep == 102)
@@ -3892,14 +4118,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // The press produced a refusal: the boundary's own machine
                     // reason (the lock) plus the player-facing disposition and
                     // message are the evidence.
-                    UI.QuickExecutionResult refused = BuffPlannerUiRoot.QuickResultForRuntime("long");
-                    UI.CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
-                    IReadOnlyList<string> dispatchRefusals = session == null
-                        ? new List<string>() : session.DispatchRefusalsForRuntime;
-                    string machine = dispatchRefusals.Count == 0
-                        ? "no-dispatch-refusal" : dispatchRefusals[dispatchRefusals.Count - 1];
-                    _physicalRecord.MoonRefusal = machine + ";" +
-                        (refused == null ? "no-result" : refused.Disposition + ":" + refused.Message);
+                    _physicalRecord.MoonRefusal = LongPressRefusal();
                     _physicalRecord.AddNote("moon-refused:" + _physicalRecord.MoonRefusal);
                 }
                 else
@@ -3933,6 +4152,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _physicalRecord.MoonGrantConsumed = _physicalGrant.Consumed;
                     _physicalRecord.MoonGrantAttempts = _physicalGrant.Attempts;
                 }
+                if (_physicalRecord.MoonExpectation == "removal") RecordRemovalAfterMoon();
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "physical-cf-moon-after.png"));
                 // Now, and only now, the launcher's planner hotkey: the
                 // editor opens physically for the browse/inspect gestures.
@@ -3951,6 +4171,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 BuffPlannerUiRoot.BeginPhysicalInputProbe();
                 _physicalRecord.DocumentSignatureBeforeBrowse =
                     BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                if (_physicalRecord.MoonExpectation == "removal") RecordRemovalNotice(view);
                 // 0.4.0 (WP3): an authoring run performs the direct graph
                 // gestures instead of the browse and description gestures.
                 if (_physicalRecord.MoonExpectation == "authoring")
@@ -4119,6 +4340,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.EscMenuOpenAfterClose = BuffPlannerUiRoot.NativeEscMenuOpenForRuntime;
                 CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
                     "physical-cf-closed.png"));
+                // 0.4.2: selection and removal runs end with the native
+                // reference screens of this same session.
+                if (_physicalRecord.MoonExpectation == "select" || _physicalRecord.MoonExpectation == "removal")
+                {
+                    // The isolation claim covers the planner's input only:
+                    // it ends here, before the game's own screens open.
+                    _physicalIsolationBeforeReferences = BuffPlannerUiRoot.EndPhysicalInputProbe();
+                    _physicalStep = NativeReferenceStep;
+                    return false;
+                }
                 return FinishPhysical(null);
             }
             return false;
@@ -4304,7 +4535,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.MoonGrantConsumed = _physicalGrant.Consumed;
                 _physicalRecord.MoonGrantAttempts = _physicalGrant.Attempts;
             }
-            UiInputIsolationProbeResult isolation = BuffPlannerUiRoot.EndPhysicalInputProbe();
+            UiInputIsolationProbeResult isolation = _physicalIsolationBeforeReferences ??
+                BuffPlannerUiRoot.EndPhysicalInputProbe();
             if (isolation != null)
             {
                 _physicalRecord.PlayerCommands = isolation.PlayerCommandCount;
@@ -4340,7 +4572,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             _physicalPublished = true;
             PhysicalWorkspaceRecord record = _physicalRecord;
-            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "physical-workspace.json"), new JObject
+            var published = new JObject
             {
                 { "schemaVersion", 1 },
                 { "runId", _request.RunId },
@@ -4477,7 +4709,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "notes", new JArray(record.Notes.Cast<object>().ToArray()) },
                 { "failures", new JArray(record.Failures.Cast<object>().ToArray()) },
                 { "violations", new JArray(record.Violations().Cast<object>().ToArray()) }
-            }.ToString(Formatting.Indented) + Environment.NewLine);
+            };
+            AddRemovalFields(published, record);
+            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "physical-workspace.json"),
+                published.ToString(Formatting.Indented) + Environment.NewLine);
             _log.Info("[KBP-PHYSICAL] published;violations=" + string.Join("|", record.Violations().ToArray()) +
                 ";notes=" + string.Join("|", record.Notes.ToArray()) + ".");
         }

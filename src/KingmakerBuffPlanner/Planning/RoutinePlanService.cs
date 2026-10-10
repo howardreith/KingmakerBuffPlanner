@@ -149,15 +149,19 @@ namespace KingmakerBuffPlanner.Planning
                     effectsBySource.TryGetValue(matches[0].Canonical, out expression);
                 return new ReadOnlyCollection<Domain.Identity.AbilityKey>(matches);
             }
-            if (EffectAggregateIdentity.IsAggregate(assignment.SourceId))
+            if (EffectAggregateIdentity.IsAggregate(assignment.SourceId) ||
+                CatalogSourceIdentity.IsAbility(assignment.SourceId))
             {
+                // The catalogue's own identity decides membership, so a
+                // class ability sharing a spell's effect stays out of the
+                // spell's entry (0.4.2) and serves its own.
                 var matches = snapshot.Providers.Select(provider => provider.Key.Ability)
                     .GroupBy(ability => ability.Canonical, StringComparer.Ordinal)
                     .Select(group => group.First()).Where(ability =>
                     {
                         EffectExpression candidate;
                         return effectsBySource.TryGetValue(ability.Canonical, out candidate) &&
-                            EffectAggregateIdentity.For(candidate, ability.Canonical) == assignment.SourceId;
+                            CatalogSourceIdentity.For(ability, candidate) == assignment.SourceId;
                     }).OrderBy(ability => ability.Canonical, StringComparer.Ordinal).ToList();
                 if (matches.Count != 0)
                     effectsBySource.TryGetValue(matches[0].Canonical, out expression);

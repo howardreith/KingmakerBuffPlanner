@@ -1,5 +1,65 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-10 0.4.2 PR #7 review corrections
+
+- R1 (`5d033b8`): failed mandatory archive + recovery handoff -> the
+  replacement session saved without the archive (pending flags not
+  captured; recovered documents are already pruned/normalized). Fixed by
+  carrying `ArchiveObligations` in `PendingSessionRecovery` and restoring
+  them before the first write. Red on f60904e, green after.
+- R2 (`7a0842f`): Classic rebinding matched the old shared aggregate before
+  the persisted ability, turning a legacy Shadow Clone assignment into
+  Mirror Image. Exact class-ability identity first; unresolved stays under
+  `ability|<guid>`. Red 3/4 on the reviewed file, green after.
+- C# 511/0; `kbp042-removal-06` PASS on `7a0842f`; Complete gate PASS on 7a0842f (exit 0, Source-only suite PASS=1 FAIL=0, 5 h 58 min).
+- Rejected theory: "the unresolved Shadow Clone assignment can keep the old
+  aggregate id" - RoutinePlanService would still match it to Mirror Image's
+  providers; it is rewritten to its exact `ability|` identity.
+
+## 2026-10-10 0.4.2 owner-test candidate (final)
+
+- Tested product commit `e9a4c5e`; Complete gate PASS (exit 0, Source-only suite PASS=1 FAIL=0, 5 h 42 min).
+- Owner continuation (2026-10-10): -01 reconciled and preserved; request
+  admission proven on the exact launcher request through the production
+  reader (`d85818a`); prepared-spell coverage mapped, one real gap fixed (a
+  missing mod made castings look removed) and four focused cases added.
+- kbp042-removal-02: the fixture knows no level 1+ spontaneous buff; the
+  scenario was reshaped to the fixture (`0f2a24d`), not the fixture changed.
+- kbp042-removal-03/-04: native edits done, the press refused - a console
+  window owned the foreground and console input threads cannot be attached;
+  the harness's no-synthetic-input rule was kept. `live-workspace-removal`
+  (`e9a4c5e`) presses through the HUD's own routine entry: -05 PASS.
+- Rejected theory: "the desktop was in use" for -04 - idle 345 s; the
+  foreground window was this session's terminal console.
+- kbp042-paper-02 re-bound the paper/sound evidence to the tested bytes.
+- Candidate: Build-Release at e9a4c5e, package 3f3d55af..., DLL b3f5023d...,
+  MVID bcb3d03e-... (byte-identical to the -05/paper-02 package). Guarded push
+  `aa053bb` (PASS, remote verified); draft PR #7 against main.
+
+## 2026-10-10 0.4.2 owner-feedback follow-up (interim)
+
+- Branch `codex/kingmaker-buff-planner-041-owner-polish` from v0.4.1
+  `ab62462`. A `4aef348`, B `03a6098` (+ evidence `0b4b5a0`, fix `eb80b14`),
+  C `15f2182` (+ diagnostics `11cec99`, `73e75de`, evidence `783cfc4`).
+- A root cause: effect-fingerprint identity plus representative-instance
+  membership hid Shadow Clone (CotW) behind Mirror Image; class abilities now
+  use `ability|<guid>`. Native cast NOT RUN (no Ninja in any fixture).
+- B: pure decision table over native membership facts; IL-verified 2.1.7b
+  contract (spend clears Available only; forget/RemoveSpell clear Spell).
+- C: `Card_Big` page + service-window table, untinted, density by screen
+  height; `CharacterScreenOpen` (Wwise `JournalOpen`) once per open.
+  `kbp042-paper-01`: luma 195..171-176 vs native 205..159-165 (0.4.1: 224).
+- Defect `kbp042-removal-01`: the host validated physical expectations with
+  its own list and rejected `removal` at boot; the launcher timed out at the
+  menu. Now one `RuntimeTestProtocol.PhysicalExpectations` list with a
+  launcher/host parity regression (fails on the old list with the exact
+  runtime rejection).
+- Rejected theory: "the run died with its reaped shell" - the launcher and
+  the game kept running and restored `Mods` themselves.
+- Rejected theory: "the game crashed under memory pressure" - output_log ends
+  in a normal exit after the launcher timeout; the host had rejected the
+  request at boot.
+
 ## 2026-10-09 0.4.0 release train: rc1 -> rc4 (lead review)
 
 - Branch `claude/kbp-complete-remaining-work-2026-10-09` from `origin/main`

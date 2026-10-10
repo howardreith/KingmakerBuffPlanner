@@ -131,6 +131,111 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
+    // 0.4.2: how the native card sheet (Card_Big) is drawn on an owned
+    // surface. The game draws the card Simple; the planner, whose frame is
+    // wider than the card, draws it as its OWN nine-slice over the same
+    // texture: the worn corner folds stay whole, the straight layered edges
+    // stretch only along their length, and the writing area is never drawn
+    // above one screen pixel per texel (no enlarged grain). The density
+    // follows the screen height like the game's own 1920x1080-referenced
+    // canvases, so corners and edges keep their proportion at every
+    // supported size. The planner-owned sprite's pixels-per-unit carries the
+    // density, so no layer scale is involved.
+    internal sealed class ParchmentSheetGeometry
+    {
+        // The planner's slice of the 2048x1567 card, in texture pixels,
+        // Unity border order: wide enough to keep the corner folds whole
+        // (measured on the runtime preview, kbp042-donors-02).
+        internal const float SliceLeft = 120f;
+        internal const float SliceBottom = 130f;
+        internal const float SliceRight = 130f;
+        internal const float SliceTop = 110f;
+        // The card's visible edge zones: its transparent shadow margin and
+        // the layered sheet edges (left/right 16+24, bottom 24+32, top 12).
+        internal const float EdgeLeftPixels = 40f;
+        internal const float EdgeBottomPixels = 56f;
+        internal const float EdgeRightPixels = 40f;
+        internal const float EdgeTopPixels = 12f;
+        internal const float ReferenceScreenHeight = 1080f;
+        internal const float MinimumScreenScale = 0.65f;
+        internal const float MaximumScreenScale = 1.35f;
+
+        private ParchmentSheetGeometry(float baseUnitsPerTexel, float screenHeight,
+            float referencePixelsPerUnit, string failure)
+        {
+            CanvasReferencePixelsPerUnit = referencePixelsPerUnit;
+            ScreenHeight = screenHeight;
+            Failure = failure;
+            if (failure != null) return;
+            ScreenScale = Math.Max(MinimumScreenScale, Math.Min(MaximumScreenScale,
+                screenHeight / ReferenceScreenHeight));
+            UnitsPerTexel = baseUnitsPerTexel * ScreenScale;
+            SpritePixelsPerUnit = referencePixelsPerUnit / UnitsPerTexel;
+            Borders = new ParchmentInsets(SliceLeft * UnitsPerTexel, SliceBottom * UnitsPerTexel,
+                SliceRight * UnitsPerTexel, SliceTop * UnitsPerTexel);
+            EdgeZones = new ParchmentInsets(EdgeLeftPixels * UnitsPerTexel,
+                EdgeBottomPixels * UnitsPerTexel, EdgeRightPixels * UnitsPerTexel,
+                EdgeTopPixels * UnitsPerTexel);
+        }
+
+        internal static ParchmentSheetGeometry For(float baseUnitsPerTexel, float screenHeight,
+            float canvasReferencePixelsPerUnit)
+        {
+            string failure = null;
+            if (float.IsNaN(canvasReferencePixelsPerUnit) || float.IsInfinity(canvasReferencePixelsPerUnit) ||
+                canvasReferencePixelsPerUnit < 1f)
+                failure = "canvas reference pixels per unit is unusable: " +
+                    canvasReferencePixelsPerUnit.ToString(CultureInfo.InvariantCulture);
+            else if (float.IsNaN(screenHeight) || float.IsInfinity(screenHeight) || screenHeight < 1f)
+                failure = "screen height is unusable: " + screenHeight.ToString(CultureInfo.InvariantCulture);
+            else if (float.IsNaN(baseUnitsPerTexel) || baseUnitsPerTexel <= 0f || baseUnitsPerTexel > 1f)
+                failure = "sheet density is unusable: " + baseUnitsPerTexel.ToString(CultureInfo.InvariantCulture);
+            return new ParchmentSheetGeometry(baseUnitsPerTexel, screenHeight,
+                canvasReferencePixelsPerUnit, failure);
+        }
+
+        internal float CanvasReferencePixelsPerUnit { get; private set; }
+        internal float ScreenHeight { get; private set; }
+        internal string Failure { get; private set; }
+        internal bool Valid { get { return Failure == null; } }
+        internal float ScreenScale { get; private set; }
+        internal float UnitsPerTexel { get; private set; }
+        // Pixels-per-unit of the planner-owned sliced sprite: Unity draws a
+        // border of b texels as b * refPPU / spritePPU = b * UnitsPerTexel.
+        internal float SpritePixelsPerUnit { get; private set; }
+        internal ParchmentInsets Borders { get; private set; }
+        internal ParchmentInsets EdgeZones { get; private set; }
+        internal float MinimumWidth { get { return Borders.Left + Borders.Right; } }
+        internal float MinimumHeight { get { return Borders.Bottom + Borders.Top; } }
+
+        internal bool DrawsUndistorted(float width, float height)
+        {
+            return Valid && width >= MinimumWidth && height >= MinimumHeight;
+        }
+
+        // Outsets scale with the sheet, so its edge zones stay beyond the
+        // surface's text at every size.
+        internal ParchmentInsets Scaled(ParchmentInsets baseOutsets)
+        {
+            float scale = Valid ? ScreenScale : 1f;
+            return new ParchmentInsets(baseOutsets.Left * scale, baseOutsets.Bottom * scale,
+                baseOutsets.Right * scale, baseOutsets.Top * scale);
+        }
+
+        internal string Describe(float width, float height)
+        {
+            if (!Valid) return "geometry=invalid(" + Failure + ")";
+            return "unitsPerTexel=" + UnitsPerTexel.ToString("0.000", CultureInfo.InvariantCulture) +
+                ";screenScale=" + ScreenScale.ToString("0.000", CultureInfo.InvariantCulture) +
+                ";refPPU=" + ParchmentInsets.Number(CanvasReferencePixelsPerUnit) +
+                ";spritePPU=" + ParchmentInsets.Number(SpritePixelsPerUnit) +
+                ";borders=" + Borders.Describe() + ";edges=" + EdgeZones.Describe() +
+                ";size=" + width.ToString("0", CultureInfo.InvariantCulture) + "x" +
+                height.ToString("0", CultureInfo.InvariantCulture) +
+                ";undistorted=" + (DrawsUndistorted(width, height) ? "true" : "false");
+        }
+    }
+
     internal enum ParchmentRuleMode
     {
         Hidden,
@@ -194,6 +299,21 @@ namespace KingmakerBuffPlanner.UI
         // and bottom edges and 60 below its top: these outsets stay on screen.
         internal static readonly ParchmentInsets WorkspaceFrameOutsets = new ParchmentInsets(12f, 18f, 12f, 24f);
         internal static readonly ParchmentInsets SpellScrollOutsets = new ParchmentInsets(10f, 12f, 10f, 14f);
+
+        // 0.4.2: the native card sheet. Its density at 1080 screen pixels
+        // (0.5 units per texel; the native Journal card is drawn at 0.6 and
+        // the frame is wider than the card) and the outsets that put its
+        // visible edge zones (20/28/20/6 units at that density) outside the
+        // surface's text, both scaled with the screen height
+        // (ParchmentSheetGeometry).
+        internal const float FrameSheetUnitsPerTexel = 0.5f;
+        internal const float ScrollSheetUnitsPerTexel = 0.35f;
+        internal static readonly ParchmentInsets WorkspaceFrameSheetOutsets = new ParchmentInsets(20f, 24f, 20f, 10f);
+        internal static readonly ParchmentInsets SpellScrollSheetOutsets = new ParchmentInsets(14f, 17f, 14f, 7f);
+
+        // A deeper shadow for the card over the dark table.
+        internal const float SheetShadowOffsetX = 3f;
+        internal const float SheetShadowOffsetY = -5f;
 
         // The soft second silhouette under the sheet (Roll for Stats).
         internal const float ShadowOffsetX = 2f;

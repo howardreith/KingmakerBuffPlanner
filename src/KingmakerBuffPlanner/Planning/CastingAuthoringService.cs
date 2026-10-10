@@ -138,6 +138,27 @@ namespace KingmakerBuffPlanner.Planning
                 new[] { castingId }.Concat(ShiftedIds(before, castings)), castings);
         }
 
+        // 0.4.2: one compound removal of several castings across routines -
+        // one history entry, one announcement (one autosave) and one Undo.
+        // Unaffected castings keep their ids, relative order, routine and
+        // intent; an unknown or repeated id refuses the whole edit.
+        public AuthoringEditResult RemoveCastings(IEnumerable<string> castingIds, string scope)
+        {
+            var ids = (castingIds ?? new string[0]).ToList();
+            if (ids.Count == 0) return AuthoringEditResult.Refuse("no-castings");
+            if (ids.Distinct(StringComparer.Ordinal).Count() != ids.Count)
+                return AuthoringEditResult.Refuse("duplicate-casting-ids");
+            foreach (string id in ids)
+                if (IndexOf(id) < 0) return AuthoringEditResult.Refuse("casting-unknown:" + id);
+            var removed = new HashSet<string>(ids, StringComparer.Ordinal);
+            var before = _document.Castings;
+            List<PlannedCasting> castings = NormalizeAll(before
+                .Where(value => !removed.Contains(value.CastingId)).ToList());
+            return Commit(string.IsNullOrWhiteSpace(scope)
+                    ? "remove-castings:" + string.Join(",", ids.ToArray()) : scope,
+                ids.Concat(ShiftedIds(before, castings)), castings);
+        }
+
         // Moves one casting to an explicit routine and position. Sibling
         // order shifts in the affected routines are disclosed in the result.
         public AuthoringEditResult MoveCasting(

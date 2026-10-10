@@ -20,7 +20,12 @@ namespace KingmakerBuffPlanner.UI
         // WP7: the casting-first planner's scroll paper and scroll rule,
         // each held to an exact native sprite contract (NativeSpriteContract).
         ScrollPaper,
-        ScrollRule
+        ScrollRule,
+        // 0.4.2: the native card sheet (Card_Big) the planner draws as its
+        // paper, and the service windows' table it lies on, each held to an
+        // exact native sprite contract.
+        SheetPaper,
+        TableBackdrop
     }
 
     internal enum NativeThemeComponent

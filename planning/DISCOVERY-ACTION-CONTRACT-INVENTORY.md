@@ -1,5 +1,18 @@
 # Discovery Action Contract Inventory
 
+## 0.4.2 catalogue source identity
+
+Discovery and its action-graph interpretation are unchanged. The catalogue
+source identity changed: a spellbook spell keeps the effect-fingerprint
+aggregate (`effect|sha256`, equal effects share one entry); a variant keeps
+`variant|base|child`; every non-spellbook ability (class feature, fact, ki
+power) is its own entry, `ability|<base guid>`. Cause: Call of the Wild's
+Shadow Clone (`NinjaShadowCloneMirrorImage` `335a48ec...`) applies exactly
+Mirror Image's `ContextActionApplyBuff` (`MirrorImageBuff` `98dc7e7c...`) and
+was hidden behind the spell's entry. Regressions: `shadow-clone-*`,
+`class-ability-identity-keeps-spells-aggregated`,
+`classic-mirror-image-never-plans-shadow-clone`.
+
 ## 2026-09-06 failed human validation: routing diagnosis
 
 Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.
