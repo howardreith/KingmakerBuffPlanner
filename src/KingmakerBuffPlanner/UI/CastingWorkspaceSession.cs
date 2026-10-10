@@ -303,6 +303,11 @@ namespace KingmakerBuffPlanner.UI
                 LoadSourcePath = _repository.GetProfilePath(campaignId);
                 LastReloadNote = "recovered-pending:" + recovery.AutosaveStatus;
                 ReplaceAuthoring(new CastingAuthoringService(recovery.Document));
+                // PR #7 review R1: the archives the intent still owes are
+                // restored before the first write below (the recovered
+                // document is already normalized and pruned, so they cannot
+                // be rediscovered from it).
+                RestoreArchiveObligations(recovery.ArchiveObligations);
                 _uiSettings = new UiProfile
                 {
                     Scale = recovery.UiSettings.Scale,
@@ -544,7 +549,36 @@ namespace KingmakerBuffPlanner.UI
         {
             return new PendingSessionRecovery(_modPath, CampaignId,
                 _authoring.Document, _uiSettings, _executionSettings,
-                _autosaveStatus ?? AutosaveStatus);
+                _autosaveStatus ?? AutosaveStatus, PendingArchiveObligations);
+        }
+
+        // The mandatory pre-write archives this session still owes, in the
+        // order SaveProfile performs them (each flag clears only after its
+        // archive was written and read back exact).
+        public IReadOnlyList<string> PendingArchiveObligations
+        {
+            get
+            {
+                var labels = new List<string>();
+                if (_retiredSemanticsPending) labels.Add(CastingPlanRepository.RetiredSemanticsArchiveLabel);
+                if (_sourceIdentityMigrationPending) labels.Add(CastingPlanRepository.SourceIdentityArchiveLabel);
+                if (_spellbookArchivePending) labels.Add(CastingPlanRepository.SpellbookRemovalArchiveLabel);
+                return labels.AsReadOnly();
+            }
+        }
+
+        // An obligation this build does not know cannot be honoured: the
+        // adoption fails and the recovery entry stays in its store.
+        private void RestoreArchiveObligations(IEnumerable<string> labels)
+        {
+            foreach (string label in labels ?? new string[0])
+            {
+                if (label == CastingPlanRepository.RetiredSemanticsArchiveLabel) _retiredSemanticsPending = true;
+                else if (label == CastingPlanRepository.SourceIdentityArchiveLabel) _sourceIdentityMigrationPending = true;
+                else if (label == CastingPlanRepository.SpellbookRemovalArchiveLabel) _spellbookArchivePending = true;
+                else throw new ArgumentException("Unknown archive obligation in the recovered intent: " + label,
+                    "recovery");
+            }
         }
 
         // Passive save state for the footer (v1.2 §2): "saved" for the
