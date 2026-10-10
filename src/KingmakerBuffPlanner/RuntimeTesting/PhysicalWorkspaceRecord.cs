@@ -139,10 +139,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // the player-facing refusal, the Long source's availability
         // ("before>after") and effect, and the state cleared before the
         // ordinary selection press.
-        // 0.4.2 (B) "removal": the spell removed from its book through the
-        // game's own RemoveSpell (known before, not after), the other spell
-        // whose level was spent through the game's own spend (slots before
-        // and after, still known), the castings authored, what the HUD press
+        // 0.4.2 (B) "removal": spell S removed from book A through the game's
+        // own RemoveSpell (known before, not after); book B (another caster
+        // knowing S) with its lowest slotted level spent to zero through the
+        // game's own spend (the spell spent with, slots before and after,
+        // S and T still known); the castings authored, what the HUD press
         // removed, what the stored plan holds after it, the archive, the
         // notice and whether the opened planner's footer shows it.
         public List<string> RemovalAuthored { get; } = new List<string>();
@@ -172,7 +173,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // spell's casting still blocking, every other casting's saved intent
         // and order unchanged, and no resource pool changed by the press.
         public List<string> RemovalLongPlan { get; } = new List<string>();
-        public string RemovalSpentReadiness { get; set; }
+        public string RemovalBlockerReadiness { get; set; }
         public bool RemovalIntentKept { get; set; }
         public string RemovalIntentDiff { get; set; }
         public string RemovalPoolsBefore { get; set; }
@@ -519,7 +520,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             var violations = new List<string>();
             var expectedRemoved = new[] { "rm-known-important", "rm-known-long" };
-            if (RemovalAuthored.Count != 3) violations.Add("removal:authored:" + RemovalAuthored.Count);
+            var expectedKept = new[] { "rm-other-book", "rm-spent-important", "rm-unrelated-draft" };
+            if (RemovalAuthored.Count != 5) violations.Add("removal:authored:" + RemovalAuthored.Count);
+            if (string.IsNullOrEmpty(RemovalKnownCaster) || RemovalKnownCaster == RemovalSpentCaster)
+                violations.Add("removal:other-book-not-another-caster");
             if (RemovalKnownBefore != true || RemovalKnownAfter != false)
                 violations.Add("removal:native-remove:" + RemovalKnownBefore + ">" + RemovalKnownAfter);
             if (RemovalSpentSlotsBefore == null || RemovalSpentSlotsBefore <= 0 || RemovalSpentSlotsAfter != 0 ||
@@ -530,7 +534,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 violations.Add("removal:outcome:" + (RemovalStatus ?? "none") + ";durable=" + RemovalDurable);
             if (!RemovalRemoved.SequenceEqual(expectedRemoved))
                 violations.Add("removal:removed:" + string.Join(",", RemovalRemoved.ToArray()));
-            if (RemovalStored.Any(id => expectedRemoved.Contains(id)) || !RemovalStored.Contains("rm-spent-important") ||
+            if (RemovalStored.Any(id => expectedRemoved.Contains(id)) || expectedKept.Any(id => !RemovalStored.Contains(id)) ||
                 SeedLongCastings.Concat(SeedImportantCastings).Concat(SeedShortCastings)
                     .Any(id => !RemovalStored.Contains(id)))
                 violations.Add("removal:stored:" + string.Join(",", RemovalStored.ToArray()));
@@ -542,9 +546,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!RemovalLongPlan.OrderBy(id => id, StringComparer.Ordinal).SequenceEqual(
                     SeedLongCastings.OrderBy(id => id, StringComparer.Ordinal)))
                 violations.Add("removal:long-plan:" + string.Join(",", RemovalLongPlan.ToArray()));
-            if (RemovalSpentReadiness == null ||
-                !RemovalSpentReadiness.StartsWith("Blocked:", StringComparison.Ordinal))
-                violations.Add("removal:spent-not-blocking:" + (RemovalSpentReadiness ?? "none"));
+            if (RemovalBlockerReadiness == null ||
+                !RemovalBlockerReadiness.StartsWith("Draft:", StringComparison.Ordinal))
+                violations.Add("removal:blocker-waived:" + (RemovalBlockerReadiness ?? "none"));
             if (!RemovalIntentKept) violations.Add("removal:intent-changed:" + (RemovalIntentDiff ?? "unread"));
             if (string.IsNullOrEmpty(RemovalPoolsBefore) || RemovalPoolsAfter != RemovalPoolsBefore)
                 violations.Add("removal:resources-changed-by-press");

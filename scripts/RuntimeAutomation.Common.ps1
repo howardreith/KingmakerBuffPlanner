@@ -1457,7 +1457,7 @@ function Assert-KbpScenarioOutcome {
             $removalKeys = @('removalAuthored', 'removalKnownBefore', 'removalKnownAfter', 'removalSpentSlotsBefore',
                 'removalSpentSlotsAfter', 'removalSpentKnownAfter', 'removalStatus', 'removalDurable', 'removalRemoved',
                 'removalArchived', 'removalStored', 'removalNotice', 'removalNoticeShown', 'removalLongPlan',
-                'removalSpentReadiness', 'removalIntentKept', 'removalIntentDiff', 'removalPoolsBefore',
+                'removalBlockerReadiness', 'removalIntentKept', 'removalIntentDiff', 'removalPoolsBefore',
                 'removalPoolsAfter')
             $names = @($record.PSObject.Properties | ForEach-Object Name)
             $missingRemoval = @($removalKeys | Where-Object { $names -cnotcontains $_ })
@@ -1468,7 +1468,9 @@ function Assert-KbpScenarioOutcome {
             $stored = @($record.removalStored | ForEach-Object { [string]$_ })
             $seeds = @(@($record.seedLongCastings) + @($record.seedImportantCastings) + @($record.seedShortCastings) |
                 ForEach-Object { [string]$_ })
-            if (@($record.removalAuthored).Count -ne 3 -or
+            if (@($record.removalAuthored).Count -ne 5 -or
+                [string]::IsNullOrEmpty([string]$record.removalKnownCaster) -or
+                [string]$record.removalKnownCaster -ceq [string]$record.removalSpentCaster -or
                 $null -eq $record.removalKnownBefore -or -not [bool]$record.removalKnownBefore -or
                 $null -eq $record.removalKnownAfter -or [bool]$record.removalKnownAfter -or
                 $null -eq $record.removalSpentSlotsBefore -or [int]$record.removalSpentSlotsBefore -le 0 -or
@@ -1477,7 +1479,8 @@ function Assert-KbpScenarioOutcome {
                 [string]$record.removalStatus -cne 'Applied' -or -not [bool]$record.removalDurable -or
                 ($removed -join ',') -cne 'rm-known-important,rm-known-long' -or
                 $stored -ccontains 'rm-known-long' -or $stored -ccontains 'rm-known-important' -or
-                $stored -cnotcontains 'rm-spent-important' -or
+                $stored -cnotcontains 'rm-spent-important' -or $stored -cnotcontains 'rm-other-book' -or
+                $stored -cnotcontains 'rm-unrelated-draft' -or
                 @($seeds | Where-Object { $stored -cnotcontains $_ }).Count -ne 0 -or
                 -not [bool]$record.removalArchived -or
                 ([string]$record.removalNotice).IndexOf('no longer known', [StringComparison]::Ordinal) -lt 0 -or
@@ -1485,13 +1488,13 @@ function Assert-KbpScenarioOutcome {
                 throw "The physical removal run did not retire exactly the removed spell's castings, durably, with its notice shown: $path"
             }
             # The ordinary run evaluated the reconciled plan (Long holds
-            # exactly the seed), the exhausted spell's casting still blocks,
-            # every other casting kept its saved intent and order, and the
-            # press changed no resource pool.
+            # exactly the seed), the unrelated Draft still blocks, every other
+            # casting kept its saved intent and order, and the press changed
+            # no resource pool.
             $longPlan = @($record.removalLongPlan | ForEach-Object { [string]$_ } | Sort-Object)
             $seedLong = @($record.seedLongCastings | ForEach-Object { [string]$_ } | Sort-Object)
             if (($longPlan -join ',') -cne ($seedLong -join ',') -or
-                -not ([string]$record.removalSpentReadiness).StartsWith('Blocked:', [StringComparison]::Ordinal) -or
+                -not ([string]$record.removalBlockerReadiness).StartsWith('Draft:', [StringComparison]::Ordinal) -or
                 -not [bool]$record.removalIntentKept -or
                 [string]::IsNullOrEmpty([string]$record.removalPoolsBefore) -or
                 [string]$record.removalPoolsAfter -cne [string]$record.removalPoolsBefore) {
