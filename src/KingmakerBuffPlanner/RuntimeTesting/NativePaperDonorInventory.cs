@@ -81,7 +81,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             report.UiSounds = ReadUiSounds();
             string path = Path.Combine(evidenceDirectory, "native-paper-donors.json");
-            File.WriteAllText(path, JsonConvert.SerializeObject(report, Formatting.Indented));
+            File.WriteAllText(path, JsonConvert.SerializeObject(report, Formatting.Indented,
+                new JsonSerializerSettings
+                {
+                    PreserveReferencesHandling = PreserveReferencesHandling.None,
+                    ContractResolver = new Newtonsoft.Json.Serialization.DefaultContractResolver()
+                }));
             return "sprites=" + report.Sprites.Count + ";previews=" + previews +
                 ";sounds=" + report.UiSounds.Count;
         }
@@ -232,49 +237,49 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
     internal sealed class NativePaperDonorReport
     {
-        public int SchemaVersion { get; set; }
-        public string CapturedAtUtc { get; set; }
-        public int ScreenWidth { get; set; }
-        public int ScreenHeight { get; set; }
-        public string ColorSpace { get; set; }
-        public List<NativePaperSpriteRecord> Sprites { get; set; }
-        public List<NativeUiSoundRecord> UiSounds { get; set; }
+        [JsonProperty] public int SchemaVersion { get; set; }
+        [JsonProperty] public string CapturedAtUtc { get; set; }
+        [JsonProperty] public int ScreenWidth { get; set; }
+        [JsonProperty] public int ScreenHeight { get; set; }
+        [JsonProperty] public string ColorSpace { get; set; }
+        [JsonProperty] public List<NativePaperSpriteRecord> Sprites { get; set; }
+        [JsonProperty] public List<NativeUiSoundRecord> UiSounds { get; set; }
     }
 
     internal sealed class NativePaperSpriteRecord
     {
-        public string Name { get; set; }
-        public string Rect { get; set; }
-        public string TextureRect { get; set; }
-        public string Border { get; set; }
-        public float PixelsPerUnit { get; set; }
-        public bool Packed { get; set; }
-        public string TextureName { get; set; }
-        public string TextureSize { get; set; }
-        public int UseCount { get; set; }
-        public List<NativePaperSpriteUse> Uses { get; set; }
-        public string PreviewFile { get; set; }
-        public string PreviewError { get; set; }
+        [JsonProperty] public string Name { get; set; }
+        [JsonProperty] public string Rect { get; set; }
+        [JsonProperty] public string TextureRect { get; set; }
+        [JsonProperty] public string Border { get; set; }
+        [JsonProperty] public float PixelsPerUnit { get; set; }
+        [JsonProperty] public bool Packed { get; set; }
+        [JsonProperty] public string TextureName { get; set; }
+        [JsonProperty] public string TextureSize { get; set; }
+        [JsonProperty] public int UseCount { get; set; }
+        [JsonProperty] public List<NativePaperSpriteUse> Uses { get; set; }
+        [JsonProperty] public string PreviewFile { get; set; }
+        [JsonProperty] public string PreviewError { get; set; }
     }
 
     internal sealed class NativePaperSpriteUse
     {
-        public string Path { get; set; }
-        public bool ActiveInHierarchy { get; set; }
-        public int SiblingIndex { get; set; }
-        public string Size { get; set; }
-        public string AnchorMin { get; set; }
-        public string AnchorMax { get; set; }
-        public string Type { get; set; }
-        public string Color { get; set; }
-        public string Material { get; set; }
-        public bool PreserveAspect { get; set; }
-        public string Scale { get; set; }
+        [JsonProperty] public string Path { get; set; }
+        [JsonProperty] public bool ActiveInHierarchy { get; set; }
+        [JsonProperty] public int SiblingIndex { get; set; }
+        [JsonProperty] public string Size { get; set; }
+        [JsonProperty] public string AnchorMin { get; set; }
+        [JsonProperty] public string AnchorMax { get; set; }
+        [JsonProperty] public string Type { get; set; }
+        [JsonProperty] public string Color { get; set; }
+        [JsonProperty] public string Material { get; set; }
+        [JsonProperty] public bool PreserveAspect { get; set; }
+        [JsonProperty] public string Scale { get; set; }
     }
 
     internal sealed class NativeUiSoundRecord
     {
-        public string Type { get; set; }
-        public string Id { get; set; }
+        [JsonProperty] public string Type { get; set; }
+        [JsonProperty] public string Id { get; set; }
     }
 }
