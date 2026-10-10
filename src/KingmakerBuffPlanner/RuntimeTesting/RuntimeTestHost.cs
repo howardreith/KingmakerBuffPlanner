@@ -2236,6 +2236,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _nativeUiContract = NativeUiContractProbe.Capture();
                     AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
                         "native-ui-contract.json"), Serialize(_nativeUiContract));
+                    // 0.4.2 diagnostic: paper donor geometry, previews and
+                    // the native UI sound table (evidence only; fail-soft).
+                    try
+                    {
+                        _log.Info("[KBP-PAPER-DONORS] " +
+                            NativePaperDonorInventory.CaptureTo(_request.EvidenceDirectory));
+                    }
+                    catch (Exception donorException)
+                    {
+                        _log.Error("[KBP-PAPER-DONORS] capture failed: " +
+                            donorException.Message, donorException);
+                    }
                     _log.Info("[KBP-UI-THEME] captured exact native campaign visual contract;" +
                         "visuals=" + _nativeUiContract.Visuals.Count + ";fonts=" +
                         _nativeUiContract.Fonts.Count + ";portraits=" +

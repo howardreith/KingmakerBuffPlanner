@@ -137,6 +137,7 @@
     <Compile Include="Execution\AppliedEffectJudgement.cs" />
     <Compile Include="RuntimeTesting\LegacyProfileFixture.cs" />
     <Compile Include="RuntimeTesting\BlueprintReferenceIndex.cs" />
+    <Compile Include="RuntimeTesting\NativePaperDonorInventory.cs" />
     <Compile Include="Persistence\PersistenceMessages.cs" />
     <Compile Include="RuntimeTesting\PhysicalWorkspaceRecord.cs" />
     <Compile Include="RuntimeTesting\ProblemNavigationRecord.cs" />
