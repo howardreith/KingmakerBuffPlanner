@@ -1,25 +1,18 @@
-# Autonomous resume — 0.4.2 owner-feedback follow-up, 2026-10-10 (interim)
+# Autonomous resume — 0.4.2 owner-test candidate, 2026-10-10
 
-Mission: `Claude_KBP_041_Followup_Prompt.md` (A Shadow Clone, B spellbook
-removal, C native paper and sound). Branch
-`codex/kingmaker-buff-planner-041-owner-polish`, worktree
+Mission: `Claude_KBP_041_Followup_Prompt.md` plus the owner's continuation
+instructions of 2026-10-10 (A Shadow Clone, B spellbook removal, C native paper
+and sound). Branch `codex/kingmaker-buff-planner-041-owner-polish`, worktree
 `repo/KingmakerBuffPlanner-OP042`, base v0.4.1 `ab62462`. Version 0.4.2.
-Product commits `88f0b87`..`eb80b14`, docs `6788780`; this checkpoint is a
-records commit on top. Interim checks at `eb80b14`: unit PASS=500 FAIL=0,
-Validate-Source 43/0, launcher meta-test 13/0 (scratch copy, purity windows
-stubbed). Runs: `kbp042-donors-01/02`, `kbp042-paper-01` PASS (restored,
-saves clean); `kbp042-removal-01` FAIL before start (host rejected the new
-expectation; fixed `eb80b14`; restored, saves clean). Its shell was reaped
-for low memory (steamwebhelper ~10 GB); the launcher itself finished.
+Tested product commit `e9a4c5ed3d34825aa0332cb3d64067b206e29070`; later commits
+are records only. Package 3f3d55af66aa33be94e28a50fa7247a78c5fb006ac292237617fa847326b3463, DLL b3f5023d74f539d5aa4452b7b0f43f64e69930b5f561fc9e4aff0b72498e7e0a,
+MVID bcb3d03e-6bc9-48a3-8ff9-4b98dfb6f1c1. Complete gate PASS (exit 0, Source-only suite PASS=1 FAIL=0, 5 h 42 min).
+Native: `kbp042-removal-05` PASS (no-input removal reconciliation),
+`kbp042-paper-02` PASS (paper and open cue) on the tested bytes; earlier attempts
+`-01`..`-04` kept as recorded. Guarded push and a draft PR against main follow (publication record).
 Full record: `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`.
-Next action (needs the owner's go-ahead after the memory-pressure reap):
-Build-Local at HEAD, then
-`Invoke-KingmakerRuntimeTest.ps1 -Scenario live-workspace-physical -PhysicalExpectation removal -FixtureFamily Automation -CompatibilityProfileId full-user -RunId kbp042-removal-02 -TimeoutSeconds 1200`
-(WhatIf first, idle desktop); then the complete unchanged
-`scripts\Test-SourceOnly.ps1` on the final product commit, Build-Release,
-identity (package/DLL SHA-256, MVID) into the handoff, guarded push through
-`codex-policy\Push-KingmakerBuffPlanner.ps1`, draft PR. No merge, tag,
-publication or permanent install.
+Next action: the owner's test of the candidate. No merge, tag, release or
+permanent install without the owner's authorization.
 
 # Autonomous resume — 0.4.0 owner-review candidate, 2026-10-09
 

@@ -100,6 +100,17 @@ too, they use the exact flat look. If `TableBackdrop` is missing, the backdrop
 gets back its exact dim tint. A sound that cannot be posted is counted
 (`UnavailableCount`, `LastFailure`) and never blocks the open.
 
+**Final build.** `kbp042-paper-02` (1920x1080) repeated the inspection on the
+tested product commit `e9a4c5e`:
+- `Frame:paper=native-sheet;sprite=Card_Big;unitsPerTexel=0.500;screenScale=1.000;borders=60.0/65.0/65.0/55.0;size=1912x1030;undistorted=true`;
+- the spell scroll at `unitsPerTexel=0.350`;
+- `backdrop=native`;
+- open cues 1/1, 1/1, 1/1, 2/2, 3/3;
+- native references captured in the same session.
+
+`kbp042-removal-05` shows the planner on the page with the removal notice
+(`physical-removal-notice.png`).
+
 **Still for the owner to judge in the game:** whether the aged sheet and table
 read as native at their usual resolution, and that the opening sound is
 audible and is the expected paper sound.

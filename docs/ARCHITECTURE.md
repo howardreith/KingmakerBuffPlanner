@@ -59,12 +59,20 @@ draws the table untinted. The opening sound is `UISoundType.CharacterScreenOpen`
 one cue per successful open. Full record: [VISUAL-THEME.md](VISUAL-THEME.md).
 
 Runtime evidence: `NativePaperReferenceCapture` and `PaperSoundEvidence`
-(native references and open-cue counts in the same session), and the
-physical expectation `removal` (`RuntimeSpellbookRemovalHost`). The removal
-run uses the game's own `Spellbook.RemoveSpell` and
-`AbilityData.SpendFromSpellbook` on the disposable automation fixture, in
-memory only. The host's request validation and the launcher share one
-expectation list, held equal by `physical-expectation-launcher-host-parity`.
+(native references and open-cue counts in the same session), and the removal
+runs in `RuntimeSpellbookRemovalHost`.
+- Both removal runs share `PrepareRemoval`, which uses the game's own
+  `Spellbook.RemoveSpell` and `AbilityData.SpendFromSpellbook` on the
+  disposable automation fixture, in memory only.
+- The physical expectation `removal` presses the moon through OS input.
+- The no-input scenario `live-workspace-removal` presses through
+  `BuffPlannerUiRoot.PressRoutineForRuntime`, the HUD button's own entry.
+  It exists for desktops where the game cannot take the foreground.
+- Both write the same removal fields (`AddRemovalFields`). The launcher
+  re-reads them through one `Assert-KbpRemovalEvidence`.
+- The host's request validation and the launcher share one expectation list,
+  held equal by `physical-expectation-launcher-host-parity`. Routing is the
+  Unity-free `RuntimeTestProtocol.MoonExpectationFor`.
 
 ## 0.4.0 WP7 scroll paper and spell scroll
 

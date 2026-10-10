@@ -1,5 +1,11 @@
 # Native Buff Coverage Matrix
 
+## 0.4.2 class abilities with a spell's effect
+
+| Source | Owner | Effect | Before 0.4.2 | 0.4.2 | Native cast |
+| --- | --- | --- | --- | --- | --- |
+| Shadow Clone (`NinjaShadowCloneMirrorImage` `335a48ec...`), Personal, 1 ki (`NinjaKiResource` `74b56c9e...`) | Call of the Wild 1.14.4c-2.1 (Ninja trick) | `MirrorImageBuff` on the caster | hidden behind Mirror Image's entry (shared effect identity) | own entry under Abilities (`ability|335a48ec...`), plannable on its owner | NOT RUN (no fixture has a Ninja) |
+
 ## 0.4.0 beneficial-buff catalogue audit (WP5)
 
 The catalogue is structural; the audit adds rules to the same classifier

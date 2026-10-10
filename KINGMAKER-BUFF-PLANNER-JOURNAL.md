@@ -1,5 +1,22 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-10 0.4.2 owner-test candidate (final)
+
+- Tested product commit `e9a4c5e`; Complete gate PASS (exit 0, Source-only suite PASS=1 FAIL=0, 5 h 42 min).
+- Owner continuation (2026-10-10): -01 reconciled and preserved; request
+  admission proven on the exact launcher request through the production
+  reader (`d85818a`); prepared-spell coverage mapped, one real gap fixed (a
+  missing mod made castings look removed) and four focused cases added.
+- kbp042-removal-02: the fixture knows no level 1+ spontaneous buff; the
+  scenario was reshaped to the fixture (`0f2a24d`), not the fixture changed.
+- kbp042-removal-03/-04: native edits done, the press refused - a console
+  window owned the foreground and console input threads cannot be attached;
+  the harness's no-synthetic-input rule was kept. `live-workspace-removal`
+  (`e9a4c5e`) presses through the HUD's own routine entry: -05 PASS.
+- Rejected theory: "the desktop was in use" for -04 - idle 345 s; the
+  foreground window was this session's terminal console.
+- kbp042-paper-02 re-bound the paper/sound evidence to the tested bytes.
+
 ## 2026-10-10 0.4.2 owner-feedback follow-up (interim)
 
 - Branch `codex/kingmaker-buff-planner-041-owner-polish` from v0.4.1
