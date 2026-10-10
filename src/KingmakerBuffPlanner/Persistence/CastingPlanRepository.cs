@@ -176,6 +176,11 @@ namespace KingmakerBuffPlanner.Persistence
         // downgrade can restore it).
         internal const string SourceIdentityArchiveLabel = ".pre-0.4.2-source-identity";
 
+        // 0.4.2: before each save that retires castings of a spell removed
+        // from a spellbook, the exact primary is archived (distinct contents
+        // take the next numbered or content-keyed name; none is overwritten).
+        internal const string SpellbookRemovalArchiveLabel = ".pre-spellbook-removal";
+
         // The exact stored primary, archived beside it under one label
         // (read back and compared; an archive holding other bytes is never
         // overwritten). Null when there is no primary yet.

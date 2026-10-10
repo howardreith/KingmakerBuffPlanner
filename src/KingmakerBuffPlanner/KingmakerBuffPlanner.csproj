@@ -172,6 +172,7 @@
     <Compile Include="GameAdapters\KingmakerInstantCastAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerPartySnapshotBuilder.cs" />
     <Compile Include="GameAdapters\KingmakerSpellbookRoleAdapter.cs" />
+    <Compile Include="GameAdapters\KingmakerSpellbookMembershipAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerProviderOptionBuilder.cs" />
     <Compile Include="GameAdapters\KingmakerShareTargetingModifier.cs" />
     <Compile Include="GameAdapters\ShareCastingModifierAdapter.cs" />
@@ -228,6 +229,9 @@
     <Compile Include="UI\CastingWorkspaceSession.cs" />
     <Compile Include="UI\CastingWorkspaceSession.Graph.cs" />
     <Compile Include="UI\CastingWorkspaceSession.DirectManipulation.cs" />
+    <Compile Include="UI\CastingWorkspaceSession.SpellbookReconciliation.cs" />
+    <Compile Include="Planning\SpellbookRemovalReconciliation.cs" />
+    <Compile Include="Domain\Providers\SpellbookMembership.cs" />
     <Compile Include="UI\CastingProblemNavigation.cs" />
     <Compile Include="UI\CastingGraphModels.cs" />
     <Compile Include="UI\PlannerButtonPalette.cs" />

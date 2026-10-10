@@ -2180,6 +2180,13 @@ namespace KingmakerBuffPlanner.UI
 
         private string DescribeReadiness()
         {
+            // 0.4.2 (B): an automatic spellbook-removal edit stays named
+            // (with its Undo) until it is undone or superseded.
+            string removal = _session.SpellbookReconciliationNotice;
+            if (!string.IsNullOrEmpty(removal))
+                return string.IsNullOrEmpty(_session.LastAttemptMessage) ||
+                    _session.LastAttemptMessage.StartsWith(removal, StringComparison.Ordinal)
+                    ? removal : removal + " Last attempt: " + _session.LastAttemptMessage;
             if (!string.IsNullOrEmpty(_session.LastAttemptMessage))
                 return "Last attempt: " + _session.LastAttemptMessage;
             CastingRunReport last = _session.LastRunReport;
@@ -2215,6 +2222,8 @@ namespace KingmakerBuffPlanner.UI
                 return;
             }
             string refusal = CastingRunPresentation.DescribeRefusal(name, result, _session);
+            if (result.SpellbookReconciliation != null && result.SpellbookReconciliation.Applied)
+                refusal = result.SpellbookReconciliation.Notice + " " + refusal;
             _session.RecordAttempt(refusal);
             _footerResult.text = refusal;
             Debug.Log("[KBP-CF-RUN] refused;reason=" + result.ReviewReason);

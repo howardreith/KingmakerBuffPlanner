@@ -46,6 +46,7 @@
     <Compile Include="StickyTouchQualificationTests.cs" />
     <Compile Include="ParchmentThemeTests.cs" />
     <Compile Include="ShadowCloneCatalogueTests.cs" />
+    <Compile Include="SpellbookRemovalTests.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\ShareCastingModifierAdapter.cs"><Link>GameAdapters\ShareCastingModifierAdapter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\EnhancementLeaseCleanup.cs"><Link>GameAdapters\EnhancementLeaseCleanup.cs</Link></Compile>
     <Compile Include="TestBuildInfo.cs" />
@@ -127,6 +128,9 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.cs"><Link>UI\CastingWorkspaceSession.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.Graph.cs"><Link>UI\CastingWorkspaceSession.Graph.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.DirectManipulation.cs"><Link>UI\CastingWorkspaceSession.DirectManipulation.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.SpellbookReconciliation.cs"><Link>UI\CastingWorkspaceSession.SpellbookReconciliation.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\SpellbookRemovalReconciliation.cs"><Link>Planning\SpellbookRemovalReconciliation.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Providers\SpellbookMembership.cs"><Link>Domain\Providers\SpellbookMembership.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingProblemNavigation.cs"><Link>UI\CastingProblemNavigation.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingGraphModels.cs"><Link>UI\CastingGraphModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerButtonPalette.cs"><Link>UI\PlannerButtonPalette.cs</Link></Compile>

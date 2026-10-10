@@ -27,11 +27,15 @@ namespace KingmakerBuffPlanner.UI
             IEnumerable<CastEnhancementSnapshot> enhancements,
             IEnumerable<ICastingTargetingModifier> targetingModifiers = null,
             ActiveEffectSnapshot liveEffects = null,
-            bool combatActive = false)
+            bool combatActive = false,
+            PartySpellbookMembership spellbookMembership = null,
+            bool runActive = false)
         {
             Snapshot = snapshot ?? throw new ArgumentNullException("snapshot");
             LiveEffects = liveEffects;
             CombatActive = combatActive;
+            SpellbookMembership = spellbookMembership;
+            RunActive = runActive;
             ProviderOptions = (providerOptions ?? new ProviderPlanningOption[0])
                 .Where(value => value != null).ToList();
             EffectsBySource = effectsBySource ??
@@ -53,6 +57,12 @@ namespace KingmakerBuffPlanner.UI
         public ActiveEffectSnapshot LiveEffects { get; private set; }
         // WP4: the party is in combat now; every routine refuses globally.
         public bool CombatActive { get; private set; }
+        // 0.4.2 (B): what each party spellbook holds, read natively with the
+        // fresh discovery a run or an open uses; null when not read (render
+        // refreshes), which never authorizes a removal.
+        public PartySpellbookMembership SpellbookMembership { get; private set; }
+        // A run is executing (its plan is immutable): no reconciliation.
+        public bool RunActive { get; private set; }
     }
 
     // The boundary between the reviewed casting plan and native submission.
@@ -201,6 +211,10 @@ namespace KingmakerBuffPlanner.UI
             Dispatch = dispatch;
             Projection = projection;
         }
+
+        // 0.4.2 (B): what the spellbook reconciliation did at this attempt's
+        // boundary, before the gate saw the plan (never null after Apply).
+        public SpellbookReconciliationOutcome SpellbookReconciliation { get; internal set; }
 
         // The exact executor steps an allowed decision projects to (one per
         // approved casting); null when the decision never reached
@@ -483,6 +497,7 @@ namespace KingmakerBuffPlanner.UI
                     CampaignId, CastingPlanRepository.SourceIdentityArchiveLabel);
                 _sourceIdentityMigrationPending = false;
             }
+            ArchiveBeforeSpellbookReconciliation();
             _repository.Save(CastingPlanProfile.FromDocument(
                 _authoring.Document, _uiSettings, _executionSettings));
         }
@@ -1565,7 +1580,18 @@ namespace KingmakerBuffPlanner.UI
             // focuses the first current blocker without authoring anything.
             if (ProblemNavigation.Active) ClearGraphFocus();
             else LeaveProblemNavigation();
-            WorkspaceApplyResult result = ApplyCore(mode, scopeRoutineId, inputs);
+            // 0.4.2 (B): a deliberate spellbook removal observed now retires
+            // its dependent castings BEFORE the gate compiles the plan, on
+            // every route (HUD-first included). A removal that could not be
+            // saved gets one more flush, then refuses the run: a pruned plan
+            // is never cast while it is not durable.
+            SpellbookReconciliationOutcome reconciliation = ReconcileSpellbookRemovals(inputs);
+            if (reconciliation.Applied && !IntentIsDurable) PersistNow("run-flush");
+            WorkspaceApplyResult result = reconciliation.Applied && !IntentIsDurable
+                ? new WorkspaceApplyResult(false,
+                    "persistence-failed:" + (_autosaveStatus ?? "unknown"), null, null)
+                : ApplyCore(mode, scopeRoutineId, inputs);
+            result.SpellbookReconciliation = reconciliation;
             if (!result.Allowed && result.BlockingCastings.Count != 0 &&
                 mode == CastingApplyMode.Ordinary)
             {
@@ -2296,7 +2322,10 @@ namespace KingmakerBuffPlanner.UI
 
         public bool Undo()
         {
-            return _authoring.Undo();
+            int revision = _authoring.CurrentRevision;
+            bool undone = _authoring.Undo();
+            if (undone) NoteUndoForSpellbookReconciliation(revision);
+            return undone;
         }
 
         // ------------------------------------------------------------------
