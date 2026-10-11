@@ -602,6 +602,86 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        // Native UI finish (UI-04): the casting card's state as one short
+        // phrase. An active effect and what the run does about it are two
+        // facts, never collapsed: "Active · Will skip" (the policy skips an
+        // active effect), "Active · Will recast" (it is active, or present but
+        // not sufficient, and this casting casts again anyway).
+        public static string CardStatus(ResolvedCastingReadiness readiness, bool cannotRunYet,
+            IEnumerable<string> existingEffectCodes)
+        {
+            switch (readiness)
+            {
+                case ResolvedCastingReadiness.AlreadySatisfied: return "Active · Will skip";
+                case ResolvedCastingReadiness.Ready:
+                    if (cannotRunYet) return "Ready · Cannot run yet";
+                    bool present = (existingEffectCodes ?? new string[0]).Any(code => code != null &&
+                        (code.StartsWith("existing-active-recast:", StringComparison.Ordinal) ||
+                         code.StartsWith("existing-insufficient:", StringComparison.Ordinal)));
+                    return present ? "Active · Will recast" : "Ready";
+                case ResolvedCastingReadiness.Disabled: return "Disabled";
+                case ResolvedCastingReadiness.Draft: return "Draft";
+                default: return "Not ready";
+            }
+        }
+
+        // What a recipient portrait click does now. Adding (no casting
+        // selected): add one casting, or select the one it already has.
+        // Editing a selected casting: its own recipient removes it, another
+        // legal recipient moves it there, a recipient holding another casting
+        // of this buff refuses (it would double), an unreachable one refuses.
+        public static string RecipientHint(bool editing, bool legal, bool unknown, string reason,
+            bool group, string ownCastingLabel, string otherCastingLabel)
+        {
+            if (editing)
+            {
+                if (ownCastingLabel != null) return "Click again to remove " + ownCastingLabel;
+                if (otherCastingLabel != null) return "Has casting " + otherCastingLabel;
+                if (!legal) return string.IsNullOrEmpty(reason) ? "Cannot receive it" : reason;
+                return group ? "Click to centre it here" : "Click to move it here";
+            }
+            if (otherCastingLabel != null) return "Has casting " + otherCastingLabel + " · click to select it";
+            if (unknown) return "Choose a caster first";
+            if (!legal) return reason ?? string.Empty;
+            return group ? "Click to centre a casting here" : "Click to add a casting";
+        }
+
+        // The sidebar's single instruction while adding a casting.
+        public static string NextStep(bool buffSelected, bool casterChosen, bool sourceChosen, bool group)
+        {
+            if (!buffSelected) return "Choose a buff";
+            if (!casterChosen || !sourceChosen) return "Choose a caster and source";
+            return group ? "Choose where to centre it" : "Choose a recipient";
+        }
+
+        // A source row's second line: what the plan leaves of it and which
+        // resource it spends; a source that cannot fund another casting says
+        // so first.
+        public static string SourceLine(bool usable, string blockedReason, string capacity, string poolLabel,
+            IEnumerable<string> sharedWith)
+        {
+            var parts = new List<string>();
+            if (!usable)
+                parts.Add(string.Equals(blockedReason, "No casts left after the rest of the plan.",
+                    StringComparison.Ordinal) ? "None left after the plan" : (blockedReason ?? string.Empty).TrimEnd('.'));
+            if (!string.IsNullOrEmpty(capacity) && (usable || capacity != "Remaining unknown")) parts.Add(capacity);
+            if (!string.IsNullOrEmpty(poolLabel)) parts.Add(poolLabel);
+            List<string> shared = (sharedWith ?? new string[0]).Where(value => !string.IsNullOrEmpty(value)).ToList();
+            string line = string.Join(" · ", parts.Where(value => value.Length != 0).ToArray());
+            return shared.Count == 0 ? line : line + " (shared with " + string.Join(", ", shared.ToArray()) + ")";
+        }
+
+        // A catalogue entry's planned-casting count, only when it says
+        // something: castings in the selected routine, or in others.
+        public static string CatalogueCount(int routineCount, int planCount, string routineName)
+        {
+            if (routineCount > 0)
+                return routineCount + " in " + routineName +
+                    (planCount > routineCount ? " · " + planCount + " in all" : string.Empty);
+            if (planCount > 0) return planCount + " in other routines";
+            return string.Empty;
+        }
+
         public static string Guidance(bool buffSelected, string casterName, int casterSources,
             string sourceLabel, bool group, int castingsShown)
         {

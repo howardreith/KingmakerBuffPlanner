@@ -3855,6 +3855,7 @@ namespace KingmakerBuffPlanner.Tests
                 "AddLogEntry",
                 "LogDataManager"
             };
+            string writer = Path.Combine(root, "src", "KingmakerBuffPlanner", "GameAdapters", "KingmakerGameLog.cs");
             var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 Path.Combine(root, "src", "KingmakerBuffPlanner", "RuntimeTesting", "NativeUiFacts.cs")
@@ -3863,7 +3864,8 @@ namespace KingmakerBuffPlanner.Tests
                 Path.Combine(root, "src", "KingmakerBuffPlanner"),
                 "*.cs", SearchOption.AllDirectories);
             foreach (string contract in nativeLogContracts)
-                foreach (string path in production.Where(value => !allowed.Contains(value)))
+                foreach (string path in production.Where(value => !allowed.Contains(value) &&
+                        !string.Equals(value, writer, StringComparison.OrdinalIgnoreCase)))
                     if (File.ReadAllText(path).IndexOf(contract, StringComparison.Ordinal) >= 0)
                         throw new InvalidOperationException(
                             "A native common/combat/event-log path was added: " +
@@ -3871,6 +3873,9 @@ namespace KingmakerBuffPlanner.Tests
             foreach (string path in allowed)
                 if (File.ReadAllText(path).IndexOf("AddLogEntry", StringComparison.Ordinal) >= 0)
                     throw new InvalidOperationException("The runtime evidence reader writes to the native log.");
+            string adapter = File.ReadAllText(writer);
+            if (adapter.Split(new[] { "LogView.AddLogEntry(" }, StringSplitOptions.None).Length != 2)
+                throw new InvalidOperationException("The game-log adapter is not the single bounded writer.");
         }
 
         private static void TestInstantExecutor()
@@ -8766,8 +8771,15 @@ namespace KingmakerBuffPlanner.Tests
             internal int CaptureCount;
             internal int EnterCount;
             internal int RestoreCount;
+            internal int YieldCount;
+            internal bool YieldedBeforeRestore;
             internal bool FailEnter;
             public bool PlannerModeRequested { get; private set; }
+            public void YieldFullScreenOwnership()
+            {
+                YieldCount++;
+                YieldedBeforeRestore = RestoreCount == 0;
+            }
             public object CaptureState() { CaptureCount++; return "state"; }
             public void EnterPlannerMode()
             {

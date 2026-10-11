@@ -172,6 +172,7 @@
     <Compile Include="GameAdapters\KingmakerAreaCoverageResolver.cs" />
     <Compile Include="GameAdapters\KingmakerActiveEffectSnapshotBuilder.cs" />
     <Compile Include="GameAdapters\KingmakerAbilityVariants.cs" />
+    <Compile Include="GameAdapters\KingmakerGameLog.cs" />
     <Compile Include="GameAdapters\KingmakerAnimatedCastAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerBuffSourceDiscovery.cs" />
     <Compile Include="GameAdapters\KingmakerAtWillCantrips.cs" />
@@ -263,6 +264,7 @@
     <Compile Include="UI\CatalogUiDiagnostics.cs" />
     <Compile Include="UI\CatalogLayoutDiagnostics.cs" />
     <Compile Include="UI\BuffPlannerUiContracts.cs" />
+    <Compile Include="UI\PlannerNativeKit.cs" />
     <Compile Include="UI\BuffPlannerHudButtonController.cs" />
     <Compile Include="UI\BuffPlannerScreenController.cs" />
     <Compile Include="UI\BuffPlannerScreenView.cs" />

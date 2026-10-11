@@ -22,7 +22,7 @@ using UnityEngine.EventSystems;
 namespace KingmakerBuffPlanner.UI
 {
     internal sealed class BuffPlannerUiRoot : MonoBehaviour, IPlannerRoutineRunner,
-        ISceneHandler, IAreaLoadingStagesHandler, IAreaActivationHandler
+        ISceneHandler, IAreaLoadingStagesHandler, IAreaActivationHandler, IFullScreenUIHandler
     {
         private const string ObjectName = "KingmakerBuffPlanner.UiRoot";
         private static BuffPlannerUiRoot _instance;
@@ -374,8 +374,68 @@ namespace KingmakerBuffPlanner.UI
                 _instance._log.Info("[KBP-BOOT] full-screen close requested;source=PlannerHotkey.");
                 return;
             }
+            // Native UI finish (UI-02): from an open native window the
+            // hotkey switches windows - the native one closes through its
+            // own close control, then the planner opens.
+            if (_instance.TryBeginWindowHandoff()) return;
             if (!_instance.OpenSetup())
                 _instance.LogUiUnavailable(_instance._screen.LastFailure);
+        }
+
+        // The planner hotkey pressed while a native service window shows:
+        // the same bounded handoff the spellbook entry uses (native close
+        // first, wait for its full-screen release, then open).
+        private readonly SpellbookHandoffStateMachine _windowHandoff = new SpellbookHandoffStateMachine();
+        private bool _windowHandoffActive;
+
+        private static bool NativeServiceWindowShown()
+        {
+            Kingmaker.UI.ServiceWindow.ServiceWindowController controller =
+                Game.Instance == null || Game.Instance.UI == null ? null : Game.Instance.UI.ServiceWindow;
+            return controller != null && controller.WindowTabs != null && controller.WindowTabs.IsShow;
+        }
+
+        private bool TryBeginWindowHandoff()
+        {
+            if (_windowHandoffActive || !NativeServiceWindowShown()) return _windowHandoffActive;
+            StaticCanvas canvas = StaticCanvas.Instance;
+            Transform close = canvas == null || canvas.ServiceWindow == null ? null
+                : canvas.ServiceWindow.transform.Find(SpellbookWindowLocator.NativeClosePath);
+            UnityEngine.UI.Button button = close == null ? null : close.GetComponent<UnityEngine.UI.Button>();
+            if (button == null || !button.IsInteractable())
+            {
+                _log.Info("[KBP-WINDOW] hotkey switch refused;reason=native-close-affordance-missing.");
+                return false;
+            }
+            _windowHandoff.Begin();
+            _windowHandoffActive = true;
+            _log.Info("[KBP-WINDOW] hotkey switch begin;native=service-window.");
+            button.onClick.Invoke();
+            return true;
+        }
+
+        private void TickWindowHandoff()
+        {
+            if (!_windowHandoffActive) return;
+            bool nativeActive = NativeServiceWindowShown() || (Game.Instance != null &&
+                Game.Instance.IsModeActive(GameModeType.FullScreenUi));
+            if (_windowHandoff.ObserveRelease(nativeActive))
+            {
+                bool accepted = false;
+                try { accepted = OpenSetup(); }
+                catch (Exception exception) { _log.Error("[KBP-WINDOW] hotkey switch open failed.", exception); }
+                _windowHandoff.ObserveOpenResult(accepted);
+            }
+            else if (_windowHandoff.ObservePresentation(_castingWorkspace != null))
+            {
+                _windowHandoffActive = false;
+                _log.Info("[KBP-WINDOW] hotkey switch completed;planner=open.");
+            }
+            if (_windowHandoff.State == SpellbookHandoffState.Failed)
+            {
+                _windowHandoffActive = false;
+                _log.Info("[KBP-WINDOW] hotkey switch failed;reason=" + _windowHandoff.Failure + ".");
+            }
         }
 
         internal static void TickOwned(float deltaTime)
@@ -469,6 +529,46 @@ namespace KingmakerBuffPlanner.UI
         internal static void CloseCastingWorkspaceForRuntime()
         {
             if (_instance != null) _instance.CloseCastingWorkspace();
+        }
+
+        // Native UI finish (UI-02): the planner is one of the game's windows.
+        // A native full-screen window shown while it is open (a hotkey, a
+        // HUD button, the spellbook's own tabs) takes over: the planner
+        // closes at once - its session, plan and selection kept for the
+        // next open - and hands the game's full-screen state to that window
+        // instead of ending it underneath (StaticCanvas keeps one flag).
+        public void HandleFullScreenUiChanged(bool state, Kingmaker.UI.FullScreenUITypes.FullScreenUIType type)
+        {
+            if (!PlannerWindowTransition.YieldsTo(_castingWorkspace != null,
+                    KingmakerPlannerInputBoundary.RaisingOwnNotification, state)) return;
+            try
+            {
+                YieldToNativeWindow(type.ToString());
+            }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-WINDOW] yielding to the native window failed.", exception);
+            }
+        }
+
+        private void YieldToNativeWindow(string window)
+        {
+            if (_workspaceInputLease != null)
+            {
+                _workspaceInputLease.ReleaseToNativeWindow();
+                _workspaceInputLease = null;
+            }
+            CloseCastingWorkspace();
+            _castingWorkspaceYields++;
+            _log.Info("[KBP-WINDOW] planner closed for a native window;window=" + window +
+                ";fullScreen=kept-by-native.");
+        }
+
+        private int _castingWorkspaceYields;
+
+        internal static int CastingWorkspaceYieldsForRuntime
+        {
+            get { return _instance == null ? 0 : _instance._castingWorkspaceYields; }
         }
 
         // Runtime-only seam (native UI finish): the planner's own Escape
@@ -1272,6 +1372,7 @@ namespace KingmakerBuffPlanner.UI
                     exception.Message + ").";
                 if (CastingSession != null) CastingSession.RecordGlobalRefusal(refusal);
                 if (_castingWorkspace != null) _castingWorkspace.ShowNotice(refusal);
+                ReportClosedPlannerRefusal(refusal);
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Refused,
                     name + " was not cast: the party state could not be refreshed (" +
@@ -1282,6 +1383,7 @@ namespace KingmakerBuffPlanner.UI
             string unavailable = EnsureCastingSession(out session, false);
             if (session == null)
             {
+                ReportClosedPlannerRefusal("Cannot run " + name + ": " + unavailable);
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Refused,
                     "Cannot run " + name + ": " + unavailable, 0, 0, 0));
@@ -1294,6 +1396,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 _log.Error("[KBP-CF-RUN] apply failed before submission;routine=" +
                     routineId + ".", exception);
+                ReportClosedPlannerRefusal(name + " failed before anything was cast: " + exception.Message);
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Failed,
                     name + " failed before anything was cast: " + exception.Message,
@@ -1324,7 +1427,9 @@ namespace KingmakerBuffPlanner.UI
                     0, 0));
                 // No floating result (the accepted HUD boundary): a refusal
                 // the player resolves in the planner opens it on that
-                // routine, with the reason in the footer.
+                // routine, with the reason in the footer; any other refusal
+                // of a press with no planner open reaches the game log.
+                if (!CastingRunPresentation.OpensPlanner(result)) ReportClosedPlannerRefusal(refusal);
                 if (CastingRunPresentation.OpensPlanner(result) &&
                     _castingWorkspace == null)
                 {
@@ -1945,9 +2050,34 @@ namespace KingmakerBuffPlanner.UI
             {
                 _log.Error("[KBP-CF-RUN] result presentation failed.", exception);
             }
-            // Deliberately no floating or native-log result (the accepted
-            // HUD boundary): the full result is logged, shown in the planner
-            // footer, and kept on the session for the next planner open.
+            // Native UI finish (UI-08): one summary line in the game's own log
+            // (the game already logs each cast); the full description is its
+            // hover text, and stays in the UMM log and on the session for the
+            // next planner open. Never a floating HUD object.
+            WriteGameLog(CastingRunPresentation.GameLogLine(report, name),
+                report.Cancelled || report.Halted || report.Failed != 0,
+                CastingRunPresentation.Describe(report, name, label));
+        }
+
+        // A routine press whose outcome no open planner window shows: one
+        // line in the game's own log.
+        private void ReportClosedPlannerRefusal(string refusal)
+        {
+            if (_castingWorkspace != null) return;
+            WriteGameLog(CastingRunPresentation.GameLogRefusal(refusal), true, refusal);
+        }
+
+        private void WriteGameLog(string line, bool warning, string detail)
+        {
+            try
+            {
+                if (!KingmakerGameLog.Write(line, warning, detail))
+                    _log.Info("[KBP-GAMELOG] unavailable;line=" + line);
+            }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-GAMELOG] write failed;line=" + line, exception);
+            }
         }
 
         // HUD routine tooltips in casting-first mode describe the casting
@@ -2078,6 +2208,7 @@ namespace KingmakerBuffPlanner.UI
             try
             {
                 if (_spellbookEntry != null) _spellbookEntry.Tick();
+                TickWindowHandoff();
                 if (_castingWorkspace != null) _castingWorkspace.TickGeometry();
                 if (Input.GetKeyDown(KeyCode.Escape)) TakeEscape("Escape");
                 // The close an accepted Classic run asked for, one frame after

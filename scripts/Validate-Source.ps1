@@ -175,18 +175,25 @@ if ($hudSource.Contains('"Feedback"') -or
     throw 'Quick results must remain in the planner footer and UMM log, never a floating HUD object.'
 }
 # Native UI finish (UI-08) superseded "never the native log": the native game
-# log is named only by the bounded files listed here (the runtime evidence
-# reader, which never writes); no other production source touches it.
+# log is named only by its one bounded writer (the game-log adapter) and the
+# runtime evidence reader, which never writes; no other production source
+# touches it.
+$nativeLogWriter = Join-Path $root 'src\KingmakerBuffPlanner\GameAdapters\KingmakerGameLog.cs'
 $nativeLogReaders = @(
     (Join-Path $root 'src\KingmakerBuffPlanner\RuntimeTesting\NativeUiFacts.cs'))
 $nativeLogCalls = @($identityFiles | Where-Object {
-        $nativeLogReaders -notcontains $_.FullName -and $_.FullName -notmatch '\\(obj|bin)\\' } |
+        $nativeLogReaders -notcontains $_.FullName -and $_.FullName -ne $nativeLogWriter -and
+        $_.FullName -notmatch '\\(obj|bin)\\' } |
     Select-String -Pattern 'MessageLogThread|AddMessage\(|CombatLog|EventLog|BattleLogManager|BattleLogView|AddLogEntry|LogDataManager')
 if ($nativeLogCalls.Count -ne 0) {
     throw 'Production source must reach the native game log only through its bounded files.'
 }
 if (@($nativeLogReaders | Select-String -Pattern 'AddLogEntry').Count -ne 0) {
     throw 'The runtime evidence reader must never write to the native game log.'
+}
+if (-not (Test-Path -LiteralPath $nativeLogWriter -PathType Leaf) -or
+    @(Select-String -LiteralPath $nativeLogWriter -Pattern 'LogView.AddLogEntry\(').Count -ne 1) {
+    throw 'The game-log adapter must be the single bounded native log writer.'
 }
 $assertions++
 

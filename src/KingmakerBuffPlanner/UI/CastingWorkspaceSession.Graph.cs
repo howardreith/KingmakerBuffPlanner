@@ -481,17 +481,10 @@ namespace KingmakerBuffPlanner.UI
         private static string GraphStatusLabel(ResolvedCasting casting,
             CastingWorkspaceInputs inputs = null)
         {
-            switch (casting.Readiness)
-            {
-                case ResolvedCastingReadiness.AlreadySatisfied: return "Already active";
-                case ResolvedCastingReadiness.Ready:
-                    return ExplicitCastingStepConverter.StandardExecutionLimitation(casting,
-                        TargetingModifierEnhancementMap(inputs)) == null
-                        ? "Ready" : "Ready - cannot run yet";
-                case ResolvedCastingReadiness.Disabled: return "Disabled";
-                case ResolvedCastingReadiness.Draft: return "Draft";
-                default: return "Blocked";
-            }
+            bool cannotRun = casting.Readiness == ResolvedCastingReadiness.Ready &&
+                ExplicitCastingStepConverter.StandardExecutionLimitation(casting,
+                    TargetingModifierEnhancementMap(inputs)) != null;
+            return CastingGraphText.CardStatus(casting.Readiness, cannotRun, casting.ExistingEffectNotes);
         }
 
         private string EnhancementBadge(CastingWorkspaceInputs inputs, string enhancementId,
@@ -597,6 +590,24 @@ namespace KingmakerBuffPlanner.UI
             Func<string, string> nameOf)
         {
             var targets = new List<CastingGraphTargetNode>();
+            // Editing a shown casting: a portrait click moves, re-centres or
+            // removes THAT casting (ClickGraphRecipient), so legality and the
+            // hint follow its own provider, not the next casting's draft.
+            PlannedCasting focused = FocusedCasting();
+            CastingGraphCasting focusedChip = focused == null ? null : chips.FirstOrDefault(value =>
+                string.Equals(value.CastingId, focused.CastingId, StringComparison.Ordinal));
+            bool editing = focusedChip != null;
+            if (editing)
+            {
+                group = focused.TargetMode != CastingTargetMode.DirectTarget;
+                option = focused.CasterUnitId == null ? null : FindRecordOption(inputs, focused);
+                if (option != null && focused.TargetingModifiers.Any(value => value.Enabled))
+                {
+                    string modifierRefusal;
+                    option = ApplyGraphTargetingModifiers(focused.TargetingModifiers, inputs, focused, option,
+                        out modifierRefusal);
+                }
+            }
             foreach (UnitSnapshot unit in inputs.Snapshot.Units)
             {
                 List<CastingGraphCasting> touching = chips.Where(value =>
@@ -620,14 +631,20 @@ namespace KingmakerBuffPlanner.UI
                         ? (group ? "The group spell cannot be centred here." : "Out of this caster's reach.")
                         : !group && invalid != null ? WorkspaceReasonText.Describe(invalid) : string.Empty;
                 }
-                string hint = touching.Count != 0
-                    ? "Shows " + string.Join(", ", touching.Select(value => "casting " + value.OrderLabel)
-                        .ToArray())
-                    : legality == CastingGraphTargetLegality.Legal
-                        ? (group ? "Click: one group casting centred here" : "Click: add a casting to " +
-                            nameOf(unit.UnitId))
-                        : legality == CastingGraphTargetLegality.Unknown ? "Choose a caster first"
-                        : reason;
+                // The casting a click on this portrait concerns: the one
+                // directed at (or centred on) it - never a group beneficiary.
+                List<CastingGraphCasting> held = chips.Where(value =>
+                    string.Equals(value.TargetUnitId, unit.UnitId, StringComparison.Ordinal)).ToList();
+                CastingGraphCasting own = editing ? held.FirstOrDefault(value =>
+                    string.Equals(value.CastingId, focusedChip.CastingId, StringComparison.Ordinal)) : null;
+                CastingGraphCasting other = held.FirstOrDefault(value => own == null ||
+                    !string.Equals(value.CastingId, own.CastingId, StringComparison.Ordinal));
+                string hint = CastingGraphText.RecipientHint(editing,
+                    legality == CastingGraphTargetLegality.Legal,
+                    legality == CastingGraphTargetLegality.Unknown, reason, group,
+                    own == null ? null : own.OrderLabel,
+                    other == null ? null : string.Join(", ", held.Where(value => own == null ||
+                        value.CastingId != own.CastingId).Select(value => value.OrderLabel).ToArray()));
                 targets.Add(new CastingGraphTargetNode(unit.UnitId, unit.DisplayName, legality, reason,
                     touching.Select(value => value.CastingId), coverage, hint));
             }

@@ -3821,9 +3821,11 @@ namespace KingmakerBuffPlanner.Tests
                 if (WorkspaceRefusalText.Describe(pair.Key) != pair.Value)
                     throw new InvalidOperationException("Refusal text for " + pair.Key + " is " +
                         WorkspaceRefusalText.Describe(pair.Key));
-            if (WorkspaceHeaderText.Describe("Long", 0, 0, true, 0) != "Long · no castings yet" ||
-                WorkspaceHeaderText.Describe("Long", 3, 2, false, 1) != "Long · 2 of 3 castings ready · Apply blocked" ||
-                WorkspaceHeaderText.Describe("Short", 1, 1, true, 0) != "Short · 1 of 1 casting ready · ready to apply")
+            // Native UI finish (UI-07/UI-08): the header counts; why a run
+            // cannot proceed is stated beside Run (WorkspaceFooterText.RunStatus).
+            if (WorkspaceHeaderText.Describe("Long", 0, 0) != "Long · no castings yet" ||
+                WorkspaceHeaderText.Describe("Long", 3, 2) != "Long · 2 of 3 castings ready" ||
+                WorkspaceHeaderText.Describe("Short", 1, 1) != "Short · 1 of 1 casting ready")
                 throw new InvalidOperationException("The routine header text is wrong.");
             // The session counts the routine, whichever buff is selected, and
             // an Add without a recipient explains itself in words.

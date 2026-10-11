@@ -573,6 +573,31 @@ namespace KingmakerBuffPlanner.UI
             return "Native casting is not available in this session (" + value + ").";
         }
 
+        // Native UI finish (UI-08): the footer's one line beside Run - what a
+        // Run does now, or exactly why it cannot (the count of castings that
+        // are not ready and where they are marked).
+        public static string RunStatus(string disposition, string routineName, int castings,
+            bool allowed, int executable, int notReady, string otherBlock, int shortInOnePass)
+        {
+            string value = disposition ?? string.Empty;
+            if (value == "native-casting-busy")
+                return "A routine is running; press its HUD button again to stop it.";
+            if (value != "native-casting-enabled")
+                return "Casting is unavailable in this session (" + value + ").";
+            if (castings == 0) return routineName + " has no castings yet.";
+            if (notReady > 0)
+                return routineName + " cannot run: " + (notReady == 1 ? "1 casting is" : notReady + " castings are") +
+                    " not ready (marked in red)." +
+                    (executable > 0 ? " Ready Casts Only runs the other " + executable + "." : string.Empty);
+            if (!allowed)
+                return routineName + " cannot run: " + (string.IsNullOrEmpty(otherBlock) ? "see the marked castings" : otherBlock) + ".";
+            string shortage = shortInOnePass <= 0 ? string.Empty
+                : " " + (shortInOnePass == 1 ? "1 casting is" : shortInOnePass + " castings are") +
+                    " short if every routine runs without rest (see Resources).";
+            if (executable == 0) return "Nothing to cast in " + routineName + ": every casting is already active." + shortage;
+            return "Run " + routineName + " casts " + executable + (executable == 1 ? " casting." : " castings.") + shortage;
+        }
+
         // The Run button names the routine it runs: the selected one.
         public static string RunCaption(string routineName)
         {
@@ -840,13 +865,14 @@ namespace KingmakerBuffPlanner.UI
     // apply": the selected buff's count beside the routine's gate).
     public static class WorkspaceHeaderText
     {
-        public static string Describe(string routineName, int castings, int ready,
-            bool applyAllowed, int blockingReasons)
+        // Native UI finish (UI-07/UI-08): the routine's count only; why a
+        // run cannot proceed is stated beside the Run action
+        // (WorkspaceFooterText.RunStatus), never as a bare "Apply blocked".
+        public static string Describe(string routineName, int castings, int ready)
         {
             if (castings == 0) return routineName + " · no castings yet";
             return routineName + " · " + ready + " of " + castings + " casting" +
-                (castings == 1 ? string.Empty : "s") + " ready · " +
-                (applyAllowed ? "ready to apply" : "Apply blocked");
+                (castings == 1 ? string.Empty : "s") + " ready";
         }
     }
 

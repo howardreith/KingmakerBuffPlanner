@@ -1285,9 +1285,7 @@ namespace KingmakerBuffPlanner.UI
         private void RebuildHeader(CastingGraphView view)
         {
             _headerStatus.text = WorkspaceHeaderText.Describe(view.SelectedRoutineName,
-                view.RoutineCastingCount, view.RoutineReadyCount,
-                view.SelectedRoutineGate != null && view.SelectedRoutineGate.Allowed,
-                view.SelectedRoutineGate == null ? 0 : view.SelectedRoutineGate.BlockingReasons.Count) +
+                view.RoutineCastingCount, view.RoutineReadyCount) +
                 (!_session.SavesRefused ? string.Empty
                     : _session.LegacyImportBlocked ? " · not saved: the classic plan could not be imported"
                     : " · not saved: the plan file cannot be read");

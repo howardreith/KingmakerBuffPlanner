@@ -60,6 +60,36 @@ namespace KingmakerBuffPlanner.UI
         }
 
 
+        // Native UI finish (UI-08): the one line a run adds to the game's own
+        // log. The game already logs every cast, so this is the run's
+        // summary only; the full description is the line's hover text.
+        internal static string GameLogLine(CastingRunReport report, string routineName)
+        {
+            if (report == null) throw new ArgumentNullException("report");
+            var text = new StringBuilder("Buff Planner: ").Append(routineName);
+            if (report.Cancelled) text.Append(" stopped");
+            else if (report.Halted || report.Failed != 0) text.Append(" finished with a failure");
+            else text.Append(" done");
+            text.Append(" - ").Append(report.Confirmed).Append(" of ").Append(report.Planned)
+                .Append(" cast");
+            if (report.Skipped != 0) text.Append(", ").Append(report.Skipped).Append(" already active");
+            if (report.Failed != 0) text.Append(", ").Append(report.Failed).Append(" failed");
+            int unfinished = report.CancelledCastings + report.NotProcessed;
+            if (unfinished != 0) text.Append(", ").Append(unfinished).Append(" not cast");
+            return text.Append(".").ToString();
+        }
+
+        // A routine press the game log reports because no planner window is
+        // open to show it: the refusal's own first sentence.
+        internal static string GameLogRefusal(string refusal)
+        {
+            string value = (refusal ?? string.Empty).Trim();
+            if (value.Length == 0) return "Buff Planner: nothing was cast.";
+            int end = value.IndexOf(". ", StringComparison.Ordinal);
+            string first = end < 0 ? value : value.Substring(0, end + 1);
+            return "Buff Planner: " + first.TrimEnd('.') + ".";
+        }
+
         // One casting's outcome in the last run, as its card shows it. The
         // effect and the resource are stated separately: a failed or
         // interrupted cast may still have spent its slot.

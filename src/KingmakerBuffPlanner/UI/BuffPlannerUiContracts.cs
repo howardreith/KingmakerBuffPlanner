@@ -437,6 +437,10 @@ namespace KingmakerBuffPlanner.UI
         void EnterPlannerMode();
         void RestoreState(object state);
         bool PlannerModeRequested { get; }
+        // Native UI finish (UI-02): a native window has taken the full-screen
+        // state over while the planner held it; the following restore leaves
+        // that state with the native window instead of ending it.
+        void YieldFullScreenOwnership();
     }
 
     public sealed class BuffPlannerInputLease : IDisposable
@@ -476,6 +480,28 @@ namespace KingmakerBuffPlanner.UI
             if (_disposed) return;
             _disposed = true;
             _boundary.RestoreState(_state);
+        }
+
+        // A native window opened over the planner and now owns the game's
+        // full-screen state (one shared flag in the game): release the lease
+        // without ending that state under the native window.
+        public void ReleaseToNativeWindow()
+        {
+            if (_disposed) return;
+            _boundary.YieldFullScreenOwnership();
+            Dispose();
+        }
+    }
+
+    // Native UI finish (UI-02): how the planner answers the game's
+    // full-screen notifications. Any full-screen window shown while the
+    // planner is open - except the planner's own notification - takes over:
+    // the planner closes and hands the full-screen state to it.
+    public static class PlannerWindowTransition
+    {
+        public static bool YieldsTo(bool plannerOpen, bool raisedByPlanner, bool shown)
+        {
+            return plannerOpen && shown && !raisedByPlanner;
         }
     }
 

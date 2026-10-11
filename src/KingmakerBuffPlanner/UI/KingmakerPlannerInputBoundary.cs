@@ -12,6 +12,11 @@ namespace KingmakerBuffPlanner.UI
     {
         private bool _requested;
 
+        // True only while this boundary raises its own full-screen
+        // notification, so the planner never mistakes it for a native window
+        // taking over (StaticCanvas keeps ONE full-screen flag, 2.1.7b).
+        internal static bool RaisingOwnNotification { get; private set; }
+
         public bool PlannerModeRequested
         {
             get
@@ -44,8 +49,16 @@ namespace KingmakerBuffPlanner.UI
             SelectionManager selection = SelectionManager.Instance;
             if (selection != null) selection.IsDisabled = true;
             _requested = true;
-            EventBus.RaiseEvent<IFullScreenUIHandler>(handler =>
-                handler.HandleFullScreenUiChanged(true, FullScreenUIType.Unknown));
+            Raise(true);
+        }
+
+        // A native window raised its own full-screen notification over the
+        // planner's: the game's single full-screen flag now belongs to it, so
+        // the restore below must not clear it (that would end FullScreenUi
+        // mode under the open native window).
+        public void YieldFullScreenOwnership()
+        {
+            _requested = false;
         }
 
         public void RestoreState(object state)
@@ -53,9 +66,7 @@ namespace KingmakerBuffPlanner.UI
             var captured = state as KingmakerInputState;
             try
             {
-                if (_requested)
-                    EventBus.RaiseEvent<IFullScreenUIHandler>(handler =>
-                        handler.HandleFullScreenUiChanged(false, FullScreenUIType.Unknown));
+                if (_requested) Raise(false);
             }
             finally
             {
@@ -63,6 +74,20 @@ namespace KingmakerBuffPlanner.UI
                 SelectionManager selection = SelectionManager.Instance;
                 if (captured != null && captured.SelectionWasAvailable && selection != null)
                     selection.IsDisabled = captured.SelectionDisabled;
+            }
+        }
+
+        private static void Raise(bool state)
+        {
+            RaisingOwnNotification = true;
+            try
+            {
+                EventBus.RaiseEvent<IFullScreenUIHandler>(handler =>
+                    handler.HandleFullScreenUiChanged(state, FullScreenUIType.Unknown));
+            }
+            finally
+            {
+                RaisingOwnNotification = false;
             }
         }
 
