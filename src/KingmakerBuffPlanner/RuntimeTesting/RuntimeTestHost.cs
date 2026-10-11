@@ -5342,6 +5342,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             _qualificationDriver.Update();
             if (!_qualificationDriver.Completed) return false;
+            // The approved run has already finished. This bounded observation
+            // reads native effects with temporary plan copies; it never calls Apply.
+            if (_qualificationRecord.CastingScenario && _qualificationRecord.TerminalReason == "completed" &&
+                _qualificationRecord.Selection != null &&
+                _qualificationRecord.Selection.Recipe == CastingQualificationRecipe.ZeroCostMixed &&
+                !ObserveNativeUiAfterQualification()) return false;
             PublishQualificationRecord();
             _liveInitialCatalogEvidence = "qualification-scenario;workspaceRoot=active;legacyScreen=closed";
             _workspaceInteractionEvidence = "qualification;recipe-authoring";
@@ -5748,6 +5754,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 try { ReleaseNativeUiProbes(); }
                 catch (Exception exception) { _log.Error("[KBP-NUI] probe cleanup failed at shutdown.", exception); }
+            }
+            if (_qualifiedUiStep > 0 && _qualifiedUiStep < 10)
+            {
+                try
+                {
+                    try { ReleaseQualifiedUiWindow(); }
+                    finally { WriteQualifiedUiObservation("shutdown:" + reason); }
+                }
+                catch (Exception exception) { _log.Error("[KBP-NUI] active probe cleanup failed at shutdown.", exception); }
             }
             if (_hoverStarted && !_hover.Completed)
             {

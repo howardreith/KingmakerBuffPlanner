@@ -14,6 +14,8 @@ using Kingmaker.UI.Selection;
 using Kingmaker.UI.ServiceWindow;
 using Kingmaker.UI.Tooltip;
 using KingmakerBuffPlanner.Domain.Authoring;
+using KingmakerBuffPlanner.Domain.Planning;
+using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.UI;
 using Newtonsoft.Json;
@@ -1112,6 +1114,216 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             _nativeUiWritten = true;
             _completed = true;
             return true;
+        }
+
+        // An effect observation after the already approved zero-cost qualification.
+        // Its own receipt distinguishes missing active UI state from casting
+        // success. Temporary plan copies are undone; native effects are never
+        // forced. The driver has completed before this probe opens a window.
+        private int _qualifiedUiStep;
+        private readonly Stopwatch _qualifiedUiClock = new Stopwatch();
+        private NativeUiCaptureBoundary _qualifiedUiCapture;
+        private readonly Stopwatch _qualifiedUiCaptureClock = new Stopwatch();
+        private readonly JObject _qualifiedUiObservation = new JObject();
+        private bool _qualifiedUiOpened;
+        private int _qualifiedUiRunsBefore;
+        private string _qualifiedUiDocument;
+        private CastingWorkspaceSession _qualifiedUiSession;
+        private int _qualifiedUiEdits;
+        private GameObject _qualifiedUiHovered;
+
+        private bool ObserveNativeUiAfterQualification()
+        {
+            try
+            {
+                if (_qualifiedUiCapture != null)
+                {
+                    NativeUiCaptureStatus status = _qualifiedUiCapture.Observe(Time.frameCount,
+                        _qualifiedUiCaptureClock.ElapsedMilliseconds);
+                    if (status == NativeUiCaptureStatus.Pending) return false;
+                    if (status == NativeUiCaptureStatus.TimedOut)
+                        throw new IOException("Post-qualification capture exceeded the ten-second boundary: " +
+                            Path.GetFileName(_qualifiedUiCapture.Path));
+                    ((JArray)_qualifiedUiObservation["captures"]).Add(new JObject
+                    {
+                        { "file", Path.GetFileName(_qualifiedUiCapture.Path) },
+                        { "requestFrame", _qualifiedUiCapture.RequestFrame }, { "completedFrame", Time.frameCount }
+                    });
+                    _qualifiedUiCapture = null;
+                    // The next UI action belongs to a subsequent Update.
+                    return false;
+                }
+                CastingWorkspaceScreenView view = BuffPlannerUiRoot.CastingWorkspaceViewForRuntime;
+                switch (_qualifiedUiStep)
+                {
+                    case 0:
+                        _qualifiedUiObservation["schemaVersion"] = 1;
+                        _qualifiedUiObservation["runId"] = _request.RunId;
+                        _qualifiedUiObservation["sourceId"] = _qualificationRecord.Selection.SourceId;
+                        _qualifiedUiObservation["screenWidth"] = Screen.width;
+                        _qualifiedUiObservation["screenHeight"] = Screen.height;
+                        _qualifiedUiObservation["captures"] = new JArray();
+                        _qualifiedUiObservation["dispatch"] = "temporary-plan-copies-and-Undo;no-os-input;no-Apply";
+                        _qualifiedUiObservation["visualReview"] = "NOT_REVIEWED";
+                        _qualifiedUiRunsBefore = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
+                        _qualifiedUiOpened = !BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                        if (_qualifiedUiOpened) BuffPlannerUiRoot.HandlePlannerHotkey();
+                        _qualifiedUiStep = 1;
+                        _qualifiedUiClock.Restart();
+                        return false;
+                    case 1:
+                        if (_qualifiedUiClock.ElapsedMilliseconds < 1500) return false;
+                        if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen || view == null)
+                            throw new InvalidOperationException("Post-qualification planner did not open.");
+                        CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                        CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+                        _qualifiedUiSession = session;
+                        _qualifiedUiDocument = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                        _qualifiedUiObservation["documentBefore"] = _qualifiedUiDocument;
+                        foreach (PlannedCasting casting in _qualificationRecord.Selection.Castings)
+                        {
+                            if (session.Document.Castings.Any(value => value.CastingId == casting.CastingId)) continue;
+                            AuthoringEditResult added = session.AddCastingForRuntime(casting);
+                            if (!added.Applied) throw new InvalidOperationException("Active probe plan copy refused: " + added.Reason);
+                            _qualifiedUiEdits++;
+                        }
+                        session.SelectGraphBuff(_qualificationRecord.Selection.SourceId, inputs);
+                        CastingGraphView graph = session.BuildGraph(inputs);
+                        string first = graph.Castings.Select(value => value.CastingId).FirstOrDefault();
+                        if (first != null) session.FocusGraphCasting(first);
+                        view.RefreshView();
+                        _qualifiedUiObservation["temporaryCopies"] = _qualifiedUiEdits;
+                        _qualifiedUiStep = 2;
+                        _qualifiedUiClock.Restart();
+                        return false;
+                    case 2:
+                        if (_qualifiedUiClock.ElapsedMilliseconds < 1500) return false;
+                        _qualifiedUiObservation["castings"] = JArray.FromObject(view.LastGraphForRuntime.Castings
+                            .Select(value => new { value.CastingId, value.CasterUnitId, value.TargetUnitId,
+                                value.StatusLabel, value.Readiness, value.SourceProviderKey }).ToArray());
+                        _qualifiedUiObservation["visibleLabels"] = JArray.FromObject(view.VisibleLabelsForRuntime());
+                        _qualifiedUiObservation["nativeGameLogLines"] = JArray.FromObject(NativeUiFacts.GameLogMessages()
+                            .Where(line => line.IndexOf("Buff Planner:", StringComparison.Ordinal) >= 0).ToArray());
+                        RequestQualifiedUiCapture("nui-qualified-active.png");
+                        _qualifiedUiStep = 3;
+                        return false;
+                    case 3:
+                        string recastId = _qualificationRecord.Selection.Castings[0].CastingId;
+                        _qualifiedUiSession.FocusGraphCasting(recastId);
+                        if (_qualifiedUiSession.Document.Castings.First(value => value.CastingId == recastId)
+                            .ExistingEffectPolicy != ExistingEffectPolicy.Overwrite)
+                        {
+                            AuthoringEditResult edited = _qualifiedUiSession.SetFocusedRecastPolicy(ExistingEffectPolicy.Overwrite);
+                            if (!edited.Applied) throw new InvalidOperationException("Active probe recast edit refused: " + edited.Reason);
+                            _qualifiedUiEdits++;
+                        }
+                        view.RefreshView();
+                        _qualifiedUiStep = 8;
+                        _qualifiedUiClock.Restart();
+                        return false;
+                    case 8:
+                        if (_qualifiedUiClock.ElapsedMilliseconds < 1500) return false;
+                        _qualifiedUiObservation["recastLabels"] = JArray.FromObject(view.VisibleLabelsForRuntime());
+                        _qualifiedUiObservation["temporaryEdits"] = _qualifiedUiEdits;
+                        RequestQualifiedUiCapture("nui-qualified-recast.png");
+                        _qualifiedUiStep = 9;
+                        return false;
+                    case 9:
+                        _qualifiedUiHovered = view.RootObject.GetComponentsInChildren<Button>(false)
+                            .Where(button => button.name.StartsWith("Casting.", StringComparison.Ordinal) &&
+                                button.IsInteractable()).Select(button => button.gameObject).FirstOrDefault();
+                        if (_qualifiedUiHovered != null)
+                            Pointer(_qualifiedUiHovered, ExecuteEvents.pointerEnterHandler);
+                        _qualifiedUiObservation["hoverDispatch"] = "Unity-pointer-callback;no-os-input";
+                        _qualifiedUiObservation["hoveredCard"] = _qualifiedUiHovered == null ? null : _qualifiedUiHovered.name;
+                        _qualifiedUiStep = 4;
+                        _qualifiedUiClock.Restart();
+                        return false;
+                    case 4:
+                        if (_qualifiedUiClock.ElapsedMilliseconds < 800) return false;
+                        _qualifiedUiObservation["hoverTargetStillPresentAtRequest"] = _qualifiedUiHovered != null &&
+                            _qualifiedUiHovered.activeInHierarchy;
+                        RequestQualifiedUiCapture("nui-qualified-active-hover.png");
+                        _qualifiedUiStep = 5;
+                        return false;
+                    case 5:
+                        RestoreQualifiedUiPlan();
+                        _qualifiedUiObservation["documentAfter"] = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                        _qualifiedUiObservation["originalRootPlanRestored"] = !string.IsNullOrEmpty(_qualifiedUiDocument) &&
+                            _qualifiedUiDocument == BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                        _qualifiedUiObservation["runsBefore"] = _qualifiedUiRunsBefore;
+                        _qualifiedUiObservation["runsAfter"] = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
+                        _qualifiedUiObservation["noAdditionalRun"] =
+                            _qualifiedUiRunsBefore == BuffPlannerUiRoot.CastingRunsStartedForRuntime;
+                        if (!(bool)_qualifiedUiObservation["originalRootPlanRestored"] ||
+                            !(bool)_qualifiedUiObservation["noAdditionalRun"])
+                            throw new InvalidOperationException("The active probe did not restore the original root plan or started a run.");
+                        ReleaseQualifiedUiWindow();
+                        _qualifiedUiStep = 6;
+                        _qualifiedUiClock.Restart();
+                        return false;
+                    case 6:
+                        if (_qualifiedUiClock.ElapsedMilliseconds < 800) return false;
+                        _qualifiedUiObservation["leaseReleased"] =
+                            !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
+                        if (!(bool)_qualifiedUiObservation["leaseReleased"])
+                            throw new InvalidOperationException("Active probe did not release its input lease.");
+                        WriteQualifiedUiObservation(null);
+                        _qualifiedUiStep = 10;
+                        return true;
+                    default: return true;
+                }
+            }
+            catch (Exception exception)
+            {
+                _qualificationRecord.Failures.Add("native-ui-active-observation:" + exception.Message);
+                try { ReleaseQualifiedUiWindow(); }
+                finally { WriteQualifiedUiObservation(exception.Message); }
+                _qualifiedUiStep = 10;
+                return true;
+            }
+        }
+
+        private void RequestQualifiedUiCapture(string name)
+        {
+            string path = Path.Combine(_request.EvidenceDirectory, name);
+            _qualifiedUiCapture = new NativeUiCaptureBoundary(path, Time.frameCount,
+                WorkspaceEngineCaptureWaitMilliseconds);
+            _qualifiedUiCaptureClock.Restart();
+            CaptureScreenshot(path);
+        }
+
+        private void RestoreQualifiedUiPlan()
+        {
+            while (_qualifiedUiEdits > 0)
+            {
+                if (_qualifiedUiSession == null || !_qualifiedUiSession.Undo())
+                    throw new InvalidOperationException("Active probe Undo did not restore its owned edit.");
+                _qualifiedUiEdits--;
+            }
+        }
+
+        private void ReleaseQualifiedUiWindow()
+        {
+            try { RestoreQualifiedUiPlan(); }
+            finally
+            {
+                if (_qualifiedUiHovered != null) Pointer(_qualifiedUiHovered, ExecuteEvents.pointerExitHandler);
+                _qualifiedUiHovered = null;
+                if (_qualifiedUiOpened && BuffPlannerUiRoot.IsCastingWorkspaceOpen) CloseProbeWorkspace();
+                _qualifiedUiOpened = false;
+            }
+        }
+
+        private void WriteQualifiedUiObservation(string failure)
+        {
+            _qualifiedUiObservation["captureFailure"] = failure;
+            _qualifiedUiObservation["capturePending"] = _qualifiedUiCapture == null ? null
+                : Path.GetFileName(_qualifiedUiCapture.Path);
+            // No label or screenshot proves physical input or actual execution.
+            // Active labels are judged with the native reads and visual review.
+            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "native-ui-active.json"),
+                _qualifiedUiObservation.ToString(Formatting.Indented) + Environment.NewLine);
         }
 
         // ---- helpers ------------------------------------------------------
