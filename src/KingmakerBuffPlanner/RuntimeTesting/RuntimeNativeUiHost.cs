@@ -13,6 +13,7 @@ using Kingmaker.UI.Constructor;
 using Kingmaker.UI.Selection;
 using Kingmaker.UI.ServiceWindow;
 using Kingmaker.UI.Tooltip;
+using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.UI;
 using Newtonsoft.Json;
@@ -51,6 +52,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private FileStream _nativeUiPlanLock;
         private bool _nativeUiEscapePopupClosed;
         private bool _nativeUiEscapeOpenAfterFirst;
+        private List<Func<string>> _nativeUiPlanning;
+        private List<string> _nativeUiPlanningNames;
+        private int _nativeUiPlanningIndex;
+        private string _nativeUiPlanningStart;
         private string _nativeUiDocumentBeforeFault;
         private readonly List<string> _nativeUiRoutes = new List<string>();
 
@@ -451,6 +456,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         live.FooterSaveState == "saved";
                     if (live != null) live.ClearGraphFocus();
                     if (view != null) view.RefreshView();
+                    BuildPlanningScript();
+                    NativeUiNext(20);
+                    return false;
+                }
+                case 20:
+                {
+                    // Case C: one planning click per step, at a player's pace.
+                    if (!NativeUiWaited(350)) return false;
+                    if (_nativeUiPlanning != null && _nativeUiPlanningIndex < _nativeUiPlanning.Count)
+                    {
+                        string name = _nativeUiPlanningNames[_nativeUiPlanningIndex];
+                        string failure;
+                        try { failure = _nativeUiPlanning[_nativeUiPlanningIndex](); }
+                        catch (Exception exception) { failure = "threw:" + exception.GetType().Name + ":" + exception.Message; }
+                        _nativeUi.PlanningSteps.Add(name + ":" + (failure ?? "ok"));
+                        if (name == "add") NativeUiCapture("nui-planning-added.png");
+                        _nativeUiPlanningIndex++;
+                        if (failure == null) { NativeUiNext(20); return false; }
+                    }
+                    _nativeUi.PlanningRestored = _nativeUiPlanningStart != null &&
+                        BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime == _nativeUiPlanningStart;
+                    CastingWorkspaceSession after = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                    if (after != null) after.ClearGraphFocus();
+                    if (view != null) view.RefreshView();
                     _nativeUiRoutes.Clear();
                     _nativeUiRoutes.AddRange(NativeUiSwitchRoutes);
                     _nativeUiSwitchIndex = 0;
@@ -608,6 +637,91 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     return FinishNativeUi(null);
                 }
             }
+        }
+
+        // Case C: the planning clicks, each a named control's own click
+        // callback (as BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime
+        // delivers it), each checked against the plan it should leave.
+        private void BuildPlanningScript()
+        {
+            _nativeUiPlanning = new List<Func<string>>();
+            _nativeUiPlanningNames = new List<string>();
+            _nativeUiPlanningIndex = 0;
+            _nativeUiPlanningStart = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+            CastingWorkspaceSession live = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+            CastingGraphView graph = live == null ? null
+                : live.BuildGraph(BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime());
+            if (graph == null || graph.Castings.Count == 0)
+            {
+                _nativeUi.AddNote("planning:no-castings");
+                return;
+            }
+            CastingGraphCasting first = graph.Castings[0];
+            string originalTarget = first.TargetUnitId;
+            CastingGraphTargetNode free = graph.Targets.FirstOrDefault(value => value.CastingIds.Count == 0 &&
+                graph.Castings.All(casting => casting.TargetUnitId != value.UnitId));
+            CastingGraphCasterNode other = graph.Casters.FirstOrDefault(value => !value.IsUnresolved &&
+                value.UnitId != first.CasterUnitId && value.Sources.Count != 0);
+            CastingGraphCasterNode own = graph.Casters.FirstOrDefault(value => value.UnitId == first.CasterUnitId);
+            if (free == null || other == null || own == null)
+            {
+                _nativeUi.AddNote("planning:fixture-shape;free=" + (free != null) + ";other=" + (other != null));
+                return;
+            }
+            int startCount = live.Document.Castings.Count;
+            string id = first.CastingId;
+            string added = null;
+            Func<string, PlannedCasting> planned = value => BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime()
+                .Document.Castings.FirstOrDefault(item => item.CastingId == value);
+            Func<string, string> click = name =>
+            {
+                string result = BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime(name);
+                return result == "invoked" ? null : name + "=" + result;
+            };
+            Action<string, Func<string>> step = (name, body) =>
+            {
+                _nativeUiPlanningNames.Add(name);
+                _nativeUiPlanning.Add(body);
+            };
+            step("focus", () => click("Casting." + id) ??
+                (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().EditingFocusCastingId == id ? null : "not-focused"));
+            step("retarget", () => click("Target." + free.UnitId) ??
+                (planned(id).DirectTargetUnitId == free.UnitId ? null : "target=" + planned(id).DirectTargetUnitId));
+            step("undo-retarget", () => click("Undo") ??
+                (planned(id).DirectTargetUnitId == originalTarget ? null : "target=" + planned(id).DirectTargetUnitId));
+            int order = 0;
+            step("cast-later", () =>
+            {
+                order = planned(id).Order;
+                return click("Casting." + id) ?? click("FocusedOrder.Later") ??
+                    (planned(id).Order == order + 1 ? null : "order=" + planned(id).Order + "<-" + order);
+            });
+            step("undo-order", () => click("Undo") ?? (planned(id).Order == order ? null : "order=" + planned(id).Order));
+            step("done", () => click("DoneEditing") ??
+                (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().EditingFocusCastingId == null ? null : "still-focused"));
+            step("choose-source", () => click("Caster." + other.UnitId) ?? click("Provider." + other.UnitId + ".0"));
+            step("add", () =>
+            {
+                string failure = click("Target." + free.UnitId);
+                if (failure != null) return failure;
+                CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                if (session.Document.Castings.Count != startCount + 1) return "count=" + session.Document.Castings.Count;
+                added = session.EditingFocusCastingId;
+                PlannedCasting created = added == null ? null : planned(added);
+                return created != null && created.CasterUnitId == other.UnitId && created.DirectTargetUnitId == free.UnitId
+                    ? null : "added=" + (created == null ? "none" : created.CasterUnitId + ">" + created.DirectTargetUnitId);
+            });
+            step("change-caster", () => click("Provider." + own.UnitId + ".0") ??
+                (added != null && planned(added).CasterUnitId == own.UnitId ? null : "caster=" +
+                    (added == null ? "none" : planned(added).CasterUnitId)));
+            step("undo-caster", () => click("Undo") ??
+                (added != null && planned(added).CasterUnitId == other.UnitId ? null : "caster-not-restored"));
+            step("remove", () => (added == null ? "no-added" : click("Casting." + added)) ?? click("Target." + free.UnitId) ??
+                (added != null && planned(added) == null ? null : "not-removed"));
+            step("undo-remove", () => click("Undo") ?? (added != null && planned(added) != null ? null : "not-restored"));
+            step("undo-add", () => click("Undo") ??
+                (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().Document.Castings.Count == startCount
+                    ? null : "count=" + BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().Document.Castings.Count));
         }
 
         private void ReleaseNativeUiPlanLock()

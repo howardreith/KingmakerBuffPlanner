@@ -415,6 +415,10 @@ namespace KingmakerBuffPlanner.Tests
             record.SaveFailureShown = true;
             record.SaveRecoveryWorked = true;
             record.SaveFailureUndoRestored = true;
+            record.PlanningSteps.AddRange(new[] { "focus:ok", "retarget:ok", "undo-retarget:ok", "cast-later:ok",
+                "undo-order:ok", "done:ok", "choose-source:ok", "add:ok", "change-caster:ok", "undo-caster:ok",
+                "remove:ok", "undo-remove:ok", "undo-add:ok" });
+            record.PlanningRestored = true;
             record.EscapeClosedFocusFirst = true;
             record.EscapeClosedPlannerLast = true;
             record.LeaseReleasedAtEnd = true;
@@ -454,6 +458,8 @@ namespace KingmakerBuffPlanner.Tests
                 { "save-failure-not-shown:none", r => r.SaveFailureShown = false },
                 { "save-recovery-failed", r => r.SaveRecoveryWorked = false },
                 { "save-failure-undo", r => r.SaveFailureUndoRestored = false },
+                { "planning:retarget:target=unit-1", r => r.PlanningSteps[1] = "retarget:target=unit-1" },
+                { "planning-not-restored", r => r.PlanningRestored = false },
                 { "escape-order", r => r.EscapeClosedFocusFirst = false },
                 { "game-log-planner-lines:2", r => r.GameLogPlannerLines.Add("Buff Planner: again") }
             };

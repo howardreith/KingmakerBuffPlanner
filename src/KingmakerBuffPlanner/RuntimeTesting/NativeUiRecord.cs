@@ -125,6 +125,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool SaveFailureShown { get; set; }
         public bool SaveRecoveryWorked { get; set; }
         public bool SaveFailureUndoRestored { get; set; }
+        // Case C: the redesigned controls drive the plan as clicks do -
+        // retarget, reorder, add, change caster, remove - each undone, and
+        // the plan ends exactly where it started.
+        public List<string> PlanningSteps { get; set; } = new List<string>();
+        public bool PlanningRestored { get; set; }
         public int RunsStarted { get; set; }
 
         public void AddNote(string note)
@@ -226,6 +231,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!SaveFailureShown) yield return "save-failure-not-shown:" + (SaveFailureFooter ?? "none");
             if (!SaveRecoveryWorked) yield return "save-recovery-failed";
             if (!SaveFailureUndoRestored) yield return "save-failure-undo";
+            foreach (string step in PlanningSteps.Where(value => !value.EndsWith(":ok", StringComparison.Ordinal)))
+                yield return "planning:" + step;
+            if (PlanningSteps.Count < 10) yield return "planning-steps:" + PlanningSteps.Count;
+            if (!PlanningRestored) yield return "planning-not-restored";
             if (!EscapeClosedFocusFirst || !EscapeClosedPlannerLast) yield return "escape-order";
             if (!LeaseReleasedAtEnd || FullScreenModeAtEnd) yield return "end-state";
             // UI-08: one concise refusal line in the native game log.
