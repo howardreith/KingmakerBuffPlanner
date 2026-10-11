@@ -408,7 +408,7 @@ namespace KingmakerBuffPlanner.Tests
             record.PlannerDocumentAfterPopup = "doc";
             record.PlannerTitle = "Buff Planner";
             record.PlannerVisibleLabels.AddRange(new[] { "Buff Planner", "Caster & source", "Castings", "Recipients" });
-            foreach (string route in new[] { "inventory", "character", "spellbook" })
+            foreach (string route in new[] { "inventory", "character", "spellbook", "key:OpenInventory" })
                 record.Switches.Add(new NativeUiWindowSwitch
                 {
                     Route = route, PlannerOpenBefore = true, NativeShownAfter = true,
@@ -465,6 +465,9 @@ namespace KingmakerBuffPlanner.Tests
                 { "switch:character:native-lost-full-screen-mode", r => r.Switches[1].FullScreenModeWhileNative = false },
                 { "switch:spellbook:pause-changed", r => r.Switches[2].PausedAfterClose = true },
                 { "switch:inventory:selection-not-kept", r => r.Switches[0].SelectedSourceAfterReopen = "other" },
+                { "switch:key:OpenInventory:planner-stayed", r => r.Switches[3].PlannerOpenAfter = true },
+                { "switch-no-key-route", r => r.Switches.RemoveAt(3) },
+                { "switch-no-hud-route", r => r.Switches.RemoveRange(0, 3) },
                 { "search-focus-native-bindings", r => r.SearchFocusSuppressesNativeBindings = false },
                 { "save-failure-not-shown:none", r => r.SaveFailureShown = false },
                 { "save-recovery-failed", r => r.SaveRecoveryWorked = false },

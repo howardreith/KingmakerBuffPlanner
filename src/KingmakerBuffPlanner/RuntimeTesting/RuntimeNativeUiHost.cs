@@ -37,7 +37,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
     {
         private const int NativeUiPrePhase = 150;
         private const int NativeUiOpenPhase = 151;
-        private static readonly string[] NativeUiSwitchRoutes = { "inventory", "character", "spellbook" };
+        // The HUD buttons' service-window routes, then the same windows and
+        // the journal by their key bindings (as the player has them bound).
+        private static readonly string[] NativeUiSwitchRoutes =
+        {
+            "inventory", "character", "spellbook",
+            "key:OpenInventory", "key:OpenChracterScreen", "key:OpenSpells", "key:OpenJournal"
+        };
         // UI-01: one spell read in both presenters - the planner's authored
         // buff and the same spell's row in the first caster's book.
         private const string NativeUiComparisonSpell = "Resistance";
@@ -1107,8 +1113,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             KeyboardAccess keyboard = Game.Instance == null ? null : Game.Instance.Keyboard;
             if (keyboard == null) return "keyboard-missing";
-            KeyboardAccess.Binding binding = keyboard.GetBindingByName(name);
-            if (binding == null) return "binding-missing:" + name;
+            // A key press reaches the callback of the name's binding for the
+            // current game mode (KeyboardAccess.Tick); GetBindingByName
+            // returns only the name's first binding, whatever its mode.
+            FieldInfo field = typeof(KeyboardAccess).GetField("m_Bindings",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var bindings = field == null ? null : field.GetValue(keyboard) as System.Collections.IEnumerable;
+            if (bindings == null) return "bindings-missing";
+            GameModeType mode = Game.Instance.CurrentMode;
+            KeyboardAccess.Binding binding = bindings.OfType<KeyboardAccess.Binding>()
+                .FirstOrDefault(value => value.Name == name && value.GameMode == mode);
+            if (binding == null) return "binding-missing:" + name + ":" + mode;
             MethodInfo invoke = typeof(KeyboardAccess).GetMethod("OnCallbackByBinding",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             if (invoke == null) return "callback-route-missing";

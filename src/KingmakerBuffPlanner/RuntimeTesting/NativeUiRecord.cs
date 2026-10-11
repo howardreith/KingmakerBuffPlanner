@@ -215,6 +215,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             // UI-02: a native window takes over from the planner and leaves
             // nothing behind; the planner comes back as it was.
             if (Switches.Count < 3) yield return "switch-cases:" + Switches.Count;
+            // Both entries: a HUD button's route and a key binding's.
+            if (!Switches.Any(item => item.Route != null && item.Route.StartsWith("key:", StringComparison.Ordinal)))
+                yield return "switch-no-key-route";
+            if (Switches.All(item => item.Route != null && item.Route.StartsWith("key:", StringComparison.Ordinal)))
+                yield return "switch-no-hud-route";
             foreach (NativeUiWindowSwitch item in Switches)
             {
                 string label = "switch:" + item.Route + ":";
