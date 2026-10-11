@@ -1,6 +1,6 @@
-# Buff Planner: player guide (0.4.3)
+# Buff Planner: player guide (0.5.0)
 
-This guide describes the casting-first planner of 0.4.3. It is
+This guide describes the casting-first planner of 0.5.0. It is
 the only normal planner: there is
 no Save button, no Accept Plan step and no Classic switch in the planner.
 "What has been checked in the game" at the end says exactly which parts a
@@ -10,7 +10,16 @@ guarded in-game run has observed at this build, and which have not.
 
 - **Ctrl+Shift+B**, or the HUD's **Setup (gear)** button, opens the
   planner. The mod's page in Unity Mod Manager (Ctrl+F10) is a normal entry
-  point too and names both.
+  point too and names both. The four HUD buttons are a row of the game's own
+  button panel, above its first four columns (0.5.0).
+- In the spellbook, **BUFF PLANNER** beside **METAMAGIC** closes the
+  spellbook and opens the planner. It is there for every character,
+  including one who cannot cast or has no Metamagic (0.5.0).
+- The planner is one of the game's windows (0.5.0): opening the inventory,
+  the character sheet, the spellbook or another game window - by its key,
+  its HUD button or its tab - closes the planner and shows that window.
+  Reopening the planner returns to the same buff and plan. Typing in the
+  planner's search never triggers the game's keys.
 - A game that still uses the Classic planner (chosen in an earlier version)
   keeps it until you choose **Switch to the casting-first planner** on the
   mod's settings page. The switch is one way: there is no route back to
@@ -61,9 +70,18 @@ expanded, merged or substituted behind your back.
    With nothing selected, a portrait that already has a casting of this buff
    selects that casting instead of adding a second one, and **Done** (or
    Escape) clears the selection.
-5. The panel on the right shows the selected casting's status and reasons,
-   its target or group centre, enhancements, routine and order, **If the
-   buff is already there** (skip, or cast it again anyway) and **Remove**.
+5. The **Casting options** panel on the right (0.5.0) shows, in order:
+   **Done**; who casts it on whom ("Linzi » Hedwirg") and from which
+   source; its state ("Ready", "Active · Will skip", "Active · Will
+   recast", or why it is not ready); **Recast if active**; its
+   **Enhancements**, each with what it does, its source and what is left
+   (one that cannot be used says why); what it spends ("If cast" when the
+   run will skip it, because it spends nothing then) with **Resource
+   details**; **Cast earlier** / **Cast later**; and **Remove casting**.
+   With nothing selected it shows **New casting**: only the next step, and
+   **Recast if active** for the castings you add next. To move a casting to
+   another routine, select that routine above, add it there and remove the
+   old one.
    There is no Disable or Duplicate any more: remove a casting you do not
    want. A casting an earlier version left **Disabled** still loads, is
    never cast, blocks nothing, and can be removed.
@@ -132,22 +150,18 @@ Another prepared copy of the spell keeps its castings.
 ## Reading a spell's full description
 
 Right-click a buff in the list, the selected buff's header, or a casting
-card: the game's own full description of that exact spell opens as a spell
-scroll, with the spell's name, a line with its duration (and whether you
-are reading the exact source you selected), and the description below.
-Long descriptions scroll with the mouse wheel; the wheel never moves the
-planner behind the scroll. **Escape** closes the description first, then
-the planner; the planner's Escape never opens the game's own menu.
+card: the game's own spell description window opens over the planner, the
+same window the spellbook opens (0.5.0). A casting shows its caster's own
+spell; a buff with no caster and source chosen shows the base spell. Long
+descriptions scroll in the window. **Escape** (or the window's close
+button) closes it first, then the selected casting, then the planner; the
+planner's Escape never opens the game's own menu. Reading descriptions
+never changes the plan.
 
-Clicking anywhere outside the scroll (on the dimmed planner) also closes
-the description, and that click does nothing else: it does not select,
-add or change anything underneath, and never reaches the game. To read
-another spell, right-click it once the description has closed. Reading
-descriptions never changes the plan.
-
-When the game's own parchment can be borrowed, the planner and the scroll
-are drawn on it; otherwise they keep the plain parchment colour. Both look
-and work the same way.
+The planner is drawn with the game's own fonts, paper, frames, buttons and
+checkboxes, borrowed from the running game (no game art ships with the
+mod); if any of them cannot be found, the planner falls back to the
+earlier look for that part.
 
 ## Running a routine
 
@@ -173,15 +187,26 @@ and work the same way.
   shows it with the reason. Choose **Animated** to cast it with the game's
   normal casting. The old "animate buffs that cannot be instant" checkbox is
   gone.
-- **Already active.** "Skip if already active" (the default) skips a
-  casting only when its recipient already has an effect at least as good;
-  a weaker or expiring effect is recast, and the card says why.
+- **Already active.** With **Recast if active** unticked (the default) a
+  casting is skipped only when its recipient already has an effect at least
+  as good (the card says "Active · Will skip"); a weaker or expiring effect
+  is recast ("Active · Will recast"), and so is any casting with **Recast
+  if active** ticked.
 - **Stopping.** Press the running routine's HUD button again: the cast in
   progress finishes and nothing after it starts. Changing area, disabling
   the mod or closing the game stop a run at once.
-- **Results.** The footer shows the last run (casts confirmed, skipped,
-  omitted, a failed cast and why, resources spent). The full per-casting
-  record is in the Unity Mod Manager log (`[KBP-CF-RUN]`).
+- **Results (0.5.0).** Each run adds one line to the game's own log, for
+  example "Buff Planner: Long done - 3 of 3 cast, 1 already active.";
+  hover the line for the full result. A HUD press that is refused while the
+  planner is closed is logged the same way; a refusal you resolve in the
+  planner opens it on that routine with the reason. The game still logs
+  each cast itself. The full per-casting record is in the Unity Mod Manager
+  log (`[KBP-CF-RUN]`).
+- **The footer (0.5.0)** shows the save state, one line saying what **Run**
+  will do now or exactly why it cannot (for example "Long cannot run: 1
+  casting is not ready (marked in red)."), and **Resources**, **Mode**,
+  **Undo** and **Run**. **Resources** opens the accounting: the selected
+  routine on its own, and the whole plan run without rest in routine order.
 
 ## Files
 
@@ -202,13 +227,31 @@ it is resolved.
 
 Install archive-first: back up the whole `Mods\KingmakerBuffPlanner` folder
 (including `UserSettings`) outside the `Mods` folder before replacing it,
-then confirm Unity Mod Manager lists version 0.4.3 (its log line
-`[KBP-BOOT] Main.Load exited;version=0.4.3;commit=<commit>` names the
+then confirm Unity Mod Manager lists version 0.5.0 (its log line
+`[KBP-BOOT] Main.Load exited;version=0.5.0;commit=<commit>` names the
 release commit). To roll back, copy the new `UserSettings` outside `Mods`,
 delete the new folder and copy your backup back. The release notes give the
 exact steps and the package checksum.
 
 ## What has been checked in the game
+
+0.5.0 (guarded runs `kbpnui-*` on 2026-10-10/11 on the disposable automation
+campaign only, at the session display (1920x1200, later 1920x1080) and at
+1280x720; full record with run ids, builds and captures in
+`docs/QUALIFICATION.md`):
+
+| What | Checked in the game |
+| --- | --- |
+| HUD row and frame | Yes: four cells on the native panel's first four columns, the frame enclosing them, the old rail hidden; idle and hover use the game's own cell art; tooltips unchanged |
+| Spellbook pair | Yes: METAMAGIC and BUFF PLANNER at one height and baseline for two casters; BUFF PLANNER alone for a character who cannot cast; it opens the planner |
+| Spell description | Yes: the game's own window from a right-click, drawn above the planner; Escape closes it, then the selection, then the planner; the plan unchanged |
+| Other windows | Yes: the inventory, character sheet and spellbook each closed the planner and showed; pause and selection unchanged; reopening kept the buff |
+| Typing in the search | Yes: with the search focused, the game's own key handler stands down |
+| Save failure | Yes: a plan file held by another program showed "Not saved" with Retry save; Retry save saved; Undo restored the plan |
+| Planning | Yes, without moving the mouse: select, move, Cast later, Done, add, change caster and remove, each undone; the plan ended exactly as it started |
+| Game log | Yes: a refused Long press added one line; the routines of the guarded casting run added their result lines |
+| Physical mouse and keyboard | No: the checks press the same controls without moving the mouse or pressing keys |
+| Remapped keys, prepared casters, pets, metamagic variants | No |
 
 0.4.3 (the owner-accepted 0.4.2 build `7a0842f` - 0.4.3 adds only the version
 number and documentation - guarded runs `kbp042-*` on 2026-10-09/10, disposable

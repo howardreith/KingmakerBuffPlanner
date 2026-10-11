@@ -981,6 +981,15 @@ namespace KingmakerBuffPlanner.UI
                 rect.pivot = new Vector2(0.5f, 1f);
                 rect.sizeDelta = new Vector2(-2f, 28f);
                 rect.anchoredPosition = new Vector2(0f, -58f);
+                // Four tabs share the lane: on a small screen the caption
+                // shrinks (never overlapping its neighbour) and keeps thin
+                // margins (kbpnui-qual-720-01).
+                TMP_Text caption = tab.GetComponentInChildren<TMP_Text>(true);
+                if (caption != null)
+                {
+                    caption.fontSizeMin = 8f;
+                    KingmakerUiFactory.Stretch(caption.rectTransform, 3f, 3f, 2f, 2f);
+                }
                 _categoryTabs[captured] = tab;
             }
             ScrollRect scroll = KingmakerUiFactory.CreateScrollView("Scroll", lane, _theme,
@@ -1347,7 +1356,7 @@ namespace KingmakerBuffPlanner.UI
                     entry.Selected ? PlannerTextRole.Strong : PlannerTextRole.Body, 16f, TextAlignmentOptions.TopLeft);
                 if (entry.Selected) name.color = PlannerNativeKit.Burgundy;
                 name.enableAutoSizing = true;
-                name.fontSizeMin = 12f;
+                name.fontSizeMin = 11f;
                 name.fontSizeMax = 16f;
                 name.overflowMode = TextOverflowModes.Ellipsis;
                 KingmakerUiFactory.Stretch(name.rectTransform, 54f, 8f, count.Length == 0 ? 5f : 20f, 6f);

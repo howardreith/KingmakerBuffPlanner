@@ -5468,6 +5468,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     { "scenario", _request.Scenario },
                     { "castingScenario", record.CastingScenario },
                     { "allowanceStatus", record.AllowanceStatus },
+                    // Native UI finish (UI-08): the lines the runs added to the
+                    // game's own log (read-only evidence).
+                    { "gameLogPlannerLines", new JArray(NativeUiFacts.GameLogMessages()
+                        .Where(line => line != null && line.StartsWith("Buff Planner:", StringComparison.Ordinal))
+                        .Cast<object>().ToArray()) },
                     { "terminalReason", record.TerminalReason },
                     { "exhaustedAccepted", record.ExhaustedAccepted.HasValue
                         ? (JToken)record.ExhaustedAccepted.Value : JValue.CreateNull() },

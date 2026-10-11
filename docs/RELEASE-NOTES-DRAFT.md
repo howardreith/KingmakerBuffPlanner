@@ -1,4 +1,85 @@
-# Kingmaker Buff Planner 0.4.3
+# Kingmaker Buff Planner 0.5.0
+
+0.5.0 makes the planner look and behave like one of the game's own windows.
+The planning model, routines, saved plans, Undo, resource accounting,
+enhancements and the HUD buttons' icons, order, actions and tooltips are
+unchanged.
+
+## What changed
+
+- **HUD.** The four buttons (gear, moon, diamond, sun) are a third row of
+  the game's own button panel, directly above its first four columns. The
+  panel's frame rises over them and steps down after the fourth. Each button
+  is the game's own button art with its symbol engraved in the game's gold,
+  and it lights up on hover like its neighbours.
+- **Spellbook.** **BUFF PLANNER** now sits beside **METAMAGIC** in the
+  spellbook's footer, as the same kind of button. It is there for every
+  character, including one without Metamagic. The old button at the window's
+  top right is gone.
+- **Spell descriptions.** Right-click a buff, the selected buff's header or a
+  casting card to open the game's own spell description window, the one the
+  spellbook opens. A casting shows its caster's own spell; an entry with no
+  caster chosen shows the base spell. **Escape** closes it first.
+- **Other windows.** Opening the inventory, character sheet, spellbook or
+  another game window (by its key, its HUD button or its tab) closes the
+  planner and shows that window. Reopening the planner brings back the same
+  buff and plan. Typing in the planner's search never triggers the game's
+  keys.
+- **Game look.** All planner text uses the game's own fonts, with its
+  ornamented title, small-capital headings and button captions. Buffs,
+  sources, castings and recipients sit on paper slips with thin frames and
+  framed portraits; the selected one is marked in burgundy. Scrollbars,
+  rules, buttons and checkboxes are the game's own.
+- **Shorter wording.** The title is just "Buff Planner"; the columns are
+  **Caster & source**, **Castings** and **Recipients**. A casting card
+  shows its state in a few words, for example "Active · Will skip" or
+  "Active · Will recast". A buff shows a count only when it has castings.
+  Recipient portraits say what a click does ("Click to add a casting",
+  "Click again to remove #1").
+- **Casting options.** The panel on the right follows one order: **Done**,
+  who casts on whom and from which source, the state, **Recast if active**,
+  **Enhancements**, the casting's resources ("If cast" when the run will
+  skip it), Cast earlier / Cast later, and **Remove casting**. While adding,
+  it shows only the next step and the default for new castings. Moving a
+  casting to another routine is no longer in this panel: select that routine
+  and add it there.
+- **Footer and game log.** The footer shows the save state, one line saying
+  what **Run** will do or exactly why it cannot, and **Resources**, **Mode**,
+  **Undo** and **Run**. **Resources** opens the full accounting: the
+  selected routine on its own and the whole plan without rest. Each run, and
+  each refused HUD press, now adds one line to the game's own log, for
+  example "Buff Planner: Long done - 3 of 3 cast, 1 already active."
+  Hovering the line shows the full result. The game still logs each cast
+  itself.
+
+## Upgrading
+
+Back up the whole `Mods\KingmakerBuffPlanner` folder (with `UserSettings`)
+outside `Mods` before installing. 0.4.3 plans load unchanged. To roll back,
+restore the backup.
+
+## Checked in the game, and not
+
+The automated in-game checks use the disposable automation campaign only.
+The exact runs, builds and results are in `docs/QUALIFICATION.md`.
+
+- **Checked:** the HUD row and frame, idle and hover; the spellbook pair for
+  two casters and a character who cannot cast; the game's description window
+  from the planner and its Escape order; switching to the inventory,
+  character sheet and spellbook and back; typing in the search not
+  triggering game keys; a failed save shown with **Retry save** and then
+  saved; adding, moving, reordering, changing the caster and removing
+  castings, each with Undo; a refused HUD press and the routines of a
+  guarded casting run in the game log; the planner, HUD and spellbook again
+  at 1280x720.
+- **Not checked:** physical mouse and keyboard input (the checks press the
+  same controls without moving the mouse); remapped keys; very long buff
+  names in a crowded party; prepared casters, pets and metamagic variants
+  (the test party has none).
+
+---
+
+# Kingmaker Buff Planner 0.4.3 (published)
 
 0.4.3 is the published release of the owner-accepted 0.4.2 build (commit
 `7a0842f`, including the fixes from its review), with the version advanced so

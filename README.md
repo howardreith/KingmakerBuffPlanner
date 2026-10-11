@@ -1,13 +1,14 @@
 # Kingmaker Buff Planner
 
-**Release:** `0.4.3` — the casting-first planner: plan every cast explicitly (caster,
+**Release:** `0.5.0` — the casting-first planner: plan every cast explicitly (caster,
 exact spell source, target, enhancements) and edit castings directly in the
 graph, with autosave and one-click Long / Important / Short routines from the
 HUD that never run in combat. See the
 [release notes](docs/RELEASE-NOTES-DRAFT.md) and the
-[player guide](docs/CASTING-FIRST-PLAYER-GUIDE.md). 0.4.3 adds Shadow Clone to
-the catalogue, retires castings of spells removed from a spellbook, and draws
-the planner on the game's own aged paper with its opening sound.
+[player guide](docs/CASTING-FIRST-PLAYER-GUIDE.md). 0.5.0 makes the planner
+one of the game's own windows: its fonts, paper and controls, the game's spell
+description window, the HUD buttons inside the game's button panel, BUFF
+PLANNER beside METAMAGIC in the spellbook, and run results in the game log.
 
 Kingmaker Buff Planner is a standalone Unity Mod Manager mod for **Pathfinder:
 Kingmaker Enhanced Plus Edition 2.1.7b**.
@@ -19,7 +20,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.4.3.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.5.0.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including
@@ -32,8 +33,9 @@ Mods\KingmakerBuffPlanner\Info.json
 Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll
 ```
 
-Load a campaign, then open the planner with the HUD's gear button or
-Ctrl+Shift+B. Pick a buff, a caster and its exact source, then click the
+Load a campaign, then open the planner with the HUD's gear button, the
+spellbook's **BUFF PLANNER** button or Ctrl+Shift+B. Pick a buff, a caster
+and its exact source, then click the
 recipient: each line is one cast, and every edit saves itself. The HUD's
 moon, diamond and sun buttons run the Long, Important and Short routines
 with one click. A classic plan from an earlier version is imported once on
@@ -52,14 +54,17 @@ Detailed instructions and qualification boundaries are in
   continuous caster -> casting -> recipient graph.
 - Autosave persistence (no Save or Accept step) with explained recovery when a
   save cannot be written.
-- One-click Long, Important, and Short routines from the HUD, with Stop.
+- One-click Long, Important, and Short routines from the HUD (a row of the
+  game's own button panel), with Stop; each run's result in the game log.
 - Plan-wide resource accounting (spell slots, rod uses, class-feature pools)
   with all-or-nothing reservation.
 - Instant (default) and Animated execution engines.
 - Metamagic rods and Brown-Fur Powerful Change / Share Transmutation (via the
   KingmakerGunslinger mod, fail-soft when absent), offered only where they are
   meaningful.
-- Right-click the game's own full spell descriptions.
+- Right-click for the game's own spell description window.
+- Drawn with the game's own fonts, paper, frames and controls, and closed by
+  any other game window like the inventory or the spellbook.
 - One-time import of classic plans, with the original archived.
 - External profile persistence with no save-owned mod content.
 - Optional, read-only Call of the Wild and gameplay-mod compatibility inputs.
