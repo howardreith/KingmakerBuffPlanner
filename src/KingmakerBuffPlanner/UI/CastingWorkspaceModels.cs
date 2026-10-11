@@ -570,6 +570,8 @@ namespace KingmakerBuffPlanner.UI
                     " casts this routine now; the HUD moon button runs Long.";
             if (value == "native-casting-busy")
                 return "A routine is running; press its HUD button again to stop it after the cast in progress.";
+            if (value.StartsWith("native-submission-disabled:runtime-test-session:", StringComparison.Ordinal))
+                return "Casting is disabled during this automated session.";
             return "Native casting is not available in this session (" + value + ").";
         }
 
@@ -582,6 +584,8 @@ namespace KingmakerBuffPlanner.UI
             string value = disposition ?? string.Empty;
             if (value == "native-casting-busy")
                 return "A routine is running; press its HUD button again to stop it.";
+            if (value.StartsWith("native-submission-disabled:runtime-test-session:", StringComparison.Ordinal))
+                return "Casting is disabled during this automated session.";
             if (value != "native-casting-enabled")
                 return "Casting is unavailable in this session (" + value + ").";
             if (castings == 0) return routineName + " has no castings yet.";

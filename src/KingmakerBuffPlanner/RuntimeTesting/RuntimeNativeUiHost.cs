@@ -413,15 +413,28 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _nativeUiUnitIndex++;
                     if (_nativeUiUnitIndex < Math.Min(3, _nativeUiUnits.Count))
                     {
-                        SelectUnit(_nativeUiUnits[_nativeUiUnitIndex]);
-                        _nativeUiStep = 5;
-                        _nativeUiClock.Restart();
+                        // A full-screen portrait changes only the book's
+                        // character. Establish the real world selection before
+                        // reopening, so its normal return route has that context.
+                        CloseNativeServiceWindow();
+                        NativeUiNext(26);
                         return false;
                     }
                     // Back to the first caster; press the owned spellbook
                     // entry exactly as its click delivers it.
                     SelectUnit(_nativeUiUnits[0]);
                     NativeUiNext(8);
+                    return false;
+                }
+                case 26:
+                {
+                    bool released = !NativeServiceWindowShown() &&
+                        !Game.Instance.IsModeActive(GameModeType.FullScreenUi);
+                    if (!released && !NativeUiWaited(10000)) return false;
+                    if (!released) return FinishNativeUi("spellbook-world-selection-boundary-not-released");
+                    SelectUnit(_nativeUiUnits[_nativeUiUnitIndex]);
+                    EventBus.RaiseEvent<IServiceWindowUIHandler>(handler => handler.HandleOpenSpellbook());
+                    NativeUiNext(5);
                     return false;
                 }
                 case 8:
@@ -830,22 +843,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         NativeUiNext(8);
                         return false;
                     }
+                    // Installed 2.1.7b refuses starting Pause over FullScreenUi.
+                    // Close our window first, pause in the native world mode,
+                    // then reopen it over the established pause state.
+                    if (_nativeUiSwitchIndex >= NativeUiSwitchRoutes.Length && !_nativeUiPauseOwned)
+                    {
+                        CloseProbeWorkspace();
+                        NativeUiNext(35);
+                        return false;
+                    }
                     if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen)
                     {
                         if (!_nativeUiClock.IsRunning) BuffPlannerUiRoot.HandlePlannerHotkey();
                         if (!NativeUiWaited(1500)) return false;
                         if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen)
                             return FinishNativeUi("switch-planner-not-reopened:" + _nativeUiRoutes[_nativeUiSwitchIndex]);
-                    }
-                    // Exercise the real pause mode through the verified native
-                    // setter; only this probe owns its change and restoration.
-                    if (_nativeUiSwitchIndex >= NativeUiSwitchRoutes.Length && !_nativeUiPauseOwned)
-                    {
-                        _nativeUiPauseBefore = Game.Instance.IsPaused;
-                        _nativeUiPauseOwned = true;
-                        Game.Instance.IsPaused = true;
-                        NativeUiNext(35);
-                        return false;
                     }
                     string route = _nativeUiRoutes[_nativeUiSwitchIndex];
                     _nativeUiSwitch = new NativeUiWindowSwitch
@@ -862,9 +874,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 case 35:
                 {
-                    if (!NativeUiWaited(350)) return false;
+                    bool released = !NativeServiceWindowShown() &&
+                        !BuffPlannerUiRoot.IsCastingWorkspaceOpen &&
+                        !Game.Instance.IsModeActive(GameModeType.FullScreenUi);
+                    if (!released && !NativeUiWaited(10000)) return false;
+                    if (!released || (Game.Instance.CurrentMode != GameModeType.Default && !Game.Instance.IsPaused))
+                        return FinishNativeUi("deliberate-pause-world-boundary-not-released");
+                    _nativeUiPauseBefore = Game.Instance.IsPaused;
+                    _nativeUiPauseOwned = true;
+                    Game.Instance.IsPaused = true;
+                    NativeUiNext(36);
+                    return false;
+                }
+                case 36:
+                {
+                    if (!Game.Instance.IsPaused && !NativeUiWaited(10000)) return false;
                     if (!Game.Instance.IsPaused) return FinishNativeUi("deliberate-pause-did-not-activate");
-                    _nativeUi.AddNote("pause:native-Game.IsPaused-setter;no-os-input");
+                    _nativeUi.AddNote("pause:native-Game.IsPaused-setter-in-world-mode;no-os-input");
                     NativeUiNext(4);
                     return false;
                 }
@@ -1384,13 +1410,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _classicHudPauseBefore = Game.Instance.IsPaused;
                     _classicHudPauseOwned = true;
                     Game.Instance.IsPaused = true;
-                    if (!Game.Instance.IsPaused || !BuffPlannerUiRoot.IsExecutingForRuntime)
-                        throw new InvalidOperationException("The real execution could not be held at its capture boundary.");
+                    // StartMode may queue the setter until the next native tick.
+                    // Verify the actual held mode in a subsequent Update.
                     _classicHudObservation["pauseBefore"] = _classicHudPauseBefore;
-                    _classicHudObservation["pauseHeld"] = Game.Instance.IsPaused;
                     _classicHudCaptureClock.Restart();
                     return true;
                 }
+                if (!Game.Instance.IsPaused)
+                {
+                    if (_classicHudCaptureClock.ElapsedMilliseconds < WorkspaceEngineCaptureWaitMilliseconds) return true;
+                    throw new InvalidOperationException("The real execution could not be paused at its capture boundary.");
+                }
+                _classicHudObservation["pauseHeld"] = true;
                 // Let the native disabled ColorTint transition settle while
                 // the actual execution condition remains held.
                 if (_classicHudCaptureClock.ElapsedMilliseconds < 200) return true;
@@ -1571,8 +1602,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return unit == null ? "null" : unit.CharacterName + "#" + unit.Descriptor.Spellbooks.Count();
         }
 
-        // The service window's own character switch (its party portraits);
-        // the world selection follows it.
+        // The native portrait switch changes the full-screen character while
+        // a service window is shown, and world selection only outside it.
         private static void SelectUnit(UnitEntityData unit)
         {
             if (unit == null) return;

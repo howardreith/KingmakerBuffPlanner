@@ -267,7 +267,11 @@ namespace KingmakerBuffPlanner.Tests
                 { WorkspaceFooterText.RunStatus("native-casting-enabled", "Short", 0, false, 0, 0, null, 0),
                     "Short has no castings yet." },
                 { WorkspaceFooterText.RunStatus("native-casting-busy", "Long", 1, false, 0, 0, null, 0),
-                    "A routine is running; press its HUD button again to stop it." }
+                    "A routine is running; press its HUD button again to stop it." },
+                { WorkspaceFooterText.RunStatus("native-submission-disabled:runtime-test-session:live-workspace-native-ui",
+                    "Long", 2, false, 2, 0, null, 0), "Casting is disabled during this automated session." },
+                { WorkspaceFooterText.Readiness("native-submission-disabled:runtime-test-session:live-workspace-native-ui",
+                    "Long"), "Casting is disabled during this automated session." }
             };
             foreach (KeyValuePair<string, string> pair in cases)
                 if (pair.Key != pair.Value)
