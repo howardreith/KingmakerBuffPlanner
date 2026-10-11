@@ -1,5 +1,13 @@
 # Buff Planner native UI finish — progress
 
+> Owner-selected continuous completion milestone, October 11: the original
+> four-hour estimate is now eleven hours after two observed probe defects.
+> Current clean source is `2c40f0633079248072c2f23a754905d665ef41d6`; its
+> version 0.5.0 package remains NOT_RUN while the selected full purity window
+> runs. Prior 743b1dc and dc60a37 game attempts FAILED and restored exactly.
+> Follow the [current milestone](../docs/NATIVE-UI-FINISH-0.5.0-COMPLETION.md)
+> and current validation policy. Earlier budget deferrals are historical.
+
 Mission packet: `KBP_NATIVE_UI_FINISH_2026-10-10` (owner ZIP
 `C:\Dev\KingmakerBuffPlannerLab\KBP_Native_UI_Finish_Mission_2026-10-10.zip`,
 SHA-256 `94ff31499bc374859366da2deb9cb7908c67bea96479b19cf5d86950e41a0470`),

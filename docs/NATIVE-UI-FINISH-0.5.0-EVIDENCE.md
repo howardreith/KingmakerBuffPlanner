@@ -1,3 +1,18 @@
+> Owner-selected continuous completion milestone, October 11: the original
+> four-hour estimate is now eleven hours after two observed probe defects.
+> Current clean source is `2c40f0633079248072c2f23a754905d665ef41d6`; its
+> version 0.5.0 package remains NOT_RUN while the selected full purity window
+> runs. Prior 743b1dc and dc60a37 game attempts FAILED and restored exactly.
+> Follow the [current milestone](NATIVE-UI-FINISH-0.5.0-COMPLETION.md)
+> and current validation policy. Earlier budget deferrals are historical.
+
+The receipt and manifest below retain the earlier candidate chronology.
+Their PASS observations apply to their named original bytes. The frozen
+4dbfa33 aggregate FAILED at its decision-refusal assertion; the numeric
+exit and underlying child output were not preserved. It did not pass
+the complete gate. The four original game PASS receipts remain valid
+for their original inputs.
+
 > Current screenshot repair: clean source 7410f92/version 0.5.0 has a validated
 > local package and focused offline capture checks; new game observations remain
 > NOT_RUN and receipt stays PARTIAL. Old frozen gate is now recorded FAILED;

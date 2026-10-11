@@ -1,8 +1,10 @@
-> Owner-selected continuous completion milestone, October 11: the four-hour
-> initial budget includes the required long purity prerequisite and two-size
-> observations. Work is active on candidate 743b1dc; earlier ordinary-budget
-> deferral below is historical. Follow the [current milestone](docs/NATIVE-UI-FINISH-0.5.0-COMPLETION.md)
-> and current validation policy. No runtime acceptance is inferred from code.
+> Owner-selected continuous completion milestone, October 11: the original
+> four-hour estimate is now eleven hours after two observed probe defects.
+> Current clean source is `2c40f0633079248072c2f23a754905d665ef41d6`; its
+> version 0.5.0 package remains NOT_RUN while the selected full purity window
+> runs. Prior 743b1dc and dc60a37 game attempts FAILED and restored exactly.
+> Follow the [current milestone](docs/NATIVE-UI-FINISH-0.5.0-COMPLETION.md)
+> and current validation policy. Earlier budget deferrals are historical.
 
 > Current capture checkpoint (October 11, after review of 9dd8997): source 7410f92
 > fixes asynchronous screenshot sequencing; focused C# 9/0, source 43/0,
