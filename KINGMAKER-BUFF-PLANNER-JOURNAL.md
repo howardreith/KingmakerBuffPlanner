@@ -1,5 +1,20 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-11 native UI finish: triage and handoff to Codex
+
+- Owner continuation: triage UI-01..06, UI-09, UI-10 with current captures (owner's triage
+  page), keep the `4dbfa33` gate running, keep provenance exact, then implement.
+- Provenance verified: `3757758` changes only records; the package (DLL, Info.json,
+  overrides, notices) is built from `4dbfa33` and is unaffected.
+- Real defect found: the catalogue's source-tab captions overran their tabs (planner canvas
+  has no scaler; text keeps pixel size while the lane narrows). Fixed in `57f136a`
+  (`SourceTabLayout`); not yet run in game.
+- Rejected theory: "catalogue rows clip their third line at 1280x720" - the cut line was the
+  crop's edge; the full frame shows all three lines.
+- HUD compared with R12 at x2/x4: the stepped enclosure matches; only the disabled-state
+  capture is missing (design for a same-frame capture in the handoff).
+- The owner handed the remaining work to Codex: `docs/NATIVE-UI-FINISH-0.5.0-CODEX-HANDOFF.md`.
+
 ## 2026-10-11 0.5.0 native UI finish (KBP_NATIVE_UI_FINISH_2026-10-10)
 
 - Branch `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10`

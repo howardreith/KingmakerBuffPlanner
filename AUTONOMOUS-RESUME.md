@@ -1,3 +1,12 @@
+# Autonomous resume — handoff to Codex, 2026-10-11 ~13:30 UTC
+
+Start with `docs/NATIVE-UI-FINISH-0.5.0-CODEX-HANDOFF.md`. Tested candidate `4dbfa33`
+(package cf658914, receipt PARTIAL); records `3757758`; `57f136a` adds the source-tab
+caption fix (product code, no package yet, not verified in game). The complete gate on
+`4dbfa33` was still running at handoff (started 12:49:38Z; log path in the handoff): no
+runtime scenario or write under the runtime folders until it exits. Next action: the
+triage work in section 4 of the handoff, then a new candidate through the full procedure.
+
 # Autonomous resume — 0.5.0 native UI finish candidate, 2026-10-11
 
 Mission: `KBP_NATIVE_UI_FINISH_2026-10-10` (packet extracted read-only under

@@ -118,6 +118,14 @@ Updated: 2026-10-11 02:30 -04:00
 - Runtime staging and restoration: every run above restored with
   verification; protected saves clean.
 
+## Handoff (2026-10-11 ~13:30 UTC)
+
+The owner handed the remaining work to Codex. Triage of UI-01..06, UI-09, UI-10 (owner's
+continuation of 2026-10-11) is in `docs/NATIVE-UI-FINISH-0.5.0-CODEX-HANDOFF.md` section 4
+and on the owner's triage page. `57f136a` (source-tab captions: one shared size that fits,
+UI-03/UI-06) is committed with its unit test (C# 518/0) but has no package and no in-game
+run. The complete gate on `4dbfa33` was running at handoff.
+
 ## Continuation
 
 Remaining blocker: none for this delivery. Open items are listed in the
