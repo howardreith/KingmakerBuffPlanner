@@ -1,3 +1,9 @@
+> October 11 Codex development checkpoint: workflow merged at `0463f553a859ecc195f862fba9632ee91586e08c`;
+> native UI observer source `a652441b07bb1f427c42e3036b10e67d8e9163d1`, version 0.5.0.
+> Focused checks pass; new observations are NOT_RUN in game. The fallback below
+> remains built from 4dbfa33 with its original PARTIAL receipt. See the
+> [current development checkpoint](NATIVE-UI-FINISH-0.5.0-DEVELOPMENT-CHECKPOINT.md).
+
 > 0.5.0 native UI finish candidate (unreleased): product `4dbfa33e1b36bf59bc9bb1a4ac3ebde860c52302`, standard package `cf658914130a010d7525ee47bc41a1f5c05f9bcde929852a1e31430ab3be8fcb`. Per-ID statuses, runs, evidence and remaining items: `docs/NATIVE-UI-FINISH-0.5.0-DELIVERY.md`.
 > 0.4.2 owner-test candidate (unreleased): product `7a0842f1ee5a343b98e5499ef7726bb321e41f40` (after the PR #7 review corrections), package `0adad29d9d79568efa79fc3c2cb11cdfffe3d7b82384099bbd0cf7fe4ae0d98a`. Evidence, NOT RUN items and the owner test list: `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`.
 > 0.4.0 owner-review candidate (unreleased): rc4 `009b6ddab80a5e70d7469962986c38222961f4ba`, package `4be8a0b7dbf150d762350a88aa6a00eafac391fe0ac0e541d85dd53618f63adb` (rc3 `c452e01` superseded after the lead review). Packages, evidence and the owner checklist: `docs/REMAINING-WORK-0.4.0-HANDOFF.md`.

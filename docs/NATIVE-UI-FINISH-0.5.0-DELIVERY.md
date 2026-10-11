@@ -1,3 +1,9 @@
+> October 11 Codex development checkpoint: workflow merged at `0463f553a859ecc195f862fba9632ee91586e08c`;
+> native UI observer source `a652441b07bb1f427c42e3036b10e67d8e9163d1`, version 0.5.0.
+> Focused checks pass; new observations are NOT_RUN in game. The fallback below
+> remains built from 4dbfa33 with its original PARTIAL receipt. See the
+> [current development checkpoint](NATIVE-UI-FINISH-0.5.0-DEVELOPMENT-CHECKPOINT.md).
+
 # Buff Planner native UI finish — delivery receipt
 
 Date: `2026-10-11 (America/New_York, -04:00)`
@@ -30,8 +36,8 @@ display changed to 1920x1080 outside the harness.
 | Item | Exact value |
 |---|---|
 | Repository / branch | `C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-NUI`, branch `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10` (base `a9c6d0f`, main v0.4.3) |
-| Final source HEAD | Product `4dbfa33e1b36bf59bc9bb1a4ac3ebde860c52302`; later commits are records only: the commits that add this receipt and the gate record (see `git log`) |
-| Reviewable commits / existing authorized review link | `c8a5a21`, `3fd5fe9` (no-input scenario), `c57f490` (window switching, game log, copy), `fa0bfc4` (UI-09), `bbe8426` (UI-10), `d5a1d99` (UI-01), `aad17d1` (UI-03..08, UI-11), `16f749c`, `545a5cf`, `7a2f357` (qualify stage), `8ae985d` (0.5.0 version and player docs), `93b29b1`, `60d6611`, `f31fea9` + `1938aaf`, `cd1b554` (qualify-stage evidence), `4dbfa33` (launcher meta-test, after the first complete gate failed); records `8fdcccd`, `6e47c83` and the commits after `4dbfa33`. No review link: nothing was pushed (no PR exists for this branch). |
+| Tested fallback source | Product `4dbfa33e1b36bf59bc9bb1a4ac3ebde860c52302`. Records 3757758 do not change it; product caption fix 57f136a and observer a652441 are outside this package. Current development identity is recorded above. |
+| Reviewable commits / existing authorized review link | `c8a5a21`, `3fd5fe9` (no-input scenario), `c57f490` (window switching, game log, copy), `fa0bfc4` (UI-09), `bbe8426` (UI-10), `d5a1d99` (UI-01), `aad17d1` (UI-03..08, UI-11), `16f749c`, `545a5cf`, `7a2f357` (qualify stage), `8ae985d` (0.5.0 version and player docs), `93b29b1`, `60d6611`, `f31fea9` + `1938aaf`, `cd1b554` (qualify-stage evidence), `4dbfa33` (launcher meta-test, after the first complete gate failed); records `8fdcccd`, `6e47c83` and the commits after `4dbfa33`. Handoff fa5f4a2 was guarded-pushed; the continuing feature checkpoint uses the same helper. No PR review link is recorded here. |
 | Working-tree state | Clean (`git status --short` empty) after the commits that add this receipt and the gate record (see `git log`); ignored `GamePath.props` and `artifacts/` only. Runtime builds from the clean detached run worktree `repo\KingmakerBuffPlanner-NUIR` at `4dbfa33`. |
 | Standard installable ZIP | `C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-NUIR\artifacts\release\0.5.0\KingmakerBuffPlanner-0.5.0.zip` (built by `scripts\Build-Release.ps1`: two deterministic builds, strict package validation); archived copy `C:\Dev\KingmakerBuffPlannerLab\package-archive\0.5.0-native-ui-finish\KingmakerBuffPlanner-0.5.0.zip` with its `release-manifest.json` and `RELEASE-NOTES-DRAFT.md` |
 | ZIP SHA-256 | `cf658914130a010d7525ee47bc41a1f5c05f9bcde929852a1e31430ab3be8fcb` |

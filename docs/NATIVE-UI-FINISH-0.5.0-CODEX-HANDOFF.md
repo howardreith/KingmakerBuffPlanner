@@ -12,6 +12,11 @@
 > ACTIVE as PID 16712 without GATE-EXIT. Preserve its watched paths; continue
 > independent source work in NUI. The old candidate and its four PASS runs keep
 > their original identities. The current receipt remains PARTIAL.
+> Continuation source `a652441b07bb1f427c42e3036b10e67d8e9163d1` prepares schema-2
+> caption, casting-popup and filter observations plus a changed-caster capture.
+> Focused checks passed; in-game observations remain NOT_RUN. Read the
+> [development checkpoint](NATIVE-UI-FINISH-0.5.0-DEVELOPMENT-CHECKPOINT.md)
+> for the current triage and exact next action.
 
 Written 2026-10-11 ~13:30 UTC by Claude at the owner's request ("find a stopping
 point, commit it, push it, and create a handoff document that will be taken over by

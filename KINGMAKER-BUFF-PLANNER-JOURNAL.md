@@ -1,5 +1,41 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-11 Codex native UI development checkpoint
+
+DATA/NUI; branch `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10`;
+version 0.5.0. Source HEAD `a652441b07bb1f427c42e3036b10e67d8e9163d1`; workflow
+merge `0463f553a859ecc195f862fba9632ee91586e08c` incorporates origin/main
+`358418f6f86ef0c34687a2f4b96374042c7393d2`. Actual shared home inspected;
+no profile installed or overrides found. Four conflicts reconciled without dropping
+native UI, stage, fixture or casing coverage. Cheap checks precede imports.
+
+One-time 16:08Z old-gate audit: ACTIVE, owned PID 16712, no GATE-EXIT; all
+495 transaction status records Restored, no runtime lock. Left NUIR, runtime
+paths and unrelated processes untouched. Reverified fallback ZIP cf658914/DLL
+b32f320e and all four original final PASS/restoration receipts against 4dbfa33.
+No aggregate gate completion claim and no conflicting live run.
+
+Prepared actual caption-size/width measurements, casting-card popup context and
+dismissal, all filter controls/row identities, and the existing changed-caster
+step's missing capture. Kept schema-1 judgement attribution separate from schema 2.
+Rejected forced-disabled HUD appearance as proof of real availability; physical
+input, long-content and fixture limits remain. Receipt PARTIAL unchanged.
+
+Focused validation: launcher 24/0 in 0.583 s; selector 6/0 in 1.026 s; parser
+6/0; source 43/0 and C# 12/0 through Test-Development in 5.028 s; push helper
+6/0 in 2.210 s; reference hashes 15/0. Initial fixture edit did not apply:
+11/1 in 11.117 s, corrected and preserved as a failed log. Builds passed.
+Unpackaged DLL b653c679...0f2bd stamped 0463f55 plus the reviewed observer diff,
+MVID 9d36fb59-9656-4d32-ad29-f94a65515e43; no new native/package qualification.
+
+Full commands, identities, local evidence paths, manual limits and next action:
+[development checkpoint](docs/NATIVE-UI-FINISH-0.5.0-DEVELOPMENT-CHECKPOINT.md).
+Ordinary focused validation applies; broad final campaigns remain deliberately
+deferred. Next: exact key-dispatch/Metamagic contract inspection and bounded
+paused-window/Metamagic observations, then deliberate guarded native checks
+after the old gate exits. Guarded feature push is the continuing authorized
+publication step; no main merge, tag, public release or permanent installation.
+
 ## 2026-10-11 native UI finish: triage and handoff to Codex
 
 - Owner continuation: triage UI-01..06, UI-09, UI-10 with current captures (owner's triage

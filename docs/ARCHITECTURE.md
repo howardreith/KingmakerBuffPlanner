@@ -524,3 +524,15 @@ The four icons are original textures generated in memory by project code and are
 New Unity graphics remain candidates for at least two update frames before EventSystem ownership is required. HUD candidates are noninteractive during this interval. A full-screen candidate acquires the native input lease only after deferred visible-presentation validation, then validates again. Any failure logs its exact predicate and complete stack, disposes only owned objects, releases only an acquired lease, and remains retryable.
 
 The HUD root is marked `LayoutElement.ignoreLayout` so the native cluster may host it without overriding its explicitly above-cluster anchor; the KBP root's own horizontal child layout remains active. EventSystem probes and dispatched pointer events convert button world centers to screen coordinates through the native `GraphicRaycaster.eventCamera`. These are integration boundaries, not domain/UI layout policy leaks.
+
+## 0.5.0 native UI observation boundary
+
+RuntimeNativeUiHost drives existing callbacks only in its guarded no-input scenario.
+The view exposes read-only control measurements and actual description subject
+identity; discovery, planning, resource, persistence and execution rules remain
+services outside the view. NativeUiRecord schema 2 judges caption fit, casting-popup
+context/dismissal and catalogue membership without Unity dependencies. Schema 1
+keeps its original verdict and cannot establish new observations. These diagnostics
+are compiled into the product and change DLL identity; real-game evidence must
+bind to the changed bytes. Callback routes and numeric fit are distinct from
+physical input dispatch and visual acceptance.

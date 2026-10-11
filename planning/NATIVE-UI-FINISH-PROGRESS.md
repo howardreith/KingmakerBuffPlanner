@@ -10,7 +10,29 @@ stays reference material; this file follows its `templates/PROGRESS.md`.
 
 Updated: 2026-10-11 02:30 -04:00
 
-## Current checkpoint
+## Current Codex development checkpoint - October 11, 2026, 16:32 UTC
+
+- DATA/NUI, branch `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10`,
+  source HEAD `a652441b07bb1f427c42e3036b10e67d8e9163d1`, version 0.5.0.
+  Main PR #9 merged at `0463f553a859ecc195f862fba9632ee91586e08c`.
+- [Current policy](../docs/VALIDATION-POLICY.md) supersedes broad automatic
+  sequences below. This is an ordinary reviewable checkpoint.
+- Gate on frozen 4dbfa33 was ACTIVE at the one-time 16:08Z audit (PID 16712,
+  no GATE-EXIT). Preserve NUIR and watched runtime paths; no cancellation,
+  new runtime scenario or broad gate selected.
+- Launcher arguments 24/0 (0.583 s), selector 6/0 (1.026 s), PowerShell syntax 6/0;
+  Test-Development affected prefixes: source 43/0, builds PASS, C# 12/0
+  (5.028 s supervision). First incomplete-fixture pass 11/1 retained (11.117 s).
+  Guarded-push helper 6/0 (2.210 s); reference hashes 15/0.
+- UI-01, UI-03, UI-05 and UI-06: targeted observations prepared and checked
+  offline; NOT_RUN in game. No per-ID acceptance promotion. Native schema 2
+  retains schema-1 verdict provenance. Product caption fix 57f136a stays in source.
+- Fallback 4dbfa33/package cf658914/DLL b32f320e preserved; all four original
+  final runtime/restoration receipts and exact hashes verified.
+- Commands, full hashes, logs, rejected theories, fixture/manual limits and exact
+  next action: [development checkpoint](../docs/NATIVE-UI-FINISH-0.5.0-DEVELOPMENT-CHECKPOINT.md).
+
+## Historical Claude checkpoint (retained)
 
 - Active objective: delivery. Implementation, qualification and the 0.5.0
   package are done; the complete `Test-SourceOnly` gate on the product

@@ -1,3 +1,30 @@
+> October 11 native UI continuation uses [VALIDATION-POLICY.md](VALIDATION-POLICY.md).
+> Workflow merge `0463f553a859ecc195f862fba9632ee91586e08c`; observer source
+> `a652441b07bb1f427c42e3036b10e67d8e9163d1`, version 0.5.0. New schema-2
+> observations have not run in game; all older native evidence retains its
+> original binary attribution. [Development checkpoint](NATIVE-UI-FINISH-0.5.0-DEVELOPMENT-CHECKPOINT.md).
+
+Current remaining native/manual acceptance list (historical records follow):
+
+- Run caption fit, casting-card popup/caster identity, filter tabs and changed-caster
+  capture on the new candidate at 1920x1080 and 1280x720 after the old gate exits,
+  with all launcher safety/source/WhatIf prerequisites satisfied.
+- Physical right-click and keyboard dispatch, remapped window actions, typing in
+  focused search, pause preservation and close/reopen. Binding callbacks prove
+  the callback route only. Add the bounded paused-switch observation first.
+- Genuine active Will skip / Will recast, unavailable recipient/provider and card
+  hover; groups, enhancement scope and alternative providers need applicable
+  guarded fixtures. Native UI still refuses Advanced; do not widen that guard.
+- Genuine long descriptions/list content and their scrolling, long names, larger
+  UI scale and the owner's 1920x1200 configuration when available. A short fixture
+  or structural fit cannot establish those states or rendered quality.
+- HUD disabled treatment while the real session IsExecuting condition holds,
+  preserving native controls' independent availability. A forced disabled
+  appearance does not prove this condition.
+- METAMAGIC's native action and independent BUFF PLANNER action, including a
+  relevant state where Metamagic is unavailable. Current pair captures remain
+  attributed to 4dbfa33.
+
 > 0.5.0 native UI finish candidate (unreleased): product `4dbfa33e1b36bf59bc9bb1a4ac3ebde860c52302`, standard package `cf658914130a010d7525ee47bc41a1f5c05f9bcde929852a1e31430ab3be8fcb`. Per-ID statuses, runs, evidence and remaining items: `docs/NATIVE-UI-FINISH-0.5.0-DELIVERY.md`.
 > 0.4.2 owner-test candidate (unreleased): product `7a0842f1ee5a343b98e5499ef7726bb321e41f40` (after the PR #7 review corrections), package `0adad29d9d79568efa79fc3c2cb11cdfffe3d7b82384099bbd0cf7fe4ae0d98a`. Evidence, NOT RUN items and the owner test list: `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`.
 > 0.4.0 owner-review candidate (unreleased): rc4 `009b6ddab80a5e70d7469962986c38222961f4ba`, package `4be8a0b7dbf150d762350a88aa6a00eafac391fe0ac0e541d85dd53618f63adb` (rc3 `c452e01` superseded after the lead review). Packages, evidence and the owner checklist: `docs/REMAINING-WORK-0.4.0-HANDOFF.md`.

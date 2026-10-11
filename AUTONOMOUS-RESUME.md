@@ -12,8 +12,11 @@ DATA development worktree: `C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPla
 branch `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10`; handoff HEAD
 `fa5f4a277558c998255b74d839eb831850c3ee29`. Incorporating `origin/main`
 `358418f6f86ef0c34687a2f4b96374042c7393d2` (PR #9) without changing main.
-Version remains 0.5.0. Checkpoint details will be recorded in the journal and
-native UI progress record after focused validation.
+Version remains 0.5.0. Current source HEAD `a652441b07bb1f427c42e3036b10e67d8e9163d1`; workflow merge
+`0463f553a859ecc195f862fba9632ee91586e08c`. Launcher arguments 24/0, selector 6/0,
+source 43/0 and focused C# 12/0 pass. See the
+[development checkpoint](docs/NATIVE-UI-FINISH-0.5.0-DEVELOPMENT-CHECKPOINT.md)
+for exact commands, costs, artefact identities, initial 11/1 fixture failure and limits.
 
 The one-time gate audit at 2026-10-11T16:08Z found the frozen `4dbfa33`
 Test-SourceOnly process ACTIVE (PID 16712, created 12:49:38Z), no GATE-EXIT,
@@ -29,8 +32,12 @@ PARTIAL. `3757758` changes records; `57f136a` changes product caption layout and
 is absent from the fallback package. New observer changes also require affected
 observations on their own bytes before any native acceptance claim.
 
-Current work: reconcile launcher refusals and native UI stages, validate caption
-layout offline, and prepare the smallest useful popup/catalogue observations.
+Implemented: combined early launcher refusals and native UI stages, offline caption
+regression, schema-2 actual caption/popup/filter observations and changed-caster capture.
+New observations are NOT_RUN in game. Next action: inspect the exact key-dispatch and
+Metamagic contracts and add bounded paused-window/Metamagic observations, using
+native-window, native-ui-record and spellbook-handoff prefixes; later select a
+small guarded two-size native observation batch after the old gate exits.
 Final frozen-candidate qualification is deliberately deferred.
 
 Historical chronology is preserved in

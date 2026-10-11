@@ -1,3 +1,10 @@
+> Observer source `a652441b07bb1f427c42e3036b10e67d8e9163d1` has focused offline
+> coverage only; new schema-2 measurements/captures are NOT_RUN in game. Current
+> [manual list](docs/MANUAL-ACCEPTANCE.md) distinguishes observation gaps from fixture
+> limits. Active buffs may be inspected after a deliberately selected guarded cast;
+> the older blanket fixture claim below is historical. No Advanced native UI route
+> or forced-disabled availability check is authorized by this checkpoint.
+
 > Current native UI continuation: the October 11 validation policy governs.
 > The frozen `4dbfa33` source-only gate was ACTIVE at the one-time 16:08Z audit;
 > preserve its worktree and watched runtime paths. It does not block independent
