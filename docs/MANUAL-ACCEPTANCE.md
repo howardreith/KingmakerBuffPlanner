@@ -1,3 +1,10 @@
+> Current screenshot repair: clean source 7410f92/version 0.5.0 has a validated
+> local package and focused offline capture checks; new game observations remain
+> NOT_RUN and receipt stays PARTIAL. Old frozen gate is now recorded FAILED;
+> required live-purity cost exceeds the ordinary budget. Exact source/artifact
+> provenance, history and next selected observation:
+> [capture checkpoint](NATIVE-UI-FINISH-0.5.0-CAPTURE-CHECKPOINT.md).
+
 > October 11 native UI continuation uses [VALIDATION-POLICY.md](VALIDATION-POLICY.md).
 > Workflow merge `0463f553a859ecc195f862fba9632ee91586e08c`; observer source
 > `a652441b07bb1f427c42e3036b10e67d8e9163d1`, version 0.5.0. New schema-2

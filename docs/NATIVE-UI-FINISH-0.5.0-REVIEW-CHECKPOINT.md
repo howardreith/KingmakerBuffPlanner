@@ -1,3 +1,9 @@
+> Historical checkpoint before the screenshot sequencing repair. The
+> [current capture checkpoint](NATIVE-UI-FINISH-0.5.0-CAPTURE-CHECKPOINT.md)
+> records source 7410f92, its packaged NOT_RUN identity, the old gate's actual
+> FAILED outcome and the budget-limited live prerequisite. Results below keep
+> their original sources and dates.
+
 # Native UI review checkpoint - October 11, 2026
 
 Development checkpoint on DATA, after the review of `0844421b222824acbc649773db51565dbc547431`.

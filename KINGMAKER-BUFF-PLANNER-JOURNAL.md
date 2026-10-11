@@ -3159,3 +3159,31 @@ two-size native observation batch on exact clean candidate bytes and inspect cap
 Declare prerequisite cost first; no automatic broad campaign. Physical/paused/real
 availability and fixture limitations are in the
 [current review checkpoint](docs/NATIVE-UI-FINISH-0.5.0-REVIEW-CHECKPOINT.md).
+
+## October 11 capture sequencing review correction (after 9dd8997)
+
+Source7410f92604621aabfba97e26cb1c9f6f17044b63 holds fresh engine captures
+through a later frame and complete readable PNG; following mode/popup/hover,
+save and switch changes run in later steps. Ten-second timeout records failure
+and preserves cleanup. Source43/0, builds PASS, selected C# 9/0 (5.108625s).
+Build-Local package 4/0 validation, creation 1/0 (3.361913s); same DLL bytes as
+focused build. ZIP 1d75a0038d2f99eaa55ebc9b774a2c9e72211e8af0991258fd24fd1728299088,
+DLL 568dec0091a13f65cecfeb4a262c3f762cbae75b04dbfe996f437f97df65d1c6,
+MVID 95959d77-29f9-488a-87cd-a55fb5ca5eb4. Packaged, NOT_RUN in game.
+
+One-time 17:56Z audit established old frozen gate FAILED at the older
+FileWhatIf:104 decision-refusal assertion, log last write 17:08:42Z; numeric
+exit unrecorded. Original PID/owned children gone, no locks/foreign lease,
+495 transaction statuses Restored; no cancellation or rerun. Fallback and four
+original game/restoration PASS records preserved with their original identities.
+
+A read-only 1,038-file manifest sample took 8.410868 s. Current 374,395 files across
+required live-purity targets imply about 101 minutes for before/after manifests.
+The selected two-size game batch is deferred beyond the ordinary 30-minute
+ceiling; no live receipt reused, guard narrowed or watched path changed.
+Rejected: larger pre-capture delay fixes an immediate subsequent mutation;
+file existence proves capture completion; offline PASS establishes visual quality;
+old aggregate failure invalidates or relabels the original separate game receipts.
+Receipt remains PARTIAL. Exact records and next separately budgeted guarded
+1920x1080/1280x720 batch followed by image review:
+[capture checkpoint](docs/NATIVE-UI-FINISH-0.5.0-CAPTURE-CHECKPOINT.md).

@@ -1,3 +1,14 @@
+> Latest capture correction, October 11: source `7410f92604621aabfba97e26cb1c9f6f17044b63`
+> holds state through a later frame/complete PNG before UI transitions. Focused
+> C# 9/0, source 43/0; local package 4/0 validation, NOT_RUN in game. The old frozen
+> gate has exited FAILED (older decision-refusal assertion; numeric exit unrecorded).
+> Current source is packaged but the unchanged required live-purity route is
+> estimated at 101 minutes, outside the ordinary 30-minute ceiling. Do not restart
+> the historical aggregate or treat a receipt as reusable. Read the
+> [current capture checkpoint](NATIVE-UI-FINISH-0.5.0-CAPTURE-CHECKPOINT.md)
+> and active resume for identities, remaining acceptance and exact next action.
+> Older ACTIVE/unobserved gate statements below are their historical audit results.
+
 # Native UI finish 0.5.0 — handoff to Codex
 
 > **Current policy, October 11:** [VALIDATION-POLICY.md](VALIDATION-POLICY.md)

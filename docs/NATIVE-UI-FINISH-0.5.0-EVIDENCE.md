@@ -1,3 +1,10 @@
+> Current screenshot repair: clean source 7410f92/version 0.5.0 has a validated
+> local package and focused offline capture checks; new game observations remain
+> NOT_RUN and receipt stays PARTIAL. Old frozen gate is now recorded FAILED;
+> required live-purity cost exceeds the ordinary budget. Exact source/artifact
+> provenance, history and next selected observation:
+> [capture checkpoint](NATIVE-UI-FINISH-0.5.0-CAPTURE-CHECKPOINT.md).
+
 > October 11 Codex development checkpoint: workflow merged at `0463f553a859ecc195f862fba9632ee91586e08c`;
 > native UI observer source `673d1e3a62356af3d1b4d5dcbd19f233fd521734`, version 0.5.0.
 > Focused checks pass; new observations are NOT_RUN in game. The fallback below

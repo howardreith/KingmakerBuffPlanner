@@ -10,7 +10,22 @@ stays reference material; this file follows its `templates/PROGRESS.md`.
 
 Updated: 2026-10-11 02:30 -04:00
 
-## Current review correction - October 11, 2026
+## Current capture correction - October 11, 2026
+
+DATA/NUI, clean source `7410f92604621aabfba97e26cb1c9f6f17044b63`, version 0.5.0:
+request state held until a later frame and complete, readable PNG; Return,
+Escape and related transitions moved to later steps; bounded ten-second failure
+uses existing cleanup. Selected C# 9/0 and source 43/0 in 5.108625 s; local package
+validation 4/0 and creation 1/0 in 3.361913 s. ZIP 1d75a003, DLL 568dec00,
+MVID 95959d77-29f9-488a-87cd-a55fb5ca5eb4, packaged/NOT_RUN. No UI status promoted.
+Old frozen gate exited FAILED at the older decision-refusal assertion; numeric
+exit unrecorded. One-time 17:56Z audit: PID/owned children gone, locks absent,
+495 transaction statuses Restored; no cancellation/rerun. Frozen fallback unchanged.
+Current required whole-history purity estimate is 101 minutes; deferred beyond the
+ordinary 30-minute ceiling. Exact hashes, commands, limits and two-size next action:
+[current capture checkpoint](../docs/NATIVE-UI-FINISH-0.5.0-CAPTURE-CHECKPOINT.md).
+
+## Previous review correction - October 11, 2026
 
 DATA/NUI, same feature branch, clean built source HEAD
 `673d1e3a62356af3d1b4d5dcbd19f233fd521734`, version 0.5.0. Launcher consumer fix

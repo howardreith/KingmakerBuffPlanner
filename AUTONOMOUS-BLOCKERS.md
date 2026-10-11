@@ -1,3 +1,13 @@
+> Current capture checkpoint (October 11, after review of 9dd8997): source 7410f92
+> fixes asynchronous screenshot sequencing; focused C# 9/0, source 43/0,
+> package validation 4/0. New package/observations NOT_RUN; receipt PARTIAL.
+> Old frozen gate exited FAILED at its older decision-refusal assertion; numeric
+> exit unrecorded, locks absent and 495 transaction records Restored at 17:56Z.
+> Required whole-history live-purity estimate is about 101 minutes, outside the
+> ordinary 30-minute ceiling. The two-size batch is deferred without receipt
+> reuse or weakened guards. [Current checkpoint](docs/NATIVE-UI-FINISH-0.5.0-CAPTURE-CHECKPOINT.md)
+> gives exact candidate bytes and next route. Earlier status notes below are historical.
+
 > Current review checkpoint: launcher consumer repaired at `3af7171`, observer
 > source `673d1e3` adds schema-3 native Metamagic and key-route diagnostics. Focused
 > checks pass; game observations remain NOT_RUN. Receipt stays PARTIAL. See the
