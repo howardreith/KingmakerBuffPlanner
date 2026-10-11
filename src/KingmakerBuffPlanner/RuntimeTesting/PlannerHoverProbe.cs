@@ -323,6 +323,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             bool tintMatches = control.transition == Selectable.Transition.ColorTint &&
                 control.targetGraphic != null && Near(tint.r, expected.r) && Near(tint.g, expected.g) &&
                 Near(tint.b, expected.b) && Near(tint.a, expected.a);
+            // Native UI finish (UI-03): the planner's native buttons swap the
+            // game's own state art (button_hover / pressed / disable); the
+            // art shown must be the one for the state, and the selected one
+            // rests on the pressed art (PlannerNativeKit.SetSelected).
+            var image = control.targetGraphic as Image;
+            if (control.transition == Selectable.Transition.SpriteSwap && image != null)
+            {
+                SpriteState sprites = control.spriteState;
+                Sprite wanted = !interactable ? sprites.disabledSprite
+                    : stored == "Pressed" ? sprites.pressedSprite
+                    : stored == "Highlighted" ? sprites.highlightedSprite : null;
+                Sprite shown = image.overrideSprite;
+                tintMatches = shown != null && shown == (wanted ?? image.sprite);
+                selectedPalette = image.sprite != null && image.sprite.name == "button_pressed";
+            }
             Rect? rect = ScreenRect(control);
             return new ButtonStateObservation(state, control.name, stored, interactable, selectedPalette,
                 tintMatches, "#" + ColorUtility.ToHtmlStringRGBA(tint),

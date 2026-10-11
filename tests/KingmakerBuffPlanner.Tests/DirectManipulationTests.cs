@@ -408,12 +408,19 @@ namespace KingmakerBuffPlanner.Tests
                 "New castings go to the selected routine; each routine runs on its own.",
                 "\"Disable\"", "Duplicate (a second, separate casting)", "Section(\"Cast by\")",
                 "ToggleProviders", "ToggleRetargets", "\"Coverage.\"", "Required: ",
-                "Cast only out of combat", "animate buffs that cannot be instant"
+                "Cast only out of combat", "animate buffs that cannot be instant",
+                // Native UI finish (UI-05/UI-07): routine reassignment, the
+                // repeated target section and the tutorial prose are gone.
+                "Section(\"Routine and order\")", "MoveFocusedCastingToRoutine", "\"Move to \"",
+                "Section(\"Target\")", "Section(\"If the buff is already there\")", "Planner: Casting-first",
+                "Who casts it · from which source", "one line is one cast", "each click adds one casting",
+                "no enhancement\""
             })
                 Expect(view.IndexOf(retired, StringComparison.Ordinal) < 0,
                     "the reduced sidebar still contains: " + retired);
-            foreach (string kept in new[] { "\"Mode: \"", "ActionButton(\"Remove\"", "Section(\"Routine and order\")",
-                "Section(\"Enhancements (this casting only)\")", "Section(\"If the buff is already there\")" })
+            foreach (string kept in new[] { "\"Mode: \"", "ActionButton(\"Remove\"", "\"FocusedOrder.Earlier\"",
+                "\"FocusedOrder.Later\"", "Section(\"Enhancements\")", "Checkbox(\"FocusedRecastPolicy\"",
+                "Checkbox(\"DraftRecastPolicy\"", "ActionButton(\"DoneEditing\", \"Done\"" })
                 Expect(view.IndexOf(kept, StringComparison.Ordinal) >= 0 ||
                     (kept == "\"Mode: \"" && view.IndexOf("Mode: ", StringComparison.Ordinal) >= 0),
                     "a retained control is missing: " + kept);

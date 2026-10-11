@@ -645,7 +645,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             "camp_frameportrait_selected", "Separator_left", "Separator_middle", "Separator_right",
             "border_line", "blockscroll_bottom", "CheckMark", "Checkmark", "SliderArea",
             "ScrollBar_Big_Handler", "save_framemini", "Portrait_Frame", "Group_Char_Frame_Normal_Simple",
-            "blockframe", "Stat_Line", "Log_Decor_01"
+            "blockframe", "Stat_Line", "Log_Decor_01", "camp_iconpointlist", "globalmap_ok",
+            "class_blockframe_#a29069_#", "SlotBackgroundFilled", "Character_Header_01"
         };
 
         private void WriteNamedPreviews()

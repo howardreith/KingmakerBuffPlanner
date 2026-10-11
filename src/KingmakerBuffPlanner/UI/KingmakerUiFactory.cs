@@ -284,7 +284,7 @@ namespace KingmakerBuffPlanner.UI
         // is the control under the pointer.
         internal static void OwnPointerHighlight(Selectable control)
         {
-            if (control == null || control is InputField) return;
+            if (control == null || control is InputField || control is TMPro.TMP_InputField) return;
             if (PlannerUiReproduction.Rc6ButtonBehaviour) return;
             Navigation navigation = control.navigation;
             navigation.mode = Navigation.Mode.None;
@@ -299,7 +299,7 @@ namespace KingmakerBuffPlanner.UI
             int count = 0;
             foreach (Selectable control in root.GetComponentsInChildren<Selectable>(true))
             {
-                if (control == null || control is InputField) continue;
+                if (control == null || control is InputField || control is TMPro.TMP_InputField) continue;
                 if (control.navigation.mode != Navigation.Mode.None) count++;
                 OwnPointerHighlight(control);
             }

@@ -61,8 +61,19 @@ namespace KingmakerBuffPlanner.UI
             "back_blockscroll", "back_blockscroll_simple", "blockscroll_bottom", "class_blockframe__no_left_border",
             "Separator_left", "Separator_middle", "Separator_right", "spellbook_esc",
             "Inventory_Filter_Icon_Background_Normal", "Inventory_Filter_Icon_Background_Selected",
-            "CheckMark", "SliderArea", "ScrollBar_Big_Handler", "dialogue_backsheet"
+            "CheckMark", "SliderArea", "ScrollBar_Big_Handler", "dialogue_backsheet",
+            // The camp management sheet's paper checkbox, the thin olive frame
+            // of the spellbook's slots, the save list's portrait frame and the
+            // character-build name box (kbpnui-facts-05 inventory).
+            "camp_iconpointlist", "globalmap_ok", "class_blockframe_#a29069_#", "save_framemini",
+            "SlotBackgroundFilled", "Character_Header_01"
         };
+
+        internal const string ThinFrame = "class_blockframe_#a29069_#";
+        internal const string PaperSlip = "back_blockscroll_simple";
+        internal const string NotchedSlip = "back_blockscroll";
+        internal const string PortraitFrame = "save_framemini";
+        internal static readonly Color Burgundy = new Color(0.502f, 0.106f, 0.094f, 1f);
 
         private static PlannerNativeKit _cached;
         private static int _cachedCanvas;
@@ -272,6 +283,111 @@ namespace KingmakerBuffPlanner.UI
             label.fontSizeMin = Mathf.Max(12f, label.fontSize - 5f);
             KingmakerUiFactory.Stretch(label.rectTransform, 10, 10, 2, 2);
             return button;
+        }
+
+        // A native frame drawn over a control (sliced, never taking clicks).
+        internal Image Frame(RectTransform target, string sprite, Color tint, string name = "Frame")
+        {
+            if (target == null || Sprite(sprite) == null) return null;
+            RectTransform frame = KingmakerUiFactory.CreateRect(name, target);
+            KingmakerUiFactory.Stretch(frame);
+            return Paint(frame, sprite, tint);
+        }
+
+        // The native paper checkbox of the camp management sheet: its box,
+        // the native check mark when on, the caption beside it; the whole
+        // row is the click target.
+        internal Button Checkbox(Transform parent, string name, string caption, bool on, Action toggle,
+            bool enabled = true, float size = 15f)
+        {
+            RectTransform row = KingmakerUiFactory.CreateRect(name, parent);
+            Image hit = row.gameObject.AddComponent<Image>();
+            hit.color = new Color(0f, 0f, 0f, 0f);
+            hit.raycastTarget = true;
+            Button button = row.gameObject.AddComponent<Button>();
+            button.targetGraphic = hit;
+            button.transition = Selectable.Transition.None;
+            Navigation navigation = button.navigation;
+            navigation.mode = Navigation.Mode.None;
+            button.navigation = navigation;
+            if (toggle != null) button.onClick.AddListener(() => toggle());
+            RectTransform box = KingmakerUiFactory.CreateRect("Box", row);
+            box.anchorMin = box.anchorMax = new Vector2(0f, 0.5f);
+            box.pivot = new Vector2(0f, 0.5f);
+            box.sizeDelta = new Vector2(20f, 20f);
+            box.anchoredPosition = new Vector2(2f, 0f);
+            if (Paint(box, "camp_iconpointlist") == null)
+            {
+                Image plain = box.gameObject.AddComponent<Image>();
+                plain.color = new Color(BodyInk.r, BodyInk.g, BodyInk.b, 0.35f);
+                plain.raycastTarget = false;
+            }
+            RectTransform mark = KingmakerUiFactory.CreateRect("Check", box);
+            KingmakerUiFactory.Stretch(mark, -1f, -3f, 1f, -3f);
+            Image check = Paint(mark, "globalmap_ok") ?? Paint(mark, "CheckMark", BodyInk);
+            if (check != null) check.preserveAspect = true;
+            mark.gameObject.SetActive(on);
+            TextMeshProUGUI label = Text(row, "Text", caption, PlannerTextRole.Body, size,
+                TextAlignmentOptions.MidlineLeft);
+            KingmakerUiFactory.Stretch(label.rectTransform, 30f, 2f, 0f, 0f);
+            button.interactable = enabled;
+            if (!enabled) label.alpha = 0.5f;
+            return button;
+        }
+
+        // The selected state of a native button: the pressed art (as the
+        // spellbook marks its selected class bookmark) and the brighter ink.
+        internal void SetSelected(Button button, bool selected)
+        {
+            Image image = button == null ? null : button.targetGraphic as Image;
+            Sprite normal = Sprite("button_normal");
+            Sprite pressed = Sprite("button_pressed");
+            if (image != null && normal != null && pressed != null) image.sprite = selected ? pressed : normal;
+            TMP_Text label = button == null ? null : button.GetComponentInChildren<TMP_Text>(true);
+            if (label != null) label.color = selected ? ActionInk : ButtonInk;
+        }
+
+        // A single-line TextMeshPro input on the native name box: typing in it
+        // is text entry to the game (KeyboardAccess stands down while a
+        // TMP_InputField is selected), never its hotkeys.
+        internal TMP_InputField InputField(Transform parent, string name, string placeholder)
+        {
+            var go = new GameObject(name);
+            go.SetActive(false);
+            go.layer = parent == null ? 0 : parent.gameObject.layer;
+            RectTransform rect = go.AddComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            Image background = Paint(rect, "SlotBackgroundFilled", null, true);
+            if (background == null)
+            {
+                background = go.AddComponent<Image>();
+                background.color = new Color(1f, 0.97f, 0.88f, 0.85f);
+                background.raycastTarget = true;
+            }
+            RectTransform area = KingmakerUiFactory.CreateRect("Text Area", rect);
+            KingmakerUiFactory.Stretch(area, 10f, 8f, 2f, 2f);
+            area.gameObject.AddComponent<RectMask2D>();
+            TextMeshProUGUI hint = Text(area, "Placeholder", placeholder, PlannerTextRole.Secondary, 15f,
+                TextAlignmentOptions.MidlineLeft);
+            hint.fontStyle = FontStyles.Italic;
+            hint.enableWordWrapping = false;
+            KingmakerUiFactory.Stretch(hint.rectTransform);
+            TextMeshProUGUI value = Text(area, "Text", string.Empty, PlannerTextRole.Body, 15f,
+                TextAlignmentOptions.MidlineLeft);
+            value.enableWordWrapping = false;
+            value.richText = false;
+            KingmakerUiFactory.Stretch(value.rectTransform);
+            TMP_InputField field = go.AddComponent<TMP_InputField>();
+            field.textViewport = area;
+            field.textComponent = value;
+            field.placeholder = hint;
+            field.targetGraphic = background;
+            field.lineType = TMP_InputField.LineType.SingleLine;
+            field.richText = false;
+            if (BodyFont != null) field.fontAsset = BodyFont;
+            field.pointSize = 15f;
+            go.SetActive(true);
+            return field;
         }
 
         internal static void SetCaption(Button button, string caption)

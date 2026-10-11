@@ -695,7 +695,8 @@ namespace KingmakerBuffPlanner.Tests
         {
             string factory = UiSource("KingmakerUiFactory.cs");
             string ownBlock = SourceBlock(factory, "internal static void OwnPointerHighlight(Selectable control)");
-            Expect(ownBlock != null && ownBlock.Contains("if (control == null || control is InputField) return;") &&
+            Expect(ownBlock != null && ownBlock.Contains(
+                    "if (control == null || control is InputField || control is TMPro.TMP_InputField) return;") &&
                 ownBlock.Contains("navigation.mode = Navigation.Mode.None;"),
                 "OwnPointerHighlight does not remove the selection navigation");
             string create = SourceBlock(factory, "internal static Button CreateButton(");
@@ -738,9 +739,11 @@ namespace KingmakerBuffPlanner.Tests
             string workspace = UiSource("CastingWorkspaceScreenView.cs");
             string classic = UiSource("BuffPlannerScreenView.cs");
             string root = UiSource("BuffPlannerUiRoot.cs");
-            Expect(workspace.Contains("internal const string ModeLabel = \"Planner: Casting-first\";") &&
-                workspace.Contains("KingmakerUiFactory.CreateText(\"PlannerMode\", header, _theme, ModeLabel,"),
-                "the casting-first workspace does not state its mode");
+            // Native UI finish (UI-07): the planner window is titled "Buff
+            // Planner" alone - the development mode label is gone.
+            Expect(!workspace.Contains("Planner: Casting-first") && !workspace.Contains("ModeLabel") &&
+                workspace.Contains("_kit.Text(header, \"Title\", \"Buff Planner\", PlannerTextRole.Title,"),
+                "the casting-first workspace still shows a development label or another title");
             Expect(classic.Contains("internal const string ModeLabel = \"Planner: Classic\";") &&
                 classic.Contains("KingmakerUiFactory.CreateText(\"PlannerMode\", header, _theme, ModeLabel,") &&
                 classic.Contains("\"SwitchToCastingFirst\""),

@@ -1437,7 +1437,6 @@ namespace KingmakerBuffPlanner.Tests
                 "SurfaceClick(_session.ClickGraphCaster(captured, _inputs()))",
                 "SurfaceClick(_session.ClickGraphSource(key, _inputs()))",
                 "SurfaceClick(_session.ClickGraphRecipient(captured, _inputs()))",
-                "_session.MoveFocusedCastingToRoutine(routineId)",
                 "_session.MoveFocusedCastingWithinRoutine(-1)",
                 "_session.MoveFocusedCastingWithinRoutine(1)",
                 "_session.SetFocusedRecastPolicy(inspector.RecastsExisting",
@@ -1456,6 +1455,11 @@ namespace KingmakerBuffPlanner.Tests
             })
                 if (!view.Contains(CollapsedWhitespace(wiring)))
                     throw new InvalidOperationException("The focused editor has no control for: " + wiring);
+            // Native UI finish (UI-05): the sidebar's routine reassignment is
+            // gone (routines are chosen in the routine bar); the session's
+            // move-to-routine stays, exercised above.
+            if (view.Contains("MoveFocusedCastingToRoutine") || view.Contains("\"FocusedRoutine.\""))
+                throw new InvalidOperationException("The sidebar still reassigns routines.");
             if (!graph.Contains(".UnresolvedReviewItems.Select(item => WorkspaceReasonText.DescribeReviewItem(item, nameOf))"))
                 throw new InvalidOperationException("The inspector's review items are not in words.");
         }
