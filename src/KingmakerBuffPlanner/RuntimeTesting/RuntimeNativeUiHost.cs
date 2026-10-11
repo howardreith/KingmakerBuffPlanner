@@ -59,6 +59,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _nativeUiSwitchIndex;
         private NativeUiWindowSwitch _nativeUiSwitch;
         private NativeUiSpellbookView _nativeUiMetamagicView;
+        private bool _nativeUiPauseOwned;
+        private bool _nativeUiPauseBefore;
         private string _nativeUiSourceId;
         private int _nativeUiLogLinesBefore;
         private int _nativeUiRunsBefore;
@@ -336,6 +338,44 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     RestoreNativeUiMetamagicMode();
                     return ContinueAfterNativeSpellbookView();
                 }
+                case 22:
+                {
+                    NativeUiUnavailablePlannerAction action = _nativeUiBookView.UnavailablePlannerAction;
+                    bool open = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                    if (!open && !NativeUiWaited(10000)) return false;
+                    if (open && !NativeUiWaited(1500)) return false;
+                    action.PlannerOpened = open;
+                    action.Capture = "nui-unavailable-metamagic-planner-" + _nativeUiUnitIndex + ".png";
+                    NativeUiCapture(action.Capture);
+                    NativeUiNext(23);
+                    return false;
+                }
+                case 23:
+                {
+                    CloseProbeWorkspace();
+                    EventBus.RaiseEvent<IServiceWindowUIHandler>(handler => handler.HandleOpenSpellbook());
+                    NativeUiNext(24);
+                    return false;
+                }
+                case 24:
+                {
+                    if (!NativeUiWaited(2800)) return false;
+                    NativeUiUnavailablePlannerAction action = _nativeUiBookView.UnavailablePlannerAction;
+                    Transform book = SpellbookWindow();
+                    action.NativeBookRestored = book != null && book.gameObject.activeInHierarchy;
+                    UnitEntityData current = Kingmaker.UI.Common.UIUtility.GetCurrentCharacter();
+                    action.UnitIdAfterReturn = current == null ? null : current.UniqueId;
+                    Button metamagic = NativeMetamagicButton();
+                    action.MetamagicStillUnavailable = metamagic == null ||
+                        !metamagic.gameObject.activeInHierarchy || !metamagic.IsInteractable();
+                    action.PlannerClosedOnReturn = !BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                    action.ReturnCapture = "nui-unavailable-metamagic-return-" + _nativeUiUnitIndex + ".png";
+                    NativeUiCapture(action.ReturnCapture);
+                    NativeUiNext(25);
+                    return false;
+                }
+                case 25:
+                    return ContinueAfterNativeSpellbookView();
                 case 11:
                 {
                     if (!NativeUiWaited(1500)) return false;
@@ -772,6 +812,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (view != null) view.RefreshView();
                     _nativeUiRoutes.Clear();
                     _nativeUiRoutes.AddRange(NativeUiSwitchRoutes);
+                    _nativeUiRoutes.Add("inventory");
+                    _nativeUiRoutes.Add("key:OpenJournal");
                     _nativeUiSwitchIndex = 0;
                     NativeUiNext(4);
                     return false;
@@ -782,6 +824,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // through the game's own route.
                     if (_nativeUiSwitchIndex >= _nativeUiRoutes.Count)
                     {
+                        RestoreNativeUiPause();
                         NativeUiNext(8);
                         return false;
                     }
@@ -792,16 +835,35 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen)
                             return FinishNativeUi("switch-planner-not-reopened:" + _nativeUiRoutes[_nativeUiSwitchIndex]);
                     }
+                    // Exercise the real pause mode through the verified native
+                    // setter; only this probe owns its change and restoration.
+                    if (_nativeUiSwitchIndex >= NativeUiSwitchRoutes.Length && !_nativeUiPauseOwned)
+                    {
+                        _nativeUiPauseBefore = Game.Instance.IsPaused;
+                        _nativeUiPauseOwned = true;
+                        Game.Instance.IsPaused = true;
+                        NativeUiNext(35);
+                        return false;
+                    }
                     string route = _nativeUiRoutes[_nativeUiSwitchIndex];
                     _nativeUiSwitch = new NativeUiWindowSwitch
                     {
                         Route = route,
+                        PauseRequested = _nativeUiSwitchIndex >= NativeUiSwitchRoutes.Length,
                         PlannerOpenBefore = BuffPlannerUiRoot.IsCastingWorkspaceOpen,
                         PausedBefore = Game.Instance.IsPaused,
                         SelectedSourceBefore = CurrentSelectedSource()
                     };
                     OpenNativeRoute(route);
                     NativeUiNext(5);
+                    return false;
+                }
+                case 35:
+                {
+                    if (!NativeUiWaited(350)) return false;
+                    if (!Game.Instance.IsPaused) return FinishNativeUi("deliberate-pause-did-not-activate");
+                    _nativeUi.AddNote("pause:native-Game.IsPaused-setter;no-os-input");
+                    NativeUiNext(4);
                     return false;
                 }
                 case 5:
@@ -812,7 +874,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _nativeUiSwitch.NativeShownAfter = NativeServiceWindowShown();
                     _nativeUiSwitch.FullScreenModeWhileNative = Game.Instance.IsModeActive(GameModeType.FullScreenUi);
                     _nativeUiSwitch.PausedWhileNative = Game.Instance.IsPaused;
-                    _nativeUiSwitch.Capture = "nui-switch-" + Safe(_nativeUiSwitch.Route) + ".png";
+                    _nativeUiSwitch.Capture = "nui-switch-" + Safe(_nativeUiSwitch.Route) +
+                        (_nativeUiSwitch.PauseRequested ? "-paused" : "") + ".png";
                     NativeUiCapture(_nativeUiSwitch.Capture);
                     NativeUiNext(31);
                     return false;
@@ -1262,6 +1325,26 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private bool ContinueAfterNativeSpellbookView()
         {
+            if (!_nativeUiBookView.MetamagicActive || !_nativeUiBookView.MetamagicInteractable)
+            {
+                if (_nativeUiBookView.UnavailablePlannerAction == null)
+                {
+                    BuffPlannerSpellbookEntryController entry = BuffPlannerUiRoot.SpellbookEntryForRuntime;
+                    Button owned = entry == null ? null : entry.OwnedButtonForRuntime;
+                    if (owned == null || !owned.gameObject.activeInHierarchy || !owned.IsInteractable())
+                        return FinishNativeUi("unavailable-metamagic-planner-entry-unavailable");
+                    UnitEntityData current = Kingmaker.UI.Common.UIUtility.GetCurrentCharacter();
+                    _nativeUiBookView.UnavailablePlannerAction = new NativeUiUnavailablePlannerAction
+                    {
+                        ButtonInvoked = true, UnitIdBefore = current == null ? null : current.UniqueId
+                    };
+                    _nativeUi.AddNote("unavailable-metamagic:" + _nativeUiBookView.Unit +
+                        ";planner-button-onClick;no-os-input;no-availability-override");
+                    owned.onClick.Invoke();
+                    NativeUiNext(22);
+                    return false;
+                }
+            }
             if (_nativeUiUnitIndex == 0)
             {
                 WriteSpellbookFacts();
@@ -1350,7 +1433,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _nativeUiCaptureClock.Reset();
             }
             try { RestoreNativeUiMetamagicMode(); }
-            finally { ReleaseNativeUiPlanLock(); }
+            finally
+            {
+                try { ReleaseNativeUiPlanLock(); }
+                finally { RestoreNativeUiPause(); }
+            }
+        }
+
+        private void RestoreNativeUiPause()
+        {
+            if (!_nativeUiPauseOwned) return;
+            if (Game.Instance != null && Game.Instance.IsPaused != _nativeUiPauseBefore)
+                Game.Instance.IsPaused = _nativeUiPauseBefore;
+            _nativeUi.OwnedPauseRestored = Game.Instance != null && Game.Instance.IsPaused == _nativeUiPauseBefore;
+            _nativeUiPauseOwned = false;
         }
 
         private void WriteSpellbookFacts()

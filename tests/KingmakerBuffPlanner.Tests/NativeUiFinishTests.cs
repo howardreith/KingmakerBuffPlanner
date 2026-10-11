@@ -590,6 +590,29 @@ namespace KingmakerBuffPlanner.Tests
                         CurrentMode = "FullScreenUi", BindingMode = "FullScreenUi", WorksWhenPaused = true
                     } : null
                 });
+            foreach (string route in new[] { "inventory", "key:OpenJournal" })
+                record.Switches.Add(new NativeUiWindowSwitch
+                {
+                    Route = route, PauseRequested = true, PausedBefore = true, PausedWhileNative = true,
+                    PausedAfterClose = true, PlannerOpenBefore = true, NativeShownAfter = true,
+                    FullScreenModeWhileNative = true, NativeReleasedAfterClose = true, PlannerReopened = true,
+                    PlannerRootsAfterReopen = 1, SelectedSourceBefore = "src", SelectedSourceAfterReopen = "src",
+                    KeyBinding = route.StartsWith("key:", StringComparison.Ordinal) ? new NativeUiKeyBindingObservation
+                    {
+                        DispatchKind = "binding-callback-forced", BindingName = route.Substring(4), Key = "J",
+                        CurrentMode = "FullScreenUi", BindingMode = "FullScreenUi", WorksWhenPaused = true, Paused = true
+                    } : null
+                });
+            record.OwnedPauseRestored = true;
+            record.Spellbooks.Add(new NativeUiSpellbookView
+            {
+                Unit = "Hedwirg", Shown = true, PlannerButtonPresent = true, PlannerButtonInteractable = true,
+                PlannerButtonCount = 1, UnavailablePlannerAction = new NativeUiUnavailablePlannerAction
+                {
+                    ButtonInvoked = true, PlannerOpened = true, UnitIdBefore = "unit-3", UnitIdAfterReturn = "unit-3",
+                    NativeBookRestored = true, MetamagicStillUnavailable = true, PlannerClosedOnReturn = true
+                }
+            });
             record.SearchFocusSuppressesNativeBindings = true;
             record.SaveFailureShown = true;
             record.SaveRecoveryWorked = true;
@@ -644,6 +667,18 @@ namespace KingmakerBuffPlanner.Tests
                     "key-route:key:OpenInventory:missing-observation" })
                 if (!schema2.Violations().Contains(missing))
                     throw new InvalidOperationException("Schema 3 accepted a missing native action: " + missing);
+            NativeUiRecord schema3 = QualifiedNativeUiRecord();
+            schema3.SchemaVersion = 3;
+            schema3.Switches.RemoveAll(item => item.PauseRequested);
+            schema3.OwnedPauseRestored = false;
+            schema3.Spellbooks[1].UnavailablePlannerAction = null;
+            if (schema3.Violations().Count != 0)
+                throw new InvalidOperationException("A schema-3 verdict was relabelled by schema-4 requirements.");
+            schema3.SchemaVersion = 4;
+            foreach (string missing in new[] { "pause:no-key-route", "pause:no-hud-route", "pause:not-restored",
+                    "unavailable-metamagic:Hedwirg:missing-action" })
+                if (!schema3.Violations().Contains(missing))
+                    throw new InvalidOperationException("Schema 4 accepted a missing observation: " + missing);
             var defects = new Dictionary<string, Action<NativeUiRecord>>
             {
                 { "hud-cell-size:42.0,42.0!=48.0,48.0", r => r.PlannerHudCell = new[] { 42f, 42f } },
@@ -660,7 +695,13 @@ namespace KingmakerBuffPlanner.Tests
                 { "spellbook-pair-height-or-baseline:Linzi", r => r.Spellbooks[0].PlannerRect = new[] { 1600f, 100f, 150f, 30f } },
                 { "spellbook-top-right-entry-present", r => r.SpellbookTopRightEntryAbsent = false },
                 { "popup-presenter:planner-scroll", r => r.PlannerPopupPresenter = "planner-scroll" },
-                { "schema:4", r => r.SchemaVersion = 4 },
+                { "schema:5", r => r.SchemaVersion = 5 },
+                { "pause:inventory:not-paused-before", r => r.Switches[4].PausedBefore = false },
+                { "pause:not-restored", r => r.OwnedPauseRestored = false },
+                { "unavailable-metamagic:no-view", r => r.Spellbooks.RemoveAt(1) },
+                { "unavailable-metamagic:Hedwirg:did-not-open-planner", r => r.Spellbooks[1].UnavailablePlannerAction.PlannerOpened = false },
+                { "unavailable-metamagic:Hedwirg:did-not-return", r => r.Spellbooks[1].UnavailablePlannerAction.MetamagicStillUnavailable = false },
+                { "unavailable-metamagic:Hedwirg:character-changed", r => r.Spellbooks[1].UnavailablePlannerAction.UnitIdAfterReturn = "unit-1" },
                 { "key-route:key:OpenInventory:dispatch-kind", r => r.Switches[3].KeyBinding.DispatchKind = "physical-key" },
                 { "key-route:key:OpenInventory:binding-name", r => r.Switches[3].KeyBinding.BindingName = "OpenSpells" },
                 { "key-route:key:OpenInventory:unbound", r => r.Switches[3].KeyBinding.Key = "None" },
@@ -709,8 +750,8 @@ namespace KingmakerBuffPlanner.Tests
                 { "switch:spellbook:pause-changed", r => r.Switches[2].PausedAfterClose = true },
                 { "switch:inventory:selection-not-kept", r => r.Switches[0].SelectedSourceAfterReopen = "other" },
                 { "switch:key:OpenInventory:planner-stayed", r => r.Switches[3].PlannerOpenAfter = true },
-                { "switch-no-key-route", r => r.Switches.RemoveAt(3) },
-                { "switch-no-hud-route", r => r.Switches.RemoveRange(0, 3) },
+                { "switch-no-key-route", r => r.Switches.RemoveAll(item => item.Route.StartsWith("key:", StringComparison.Ordinal)) },
+                { "switch-no-hud-route", r => r.Switches.RemoveAll(item => !item.Route.StartsWith("key:", StringComparison.Ordinal)) },
                 { "search-focus-native-bindings", r => r.SearchFocusSuppressesNativeBindings = false },
                 { "save-failure-not-shown:none", r => r.SaveFailureShown = false },
                 { "save-recovery-failed", r => r.SaveRecoveryWorked = false },

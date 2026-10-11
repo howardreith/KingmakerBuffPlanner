@@ -15,6 +15,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public string Route { get; set; }
         public bool PlannerOpenBefore { get; set; }
         public bool PausedBefore { get; set; }
+        public bool PauseRequested { get; set; }
         public bool PlannerOpenAfter { get; set; }
         public bool InputLeaseHeldAfter { get; set; }
         public bool NativeShownAfter { get; set; }
@@ -40,6 +41,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool MetamagicActive { get; set; }
         public bool MetamagicInteractable { get; set; }
         public NativeUiMetamagicAction MetamagicAction { get; set; }
+        public NativeUiUnavailablePlannerAction UnavailablePlannerAction { get; set; }
         public bool PlannerButtonPresent { get; set; }
         public bool PlannerButtonInteractable { get; set; }
         public int PlannerButtonCount { get; set; }
@@ -76,6 +78,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool ControllerPresentAfterReturn { get; set; }
         public bool PlannerButtonOfferedAfterReturn { get; set; }
         public string Capture { get; set; }
+    }
+
+    public sealed class NativeUiUnavailablePlannerAction
+    {
+        public bool ButtonInvoked { get; set; }
+        public bool PlannerOpened { get; set; }
+        public string UnitIdBefore { get; set; }
+        public string UnitIdAfterReturn { get; set; }
+        public bool NativeBookRestored { get; set; }
+        public bool MetamagicStillUnavailable { get; set; }
+        public bool PlannerClosedOnReturn { get; set; }
+        public string Capture { get; set; }
+        public string ReturnCapture { get; set; }
     }
 
     public sealed class NativeUiCaptionFit
@@ -119,8 +134,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         // Earlier schemas retain their original judgements. Schema 2 adds
         // popup/caption/filter observations; schema 3 adds native action and
-        // key-route preconditions. Historical records prove only what they observed.
-        public int SchemaVersion { get; set; } = 3;
+        // key-route preconditions. Schema 4 adds deliberately paused switching and
+        // the planner action with unavailable Metamagic. Historical records
+        // prove only what they observed.
+        public int SchemaVersion { get; set; } = 4;
         public string RunId { get; set; }
         public string Stage { get; set; }
         public int ScreenWidth { get; set; }
@@ -194,6 +211,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool EscapeClosedPlannerLast { get; set; }
         public bool LeaseReleasedAtEnd { get; set; }
         public bool FullScreenModeAtEnd { get; set; }
+        public bool OwnedPauseRestored { get; set; }
 
         // Native game log.
         public int GameLogLinesBefore { get; set; }
@@ -222,7 +240,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public IList<string> Violations()
         {
             var violations = new List<string>();
-            if (SchemaVersion != 1 && SchemaVersion != 2 && SchemaVersion != 3) violations.Add("schema:" + SchemaVersion);
+            if (SchemaVersion != 1 && SchemaVersion != 2 && SchemaVersion != 3 && SchemaVersion != 4) violations.Add("schema:" + SchemaVersion);
             if (Stage != FactsStage && Stage != QualifyStage) violations.Add("stage:" + (Stage ?? "null"));
             violations.AddRange(Failures.Select(value => "failure:" + value));
             violations.AddRange(MissingCaptures.Select(value => "capture-missing:" + value));
@@ -246,6 +264,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 foreach (string violation in ObservationViolations()) yield return violation;
             if (SchemaVersion >= 3)
                 foreach (string violation in NativeActionViolations()) yield return violation;
+            if (SchemaVersion >= 4)
+                foreach (string violation in PausedAndUnavailableViolations()) yield return violation;
             // UI-09: four cells the size of the native cells, one per native
             // column, on a third row above the native rows, inside the frame.
             if (PlannerHudButtons != 4) yield return "hud-planner-buttons:" + PlannerHudButtons;
@@ -380,6 +400,31 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (!action.ReturnInvoked || !action.ControllerPresentAfterReturn ||
                     action.ModeAfterReturn != action.ModeBefore) yield return label + "did-not-return";
                 if (!action.PlannerButtonOfferedAfterReturn) yield return label + "planner-entry-unavailable";
+            }
+        }
+
+        private IEnumerable<string> PausedAndUnavailableViolations()
+        {
+            if (!OwnedPauseRestored) yield return "pause:not-restored";
+            foreach (bool keyRoute in new[] { false, true })
+                if (!Switches.Any(item => item.PauseRequested && item.Route != null &&
+                        item.Route.StartsWith("key:", StringComparison.Ordinal) == keyRoute))
+                    yield return keyRoute ? "pause:no-key-route" : "pause:no-hud-route";
+            foreach (NativeUiWindowSwitch item in Switches.Where(value => value.PauseRequested))
+                if (!item.PausedBefore) yield return "pause:" + item.Route + ":not-paused-before";
+            var unavailable = Spellbooks.Where(view => view.Shown &&
+                (!view.MetamagicActive || !view.MetamagicInteractable)).ToList();
+            if (unavailable.Count == 0) yield return "unavailable-metamagic:no-view";
+            foreach (NativeUiSpellbookView view in unavailable)
+            {
+                string label = "unavailable-metamagic:" + view.Unit + ":";
+                NativeUiUnavailablePlannerAction action = view.UnavailablePlannerAction;
+                if (action == null) { yield return label + "missing-action"; continue; }
+                if (!action.ButtonInvoked || !action.PlannerOpened) yield return label + "did-not-open-planner";
+                if (!action.NativeBookRestored || !action.PlannerClosedOnReturn || !action.MetamagicStillUnavailable)
+                    yield return label + "did-not-return";
+                if (string.IsNullOrEmpty(action.UnitIdBefore) || action.UnitIdBefore != action.UnitIdAfterReturn)
+                    yield return label + "character-changed";
             }
         }
 
