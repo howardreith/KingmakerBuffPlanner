@@ -250,8 +250,12 @@ try {
            Args = @('-Scenario', 'live-classic-select', '-ClassicAllowancePath', $outsideQualification, '-TimeoutSeconds', '900', '-WhatIf') },
         @{ Name = 'classic-select-short-timeout'; Expect = '*at least 900*'
            Args = @('-Scenario', 'live-classic-select', '-WhatIf') },
-        @{ Name = 'display-mode-other-scenario'; Expect = '*only valid with -Scenario live-workspace-physical or live-workspace-qual*'
+        @{ Name = 'display-mode-other-scenario'; Expect = '*only valid with -Scenario live-workspace-physical, live-workspace-qual or live-workspace-native-ui.*'
            Args = @('-Scenario', 'live-workspace-import', '-DisplayMode', 'windowed-1920x1080', '-WhatIf') },
+        @{ Name = 'native-ui-without-stage'; Expect = '*requires an explicit -NativeUiStage (facts or qualify).*'
+           Args = @('-Scenario', 'live-workspace-native-ui', '-WhatIf') },
+        @{ Name = 'native-ui-stage-other-scenario'; Expect = '*-NativeUiStage is only valid with -Scenario live-workspace-native-ui.*'
+           Args = @('-Scenario', 'live-workspace-import', '-NativeUiStage', 'facts', '-WhatIf') },
         @{ Name = 'physical-short-timeout'; Expect = '*at least 900*'
            Args = @('-Scenario', 'live-workspace-physical', '-WhatIf') }
     )
