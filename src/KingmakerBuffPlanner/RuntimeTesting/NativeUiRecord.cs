@@ -94,6 +94,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public string NativePopupTitle { get; set; }
         public string PlannerPopupPresenter { get; set; }
         public string PlannerPopupTitle { get; set; }
+        // The same spell in both: the planner's popup title read as the
+        // book's (ornament markup aside).
+        public bool PopupSameSpell { get; set; }
         public bool PlannerPopupClosedByEscape { get; set; }
         public bool PlannerStillOpenAfterPopupEscape { get; set; }
         public string PlannerDocumentBeforePopup { get; set; }
@@ -203,6 +206,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 yield return "popup-escape-order";
             if (PlannerDocumentBeforePopup == null || PlannerDocumentBeforePopup != PlannerDocumentAfterPopup)
                 yield return "popup-changed-plan";
+            if (!PopupSameSpell) yield return "popup-not-same-spell";
             // UI-07: development wording gone from the running surface.
             foreach (string retired in new[] { "Planner: Casting-first", "casting plan" })
                 if (PlannerVisibleLabels.Any(label => label.IndexOf(retired, StringComparison.Ordinal) >= 0))
@@ -241,6 +245,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!RoutinePressRefused) yield return "routine-press-not-refused";
             if (GameLogPlannerLines.Count != 1)
                 yield return "game-log-planner-lines:" + GameLogPlannerLines.Count;
+        }
+
+        // Two description titles name the same spell: their text without the
+        // rich-text tags of the ornamented initial.
+        public static bool SameDescriptionTitle(string native, string planner)
+        {
+            string left = PlainTitle(native);
+            return left.Length != 0 && left == PlainTitle(planner);
+        }
+
+        private static string PlainTitle(string title)
+        {
+            return System.Text.RegularExpressions.Regex.Replace(title ?? string.Empty, "<[^>]*>", string.Empty).Trim();
         }
 
         private static bool SameSize(float[] expected, float[] actual, float tolerance)

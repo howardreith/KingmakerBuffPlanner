@@ -38,6 +38,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private const int NativeUiPrePhase = 150;
         private const int NativeUiOpenPhase = 151;
         private static readonly string[] NativeUiSwitchRoutes = { "inventory", "character", "spellbook" };
+        // UI-01: one spell read in both presenters - the planner's authored
+        // buff and the same spell's row in the first caster's book.
+        private const string NativeUiComparisonSpell = "Resistance";
         private readonly NativeUiRecord _nativeUi = new NativeUiRecord();
         private int _nativeUiStep;
         private Stopwatch _nativeUiClock = new Stopwatch();
@@ -212,14 +215,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (_nativeUiUnitIndex == 0)
                     {
                         WriteSpellbookFacts();
-                        TooltipTrigger trigger = FirstSpellTrigger();
-                        if (trigger == null) return FinishNativeUi("spellbook-no-spell-trigger");
-                        trigger.OpenDescriptionWindow();
-                        NativeUiNext(6);
-                        return false;
+                        // The comparison spell's page, through the book's own
+                        // level tab click, when the open page lacks it.
+                        if (BookSpellTrigger(NativeUiComparisonSpell) == null && ClickBookLevelOf(NativeUiComparisonSpell))
+                        {
+                            NativeUiNext(11);
+                            return false;
+                        }
+                        return OpenNativeBookPopup();
                     }
                     NativeUiNext(7);
                     return false;
+                }
+                case 11:
+                {
+                    if (!NativeUiWaited(1500)) return false;
+                    return OpenNativeBookPopup();
                 }
                 case 6:
                 {
@@ -361,6 +372,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         : view != null && view.SpellInspectOpen ? "planner-scroll" : "none";
                     _nativeUi.PlannerPopupTitle = native ? DescriptionTitle(window)
                         : view == null ? null : view.SpellInspectTitleForRuntime;
+                    _nativeUi.PopupSameSpell = NativeUiRecord.SameDescriptionTitle(_nativeUi.NativePopupTitle,
+                        _nativeUi.PlannerPopupTitle);
                     NativeUiCapture("nui-planner-popup.png");
                     BuffPlannerUiRoot.HandleEscapeForRuntime();
                     NativeUiNext(3);
@@ -973,6 +986,51 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _nativeUi.AddNote("preview:" + file);
         }
 
+        private bool OpenNativeBookPopup()
+        {
+            TooltipTrigger trigger = BookSpellTrigger(NativeUiComparisonSpell);
+            _nativeUi.AddNote("native-popup-row:" + (trigger != null ? NativeUiComparisonSpell : "first-row"));
+            if (trigger == null) trigger = FirstSpellTrigger();
+            if (trigger == null) return FinishNativeUi("spellbook-no-spell-trigger");
+            trigger.OpenDescriptionWindow();
+            NativeUiNext(6);
+            return false;
+        }
+
+        // The open book page's row for one spell, by its blueprint's name.
+        private static TooltipTrigger BookSpellTrigger(string spell)
+        {
+            Transform spellbook = SpellbookWindow();
+            Transform book = spellbook == null ? null : spellbook.Find("Container_Book/Book");
+            if (book == null) return null;
+            return book.GetComponentsInChildren<TooltipTrigger>(false).FirstOrDefault(trigger =>
+            {
+                SpellItem item = trigger == null || !trigger.isActiveAndEnabled ? null
+                    : trigger.GetComponentInParent<SpellItem>();
+                return item != null && item.Spell != null && item.Spell.Name == spell;
+            });
+        }
+
+        // Clicks the level tab of the first caster's book page that lists
+        // the spell, as a click on the tab delivers it (its own Toggle).
+        private bool ClickBookLevelOf(string spell)
+        {
+            UnitEntityData unit = _nativeUiUnits == null || _nativeUiUnits.Count == 0 ? null : _nativeUiUnits[0];
+            int level = unit == null ? -1 : unit.Descriptor.Spellbooks
+                .SelectMany(book => Enumerable.Range(0, book.MaxSpellLevel + 1)
+                    .Where(value => book.GetKnownSpells(value).Any(known =>
+                        known != null && known.Blueprint != null && known.Blueprint.Name == spell)))
+                .DefaultIfEmpty(-1).First();
+            Transform spellbook = SpellbookWindow();
+            Kingmaker.UI.Common.ExtendedToggleTab tab = level < 0 || spellbook == null ? null
+                : spellbook.GetComponentsInChildren<Kingmaker.UI.Common.ExtendedToggleTab>(false).FirstOrDefault(value =>
+                    value.LevelIndex == level && value.Toggle != null && value.Toggle.IsInteractable());
+            _nativeUi.AddNote("book-level-tab:" + spell + ";level=" + level + ";tab=" + (tab != null));
+            if (tab == null) return false;
+            Pointer(tab.Toggle.gameObject, ExecuteEvents.pointerClickHandler);
+            return true;
+        }
+
         // A spell row of the open book page (never the metamagic mixer's or
         // memorizing panel's slots).
         private static TooltipTrigger FirstSpellTrigger()
@@ -1073,7 +1131,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (inputs == null) return "author:no-inputs";
             CastingGraphView view = session.BuildGraph(inputs);
             CastingGraphCatalogueEntry entry = view.Catalogue
-                .Where(value => value.Label != null && value.Label.StartsWith("Resistance", StringComparison.Ordinal))
+                .Where(value => value.Label != null && value.Label.StartsWith(NativeUiComparisonSpell, StringComparison.Ordinal))
                 .FirstOrDefault() ?? view.Catalogue.FirstOrDefault();
             if (entry == null) return "author:empty-catalogue";
             session.SelectGraphBuff(entry.SourceId, inputs);

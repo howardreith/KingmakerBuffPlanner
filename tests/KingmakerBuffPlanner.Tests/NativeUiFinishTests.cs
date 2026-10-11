@@ -398,6 +398,10 @@ namespace KingmakerBuffPlanner.Tests
             record.SpellbookTopRightEntryAbsent = true;
             record.SpellbookHandoffOpenedPlanner = true;
             record.PlannerPopupPresenter = "native-description-window";
+            // Titles in the form the runs read them, ornamented initial included.
+            record.NativePopupTitle = ResistanceTitle;
+            record.PlannerPopupTitle = ResistanceTitle;
+            record.PopupSameSpell = NativeUiRecord.SameDescriptionTitle(record.NativePopupTitle, record.PlannerPopupTitle);
             record.PlannerPopupClosedByEscape = true;
             record.PlannerStillOpenAfterPopupEscape = true;
             record.PlannerDocumentBeforePopup = "doc";
@@ -427,6 +431,11 @@ namespace KingmakerBuffPlanner.Tests
             return record;
         }
 
+        private const string ResistanceTitle =
+            "<font=\"Saber_Dist32\"><color=#983F1D><size=140%>R</size></color></font>esistance";
+        private const string EarPiercingScreamTitle =
+            "<font=\"Saber_Dist32\"><color=#983F1D><size=140%>E</size></color></font>ar-Piercing Scream";
+
         // The qualify stage judges each approved integration; each defect
         // the owner reported (or a regression of a working behaviour) is a
         // named violation.
@@ -448,6 +457,8 @@ namespace KingmakerBuffPlanner.Tests
                 { "spellbook-top-right-entry-present", r => r.SpellbookTopRightEntryAbsent = false },
                 { "popup-presenter:planner-scroll", r => r.PlannerPopupPresenter = "planner-scroll" },
                 { "popup-changed-plan", r => r.PlannerDocumentAfterPopup = "doc2" },
+                { "popup-not-same-spell", r => r.PopupSameSpell =
+                    NativeUiRecord.SameDescriptionTitle(EarPiercingScreamTitle, r.PlannerPopupTitle) },
                 { "retired-label:Planner: Casting-first", r => r.PlannerVisibleLabels.Add("Planner: Casting-first") },
                 { "planner-title:Buff Planner — casting plan", r => r.PlannerTitle = "Buff Planner — casting plan" },
                 { "switch:inventory:planner-stayed", r => r.Switches[0].PlannerOpenAfter = true },
