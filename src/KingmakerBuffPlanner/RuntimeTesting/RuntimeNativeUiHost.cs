@@ -63,6 +63,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private NativeUiSpellbookView _nativeUiMetamagicView;
         private bool _nativeUiPauseOwned;
         private bool _nativeUiPauseBefore;
+        private NativeUiPauseRestoration _nativeUiPauseRestoration;
+        private readonly Stopwatch _nativeUiPauseRestoreClock = new Stopwatch();
         private string _nativeUiSourceId;
         private int _nativeUiLogLinesBefore;
         private int _nativeUiRunsBefore;
@@ -839,8 +841,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // through the game's own route.
                     if (_nativeUiSwitchIndex >= _nativeUiRoutes.Count)
                     {
-                        RestoreNativeUiPause();
-                        NativeUiNext(8);
+                        if (_nativeUiPauseOwned)
+                        {
+                            _nativeUiPauseRestoration = new NativeUiPauseRestoration(_nativeUiPauseBefore,
+                                WorkspaceEngineCaptureWaitMilliseconds);
+                            _nativeUiPauseRestoreClock.Restart();
+                            CloseProbeWorkspace();
+                            NativeUiNext(37);
+                        }
+                        else NativeUiNext(8);
                         return false;
                     }
                     // Installed 2.1.7b refuses starting Pause over FullScreenUi.
@@ -892,6 +901,29 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (!Game.Instance.IsPaused) return FinishNativeUi("deliberate-pause-did-not-activate");
                     _nativeUi.AddNote("pause:native-Game.IsPaused-setter-in-world-mode;no-os-input");
                     NativeUiNext(4);
+                    return false;
+                }
+                case 37:
+                {
+                    NativeUiPauseRestoreStatus status = _nativeUiPauseRestoration.Observe(
+                        NativeUiPauseWorldReleased(), Game.Instance.IsPaused,
+                        _nativeUiPauseRestoreClock.ElapsedMilliseconds, value => Game.Instance.IsPaused = value);
+                    if (status == NativeUiPauseRestoreStatus.Pending) return false;
+                    if (status == NativeUiPauseRestoreStatus.TimedOut)
+                        return FinishNativeUi("pause-restoration-boundary-timed-out");
+                    _nativeUi.OwnedPauseRestored = Game.Instance.IsPaused == _nativeUiPauseBefore;
+                    _nativeUiPauseOwned = false;
+                    _nativeUi.AddNote("pause:original-state-observed-after-world-release;frame=" + Time.frameCount);
+                    BuffPlannerUiRoot.HandlePlannerHotkey();
+                    NativeUiNext(38);
+                    return false;
+                }
+                case 38:
+                {
+                    if (!NativeUiWaited(1500)) return false;
+                    if (!BuffPlannerUiRoot.IsCastingWorkspaceOpen)
+                        return FinishNativeUi("pause-restoration-planner-not-reopened");
+                    NativeUiNext(8);
                     return false;
                 }
                 case 5:
@@ -1361,6 +1393,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private bool _classicHudCaptureRequested;
         private bool _classicHudPauseOwned;
         private bool _classicHudPauseBefore;
+        private NativeUiPauseRestoration _classicHudPauseRestoration;
+        private readonly Stopwatch _classicHudPauseRestoreClock = new Stopwatch();
 
         private void BeginClassicHudAvailabilityObservation()
         {
@@ -1394,8 +1428,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _classicHudObservation["atCompletion"] = ClassicHudAvailabilitySnapshot();
                     _classicHudObservation["status"] = "CAPTURED";
                     _classicHudCapture = null;
-                    RestoreClassicHudCapturePause();
-                    return true; // subsequent execution/result work runs in another Update
+                    _classicHudPauseRestoration = new NativeUiPauseRestoration(_classicHudPauseBefore,
+                        WorkspaceEngineCaptureWaitMilliseconds);
+                    _classicHudPauseRestoreClock.Restart();
+                    return true; // release and result work run in subsequent Updates
+                }
+                if (_classicHudPauseRestoration != null)
+                {
+                    NativeUiPauseRestoreStatus restore = _classicHudPauseRestoration.Observe(
+                        NativeUiPauseWorldReleased(), Game.Instance.IsPaused,
+                        _classicHudPauseRestoreClock.ElapsedMilliseconds, value => Game.Instance.IsPaused = value);
+                    if (restore == NativeUiPauseRestoreStatus.Pending) return true;
+                    if (restore == NativeUiPauseRestoreStatus.TimedOut)
+                        throw new InvalidOperationException("Classic capture pause restoration exceeded ten seconds.");
+                    _classicHudObservation["pauseRestored"] = Game.Instance.IsPaused == _classicHudPauseBefore;
+                    _classicHudPauseOwned = false;
+                    _classicHudPauseRestoration = null;
+                    return true;
                 }
                 if (_classicHudCaptureRequested) return false;
                 if (!BuffPlannerUiRoot.IsExecutingForRuntime)
@@ -1474,9 +1523,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (Game.Instance == null) throw new InvalidOperationException("Classic capture pause owner lost the game.");
             Game.Instance.IsPaused = _classicHudPauseBefore;
             _classicHudObservation["pauseRestored"] = Game.Instance.IsPaused == _classicHudPauseBefore;
-            if (!(bool)_classicHudObservation["pauseRestored"])
-                throw new InvalidOperationException("Classic capture did not restore its owned pause state.");
-            _classicHudPauseOwned = false;
+            // Cleanup can queue the request too. Keep ownership and the false
+            // receipt until the original native state is actually observed.
+            if ((bool)_classicHudObservation["pauseRestored"]) _classicHudPauseOwned = false;
         }
 
         private void EndClassicHudAvailabilityObservation(string reason)
@@ -1816,7 +1865,24 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             finally
             {
                 try { ReleaseNativeUiPlanLock(); }
-                finally { RestoreNativeUiPause(); }
+                finally
+                {
+                    try
+                    {
+                        if (_nativeUiPauseOwned)
+                        {
+                            try
+                            {
+                                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen) CloseProbeWorkspace();
+                            }
+                            finally
+                            {
+                                if (NativeServiceWindowShown()) CloseNativeServiceWindow();
+                            }
+                        }
+                    }
+                    finally { RestoreNativeUiPause(); }
+                }
             }
         }
 
@@ -1826,7 +1892,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (Game.Instance != null && Game.Instance.IsPaused != _nativeUiPauseBefore)
                 Game.Instance.IsPaused = _nativeUiPauseBefore;
             _nativeUi.OwnedPauseRestored = Game.Instance != null && Game.Instance.IsPaused == _nativeUiPauseBefore;
-            _nativeUiPauseOwned = false;
+            if (_nativeUi.OwnedPauseRestored) _nativeUiPauseOwned = false;
+        }
+
+        private static bool NativeUiPauseWorldReleased()
+        {
+            return Game.Instance != null && !BuffPlannerUiRoot.IsCastingWorkspaceOpen &&
+                !NativeServiceWindowShown() && !Game.Instance.IsModeActive(GameModeType.FullScreenUi) &&
+                (Game.Instance.CurrentMode == GameModeType.Default || Game.Instance.CurrentMode == GameModeType.Pause);
         }
 
         private void WriteSpellbookFacts()

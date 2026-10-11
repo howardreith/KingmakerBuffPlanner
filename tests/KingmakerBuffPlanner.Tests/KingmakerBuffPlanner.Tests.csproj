@@ -99,6 +99,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\SpellbookEntryRecord.cs"><Link>RuntimeTesting\SpellbookEntryRecord.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\NativeUiRecord.cs"><Link>RuntimeTesting\NativeUiRecord.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\NativeUiCaptureBoundary.cs"><Link>RuntimeTesting\NativeUiCaptureBoundary.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\NativeUiPauseRestoration.cs"><Link>RuntimeTesting\NativeUiPauseRestoration.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingQualificationDriver.cs"><Link>Execution\CastingQualificationDriver.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\SingleCastProbeObservation.cs"><Link>Execution\SingleCastProbeObservation.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\MaterialComponentAvailability.cs"><Link>Execution\MaterialComponentAvailability.cs</Link></Compile>

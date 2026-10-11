@@ -14,6 +14,10 @@ namespace KingmakerBuffPlanner.Tests
         // Native UI finish (KBP_NATIVE_UI_FINISH_2026-10-10).
         private static void RunNativeUiFinishTests(string root)
         {
+            Run("native-pause-restoration-world-boundary", TestPauseRestoreWorldBoundary);
+            Run("native-pause-restoration-queued-mode", TestPauseRestoreQueuedMode);
+            Run("native-pause-restoration-original-state", TestPauseRestoreOriginalState);
+            Run("native-pause-restoration-bounded-timeout", TestPauseRestoreTimeout);
             Run("native-ui-capture-holds-frame-and-output", TestNativeUiCaptureBoundary);
             Run("native-ui-capture-bounded-timeout", TestNativeUiCaptureTimeout);
             Run("native-ui-capture-refuses-stale-output", TestNativeUiCaptureFreshOutput);
@@ -26,6 +30,65 @@ namespace KingmakerBuffPlanner.Tests
             Run("native-hud-stepped-enclosure-geometry", TestHudStepGeometry);
             Run("native-hud-cell-art-composition", TestHudCellArt);
             Run("native-source-tabs-share-one-caption-size", TestSourceTabLayout);
+        }
+
+        private static void TestPauseRestoreWorldBoundary()
+        {
+            var restore = new NativeUiPauseRestoration(false, 10000);
+            int requests = 0;
+            Action<bool> request = value => requests++;
+            if (restore.Observe(false, true, 1, request) != NativeUiPauseRestoreStatus.Pending ||
+                restore.Observe(false, false, 2, request) != NativeUiPauseRestoreStatus.Pending || requests != 0)
+                throw new InvalidOperationException("Pause restoration ran beneath an owned full-screen window.");
+            if (restore.Observe(true, true, 3, request) != NativeUiPauseRestoreStatus.Pending || requests != 1)
+                throw new InvalidOperationException("World release did not permit the one owned restoration request.");
+        }
+
+        private static void TestPauseRestoreQueuedMode()
+        {
+            var restore = new NativeUiPauseRestoration(false, 10000);
+            int requests = 0;
+            Action<bool> request = value =>
+            {
+                if (value) throw new InvalidOperationException("Unpause restoration requested pause.");
+                requests++;
+            };
+            if (restore.Observe(true, true, 1, request) != NativeUiPauseRestoreStatus.Pending ||
+                restore.Observe(true, true, 2, request) != NativeUiPauseRestoreStatus.Pending || requests != 1)
+                throw new InvalidOperationException("A queued request was treated as observed restoration or repeated.");
+            if (restore.Observe(true, false, 3, request) != NativeUiPauseRestoreStatus.Restored ||
+                restore.Observe(true, false, 10000, request) != NativeUiPauseRestoreStatus.Restored || requests != 1)
+                throw new InvalidOperationException("The later native state was not retained as restoration.");
+        }
+
+        private static void TestPauseRestoreOriginalState()
+        {
+            foreach (bool original in new[] { false, true })
+            {
+                var restore = new NativeUiPauseRestoration(original, 10000);
+                if (restore.Observe(true, original, 1, value =>
+                    { throw new InvalidOperationException("An unchanged native pause state was rewritten."); })
+                    != NativeUiPauseRestoreStatus.Restored)
+                    throw new InvalidOperationException("The original native pause state was not preserved.");
+                restore = new NativeUiPauseRestoration(original, 10000);
+                if (restore.Observe(true, !original, 1, value =>
+                    { if (value != original) throw new InvalidOperationException("Wrong original pause requested."); })
+                    != NativeUiPauseRestoreStatus.Pending ||
+                    restore.Observe(true, original, 2, value => {}) != NativeUiPauseRestoreStatus.Restored)
+                    throw new InvalidOperationException("Restoration did not preserve either original pause value.");
+            }
+        }
+
+        private static void TestPauseRestoreTimeout()
+        {
+            foreach (bool worldReleased in new[] { false, true })
+            {
+                var restore = new NativeUiPauseRestoration(false, 10000);
+                if (restore.Observe(worldReleased, true, 9999, value => {}) != NativeUiPauseRestoreStatus.Pending ||
+                    restore.Observe(worldReleased, true, 10000, value => {}) != NativeUiPauseRestoreStatus.TimedOut ||
+                    restore.Observe(true, false, 10001, value => {}) != NativeUiPauseRestoreStatus.TimedOut)
+                    throw new InvalidOperationException("A blocked or stalled pause restoration was not bounded.");
+            }
         }
 
         private static readonly byte[] NativeUiTestPng = Convert.FromBase64String(
