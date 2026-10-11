@@ -49,6 +49,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _nativeUiLogLinesBefore;
         private int _nativeUiRunsBefore;
         private FileStream _nativeUiPlanLock;
+        private bool _nativeUiEscapePopupClosed;
+        private bool _nativeUiEscapeOpenAfterFirst;
         private string _nativeUiDocumentBeforeFault;
         private readonly List<string> _nativeUiRoutes = new List<string>();
 
@@ -363,7 +365,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     if (!NativeUiWaited(700)) return false;
                     DescriptionWindow window = NativeDescriptionWindow();
-                    bool nativeOpen = window != null && window.gameObject.activeInHierarchy;
+                    bool nativeOpen = NativeDescriptionPresenter.IsOpen;
                     _nativeUi.PlannerPopupClosedByEscape = !nativeOpen && (view == null || !view.SpellInspectOpen);
                     _nativeUi.PlannerStillOpenAfterPopupEscape = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
                     _nativeUi.PlannerDocumentAfterPopup = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
@@ -542,22 +544,42 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 case 9:
                 {
+                    // Three Escape presses at a player's pace: the description,
+                    // then the focused casting, then the planner itself.
                     if (!NativeUiWaited(1500)) return false;
                     BuffPlannerUiRoot.HandleEscapeForRuntime();
-                    DescriptionWindow window = NativeDescriptionWindow();
-                    bool popupClosed = !(window != null && window.gameObject.activeInHierarchy) &&
+                    NativeUiNext(17);
+                    return false;
+                }
+                case 17:
+                {
+                    if (!NativeUiWaited(700)) return false;
+                    _nativeUiEscapePopupClosed = !NativeDescriptionPresenter.IsOpen &&
                         (view == null || !view.SpellInspectOpen);
-                    bool open = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                    _nativeUiEscapeOpenAfterFirst = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
                     BuffPlannerUiRoot.HandleEscapeForRuntime();
+                    NativeUiNext(18);
+                    return false;
+                }
+                case 18:
+                {
+                    if (!NativeUiWaited(700)) return false;
                     CastingWorkspaceSession live = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
                     bool focusCleared = live != null && live.EditingFocusCastingId == null;
                     bool stillOpen = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
-                    _nativeUi.EscapeClosedFocusFirst = popupClosed && open && focusCleared && stillOpen;
+                    _nativeUi.EscapeClosedFocusFirst = _nativeUiEscapePopupClosed && _nativeUiEscapeOpenAfterFirst &&
+                        focusCleared && stillOpen;
+                    _nativeUi.AddNote("escape:popupClosed=" + _nativeUiEscapePopupClosed + ";openAfter1=" +
+                        _nativeUiEscapeOpenAfterFirst + ";focusCleared=" + focusCleared + ";openAfter2=" + stillOpen);
                     BuffPlannerUiRoot.HandleEscapeForRuntime();
+                    NativeUiNext(19);
+                    return false;
+                }
+                case 19:
+                {
+                    if (!NativeUiWaited(700)) return false;
                     _nativeUi.EscapeClosedPlannerLast = !BuffPlannerUiRoot.IsCastingWorkspaceOpen &&
                         !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
-                    _nativeUi.AddNote("escape:popupClosed=" + popupClosed + ";openAfter1=" + open +
-                        ";focusCleared=" + focusCleared + ";openAfter2=" + stillOpen);
                     NativeUiNext(10);
                     return false;
                 }

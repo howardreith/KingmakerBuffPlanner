@@ -117,6 +117,7 @@ namespace KingmakerBuffPlanner.UI
         // description window (NativeDescriptionPresenter), read-only: it
         // never authors, targets, casts or persists anything.
         private NativeDescriptionPresenter _description;
+        private bool _descriptionShownLastFrame;
         private readonly Action<string> _log;
 
         internal CastingWorkspaceScreenView(
@@ -187,8 +188,13 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed) return false;
             // The native description is the innermost window: Escape closes
-            // it first, leaving the planner exactly as it was.
-            if (NativeDescriptionPresenter.CloseIfOpen()) return true;
+            // it first, leaving the planner exactly as it was. Shown at the
+            // end of the last frame counts too: the game's own Escape
+            // manager may have closed it earlier in this frame, and one
+            // press never closes both it and the planner.
+            bool described = NativeDescriptionPresenter.CloseIfOpen() || _descriptionShownLastFrame;
+            _descriptionShownLastFrame = false;
+            if (described) return true;
             // Then the Resources details, if shown.
             if (_resources != null && _resources.gameObject.activeSelf)
             {
@@ -200,6 +206,12 @@ namespace KingmakerBuffPlanner.UI
             _session.ClearGraphFocus();
             RefreshView();
             return true;
+        }
+
+        // Called once at the end of every frame's planner tick.
+        internal void NoteFrameEnd()
+        {
+            _descriptionShownLastFrame = NativeDescriptionPresenter.IsOpen;
         }
 
         internal void ShowNotice(string text)

@@ -8,31 +8,27 @@ extracted read-only to
 `scripts/verify_packet.py` PASS (30 files against MANIFEST.json). The packet
 stays reference material; this file follows its `templates/PROGRESS.md`.
 
-Updated: 2026-10-10 23:40 -04:00
+Updated: 2026-10-11 01:20 -04:00
 
 ## Current checkpoint
 
-- Active objective: Stage 1 — native contracts and a no-input native-UI runtime
-  scenario (facts + before evidence), then Stage 2 implementation.
+- Active objective: Stage 3 — qualification of the implemented UI-01..UI-11
+  (native-UI qualify stage at the owner's 1920x1200, then the layout
+  boundary, planning interactions and the casting/game-log case), then the
+  version, records and the frozen-commit gate.
 - Repository / branch / HEAD:
   `C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-NUI` /
-  `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10` / base
-  `a9c6d0f766370cdfb5176665fc6279b6620c4884` (main, v0.4.3, PR #8 merge).
-- Working tree: new isolated worktree from `main`; ignored machine-local
-  `GamePath.props` copied from the OP042 worktree. The main checkout
-  (`repo/KingmakerBuffPlanner`, old 0.3.0 branch) and every other worktree
-  are untouched.
-- Baseline build: 0.4.3, Release `Build.ps1` PASS (DLL
-  `2b5750e3dc9e1ce045217a245956d579b602f7c5d5edf0533eadfdaf57bbb5ac`);
-  C# protocol suite PASS=511 FAIL=0 (20 s).
-- Installed in the live game: `Mods\KingmakerBuffPlanner` 0.1.1-rc3, DLL
-  `78407dd4c7240ce25c7654715854e83061da744a18d8eb4a2198fdffec5e3080`
-  (restored by the harness after every run; never edited by hand).
-- Runtime context: Kingmaker Enhanced Plus 2.1.7b, owner display 1920x1200,
-  `full-user` profile, Automation fixture (`KBP_AUTOMATION_WORKING`).
-- Guard/lease state (2026-10-10 23:10): no Kingmaker or launcher process; no
-  open transaction in `runtime-state\transactions`; latest run
-  `kbp042-removal-06` complete with restoration verified.
+  `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10` / `16f749c`
+  (base `a9c6d0f`, main 0.4.3). Runtime builds come from the detached run
+  worktree `repo/KingmakerBuffPlanner-NUIR` checked out at the same commit
+  (clean tree, `Build-Local.ps1`).
+- Working tree: clean at each runtime build; ignored `GamePath.props` only.
+- Version: still 0.4.3 in source; the version advance is scheduled with the
+  final records so the qualified build is the delivered build.
+- C# protocol suite PASS=517 FAIL=0; Validate-Source PASS=43 FAIL=0 at
+  `16f749c`.
+- Guard/lease state: every runtime run below completed with restoration
+  verified and protected saves clean; no open transaction.
 
 ## Reference review
 
@@ -70,17 +66,17 @@ Updated: 2026-10-10 23:40 -04:00
 
 | ID | Status | Implementation checkpoint | Evidence / remaining criterion |
 |---|---|---|---|
-| UI-01 Popup | NOT_RUN | | |
-| UI-02 Window switching | NOT_RUN | | |
-| UI-03 Font | NOT_RUN | | |
-| UI-04 Casting cards | NOT_RUN | | |
-| UI-05 Sidebar | NOT_RUN | | |
-| UI-06 Catalogue | NOT_RUN | | |
-| UI-07 Chrome text | NOT_RUN | | |
-| UI-08 Footer/native log | NOT_RUN | | |
-| UI-09 HUD frame | NOT_RUN | | |
-| UI-10 Spellbook pair | NOT_RUN | | |
-| UI-11 Shared parchment | NOT_RUN | | |
+| UI-01 Popup | IMPLEMENTED, qualify pending | `d5a1d99` | kbpnui-facts-06: right-click opens the game's own DescriptionWindow above the planner (tooltip layer lifted by an owned override canvas), Escape closes it first, plan unchanged. |
+| UI-02 Window switching | IMPLEMENTED, qualify pending | `c57f490`, `16f749c` | facts runs: three native routes take over and restore; search focus gate judged in qualify. |
+| UI-03 Font | IMPLEMENTED, qualify pending | `aad17d1` | kbpnui-facts-07 planner capture: NexusSerif TMP by role, ornamental title. |
+| UI-04 Casting cards | IMPLEMENTED, qualify pending | `c57f490`, `aad17d1` | Paper slips, fine lines, "Active · Will skip/recast". |
+| UI-05 Sidebar | IMPLEMENTED, qualify pending | `aad17d1` | Owner's order; routine reassignment removed; new-castings scope named. |
+| UI-06 Catalogue | IMPLEMENTED, qualify pending | `aad17d1` | Paper slips, framed icons, counts only when meaningful. |
+| UI-07 Chrome text | IMPLEMENTED, qualify pending | `aad17d1` | Title "Buff Planner"; short lane headings; retired labels judged. |
+| UI-08 Footer/native log | IMPLEMENTED, qualify pending | `c57f490`, `aad17d1` | One game-log line per run/refusal; footer Run status; Resources details; save failure judged in qualify. |
+| UI-09 HUD frame | IMPLEMENTED, facts PASS | `fa0bfc4` | kbpnui-facts-04: enclosure installed, offsets 0, rail hidden, 4/4 top hits; captures nui-hud*.png. |
+| UI-10 Spellbook pair | IMPLEMENTED, facts PASS | `bbe8426`, `d5a1d99` | kbpnui-facts-05: 210/210 pair, gap 10, same baseline/font; non-caster keeps the planner entry. |
+| UI-11 Shared parchment | IMPLEMENTED, qualify pending | `aad17d1`, `16f749c` | Native slips, frames, portrait frames, rules, scrollbars. |
 
 ## Verification ledger
 
@@ -88,6 +84,11 @@ Updated: 2026-10-10 23:40 -04:00
 |---|---|---|---|---|
 | Baseline build | a9c6d0f, 0.4.3 | `scripts\Build.ps1 -Configuration Release` | PASS | DLL 2b5750e3… |
 | Baseline C# suite | a9c6d0f, 0.4.3 | tests exe (no args) | PASS | PASS=511 FAIL=0 |
+| Facts stage (no input) | `3fd5fe9`, 0.4.3 | live-workspace-native-ui facts, kbpnui-facts-03 | PASS | native facts and before captures; restoration verified |
+| Facts stage | `fa0bfc4` | kbpnui-facts-04 | PASS | HUD enclosure live (UI-09) |
+| Facts stage | `bbe8426` | kbpnui-facts-05 | PASS | spellbook pair live (UI-10) |
+| Facts stage | `d5a1d99` | kbpnui-facts-06 | PASS | native description window live (UI-01) |
+| Facts stage | `aad17d1`, DLL 1ba4ecbc…, MVID e198b338… | kbpnui-facts-07 | PASS | rewritten planner live (UI-03..08, UI-11) |
 
 - Final frozen-commit gate: not started.
 - Before/after screenshot manifest: not started.
@@ -97,6 +98,6 @@ Updated: 2026-10-10 23:40 -04:00
 
 Remaining blocker: none known.
 
-Next action: add the no-input `live-workspace-native-ui` scenario (native
-facts, sprite previews, before screenshots), build the local package, run it
-under the guarded launcher with an explicit non-casting configuration.
+Next action: read kbpnui-qual-01 (qualify stage, 1920x1200), fix any
+violation, then the layout-boundary configuration, live-workspace-qual
+(planning interactions) and the casting/game-log case.

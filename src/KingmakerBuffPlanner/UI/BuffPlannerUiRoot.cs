@@ -2212,6 +2212,7 @@ namespace KingmakerBuffPlanner.UI
                 TickWindowHandoff();
                 if (_castingWorkspace != null) _castingWorkspace.TickGeometry();
                 if (Input.GetKeyDown(KeyCode.Escape)) TakeEscape("Escape");
+                if (_castingWorkspace != null) _castingWorkspace.NoteFrameEnd();
                 // The close an accepted Classic run asked for, one frame after
                 // the press (never inside the button's own callback).
                 if (_closeScreenForClassicRun)

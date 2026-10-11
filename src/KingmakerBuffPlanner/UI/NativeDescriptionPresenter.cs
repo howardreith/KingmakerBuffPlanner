@@ -71,12 +71,20 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        // Shown, as the window itself counts it: CloseWindow clears its
+        // m_IsShowed at once and deactivates only after the disappear
+        // animation (exact 2.1.7b contract), so a closing window is closed.
+        private static readonly System.Reflection.FieldInfo ShownField =
+            typeof(DescriptionWindowBase).GetField("m_IsShowed",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
         internal static bool IsOpen
         {
             get
             {
                 DescriptionWindow window = Window;
-                return window != null && window.gameObject.activeInHierarchy;
+                if (window == null || !window.gameObject.activeInHierarchy) return false;
+                return ShownField == null || (bool)ShownField.GetValue(window);
             }
         }
 
