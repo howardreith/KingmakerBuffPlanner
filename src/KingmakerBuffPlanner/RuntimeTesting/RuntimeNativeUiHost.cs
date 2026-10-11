@@ -1326,6 +1326,143 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _qualifiedUiObservation.ToString(Formatting.Indented) + Environment.NewLine);
         }
 
+        // UI-09: a real animated Classic execution disables the owned HUD
+        // cells. Hold that execution with the native pause setter for one
+        // bounded capture; never set an availability flag or disabled style.
+        private readonly JObject _classicHudObservation = new JObject();
+        private NativeUiCaptureBoundary _classicHudCapture;
+        private readonly Stopwatch _classicHudCaptureClock = new Stopwatch();
+        private bool _classicHudCaptureRequested;
+        private bool _classicHudPauseOwned;
+        private bool _classicHudPauseBefore;
+
+        private void BeginClassicHudAvailabilityObservation()
+        {
+            if (!_classicRecord.CastingScenario || _classicRecord.ExecutionMode != "animated") return;
+            _classicHudObservation["schemaVersion"] = 1;
+            _classicHudObservation["runId"] = _request.RunId;
+            _classicHudObservation["sourceCommit"] = _request.ExpectedCommit;
+            _classicHudObservation["packageSha256"] = _request.ExpectedPackageSha256;
+            _classicHudObservation["screenWidth"] = Screen.width;
+            _classicHudObservation["screenHeight"] = Screen.height;
+            _classicHudObservation["condition"] = "real-classic-execution-held-by-native-pause";
+            _classicHudObservation["visualReview"] = "NOT_REVIEWED";
+            _classicHudObservation["before"] = ClassicHudAvailabilitySnapshot();
+        }
+
+        private bool ObserveClassicHudAvailability()
+        {
+            if (_classicHudObservation.Count == 0) return false;
+            try
+            {
+                if (_classicHudCapture != null)
+                {
+                    if (!BuffPlannerUiRoot.IsExecutingForRuntime || !ClassicHudCellsUnavailable())
+                        throw new InvalidOperationException("The real disabled condition ended before capture completed.");
+                    NativeUiCaptureStatus status = _classicHudCapture.Observe(Time.frameCount,
+                        _classicHudCaptureClock.ElapsedMilliseconds);
+                    if (status == NativeUiCaptureStatus.Pending) return true;
+                    if (status == NativeUiCaptureStatus.TimedOut)
+                        throw new IOException("Classic disabled-HUD capture exceeded the ten-second boundary.");
+                    _classicHudObservation["completedFrame"] = Time.frameCount;
+                    _classicHudObservation["atCompletion"] = ClassicHudAvailabilitySnapshot();
+                    _classicHudObservation["status"] = "CAPTURED";
+                    _classicHudCapture = null;
+                    RestoreClassicHudCapturePause();
+                    return true; // subsequent execution/result work runs in another Update
+                }
+                if (_classicHudCaptureRequested) return false;
+                if (!BuffPlannerUiRoot.IsExecutingForRuntime)
+                    throw new InvalidOperationException("The animated execution ended before disabled HUD observation.");
+                BuffPlannerHudButtonController hud = BuffPlannerUiRoot.HudForRuntime;
+                if (hud == null) throw new InvalidOperationException("Classic HUD is missing.");
+                hud.RefreshAvailability(); // production condition, no forced appearance
+                if (!ClassicHudCellsUnavailable())
+                    throw new InvalidOperationException("Executing Classic HUD cells are still available.");
+                if (!_classicHudPauseOwned)
+                {
+                    _classicHudPauseBefore = Game.Instance.IsPaused;
+                    _classicHudPauseOwned = true;
+                    Game.Instance.IsPaused = true;
+                    if (!Game.Instance.IsPaused || !BuffPlannerUiRoot.IsExecutingForRuntime)
+                        throw new InvalidOperationException("The real execution could not be held at its capture boundary.");
+                    _classicHudObservation["pauseBefore"] = _classicHudPauseBefore;
+                    _classicHudObservation["pauseHeld"] = Game.Instance.IsPaused;
+                    _classicHudCaptureClock.Restart();
+                    return true;
+                }
+                // Let the native disabled ColorTint transition settle while
+                // the actual execution condition remains held.
+                if (_classicHudCaptureClock.ElapsedMilliseconds < 200) return true;
+                _classicHudObservation["atRequest"] = ClassicHudAvailabilitySnapshot();
+                _classicHudObservation["capture"] = "nui-hud-executing-disabled.png";
+                _classicHudObservation["requestFrame"] = Time.frameCount;
+                _classicHudCapture = new NativeUiCaptureBoundary(Path.Combine(_request.EvidenceDirectory,
+                    "nui-hud-executing-disabled.png"), Time.frameCount, WorkspaceEngineCaptureWaitMilliseconds);
+                _classicHudCaptureRequested = true;
+                _classicHudCaptureClock.Restart();
+                CaptureScreenshot(_classicHudCapture.Path);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                _classicHudObservation["captureFailure"] = exception.Message;
+                _classicHudObservation["status"] = "FAILED";
+                RestoreClassicHudCapturePause();
+                throw;
+            }
+        }
+
+        private static bool ClassicHudCellsUnavailable()
+        {
+            BuffPlannerHudButtonController hud = BuffPlannerUiRoot.HudForRuntime;
+            return hud != null && new[] { "setup", "long", "important", "short" }.All(id =>
+                hud.ButtonForRuntime(id) != null && !hud.ButtonForRuntime(id).interactable);
+        }
+
+        private static JObject ClassicHudAvailabilitySnapshot()
+        {
+            BuffPlannerHudButtonController hud = BuffPlannerUiRoot.HudForRuntime;
+            Button[] owned = hud == null ? new Button[0] : new[] { "setup", "long", "important", "short" }
+                .Select(id => hud.ButtonForRuntime(id)).Where(button => button != null).ToArray();
+            return new JObject
+            {
+                { "sessionExecuting", BuffPlannerUiRoot.IsExecutingForRuntime },
+                { "owned", JArray.FromObject(owned.Select(button => new
+                    { button.name, button.interactable, highlight = HighlightTint(button) }).ToArray()) },
+                { "native", JArray.FromObject(hud == null || hud.NativeClusterForRuntime == null ? new object[0]
+                    : hud.NativeClusterForRuntime.GetComponentsInChildren<Button>(false)
+                        .Where(button => !owned.Contains(button)).Select(button => (object)new
+                            { button.name, button.interactable }).ToArray()) }
+            };
+        }
+
+        private void RestoreClassicHudCapturePause()
+        {
+            if (!_classicHudPauseOwned) return;
+            if (Game.Instance == null) throw new InvalidOperationException("Classic capture pause owner lost the game.");
+            Game.Instance.IsPaused = _classicHudPauseBefore;
+            _classicHudObservation["pauseRestored"] = Game.Instance.IsPaused == _classicHudPauseBefore;
+            if (!(bool)_classicHudObservation["pauseRestored"])
+                throw new InvalidOperationException("Classic capture did not restore its owned pause state.");
+            _classicHudPauseOwned = false;
+        }
+
+        private void EndClassicHudAvailabilityObservation(string reason)
+        {
+            if (_classicHudObservation.Count == 0) return;
+            try { RestoreClassicHudCapturePause(); }
+            finally
+            {
+                _classicHudObservation["terminalReason"] = reason;
+                _classicHudObservation["capturePending"] = _classicHudCapture == null ? null
+                    : Path.GetFileName(_classicHudCapture.Path);
+                _classicHudObservation["after"] = ClassicHudAvailabilitySnapshot();
+                AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "native-ui-classic-hud.json"),
+                    _classicHudObservation.ToString(Formatting.Indented) + Environment.NewLine);
+            }
+        }
+
         // ---- helpers ------------------------------------------------------
 
         // The tint the cell's ColorTint transition has rendered on its

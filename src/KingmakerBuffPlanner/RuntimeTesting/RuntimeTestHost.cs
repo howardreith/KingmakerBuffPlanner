@@ -4884,6 +4884,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 // earlier in the session never stands in for it).
                 _classicQuickBefore = BuffPlannerUiRoot.QuickResultForRuntime("long");
                 _log.Info("[KBP-CLASSIC] grant armed;pressing the Long routine;" + _classicGrant.Describe() + ".");
+                BeginClassicHudAvailabilityObservation();
                 if (!BuffPlannerUiRoot.PressRoutineForRuntime("long"))
                     return FailClassic("press-not-started");
                 _classicClock.Reset();
@@ -4893,6 +4894,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             if (_classicStage == 3)
             {
+                if (ObserveClassicHudAvailability()) return false;
                 QuickExecutionResult quick = BuffPlannerUiRoot.QuickResultForRuntime("long");
                 if (BuffPlannerUiRoot.IsExecutingForRuntime || quick == null ||
                     ReferenceEquals(quick, _classicQuickBefore))
@@ -4914,8 +4916,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // owned terminal and the grant is disarmed, used or not.
         private void EndClassicScenario(string reason)
         {
-            BuffPlannerUiRoot.EndClassicRunForRuntime(reason);
-            UI.NativeCastingSessionPolicy.DisarmClassicGrant();
+            try { EndClassicHudAvailabilityObservation(reason); }
+            finally
+            {
+                BuffPlannerUiRoot.EndClassicRunForRuntime(reason);
+                UI.NativeCastingSessionPolicy.DisarmClassicGrant();
+            }
             _classicRecord.GrantArmedAtEnd = UI.NativeCastingSessionPolicy.ClassicGrant != null &&
                 !UI.NativeCastingSessionPolicy.ClassicGrant.Disarmed;
         }
