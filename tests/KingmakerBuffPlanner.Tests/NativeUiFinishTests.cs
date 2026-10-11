@@ -22,6 +22,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("native-ui-game-log-lines", TestNativeUiGameLogLines);
             Run("native-hud-stepped-enclosure-geometry", TestHudStepGeometry);
             Run("native-hud-cell-art-composition", TestHudCellArt);
+            Run("native-source-tabs-share-one-caption-size", TestSourceTabLayout);
         }
 
         // The no-input native UI scenario is a workspace scenario on the
@@ -248,6 +249,61 @@ namespace KingmakerBuffPlanner.Tests
         // border rises one row over them, the step's rail stands after the
         // fourth column, and the native rail it meets is redrawn from the
         // exact texture columns the native tiled frame shows there.
+        // The catalogue's source tabs (UI-03, UI-06): one caption size for all
+        // four, every caption inside margins clear of the button frame, each
+        // tab as wide as its caption needs. Caption widths are the four
+        // captions at 14 px; the rows are the catalogue lane at 1920x1080 and
+        // at 1280x720, where four equal quarters overran (kbpnui-final-qual-07,
+        // kbpnui-final-qual-720-05).
+        private static void TestSourceTabLayout()
+        {
+            float[] captions = { 19.6f, 39.2f, 55.1f, 38.4f };
+            const float margin = SourceTabLayout.CaptionMargin;
+            Action<SourceTabLayout, float> fitsRow = (layout, row) =>
+            {
+                if (!layout.Fits) throw new InvalidOperationException("The tabs do not fit a row of " + row + ".");
+                float total = layout.Widths.Sum() + (captions.Length - 1) * SourceTabLayout.TabGap;
+                if (Math.Abs(total - row) > 0.05f)
+                    throw new InvalidOperationException("The tabs do not fill the row: " + total + " of " + row + ".");
+                for (int index = 0; index < captions.Length; index++)
+                {
+                    if (captions[index] * layout.CaptionSize / 14f + 2f * margin > layout.Widths[index] + 0.01f)
+                        throw new InvalidOperationException("Caption " + index + " overruns its tab at " + layout.CaptionSize + ".");
+                    if (index > 0 && Math.Abs(layout.Lefts[index] - (layout.Lefts[index - 1] + layout.Widths[index - 1] +
+                            SourceTabLayout.TabGap)) > 0.01f)
+                        throw new InvalidOperationException("Tab " + index + " is not beside its neighbour.");
+                }
+                if (layout.Lefts[0] != 0f) throw new InvalidOperationException("The first tab does not start the row.");
+            };
+            SourceTabLayout wide = SourceTabLayout.Compute(253f, captions, 14f, 9f);
+            if (wide.CaptionSize != 14f) throw new InvalidOperationException("A wide row shrank the captions: " + wide.CaptionSize);
+            fitsRow(wide, 253f);
+            SourceTabLayout narrow = SourceTabLayout.Compute(166f, captions, 14f, 9f);
+            if (narrow.CaptionSize >= 14f || narrow.CaptionSize < 9f || narrow.CaptionSize * 2f != Math.Floor(narrow.CaptionSize * 2f))
+                throw new InvalidOperationException("The narrow row's caption size is " + narrow.CaptionSize + ".");
+            fitsRow(narrow, 166f);
+            // The equal quarters this replaces: "Abilities" had no room at the
+            // same size.
+            float quarter = (166f - 3f * SourceTabLayout.TabGap) / 4f - 2f * margin;
+            if (captions[2] * narrow.CaptionSize / 14f <= quarter)
+                throw new InvalidOperationException("The regression case no longer overran equal quarters.");
+            SourceTabLayout cramped = SourceTabLayout.Compute(60f, captions, 14f, 9f);
+            if (cramped.CaptionSize != 9f || cramped.Fits)
+                throw new InvalidOperationException("A row too narrow for the minimum size is reported as fitting.");
+            foreach (Action invalid in new Action[]
+                {
+                    () => SourceTabLayout.Compute(0f, captions, 14f, 9f),
+                    () => SourceTabLayout.Compute(166f, new float[0], 14f, 9f),
+                    () => SourceTabLayout.Compute(166f, captions, 8f, 9f)
+                })
+            {
+                bool refused = false;
+                try { invalid(); }
+                catch (ArgumentException) { refused = true; }
+                if (!refused) throw new InvalidOperationException("An invalid tab row was laid out.");
+            }
+        }
+
         private static void TestHudStepGeometry()
         {
             float[] lefts = { 2f, 51f, 100f, 149f, 198f, 247f };

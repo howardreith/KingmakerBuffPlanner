@@ -78,6 +78,11 @@ namespace KingmakerBuffPlanner.UI
         private PlannerSourceCategory _sourceCategory = PlannerSourceCategory.All;
         private readonly Dictionary<PlannerSourceCategory, Button> _categoryTabs =
             new Dictionary<PlannerSourceCategory, Button>();
+        private const float SourceTabCaptionMax = 14f;
+        private const float SourceTabCaptionMin = 9f;
+        private readonly List<TMP_Text> _sourceTabCaptions = new List<TMP_Text>();
+        private float _sourceTabsWidth = -1f;
+        private string _sourceTabFit = "not-laid-out";
         // Graph.
         private Image _bannerIcon;
         private TMP_Text _bannerTitle;
@@ -212,6 +217,56 @@ namespace KingmakerBuffPlanner.UI
         internal void NoteFrameEnd()
         {
             _descriptionShownLastFrame = NativeDescriptionPresenter.IsOpen;
+            FitSourceTabs();
+        }
+
+        // The source tabs follow the lane's width (SourceTabLayout); laid out
+        // again only when that width changes.
+        private void FitSourceTabs()
+        {
+            if (_sourceTabCaptions.Count == 0 || _sourceTabCaptions.Count != _categoryTabs.Count) return;
+            RectTransform lane = _sourceTabCaptions[0].rectTransform.parent == null ? null
+                : _sourceTabCaptions[0].rectTransform.parent.parent as RectTransform;
+            float width = lane == null ? 0f : lane.rect.width;
+            if (width <= 0f || Mathf.Abs(width - _sourceTabsWidth) < 0.5f) return;
+            _sourceTabsWidth = width;
+            var measured = new float[_sourceTabCaptions.Count];
+            for (int index = 0; index < measured.Length; index++)
+            {
+                TMP_Text caption = _sourceTabCaptions[index];
+                caption.fontSize = SourceTabCaptionMax;
+                measured[index] = Mathf.Max(1f, caption.GetPreferredValues(caption.text,
+                    float.PositiveInfinity, float.PositiveInfinity).x);
+            }
+            SourceTabLayout layout = SourceTabLayout.Compute(width, measured, SourceTabCaptionMax, SourceTabCaptionMin);
+            var parts = new List<string>();
+            for (int index = 0; index < measured.Length; index++)
+            {
+                TMP_Text caption = _sourceTabCaptions[index];
+                caption.fontSize = layout.CaptionSize;
+                RectTransform tab = caption.rectTransform.parent as RectTransform;
+                if (tab != null)
+                {
+                    tab.anchoredPosition = new Vector2(layout.Lefts[index], tab.anchoredPosition.y);
+                    tab.sizeDelta = new Vector2(layout.Widths[index], tab.sizeDelta.y);
+                }
+                parts.Add(caption.text + ":" + Invariant(measured[index] * layout.CaptionSize / SourceTabCaptionMax) +
+                    "/" + Invariant(layout.Widths[index] - 2f * SourceTabLayout.CaptionMargin));
+            }
+            _sourceTabFit = "size=" + Invariant(layout.CaptionSize) + ";fits=" + layout.Fits + ";row=" +
+                Invariant(width) + ";" + string.Join(";", parts.ToArray());
+        }
+
+        private static string Invariant(float value)
+        {
+            return value.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        // Runtime evidence: the source tabs' shared caption size and, per
+        // tab, the caption's width against the room inside its margins.
+        internal string SourceTabFitForRuntime
+        {
+            get { return _sourceTabFit; }
         }
 
         internal void ShowNotice(string text)
@@ -963,6 +1018,7 @@ namespace KingmakerBuffPlanner.UI
                 PlannerSourceCategory.All, PlannerSourceCategory.Spells,
                 PlannerSourceCategory.Abilities, PlannerSourceCategory.Other
             };
+            _sourceTabCaptions.Clear();
             for (int index = 0; index < categories.Length; index++)
             {
                 PlannerSourceCategory captured = categories[index];
@@ -976,22 +1032,26 @@ namespace KingmakerBuffPlanner.UI
                             PropagateUiLayer();
                         }
                     }, PlannerTextRole.Button, 14f);
+                // Placed by FitSourceTabs once the lane has its width: one
+                // row, one caption size, each tab as wide as its caption needs.
                 RectTransform rect = RectOf(tab);
-                KingmakerUiFactory.SetAnchors(rect, index * 0.25f, 1f, (index + 1) * 0.25f, 1f, 1f, 1f, 0f, 0f);
-                rect.pivot = new Vector2(0.5f, 1f);
-                rect.sizeDelta = new Vector2(-2f, 28f);
-                rect.anchoredPosition = new Vector2(0f, -58f);
-                // Four tabs share the lane: on a small screen the caption
-                // shrinks (never overlapping its neighbour) and keeps thin
-                // margins (kbpnui-qual-720-01).
+                rect.anchorMin = new Vector2(0f, 1f);
+                rect.anchorMax = new Vector2(0f, 1f);
+                rect.pivot = new Vector2(0f, 1f);
+                rect.sizeDelta = new Vector2(60f, 28f);
+                rect.anchoredPosition = new Vector2(index * 62f, -58f);
                 TMP_Text caption = tab.GetComponentInChildren<TMP_Text>(true);
                 if (caption != null)
                 {
-                    caption.fontSizeMin = 8f;
-                    KingmakerUiFactory.Stretch(caption.rectTransform, 3f, 3f, 2f, 2f);
+                    caption.enableAutoSizing = false;
+                    caption.fontSize = SourceTabCaptionMax;
+                    KingmakerUiFactory.Stretch(caption.rectTransform, SourceTabLayout.CaptionMargin,
+                        SourceTabLayout.CaptionMargin, 2f, 2f);
+                    _sourceTabCaptions.Add(caption);
                 }
                 _categoryTabs[captured] = tab;
             }
+            _sourceTabsWidth = -1f;
             ScrollRect scroll = KingmakerUiFactory.CreateScrollView("Scroll", lane, _theme,
                 out _catalogueContent, 16f);
             KingmakerUiFactory.SetAnchors(RectOf(scroll), 0f, 0f, 1f, 1f, 0f, 0f, 20f, 92f);

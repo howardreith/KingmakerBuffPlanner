@@ -285,6 +285,7 @@
     <Compile Include="UI\AssignmentEligibility.cs" />
     <Compile Include="UI\SpellbookHandoffStateMachine.cs" />
     <Compile Include="UI\SpellbookWindowLocator.cs" />
+    <Compile Include="UI\SourceTabLayout.cs" />
     <Compile Include="UI\SpellbookFooterLayout.cs" />
     <Compile Include="UI\SpellbookHandoffFaults.cs" />
     <Compile Include="UI\BuffPlannerSpellbookEntryController.cs" />
