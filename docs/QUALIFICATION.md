@@ -1,4 +1,4 @@
-> 0.5.0 native UI finish candidate (unreleased): product `cd1b5545d49cbd294d0f6997c812a432729fac81`, standard package `d94418b0d39e5417b1638a495a0b9f34515a618a4441630cc2fca41fda834218`. Per-ID statuses, runs, evidence and remaining items: `docs/NATIVE-UI-FINISH-0.5.0-DELIVERY.md`.
+> 0.5.0 native UI finish candidate (unreleased): product `4dbfa33e1b36bf59bc9bb1a4ac3ebde860c52302`, standard package `cf658914130a010d7525ee47bc41a1f5c05f9bcde929852a1e31430ab3be8fcb`. Per-ID statuses, runs, evidence and remaining items: `docs/NATIVE-UI-FINISH-0.5.0-DELIVERY.md`.
 > 0.4.2 owner-test candidate (unreleased): product `7a0842f1ee5a343b98e5499ef7726bb321e41f40` (after the PR #7 review corrections), package `0adad29d9d79568efa79fc3c2cb11cdfffe3d7b82384099bbd0cf7fe4ae0d98a`. Evidence, NOT RUN items and the owner test list: `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`.
 > 0.4.0 owner-review candidate (unreleased): rc4 `009b6ddab80a5e70d7469962986c38222961f4ba`, package `4be8a0b7dbf150d762350a88aa6a00eafac391fe0ac0e541d85dd53618f63adb` (rc3 `c452e01` superseded after the lead review). Packages, evidence and the owner checklist: `docs/REMAINING-WORK-0.4.0-HANDOFF.md`.
 > Unreleased WP2A candidate: ordinary blocked runs focus the first blocking casting; HUD refusals open directly to it. Previous/Next navigate current blockers without editing or saving. Repairs recompute through the compiler/gate. Global refusals stay global; Ready Casts Only remains an explicit fallback. Duplicate and Reload leave problem inspection; group summaries identify known origins. Review corrections are implemented and regressed. Qualification belongs to the exact manifest, complete source gate and fresh guarded runtime completion; see the dated checkpoint and required records in [WP2A evidence](../docs/WP2A-NOT-READY-NAVIGATION.md). Historical 0.3.0 evidence below is unchanged.
@@ -1266,21 +1266,21 @@ The row-by-row verdicts on the original E01–E27 definitions are in
 
 Mission `KBP_NATIVE_UI_FINISH_2026-10-10`; branch
 `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10` from main
-`a9c6d0f` (v0.4.3). Product `cd1b5545d49cbd294d0f6997c812a432729fac81`, version 0.5.0, package
-`d94418b0d39e5417b1638a495a0b9f34515a618a4441630cc2fca41fda834218` (local-runtime and standard ZIP, byte-identical), DLL
-`a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41`, MVID `6e0ed7cd-3d0b-41da-af95-d820bfec8a09`.
+`a9c6d0f` (v0.4.3). Product `4dbfa33e1b36bf59bc9bb1a4ac3ebde860c52302`, version 0.5.0, package
+`cf658914130a010d7525ee47bc41a1f5c05f9bcde929852a1e31430ab3be8fcb` (local-runtime and standard ZIP, byte-identical), DLL
+`b32f320ecebd1288eb409cec4893953f2e685a1acad0898de1b8f03164e58e69`, MVID `526e6663-b368-4e64-9afa-08f979dbcfe0`.
 
 | Check | Result |
 | --- | --- |
 | C# protocol suite | PASS=517 FAIL=0 |
 | `Validate-Source.ps1` | PASS=43 FAIL=0 |
 | `Build-Release.ps1` | PASS=3 FAIL=0 (deterministic 2/2, strict package validation PASS=4 FAIL=0) |
-| `Test-SourceOnly.ps1` | running since 2026-10-11T06:24:49Z |
-| `kbpnui-final-qual-06` (qualify, 1920x1080) | PASS: no violations; 7/7 window switches (HUD routes and key bindings); same-spell native popups; Escape and close button; planning 13/13 restored; save failure recovered; one refusal line in the game log; HUD idle/hover/pressed tints 0.0 / 1.0 / 0.784 |
-| `kbpnui-final-qual-720-04` (qualify, 1280x720) | PASS: the same checks at canvas scale 0.667 |
-| `kbpnui-final-cast-select-03`, `kbpnui-final-cast-02` (`zero-cost-mixed`, instant) | PASS: stop, complete (already-active skip), repeat refused, Always recast, held disable, recover; five game-log lines, one per run |
+| `Test-SourceOnly.ps1` | `cd1b554`: FAIL (stale launcher meta-test expectation, fixed in `4dbfa33`; every earlier step passed); `4dbfa33`: running since 2026-10-11T12:49:38Z |
+| `kbpnui-final-qual-07` (qualify, 1920x1080) | PASS: no violations; 7/7 window switches (HUD routes and key bindings); same-spell native popups; Escape and close button; planning 13/13 restored; save failure recovered; one refusal line in the game log; HUD idle/hover/pressed tints 0.0 / 1.0 / 0.784 |
+| `kbpnui-final-qual-720-05` (qualify, 1280x720) | PASS: the same checks at canvas scale 0.667 |
+| `kbpnui-final-cast-select-04`, `kbpnui-final-cast-03` (`zero-cost-mixed`, instant) | PASS: stop, complete (already-active skip), repeat refused, Always recast, held disable, recover; five game-log lines, one per run |
 
-Every run loaded version 0.5.0 at `cd1b554` with the DLL and MVID above,
+Every run loaded version 0.5.0 at `4dbfa33` with the DLL and MVID above,
 restored `Mods` with verification and left every protected save unchanged.
 No physical-input run: the checks press the same controls through their own
 handlers. The full ledger, including the superseded and failed runs, is in

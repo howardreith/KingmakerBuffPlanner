@@ -12,10 +12,10 @@ state only; behaviour is proven by each run's record (`native-ui.json`, `qual-ou
 | Run | Role | Result | Commit | Version | DLL SHA-256 | MVID | Screen |
 |---|---|---|---|---|---|---|---|
 | `kbpnui-facts-03` | before: 0.4.3 baseline captures (owner display 1920x1200) | PASS | `3fd5fe9` | 0.4.3 | `a6a379c876cb09a3984529e0cd8b5b96efe9e2427dba96198be01901dac6af2d` | `5ffa2a58-f419-44ce-872c-0d607660329e` | 1920x1200 |
-| `kbpnui-final-qual-06` | after: final qualify, 1920x1080 | PASS | `cd1b554` | 0.5.0 | `a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41` | `6e0ed7cd-3d0b-41da-af95-d820bfec8a09` | 1920x1080 |
-| `kbpnui-final-qual-720-04` | after: final qualify, 1280x720 (case F) | PASS | `cd1b554` | 0.5.0 | `a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41` | `6e0ed7cd-3d0b-41da-af95-d820bfec8a09` | 1280x720 |
-| `kbpnui-final-cast-select-03` | final casting selection (non-casting) | PASS | `cd1b554` | 0.5.0 | `a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41` | `6e0ed7cd-3d0b-41da-af95-d820bfec8a09` | - |
-| `kbpnui-final-cast-02` | final casting run (cases D/E) | PASS | `cd1b554` | 0.5.0 | `a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41` | `6e0ed7cd-3d0b-41da-af95-d820bfec8a09` | - |
+| `kbpnui-final-qual-07` | after: final qualify, 1920x1080 | PASS | `4dbfa33` | 0.5.0 | `b32f320ecebd1288eb409cec4893953f2e685a1acad0898de1b8f03164e58e69` | `526e6663-b368-4e64-9afa-08f979dbcfe0` | 1920x1080 |
+| `kbpnui-final-qual-720-05` | after: final qualify, 1280x720 (case F) | PASS | `4dbfa33` | 0.5.0 | `b32f320ecebd1288eb409cec4893953f2e685a1acad0898de1b8f03164e58e69` | `526e6663-b368-4e64-9afa-08f979dbcfe0` | 1280x720 |
+| `kbpnui-final-cast-select-04` | final casting selection (non-casting) | PASS | `4dbfa33` | 0.5.0 | `b32f320ecebd1288eb409cec4893953f2e685a1acad0898de1b8f03164e58e69` | `526e6663-b368-4e64-9afa-08f979dbcfe0` | - |
+| `kbpnui-final-cast-03` | final casting run (cases D/E) | PASS | `4dbfa33` | 0.5.0 | `b32f320ecebd1288eb409cec4893953f2e685a1acad0898de1b8f03164e58e69` | `526e6663-b368-4e64-9afa-08f979dbcfe0` | - |
 | `kbpnui-facts-02` | facts stage, failed (probe) | FAIL | `c8a5a21` | 0.4.3 | `5f900661872d506d67c9633f555a269418e222e4a8399d1f84fd885ff70dda84` | `87e3884a-2df1-46b8-ab96-bd3fcbeede9b` | 1920x1200 |
 | `kbpnui-facts-04` | facts: UI-09 implementation | PASS | `fa0bfc4` | 0.4.3 | `a6c3e141e86b50a7ba309e3fedc8cd07aca133392e2b53863b4949441b5746a7` | `339ad506-2e34-49dd-90de-1f1ed182ad01` | 1920x1200 |
 | `kbpnui-facts-05` | facts: UI-10 implementation | PASS | `bbe8426` | 0.4.3 | `bf10718663d1fc412ed4d78e651e7d3f3641aae0f08c2043dba6235e06210cc2` | `3e92babc-daf9-4780-b40f-be12d92ff527` | 1920x1200 |
@@ -35,6 +35,10 @@ state only; behaviour is proven by each run's record (`native-ui.json`, `qual-ou
 | `kbpnui-final-qual-05` | qualify, superseded (pressed frame showed idle) | PASS | `1938aaf` | 0.5.0 | `ed11adbe976fb2fdc41c7a32d5809d6eb2fbf6442d40167f534b639ad483e2c1` | `300351a9-97ff-4373-8ca9-01a234e57881` | 1920x1080 |
 | `kbpnui-final-qual-720-03` | qualify 1280x720, superseded | PASS | `1938aaf` | 0.5.0 | `ed11adbe976fb2fdc41c7a32d5809d6eb2fbf6442d40167f534b639ad483e2c1` | `300351a9-97ff-4373-8ca9-01a234e57881` | 1280x720 |
 | `kbpnui-final-cast-select-02` | casting selection, superseded | PASS | `1938aaf` | 0.5.0 | `ed11adbe976fb2fdc41c7a32d5809d6eb2fbf6442d40167f534b639ad483e2c1` | `300351a9-97ff-4373-8ca9-01a234e57881` | - |
+| `kbpnui-final-qual-06` | qualify (state tints), superseded by the gate fix | PASS | `cd1b554` | 0.5.0 | `a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41` | `6e0ed7cd-3d0b-41da-af95-d820bfec8a09` | 1920x1080 |
+| `kbpnui-final-qual-720-04` | qualify 1280x720 (state tints), superseded by the gate fix | PASS | `cd1b554` | 0.5.0 | `a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41` | `6e0ed7cd-3d0b-41da-af95-d820bfec8a09` | 1280x720 |
+| `kbpnui-final-cast-select-03` | casting selection, superseded by the gate fix | PASS | `cd1b554` | 0.5.0 | `a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41` | `6e0ed7cd-3d0b-41da-af95-d820bfec8a09` | - |
+| `kbpnui-final-cast-02` | casting run, superseded by the gate fix | PASS | `cd1b554` | 0.5.0 | `a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41` | `6e0ed7cd-3d0b-41da-af95-d820bfec8a09` | - |
 
 ## Before and after
 
@@ -43,21 +47,21 @@ state only; behaviour is proven by each run's record (`native-ui.json`, `qual-ou
 Before: 0.4.3 planner (legacy sans-serif text, development title, ledger footer), its own scroll popup open. After: native fonts, paper slips, Casting options, compact footer.
 
 - Before (0.4.3, 1920x1200): `kbpnui-facts-03/nui-planner-casting.png` `bbda89d19dc0eb0937fe3dbb55e9190c89971cacc2ef3be1635c4ec90315dba4`
-- After: `kbpnui-final-qual-06/nui-planner-casting.png` `2bd269cc92032b618fbb9adcc18ca92e96eca2b44e005b5b32df84ca7588d8c2`
-- After: `kbpnui-final-qual-720-04/nui-planner-casting.png` `5d802af54053a589d50ecb5d0c4a3fd4a0473e006b725b1076b7e1cd63d7e166`
+- After: `kbpnui-final-qual-07/nui-planner-casting.png` `9d8eb6e908f41ff275bbb84d19f960ef4c5c99fb94929ad5111fa0fa0ee9acc6`
+- After: `kbpnui-final-qual-720-05/nui-planner-casting.png` `5d802af54053a589d50ecb5d0c4a3fd4a0473e006b725b1076b7e1cd63d7e166`
 
 ### UI-01 description
 
 Before: the planner's own parchment scroll. After: the same spell (Resistance) in the game's DescriptionWindow from the spellbook and from the planner, same scale and position.
 
 - Before (0.4.3, 1920x1200): `kbpnui-facts-03/nui-planner-popup.png` `060fd0589ee2921104347d5e078670308c951c5c629ea6e62408a8d47f94b0d8`
-- After: `kbpnui-final-qual-06/nui-native-popup.png` `c1cfa9a1cb1469b5ffdd54e527e00dddf94159079438bdde5387f62533aca5b1`
-- After: `kbpnui-final-qual-06/nui-planner-popup.png` `3ce06b50615267f9ece59e82c9946c08919dad24e3149f745f6146209f0909e4`
-- After: `kbpnui-final-qual-720-04/nui-native-popup.png` `804c5d232e2ea3882a977339859254d4cb9b09c5dfca37b407405a83139d65ff`
-- After: `kbpnui-final-qual-720-04/nui-planner-popup.png` `3cb7226553a3672d9844eb355e8b129557f9f27f45d35507ddb08b251a033f0e`
+- After: `kbpnui-final-qual-07/nui-native-popup.png` `c1cfa9a1cb1469b5ffdd54e527e00dddf94159079438bdde5387f62533aca5b1`
+- After: `kbpnui-final-qual-07/nui-planner-popup.png` `58ce5b3521e0606ad6c5fc1fdf3688e0e7db7e65426cd698898af793295948c6`
+- After: `kbpnui-final-qual-720-05/nui-native-popup.png` `de0f9502fbc4d5119c677c56a2d315df89e93dc1e64ed25ac3ace4c664d60cb4`
+- After: `kbpnui-final-qual-720-05/nui-planner-popup.png` `3cb7226553a3672d9844eb355e8b129557f9f27f45d35507ddb08b251a033f0e`
 - After: `crops/UI-01_after_1920x1080_native-spellbook-popup-Resistance.png` `d6818ef67656e322b2a0756f53fa1a713c1ea63f236bf6b222d4ef85a4284ed0`
 - After: `crops/UI-01_after_1920x1080_planner-popup-Resistance.png` `61c2aca4895f55c350e286b206cd81964d6bc40d60fcd0c60f064eaa8b4dfa17`
-- After: `crops/UI-01_after_1280x720_native-spellbook-popup-Resistance.png` `54eb02ce5f70357e05136cb4ae6dba320d5ff38d80f632d0b84a4fb3955fc88c`
+- After: `crops/UI-01_after_1280x720_native-spellbook-popup-Resistance.png` `69def173f6d6a540696f32d2bbde8fae464e03bdacbdd2bda7bc943303156780`
 - After: `crops/UI-01_after_1280x720_planner-popup-Resistance.png` `b786afefdfe657a95435da4763f9128c40ec4d4c65a8d55c4c12ce887f9e602c`
 
 ### UI-09 HUD
@@ -65,27 +69,27 @@ Before: the planner's own parchment scroll. After: the same spell (Resistance) i
 Before: bare white glyphs above the old rail. After: four native cells in the stepped frame; hover (Setup) and pressed (Long) beside the native Formation cell's hover.
 
 - Before (0.4.3, 1920x1200): `kbpnui-facts-03/nui-hud.png` `c3941d2ff7eca08a931493dcc91672f07bf84bb09b11faff6b568919812a126d`
-- After: `kbpnui-final-qual-06/nui-hud.png` `69d4922499e37319263efa7de573b1a36298da61ec5ed9d3b4dd804e11f4d547`
-- After: `kbpnui-final-qual-06/nui-hud-hover-planner.png` `ba583a4158e7bc19bac732a9ddfccce38ee909ee1cd52cee59ca1309a87824c7`
-- After: `kbpnui-final-qual-06/nui-hud-pressed-planner.png` `6fea86c74c828eb561f2ff3a5af254f63cd407860e8d9cdfe3e055508fc27766`
-- After: `kbpnui-final-qual-06/nui-hud-hover-native.png` `872e1a3500ec983958d9583f451a0d18b3b82f8f5afc2a755b7bc8e7765c324a`
-- After: `kbpnui-final-qual-720-04/nui-hud.png` `99363f7bff4aec249c23b0a9ccc233d5a0a9f40577358463c7e3a46b8321109a`
+- After: `kbpnui-final-qual-07/nui-hud.png` `3c1cee0d436cb0213d9e2bb7918a332d7fcafeef6f3594eec508030131f3b711`
+- After: `kbpnui-final-qual-07/nui-hud-hover-planner.png` `65eb9f10ffade5a7ca4eb1e54c06fd16f7446871c6484bdb0181bb98f051218c`
+- After: `kbpnui-final-qual-07/nui-hud-pressed-planner.png` `e13bf726557c60e4331c2fa0a18b5157704d9680c63339d692ee8794d929aba1`
+- After: `kbpnui-final-qual-07/nui-hud-hover-native.png` `2d1915f52c661b66ca9257b039e941a56111575d730dbc6daed02355dc079914`
+- After: `kbpnui-final-qual-720-05/nui-hud.png` `cefdc28de794a500a6efa445e493658d1e45a2b3015c3e14a978004a2ba49ee9`
 - After: `crops/UI-09_before_1920x1200_hud.png` `76215253dec07e71c856323a9f1d3179814992953399966128525ffa700c54c1`
-- After: `crops/UI-09_after_1920x1080_hud-idle.png` `c21ff2861c6f1d3da815c83559654d7f78bac2b5c6e52ac1d1e19af67f82eb9f`
-- After: `crops/UI-09_after_1920x1080_cells-idle_x3.png` `1b88a43f28d2a2fa9cea9ec0c92ae27e0d0f5dee531d17ea1f7bcb0689294cba`
-- After: `crops/UI-09_after_1920x1080_cells-hover-setup_x3.png` `72ca536d3d30ca919d51b4f097f054e003ecdaedde964e2fa8c17dad756cab08`
-- After: `crops/UI-09_after_1920x1080_cells-pressed-long_x3.png` `e77ce6ded1769b2bf42c0c5c2f3d3283bcc9f115b0ccc3f2914a1075bc8fada6`
-- After: `crops/UI-09_after_1920x1080_native-hover_x2.png` `8c0d9f032b1a1083ab2a701c813d379c4d6adbb3b63118272af4dc59fc70e5dc`
-- After: `crops/UI-09_after_1280x720_hud-idle_x2.png` `4b0db06f2bc01431d7f5bcd26321df607d3394f62f9de1a2723884619faf76d7`
+- After: `crops/UI-09_after_1920x1080_hud-idle.png` `69453f573577e6b42df34750fb05cf2b3dcbd83f9ee43b875acce7559849356c`
+- After: `crops/UI-09_after_1920x1080_cells-idle_x3.png` `12169113205cb06577d1558f6f702608f95af1503d10dcc9fc03a9e58a66c892`
+- After: `crops/UI-09_after_1920x1080_cells-hover-setup_x3.png` `5488c15921c9dd68d1b9238a4d1256f553c9517cac70d0e33f5490e7411b9ab2`
+- After: `crops/UI-09_after_1920x1080_cells-pressed-long_x3.png` `12dd3c7c66d951851687a1db7e1d9065c07333ca24a78f9d0e13452424439a02`
+- After: `crops/UI-09_after_1920x1080_native-hover_x2.png` `4ae2d7bddc485b338f4abdf6ab59f207a1f5b80ad16570c17199555e8a93bdf4`
+- After: `crops/UI-09_after_1280x720_hud-idle_x2.png` `4c6e827f7c3581c3bc2b52e8108c539dca39d7ef55ecab14fc19deaf8af00124`
 
 ### UI-10 spellbook pair
 
 Before: METAMAGIC alone in the footer (the planner entry sat at the window's top right). After: the pair for a caster; BUFF PLANNER alone for a character without a spellbook.
 
 - Before (0.4.3, 1920x1200): `kbpnui-facts-03/nui-spellbook-0.png` `f84d8ac0afceedb3343b705ee2c390d0f3153f7511d0caf45713d43b9472997a`
-- After: `kbpnui-final-qual-06/nui-spellbook-0.png` `e3e8d414f1872da0e648d11103a9c1e4ad0554b6ef345d09a8f7fad6c5b0004d`
-- After: `kbpnui-final-qual-06/nui-spellbook-2.png` `847000532e93dfce5ffa8d7145f0ce09a469ffe82f46df56ead932ff37410e63`
-- After: `kbpnui-final-qual-720-04/nui-spellbook-0.png` `40472943d1df62298637700a4fc63714305207f6650a0055408d878ee9291343`
+- After: `kbpnui-final-qual-07/nui-spellbook-0.png` `4717a6729725e5973a93f115310bddf8fa78cc4ef5304555b9b74f9586ae0dee`
+- After: `kbpnui-final-qual-07/nui-spellbook-2.png` `847000532e93dfce5ffa8d7145f0ce09a469ffe82f46df56ead932ff37410e63`
+- After: `kbpnui-final-qual-720-05/nui-spellbook-0.png` `be69d457a4abb7fcd22c442d8f1b79406fec99bcb231a8b748a79860d62a7743`
 - After: `crops/UI-10_before_1920x1200_spellbook-footer.png` `39762b5a9d591c449848d6d3476d1b135d158bb79d9fa2888849a460d5b715dc`
 - After: `crops/UI-10_after_1920x1080_pair-caster-Linzi_x2.png` `078b6a6de8bf2d8d213fb5a61528e5b7f63358f779419a46b203af1a150bedb7`
 - After: `crops/UI-10_after_1920x1080_pair-noncaster-Hedwirg_x2.png` `f386279954e455c3f493e113ca2e58162e753be4816d8f09dc0642bf0b670d72`
@@ -97,28 +101,28 @@ Before: METAMAGIC alone in the footer (the planner entry sat at the window's top
 The native window shown after each route, the planner closed.
 
 - Before (0.4.3, 1920x1200): `kbpnui-facts-03/nui-switch-inventory.png` `060fd0589ee2921104347d5e078670308c951c5c629ea6e62408a8d47f94b0d8`
-- After: `kbpnui-final-qual-06/nui-switch-inventory.png` `8c650db59d6d1e7d9a5c7266a4b096db4330c5357e7c32fa212387be0d714f44`
-- After: `kbpnui-final-qual-06/nui-switch-character.png` `cf5c804ed51ff80e4c2deb1651e20ea3a220ea67f052dd61463caecade5f76ed`
-- After: `kbpnui-final-qual-06/nui-switch-spellbook.png` `f4818ffe9f4fdc6687516cdad8b03874e775888e0be22e6562724e87b13a7e76`
-- After: `kbpnui-final-qual-06/nui-switch-key-OpenInventory.png` `e57146a610482d4ce9442338e2bf4e94ff4dfe6bdb7c6afa3624b857c80aa253`
-- After: `kbpnui-final-qual-06/nui-switch-key-OpenChracterScreen.png` `bc186fcecdc8290f7b2c16df3aff88dc1740317ca8547b2ad2b7c0c9df1637aa`
-- After: `kbpnui-final-qual-06/nui-switch-key-OpenSpells.png` `f4818ffe9f4fdc6687516cdad8b03874e775888e0be22e6562724e87b13a7e76`
-- After: `kbpnui-final-qual-06/nui-switch-key-OpenJournal.png` `08bc656dd855eddbc0a1eb76e01a234cb2e81a012da81b22e7b7c7d39b81f1a7`
+- After: `kbpnui-final-qual-07/nui-switch-inventory.png` `c13bfba416dcaa149edcf1bb2734cf009bf46afa4a2cf42446887aa32b683007`
+- After: `kbpnui-final-qual-07/nui-switch-character.png` `cf5c804ed51ff80e4c2deb1651e20ea3a220ea67f052dd61463caecade5f76ed`
+- After: `kbpnui-final-qual-07/nui-switch-spellbook.png` `f4818ffe9f4fdc6687516cdad8b03874e775888e0be22e6562724e87b13a7e76`
+- After: `kbpnui-final-qual-07/nui-switch-key-OpenInventory.png` `e4bbcefe5e31597951269d500478e88bf543755c0271d3ead0ce17d1162e3712`
+- After: `kbpnui-final-qual-07/nui-switch-key-OpenChracterScreen.png` `bc186fcecdc8290f7b2c16df3aff88dc1740317ca8547b2ad2b7c0c9df1637aa`
+- After: `kbpnui-final-qual-07/nui-switch-key-OpenSpells.png` `f4818ffe9f4fdc6687516cdad8b03874e775888e0be22e6562724e87b13a7e76`
+- After: `kbpnui-final-qual-07/nui-switch-key-OpenJournal.png` `08bc656dd855eddbc0a1eb76e01a234cb2e81a012da81b22e7b7c7d39b81f1a7`
 
 ### UI-05 sidebar
 
 A new casting selected; nothing selected after Done (only the next step).
 
 - Before (0.4.3, 1920x1200): none
-- After: `kbpnui-final-qual-06/nui-planning-added.png` `cf1d841d0ef86c7cbad7cb79bc965ff1e7d26ab404ad859b21936ac09c379bc7`
-- After: `kbpnui-final-qual-06/nui-planning-no-selection.png` `b76039b549b380439150ef168b0c7503f79ffb53905799065b26fac35f660b36`
-- After: `kbpnui-final-qual-720-04/nui-planning-no-selection.png` `8f66200383b1554f179ec050da86bd2c3fd9b8ee421e4ec5221b22122ad70ad4`
+- After: `kbpnui-final-qual-07/nui-planning-added.png` `10f7559fd660fab663d5a8a3754b3fb490c99318e0ccf5515ee192c6e155b096`
+- After: `kbpnui-final-qual-07/nui-planning-no-selection.png` `b885a6bc1652c4ea575dccb4db6537dacf967960bff5a97026b26c9ac983aa82`
+- After: `kbpnui-final-qual-720-05/nui-planning-no-selection.png` `8f66200383b1554f179ec050da86bd2c3fd9b8ee421e4ec5221b22122ad70ad4`
 
 ### UI-08 footer and game log
 
 The refused press's line in the game log; "Not saved" with Retry save, then saved.
 
 - Before (0.4.3, 1920x1200): `kbpnui-facts-03/nui-gamelog.png` `f624c5a2a626798b3eb35ab7d616cf67dcea642340f08202cfebcbbbe3a3974c`
-- After: `kbpnui-final-qual-06/nui-gamelog.png` `2c2bb0d77831e779aff8185acf0dbfce7cc2429ceaa17929ab14a62d2438d27f`
-- After: `kbpnui-final-qual-06/nui-save-failed.png` `812076540080a6b260e0d7b8f0d7d89fbb9b06969191f942130a798eb1d6f5da`
-- After: `kbpnui-final-qual-06/nui-save-recovered.png` `2bd269cc92032b618fbb9adcc18ca92e96eca2b44e005b5b32df84ca7588d8c2`
+- After: `kbpnui-final-qual-07/nui-gamelog.png` `8566502a11d8023f9133c84b790de8ee8548d94a33a542493847b38f6dab8a62`
+- After: `kbpnui-final-qual-07/nui-save-failed.png` `aa91b75e3f05d981fc55d5b776e8467b93b3d14c892c83b3b96122d89eb74b56`
+- After: `kbpnui-final-qual-07/nui-save-recovered.png` `d570cdbb7fd5920e71bb24e539503847104fc2c24f486cc9b07c9c8f37a62288`

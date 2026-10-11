@@ -14,11 +14,12 @@ Updated: 2026-10-11 02:30 -04:00
 
 - Active objective: delivery. Implementation, qualification and the 0.5.0
   package are done; the complete `Test-SourceOnly` gate on the product
-  commit is running (started 2026-10-11T06:24:49Z).
+  commit `4dbfa33` is running since 2026-10-11T12:49:38Z; the first, on `cd1b554`, failed on a stale launcher meta-test
+  expectation (fixed in `4dbfa33`).
 - Repository / branch / HEAD:
   `C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-NUI` /
   `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10` / product
-  `cd1b5545d49cbd294d0f6997c812a432729fac81` (base `a9c6d0f`, main 0.4.3); later commits are records
+  `4dbfa33e1b36bf59bc9bb1a4ac3ebde860c52302` (base `a9c6d0f`, main 0.4.3); later commits are records
   only. Runtime builds come from the detached run worktree
   `repo/KingmakerBuffPlanner-NUIR` at the product commit (clean tree,
   `Build-Local.ps1`).
@@ -27,8 +28,8 @@ Updated: 2026-10-11 02:30 -04:00
   README, installation guide and player guide).
 - C# protocol suite PASS=517 FAIL=0; Validate-Source PASS=43 FAIL=0 at the
   product commit.
-- Candidate: package `d94418b0d39e5417b1638a495a0b9f34515a618a4441630cc2fca41fda834218`, DLL `a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41`, MVID `6e0ed7cd-3d0b-41da-af95-d820bfec8a09`; standard ZIP
-  `C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-NUIR\artifacts\release\0.5.0\KingmakerBuffPlanner-0.5.0.zip` (`d94418b0d39e5417b1638a495a0b9f34515a618a4441630cc2fca41fda834218`).
+- Candidate: package `cf658914130a010d7525ee47bc41a1f5c05f9bcde929852a1e31430ab3be8fcb`, DLL `b32f320ecebd1288eb409cec4893953f2e685a1acad0898de1b8f03164e58e69`, MVID `526e6663-b368-4e64-9afa-08f979dbcfe0`; standard ZIP
+  `C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-NUIR\artifacts\release\0.5.0\KingmakerBuffPlanner-0.5.0.zip` (`cf658914130a010d7525ee47bc41a1f5c05f9bcde929852a1e31430ab3be8fcb`, byte-identical).
 - Guard/lease state: every runtime run in the ledger completed with
   restoration verified and protected saves clean; no open transaction.
 - Delivery receipt: `docs/NATIVE-UI-FINISH-0.5.0-DELIVERY.md`; evidence
@@ -103,10 +104,15 @@ Updated: 2026-10-11 02:30 -04:00
 | Qualify stage | `f31fea9`, DLL 595ce75a… | kbpnui-final-qual-04 | FAIL | `hud-disabled-cells:0`: the HUD refreshes availability every tick; probe removed in `1938aaf` |
 | Qualify stage | `1938aaf`, DLL ed11adbe… | kbpnui-final-qual-05, kbpnui-final-qual-720-03 | PASS | close button, empty selection; its pressed frame showed idle (probe never entered the cell); fixed in `cd1b554` |
 | Selection | `1938aaf` frozen | kbpnui-final-cast-select-02 | PASS | superseded before its casting run |
-| Qualify stage (final) | `cd1b554`, DLL a8db3a16… | kbpnui-final-qual-06 (1920x1080), kbpnui-final-qual-720-04 (1280x720) | PASS | no violations; same-spell popups; 7/7 switches; close button; planning 13/13; HUD tints idle 0.0, hover 1.0, pressed 0.784 |
-| Casting (D/E, final) | `cd1b554` frozen | kbpnui-final-cast-select-03, kbpnui-final-cast-02 | PASS | five runs, five game-log lines; resources unchanged (cantrips); no save written |
-| Standard package | `cd1b554` | `scripts\Build-Release.ps1` | PASS | PASS=3 FAIL=0, deterministic 2/2; ZIP `d94418b0…` is byte-identical to the tested package |
-| Complete gate | `cd1b554` | `scripts\Test-SourceOnly.ps1` | RUNNING | running since 2026-10-11T06:24:49Z in the run worktree |
+| Qualify stage | `cd1b554`, DLL a8db3a16… | kbpnui-final-qual-06 (1920x1080), kbpnui-final-qual-720-04 (1280x720) | PASS | no violations; same-spell popups; 7/7 switches; close button; planning 13/13; HUD tints idle 0.0, hover 1.0, pressed 0.784 |
+| Casting (D/E) | `cd1b554` frozen | kbpnui-final-cast-select-03, kbpnui-final-cast-02 | PASS | five runs, five game-log lines; resources unchanged (cantrips); no save written |
+| Standard package | `cd1b554` | `scripts\Build-Release.ps1` | PASS | ZIP `d94418b0…`, byte-identical to the tested package; superseded |
+| Complete gate | `cd1b554` | `scripts\Test-SourceOnly.ps1` (06:24:49Z-12:28:41Z) | FAIL | exit 1 in `Test-RuntimeLauncherFileWhatIf`: `display-mode-other-scenario` expected the refusal text from before `c8a5a21`; every earlier step passed |
+| Gate fix fast checks | `4dbfa33`, DLL b32f320e… | scratch launcher meta-test (purity windows stubbed, stdin closed); `Test-FixtureInventoryEvidence`, `Test-RestoreInstallLocal`, `Test-PublishReleaseGate` | PASS | 13/13; 3/3; 16/16; 3/3 |
+| Qualify stage (final) | `4dbfa33`, DLL b32f320e… | kbpnui-final-qual-07 (1920x1080), kbpnui-final-qual-720-05 (1280x720) | PASS | no violations; same-spell popups; 7/7 switches; close button; planning 13/13; HUD tints idle 0.0, hover 1.0, pressed 0.784 |
+| Casting (D/E, final) | `4dbfa33` frozen | kbpnui-final-cast-select-04, kbpnui-final-cast-03 | PASS | five runs, five game-log lines; resources unchanged (cantrips); no save written |
+| Standard package | `4dbfa33` | `scripts\Build-Release.ps1` | PASS | PASS=3 FAIL=0, deterministic 2/2; ZIP `cf658914…` is byte-identical to the tested package |
+| Complete gate | `4dbfa33` | `scripts\Test-SourceOnly.ps1` | RUNNING | running since 2026-10-11T12:49:38Z |
 
 - Before/after screenshot manifest: `docs/NATIVE-UI-FINISH-0.5.0-EVIDENCE.md`.
 - Runtime staging and restoration: every run above restored with

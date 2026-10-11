@@ -4,11 +4,11 @@ Mission: `KBP_NATIVE_UI_FINISH_2026-10-10` (packet extracted read-only under
 `handoff\kbp-native-ui-finish-2026-10-10-94ff3149`). Branch
 `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10`, worktree
 `repo/KingmakerBuffPlanner-NUI`, base main `a9c6d0f` (v0.4.3). Version 0.5.0.
-Tested product commit `cd1b5545d49cbd294d0f6997c812a432729fac81`; later commits are records only. Package
-`d94418b0d39e5417b1638a495a0b9f34515a618a4441630cc2fca41fda834218` (local-runtime and standard ZIP, byte-identical), DLL `a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41`,
-MVID `6e0ed7cd-3d0b-41da-af95-d820bfec8a09`. Complete gate running since 2026-10-11T06:24:49Z.
-Native on these bytes: `kbpnui-final-qual-06`, `kbpnui-final-qual-720-04`,
-`kbpnui-final-cast-02`. Receipt: `docs/NATIVE-UI-FINISH-0.5.0-DELIVERY.md`
+Tested product commit `4dbfa33e1b36bf59bc9bb1a4ac3ebde860c52302`; later commits are records only. Package
+`cf658914130a010d7525ee47bc41a1f5c05f9bcde929852a1e31430ab3be8fcb` (local-runtime and standard ZIP, byte-identical), DLL `b32f320ecebd1288eb409cec4893953f2e685a1acad0898de1b8f03164e58e69`,
+MVID `526e6663-b368-4e64-9afa-08f979dbcfe0`. Complete gate on `cd1b554` FAILED on a stale launcher meta-test expectation (fixed in `4dbfa33`); on `4dbfa33`: running since 2026-10-11T12:49:38Z.
+Native on these bytes: `kbpnui-final-qual-07`, `kbpnui-final-qual-720-05`,
+`kbpnui-final-cast-03`. Receipt: `docs/NATIVE-UI-FINISH-0.5.0-DELIVERY.md`
 (outcome PARTIAL; UI-07, UI-08, UI-11 PASS).
 Next action: the owner's review. Nothing is pushed; no merge, tag or release
 without the owner's authorization.

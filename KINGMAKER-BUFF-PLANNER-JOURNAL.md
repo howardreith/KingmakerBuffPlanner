@@ -4,16 +4,16 @@
 
 - Branch `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10`
   (worktree `repo/KingmakerBuffPlanner-NUI`) from main `a9c6d0f` (v0.4.3).
-  Product `cd1b5545d49cbd294d0f6997c812a432729fac81`, 0.5.0; later commits are records only. Package
-  `d94418b0d39e5417b1638a495a0b9f34515a618a4441630cc2fca41fda834218`, DLL `a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41`, MVID `6e0ed7cd-3d0b-41da-af95-d820bfec8a09`; the standard ZIP is byte-identical.
+  Product `4dbfa33e1b36bf59bc9bb1a4ac3ebde860c52302`, 0.5.0; later commits are records only. Package
+  `cf658914130a010d7525ee47bc41a1f5c05f9bcde929852a1e31430ab3be8fcb`, DLL `b32f320ecebd1288eb409cec4893953f2e685a1acad0898de1b8f03164e58e69`, MVID `526e6663-b368-4e64-9afa-08f979dbcfe0`; the standard ZIP is byte-identical.
 - UI-01..UI-11: `c57f490` (window takeover, game log, copy), `fa0bfc4` (HUD
   row in a stepped native enclosure), `bbe8426` (spellbook footer pair),
   `d5a1d99` (the game's DescriptionWindow), `aad17d1` (TextMeshPro text and
   the native paper kit), `16f749c` and `545a5cf` (row text, scrollbars,
   description closing), `8ae985d` (0.5.0 version and player docs).
-- Qualified without OS input: `kbpnui-final-qual-06` (1920x1080) and
-  `kbpnui-final-qual-720-04` (1280x720) PASS; casting
-  `kbpnui-final-cast-02` PASS (five runs, one game-log line each).
+- Qualified without OS input: `kbpnui-final-qual-07` (1920x1080) and
+  `kbpnui-final-qual-720-05` (1280x720) PASS; casting
+  `kbpnui-final-cast-03` PASS (five runs, one game-log line each).
 - Defects found by the in-game runs, each fixed and regressed in
   `NativeUiFinishTests`: the description counted as open during its closing
   animation (`kbpnui-qual-01`, fixed `545a5cf`); the probe compared popups of
@@ -28,7 +28,16 @@
   line" - the qualification driver applies that step through its own
   session; only its stop step uses the HUD press path. The press path's
   refusal line is proven by the qualify stage.
-- C# 517/0 (baseline 511); Validate-Source 43/43; complete gate running.
+- The first complete gate (on `cd1b554`) failed after 6 h in
+  `Test-RuntimeLauncherFileWhatIf`: `display-mode-other-scenario` still
+  expected the refusal text from before `c8a5a21`, which added
+  `live-workspace-native-ui` to it. The launcher refused as intended; the
+  expectation was stale. Fixed in `4dbfa33` (with cases for the native-UI
+  stage rules), checked fast (launcher meta-test 13/13 with purity windows
+  stubbed, and the three steps the gate never reached), the final runs
+  repeated on its bytes (the DLL embeds the commit), then the gate rerun.
+- C# 517/0 (baseline 511); Validate-Source 43/43; complete gate on `4dbfa33`
+  running since 2026-10-11T12:49:38Z.
 - Uncertainty: no physical input; the owner's 1920x1200 display was
   available only for the before captures; fixture-limited states (active
   cards, groups, enhancements, long descriptions and lists).
