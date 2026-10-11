@@ -727,9 +727,17 @@ pending, separate from historical 0.3.0 qualification below/above.
 
 ## 0.5.0 native UI finish — owner checks
 
-The guarded runs pressed every control through its own handler, never with
-the mouse or keyboard, on the automation party. These checks cover what they
-could not (statuses in `docs/NATIVE-UI-FINISH-0.5.0-DELIVERY.md`):
+The [current review checkpoint](NATIVE-UI-FINISH-0.5.0-REVIEW-CHECKPOINT.md)
+prepares new observations at source 673d1e3, still NOT_RUN in Kingmaker. Key-route
+preconditions are read-only callback evidence; they do not establish physical
+keys or a paused switch. The Metamagic observation uses its already available
+native control; the hidden-Metamagic character's independent planner action
+remains an acceptance item. Genuine execution-disabled HUD availability, long
+content and fixture-specific states also remain separate.
+
+The historical guarded runs exercised their recorded controls through handlers
+on the automation party. These checks address unobserved interactions and states
+(statuses in `docs/NATIVE-UI-FINISH-0.5.0-DELIVERY.md`):
 
 1. HUD: hover and press each of the four buttons with the mouse; each lights
    like the native buttons beside it and keeps its tooltip. Start Long and

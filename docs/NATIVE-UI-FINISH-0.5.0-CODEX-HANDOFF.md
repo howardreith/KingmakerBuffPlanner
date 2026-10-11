@@ -3,8 +3,9 @@
 > **Current policy, October 11:** [VALIDATION-POLICY.md](VALIDATION-POLICY.md)
 > supersedes the automatic broad sequence below. Use repository-owned
 > `Test-Development.ps1 -Only <affected prefixes>` and
-> `Test-RuntimeLauncherArguments.ps1` for ordinary checkpoints (15-minute target,
-> 30-minute ceiling). Section 5 is historical candidate-qualification guidance,
+> `Test-RuntimeLauncherArguments.ps1` plus the shared child-process
+> `Test-RuntimeLauncherFileArguments.ps1` for launcher consumer repairs
+> at ordinary checkpoints (15-minute target, 30-minute ceiling). Section 5 is historical candidate-qualification guidance,
 > selected only at an explicit boundary; Claude's temporary purity-stubbing helper
 > is not the development route. All live launcher/source/WhatIf, ownership,
 > fixture, package, protected-save, staging and restoration guards still apply.
@@ -12,11 +13,13 @@
 > ACTIVE as PID 16712 without GATE-EXIT. Preserve its watched paths; continue
 > independent source work in NUI. The old candidate and its four PASS runs keep
 > their original identities. The current receipt remains PARTIAL.
-> Continuation source `a652441b07bb1f427c42e3036b10e67d8e9163d1` prepares schema-2
-> caption, casting-popup and filter observations plus a changed-caster capture.
-> Focused checks passed; in-game observations remain NOT_RUN. Read the
-> [development checkpoint](NATIVE-UI-FINISH-0.5.0-DEVELOPMENT-CHECKPOINT.md)
-> for the current triage and exact next action.
+> Current observer source `673d1e3a62356af3d1b4d5dcbd19f233fd521734` also prepares
+> schema-3 Metamagic action and key-route preconditions; schemas 1/2 keep their
+> original verdicts. `3af7171` repairs the stale broad native-fixture assertion and
+> exercises its real shared -File path (8/0), preserving the direct checks (24/0).
+> Affected C# 6/0 passes on a clean development build; game observations are NOT_RUN.
+> Read the [current review checkpoint](NATIVE-UI-FINISH-0.5.0-REVIEW-CHECKPOINT.md)
+> for current identities, acceptance limits and the exact next action.
 
 Written 2026-10-11 ~13:30 UTC by Claude at the owner's request ("find a stopping
 point, commit it, push it, and create a handoff document that will be taken over by

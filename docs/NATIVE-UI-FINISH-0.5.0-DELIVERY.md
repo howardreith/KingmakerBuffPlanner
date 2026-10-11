@@ -1,8 +1,8 @@
 > October 11 Codex development checkpoint: workflow merged at `0463f553a859ecc195f862fba9632ee91586e08c`;
-> native UI observer source `a652441b07bb1f427c42e3036b10e67d8e9163d1`, version 0.5.0.
+> native UI observer source `673d1e3a62356af3d1b4d5dcbd19f233fd521734`, version 0.5.0.
 > Focused checks pass; new observations are NOT_RUN in game. The fallback below
 > remains built from 4dbfa33 with its original PARTIAL receipt. See the
-> [current development checkpoint](NATIVE-UI-FINISH-0.5.0-DEVELOPMENT-CHECKPOINT.md).
+> [current review checkpoint](NATIVE-UI-FINISH-0.5.0-REVIEW-CHECKPOINT.md).
 
 # Buff Planner native UI finish — delivery receipt
 

@@ -1,3 +1,10 @@
+> Current review checkpoint: launcher consumer repaired at `3af7171`, observer
+> source `673d1e3` adds schema-3 native Metamagic and key-route diagnostics. Focused
+> checks pass; game observations remain NOT_RUN. Receipt stays PARTIAL. See the
+> [current checkpoint](docs/NATIVE-UI-FINISH-0.5.0-REVIEW-CHECKPOINT.md) for the
+> specific physical, paused-switch, real-availability and fixture/manual list.
+> The old gate's completion remains unobserved; its prior audit is preserved below.
+
 > Observer source `a652441b07bb1f427c42e3036b10e67d8e9163d1` has focused offline
 > coverage only; new schema-2 measurements/captures are NOT_RUN in game. Current
 > [manual list](docs/MANUAL-ACCEPTANCE.md) distinguishes observation gaps from fixture

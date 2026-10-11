@@ -70,6 +70,13 @@ cannot select deployment, launcher live purity, restore-install or publisher.
 requires its already built, matching local package; the selector does not
 silently package a product to satisfy that prerequisite.
 
+For launcher arguments, `scripts/Test-RuntimeLauncherArguments.ps1` exercises
+bounded direct invocation. A -File consumer repair also uses
+`scripts/Test-RuntimeLauncherFileArguments.ps1`: the shared real child-process
+refusal assertion runs before external imports for the native UI cases, without
+starting the broad gate's preceding live-purity windows. Both are focused checks
+and provide no live-purity or runtime qualification receipt.
+
 Broad routes remain explicit:
 
 ```powershell

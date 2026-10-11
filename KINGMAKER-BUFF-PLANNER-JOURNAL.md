@@ -3126,3 +3126,36 @@ handoff in the identity-bound generated evidence; leave the qualified clean
 source commit unchanged so gate, build, runtime and pushed HEAD match.
 At this snapshot: implemented/regressed; final source/runtime qualification
 pending. No PR/merge/tag/release/permanent install/later work package.
+
+
+## 2026-10-11 native UI review correction and bounded native actions
+
+DATA/NUI feature branch `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10`;
+reviewed starting HEAD 0844421b222824acbc649773db51565dbc547431. Fixed the owner's
+P2 stale refusal consumer at 3af7171a70f95ef13da3359245d00b030bc62843: native UI
+uses KBP_NATIVE_UI_FIXTURE, other family cases retain their matcher, every child
+must exit unsuccessfully. Actual shared -File path 8/0 (1.542 s), direct argument
+checks unchanged 24/0 (0.263 s), syntax 3/0. No broad preceding work selected.
+
+Clean source/build HEAD 673d1e3a62356af3d1b4d5dcbd19f233fd521734 adds native
+Metamagic toggle/return observations, exact private mode getter, owned cleanup
+and read-only key-route preconditions. Schema 3 requires them; schema 1/2 verdicts
+retain their meaning. Test-Development -Only native-ui-record,native-window,
+spellbook-handoff,native-source-tabs: source 43/0, builds PASS, C# 6/0 (7.712 s).
+Guarded-push tests 6/0 (2.042 s). DLL ca3d6bc5a4a674397e1baab60601c972dc008086d93c247c7451ca97fb8a7250,
+MVID a956e985-a762-4994-84e6-07f586a947ec, version 0.5.0, unpackaged/NOT_RUN.
+Contract and validation logs are artifacts/native-ui-review-2026-10-11; final
+publication receipt separates documentation HEAD from clean product source.
+
+Rejected: direct argument PASS proves the older child consumer; restoring stale
+producer prose; force=true proves physical dispatch; pause support proves a
+paused switch; cleanup repairs an observed FAIL into PASS. Frozen 4dbfa33/package
+and four original PASS receipts preserved. Its old gate was not polled or restarted;
+completion is still unobserved after the prior one-time audit. Receipt stays PARTIAL.
+
+Next: review the coherent diff and live prerequisite call graph; after verified old
+gate exit/clean ownership at an explicit runtime boundary, select the smallest guarded
+two-size native observation batch on exact clean candidate bytes and inspect captures.
+Declare prerequisite cost first; no automatic broad campaign. Physical/paused/real
+availability and fixture limitations are in the
+[current review checkpoint](docs/NATIVE-UI-FINISH-0.5.0-REVIEW-CHECKPOINT.md).

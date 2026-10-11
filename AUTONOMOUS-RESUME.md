@@ -10,13 +10,16 @@ Test-Development prefixes and cheap launcher argument checks (15-minute target,
 
 DATA development worktree: `C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-NUI`;
 branch `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10`; handoff HEAD
-`fa5f4a277558c998255b74d839eb831850c3ee29`. Incorporating `origin/main`
+`fa5f4a277558c998255b74d839eb831850c3ee29`. Incorporated `origin/main`
 `358418f6f86ef0c34687a2f4b96374042c7393d2` (PR #9) without changing main.
-Version remains 0.5.0. Current source HEAD `a652441b07bb1f427c42e3036b10e67d8e9163d1`; workflow merge
-`0463f553a859ecc195f862fba9632ee91586e08c`. Launcher arguments 24/0, selector 6/0,
-source 43/0 and focused C# 12/0 pass. See the
-[development checkpoint](docs/NATIVE-UI-FINISH-0.5.0-DEVELOPMENT-CHECKPOINT.md)
-for exact commands, costs, artefact identities, initial 11/1 fixture failure and limits.
+Version remains 0.5.0. Current clean built source HEAD `673d1e3a62356af3d1b4d5dcbd19f233fd521734`; workflow merge
+`0463f553a859ecc195f862fba9632ee91586e08c`. Launcher consumer repair
+`3af7171a70f95ef13da3359245d00b030bc62843`: real shared -File checks 8/0 (1.542 s),
+original direct argument checks 24/0 (0.263 s), source 43/0, builds PASS and affected
+C# 6/0 (7.712 s). Guarded-push tests 6/0 (2.042 s). Selector behavior is unchanged.
+See the [current review checkpoint](docs/NATIVE-UI-FINISH-0.5.0-REVIEW-CHECKPOINT.md)
+for commands, identities, limits and next action; the earlier checkpoint preserves
+its original 12/0, selector 6/0 and initial 11/1 fixture result.
 
 The one-time gate audit at 2026-10-11T16:08Z found the frozen `4dbfa33`
 Test-SourceOnly process ACTIVE (PID 16712, created 12:49:38Z), no GATE-EXIT,
@@ -32,12 +35,19 @@ PARTIAL. `3757758` changes records; `57f136a` changes product caption layout and
 is absent from the fallback package. New observer changes also require affected
 observations on their own bytes before any native acceptance claim.
 
-Implemented: combined early launcher refusals and native UI stages, offline caption
-regression, schema-2 actual caption/popup/filter observations and changed-caster capture.
-New observations are NOT_RUN in game. Next action: inspect the exact key-dispatch and
-Metamagic contracts and add bounded paused-window/Metamagic observations, using
-native-window, native-ui-record and spellbook-handoff prefixes; later select a
-small guarded two-size native observation batch after the old gate exits.
+Implemented: combined early launcher refusals/stages, the corrected broad native
+fixture assertion and focused shared child-process check, caption/popup/filter
+observations and changed-caster capture, plus schema-3 Metamagic action and key-route
+preconditions. Schema 1/2 retain their original verdicts. New observations are NOT_RUN
+in game. Clean 673d1e3 development DLL SHA-256
+`ca3d6bc5a4a674397e1baab60601c972dc008086d93c247c7451ca97fb8a7250`,
+MVID `a956e985-a762-4994-84e6-07f586a947ec`, version 0.5.0; no package/runtime receipt.
+
+Next action: review the coherent changes and inspect the live prerequisite call graph;
+once the old gate is verified exited at an explicit runtime boundary, select the
+smallest guarded two-size native observation batch, declaring prerequisite cost and
+retaining all safety guards. Inspect its screenshots. Physical keys, paused switching,
+real disabled states and fixture/manual limits remain in the current checkpoint.
 Final frozen-candidate qualification is deliberately deferred.
 
 Historical chronology is preserved in

@@ -532,7 +532,10 @@ The view exposes read-only control measurements and actual description subject
 identity; discovery, planning, resource, persistence and execution rules remain
 services outside the view. NativeUiRecord schema 2 judges caption fit, casting-popup
 context/dismissal and catalogue membership without Unity dependencies. Schema 1
-keeps its original verdict and cannot establish new observations. These diagnostics
+keeps its original verdict and cannot establish new observations. Schema 3 adds
+Metamagic toggle/return and key-route preconditions, preserving schema-2 verdicts.
+Native mode access uses the exact verified private getter; probe cleanup restores
+its owned native mode and releases its plan lock on completion or shutdown. These diagnostics
 are compiled into the product and change DLL identity; real-game evidence must
 bind to the changed bytes. Callback routes and numeric fit are distinct from
 physical input dispatch and visual acceptance.

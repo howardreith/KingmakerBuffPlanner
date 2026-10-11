@@ -10,7 +10,23 @@ stays reference material; this file follows its `templates/PROGRESS.md`.
 
 Updated: 2026-10-11 02:30 -04:00
 
-## Current Codex development checkpoint - October 11, 2026, 16:32 UTC
+## Current review correction - October 11, 2026
+
+DATA/NUI, same feature branch, clean built source HEAD
+`673d1e3a62356af3d1b4d5dcbd19f233fd521734`, version 0.5.0. Launcher consumer fix
+`3af7171a70f95ef13da3359245d00b030bc62843` preserves the producer/direct checks;
+shared real -File assertion checks 8/0 (1.542 s), original direct checks 24/0
+(0.263 s), syntax 3/0; affected development selection source 43/0, builds PASS,
+C# 6/0 (7.712 s); guarded push 6/0 (2.042 s). Native Metamagic and key-route
+measurements advance UI-02/UI-10 observation readiness, with schema 3 preserving
+schemas 1/2. New observations NOT_RUN; receipt remains PARTIAL. Development DLL
+SHA-256 `ca3d6bc5a4a674397e1baab60601c972dc008086d93c247c7451ca97fb8a7250`,
+MVID `a956e985-a762-4994-84e6-07f586a947ec`; no package or native qualification.
+Frozen fallback/gate paths were not changed or polled. Precise manual/fixture
+limits and next guarded observation action are in the
+[current review checkpoint](../docs/NATIVE-UI-FINISH-0.5.0-REVIEW-CHECKPOINT.md).
+
+## Previous Codex development checkpoint - October 11, 2026, 16:32 UTC
 
 - DATA/NUI, branch `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10`,
   source HEAD `a652441b07bb1f427c42e3036b10e67d8e9163d1`, version 0.5.0.

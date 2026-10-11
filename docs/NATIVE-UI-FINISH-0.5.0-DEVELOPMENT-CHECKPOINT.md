@@ -1,5 +1,7 @@
 # Native UI development checkpoint - October 11, 2026
 
+> Historical checkpoint through 0844421. The [review correction and current next action](NATIVE-UI-FINISH-0.5.0-REVIEW-CHECKPOINT.md) supersede its continuation instructions.
+
 Development checkpoint only. [VALIDATION-POLICY.md](VALIDATION-POLICY.md) governs;
 final qualification and release work are deliberately deferred. Receipt remains
 PARTIAL: UI-07, UI-08 and UI-11 retain their original PASS attribution; all other
