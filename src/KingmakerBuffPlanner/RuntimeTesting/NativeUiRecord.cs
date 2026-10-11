@@ -49,12 +49,48 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public string Capture { get; set; }
     }
 
+    public sealed class NativeUiCaptionFit
+    {
+        public string Caption { get; set; }
+        public float Size { get; set; }
+        public float TextWidth { get; set; }
+        public float AvailableWidth { get; set; }
+    }
+
+    public sealed class NativeUiCastingPopup
+    {
+        public string CastingId { get; set; }
+        public string ExpectedCasterUnitId { get; set; }
+        public string ActualCasterUnitId { get; set; }
+        public string ExpectedAbilityGuid { get; set; }
+        public string ActualAbilityGuid { get; set; }
+        public string ExpectedTitle { get; set; }
+        public string ActualTitle { get; set; }
+        public string Presenter { get; set; }
+        public bool ClosedByEscape { get; set; }
+        public string DocumentBefore { get; set; }
+        public string DocumentAfter { get; set; }
+        public string Capture { get; set; }
+    }
+
+    public sealed class NativeUiCatalogueFilter
+    {
+        public string Category { get; set; }
+        public string[] ExpectedSourceIds { get; set; }
+        public string[] VisibleSourceIds { get; set; }
+        public string DocumentBefore { get; set; }
+        public string DocumentAfter { get; set; }
+        public string Capture { get; set; }
+    }
+
     public sealed class NativeUiRecord
     {
         public const string FactsStage = "facts";
         public const string QualifyStage = "qualify";
 
-        public int SchemaVersion { get; set; } = 1;
+        // Schema 1 keeps its original judgements. Schema 2 requires the new
+        // observations; old evidence cannot establish their acceptance.
+        public int SchemaVersion { get; set; } = 2;
         public string RunId { get; set; }
         public string Stage { get; set; }
         public int ScreenWidth { get; set; }
@@ -116,6 +152,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public string PlannerTitle { get; set; }
         public List<string> PlannerVisibleLabels { get; } = new List<string>();
         public string PlannerTextFonts { get; set; }
+        public string SourceTabLayoutEvidence { get; set; }
+        public List<NativeUiCaptionFit> SourceTabs { get; } = new List<NativeUiCaptionFit>();
+        public NativeUiCastingPopup CastingPopup { get; set; }
+        public List<NativeUiCatalogueFilter> CatalogueFilters { get; } = new List<NativeUiCatalogueFilter>();
 
         // Window switching and nested Escape.
         public List<NativeUiWindowSwitch> Switches { get; } = new List<NativeUiWindowSwitch>();
@@ -152,6 +192,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public IList<string> Violations()
         {
             var violations = new List<string>();
+            if (SchemaVersion != 1 && SchemaVersion != 2) violations.Add("schema:" + SchemaVersion);
             if (Stage != FactsStage && Stage != QualifyStage) violations.Add("stage:" + (Stage ?? "null"));
             violations.AddRange(Failures.Select(value => "failure:" + value));
             violations.AddRange(MissingCaptures.Select(value => "capture-missing:" + value));
@@ -171,6 +212,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // UI-09, UI-10). Appearance itself is judged from the captures.
         private IEnumerable<string> QualifyViolations()
         {
+            if (SchemaVersion >= 2)
+                foreach (string violation in ObservationViolations()) yield return violation;
             // UI-09: four cells the size of the native cells, one per native
             // column, on a third row above the native rows, inside the frame.
             if (PlannerHudButtons != 4) yield return "hud-planner-buttons:" + PlannerHudButtons;
@@ -269,6 +312,60 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!RoutinePressRefused) yield return "routine-press-not-refused";
             if (GameLogPlannerLines.Count != 1)
                 yield return "game-log-planner-lines:" + GameLogPlannerLines.Count;
+        }
+
+        // These observations support bounded integration judgements, not a
+        // visual PASS, physical input dispatch, or coverage of long content.
+        private IEnumerable<string> ObservationViolations()
+        {
+            string[] categories = { "All", "Spells", "Abilities", "Other" };
+            if (SourceTabs.Count != categories.Length ||
+                !SourceTabs.Select(tab => PlainTitle(tab.Caption)).OrderBy(value => value, StringComparer.Ordinal)
+                    .SequenceEqual(categories.OrderBy(value => value, StringComparer.Ordinal)))
+                yield return "source-tabs:missing-captions";
+            foreach (NativeUiCaptionFit tab in SourceTabs)
+            {
+                if (!Finite(tab.Size) || tab.Size < 10f) yield return "source-tab:" + tab.Caption + ":too-small";
+                if (!Finite(tab.TextWidth) || !Finite(tab.AvailableWidth) || tab.TextWidth <= 0f ||
+                    tab.AvailableWidth <= 0f || tab.TextWidth > tab.AvailableWidth + 0.05f)
+                    yield return "source-tab:" + tab.Caption + ":clipped";
+                if (SourceTabs.Count != 0 && Math.Abs(tab.Size - SourceTabs[0].Size) > 0.05f)
+                    yield return "source-tabs:unequal-sizes";
+            }
+            if (CastingPopup == null) yield return "casting-popup:missing";
+            else
+            {
+                if (CastingPopup.Presenter != "native-description-window") yield return "casting-popup:presenter";
+                if (string.IsNullOrEmpty(CastingPopup.CastingId) ||
+                    string.IsNullOrEmpty(CastingPopup.ExpectedCasterUnitId) ||
+                    CastingPopup.ActualCasterUnitId != CastingPopup.ExpectedCasterUnitId)
+                    yield return "casting-popup:caster";
+                if (string.IsNullOrEmpty(CastingPopup.ExpectedAbilityGuid) ||
+                    CastingPopup.ActualAbilityGuid != CastingPopup.ExpectedAbilityGuid)
+                    yield return "casting-popup:ability";
+                if (!SameDescriptionTitle(CastingPopup.ExpectedTitle, CastingPopup.ActualTitle))
+                    yield return "casting-popup:title";
+                if (!CastingPopup.ClosedByEscape) yield return "casting-popup:escape";
+                if (CastingPopup.DocumentBefore == null || CastingPopup.DocumentBefore != CastingPopup.DocumentAfter)
+                    yield return "casting-popup:changed-plan";
+            }
+            if (CatalogueFilters.Count != categories.Length ||
+                !CatalogueFilters.Select(filter => filter.Category).OrderBy(value => value, StringComparer.Ordinal)
+                    .SequenceEqual(categories.OrderBy(value => value, StringComparer.Ordinal)))
+                yield return "catalogue-filters:missing-categories";
+            foreach (NativeUiCatalogueFilter filter in CatalogueFilters)
+            {
+                if (filter.ExpectedSourceIds == null || filter.VisibleSourceIds == null ||
+                    !filter.ExpectedSourceIds.SequenceEqual(filter.VisibleSourceIds))
+                    yield return "catalogue-filter:" + filter.Category + ":rows";
+                if (filter.DocumentBefore == null || filter.DocumentBefore != filter.DocumentAfter)
+                    yield return "catalogue-filter:" + filter.Category + ":changed-plan";
+            }
+        }
+
+        private static bool Finite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         // Two description titles name the same spell: their text without the

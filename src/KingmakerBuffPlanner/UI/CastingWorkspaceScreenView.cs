@@ -269,6 +269,34 @@ namespace KingmakerBuffPlanner.UI
             get { return _sourceTabFit; }
         }
 
+        // Read-only observations of the laid-out controls, not a forced state.
+        internal TMP_Text[] SourceTabCaptionsForRuntime
+        {
+            get { return _sourceTabCaptions.ToArray(); }
+        }
+
+        internal string[] CatalogueSourceIdsForRuntime
+        {
+            get
+            {
+                if (_catalogueContent == null) return new string[0];
+                return _catalogueContent.Cast<Transform>()
+                    .Where(child => child.gameObject.activeInHierarchy &&
+                        child.name.StartsWith("Source.", StringComparison.Ordinal))
+                    .Select(child => child.name.Substring("Source.".Length)).ToArray();
+            }
+        }
+
+        internal string SpellInspectCasterForRuntime
+        {
+            get { return _description == null ? null : _description.LastCasterUnitId; }
+        }
+
+        internal string SpellInspectAbilityForRuntime
+        {
+            get { return _description == null ? null : _description.LastAbilityGuid; }
+        }
+
         internal void ShowNotice(string text)
         {
             Feedback(text, true);

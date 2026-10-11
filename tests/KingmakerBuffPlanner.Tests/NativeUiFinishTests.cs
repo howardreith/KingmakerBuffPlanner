@@ -467,6 +467,32 @@ namespace KingmakerBuffPlanner.Tests
             record.PlannerPopupClosedByCloseButton = true;
             record.PlannerDocumentBeforePopup = "doc";
             record.PlannerDocumentAfterPopup = "doc";
+            record.CastingPopup = new NativeUiCastingPopup
+            {
+                CastingId = "casting-1", ExpectedCasterUnitId = "unit-1", ActualCasterUnitId = "unit-1",
+                ExpectedAbilityGuid = "resistance", ActualAbilityGuid = "resistance",
+                ExpectedTitle = "Resistance", ActualTitle = ResistanceTitle,
+                Presenter = "native-description-window", ClosedByEscape = true,
+                DocumentBefore = "doc", DocumentAfter = "doc"
+            };
+            string[] categories = { "All", "Spells", "Abilities", "Other" };
+            float[] widths = { 19.6f, 39.2f, 55.1f, 38.4f };
+            for (int index = 0; index < categories.Length; index++)
+                record.SourceTabs.Add(new NativeUiCaptionFit
+                {
+                    Caption = categories[index], Size = 14f, TextWidth = widths[index], AvailableWidth = widths[index] + 8f
+                });
+            foreach (string category in categories)
+            {
+                string[] rows = category == "All" ? new[] { "src", "spell", "ability" }
+                    : category == "Spells" ? new[] { "src", "spell" }
+                    : category == "Abilities" ? new[] { "src", "ability" } : new[] { "src" };
+                record.CatalogueFilters.Add(new NativeUiCatalogueFilter
+                {
+                    Category = category, ExpectedSourceIds = rows, VisibleSourceIds = (string[])rows.Clone(),
+                    DocumentBefore = "doc", DocumentAfter = "doc"
+                });
+            }
             record.PlannerTitle = "Buff Planner";
             record.PlannerVisibleLabels.AddRange(new[] { "Buff Planner", "Caster & source", "Castings", "Recipients" });
             foreach (string route in new[] { "inventory", "character", "spellbook", "key:OpenInventory" })
@@ -506,6 +532,19 @@ namespace KingmakerBuffPlanner.Tests
             if (good.Violations().Count != 0)
                 throw new InvalidOperationException("A qualified record is judged: " +
                     string.Join("|", good.Violations().ToArray()));
+            // Schema 1 retains its original verdict and cannot prove the new observations.
+            NativeUiRecord legacy = QualifiedNativeUiRecord();
+            legacy.SchemaVersion = 1;
+            legacy.SourceTabs.Clear();
+            legacy.CastingPopup = null;
+            legacy.CatalogueFilters.Clear();
+            if (legacy.Violations().Count != 0)
+                throw new InvalidOperationException("A legacy verdict was relabelled by schema-2 requirements.");
+            legacy.SchemaVersion = 2;
+            foreach (string missing in new[] { "source-tabs:missing-captions", "casting-popup:missing",
+                    "catalogue-filters:missing-categories" })
+                if (!legacy.Violations().Contains(missing))
+                    throw new InvalidOperationException("Missing observation was accepted: " + missing);
             var defects = new Dictionary<string, Action<NativeUiRecord>>
             {
                 { "hud-cell-size:42.0,42.0!=48.0,48.0", r => r.PlannerHudCell = new[] { 42f, 42f } },
@@ -522,6 +561,23 @@ namespace KingmakerBuffPlanner.Tests
                 { "spellbook-pair-height-or-baseline:Linzi", r => r.Spellbooks[0].PlannerRect = new[] { 1600f, 100f, 150f, 30f } },
                 { "spellbook-top-right-entry-present", r => r.SpellbookTopRightEntryAbsent = false },
                 { "popup-presenter:planner-scroll", r => r.PlannerPopupPresenter = "planner-scroll" },
+                { "schema:3", r => r.SchemaVersion = 3 },
+                { "source-tabs:missing-captions", r => r.SourceTabs.RemoveAt(0) },
+                { "source-tab:Abilities:too-small", r => r.SourceTabs[2].Size = 9f },
+                { "source-tab:Abilities:clipped", r => r.SourceTabs[2].AvailableWidth = 20f },
+                { "source-tab:Spells:too-small", r => r.SourceTabs[1].Size = float.NaN },
+                { "source-tab:Other:clipped", r => r.SourceTabs[3].TextWidth = float.PositiveInfinity },
+                { "source-tabs:unequal-sizes", r => r.SourceTabs[3].Size = 13f },
+                { "casting-popup:presenter", r => r.CastingPopup.Presenter = "planner-scroll" },
+                { "casting-popup:caster", r => r.CastingPopup.ActualCasterUnitId = "unit-2" },
+                { "casting-popup:ability", r => r.CastingPopup.ActualAbilityGuid = "other-ability" },
+                { "casting-popup:title", r => r.CastingPopup.ActualTitle = EarPiercingScreamTitle },
+                { "casting-popup:escape", r => r.CastingPopup.ClosedByEscape = false },
+                { "casting-popup:changed-plan", r => r.CastingPopup.DocumentAfter = "doc2" },
+                { "catalogue-filters:missing-categories", r => r.CatalogueFilters.RemoveAt(0) },
+                { "catalogue-filter:All:rows", r => r.CatalogueFilters[0].VisibleSourceIds = new[] { "src" } },
+                { "catalogue-filter:Spells:rows", r => r.CatalogueFilters[1].VisibleSourceIds = new[] { "spell" } },
+                { "catalogue-filter:Abilities:changed-plan", r => r.CatalogueFilters[2].DocumentAfter = "doc2" },
                 { "popup-changed-plan", r => r.PlannerDocumentAfterPopup = "doc2" },
                 { "popup-close-button:did-not-close", r => r.PlannerPopupClosedByCloseButton = false },
                 { "popup-not-same-spell", r => r.PopupSameSpell =

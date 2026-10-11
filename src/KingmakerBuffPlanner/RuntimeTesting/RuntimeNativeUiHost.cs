@@ -66,6 +66,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _nativeUiPlanningIndex;
         private string _nativeUiPlanningStart;
         private string _nativeUiDocumentBeforeFault;
+        private int _nativeUiFilterIndex;
+        private NativeUiCatalogueFilter _nativeUiFilter;
+        private static readonly string[] NativeUiFilterCategories = { "Spells", "Abilities", "Other", "All" };
         private readonly List<string> _nativeUiRoutes = new List<string>();
 
         private string NativeUiStage
@@ -372,6 +375,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     {
                         _nativeUi.PlannerVisibleLabels.AddRange(view.VisibleLabelsForRuntime().Distinct().Take(400));
                         _nativeUi.PlannerTextFonts = TextFontSummary(view.RootObject);
+                        Canvas.ForceUpdateCanvases();
+                        _nativeUi.SourceTabLayoutEvidence = view.SourceTabFitForRuntime;
+                        foreach (TMP_Text caption in view.SourceTabCaptionsForRuntime)
+                            _nativeUi.SourceTabs.Add(new NativeUiCaptionFit
+                            {
+                                Caption = caption.text,
+                                Size = caption.fontSize,
+                                TextWidth = caption.GetPreferredValues(caption.text,
+                                    float.PositiveInfinity, float.PositiveInfinity).x,
+                                AvailableWidth = caption.rectTransform.rect.width
+                            });
                     }
                     _nativeUi.PlannerDocumentBeforePopup = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
                     if (view == null || _nativeUiSourceId == null ||
@@ -434,10 +448,94 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime == _nativeUi.PlannerDocumentBeforePopup;
                     DescriptionWindow window = NativeDescriptionWindow();
                     if (NativeDescriptionPresenter.IsOpen && window != null) window.CloseWindow();
-                    // UI-02: typing in the search is text entry - focus it as a
-                    // click does, then read the game's own gate for its hotkeys.
-                    if (view != null) view.FocusSearchForRuntime(true);
-                    NativeUiNext(12);
+                    // Inspect the actual casting card through its existing
+                    // right-click callback, without selecting or editing it.
+                    CastingWorkspaceSession live = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                    CastingGraphView graph = live == null ? null
+                        : live.BuildGraph(BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime());
+                    CastingGraphCasting casting = graph == null ? null : graph.Castings.FirstOrDefault();
+                    _nativeUi.CastingPopup = new NativeUiCastingPopup
+                    {
+                        CastingId = casting == null ? null : casting.CastingId,
+                        ExpectedCasterUnitId = casting == null ? null : casting.CasterUnitId,
+                        ExpectedAbilityGuid = casting == null || casting.SpellAbility == null ? null
+                            : string.IsNullOrEmpty(casting.SpellAbility.VariantGuid)
+                                ? casting.SpellAbility.BaseAbilityGuid : casting.SpellAbility.VariantGuid,
+                        ExpectedTitle = casting == null ? null : casting.SpellTitle,
+                        DocumentBefore = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime,
+                        Capture = "nui-casting-card-popup.png"
+                    };
+                    if (casting == null || view == null || !view.RightClickForRuntime("chip:" + casting.CastingId))
+                        _nativeUi.Failures.Add("casting-popup-not-invoked");
+                    NativeUiNext(23);
+                    return false;
+                }
+                case 23:
+                {
+                    if (!NativeUiWaited(1500)) return false;
+                    NativeUiCastingPopup popup = _nativeUi.CastingPopup;
+                    DescriptionWindow window = NativeDescriptionWindow();
+                    popup.Presenter = NativeDescriptionPresenter.IsOpen ? "native-description-window" : "none";
+                    popup.ActualTitle = window == null ? null : DescriptionTitle(window);
+                    popup.ActualCasterUnitId = view == null ? null : view.SpellInspectCasterForRuntime;
+                    popup.ActualAbilityGuid = view == null ? null : view.SpellInspectAbilityForRuntime;
+                    NativeUiCapture(popup.Capture);
+                    BuffPlannerUiRoot.HandleEscapeForRuntime();
+                    NativeUiNext(24);
+                    return false;
+                }
+                case 24:
+                {
+                    if (!NativeUiWaited(700)) return false;
+                    _nativeUi.CastingPopup.ClosedByEscape = !NativeDescriptionPresenter.IsOpen &&
+                        BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                    _nativeUi.CastingPopup.DocumentAfter = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                    // Clean up a failed popup before proceeding, retaining its failure.
+                    NativeDescriptionPresenter.CloseIfOpen();
+                    _nativeUiFilterIndex = 0;
+                    NativeUiNext(25);
+                    return false;
+                }
+                case 25:
+                {
+                    if (_nativeUiFilterIndex >= NativeUiFilterCategories.Length)
+                    {
+                        // UI-02: read the game's own hotkey gate with search focused.
+                        if (view != null) view.FocusSearchForRuntime(true);
+                        NativeUiNext(12);
+                        return false;
+                    }
+                    string category = NativeUiFilterCategories[_nativeUiFilterIndex];
+                    _nativeUiFilter = new NativeUiCatalogueFilter
+                    {
+                        Category = category,
+                        DocumentBefore = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime,
+                        Capture = "nui-catalogue-" + category.ToLowerInvariant() + ".png"
+                    };
+                    string result = BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("SourceTab." + category);
+                    if (result != "invoked") _nativeUi.Failures.Add("catalogue-filter:" + category + ":" + result);
+                    NativeUiNext(26);
+                    return false;
+                }
+                case 26:
+                {
+                    if (!NativeUiWaited(350)) return false;
+                    CastingWorkspaceSession live = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                    CastingGraphView graph = live == null ? null
+                        : live.BuildGraph(BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime());
+                    PlannerSourceCategory category = (PlannerSourceCategory)Enum.Parse(typeof(PlannerSourceCategory),
+                        _nativeUiFilter.Category);
+                    // The selected entry intentionally remains listed in every filter.
+                    _nativeUiFilter.ExpectedSourceIds = graph == null ? null : graph.Catalogue
+                        .Where(entry => entry.Selected || (WorkspaceSourceLabels.MatchesCategory(entry.Source, category) &&
+                            WorkspaceSourceLabels.Matches(entry.Source, view == null ? null : view.SearchTextForRuntime)))
+                        .Select(entry => entry.SourceId).ToArray();
+                    _nativeUiFilter.VisibleSourceIds = view == null ? null : view.CatalogueSourceIdsForRuntime;
+                    _nativeUiFilter.DocumentAfter = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                    NativeUiCapture(_nativeUiFilter.Capture);
+                    _nativeUi.CatalogueFilters.Add(_nativeUiFilter);
+                    _nativeUiFilterIndex++;
+                    NativeUiNext(25);
                     return false;
                 }
                 case 12:
@@ -532,6 +630,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _nativeUi.PlanningSteps.Add(name + ":" + (failure ?? "ok"));
                         if (name == "add") NativeUiCapture("nui-planning-added.png");
                         if (name == "done") NativeUiCapture("nui-planning-no-selection.png");
+                        if (name == "change-caster") NativeUiCapture("nui-planning-changed-caster.png");
                         _nativeUiPlanningIndex++;
                         if (failure == null) { NativeUiNext(20); return false; }
                     }

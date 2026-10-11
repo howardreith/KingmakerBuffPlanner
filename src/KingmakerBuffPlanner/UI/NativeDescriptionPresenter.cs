@@ -51,6 +51,9 @@ namespace KingmakerBuffPlanner.UI
 
         internal string LastSubject { get; private set; }
         internal string LastFailure { get; private set; }
+        // The actual subject handed to the native trigger, for guarded observation.
+        internal string LastCasterUnitId { get; private set; }
+        internal string LastAbilityGuid { get; private set; }
 
         internal string LiftEvidence
         {
@@ -136,6 +139,8 @@ namespace KingmakerBuffPlanner.UI
         internal bool Open(AbilityKey ability, bool exactVariant, string casterUnitId)
         {
             LastFailure = null;
+            LastCasterUnitId = null;
+            LastAbilityGuid = null;
             if (_disposed || ability == null)
             {
                 LastFailure = _disposed ? "presenter-disposed" : "no-ability";
@@ -171,6 +176,11 @@ namespace KingmakerBuffPlanner.UI
                 return false;
             }
             LastSubject = Describe(subject);
+            AbilityData data = subject as AbilityData;
+            BlueprintAbility blueprint = data == null ? subject as BlueprintAbility : data.Blueprint;
+            LastAbilityGuid = blueprint == null ? null : blueprint.AssetGuid;
+            LastCasterUnitId = data == null || data.Caster == null || data.Caster.Unit == null
+                ? null : data.Caster.Unit.UniqueId;
             return true;
         }
 
@@ -179,6 +189,8 @@ namespace KingmakerBuffPlanner.UI
         internal bool OpenText(string title, string text)
         {
             LastFailure = null;
+            LastCasterUnitId = null;
+            LastAbilityGuid = null;
             if (_disposed) return false;
             Lift();
             try
