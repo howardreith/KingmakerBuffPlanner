@@ -5,6 +5,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1')
 & (Join-Path $PSScriptRoot 'Test-RuntimeLauncherArguments.ps1')
+& (Join-Path $PSScriptRoot 'Test-RuntimeLauncherFileArguments.ps1')
+. (Join-Path $PSScriptRoot 'RuntimeLauncherRefusalTest.Common.ps1')
 
 # Regression for the powershell.exe -File defect class: a top-level
 # script's $PSCmdlet cannot service ShouldProcess when confirmation must
@@ -186,25 +188,8 @@ foreach ($case in $bindingCases.Keys) {
 # or legacy-execution scenario before any save lookup, deployment or
 # launch; only the non-casting inspection and workspace scenarios may load
 # it.
-$familyCases = @(
-    @{ Name = 'advanced-probe-select'; Args = @('-Scenario', 'live-cast-probe-select', '-FixtureFamily', 'Advanced', '-TimeoutSeconds', '600', '-WhatIf') },
-    @{ Name = 'advanced-bootstrap'; Args = @('-Scenario', 'live-ui-bootstrap', '-FixtureFamily', 'Advanced', '-WhatIf') },
-    @{ Name = 'advanced-smoke'; Args = @('-Scenario', 'mod-load-smoke', '-FixtureFamily', 'Advanced', '-WhatIf') },
-    @{ Name = 'advanced-reload'; Args = @('-Scenario', 'live-workspace-reload', '-FixtureFamily', 'Advanced', '-TimeoutSeconds', '600', '-WhatIf') },
-    @{ Name = 'advanced-import'; Args = @('-Scenario', 'live-workspace-import', '-FixtureFamily', 'Advanced', '-WhatIf') },
-    @{ Name = 'advanced-removal'; Args = @('-Scenario', 'live-workspace-removal', '-FixtureFamily', 'Advanced', '-TimeoutSeconds', '600', '-WhatIf') },
-    @{ Name = 'advanced-native-ui'; Args = @('-Scenario', 'live-workspace-native-ui', '-NativeUiStage', 'facts', '-FixtureFamily', 'Advanced', '-TimeoutSeconds', '600', '-WhatIf') }
-)
-foreach ($case in $familyCases) {
-    $ErrorActionPreference = 'Continue'
-    $caseArgs = $case.Args
-    $caseOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher @caseArgs 2>&1)
-    $caseExit = $LASTEXITCODE
-    $ErrorActionPreference = 'Stop'
-    if ($caseExit -eq 0 -or -not (@($caseOutput | Where-Object {
-            "$_" -like '*may only be loaded by the non-casting scenarios*' }).Count -ge 1)) {
-        throw "Advanced family case $($case.Name) was not refused as expected.: $($caseOutput -join ' ')"
-    }
+foreach ($case in @(Get-KbpRuntimeLauncherAdvancedFamilyCases)) {
+    Invoke-KbpRuntimeLauncherFileRefusal -Launcher $launcher -Case $case | Out-Null
 }
 # Layer 7b (advanced profile, mission batch 3 section 5): the advanced copy
 # runs only under its own profile, and that profile only with the advanced
