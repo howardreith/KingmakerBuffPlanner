@@ -203,6 +203,26 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         Pointer(longButton.gameObject, ExecuteEvents.pointerUpHandler);
                         Pointer(longButton.gameObject, ExecuteEvents.pointerExitHandler);
                     }
+                    // The disabled state, as an execution in progress leaves
+                    // the cells (RefreshAvailability), then their own refresh.
+                    foreach (string id in new[] { "setup", "long", "important", "short" })
+                    {
+                        Button cell = hud.ButtonForRuntime(id);
+                        if (cell != null) cell.interactable = false;
+                    }
+                    NativeUiNext(12);
+                    return false;
+                }
+                case 12:
+                {
+                    if (!NativeUiWaited(600)) return false;
+                    NativeUiCapture("nui-hud-disabled-planner.png");
+                    string[] ids = { "setup", "long", "important", "short" };
+                    _nativeUi.PlannerHudDisabledCells = ids.Count(id => hud.ButtonForRuntime(id) != null &&
+                        !hud.ButtonForRuntime(id).IsInteractable());
+                    hud.RefreshAvailability();
+                    _nativeUi.PlannerHudEnabledAfterRefresh = ids.All(id => hud.ButtonForRuntime(id) != null &&
+                        hud.ButtonForRuntime(id).IsInteractable());
                     _nativeUi.NativeActivationsDuringHudProbe = hud.RuntimeUnderlyingNativeActivationCount;
                     hud.EndRuntimePhysicalObservation();
                     _nativeUiUnits = SpellbookUnitsInOrder();
@@ -394,6 +414,35 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _nativeUi.PlannerStillOpenAfterPopupEscape = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
                     _nativeUi.PlannerDocumentAfterPopup = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
                     if (nativeOpen) window.CloseWindow();
+                    // Once more, closed by the window's own close button.
+                    if (view == null || _nativeUiSourceId == null || !view.RightClickForRuntime("tile:" + _nativeUiSourceId))
+                        _nativeUi.Failures.Add("close-button-popup-not-invoked");
+                    NativeUiNext(21);
+                    return false;
+                }
+                case 21:
+                {
+                    if (!NativeUiWaited(1500)) return false;
+                    DescriptionWindow window = NativeDescriptionWindow();
+                    Button close = window == null ? null : window.GetComponentsInChildren<Button>(false)
+                        .FirstOrDefault(button => button.name == "Close" && button.IsInteractable());
+                    ScrollRect scroll = window == null ? null : window.Scroll;
+                    _nativeUi.AddNote("popup-scroll:" + (scroll == null || scroll.content == null || scroll.viewport == null
+                        ? "none" : "content=" + scroll.content.rect.height.ToString("0") + ";viewport=" +
+                            scroll.viewport.rect.height.ToString("0")));
+                    _nativeUi.PlannerPopupCloseButtonFound = close != null && NativeDescriptionPresenter.IsOpen;
+                    if (close != null) Pointer(close.gameObject, ExecuteEvents.pointerClickHandler);
+                    NativeUiNext(22);
+                    return false;
+                }
+                case 22:
+                {
+                    if (!NativeUiWaited(700)) return false;
+                    _nativeUi.PlannerPopupClosedByCloseButton = _nativeUi.PlannerPopupCloseButtonFound &&
+                        !NativeDescriptionPresenter.IsOpen && BuffPlannerUiRoot.IsCastingWorkspaceOpen &&
+                        BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime == _nativeUi.PlannerDocumentBeforePopup;
+                    DescriptionWindow window = NativeDescriptionWindow();
+                    if (NativeDescriptionPresenter.IsOpen && window != null) window.CloseWindow();
                     // UI-02: typing in the search is text entry - focus it as a
                     // click does, then read the game's own gate for its hotkeys.
                     if (view != null) view.FocusSearchForRuntime(true);
@@ -491,6 +540,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         catch (Exception exception) { failure = "threw:" + exception.GetType().Name + ":" + exception.Message; }
                         _nativeUi.PlanningSteps.Add(name + ":" + (failure ?? "ok"));
                         if (name == "add") NativeUiCapture("nui-planning-added.png");
+                        if (name == "done") NativeUiCapture("nui-planning-no-selection.png");
                         _nativeUiPlanningIndex++;
                         if (failure == null) { NativeUiNext(20); return false; }
                     }

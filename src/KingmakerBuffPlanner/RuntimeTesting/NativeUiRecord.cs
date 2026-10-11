@@ -82,6 +82,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public string PlannerHudTooltipTitle { get; set; }
         public int HudTopHitOwnedCells { get; set; }
         public int NativeActivationsDuringHudProbe { get; set; }
+        // The disabled state (an execution in progress), then the cells'
+        // own availability refresh.
+        public int PlannerHudDisabledCells { get; set; }
+        public bool PlannerHudEnabledAfterRefresh { get; set; }
 
         // Spellbook.
         public List<NativeUiSpellbookView> Spellbooks { get; } = new List<NativeUiSpellbookView>();
@@ -99,6 +103,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool PopupSameSpell { get; set; }
         public bool PlannerPopupClosedByEscape { get; set; }
         public bool PlannerStillOpenAfterPopupEscape { get; set; }
+        // The window's own close button dismisses it as well, leaving the
+        // planner open and the plan unchanged.
+        public bool PlannerPopupCloseButtonFound { get; set; }
+        public bool PlannerPopupClosedByCloseButton { get; set; }
         public string PlannerDocumentBeforePopup { get; set; }
         public string PlannerDocumentAfterPopup { get; set; }
 
@@ -174,6 +182,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!PlannerFrameEnclosesRow) yield return "hud-frame-not-enclosing-row";
             if (!OldRailHiddenUnderRow) yield return "hud-old-rail-under-row";
             if (HudTopHitOwnedCells != 4) yield return "hud-top-hit-owned:" + HudTopHitOwnedCells;
+            if (PlannerHudDisabledCells != 4) yield return "hud-disabled-cells:" + PlannerHudDisabledCells;
+            if (!PlannerHudEnabledAfterRefresh) yield return "hud-not-enabled-after-refresh";
             if (NativeActivationsDuringHudProbe != 0)
                 yield return "hud-native-activations:" + NativeActivationsDuringHudProbe;
             if (!PlannerHudTooltipShown || PlannerHudTooltipTitle != "Buff Planner")
@@ -204,6 +214,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 yield return "popup-presenter:" + (PlannerPopupPresenter ?? "none");
             if (!PlannerPopupClosedByEscape || !PlannerStillOpenAfterPopupEscape)
                 yield return "popup-escape-order";
+            if (!PlannerPopupClosedByCloseButton)
+                yield return "popup-close-button:" + (PlannerPopupCloseButtonFound ? "did-not-close" : "not-found");
             if (PlannerDocumentBeforePopup == null || PlannerDocumentBeforePopup != PlannerDocumentAfterPopup)
                 yield return "popup-changed-plan";
             if (!PopupSameSpell) yield return "popup-not-same-spell";
