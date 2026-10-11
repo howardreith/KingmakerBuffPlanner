@@ -1,3 +1,18 @@
+# Autonomous resume — 0.5.0 native UI finish candidate, 2026-10-11
+
+Mission: `KBP_NATIVE_UI_FINISH_2026-10-10` (packet extracted read-only under
+`handoff\kbp-native-ui-finish-2026-10-10-94ff3149`). Branch
+`codex/kingmaker-buff-planner-native-ui-finish-2026-10-10`, worktree
+`repo/KingmakerBuffPlanner-NUI`, base main `a9c6d0f` (v0.4.3). Version 0.5.0.
+Tested product commit `cd1b5545d49cbd294d0f6997c812a432729fac81`; later commits are records only. Package
+`d94418b0d39e5417b1638a495a0b9f34515a618a4441630cc2fca41fda834218` (local-runtime and standard ZIP, byte-identical), DLL `a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41`,
+MVID `6e0ed7cd-3d0b-41da-af95-d820bfec8a09`. Complete gate running since 2026-10-11T06:24:49Z.
+Native on these bytes: `kbpnui-final-qual-06`, `kbpnui-final-qual-720-04`,
+`kbpnui-final-cast-02`. Receipt: `docs/NATIVE-UI-FINISH-0.5.0-DELIVERY.md`
+(outcome PARTIAL; UI-07, UI-08, UI-11 PASS).
+Next action: the owner's review. Nothing is pushed; no merge, tag or release
+without the owner's authorization.
+
 # Autonomous resume — 0.4.2 owner-test candidate after PR #7 review, 2026-10-10
 
 Mission: `Claude_KBP_041_Followup_Prompt.md`, the owner's continuation of

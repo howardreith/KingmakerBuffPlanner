@@ -1,5 +1,39 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-11 0.5.0 native UI finish (KBP_NATIVE_UI_FINISH_2026-10-10)
+
+- Branch `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10`
+  (worktree `repo/KingmakerBuffPlanner-NUI`) from main `a9c6d0f` (v0.4.3).
+  Product `cd1b5545d49cbd294d0f6997c812a432729fac81`, 0.5.0; later commits are records only. Package
+  `d94418b0d39e5417b1638a495a0b9f34515a618a4441630cc2fca41fda834218`, DLL `a8db3a16a36905e1c2f0889bd87ed6e8bf2730a14587cbf6f5265e2800fe8e41`, MVID `6e0ed7cd-3d0b-41da-af95-d820bfec8a09`; the standard ZIP is byte-identical.
+- UI-01..UI-11: `c57f490` (window takeover, game log, copy), `fa0bfc4` (HUD
+  row in a stepped native enclosure), `bbe8426` (spellbook footer pair),
+  `d5a1d99` (the game's DescriptionWindow), `aad17d1` (TextMeshPro text and
+  the native paper kit), `16f749c` and `545a5cf` (row text, scrollbars,
+  description closing), `8ae985d` (0.5.0 version and player docs).
+- Qualified without OS input: `kbpnui-final-qual-06` (1920x1080) and
+  `kbpnui-final-qual-720-04` (1280x720) PASS; casting
+  `kbpnui-final-cast-02` PASS (five runs, one game-log line each).
+- Defects found by the in-game runs, each fixed and regressed in
+  `NativeUiFinishTests`: the description counted as open during its closing
+  animation (`kbpnui-qual-01`, fixed `545a5cf`); the probe compared popups of
+  two different spells (`93b29b1`); `GetBindingByName` returns a name's first
+  binding, which its callback ignores in another game mode (`60d6611`); the
+  HUD press capture never entered the cell, so it showed idle (`cd1b554`).
+- Rejected theory: "forcing the HUD cells non-interactable shows their
+  disabled state" - the HUD's Tick refreshes availability every frame
+  (`kbpnui-final-qual-04` FAIL `hud-disabled-cells:0`; probe removed in
+  `1938aaf`).
+- Rejected theory: "the casting run's repeat refusal should add a game-log
+  line" - the qualification driver applies that step through its own
+  session; only its stop step uses the HUD press path. The press path's
+  refusal line is proven by the qualify stage.
+- C# 517/0 (baseline 511); Validate-Source 43/43; complete gate running.
+- Uncertainty: no physical input; the owner's 1920x1200 display was
+  available only for the before captures; fixture-limited states (active
+  cards, groups, enhancements, long descriptions and lists).
+- Next: the owner's review. No push, merge, tag or release.
+
 ## 2026-10-10 0.4.2 PR #7 review corrections
 
 - R1 (`5d033b8`): failed mandatory archive + recovery handoff -> the

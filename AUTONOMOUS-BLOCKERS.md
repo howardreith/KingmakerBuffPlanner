@@ -1,3 +1,14 @@
+# Autonomous blockers — 0.5.0 native UI finish candidate, 2026-10-11
+
+Open items (details in `docs/NATIVE-UI-FINISH-0.5.0-DELIVERY.md`): owner
+acceptance; no physical-input run (the harness refuses synthetic OS input and
+the game cannot take the foreground from a console window); the automation
+party cannot show active-state cards, groups, enhancements, alternative
+providers, long descriptions or long lists; the HUD's disabled state occurs
+only during classic-mode executions; the session display changed from the
+owner's 1920x1200 to 1920x1080 after `kbpnui-facts-06`, outside the harness.
+The 0.4.2 section below is historical.
+
 # Autonomous blockers — 0.4.2 owner-test candidate, 2026-10-10
 
 Open items (details in `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`): owner
