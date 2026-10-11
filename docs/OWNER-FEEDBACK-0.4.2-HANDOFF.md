@@ -1,3 +1,8 @@
+> October 11, 2026 owner workflow amendment: the timings and evidence below
+> remain historical and bound to their original bytes. docs/VALIDATION-POLICY.md
+> governs new development/review. The old aggregate is not the ordinary default;
+> preserve this immutable candidate across documentation updates.
+
 # 0.4.2 owner-feedback follow-up: evidence handoff
 
 This is the follow-up to the owner's 0.4.1 feedback (prompt

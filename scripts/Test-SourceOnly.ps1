@@ -6,6 +6,9 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Common.ps1')
 
 $root = Get-KbpRepositoryRoot
+# Explicit broad qualification aggregate. Cheap argument refusals precede builds
+# and live history scans; ordinary work uses Test-Development.ps1 instead.
+& (Join-Path $PSScriptRoot 'Test-RuntimeLauncherArguments.ps1')
 & (Join-Path $PSScriptRoot 'Validate-Source.ps1')
 $msbuild = Get-KbpMsBuild
 & $msbuild (Join-Path $root 'tests\KingmakerBuffPlanner.Tests\KingmakerBuffPlanner.Tests.csproj') /t:Rebuild /p:Configuration=Release /m /nologo /v:minimal
