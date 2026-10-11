@@ -82,6 +82,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public string PlannerHudTooltipTitle { get; set; }
         public int HudTopHitOwnedCells { get; set; }
         public int NativeActivationsDuringHudProbe { get; set; }
+        // The rendered highlight tint of the cells in each captured state:
+        // idle (the brightest of the four), Setup hovered, Long pressed.
+        public float PlannerHudIdleHighlightAlpha { get; set; } = 1f;
+        public float[] PlannerHudHoverHighlight { get; set; }
+        public float[] PlannerHudPressedHighlight { get; set; }
 
         // Spellbook.
         public List<NativeUiSpellbookView> Spellbooks { get; } = new List<NativeUiSpellbookView>();
@@ -178,6 +183,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!PlannerFrameEnclosesRow) yield return "hud-frame-not-enclosing-row";
             if (!OldRailHiddenUnderRow) yield return "hud-old-rail-under-row";
             if (HudTopHitOwnedCells != 4) yield return "hud-top-hit-owned:" + HudTopHitOwnedCells;
+            // The native cells' ColorTint: idle hides the hover art, hover
+            // shows it, a press shows it dimmed (0.784).
+            if (PlannerHudIdleHighlightAlpha > 0.05f)
+                yield return "hud-idle-highlight:" + Describe(new[] { PlannerHudIdleHighlightAlpha });
+            if (!SameTint(PlannerHudHoverHighlight, 1f, 1f))
+                yield return "hud-hover-highlight:" + Describe(PlannerHudHoverHighlight);
+            if (!SameTint(PlannerHudPressedHighlight, 0.784f, 1f))
+                yield return "hud-pressed-highlight:" + Describe(PlannerHudPressedHighlight);
             if (NativeActivationsDuringHudProbe != 0)
                 yield return "hud-native-activations:" + NativeActivationsDuringHudProbe;
             if (!PlannerHudTooltipShown || PlannerHudTooltipTitle != "Buff Planner")
@@ -269,6 +282,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private static string PlainTitle(string title)
         {
             return System.Text.RegularExpressions.Regex.Replace(title ?? string.Empty, "<[^>]*>", string.Empty).Trim();
+        }
+
+        private static bool SameTint(float[] tint, float grey, float alpha)
+        {
+            return tint != null && tint.Length == 4 && tint.Take(3).All(value => Math.Abs(value - grey) <= 0.05f) &&
+                Math.Abs(tint[3] - alpha) <= 0.05f;
         }
 
         private static bool SameSize(float[] expected, float[] actual, float tolerance)

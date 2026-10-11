@@ -385,6 +385,9 @@ namespace KingmakerBuffPlanner.Tests
             record.PlannerFrameEnclosesRow = true;
             record.OldRailHiddenUnderRow = true;
             record.HudTopHitOwnedCells = 4;
+            record.PlannerHudIdleHighlightAlpha = 0f;
+            record.PlannerHudHoverHighlight = new[] { 1f, 1f, 1f, 1f };
+            record.PlannerHudPressedHighlight = new[] { 0.784f, 0.784f, 0.784f, 1f };
             record.PlannerHudTooltipShown = true;
             record.PlannerHudTooltipTitle = "Buff Planner";
             NativeUiSpellbookView view = record.Spellbooks[0];
@@ -453,6 +456,11 @@ namespace KingmakerBuffPlanner.Tests
                 { "hud-columns:0.0,0.0,3.0,0.0", r => r.PlannerColumnOffsets = new[] { 0f, 0f, 3f, 0f } },
                 { "hud-frame-not-enclosing-row", r => r.PlannerFrameEnclosesRow = false },
                 { "hud-old-rail-under-row", r => r.OldRailHiddenUnderRow = false },
+                { "hud-idle-highlight:1.0", r => r.PlannerHudIdleHighlightAlpha = 1f },
+                { "hud-hover-highlight:1.0,1.0,1.0,0.0", r => r.PlannerHudHoverHighlight = new[] { 1f, 1f, 1f, 0f } },
+                // The press the probe once sent without entering the cell
+                // rendered the idle tint (kbpnui-final-qual-05).
+                { "hud-pressed-highlight:1.0,1.0,1.0,0.0", r => r.PlannerHudPressedHighlight = new[] { 1f, 1f, 1f, 0f } },
                 { "hud-tooltip:none", r => { r.PlannerHudTooltipShown = false; r.PlannerHudTooltipTitle = null; } },
                 { "spellbook-planner-button-disabled:Linzi", r => r.Spellbooks[0].PlannerButtonInteractable = false },
                 { "spellbook-pair-height-or-baseline:Linzi", r => r.Spellbooks[0].PlannerRect = new[] { 1600f, 100f, 150f, 30f } },

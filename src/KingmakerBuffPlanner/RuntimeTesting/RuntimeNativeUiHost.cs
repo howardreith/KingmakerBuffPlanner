@@ -153,6 +153,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _nativeUi.AddNote("preview:" + file);
                     WriteNamedPreviews();
                     RecordHudGeometry(hud);
+                    _nativeUi.PlannerHudIdleHighlightAlpha = new[] { "setup", "long", "important", "short" }
+                        .Select(id => HighlightTint(hud.ButtonForRuntime(id)))
+                        .Select(tint => tint == null ? 1f : tint[3]).Max();
                     NativeUiCapture("nui-hud.png");
                     hud.BeginRuntimePhysicalObservation();
                     NativeUiNext(1);
@@ -173,6 +176,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _nativeUi.PlannerHudTooltipShown = tooltip != null && tooltip.Active && tooltip.NativeTriggerCount == 4;
                     string text = hud.TooltipForRuntime("setup");
                     _nativeUi.PlannerHudTooltipTitle = text == null ? null : text.Split('\n')[0];
+                    _nativeUi.PlannerHudHoverHighlight = HighlightTint(hud.ButtonForRuntime("setup"));
                     NativeUiCapture("nui-hud-hover-planner.png");
                     Button setup = hud.ButtonForRuntime("setup");
                     if (setup != null) Pointer(setup.gameObject, ExecuteEvents.pointerExitHandler);
@@ -187,14 +191,21 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     NativeUiCapture("nui-hud-hover-native.png");
                     Button native = NativeFormationButton(hud);
                     if (native != null) Pointer(native.gameObject, ExecuteEvents.pointerExitHandler);
+                    // A press shows only while the pointer is inside the cell
+                    // (Selectable.IsPressed): enter, then press.
                     Button longButton = hud.ButtonForRuntime("long");
-                    if (longButton != null) Pointer(longButton.gameObject, ExecuteEvents.pointerDownHandler);
+                    if (longButton != null)
+                    {
+                        Pointer(longButton.gameObject, ExecuteEvents.pointerEnterHandler);
+                        Pointer(longButton.gameObject, ExecuteEvents.pointerDownHandler);
+                    }
                     NativeUiNext(4);
                     return false;
                 }
                 case 4:
                 {
                     if (!NativeUiWaited(500)) return false;
+                    _nativeUi.PlannerHudPressedHighlight = HighlightTint(hud.ButtonForRuntime("long"));
                     NativeUiCapture("nui-hud-pressed-planner.png");
                     Button longButton = hud.ButtonForRuntime("long");
                     // Up without a click: the pressed state ends, nothing runs.
@@ -801,6 +812,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         }
 
         // ---- helpers ------------------------------------------------------
+
+        // The tint the cell's ColorTint transition has rendered on its
+        // highlight (the hover art): r, g, b, a.
+        private static float[] HighlightTint(Button button)
+        {
+            Graphic target = button == null ? null : button.targetGraphic;
+            if (target == null || target.canvasRenderer == null) return null;
+            Color color = target.canvasRenderer.GetColor();
+            return new[] { color.r, color.g, color.b, color.a };
+        }
 
         private static void Pointer<T>(GameObject target, ExecuteEvents.EventFunction<T> handler)
             where T : IEventSystemHandler
