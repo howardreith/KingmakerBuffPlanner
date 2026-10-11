@@ -5744,6 +5744,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             // never outlive the run, whatever ends it (deadline, abort, host
             // exception, disable or unload).
             PlannerUiReproduction.Rc6ButtonBehaviour = false;
+            if (RuntimeTestProtocol.IsNativeUiScenario(_request.Scenario))
+            {
+                try { ReleaseNativeUiProbes(); }
+                catch (Exception exception) { _log.Error("[KBP-NUI] probe cleanup failed at shutdown.", exception); }
+            }
             if (_hoverStarted && !_hover.Completed)
             {
                 EndHoverClassic();

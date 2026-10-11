@@ -29,6 +29,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public string SelectedSourceAfterReopen { get; set; }
         public int PlannerRootsAfterReopen { get; set; }
         public string Capture { get; set; }
+        public NativeUiKeyBindingObservation KeyBinding { get; set; }
     }
 
     public sealed class NativeUiSpellbookView
@@ -38,6 +39,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool MetamagicPresent { get; set; }
         public bool MetamagicActive { get; set; }
         public bool MetamagicInteractable { get; set; }
+        public NativeUiMetamagicAction MetamagicAction { get; set; }
         public bool PlannerButtonPresent { get; set; }
         public bool PlannerButtonInteractable { get; set; }
         public int PlannerButtonCount { get; set; }
@@ -46,6 +48,33 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public float[] PlannerRect { get; set; }
         public string PlannerLabelFont { get; set; }
         public string MetamagicLabelFont { get; set; }
+        public string Capture { get; set; }
+    }
+
+    public sealed class NativeUiKeyBindingObservation
+    {
+        public string DispatchKind { get; set; }
+        public string BindingName { get; set; }
+        public string Key { get; set; }
+        public string CurrentMode { get; set; }
+        public string BindingMode { get; set; }
+        public bool KeyboardDisabled { get; set; }
+        public bool InputFieldSelected { get; set; }
+        public bool Paused { get; set; }
+        public bool WorksWhenPaused { get; set; }
+        public bool ControllerGamepad { get; set; }
+    }
+
+    public sealed class NativeUiMetamagicAction
+    {
+        public bool ButtonInvoked { get; set; }
+        public bool ModeBefore { get; set; }
+        public bool ModeWhileOpen { get; set; }
+        public bool PlannerOpenWhileMetamagic { get; set; }
+        public bool ReturnInvoked { get; set; }
+        public bool ModeAfterReturn { get; set; }
+        public bool ControllerPresentAfterReturn { get; set; }
+        public bool PlannerButtonOfferedAfterReturn { get; set; }
         public string Capture { get; set; }
     }
 
@@ -88,9 +117,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public const string FactsStage = "facts";
         public const string QualifyStage = "qualify";
 
-        // Schema 1 keeps its original judgements. Schema 2 requires the new
-        // observations; old evidence cannot establish their acceptance.
-        public int SchemaVersion { get; set; } = 2;
+        // Earlier schemas retain their original judgements. Schema 2 adds
+        // popup/caption/filter observations; schema 3 adds native action and
+        // key-route preconditions. Historical records prove only what they observed.
+        public int SchemaVersion { get; set; } = 3;
         public string RunId { get; set; }
         public string Stage { get; set; }
         public int ScreenWidth { get; set; }
@@ -192,7 +222,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public IList<string> Violations()
         {
             var violations = new List<string>();
-            if (SchemaVersion != 1 && SchemaVersion != 2) violations.Add("schema:" + SchemaVersion);
+            if (SchemaVersion != 1 && SchemaVersion != 2 && SchemaVersion != 3) violations.Add("schema:" + SchemaVersion);
             if (Stage != FactsStage && Stage != QualifyStage) violations.Add("stage:" + (Stage ?? "null"));
             violations.AddRange(Failures.Select(value => "failure:" + value));
             violations.AddRange(MissingCaptures.Select(value => "capture-missing:" + value));
@@ -214,6 +244,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             if (SchemaVersion >= 2)
                 foreach (string violation in ObservationViolations()) yield return violation;
+            if (SchemaVersion >= 3)
+                foreach (string violation in NativeActionViolations()) yield return violation;
             // UI-09: four cells the size of the native cells, one per native
             // column, on a third row above the native rows, inside the frame.
             if (PlannerHudButtons != 4) yield return "hud-planner-buttons:" + PlannerHudButtons;
@@ -316,6 +348,41 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         // These observations support bounded integration judgements, not a
         // visual PASS, physical input dispatch, or coverage of long content.
+        private IEnumerable<string> NativeActionViolations()
+        {
+            foreach (NativeUiWindowSwitch item in Switches.Where(value => value.Route != null &&
+                    value.Route.StartsWith("key:", StringComparison.Ordinal)))
+            {
+                string label = "key-route:" + item.Route + ":";
+                NativeUiKeyBindingObservation key = item.KeyBinding;
+                if (key == null) { yield return label + "missing-observation"; continue; }
+                if (key.DispatchKind != "binding-callback-forced") yield return label + "dispatch-kind";
+                if (key.BindingName != item.Route.Substring(4)) yield return label + "binding-name";
+                if (string.IsNullOrEmpty(key.Key) || key.Key == "None") yield return label + "unbound";
+                if (string.IsNullOrEmpty(key.CurrentMode) || key.CurrentMode != key.BindingMode)
+                    yield return label + "mode";
+                if (key.KeyboardDisabled) yield return label + "keyboard-disabled";
+                if (key.InputFieldSelected) yield return label + "input-field-selected";
+                if (key.ControllerGamepad) yield return label + "controller-gamepad";
+                if (key.Paused != item.PausedBefore) yield return label + "pause-observation";
+                if (key.Paused && !key.WorksWhenPaused) yield return label + "does-not-work-paused";
+            }
+            if (!Spellbooks.Any(view => view.MetamagicAction != null)) yield return "metamagic:no-available-action";
+            foreach (NativeUiSpellbookView view in Spellbooks.Where(value => value.Shown &&
+                    value.MetamagicActive && value.MetamagicInteractable))
+            {
+                string label = "metamagic:" + view.Unit + ":";
+                NativeUiMetamagicAction action = view.MetamagicAction;
+                if (action == null) { yield return label + "missing-action"; continue; }
+                if (!action.ButtonInvoked || action.ModeBefore || !action.ModeWhileOpen)
+                    yield return label + "did-not-open";
+                if (action.PlannerOpenWhileMetamagic) yield return label + "opened-planner";
+                if (!action.ReturnInvoked || !action.ControllerPresentAfterReturn ||
+                    action.ModeAfterReturn != action.ModeBefore) yield return label + "did-not-return";
+                if (!action.PlannerButtonOfferedAfterReturn) yield return label + "planner-entry-unavailable";
+            }
+        }
+
         private IEnumerable<string> ObservationViolations()
         {
             string[] categories = { "All", "Spells", "Abilities", "Other" };

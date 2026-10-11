@@ -447,6 +447,13 @@ namespace KingmakerBuffPlanner.Tests
             record.PlannerHudTooltipShown = true;
             record.PlannerHudTooltipTitle = "Buff Planner";
             NativeUiSpellbookView view = record.Spellbooks[0];
+            view.MetamagicActive = true;
+            view.MetamagicInteractable = true;
+            view.MetamagicAction = new NativeUiMetamagicAction
+            {
+                ButtonInvoked = true, ModeWhileOpen = true, ReturnInvoked = true,
+                ControllerPresentAfterReturn = true, PlannerButtonOfferedAfterReturn = true
+            };
             view.PlannerButtonPresent = true;
             view.PlannerButtonInteractable = true;
             view.PlannerButtonCount = 1;
@@ -500,7 +507,12 @@ namespace KingmakerBuffPlanner.Tests
                 {
                     Route = route, PlannerOpenBefore = true, NativeShownAfter = true,
                     FullScreenModeWhileNative = true, NativeReleasedAfterClose = true, PlannerReopened = true,
-                    PlannerRootsAfterReopen = 1, SelectedSourceBefore = "src", SelectedSourceAfterReopen = "src"
+                    PlannerRootsAfterReopen = 1, SelectedSourceBefore = "src", SelectedSourceAfterReopen = "src",
+                    KeyBinding = route.StartsWith("key:", StringComparison.Ordinal) ? new NativeUiKeyBindingObservation
+                    {
+                        DispatchKind = "binding-callback-forced", BindingName = route.Substring(4), Key = "I",
+                        CurrentMode = "FullScreenUi", BindingMode = "FullScreenUi", WorksWhenPaused = true
+                    } : null
                 });
             record.SearchFocusSuppressesNativeBindings = true;
             record.SaveFailureShown = true;
@@ -545,6 +557,17 @@ namespace KingmakerBuffPlanner.Tests
                     "catalogue-filters:missing-categories" })
                 if (!legacy.Violations().Contains(missing))
                     throw new InvalidOperationException("Missing observation was accepted: " + missing);
+            NativeUiRecord schema2 = QualifiedNativeUiRecord();
+            schema2.SchemaVersion = 2;
+            schema2.Spellbooks[0].MetamagicAction = null;
+            schema2.Switches[3].KeyBinding = null;
+            if (schema2.Violations().Count != 0)
+                throw new InvalidOperationException("A schema-2 verdict was relabelled by schema-3 requirements.");
+            schema2.SchemaVersion = 3;
+            foreach (string missing in new[] { "metamagic:Linzi:missing-action",
+                    "key-route:key:OpenInventory:missing-observation" })
+                if (!schema2.Violations().Contains(missing))
+                    throw new InvalidOperationException("Schema 3 accepted a missing native action: " + missing);
             var defects = new Dictionary<string, Action<NativeUiRecord>>
             {
                 { "hud-cell-size:42.0,42.0!=48.0,48.0", r => r.PlannerHudCell = new[] { 42f, 42f } },
@@ -561,7 +584,28 @@ namespace KingmakerBuffPlanner.Tests
                 { "spellbook-pair-height-or-baseline:Linzi", r => r.Spellbooks[0].PlannerRect = new[] { 1600f, 100f, 150f, 30f } },
                 { "spellbook-top-right-entry-present", r => r.SpellbookTopRightEntryAbsent = false },
                 { "popup-presenter:planner-scroll", r => r.PlannerPopupPresenter = "planner-scroll" },
-                { "schema:3", r => r.SchemaVersion = 3 },
+                { "schema:4", r => r.SchemaVersion = 4 },
+                { "key-route:key:OpenInventory:dispatch-kind", r => r.Switches[3].KeyBinding.DispatchKind = "physical-key" },
+                { "key-route:key:OpenInventory:binding-name", r => r.Switches[3].KeyBinding.BindingName = "OpenSpells" },
+                { "key-route:key:OpenInventory:unbound", r => r.Switches[3].KeyBinding.Key = "None" },
+                { "key-route:key:OpenInventory:mode", r => r.Switches[3].KeyBinding.BindingMode = "Default" },
+                { "key-route:key:OpenInventory:keyboard-disabled", r => r.Switches[3].KeyBinding.KeyboardDisabled = true },
+                { "key-route:key:OpenInventory:input-field-selected", r => r.Switches[3].KeyBinding.InputFieldSelected = true },
+                { "key-route:key:OpenInventory:controller-gamepad", r => r.Switches[3].KeyBinding.ControllerGamepad = true },
+                { "key-route:key:OpenInventory:pause-observation", r => r.Switches[3].KeyBinding.Paused = true },
+                { "key-route:key:OpenInventory:does-not-work-paused", r =>
+                    { r.Switches[3].PausedBefore = true; r.Switches[3].KeyBinding.Paused = true;
+                      r.Switches[3].KeyBinding.WorksWhenPaused = false; } },
+                { "metamagic:Linzi:did-not-open", r => r.Spellbooks[0].MetamagicAction.ModeWhileOpen = false },
+                { "metamagic:Tartuccio:did-not-open", r =>
+                    { r.Spellbooks[0].Unit = "Tartuccio"; r.Spellbooks[0].MetamagicAction.ButtonInvoked = false; } },
+                { "metamagic:Linzi:opened-planner", r => r.Spellbooks[0].MetamagicAction.PlannerOpenWhileMetamagic = true },
+                { "metamagic:Linzi:did-not-return", r => r.Spellbooks[0].MetamagicAction.ModeAfterReturn = true },
+                { "metamagic:Tartuccio:did-not-return", r =>
+                    { r.Spellbooks[0].Unit = "Tartuccio"; r.Spellbooks[0].MetamagicAction.ReturnInvoked = false; } },
+                { "metamagic:Hedwirg:did-not-return", r =>
+                    { r.Spellbooks[0].Unit = "Hedwirg"; r.Spellbooks[0].MetamagicAction.ControllerPresentAfterReturn = false; } },
+                { "metamagic:Linzi:planner-entry-unavailable", r => r.Spellbooks[0].MetamagicAction.PlannerButtonOfferedAfterReturn = false },
                 { "source-tabs:missing-captions", r => r.SourceTabs.RemoveAt(0) },
                 { "source-tab:Abilities:too-small", r => r.SourceTabs[2].Size = 9f },
                 { "source-tab:Abilities:clipped", r => r.SourceTabs[2].AvailableWidth = 20f },

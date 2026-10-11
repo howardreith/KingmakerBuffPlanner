@@ -55,6 +55,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _nativeUiUnitIndex;
         private int _nativeUiSwitchIndex;
         private NativeUiWindowSwitch _nativeUiSwitch;
+        private NativeUiSpellbookView _nativeUiMetamagicView;
         private string _nativeUiSourceId;
         private int _nativeUiLogLinesBefore;
         private int _nativeUiRunsBefore;
@@ -231,21 +232,44 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 case 5:
                 {
                     if (!NativeUiWaited(2800)) return false;
-                    RecordSpellbookView(_nativeUiUnitIndex);
-                    if (_nativeUiUnitIndex == 0)
-                    {
-                        WriteSpellbookFacts();
-                        // The comparison spell's page, through the book's own
-                        // level tab click, when the open page lacks it.
-                        if (BookSpellTrigger(NativeUiComparisonSpell) == null && ClickBookLevelOf(NativeUiComparisonSpell))
-                        {
-                            NativeUiNext(11);
-                            return false;
-                        }
-                        return OpenNativeBookPopup();
-                    }
-                    NativeUiNext(7);
+                    NativeUiSpellbookView bookView = RecordSpellbookView(_nativeUiUnitIndex);
+                    if (BeginNativeMetamagicObservation(bookView)) return false;
+                    return ContinueAfterNativeSpellbookView();
+                }
+                case 12:
+                {
+                    if (!NativeUiWaited(1500)) return false;
+                    SpellBookController controller = NativeSpellbookController();
+                    NativeUiMetamagicAction action = _nativeUiMetamagicView.MetamagicAction;
+                    action.ModeWhileOpen = controller != null && NativeMetamagicMode(controller);
+                    action.PlannerOpenWhileMetamagic = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                    action.Capture = "nui-metamagic-" + _nativeUiUnitIndex + ".png";
+                    NativeUiCapture(action.Capture);
+                    Button button = NativeMetamagicButton();
+                    if (button == null || !button.gameObject.activeInHierarchy || !button.IsInteractable())
+                        return FinishNativeUi("metamagic-return-button-unavailable");
+                    // The same native footer button returns to the ordinary book.
+                    action.ReturnInvoked = true;
+                    button.onClick.Invoke();
+                    NativeUiNext(13);
                     return false;
+                }
+                case 13:
+                {
+                    if (!NativeUiWaited(1500)) return false;
+                    SpellBookController controller = NativeSpellbookController();
+                    NativeUiMetamagicAction action = _nativeUiMetamagicView.MetamagicAction;
+                    action.ModeAfterReturn = controller != null && NativeMetamagicMode(controller);
+                    action.ControllerPresentAfterReturn = controller != null;
+                    BuffPlannerSpellbookEntryController entry = BuffPlannerUiRoot.SpellbookEntryForRuntime;
+                    Button owned = entry == null ? null : entry.OwnedButtonForRuntime;
+                    action.PlannerButtonOfferedAfterReturn = owned != null &&
+                        owned.gameObject.activeInHierarchy && owned.IsInteractable();
+                    NativeUiCapture("nui-metamagic-return-" + _nativeUiUnitIndex + ".png");
+                    // Any failed return is recorded; cleanup restores only the
+                    // mode owned by this probe and cannot turn it into a PASS.
+                    RestoreNativeUiMetamagicMode();
+                    return ContinueAfterNativeSpellbookView();
                 }
                 case 11:
                 {
@@ -892,7 +916,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private bool FinishNativeUi(string failure)
         {
-            ReleaseNativeUiPlanLock();
+            ReleaseNativeUiProbes();
             if (failure != null) _nativeUi.Failures.Add(failure);
             if (BuffPlannerUiRoot.IsCastingWorkspaceOpen) CloseProbeWorkspace();
             if (NativeServiceWindowShown()) CloseNativeServiceWindow();
@@ -1066,7 +1090,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 : canvas.ServiceWindow.transform.Find("SpellBook");
         }
 
-        private void RecordSpellbookView(int index)
+        private NativeUiSpellbookView RecordSpellbookView(int index)
         {
             Transform spellbook = SpellbookWindow();
             UnitEntityData current = null;
@@ -1116,6 +1140,94 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             _nativeUi.SpellbookTopRightEntryAbsent = owned == null || (owned.transform.parent != null &&
                 owned.transform.parent.name == BuffPlannerSpellbookEntryController.FooterPlaceName &&
                 owned.transform.parent.parent == spellbook);
+            return record;
+        }
+
+        private bool ContinueAfterNativeSpellbookView()
+        {
+            if (_nativeUiUnitIndex == 0)
+            {
+                WriteSpellbookFacts();
+                // The comparison spell's page, through the book's own level tab.
+                if (BookSpellTrigger(NativeUiComparisonSpell) == null && ClickBookLevelOf(NativeUiComparisonSpell))
+                {
+                    NativeUiNext(11);
+                    return false;
+                }
+                return OpenNativeBookPopup();
+            }
+            NativeUiNext(7);
+            return false;
+        }
+
+        private static SpellBookController NativeSpellbookController()
+        {
+            Transform book = SpellbookWindow();
+            return book == null ? null : book.GetComponent<SpellBookController>();
+        }
+
+        // The installed 2.1.7b mode getter is private; the toggle/restore
+        // method is public. Use only this exact, verified read-only contract.
+        private static bool NativeMetamagicMode(SpellBookController controller)
+        {
+            MethodInfo mode = typeof(SpellBookController).GetMethod("get_IsMetamagicMode",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (mode == null) throw new InvalidOperationException("Native Metamagic mode getter is unavailable.");
+            return (bool)mode.Invoke(controller, null);
+        }
+
+        private static Button NativeMetamagicButton()
+        {
+            Transform book = SpellbookWindow();
+            Transform apply = book == null ? null
+                : book.Find(BuffPlannerSpellbookEntryController.NativeFooterPath + "/Apply");
+            return apply == null ? null : apply.GetComponent<Button>();
+        }
+
+        private bool BeginNativeMetamagicObservation(NativeUiSpellbookView view)
+        {
+            // Never make an unavailable button available for the observation.
+            if (!view.MetamagicActive || !view.MetamagicInteractable) return false;
+            SpellBookController controller = NativeSpellbookController();
+            Button button = NativeMetamagicButton();
+            if (controller == null || button == null)
+            {
+                _nativeUi.Failures.Add("metamagic-native-control-missing:" + view.Unit);
+                return false;
+            }
+            if (NativeMetamagicMode(controller))
+            {
+                _nativeUi.Failures.Add("metamagic-already-open:" + view.Unit);
+                return false;
+            }
+            view.MetamagicAction = new NativeUiMetamagicAction
+            {
+                ModeBefore = NativeMetamagicMode(controller), ButtonInvoked = true
+            };
+            _nativeUiMetamagicView = view;
+            _nativeUi.AddNote("metamagic:" + view.Unit + ";native-button-onClick;no-os-input;no-write-spell");
+            button.onClick.Invoke();
+            NativeUiNext(12);
+            return true;
+        }
+
+        private void RestoreNativeUiMetamagicMode()
+        {
+            if (_nativeUiMetamagicView == null) return;
+            try
+            {
+                SpellBookController controller = NativeSpellbookController();
+                bool before = _nativeUiMetamagicView.MetamagicAction.ModeBefore;
+                if (controller != null && NativeMetamagicMode(controller) != before)
+                    controller.SwitchToMetamagicMode(before);
+            }
+            finally { _nativeUiMetamagicView = null; }
+        }
+
+        private void ReleaseNativeUiProbes()
+        {
+            try { RestoreNativeUiMetamagicMode(); }
+            finally { ReleaseNativeUiPlanLock(); }
         }
 
         private void WriteSpellbookFacts()
@@ -1241,7 +1353,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             if (route.StartsWith("key:", StringComparison.Ordinal))
             {
-                string failure = InvokeKeyBinding(route.Substring(4));
+                string failure = InvokeKeyBinding(route.Substring(4), _nativeUiSwitch);
                 if (failure != null) _nativeUi.Failures.Add("switch-key:" + failure);
                 return;
             }
@@ -1259,7 +1371,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
         }
 
-        private static string InvokeKeyBinding(string name)
+        private static string InvokeKeyBinding(string name, NativeUiWindowSwitch observation)
         {
             KeyboardAccess keyboard = Game.Instance == null ? null : Game.Instance.Keyboard;
             if (keyboard == null) return "keyboard-missing";
@@ -1277,6 +1389,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             MethodInfo invoke = typeof(KeyboardAccess).GetMethod("OnCallbackByBinding",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             if (invoke == null) return "callback-route-missing";
+            // These are read-only preconditions, not evidence that an OS key
+            // reached Tick/InputMatched. The force flag still bypasses input matching.
+            observation.KeyBinding = new NativeUiKeyBindingObservation
+            {
+                DispatchKind = "binding-callback-forced", BindingName = binding.Name,
+                Key = binding.Key.ToString(), CurrentMode = mode.ToString(), BindingMode = binding.GameMode.ToString(),
+                KeyboardDisabled = keyboard.Disabled, InputFieldSelected = NativeKeyboardStandsDown(),
+                Paused = Game.Instance.IsPaused, WorksWhenPaused = binding.WorksWhenPaused,
+                ControllerGamepad = Game.Instance.IsControllerGamepad
+            };
             invoke.Invoke(keyboard, new object[] { binding, true });
             return null;
         }
