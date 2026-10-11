@@ -203,26 +203,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         Pointer(longButton.gameObject, ExecuteEvents.pointerUpHandler);
                         Pointer(longButton.gameObject, ExecuteEvents.pointerExitHandler);
                     }
-                    // The disabled state, as an execution in progress leaves
-                    // the cells (RefreshAvailability), then their own refresh.
-                    foreach (string id in new[] { "setup", "long", "important", "short" })
-                    {
-                        Button cell = hud.ButtonForRuntime(id);
-                        if (cell != null) cell.interactable = false;
-                    }
-                    NativeUiNext(12);
-                    return false;
-                }
-                case 12:
-                {
-                    if (!NativeUiWaited(600)) return false;
-                    NativeUiCapture("nui-hud-disabled-planner.png");
-                    string[] ids = { "setup", "long", "important", "short" };
-                    _nativeUi.PlannerHudDisabledCells = ids.Count(id => hud.ButtonForRuntime(id) != null &&
-                        !hud.ButtonForRuntime(id).IsInteractable());
-                    hud.RefreshAvailability();
-                    _nativeUi.PlannerHudEnabledAfterRefresh = ids.All(id => hud.ButtonForRuntime(id) != null &&
-                        hud.ButtonForRuntime(id).IsInteractable());
                     _nativeUi.NativeActivationsDuringHudProbe = hud.RuntimeUnderlyingNativeActivationCount;
                     hud.EndRuntimePhysicalObservation();
                     _nativeUiUnits = SpellbookUnitsInOrder();

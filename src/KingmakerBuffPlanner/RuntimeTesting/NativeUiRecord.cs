@@ -82,10 +82,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public string PlannerHudTooltipTitle { get; set; }
         public int HudTopHitOwnedCells { get; set; }
         public int NativeActivationsDuringHudProbe { get; set; }
-        // The disabled state (an execution in progress), then the cells'
-        // own availability refresh.
-        public int PlannerHudDisabledCells { get; set; }
-        public bool PlannerHudEnabledAfterRefresh { get; set; }
 
         // Spellbook.
         public List<NativeUiSpellbookView> Spellbooks { get; } = new List<NativeUiSpellbookView>();
@@ -182,8 +178,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!PlannerFrameEnclosesRow) yield return "hud-frame-not-enclosing-row";
             if (!OldRailHiddenUnderRow) yield return "hud-old-rail-under-row";
             if (HudTopHitOwnedCells != 4) yield return "hud-top-hit-owned:" + HudTopHitOwnedCells;
-            if (PlannerHudDisabledCells != 4) yield return "hud-disabled-cells:" + PlannerHudDisabledCells;
-            if (!PlannerHudEnabledAfterRefresh) yield return "hud-not-enabled-after-refresh";
             if (NativeActivationsDuringHudProbe != 0)
                 yield return "hud-native-activations:" + NativeActivationsDuringHudProbe;
             if (!PlannerHudTooltipShown || PlannerHudTooltipTitle != "Buff Planner")

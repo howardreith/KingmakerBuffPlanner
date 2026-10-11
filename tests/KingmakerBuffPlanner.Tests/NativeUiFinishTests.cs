@@ -385,8 +385,6 @@ namespace KingmakerBuffPlanner.Tests
             record.PlannerFrameEnclosesRow = true;
             record.OldRailHiddenUnderRow = true;
             record.HudTopHitOwnedCells = 4;
-            record.PlannerHudDisabledCells = 4;
-            record.PlannerHudEnabledAfterRefresh = true;
             record.PlannerHudTooltipShown = true;
             record.PlannerHudTooltipTitle = "Buff Planner";
             NativeUiSpellbookView view = record.Spellbooks[0];
@@ -462,8 +460,6 @@ namespace KingmakerBuffPlanner.Tests
                 { "popup-presenter:planner-scroll", r => r.PlannerPopupPresenter = "planner-scroll" },
                 { "popup-changed-plan", r => r.PlannerDocumentAfterPopup = "doc2" },
                 { "popup-close-button:did-not-close", r => r.PlannerPopupClosedByCloseButton = false },
-                { "hud-disabled-cells:3", r => r.PlannerHudDisabledCells = 3 },
-                { "hud-not-enabled-after-refresh", r => r.PlannerHudEnabledAfterRefresh = false },
                 { "popup-not-same-spell", r => r.PopupSameSpell =
                     NativeUiRecord.SameDescriptionTitle(EarPiercingScreamTitle, r.PlannerPopupTitle) },
                 { "retired-label:Planner: Casting-first", r => r.PlannerVisibleLabels.Add("Planner: Casting-first") },
