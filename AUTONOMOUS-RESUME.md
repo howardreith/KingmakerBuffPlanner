@@ -1,3 +1,9 @@
+> Owner-selected continuous completion milestone, October 11: the four-hour
+> initial budget includes the required long purity prerequisite and two-size
+> observations. Work is active on candidate 743b1dc; earlier ordinary-budget
+> deferral below is historical. Follow the [current milestone](docs/NATIVE-UI-FINISH-0.5.0-COMPLETION.md)
+> and current validation policy. No runtime acceptance is inferred from code.
+
 # Current native UI capture checkpoint - October 11, 2026
 
 Read [validation policy](docs/VALIDATION-POLICY.md),

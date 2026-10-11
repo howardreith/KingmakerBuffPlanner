@@ -1,3 +1,9 @@
+> Owner-selected continuous completion milestone, October 11: the four-hour
+> initial budget includes the required long purity prerequisite and two-size
+> observations. Work is active on candidate 743b1dc; earlier ordinary-budget
+> deferral below is historical. Follow the [current milestone](NATIVE-UI-FINISH-0.5.0-COMPLETION.md)
+> and current validation policy. No runtime acceptance is inferred from code.
+
 > Latest capture correction, October 11: source `7410f92604621aabfba97e26cb1c9f6f17044b63`
 > holds state through a later frame/complete PNG before UI transitions. Focused
 > C# 9/0, source 43/0; local package 4/0 validation, NOT_RUN in game. The old frozen

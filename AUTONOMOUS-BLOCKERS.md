@@ -1,3 +1,9 @@
+> Owner-selected continuous completion milestone, October 11: the four-hour
+> initial budget includes the required long purity prerequisite and two-size
+> observations. Work is active on candidate 743b1dc; earlier ordinary-budget
+> deferral below is historical. Follow the [current milestone](docs/NATIVE-UI-FINISH-0.5.0-COMPLETION.md)
+> and current validation policy. No runtime acceptance is inferred from code.
+
 > Current capture checkpoint (October 11, after review of 9dd8997): source 7410f92
 > fixes asynchronous screenshot sequencing; focused C# 9/0, source 43/0,
 > package validation 4/0. New package/observations NOT_RUN; receipt PARTIAL.
