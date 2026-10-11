@@ -1,13 +1,16 @@
-> Current milestone state (supersedes dated in-progress notes below): the first
-> whole-history prerequisite passed, exit 0, in 6354.6762028 seconds on actual
-> WhatIf source 743b1dc. Its first 1920×1080 game run failed with exit 1 in
-> 282.7342866 seconds; original cleanup verified restoration and protected saves.
-> Two demonstrated observer world-boundary failures and a visible footer code
-> are repaired in clean source dc60a37467b5b019b0a63b121b6cd5177ad61714.
-> A fresh current-input full purity window is running before its final native,
-> selection and physical observations. The revised planning estimate is nine
-> hours (approximately 2026-10-12T03:28:29Z), not a cancellation deadline.
-> Acceptance remains PARTIAL; the new candidate is NOT_RUN until its own runs.
+> Current milestone state (supersedes dated notes below): the 743b1dc and
+> dc60a37 1080p attempts FAILED, with original game exit, registry/mod restoration
+> and clean protected-save receipts. The dc60a37 run passed all nine ordinary and
+> paused switches but did not restore the probe's original pause state.
+> Verified installed DoStopMode refuses stopping Pause beneath FullScreenUi.
+> Repair source 2c40f0633079248072c2f23a754905d665ef41d6 closes the owned
+> window, waits for world release and observes the actual original state before
+> reopening. Classic capture release uses the same bounded observation.
+> Focused source 43/0, build 1/0 and selected C# 23/0 passed in 5.7201224 seconds.
+> The new clean 0.5.0 package is NOT_RUN; its fresh full-purity scan is active
+> (PID 17844, started 22:54:11.9563390Z) outside all watched paths for supervision.
+> Revised planning estimate: eleven hours, approximately 2026-10-12T05:28:29Z.
+> Acceptance remains PARTIAL. This estimate is not a cancellation deadline.
 
 # Native UI completion milestone — October 11, 2026
 
@@ -21,7 +24,7 @@ The [validation policy](VALIDATION-POLICY.md) remains effective. Focused checks
 still accompany individual corrections. No aggregate or publisher campaign is
 selected automatically.
 
-## Candidate and ownership
+## First preparation candidate and ownership (historical, 18:44Z)
 
 - Host DATA; development worktree `C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-NUI`.
 - Feature `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10` started clean
@@ -90,7 +93,7 @@ was invoked against live paths to reproduce the old assertion. The original
 child cause remains unknown; the selected direct route is supported by the
 focused reproduction and must still satisfy its real preflight.
 
-Current owned whole-history supervisor PID 6600 started at
+The first owned whole-history supervisor PID 6600 started at
 2026-10-11T18:44:57.5530991Z; inventories began 18:45:27.4785267Z. It uses all
 five unchanged targets, `-Attempts 1 -LeaseWaitSeconds 120`, and both native UI
 WhatIf modes in the same before/after window. No broad gate or blind retry is
@@ -107,13 +110,13 @@ transport helper was interrupted at a verified boundary after copies completed;
 it launched no runtime transaction and the purity process was preserved. Its
 termination numeric exit was not retained; the interruption receipt says so.
 
-Current result is **IN_PROGRESS**, not runtime qualification. After the actual
-purity verdict, run the serial two-resolution observations, verify exact
-restoration and protected saves between them, and inspect their pictures against
-the supplied R01–R15 reference index and all eleven acceptance criteria. Then
-complete feasible active-state and physical observations through established
-routes with their required prerequisites. Retain precise fixture and physical
-limits; callbacks, forced appearances and PNG writes alone cannot establish PASS.
+The preparation was **IN_PROGRESS** when these dated notes were written. Its
+actual first purity PASS and subsequent 743b1dc game FAIL are recorded above and
+in the later sections. The remaining sequence applies to the repaired candidate:
+serial two-resolution observations, exact restoration and protected-save checks
+between them, and picture review against R01–R15 and all eleven criteria; then
+feasible active-state and physical observations through their existing guarded
+routes. Callbacks, forced appearances and PNG writes alone cannot establish PASS.
 
 ## Further independently actionable availability observation
 
@@ -219,3 +222,108 @@ Logs and numeric outcome are in `selection-physical-purity-*.json` and
 `selection-physical-purity-window.log`, outside watched paths. Separate actual
 run-bound allowances and the selected casting WhatIf window are still required
 for the two casting observations. No runtime writes occur during this inventory.
+
+## Repaired-candidate prerequisite (22:25:51Z)
+
+`run-additional-purity.ps1 -Scope selection-physical -ExpectedCommit dc60a37467b5b019b0a63b121b6cd5177ad61714 -ExpectedZipSha256 46936e57b420dc6f64c9dadccadd6f68af66b66e4dc52677441dceeb9f9dd879`
+completed with numeric exit 0 in 5718.9611891 seconds. Attempts 1, bounded lease
+wait 120 seconds; unchanged complete targets are runtime-state, runtime-staging,
+runtime-backups, runtime-evidence and live Mods. All six source preflights
+reported 43/0; all twelve package checks reported 4/0. The two native sizes,
+Classic selection, qualification selection, physical spellbook and physical
+selection WhatIf calls completed inside this same before/after window.
+The original supervision script is preserved before the later future-casting
+branch extension; that extension did not change the running selection branch.
+
+Receipt/log: `artifacts/native-ui-milestone-2026-10-11/selection-physical-purity-*`.
+The final 1080p native run is `kbpnui-complete-final-1080-01`, supervisor PID 2108,
+started 2026-10-11T22:27:03.7089789Z. Subsequent 720p and other live work require
+its actual restoration and protected-save result first. No live PASS is inferred
+from this prerequisite. The original exact-path NUIC package remains the runtime
+input; the standard local archive is a byte-identical delivery copy with its
+original build receipt, without rebuilding or rewriting provenance.
+
+## Second observed failure and bounded restoration repair (22:32–22:54Z)
+
+`kbpnui-complete-final-1080-01` on source dc60a37/package 46936e57 returned
+numeric exit 1 in 305.8032897 seconds. All nine switches, including both paused
+routes, passed their recorded downstream behavior. The one native violation was
+`pause:not-restored`; Escape order, plan and input-lease cleanup passed. This is
+an actual restoration request beneath the still-open planner, not a prose or
+reader mismatch. Installed `Game.DoStopMode` refuses stopping a mode below the
+active mode. The exact read-only IL evidence is
+`artifacts/native-ui-milestone-2026-10-11/native-mode-do-stop-il.txt`.
+
+Original completion/transaction records prove game exit and exact restoration;
+protected-save records contain zero violations and blocking entries. The display
+registry was restored with zero differences. The supervision wrapper's false
+RestorationVerified/ProtectedSavesClean fields mean its success postcondition
+was not reached; they do not override the original cleanup receipts. A current
+post-failure boundary check passed with no game, foreign lease, unresolved
+transaction or unacknowledged save violation. The second size was not launched
+on these known failing bytes. Preserve all original images and verdicts.
+
+Visually opened on dc60a37: `nui-planner-casting.png` shows native parchment,
+readable filter captions and the friendly automated-session footer;
+`nui-metamagic-0.png` holds the actual Metamagic mode with its native Return and
+Buff Planner pair; `nui-unavailable-metamagic-return-2.png` correctly returns to
+Hedwirg with Metamagic absent and Buff Planner offered. These are valid observed
+pictures on their own source, not qualification of the next binary. The caster
+has no Metamagic feats; opening the native mode is not applying a feat.
+
+Repair commit `2c40f0633079248072c2f23a754905d665ef41d6` uses a small shared
+restoration boundary: no native pause request beneath a full-screen lease, one
+request after world release, and completion only when the original boolean is
+observed. The normal native probe closes/reopens its owned planner around this
+boundary. Classic release waits after its completed screenshot instead of
+assuming the setter is synchronous. Cleanup retains ownership until observed,
+still releases the plan lock in finally and still ends the Classic execution
+and disarms its grant. The ten-second screenshot and restoration bounds remain.
+Four meaningful regressions exercise blocked world release, queued restoration,
+both original pause values and a bounded timeout. Production and tests both use
+the repository's explicit compile lists. Two missing-list draft compile failures
+were corrected and preserved; neither is reported as a passing test run.
+
+Actual command:
+`Test-Development.ps1 -Only 'native-pause-restoration,native-ui-capture,native-ui-record,native-window,native-source-tabs,native-ui-planner-copy,native-ui-game-log,spellbook-handoff,footer-names,qualification-driver-end-to-end,qualification-on-the-planner-pumped-host,qualification-disable-step-rules,classic-run-advances-only-while-the-world-runs,classic-cast-grant-digest-allowance-and-judgement,classic-runs-halt-after-a-failure-and-keep-cleanup,classic-cast-scenario-requests-and-host-order'`
+passed source 43/0, build 1/0 and C# 23/0 in 5.7201224 seconds, exit 0.
+This compiled at documentation HEAD 57c3239 plus the patch subsequently committed
+as 2c40f06; its pre-commit DLL b420e587 is not the delivered candidate.
+
+The clean owned NUIC checkout is fixed at 2c40f06. Build-Local completed once in
+3.2447661 seconds: source 43/0, build 1/0, package validation 4/0, package
+creation 1/0, exit 0. Exact current inputs:
+
+- Product/build source: `2c40f0633079248072c2f23a754905d665ef41d6`, version 0.5.0.
+- ZIP SHA-256: `dc10ee39c4f254f1ddb7730f42758aba76153a46d95683d076bb84da522f2a12`.
+- DLL SHA-256: `0b9a900567c994c9549a430237f62a3f6b156394b9fc2dab68425aa21aa9f9fc`.
+- MVID: `f21722c4-81e8-47e6-9be0-be9cd698e3cb`.
+- Standard local archive:
+  `C:\Dev\KingmakerBuffPlannerLab\package-archive\0.5.0-native-ui-completion-2026-10-11-2c40f06\KingmakerBuffPlanner-0.5.0.zip`.
+- Original exact-path runtime package and receipt remain under clean NUIC
+  `artifacts/local-runtime/0.5.0/`; copied original build receipt preserves that
+  provenance. No DLL rebuild or rewritten generator record was used for the
+  standard delivery copy.
+- Existing qualification freeze:
+  `runtime-backups/qualification-frozen/2c40f0633079248072c2f23a754905d665ef41d6/FREEZE.json`;
+  verified packaged DLL bytes directly before exclusive creation.
+
+Current supervision is outside all five watched runtime roots:
+`artifacts/native-ui-milestone-2026-10-11/candidate-2c40f06/`.
+The new full prerequisite began at 22:54:11.9563390Z, inventories at
+22:54:41.9251142Z, PID 17844. Both native sizes and the existing selection,
+physical spellbook and physical selection WhatIf calls remain in one complete
+before/after window, Attempts 1 and LeaseWaitSeconds 120. The existing display
+helper now checks both selected sizes before the slow inventory. Steam,
+compatibility profile, fixture, cleanliness, package, current ownership and
+transaction checks also run first. No blind retry or narrowed targets.
+
+Fresh final native RunIds are `kbpnui-complete-final-1080-02` and
+`kbpnui-complete-final-720-02`. The eight selected selection/casting/physical IDs
+ending in `-01` are still unused and were rechecked across all four runtime
+locations and the allowance paths; no collisions. The next action after the
+actual full-purity verdict is the first guarded native run on these exact new
+bytes, then restoration/protected-save verification, second size and picture
+review; continue the already selected dependent observations and final delivery.
+The eleven-hour estimate records the extra mandatory current-input scan caused
+by this concrete defect; it authorizes no killing of active work or guard bypass.
