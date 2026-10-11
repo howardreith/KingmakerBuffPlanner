@@ -118,6 +118,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public int GameLogLinesAfter { get; set; }
         public List<string> GameLogPlannerLines { get; } = new List<string>();
         public bool RoutinePressRefused { get; set; }
+        // Case E: an autosave that fails while the plan file is held is
+        // shown ("Not saved" with Retry save), Retry save heals it once
+        // the file is free, and Undo restores the plan.
+        public string SaveFailureFooter { get; set; }
+        public bool SaveFailureShown { get; set; }
+        public bool SaveRecoveryWorked { get; set; }
+        public bool SaveFailureUndoRestored { get; set; }
         public int RunsStarted { get; set; }
 
         public void AddNote(string note)
@@ -216,6 +223,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     yield return label + "selection-not-kept";
             }
             if (!SearchFocusSuppressesNativeBindings) yield return "search-focus-native-bindings";
+            if (!SaveFailureShown) yield return "save-failure-not-shown:" + (SaveFailureFooter ?? "none");
+            if (!SaveRecoveryWorked) yield return "save-recovery-failed";
+            if (!SaveFailureUndoRestored) yield return "save-failure-undo";
             if (!EscapeClosedFocusFirst || !EscapeClosedPlannerLast) yield return "escape-order";
             if (!LeaseReleasedAtEnd || FullScreenModeAtEnd) yield return "end-state";
             // UI-08: one concise refusal line in the native game log.

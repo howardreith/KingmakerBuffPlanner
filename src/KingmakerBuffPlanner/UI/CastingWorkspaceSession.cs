@@ -680,6 +680,12 @@ namespace KingmakerBuffPlanner.UI
         // Whether the plan's primary file exists now (a backup loaded while it
         // is missing saves normally; one loaded while it is unreadable does
         // not). Read when the planner opens and on Reload.
+        // Runtime evidence only: the stored plan file of this campaign.
+        internal string PlanPathForRuntime
+        {
+            get { return _repository.GetProfilePath(CampaignId); }
+        }
+
         public bool PrimaryPlanFileExists
         {
             get { return File.Exists(_repository.GetProfilePath(CampaignId)); }

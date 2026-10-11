@@ -434,6 +434,16 @@ namespace KingmakerBuffPlanner.UI
             get { return _inspectorScroll == null ? -1f : _inspectorScroll.verticalNormalizedPosition; }
         }
 
+        internal string FooterSaveTextForRuntime
+        {
+            get { return _footerSave == null ? null : _footerSave.text; }
+        }
+
+        internal bool SaveRecoveryShownForRuntime
+        {
+            get { return _footerRecovery != null && _footerRecovery.gameObject.activeInHierarchy; }
+        }
+
         internal string FooterResultForRuntime
         {
             get { return _footerResult == null ? string.Empty : _footerResult.text; }
@@ -443,7 +453,8 @@ namespace KingmakerBuffPlanner.UI
         // player can see now (legacy and TextMeshPro text alike).
         internal string TitleTextForRuntime
         {
-            get { return _title == null ? null : _title.text; }
+            // As read: the ornamental initial's markup is not part of it.
+            get { return _title == null ? null : _title.GetParsedText(); }
         }
 
         internal IList<string> VisibleLabelsForRuntime()
@@ -486,6 +497,22 @@ namespace KingmakerBuffPlanner.UI
         internal bool SearchFocusedForRuntime
         {
             get { return _buffSearch != null && _buffSearch.isFocused; }
+        }
+
+        // Runtime evidence only: the search focused (or left) as a click
+        // on it focuses it.
+        internal void FocusSearchForRuntime(bool focus)
+        {
+            if (_buffSearch == null || EventSystem.current == null) return;
+            if (focus)
+            {
+                EventSystem.current.SetSelectedGameObject(_buffSearch.gameObject);
+                _buffSearch.ActivateInputField();
+                return;
+            }
+            _buffSearch.DeactivateInputField();
+            if (EventSystem.current.currentSelectedGameObject == _buffSearch.gameObject)
+                EventSystem.current.SetSelectedGameObject(null);
         }
 
         // "<sourceId>|<label>|<selected>" for every catalogue entry shown now.
@@ -634,7 +661,33 @@ namespace KingmakerBuffPlanner.UI
             BuildInspector(_frame);
             BuildFooter(_frame);
             ApplyScrollPaper();
+            foreach (ScrollRect lane in new[] { CatalogueScroll(), _graphScroll, _inspectorScroll })
+                NativeScrollbar(lane);
             PropagateUiLayer();
+        }
+
+        // The game's own scrollbar art (the combat log's slider track and
+        // handle, UI-11); the factory colours stay as the fallback.
+        private void NativeScrollbar(ScrollRect scroll)
+        {
+            Scrollbar bar = scroll == null ? null : scroll.verticalScrollbar;
+            Sprite track = _kit.Sprite("SliderArea");
+            Sprite handle = _kit.Sprite("ScrollBar_Big_Handler");
+            if (bar == null || track == null || handle == null) return;
+            Image trackImage = bar.GetComponent<Image>();
+            if (trackImage != null)
+            {
+                trackImage.sprite = track;
+                trackImage.type = Image.Type.Sliced;
+                trackImage.color = Color.white;
+            }
+            Image handleImage = bar.handleRect == null ? null : bar.handleRect.GetComponent<Image>();
+            if (handleImage != null)
+            {
+                handleImage.sprite = handle;
+                handleImage.type = Image.Type.Sliced;
+                handleImage.color = Color.white;
+            }
         }
 
         // Historical donors of the retired two-page book art, retained for
@@ -919,7 +972,7 @@ namespace KingmakerBuffPlanner.UI
                 _categoryTabs[captured] = tab;
             }
             ScrollRect scroll = KingmakerUiFactory.CreateScrollView("Scroll", lane, _theme,
-                out _catalogueContent, 10f);
+                out _catalogueContent, 16f);
             KingmakerUiFactory.SetAnchors(RectOf(scroll), 0f, 0f, 1f, 1f, 0f, 0f, 20f, 92f);
             ContentSizeFitter fitter = _catalogueContent.gameObject.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -980,7 +1033,7 @@ namespace KingmakerBuffPlanner.UI
             AddLaneCaption(captions, "CasterCaption", "Caster & source", 0f, 0.36f);
             AddLaneCaption(captions, "CastingCaption", "Castings", 0.36f, 0.76f);
             AddLaneCaption(captions, "TargetCaption", "Recipients", 0.76f, 1f);
-            _graphScroll = KingmakerUiFactory.CreateScrollView("Scroll", area, _theme, out _graphContent, 10f);
+            _graphScroll = KingmakerUiFactory.CreateScrollView("Scroll", area, _theme, out _graphContent, 16f);
             KingmakerUiFactory.SetAnchors(RectOf(_graphScroll), 0f, 0f, 1f, 1f, 0f, 0f, 0f, 104f);
             _graphViewport = _graphScroll.viewport;
             // Absolute placement: the graph lays itself out (no layout group),
@@ -1009,7 +1062,7 @@ namespace KingmakerBuffPlanner.UI
             _inspectorTitle.rectTransform.pivot = new Vector2(0.5f, 1f);
             _inspectorTitle.rectTransform.sizeDelta = new Vector2(0f, 24f);
             ScrollRect scroll = KingmakerUiFactory.CreateScrollView("Scroll", lane, _theme,
-                out _inspectorContent, 10f);
+                out _inspectorContent, 16f);
             _inspectorScroll = scroll;
             KingmakerUiFactory.SetAnchors(RectOf(scroll), 0f, 0f, 1f, 1f, 0f, 0f, 0f, 28f);
             ContentSizeFitter fitter = _inspectorContent.gameObject.AddComponent<ContentSizeFitter>();
@@ -1509,7 +1562,7 @@ namespace KingmakerBuffPlanner.UI
                 if (row.Selected) label.color = PlannerNativeKit.Burgundy;
                 label.enableWordWrapping = false;
                 label.overflowMode = TextOverflowModes.Ellipsis;
-                KingmakerUiFactory.Stretch(label.rectTransform, 10, 8, 20, 4);
+                KingmakerUiFactory.Stretch(label.rectTransform, 10, 8, 19, 2);
                 TextMeshProUGUI count = _kit.Text(rect, "Capacity", CastingGraphText.SourceLine(row.Usable,
                         row.BlockedReason, row.CapacityText, row.PoolLabel, row.SharedPoolWith),
                     PlannerTextRole.Small, 13f, TextAlignmentOptions.BottomLeft);
@@ -1519,7 +1572,7 @@ namespace KingmakerBuffPlanner.UI
                 count.fontSizeMax = 13f;
                 count.enableWordWrapping = false;
                 count.overflowMode = TextOverflowModes.Ellipsis;
-                KingmakerUiFactory.Stretch(count.rectTransform, 10, 8, 4, 21);
+                KingmakerUiFactory.Stretch(count.rectTransform, 10, 8, 2, 23);
             }
         }
 
@@ -1992,7 +2045,8 @@ namespace KingmakerBuffPlanner.UI
             });
         }
 
-        // "Linzi → Hedwirg", or the group's centre for a group casting.
+        // "Linzi » Hedwirg" (the native face has no arrow glyph), or the
+        // group's centre for a group casting.
         private static string RelationLine(CastingGraphView view, CastingGraphInspector inspector)
         {
             CastingGraphCasting chip = inspector.Chip;
@@ -2002,9 +2056,9 @@ namespace KingmakerBuffPlanner.UI
             if (casting.TargetMode == CastingTargetMode.DirectTarget)
             {
                 CastingGraphTargetNode target = view.TargetById(casting.DirectTargetUnitId);
-                return casterName + " → " + (target == null ? inspector.TargetLabel : target.DisplayName);
+                return casterName + " » " + (target == null ? inspector.TargetLabel : target.DisplayName);
             }
-            return casterName + " → group: " + inspector.TargetLabel;
+            return casterName + " » group: " + inspector.TargetLabel;
         }
 
         // The casting's source as its caster's row names it ("Wizard ·

@@ -48,6 +48,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _nativeUiSourceId;
         private int _nativeUiLogLinesBefore;
         private int _nativeUiRunsBefore;
+        private FileStream _nativeUiPlanLock;
+        private string _nativeUiDocumentBeforeFault;
         private readonly List<string> _nativeUiRoutes = new List<string>();
 
         private string NativeUiStage
@@ -366,6 +368,87 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _nativeUi.PlannerStillOpenAfterPopupEscape = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
                     _nativeUi.PlannerDocumentAfterPopup = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
                     if (nativeOpen) window.CloseWindow();
+                    // UI-02: typing in the search is text entry - focus it as a
+                    // click does, then read the game's own gate for its hotkeys.
+                    if (view != null) view.FocusSearchForRuntime(true);
+                    NativeUiNext(12);
+                    return false;
+                }
+                case 12:
+                {
+                    if (!NativeUiWaited(600)) return false;
+                    bool focused = view != null && view.SearchFocusedForRuntime;
+                    bool standsDown = NativeKeyboardStandsDown();
+                    _nativeUi.SearchFocusSuppressesNativeBindings = focused && standsDown;
+                    _nativeUi.AddNote("search-focus:focused=" + focused + ";KeyboardAccess.IsInputFieldSelected=" +
+                        standsDown);
+                    if (view != null) view.FocusSearchForRuntime(false);
+                    NativeUiNext(13);
+                    return false;
+                }
+                case 13:
+                {
+                    // Case E: one sidebar edit autosaves while the plan file
+                    // is held by another reader (an OS sharing lock, as the
+                    // C# footer test), so the save fails for real.
+                    if (!NativeUiWaited(300)) return false;
+                    CastingWorkspaceSession live = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                    CastingGraphView graph = live == null ? null
+                        : live.BuildGraph(BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime());
+                    string casting = graph == null ? null
+                        : graph.Castings.Select(value => value.CastingId).FirstOrDefault();
+                    if (live == null || casting == null || !File.Exists(live.PlanPathForRuntime))
+                    {
+                        _nativeUi.AddNote("save-fault:skipped;casting=" + (casting ?? "none"));
+                        NativeUiNext(16);
+                        return false;
+                    }
+                    live.FocusGraphCasting(casting);
+                    if (view != null) view.RefreshView();
+                    _nativeUiDocumentBeforeFault = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                    _nativeUiPlanLock = new FileStream(live.PlanPathForRuntime, FileMode.Open, FileAccess.Read,
+                        FileShare.Read);
+                    _nativeUi.AddNote("save-fault:locked;edit=" +
+                        BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("FocusedRecastPolicy"));
+                    NativeUiNext(14);
+                    return false;
+                }
+                case 14:
+                {
+                    if (!NativeUiWaited(900)) return false;
+                    CastingWorkspaceSession live = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                    _nativeUi.SaveFailureFooter = (view == null ? "no-view" : view.FooterSaveTextForRuntime + "|" +
+                        view.FooterResultForRuntime) + "|state=" + (live == null ? "none" : live.FooterSaveState);
+                    _nativeUi.SaveFailureShown = view != null && view.FooterSaveTextForRuntime == "Not saved" &&
+                        view.SaveRecoveryShownForRuntime && live != null &&
+                        live.FooterSaveState.StartsWith("save-failed:", StringComparison.Ordinal);
+                    NativeUiCapture("nui-save-failed.png");
+                    ReleaseNativeUiPlanLock();
+                    _nativeUi.AddNote("save-fault:retry=" +
+                        BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("SaveRecovery"));
+                    NativeUiNext(15);
+                    return false;
+                }
+                case 15:
+                {
+                    if (!NativeUiWaited(900)) return false;
+                    CastingWorkspaceSession live = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                    _nativeUi.SaveRecoveryWorked = live != null && live.FooterSaveState == "saved" &&
+                        view != null && view.FooterSaveTextForRuntime == "Saved" && !view.SaveRecoveryShownForRuntime;
+                    NativeUiCapture("nui-save-recovered.png");
+                    _nativeUi.AddNote("save-fault:undo=" + BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("Undo"));
+                    NativeUiNext(16);
+                    return false;
+                }
+                case 16:
+                {
+                    if (!NativeUiWaited(900)) return false;
+                    CastingWorkspaceSession live = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                    _nativeUi.SaveFailureUndoRestored = _nativeUiDocumentBeforeFault != null && live != null &&
+                        BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime == _nativeUiDocumentBeforeFault &&
+                        live.FooterSaveState == "saved";
+                    if (live != null) live.ClearGraphFocus();
+                    if (view != null) view.RefreshView();
                     _nativeUiRoutes.Clear();
                     _nativeUiRoutes.AddRange(NativeUiSwitchRoutes);
                     _nativeUiSwitchIndex = 0;
@@ -505,8 +588,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
         }
 
+        private void ReleaseNativeUiPlanLock()
+        {
+            if (_nativeUiPlanLock == null) return;
+            _nativeUiPlanLock.Dispose();
+            _nativeUiPlanLock = null;
+        }
+
         private bool FinishNativeUi(string failure)
         {
+            ReleaseNativeUiPlanLock();
             if (failure != null) _nativeUi.Failures.Add(failure);
             if (BuffPlannerUiRoot.IsCastingWorkspaceOpen) CloseProbeWorkspace();
             if (NativeServiceWindowShown()) CloseNativeServiceWindow();
@@ -756,6 +847,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return book.GetComponentsInChildren<TooltipTrigger>(false)
                 .FirstOrDefault(trigger => trigger != null && trigger.isActiveAndEnabled &&
                     trigger.GetComponentInParent<SpellItem>() != null);
+        }
+
+        // The game's own gate: KeyboardAccess.Tick runs no binding while a
+        // TMP_InputField is the selected object (exact 2.1.7b contract,
+        // private static IsInputFieldSelected).
+        private static bool NativeKeyboardStandsDown()
+        {
+            MethodInfo gate = typeof(KeyboardAccess).GetMethod("IsInputFieldSelected",
+                BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+            return gate != null && (bool)gate.Invoke(null, null);
         }
 
         private static DescriptionWindow NativeDescriptionWindow()

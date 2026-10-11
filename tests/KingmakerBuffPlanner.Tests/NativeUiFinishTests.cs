@@ -412,6 +412,9 @@ namespace KingmakerBuffPlanner.Tests
                     PlannerRootsAfterReopen = 1, SelectedSourceBefore = "src", SelectedSourceAfterReopen = "src"
                 });
             record.SearchFocusSuppressesNativeBindings = true;
+            record.SaveFailureShown = true;
+            record.SaveRecoveryWorked = true;
+            record.SaveFailureUndoRestored = true;
             record.EscapeClosedFocusFirst = true;
             record.EscapeClosedPlannerLast = true;
             record.LeaseReleasedAtEnd = true;
@@ -448,6 +451,9 @@ namespace KingmakerBuffPlanner.Tests
                 { "switch:spellbook:pause-changed", r => r.Switches[2].PausedAfterClose = true },
                 { "switch:inventory:selection-not-kept", r => r.Switches[0].SelectedSourceAfterReopen = "other" },
                 { "search-focus-native-bindings", r => r.SearchFocusSuppressesNativeBindings = false },
+                { "save-failure-not-shown:none", r => r.SaveFailureShown = false },
+                { "save-recovery-failed", r => r.SaveRecoveryWorked = false },
+                { "save-failure-undo", r => r.SaveFailureUndoRestored = false },
                 { "escape-order", r => r.EscapeClosedFocusFirst = false },
                 { "game-log-planner-lines:2", r => r.GameLogPlannerLines.Add("Buff Planner: again") }
             };
