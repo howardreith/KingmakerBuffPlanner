@@ -563,6 +563,29 @@ namespace KingmakerBuffPlanner.UI
                 ? string.Empty : TooltipTitle(routineId) + "\n" + _tooltips[index]();
         }
 
+        // Runtime evidence only: an owned cell ("setup", "long", "important",
+        // "short") and the native panel the cells extend.
+        internal Button ButtonForRuntime(string routineId)
+        {
+            int index = routineId == "setup" ? 0 : routineId == "long" ? 1 :
+                routineId == "important" ? 2 : routineId == "short" ? 3 : -1;
+            return index < 0 || index >= _buttons.Length ? null : _buttons[index];
+        }
+
+        internal RectTransform NativeClusterForRuntime { get { return _nativeCluster; } }
+        internal RectTransform RootForRuntime { get { return _root; } }
+
+        // What frames the owned row and what its cells are drawn with.
+        internal string FrameEvidenceForRuntime
+        {
+            get { return "frame=floating-row;encloses=False;railUnderRow=native"; }
+        }
+
+        internal string SkinEvidenceForRuntime
+        {
+            get { return _nativeStyle == null ? "skin=missing" : "skin=formation-highlight;" + _nativeStyle.Evidence; }
+        }
+
         internal Vector2 ButtonCenterForRuntime(string routineId)
         {
             int index = routineId == "setup" ? 0 : routineId == "long" ? 1 :

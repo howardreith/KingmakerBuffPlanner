@@ -434,6 +434,40 @@ namespace KingmakerBuffPlanner.UI
             get { return _footerResult == null ? string.Empty : _footerResult.text; }
         }
 
+        // Native UI finish evidence: the window title and every label the
+        // player can see now (legacy and TextMeshPro text alike).
+        internal string TitleTextForRuntime
+        {
+            get { return _title == null ? null : _title.text; }
+        }
+
+        internal IList<string> VisibleLabelsForRuntime()
+        {
+            var labels = new List<string>();
+            if (_root == null) return labels;
+            foreach (Text text in _root.GetComponentsInChildren<Text>(false))
+                if (text != null && text.enabled && !string.IsNullOrEmpty(text.text)) labels.Add(text.text);
+            foreach (TMPro.TMP_Text text in _root.GetComponentsInChildren<TMPro.TMP_Text>(false))
+                if (text != null && text.enabled && !string.IsNullOrEmpty(text.text)) labels.Add(text.text);
+            return labels;
+        }
+
+        // The right-click read of a part ("tile:<sourceId>", "chip:<id>",
+        // "banner"), exactly as a right mouse click on it delivers it.
+        internal bool RightClickForRuntime(string part)
+        {
+            RectTransform rect = null;
+            if (part == "banner") rect = _bannerIcon == null ? null : RectOf(_bannerIcon);
+            else if (part != null && part.StartsWith("tile:", StringComparison.Ordinal) && _catalogueContent != null)
+                rect = _catalogueContent.Find("Source." + part.Substring(5)) as RectTransform;
+            else if (part != null && part.StartsWith("chip:", StringComparison.Ordinal) && _graphContent != null)
+                rect = FindGraphPart("Casting." + part.Substring(5));
+            RightClickProxy proxy = rect == null ? null : rect.GetComponent<RightClickProxy>();
+            if (proxy == null || proxy.OnRightClick == null) return false;
+            proxy.OnRightClick();
+            return true;
+        }
+
         private ScrollRect CatalogueScroll()
         {
             return _catalogueContent == null ? null : _catalogueContent.GetComponentInParent<ScrollRect>();

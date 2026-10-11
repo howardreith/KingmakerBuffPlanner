@@ -471,6 +471,48 @@ namespace KingmakerBuffPlanner.UI
             if (_instance != null) _instance.CloseCastingWorkspace();
         }
 
+        // Runtime-only seam (native UI finish): the planner's own Escape
+        // handling, exactly as an Escape key press reaches it, without OS
+        // input; true when a planner window took it.
+        internal static bool HandleEscapeForRuntime()
+        {
+            return _instance != null && _instance.TakeEscape("runtime-escape");
+        }
+
+        // Runtime-only seam: the HUD controller (its owned cells and the
+        // native panel they extend), for the no-input native UI evidence.
+        internal static BuffPlannerHudButtonController HudForRuntime
+        {
+            get { return _instance == null ? null : _instance._hud; }
+        }
+
+        // Escape first leaves the workspace's innermost surface (its spell
+        // description, then its focused casting); only then does it close
+        // the workspace, before the legacy screen is consulted (never open
+        // together). Either way the planner took this Escape: the game's own
+        // Escape binding must not also open its menu.
+        private bool TakeEscape(string source)
+        {
+            bool taken = false;
+            if (_castingWorkspace != null)
+            {
+                PlannerHotkey.MarkEscapeTaken();
+                taken = true;
+                if (!_castingWorkspace.HandleEscape())
+                {
+                    CloseCastingWorkspace();
+                    _log.Info("[KBP-BOOT] casting workspace close requested;source=" + source + ".");
+                }
+            }
+            else if (_screen.LifecycleState != PlannerScreenLifecycleState.Closed)
+            {
+                PlannerHotkey.MarkEscapeTaken();
+                taken = true;
+                _screen.Close();
+            }
+            return taken;
+        }
+
         // Runtime-only seams for the hover diagnostic: the Classic screen
         // opened directly (whatever the planner mode, never while the
         // workspace is open) so the rc6 reproduction and the corrected
@@ -2037,26 +2079,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 if (_spellbookEntry != null) _spellbookEntry.Tick();
                 if (_castingWorkspace != null) _castingWorkspace.TickGeometry();
-                if (_castingWorkspace != null && Input.GetKeyDown(KeyCode.Escape))
-                {
-                    // Escape first leaves the workspace's own focused casting
-                    // (its inspector); only then does it close the workspace,
-                    // before the legacy screen is consulted (never open
-                    // together). Either way the planner took this Escape: the
-                    // game's own Escape binding must not also open its menu.
-                    PlannerHotkey.MarkEscapeTaken();
-                    if (!_castingWorkspace.HandleEscape())
-                    {
-                        CloseCastingWorkspace();
-                        _log.Info("[KBP-BOOT] casting workspace close requested;source=Escape.");
-                    }
-                }
-                if (_screen.LifecycleState != PlannerScreenLifecycleState.Closed &&
-                    Input.GetKeyDown(KeyCode.Escape))
-                {
-                    PlannerHotkey.MarkEscapeTaken();
-                    _screen.Close();
-                }
+                if (Input.GetKeyDown(KeyCode.Escape)) TakeEscape("Escape");
                 // The close an accepted Classic run asked for, one frame after
                 // the press (never inside the button's own callback).
                 if (_closeScreenForClassicRun)

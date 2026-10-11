@@ -1,6 +1,6 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal')][string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal', 'live-workspace-native-ui')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
@@ -82,7 +82,12 @@ param(
     # registry key (Unity PlayerPrefs) is restored byte-exact after exit.
     # 0.4.0 (WP7): 1600x900 and 1280x720 give a meaningfully different
     # resolution on a 1920x1080 session, where 2560x1440 is refused.
-    [ValidateSet('owner', 'windowed-1920x1080', 'windowed-2560x1440', 'windowed-1600x900', 'windowed-1280x720')][string]$DisplayMode = 'owner'
+    [ValidateSet('owner', 'windowed-1920x1080', 'windowed-2560x1440', 'windowed-1600x900', 'windowed-1280x720')][string]$DisplayMode = 'owner',
+    # Native UI finish (live-workspace-native-ui only, required there): 'facts'
+    # records the native contracts and the frames; 'qualify' also judges the
+    # planner's native integration. Neither takes a casting allowance and
+    # neither sends OS input.
+    [ValidateSet('facts', 'qualify')][string]$NativeUiStage
 )
 
 Set-StrictMode -Version Latest
@@ -95,7 +100,7 @@ $WhatIfPreference = $false
 # Review of f7726c9..1332ed8, P3-J: ValidateSet binds case-insensitively,
 # but every later comparison is case-sensitive; continue with the
 # canonical spelling of each value (for example -Scenario LIVE-CAST-QUAL).
-foreach ($canonicalName in @('Scenario', 'CompatibilityProfileId', 'ExecutionMode', 'FixtureFamily', 'QualificationRecipe', 'DisplayMode')) {
+foreach ($canonicalName in @('Scenario', 'CompatibilityProfileId', 'ExecutionMode', 'FixtureFamily', 'QualificationRecipe', 'DisplayMode', 'NativeUiStage')) {
     $bound = Get-Variable -Name $canonicalName -ValueOnly -ErrorAction SilentlyContinue
     if ([string]::IsNullOrEmpty([string]$bound)) { continue }
     $validSet = @((Get-Command -Name $PSCommandPath).Parameters[$canonicalName].Attributes |
@@ -211,10 +216,19 @@ else {
         throw '-PhysicalExpectation is only valid with -Scenario live-workspace-physical.'
     }
 }
+if ($Scenario -ceq 'live-workspace-native-ui') {
+    if ([string]::IsNullOrWhiteSpace($NativeUiStage)) {
+        throw 'live-workspace-native-ui requires an explicit -NativeUiStage (facts or qualify).'
+    }
+}
+elseif (-not [string]::IsNullOrWhiteSpace($NativeUiStage)) {
+    throw '-NativeUiStage is only valid with -Scenario live-workspace-native-ui.'
+}
 $displaySize = $null
 if ($DisplayMode -cne 'owner') {
-    if ($Scenario -cne 'live-workspace-physical' -and $Scenario -cne 'live-workspace-qual') {
-        throw '-DisplayMode is only valid with -Scenario live-workspace-physical or live-workspace-qual.'
+    if ($Scenario -cne 'live-workspace-physical' -and $Scenario -cne 'live-workspace-qual' -and
+        $Scenario -cne 'live-workspace-native-ui') {
+        throw '-DisplayMode is only valid with -Scenario live-workspace-physical, live-workspace-qual or live-workspace-native-ui.'
     }
     $displaySize = $DisplayMode.Substring('windowed-'.Length)
     $sessionDisplay = Get-KbpSessionDisplaySize
@@ -246,9 +260,11 @@ if (($Scenario -ceq 'live-cast-qual' -or $Scenario -ceq 'live-cast-qual-select')
 # cover them, or it would abandon a live run with the Mods folder
 # unrestored.
 # 0.4.2: live-workspace-removal (no synthetic input) needs the same boot/load
-# budget plus its short press, open and close sequence.
+# budget plus its short press, open and close sequence; the native UI
+# scenario likewise (its HUD, spellbook, popup and window sequence).
 if (($Scenario -ceq 'live-cast-probe' -or $Scenario -ceq 'live-cast-probe-select' -or
-        $Scenario -ceq 'live-workspace-reload' -or $Scenario -ceq 'live-workspace-removal') -and
+        $Scenario -ceq 'live-workspace-reload' -or $Scenario -ceq 'live-workspace-removal' -or
+        $Scenario -ceq 'live-workspace-native-ui') -and
     $TimeoutSeconds -lt 600) {
     throw "TimeoutSeconds must be at least 600 for $Scenario (boot/load plus the probe's world wait and deadline); got $TimeoutSeconds."
 }
@@ -291,7 +307,7 @@ $savePair = if ($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-work
     $Scenario -ceq 'live-advanced-inspect' -or $Scenario -ceq 'live-cast-qual-select' -or
     $Scenario -ceq 'live-cast-qual' -or $Scenario -ceq 'live-classic-select' -or
     $Scenario -ceq 'live-classic-cast' -or $Scenario -ceq 'live-workspace-physical' -or
-    $Scenario -ceq 'live-workspace-removal') {
+    $Scenario -ceq 'live-workspace-removal' -or $Scenario -ceq 'live-workspace-native-ui') {
     Get-KbpDisposableSavePair -Family $FixtureFamily } else { $null }
 $advancedBinding = if ($FixtureFamily -ceq 'Advanced') { Assert-KbpAdvancedFixtureBinding -Pair $savePair } else { $null }
 $advancedInspectionRunId = if ($FixtureFamily -ceq 'Advanced' -and $Scenario -ceq 'live-cast-qual') {
@@ -471,6 +487,10 @@ try {
     if ($null -ne $displaySize) {
         # The host judges the screen it actually got against this size.
         $scenarioParameters.expectedScreen = $displaySize
+    }
+    if ($Scenario -ceq 'live-workspace-native-ui') {
+        # Which native UI stage the host records and judges.
+        $scenarioParameters.nativeUiStage = $NativeUiStage
     }
     if ($null -ne $qualificationAllowanceJson) {
         $scenarioParameters.qualificationAllowance = $qualificationAllowanceJson

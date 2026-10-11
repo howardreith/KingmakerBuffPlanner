@@ -219,7 +219,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 IsQualificationScenario(scenario) ||
                 IsClassicCastScenario(scenario) ||
                 IsPhysicalWorkspaceScenario(scenario) ||
-                IsRemovalScenario(scenario);
+                IsRemovalScenario(scenario) ||
+                IsNativeUiScenario(scenario);
         }
 
         // Physical input in the casting-first workspace (mission batch 3,
@@ -365,8 +366,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return IsManualWorkspaceScenario(scenario) || IsProbeScenario(scenario) ||
                 IsInspectionScenario(scenario) || IsQualificationScenario(scenario) ||
                 IsImportScenario(scenario) || IsClassicCastScenario(scenario) ||
-                IsRemovalScenario(scenario);
+                IsRemovalScenario(scenario) || IsNativeUiScenario(scenario);
         }
+
+        // Native UI finish (KBP_NATIVE_UI_FINISH_2026-10-10): the HUD panel,
+        // the spellbook footer pair, the spell description, window switching,
+        // nested Escape and the game log, with zero synthetic OS input. The
+        // automation fixture only; the "facts" stage records the native
+        // contracts and frames, the "qualify" stage also judges the planner's
+        // native integration (NativeUiRecord). Nothing is cast: the session
+        // lock refuses its one routine press.
+        internal static bool IsNativeUiScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-workspace-native-ui", StringComparison.Ordinal);
+        }
+
+        internal static readonly string[] NativeUiStages = { "facts", "qualify" };
 
         // 0.4.2 (B): the spellbook-removal reconciliation with zero synthetic
         // input, for a desktop where the game cannot take the foreground
@@ -521,7 +536,28 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             // resolution, without physical input).
             bool hasScreen = request.Parameters.ContainsKey("expectedScreen");
             bool screenScenario = IsPhysicalWorkspaceScenario(request.Scenario) ||
+                IsNativeUiScenario(request.Scenario) ||
                 string.Equals(request.Scenario, "live-workspace-qual", StringComparison.Ordinal);
+            // The native UI stage exists only on the native UI scenario,
+            // which always names it.
+            bool hasNativeUiStage = request.Parameters.ContainsKey("nativeUiStage");
+            if (hasNativeUiStage && !IsNativeUiScenario(request.Scenario))
+                throw new InvalidDataException("native-ui-stage-only-with-native-ui");
+            if (!hasNativeUiStage && IsNativeUiScenario(request.Scenario))
+                throw new InvalidDataException("native-ui-stage-required");
+            if (hasNativeUiStage)
+            {
+                string stage = request.Parameters["nativeUiStage"] as string;
+                if (stage == null || Array.IndexOf(NativeUiStages, stage) < 0)
+                    throw new InvalidDataException("native-ui-stage");
+                if (hasScreen && !IsScreenSize(request.Parameters["expectedScreen"] as string))
+                    throw new InvalidDataException("expected-screen");
+                ValidateLiveSaveParameters(request, 10 + (hasScreen ? 1 : 0));
+                if (!string.Equals((string)request.Parameters["workingSaveName"], "KBP_AUTOMATION_WORKING",
+                        StringComparison.Ordinal))
+                    throw new InvalidDataException("native-ui-automation-fixture-only");
+                return;
+            }
             if (hasScreen && !screenScenario)
                 throw new InvalidDataException("expected-screen-only-with-workspace-display");
             if (IsPhysicalWorkspaceScenario(request.Scenario) || hasScreen)

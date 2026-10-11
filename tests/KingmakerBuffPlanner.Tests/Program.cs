@@ -451,6 +451,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunParchmentThemeTests();
                 RunShadowCloneCatalogueTests(root);
                 RunSpellbookRemovalTests(root);
+                RunNativeUiFinishTests(root);
             }
             finally
             {
@@ -3839,22 +3840,37 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "Quick results crossed the HUD-only presentation boundary or lost diagnostics.");
 
+            // Native UI finish (UI-08) superseded "never the native log": the
+            // native game log is named only by the bounded files below - the
+            // runtime evidence reader, which never writes - and nothing else
+            // in production touches it.
             string[] nativeLogContracts =
             {
                 "MessageLogThread",
                 "AddMessage(",
                 "CombatLog",
-                "EventLog"
+                "EventLog",
+                "BattleLogManager",
+                "BattleLogView",
+                "AddLogEntry",
+                "LogDataManager"
+            };
+            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                Path.Combine(root, "src", "KingmakerBuffPlanner", "RuntimeTesting", "NativeUiFacts.cs")
             };
             string[] production = Directory.GetFiles(
                 Path.Combine(root, "src", "KingmakerBuffPlanner"),
                 "*.cs", SearchOption.AllDirectories);
             foreach (string contract in nativeLogContracts)
-                if (production.Any(path => File.ReadAllText(path)
-                    .IndexOf(contract, StringComparison.Ordinal) >= 0))
-                    throw new InvalidOperationException(
-                        "A native common/combat/event-log path was added: " +
-                        contract);
+                foreach (string path in production.Where(value => !allowed.Contains(value)))
+                    if (File.ReadAllText(path).IndexOf(contract, StringComparison.Ordinal) >= 0)
+                        throw new InvalidOperationException(
+                            "A native common/combat/event-log path was added: " +
+                            contract + " in " + Path.GetFileName(path));
+            foreach (string path in allowed)
+                if (File.ReadAllText(path).IndexOf("AddLogEntry", StringComparison.Ordinal) >= 0)
+                    throw new InvalidOperationException("The runtime evidence reader writes to the native log.");
         }
 
         private static void TestInstantExecutor()

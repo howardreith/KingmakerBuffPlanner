@@ -143,7 +143,7 @@ function New-KbpRuntimeRequest {
         [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
         [hashtable]$Parameters = @{},
-        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal')][string]$Scenario = 'mod-load-smoke')
+        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal', 'live-workspace-native-ui')][string]$Scenario = 'mod-load-smoke')
     # This ValidateSet must equal the launcher's -Scenario set exactly
     # (Test-RuntimeHarness builds a request for every launcher scenario).
     return [ordered]@{
@@ -1396,6 +1396,43 @@ function Assert-KbpScenarioOutcome {
     # 0.4.2 (B): the no-input removal scenario - a cold Long press through
     # the HUD's own routine entry, refused by the session lock, then the
     # removal evidence, and the planner closed with its lease released.
+    # Native UI finish: the no-input native UI scenario's own record, re-read
+    # raw. Every stage: the record of this run and stage, judged clean by the
+    # host, nothing cast, nothing left open, and the native and planner
+    # frames it names present. The qualify stage also re-reads the window
+    # switches, the native popup presenter and the game-log line.
+    if ($scenario -ceq 'live-workspace-native-ui') {
+        $path = Join-Path $directory 'native-ui.json'
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Native UI scenario evidence is missing.' }
+        $record = Read-KbpJson $path
+        $stage = [string]$Request.parameters.nativeUiStage
+        if ([string]$record.RunId -cne [string]$Request.runId -or [string]$record.Stage -cne $stage -or
+            @($record.violations).Count -ne 0 -or @($record.Failures).Count -ne 0 -or
+            @($record.MissingCaptures).Count -ne 0 -or [int]$record.RunsStarted -ne 0 -or
+            -not [bool]$record.LeaseReleasedAtEnd -or [bool]$record.FullScreenModeAtEnd -or
+            -not [bool]$record.NativePopupOpened -or -not [bool]$record.PlannerOpened) {
+            throw "The native UI scenario run is inconsistent with a PASS: $path"
+        }
+        foreach ($capture in @('nui-hud.png', 'nui-native-popup.png', 'nui-planner-casting.png',
+                'nui-planner-popup.png', 'nui-gamelog.png')) {
+            if (@($record.Captures) -cnotcontains $capture -or
+                -not (Test-Path -LiteralPath (Join-Path $directory $capture) -PathType Leaf)) {
+                throw "The native UI scenario frame $capture is missing: $path"
+            }
+        }
+        if ($stage -ceq 'qualify') {
+            $switches = @($record.Switches)
+            if ($switches.Count -lt 3 -or
+                @($switches | Where-Object { [bool]$_.PlannerOpenAfter -or -not [bool]$_.NativeShownAfter -or
+                    -not [bool]$_.PlannerReopened -or
+                    [string]$_.SelectedSourceBefore -cne [string]$_.SelectedSourceAfterReopen }).Count -ne 0 -or
+                [string]$record.PlannerPopupPresenter -cne 'native-description-window' -or
+                @($record.GameLogPlannerLines).Count -ne 1 -or -not [bool]$record.RoutinePressRefused) {
+                throw "The native UI qualification did not show the native window switching, popup and game log: $path"
+            }
+        }
+        return
+    }
     if ($scenario -ceq 'live-workspace-removal') {
         $path = Join-Path $directory 'removal-reconcile.json'
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Removal scenario evidence is missing.' }
@@ -1910,12 +1947,14 @@ function Get-KbpProtectedSavePolicy {
     $strict = $FixtureFamily -ceq 'Advanced' -or
         @('live-cast-qual', 'live-cast-qual-select', 'live-advanced-inspect', 'live-cast-probe',
             'live-workspace-reload', 'live-workspace-import', 'live-classic-select',
-            'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal') -ccontains $Scenario
+            'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal',
+            'live-workspace-native-ui') -ccontains $Scenario
     return [pscustomobject]@{
         allowedChanged = if ($strict) { @() } else { @($WorkingFileName) }
         newFilesBlocking = $FixtureFamily -ceq 'Advanced' -or
             @('live-cast-qual', 'live-cast-probe', 'live-workspace-reload', 'live-workspace-import',
-                'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal') -ccontains $Scenario
+                'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal',
+                'live-workspace-native-ui') -ccontains $Scenario
     }
 }
 

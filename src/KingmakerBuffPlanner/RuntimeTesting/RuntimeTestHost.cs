@@ -1095,6 +1095,37 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         result.Stage = "import-validation";
                     }
                 }
+                else if (RuntimeTestProtocol.IsNativeUiScenario(_request.Scenario))
+                {
+                    // Native UI finish (Unity-free rules in
+                    // NativeUiRecord.Violations): the native contracts and
+                    // frames captured, and in the qualify stage the planner's
+                    // native integration; nothing ran, nothing left open.
+                    IList<string> violations = _nativeUi.Violations();
+                    bool noSubmission = UI.NativeCastingSessionPolicy.Locked &&
+                        BuffPlannerUiRoot.CastingRunsStartedForRuntime == 0;
+                    string claim = "native UI " + (_nativeUi.Stage ?? "unknown") +
+                        ": native facts and frames" + (_nativeUi.Stage == NativeUiRecord.QualifyStage
+                            ? ", HUD row, spellbook pair, native popup, window switching, Escape, game log"
+                            : string.Empty);
+                    result.Assertions.Add(_nativeUiWritten && violations.Count == 0
+                        ? RuntimeTestAssertion.Pass("native-ui", claim,
+                            "captures=" + _nativeUi.Captures.Count + ";switches=" + _nativeUi.Switches.Count)
+                        : RuntimeTestAssertion.Fail("native-ui", claim,
+                            (_nativeUiWritten ? string.Empty : "record-not-written|") +
+                                string.Join("|", violations.ToArray())));
+                    result.Assertions.Add(noSubmission
+                        ? RuntimeTestAssertion.Pass("native-ui-no-native-submission", "session locked;0 runs",
+                            "locked=True;runs=0")
+                        : RuntimeTestAssertion.Fail("native-ui-no-native-submission", "session locked;0 runs",
+                            "locked=" + UI.NativeCastingSessionPolicy.Locked + ";runs=" +
+                                BuffPlannerUiRoot.CastingRunsStartedForRuntime));
+                    if (!_nativeUiWritten || violations.Count != 0 || !noSubmission)
+                    {
+                        result.Status = "FAIL";
+                        result.Stage = "native-ui-validation";
+                    }
+                }
                 else if (RuntimeTestProtocol.IsRemovalScenario(_request.Scenario))
                 {
                     // Removal acceptance (Unity-free rules in
@@ -2367,6 +2398,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveUiPhase = RemovalScenarioPrePhase;
                         return false;
                     }
+                    if (RuntimeTestProtocol.IsNativeUiScenario(_request.Scenario))
+                    {
+                        // The HUD, the spellbook and the native popup come
+                        // first; phase 22 opens the planner afterwards.
+                        _liveUiPhase = NativeUiPrePhase;
+                        return false;
+                    }
                     _log.Info("[KBP-MANUAL] control frame consumed; opening the " +
                         "candidate programmatically with no input request.");
                     _liveUiPhase = 22;
@@ -2544,6 +2582,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveUiPhase = RemovalScenarioOpenPhase;
                         return false;
                     }
+                    if (RuntimeTestProtocol.IsNativeUiScenario(_request.Scenario))
+                    {
+                        // Native UI: presentation, popup, switching, Escape, log.
+                        _nativeUiStep = 0;
+                        _nativeUiClock.Reset();
+                        _liveUiPhase = NativeUiOpenPhase;
+                        return false;
+                    }
                     if (RuntimeTestProtocol.IsClassicCastScenario(_request.Scenario))
                     {
                         // Classic: back to the Classic planner and its routes.
@@ -2594,6 +2640,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (_liveUiPhase == RemovalScenarioOpenPhase)
             {
                 return UpdateRemovalScenarioOpened();
+            }
+            if (_liveUiPhase == NativeUiPrePhase)
+            {
+                return UpdateNativeUiBeforeOpen();
+            }
+            if (_liveUiPhase == NativeUiOpenPhase)
+            {
+                return UpdateNativeUiOpened();
             }
             if (_liveUiPhase == 55)
             {

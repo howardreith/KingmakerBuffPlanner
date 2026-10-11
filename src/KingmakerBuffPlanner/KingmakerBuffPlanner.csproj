@@ -54,6 +54,11 @@
       <Private>False</Private>
       <ExternallyResolved>True</ExternallyResolved>
     </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>False</Private>
+      <ExternallyResolved>True</ExternallyResolved>
+    </Reference>
     <Reference Include="0Harmony12">
       <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityModManager\0Harmony12.dll</HintPath>
       <Private>False</Private>
@@ -147,6 +152,9 @@
     <Compile Include="RuntimeTesting\RuntimePolicyAuthoringHost.cs" />
     <Compile Include="RuntimeTesting\SpellbookEntryRecord.cs" />
     <Compile Include="RuntimeTesting\RuntimeSpellbookEntryHost.cs" />
+    <Compile Include="RuntimeTesting\NativeUiRecord.cs" />
+    <Compile Include="RuntimeTesting\NativeUiFacts.cs" />
+    <Compile Include="RuntimeTesting\RuntimeNativeUiHost.cs" />
     <Compile Include="Execution\CastingCapabilityInventory.cs" />
     <Compile Include="Execution\CastingQualification.cs" />
     <Compile Include="Execution\CastingQualificationDriver.cs" />

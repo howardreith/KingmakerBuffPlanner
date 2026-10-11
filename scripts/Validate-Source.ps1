@@ -174,10 +174,19 @@ if ($hudSource.Contains('"Feedback"') -or
     -not $uiRootSource.Contains('Routine UI result:')) {
     throw 'Quick results must remain in the planner footer and UMM log, never a floating HUD object.'
 }
-$nativeLogCalls = @($identityFiles | Select-String -Pattern `
-    'MessageLogThread|AddMessage\(|CombatLog|EventLog')
+# Native UI finish (UI-08) superseded "never the native log": the native game
+# log is named only by the bounded files listed here (the runtime evidence
+# reader, which never writes); no other production source touches it.
+$nativeLogReaders = @(
+    (Join-Path $root 'src\KingmakerBuffPlanner\RuntimeTesting\NativeUiFacts.cs'))
+$nativeLogCalls = @($identityFiles | Where-Object {
+        $nativeLogReaders -notcontains $_.FullName -and $_.FullName -notmatch '\\(obj|bin)\\' } |
+    Select-String -Pattern 'MessageLogThread|AddMessage\(|CombatLog|EventLog|BattleLogManager|BattleLogView|AddLogEntry|LogDataManager')
 if ($nativeLogCalls.Count -ne 0) {
-    throw 'Production source must not route quick results to a native common/combat/event log.'
+    throw 'Production source must reach the native game log only through its bounded files.'
+}
+if (@($nativeLogReaders | Select-String -Pattern 'AddLogEntry').Count -ne 0) {
+    throw 'The runtime evidence reader must never write to the native game log.'
 }
 $assertions++
 

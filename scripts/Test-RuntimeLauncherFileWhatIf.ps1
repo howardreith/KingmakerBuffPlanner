@@ -191,7 +191,8 @@ $familyCases = @(
     @{ Name = 'advanced-smoke'; Args = @('-Scenario', 'mod-load-smoke', '-FixtureFamily', 'Advanced', '-WhatIf') },
     @{ Name = 'advanced-reload'; Args = @('-Scenario', 'live-workspace-reload', '-FixtureFamily', 'Advanced', '-TimeoutSeconds', '600', '-WhatIf') },
     @{ Name = 'advanced-import'; Args = @('-Scenario', 'live-workspace-import', '-FixtureFamily', 'Advanced', '-WhatIf') },
-    @{ Name = 'advanced-removal'; Args = @('-Scenario', 'live-workspace-removal', '-FixtureFamily', 'Advanced', '-TimeoutSeconds', '600', '-WhatIf') }
+    @{ Name = 'advanced-removal'; Args = @('-Scenario', 'live-workspace-removal', '-FixtureFamily', 'Advanced', '-TimeoutSeconds', '600', '-WhatIf') },
+    @{ Name = 'advanced-native-ui'; Args = @('-Scenario', 'live-workspace-native-ui', '-NativeUiStage', 'facts', '-FixtureFamily', 'Advanced', '-TimeoutSeconds', '600', '-WhatIf') }
 )
 foreach ($case in $familyCases) {
     $ErrorActionPreference = 'Continue'
@@ -812,6 +813,61 @@ try {
             $r.removalPoolsAfter = 'unit-linzi|spontaneous|1=1'; Write-KbpJsonAtomic (Join-Path $d 'removal-reconcile.json') $r }
         'removal-scenario-violation' = { param($d) $r = Read-KbpJson (Join-Path $d 'removal-reconcile.json')
             $r.violations = @('removal:notice:none'); Write-KbpJsonAtomic (Join-Path $d 'removal-reconcile.json') $r }
+    }
+    # Native UI finish: the no-input native UI scenario's own record, in
+    # both stages; the launcher refuses every tampered one.
+    function New-NativeUiOutcomeCase([string]$Name, [string]$Stage, [scriptblock]$Tamper) {
+        $directory = Join-Path $outcomeRoot $Name
+        New-Item -ItemType Directory -Path $directory | Out-Null
+        $captures = @('nui-hud.png', 'nui-native-popup.png', 'nui-planner-casting.png', 'nui-planner-popup.png',
+            'nui-gamelog.png')
+        foreach ($capture in $captures) { [IO.File]::WriteAllBytes((Join-Path $directory $capture), [byte[]](1, 2, 3)) }
+        $switch = [ordered]@{ Route = 'inventory'; PlannerOpenBefore = $true; PlannerOpenAfter = $false
+            NativeShownAfter = $true; PlannerReopened = $true; SelectedSourceBefore = 'src-1'
+            SelectedSourceAfterReopen = 'src-1' }
+        $record = [ordered]@{ SchemaVersion = 1; RunId = 'native-ui-run'; Stage = $Stage
+            Captures = $captures; MissingCaptures = @(); Failures = @(); RunsStarted = 0
+            LeaseReleasedAtEnd = $true; FullScreenModeAtEnd = $false; NativePopupOpened = $true
+            PlannerOpened = $true; Switches = @($switch, $switch, $switch)
+            PlannerPopupPresenter = 'native-description-window'
+            GameLogPlannerLines = @('Buff Planner: Long was not cast.'); RoutinePressRefused = $true
+            violations = @() }
+        Write-KbpJsonAtomic (Join-Path $directory 'native-ui.json') $record
+        if ($null -ne $Tamper) { & $Tamper $directory }
+        return [ordered]@{ runId = 'native-ui-run'; scenario = 'live-workspace-native-ui'; evidenceDirectory = $directory
+            parameters = [ordered]@{ nativeUiStage = $Stage } }
+    }
+    Assert-KbpScenarioOutcome -Request (New-NativeUiOutcomeCase 'native-ui-facts-good' 'facts' $null)
+    Assert-KbpScenarioOutcome -Request (New-NativeUiOutcomeCase 'native-ui-qualify-good' 'qualify' $null)
+    $nativeUiCases = [ordered]@{
+        'native-ui-missing' = @('facts', { param($d) Remove-Item -LiteralPath (Join-Path $d 'native-ui.json') })
+        'native-ui-other-stage' = @('qualify', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
+            $r.Stage = 'facts'; Write-KbpJsonAtomic (Join-Path $d 'native-ui.json') $r })
+        'native-ui-violation' = @('facts', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
+            $r.violations = @('native-popup-not-opened'); Write-KbpJsonAtomic (Join-Path $d 'native-ui.json') $r })
+        'native-ui-ran' = @('facts', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
+            $r.RunsStarted = 1; Write-KbpJsonAtomic (Join-Path $d 'native-ui.json') $r })
+        'native-ui-left-open' = @('facts', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
+            $r.LeaseReleasedAtEnd = $false; Write-KbpJsonAtomic (Join-Path $d 'native-ui.json') $r })
+        'native-ui-frame-missing' = @('facts', { param($d) Remove-Item -LiteralPath (Join-Path $d 'nui-planner-popup.png') })
+        'native-ui-planner-stayed' = @('qualify', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
+            $r.Switches[1].PlannerOpenAfter = $true; Write-KbpJsonAtomic (Join-Path $d 'native-ui.json') $r })
+        'native-ui-selection-lost' = @('qualify', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
+            $r.Switches[2].SelectedSourceAfterReopen = 'src-2'; Write-KbpJsonAtomic (Join-Path $d 'native-ui.json') $r })
+        'native-ui-planner-popup' = @('qualify', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
+            $r.PlannerPopupPresenter = 'planner-scroll'; Write-KbpJsonAtomic (Join-Path $d 'native-ui.json') $r })
+        'native-ui-log-flood' = @('qualify', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
+            $r.GameLogPlannerLines = @('a', 'b'); Write-KbpJsonAtomic (Join-Path $d 'native-ui.json') $r })
+    }
+    foreach ($case in $nativeUiCases.Keys) {
+        $refusal = $null
+        try {
+            Assert-KbpScenarioOutcome -Request (New-NativeUiOutcomeCase $case $nativeUiCases[$case][0] $nativeUiCases[$case][1])
+        }
+        catch { $refusal = $_.Exception.Message }
+        if ($null -eq $refusal -or $refusal -notlike '*ative UI*') {
+            throw "Native UI outcome case $case was not refused by the launcher's check: $refusal"
+        }
     }
     foreach ($case in $removalScenarioCases.Keys) {
         $refusal = $null

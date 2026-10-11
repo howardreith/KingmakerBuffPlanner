@@ -141,7 +141,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         // GPU copy of the sprite's own texture region (works for textures
         // that are not CPU-readable); the PNG is a local inspection aid.
-        private static string WritePreview(Sprite sprite, string evidenceDirectory)
+        internal static string WritePreview(Sprite sprite, string evidenceDirectory)
         {
             Texture2D texture = sprite.texture;
             if (texture == null) throw new InvalidOperationException("texture-null");

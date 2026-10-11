@@ -47,12 +47,17 @@ namespace KingmakerBuffPlanner.Tests
                 !owns.Contains("BuffPlannerUiRoot.IsCastingWorkspaceOpen") ||
                 !owns.Contains("BuffPlannerUiRoot.IsScreenOpen"))
                 throw new InvalidOperationException("The native Escape is not suppressed while the planner owns it.");
-            string root = WithoutComments(ProductionSource("UI", "BuffPlannerUiRoot.cs"));
-            int workspaceEscape = root.IndexOf("if (_castingWorkspace != null && Input.GetKeyDown(KeyCode.Escape))",
-                StringComparison.Ordinal);
-            int marked = root.IndexOf("PlannerHotkey.MarkEscapeTaken();", workspaceEscape, StringComparison.Ordinal);
-            int handled = root.IndexOf("_castingWorkspace.HandleEscape()", workspaceEscape, StringComparison.Ordinal);
-            if (workspaceEscape < 0 || marked < 0 || handled < 0 || marked > handled)
+            // Native UI finish: every Escape key press reaches the one
+            // TakeEscape route (the runtime seam calls the same method),
+            // which marks the Escape taken before the workspace handles it.
+            string rootSource = ProductionSource("UI", "BuffPlannerUiRoot.cs");
+            string root = WithoutComments(rootSource);
+            string take = WithoutComments(MemberBody(rootSource, "private bool TakeEscape("));
+            int marked = take.IndexOf("PlannerHotkey.MarkEscapeTaken();", StringComparison.Ordinal);
+            int handled = take.IndexOf("_castingWorkspace.HandleEscape()", StringComparison.Ordinal);
+            if (!root.Contains("if (Input.GetKeyDown(KeyCode.Escape)) TakeEscape(\"Escape\");") ||
+                !root.Contains("_instance.TakeEscape(\"runtime-escape\")") ||
+                marked < 0 || handled < 0 || marked > handled)
                 throw new InvalidOperationException("The workspace's Escape is not marked as taken before it is handled.");
             // The installed game's own binding: KeyboardAccess registers
             // "EscPressed" on KeyCode 27, and the prefix's target exists.
