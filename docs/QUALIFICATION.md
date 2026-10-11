@@ -4,6 +4,13 @@
 
 # Qualification
 
+The [October 11 validation policy](VALIDATION-POLICY.md) governs current
+development/review frequency. The candidate publication/qualification statements
+above and dated evidence below retain their original context. Later release
+records do not retroactively execute NOT RUN checks on a newer binary. Use the
+[workflow handoff](WORKFLOW-RESET-HANDOFF.md) for this repair; no old acceptance
+or publication campaign is selected.
+
 ## 2026-09-06 failed human validation: routing diagnosis
 
 Product-bearing checkpoint: `de57d90b38711c4c641d470900339bd8815a3fa8`.

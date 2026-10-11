@@ -87,6 +87,12 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ($DisplayMode -ine 'owner' -and $Scenario -ine 'live-workspace-physical' -and
+    $Scenario -ine 'live-workspace-qual') {
+    $PSCmdlet.ThrowTerminatingError([System.Management.Automation.ErrorRecord]::new(
+        [ArgumentException]::new('-DisplayMode requires a physical or workspace qualification scenario.'),
+        'KBP_DISPLAY_MODE_SCENARIO', [System.Management.Automation.ErrorCategory]::InvalidArgument, $Scenario))
+}
 . (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1')
 . (Join-Path $PSScriptRoot 'compatibility\CompatibilityProfile.Common.ps1')
 
@@ -213,9 +219,6 @@ else {
 }
 $displaySize = $null
 if ($DisplayMode -cne 'owner') {
-    if ($Scenario -cne 'live-workspace-physical' -and $Scenario -cne 'live-workspace-qual') {
-        throw '-DisplayMode is only valid with -Scenario live-workspace-physical or live-workspace-qual.'
-    }
     $displaySize = $DisplayMode.Substring('windowed-'.Length)
     $sessionDisplay = Get-KbpSessionDisplaySize
     if (-not (Test-KbpDisplayModeSupported -Size $displaySize -DisplaySize $sessionDisplay)) {
