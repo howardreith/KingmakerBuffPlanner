@@ -1,3 +1,10 @@
+> Current native UI continuation: the October 11 validation policy governs.
+> The frozen `4dbfa33` source-only gate was ACTIVE at the one-time 16:08Z audit;
+> preserve its worktree and watched runtime paths. It does not block independent
+> development in NUI. No gate rerun or conflicting live run is selected here.
+> Receipt remains PARTIAL; the dated observations below are historical, and
+> proposed probe changes do not turn missing evidence into PASS.
+
 # Autonomous blockers — 0.5.0 native UI finish candidate, 2026-10-11
 
 Open items (details in `docs/NATIVE-UI-FINISH-0.5.0-DELIVERY.md`): owner
@@ -8,6 +15,11 @@ providers, long descriptions or long lists; the HUD's disabled state occurs
 only during classic-mode executions; the session display changed from the
 owner's 1920x1200 to 1920x1080 after `kbpnui-facts-06`, outside the harness.
 The 0.4.2 section below is historical.
+> October 11 workflow task: follow [validation policy](docs/VALIDATION-POLICY.md)
+> and [current handoff](docs/WORKFLOW-RESET-HANDOFF.md). The dated candidate gaps
+> below are retained evidence, not instructions to restart acceptance/release.
+> Later publication records do not convert earlier NOT RUN checks into coverage
+> on newer bytes; preserve each record's original provenance.
 
 # Autonomous blockers — 0.4.2 owner-test candidate, 2026-10-10
 

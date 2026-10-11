@@ -1,5 +1,18 @@
 # Native UI finish 0.5.0 — handoff to Codex
 
+> **Current policy, October 11:** [VALIDATION-POLICY.md](VALIDATION-POLICY.md)
+> supersedes the automatic broad sequence below. Use repository-owned
+> `Test-Development.ps1 -Only <affected prefixes>` and
+> `Test-RuntimeLauncherArguments.ps1` for ordinary checkpoints (15-minute target,
+> 30-minute ceiling). Section 5 is historical candidate-qualification guidance,
+> selected only at an explicit boundary; Claude's temporary purity-stubbing helper
+> is not the development route. All live launcher/source/WhatIf, ownership,
+> fixture, package, protected-save, staging and restoration guards still apply.
+> At the one-time 2026-10-11T16:08Z audit, the old frozen `4dbfa33` gate remained
+> ACTIVE as PID 16712 without GATE-EXIT. Preserve its watched paths; continue
+> independent source work in NUI. The old candidate and its four PASS runs keep
+> their original identities. The current receipt remains PARTIAL.
+
 Written 2026-10-11 ~13:30 UTC by Claude at the owner's request ("find a stopping
 point, commit it, push it, and create a handoff document that will be taken over by
 Codex"). Read `AGENTS.md` first; every rule there applies. No merge, tag or public
@@ -99,7 +112,7 @@ Fixture-limited or blocked regardless: physical mouse/keyboard (harness refuses 
 while a console owns the foreground), remapped keys, group/enhancement states, long lists, the
 owner's 1920x1200 display (the session display is 1920x1080 since `kbpnui-facts-07`).
 
-## 5. Procedure to the next candidate
+## 5. Historical candidate qualification procedure (explicit boundary)
 
 Run every script with Windows PowerShell 5.1 as
 `env -u PSModulePath powershell.exe -NoProfile -NonInteractive -Command "& .\scripts\X.ps1 ..."`

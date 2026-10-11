@@ -75,7 +75,7 @@ param(
     # non-casting scenarios and only when it matches its guarded bootstrap
     # manifest exactly.
     [ValidateSet('Automation', 'Advanced')][string]$FixtureFamily = 'Automation',
-    # Game window mode for live-workspace-physical and live-workspace-qual
+    # Game window mode for live-workspace-physical, live-workspace-qual and live-workspace-native-ui
     # (mission batch 3, section 10): the owner's own settings, or a borderless window of an
     # exact size through Unity's launch arguments. A size larger than this
     # session's display is refused before anything changes; the game's
@@ -92,6 +92,37 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ($DisplayMode -ine 'owner' -and $Scenario -ine 'live-workspace-physical' -and
+    $Scenario -ine 'live-workspace-qual' -and $Scenario -ine 'live-workspace-native-ui') {
+    $PSCmdlet.ThrowTerminatingError([System.Management.Automation.ErrorRecord]::new(
+        [ArgumentException]::new('-DisplayMode requires live-workspace-physical, live-workspace-qual or live-workspace-native-ui.'),
+        'KBP_DISPLAY_MODE_SCENARIO', [System.Management.Automation.ErrorCategory]::InvalidArgument, $Scenario))
+}
+# Pure native-UI argument checks precede imports, package/source validation
+# and live purity. ValidateSet accepts casing variants; use insensitive checks
+# here, then retain the canonicalization below for the rest of the launcher.
+if ($Scenario -ieq 'live-workspace-native-ui') {
+    if ([string]::IsNullOrWhiteSpace($NativeUiStage)) {
+        $PSCmdlet.ThrowTerminatingError([System.Management.Automation.ErrorRecord]::new(
+            [ArgumentException]::new('live-workspace-native-ui requires an explicit -NativeUiStage (facts or qualify).'),
+            'KBP_NATIVE_UI_STAGE_REQUIRED', [System.Management.Automation.ErrorCategory]::InvalidArgument, $Scenario))
+    }
+    if ($FixtureFamily -ieq 'Advanced' -or $CompatibilityProfileId -ieq 'advanced-gunslinger-0136') {
+        $PSCmdlet.ThrowTerminatingError([System.Management.Automation.ErrorRecord]::new(
+            [ArgumentException]::new('The advanced copy may only be loaded by its approved scenarios; refused: live-workspace-native-ui. Its profile is also restricted to that copy.'),
+            'KBP_NATIVE_UI_FIXTURE', [System.Management.Automation.ErrorCategory]::InvalidArgument, $FixtureFamily))
+    }
+    if ($TimeoutSeconds -lt 600) {
+        $PSCmdlet.ThrowTerminatingError([System.Management.Automation.ErrorRecord]::new(
+            [ArgumentException]::new('TimeoutSeconds must be at least 600 for live-workspace-native-ui (boot/load plus the probe deadline).'),
+            'KBP_NATIVE_UI_TIMEOUT', [System.Management.Automation.ErrorCategory]::InvalidArgument, $TimeoutSeconds))
+    }
+}
+elseif (-not [string]::IsNullOrWhiteSpace($NativeUiStage)) {
+    $PSCmdlet.ThrowTerminatingError([System.Management.Automation.ErrorRecord]::new(
+        [ArgumentException]::new('-NativeUiStage is only valid with -Scenario live-workspace-native-ui.'),
+        'KBP_NATIVE_UI_STAGE_SCENARIO', [System.Management.Automation.ErrorCategory]::InvalidArgument, $Scenario))
+}
 . (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1')
 . (Join-Path $PSScriptRoot 'compatibility\CompatibilityProfile.Common.ps1')
 
@@ -216,20 +247,8 @@ else {
         throw '-PhysicalExpectation is only valid with -Scenario live-workspace-physical.'
     }
 }
-if ($Scenario -ceq 'live-workspace-native-ui') {
-    if ([string]::IsNullOrWhiteSpace($NativeUiStage)) {
-        throw 'live-workspace-native-ui requires an explicit -NativeUiStage (facts or qualify).'
-    }
-}
-elseif (-not [string]::IsNullOrWhiteSpace($NativeUiStage)) {
-    throw '-NativeUiStage is only valid with -Scenario live-workspace-native-ui.'
-}
 $displaySize = $null
 if ($DisplayMode -cne 'owner') {
-    if ($Scenario -cne 'live-workspace-physical' -and $Scenario -cne 'live-workspace-qual' -and
-        $Scenario -cne 'live-workspace-native-ui') {
-        throw '-DisplayMode is only valid with -Scenario live-workspace-physical, live-workspace-qual or live-workspace-native-ui.'
-    }
     $displaySize = $DisplayMode.Substring('windowed-'.Length)
     $sessionDisplay = Get-KbpSessionDisplaySize
     if (-not (Test-KbpDisplayModeSupported -Size $displaySize -DisplaySize $sessionDisplay)) {

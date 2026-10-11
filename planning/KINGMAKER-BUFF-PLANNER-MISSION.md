@@ -1,3 +1,11 @@
+## Current owner workflow directive - October 11, 2026
+
+Read ../docs/VALIDATION-POLICY.md. Development and review default to focused
+production compilation and selected behavior/dependency tests. Broad aggregate,
+native acceptance, purity and final release gates below remain explicit closure
+requirements; they are not required after every ordinary edit or checkpoint.
+The dated release/resume commands below are historical, not current next actions.
+
 # CODEX AUTONOMOUS MISSION
 
 ## 2026-09-06 failed human validation: routing diagnosis

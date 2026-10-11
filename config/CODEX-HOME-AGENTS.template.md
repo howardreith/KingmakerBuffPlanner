@@ -1,11 +1,20 @@
+## Validation default - owner directive October 11, 2026
+
+Read the current worktree's docs/VALIDATION-POLICY.md. Default to focused
+development/review through scripts/Test-Development.ps1; select broad native,
+purity, package and release work explicitly. This file is a template, not proof
+that an active CODEX_HOME has been updated. Inspect the actual profile and its
+override in a fresh session. Shared profiles keep repository-specific policy in
+the repository; this task may operate across the owner's three assigned labs.
+
 # Desktop Codex Operating Contract
 
 This Codex home is dedicated to the standalone **Kingmaker Buff Planner** project.
 
 ## Machine and project isolation
 
-- Work only inside `C:\Dev\KingmakerBuffPlannerLab` unless a project-owned guarded script explicitly performs a reversible operation against the installed Kingmaker environment.
-- The Tabletop Added Rules / Gunslinger project is a different product on a different machine. Never mutate, commit, reset, clean, rebase, push, package, or deploy it from this desktop.
+- Buff Planner work stays inside `C:\Dev\KingmakerBuffPlannerLab` unless a guarded script performs an authorized reversible game operation. The owner's October 11 workflow task separately authorizes the other two local labs; keep their instructions and changes scoped to their own repositories.
+- Keep Buff Planner changes within its lab. The owner's October 11 workflow task explicitly authorizes separate changes in the local Gunslinger and Mounted Combat labs; each uses its own repository policy and review branch.
 - Read-only copies under `reference-source`, `examples`, and `harness-reference` are evidence and design references, not writable worktrees.
 - Never copy or use laptop Git credential stores, Codex authentication state, secret files, active worktrees, runtime locks, or mutable backup directories.
 

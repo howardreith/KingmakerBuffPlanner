@@ -4,6 +4,7 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1')
+& (Join-Path $PSScriptRoot 'Test-RuntimeLauncherArguments.ps1')
 
 # Regression for the powershell.exe -File defect class: a top-level
 # script's $PSCmdlet cannot service ShouldProcess when confirmation must
@@ -250,8 +251,6 @@ try {
            Args = @('-Scenario', 'live-classic-select', '-ClassicAllowancePath', $outsideQualification, '-TimeoutSeconds', '900', '-WhatIf') },
         @{ Name = 'classic-select-short-timeout'; Expect = '*at least 900*'
            Args = @('-Scenario', 'live-classic-select', '-WhatIf') },
-        @{ Name = 'display-mode-other-scenario'; Expect = '*only valid with -Scenario live-workspace-physical, live-workspace-qual or live-workspace-native-ui.*'
-           Args = @('-Scenario', 'live-workspace-import', '-DisplayMode', 'windowed-1920x1080', '-WhatIf') },
         @{ Name = 'native-ui-without-stage'; Expect = '*requires an explicit -NativeUiStage (facts or qualify).*'
            Args = @('-Scenario', 'live-workspace-native-ui', '-WhatIf') },
         @{ Name = 'native-ui-stage-other-scenario'; Expect = '*-NativeUiStage is only valid with -Scenario live-workspace-native-ui.*'
