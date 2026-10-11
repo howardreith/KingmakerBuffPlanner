@@ -153,6 +153,7 @@
     <Compile Include="RuntimeTesting\SpellbookEntryRecord.cs" />
     <Compile Include="RuntimeTesting\RuntimeSpellbookEntryHost.cs" />
     <Compile Include="RuntimeTesting\NativeUiRecord.cs" />
+    <Compile Include="RuntimeTesting\NativeUiCaptureBoundary.cs" />
     <Compile Include="RuntimeTesting\NativeUiFacts.cs" />
     <Compile Include="RuntimeTesting\RuntimeNativeUiHost.cs" />
     <Compile Include="Execution\CastingCapabilityInventory.cs" />

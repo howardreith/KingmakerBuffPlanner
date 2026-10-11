@@ -51,6 +51,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _nativeUiStep;
         private Stopwatch _nativeUiClock = new Stopwatch();
         private bool _nativeUiWritten;
+        private NativeUiCaptureBoundary _nativeUiCapture;
+        private readonly Stopwatch _nativeUiCaptureClock = new Stopwatch();
+        private NativeUiSpellbookView _nativeUiBookView;
         private List<UnitEntityData> _nativeUiUnits;
         private int _nativeUiUnitIndex;
         private int _nativeUiSwitchIndex;
@@ -95,15 +98,45 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private void NativeUiCapture(string file)
         {
+            if (_nativeUiCapture != null)
+                throw new InvalidOperationException("A native UI capture is already pending.");
             try
             {
-                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, file));
-                _nativeUi.Captures.Add(file);
+                string path = Path.Combine(_request.EvidenceDirectory, file);
+                _nativeUiCapture = new NativeUiCaptureBoundary(path, Time.frameCount,
+                    WorkspaceEngineCaptureWaitMilliseconds);
+                _nativeUiCaptureClock.Restart();
+                CaptureScreenshot(path);
             }
             catch (Exception exception)
             {
+                _nativeUiCapture = null;
+                _nativeUiCaptureClock.Reset();
                 _nativeUi.MissingCaptures.Add(file + ":" + exception.GetType().Name);
+                throw;
             }
+        }
+
+        // Hold the displayed state until a later frame has produced a complete
+        // PNG. Even on completion, the next UI action runs in another Update.
+        private bool UpdateNativeUiCapture()
+        {
+            NativeUiCaptureBoundary capture = _nativeUiCapture;
+            NativeUiCaptureStatus status = capture.Observe(Time.frameCount,
+                _nativeUiCaptureClock.ElapsedMilliseconds);
+            if (status == NativeUiCaptureStatus.Pending) return false;
+            _nativeUiCapture = null;
+            _nativeUiCaptureClock.Reset();
+            string file = Path.GetFileName(capture.Path);
+            if (status == NativeUiCaptureStatus.TimedOut)
+            {
+                _nativeUi.MissingCaptures.Add(file + ":capture-timeout");
+                return FinishNativeUi("capture-timeout:" + file);
+            }
+            _nativeUi.Captures.Add(file);
+            _nativeUi.AddNote("capture-completed:" + file + ";request-frame=" + capture.RequestFrame +
+                ";completed-frame=" + Time.frameCount);
+            return false;
         }
 
         // ---- before the planner opens: HUD, spellbook, native popup -------
@@ -112,6 +145,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             try
             {
+                if (_nativeUiCapture != null) return UpdateNativeUiCapture();
                 return NativeUiBeforeOpenStep();
             }
             catch (Exception exception)
@@ -182,6 +216,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _nativeUi.PlannerHudTooltipTitle = text == null ? null : text.Split('\n')[0];
                     _nativeUi.PlannerHudHoverHighlight = HighlightTint(hud.ButtonForRuntime("setup"));
                     NativeUiCapture("nui-hud-hover-planner.png");
+                    NativeUiNext(19);
+                    return false;
+                }
+                case 19:
+                {
                     Button setup = hud.ButtonForRuntime("setup");
                     if (setup != null) Pointer(setup.gameObject, ExecuteEvents.pointerExitHandler);
                     Button native = NativeFormationButton(hud);
@@ -193,6 +232,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     if (!NativeUiWaited(1800)) return false;
                     NativeUiCapture("nui-hud-hover-native.png");
+                    NativeUiNext(20);
+                    return false;
+                }
+                case 20:
+                {
                     Button native = NativeFormationButton(hud);
                     if (native != null) Pointer(native.gameObject, ExecuteEvents.pointerExitHandler);
                     // A press shows only while the pointer is inside the cell
@@ -211,6 +255,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (!NativeUiWaited(500)) return false;
                     _nativeUi.PlannerHudPressedHighlight = HighlightTint(hud.ButtonForRuntime("long"));
                     NativeUiCapture("nui-hud-pressed-planner.png");
+                    NativeUiNext(21);
+                    return false;
+                }
+                case 21:
+                {
                     Button longButton = hud.ButtonForRuntime("long");
                     // Up without a click: the pressed state ends, nothing runs.
                     if (longButton != null)
@@ -232,8 +281,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 case 5:
                 {
                     if (!NativeUiWaited(2800)) return false;
-                    NativeUiSpellbookView bookView = RecordSpellbookView(_nativeUiUnitIndex);
-                    if (BeginNativeMetamagicObservation(bookView)) return false;
+                    _nativeUiBookView = RecordSpellbookView(_nativeUiUnitIndex);
+                    NativeUiNext(14);
+                    return false;
+                }
+                case 14:
+                {
+                    if (BeginNativeMetamagicObservation(_nativeUiBookView)) return false;
                     return ContinueAfterNativeSpellbookView();
                 }
                 case 12:
@@ -245,6 +299,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     action.PlannerOpenWhileMetamagic = BuffPlannerUiRoot.IsCastingWorkspaceOpen;
                     action.Capture = "nui-metamagic-" + _nativeUiUnitIndex + ".png";
                     NativeUiCapture(action.Capture);
+                    NativeUiNext(15);
+                    return false;
+                }
+                case 15:
+                {
+                    NativeUiMetamagicAction action = _nativeUiMetamagicView.MetamagicAction;
                     Button button = NativeMetamagicButton();
                     if (button == null || !button.gameObject.activeInHierarchy || !button.IsInteractable())
                         return FinishNativeUi("metamagic-return-button-unavailable");
@@ -266,6 +326,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     action.PlannerButtonOfferedAfterReturn = owned != null &&
                         owned.gameObject.activeInHierarchy && owned.IsInteractable();
                     NativeUiCapture("nui-metamagic-return-" + _nativeUiUnitIndex + ".png");
+                    NativeUiNext(16);
+                    return false;
+                }
+                case 16:
+                {
                     // Any failed return is recorded; cleanup restores only the
                     // mode owned by this probe and cannot turn it into a PASS.
                     RestoreNativeUiMetamagicMode();
@@ -290,6 +355,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     foreach (string file in NativeUiFacts.Previews(NativeUiFacts.Sprites(constructor),
                             _request.EvidenceDirectory, 32, _nativeUi.Notes))
                         _nativeUi.AddNote("preview:" + file);
+                    NativeUiNext(17);
+                    return false;
+                }
+                case 17:
+                {
+                    DescriptionWindow window = NativeDescriptionWindow();
                     if (window != null) window.CloseWindow();
                     NativeUiNext(7);
                     return false;
@@ -335,6 +406,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (open && !NativeUiWaited(1500)) return false;
                     _nativeUi.SpellbookHandoffOpenedPlanner = open;
                     if (open) NativeUiCapture("nui-planner-from-spellbook.png");
+                    NativeUiNext(18);
+                    return false;
+                }
+                case 18:
+                {
                     CloseProbeWorkspace();
                     NativeUiNext(10);
                     return false;
@@ -364,6 +440,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             try
             {
+                if (_nativeUiCapture != null) return UpdateNativeUiCapture();
                 return NativeUiOpenedStep();
             }
             catch (Exception exception)
@@ -393,7 +470,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 case 1:
                 {
                     if (!NativeUiWaited(1500)) return false;
-                    NativeUiCapture("nui-planner-casting.png");
                     _nativeUi.PlannerTitle = view == null ? null : view.TitleTextForRuntime;
                     if (view != null)
                     {
@@ -412,6 +488,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             });
                     }
                     _nativeUi.PlannerDocumentBeforePopup = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                    NativeUiCapture("nui-planner-casting.png");
+                    NativeUiNext(34);
+                    return false;
+                }
+                case 34:
+                {
                     if (view == null || _nativeUiSourceId == null ||
                         !view.RightClickForRuntime("tile:" + _nativeUiSourceId))
                         _nativeUi.Failures.Add("planner-popup-not-invoked");
@@ -430,6 +512,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _nativeUi.PopupSameSpell = NativeUiRecord.SameDescriptionTitle(_nativeUi.NativePopupTitle,
                         _nativeUi.PlannerPopupTitle);
                     NativeUiCapture("nui-planner-popup.png");
+                    NativeUiNext(27);
+                    return false;
+                }
+                case 27:
+                {
                     BuffPlannerUiRoot.HandleEscapeForRuntime();
                     NativeUiNext(3);
                     return false;
@@ -504,6 +591,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     popup.ActualCasterUnitId = view == null ? null : view.SpellInspectCasterForRuntime;
                     popup.ActualAbilityGuid = view == null ? null : view.SpellInspectAbilityForRuntime;
                     NativeUiCapture(popup.Capture);
+                    NativeUiNext(28);
+                    return false;
+                }
+                case 28:
+                {
                     BuffPlannerUiRoot.HandleEscapeForRuntime();
                     NativeUiNext(24);
                     return false;
@@ -611,6 +703,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         view.SaveRecoveryShownForRuntime && live != null &&
                         live.FooterSaveState.StartsWith("save-failed:", StringComparison.Ordinal);
                     NativeUiCapture("nui-save-failed.png");
+                    NativeUiNext(29);
+                    return false;
+                }
+                case 29:
+                {
                     ReleaseNativeUiPlanLock();
                     _nativeUi.AddNote("save-fault:retry=" +
                         BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("SaveRecovery"));
@@ -624,6 +721,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _nativeUi.SaveRecoveryWorked = live != null && live.FooterSaveState == "saved" &&
                         view != null && view.FooterSaveTextForRuntime == "Saved" && !view.SaveRecoveryShownForRuntime;
                     NativeUiCapture("nui-save-recovered.png");
+                    NativeUiNext(30);
+                    return false;
+                }
+                case 30:
+                {
                     _nativeUi.AddNote("save-fault:undo=" + BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("Undo"));
                     NativeUiNext(16);
                     return false;
@@ -658,6 +760,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _nativeUiPlanningIndex++;
                         if (failure == null) { NativeUiNext(20); return false; }
                     }
+                    NativeUiNext(33);
+                    return false;
+                }
+                case 33:
+                {
                     _nativeUi.PlanningRestored = _nativeUiPlanningStart != null &&
                         BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime == _nativeUiPlanningStart;
                     CastingWorkspaceSession after = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
@@ -707,6 +814,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _nativeUiSwitch.PausedWhileNative = Game.Instance.IsPaused;
                     _nativeUiSwitch.Capture = "nui-switch-" + Safe(_nativeUiSwitch.Route) + ".png";
                     NativeUiCapture(_nativeUiSwitch.Capture);
+                    NativeUiNext(31);
+                    return false;
+                }
+                case 31:
+                {
                     CloseNativeServiceWindow();
                     NativeUiNext(6);
                     return false;
@@ -817,6 +929,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             _nativeUi.GameLogPlannerLines.Add(line);
                     _nativeUi.RoutinePressRefused = BuffPlannerUiRoot.CastingRunsStartedForRuntime == _nativeUiRunsBefore;
                     NativeUiCapture("nui-gamelog.png");
+                    NativeUiNext(32);
+                    return false;
+                }
+                case 32:
+                {
                     return FinishNativeUi(null);
                 }
             }
@@ -1226,6 +1343,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private void ReleaseNativeUiProbes()
         {
+            if (_nativeUiCapture != null)
+            {
+                _nativeUi.MissingCaptures.Add(Path.GetFileName(_nativeUiCapture.Path) + ":capture-interrupted");
+                _nativeUiCapture = null;
+                _nativeUiCaptureClock.Reset();
+            }
             try { RestoreNativeUiMetamagicMode(); }
             finally { ReleaseNativeUiPlanLock(); }
         }

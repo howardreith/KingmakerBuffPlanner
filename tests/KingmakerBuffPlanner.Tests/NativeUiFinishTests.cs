@@ -14,6 +14,9 @@ namespace KingmakerBuffPlanner.Tests
         // Native UI finish (KBP_NATIVE_UI_FINISH_2026-10-10).
         private static void RunNativeUiFinishTests(string root)
         {
+            Run("native-ui-capture-holds-frame-and-output", TestNativeUiCaptureBoundary);
+            Run("native-ui-capture-bounded-timeout", TestNativeUiCaptureTimeout);
+            Run("native-ui-capture-refuses-stale-output", TestNativeUiCaptureFreshOutput);
             Run("native-ui-scenario-admission", TestNativeUiScenarioAdmission);
             Run("native-ui-record-facts-judgement", TestNativeUiFactsJudgement);
             Run("native-ui-record-qualify-judgement", TestNativeUiQualifyJudgement);
@@ -23,6 +26,79 @@ namespace KingmakerBuffPlanner.Tests
             Run("native-hud-stepped-enclosure-geometry", TestHudStepGeometry);
             Run("native-hud-cell-art-composition", TestHudCellArt);
             Run("native-source-tabs-share-one-caption-size", TestSourceTabLayout);
+        }
+
+        private static readonly byte[] NativeUiTestPng = Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aMxkAAAAASUVORK5CYII=");
+
+        private static string NativeUiCaptureTestPath()
+        {
+            return Path.Combine(_protocolEvidenceRoot, "nui-capture-" + Guid.NewGuid().ToString("N") + ".png");
+        }
+
+        private static void TestNativeUiCaptureBoundary()
+        {
+            string path = NativeUiCaptureTestPath();
+            var capture = new NativeUiCaptureBoundary(path, 42, 10000);
+            if (capture.Observe(43, 1) != NativeUiCaptureStatus.Pending)
+                throw new InvalidOperationException("A later frame without output released the UI state.");
+            File.WriteAllBytes(path, NativeUiTestPng.Take(NativeUiTestPng.Length - 12).ToArray());
+            if (capture.Observe(43, 2) != NativeUiCaptureStatus.Pending)
+                throw new InvalidOperationException("A partial PNG released the UI state.");
+            File.WriteAllBytes(path, NativeUiTestPng);
+            using (var writer = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
+                if (capture.Observe(43, 3) != NativeUiCaptureStatus.Pending)
+                    throw new InvalidOperationException("Output still open for writing released the UI state.");
+            if (capture.Observe(42, 4) != NativeUiCaptureStatus.Pending)
+                throw new InvalidOperationException("Ready output in the request frame released the UI state.");
+            if (capture.Observe(43, 5) != NativeUiCaptureStatus.Completed ||
+                capture.Observe(44, 10000) != NativeUiCaptureStatus.Completed)
+                throw new InvalidOperationException("Completed output on a later frame was not retained.");
+        }
+
+        private static void TestNativeUiCaptureTimeout()
+        {
+            foreach (string condition in new[] { "missing", "partial", "stalled-frame", "locked" })
+            {
+                string path = NativeUiCaptureTestPath();
+                var capture = new NativeUiCaptureBoundary(path, 42, 10000);
+                if (condition != "missing") File.WriteAllBytes(path, condition == "partial"
+                    ? NativeUiTestPng.Take(NativeUiTestPng.Length - 12).ToArray() : NativeUiTestPng);
+                int frame = condition == "stalled-frame" ? 42 : 43;
+                using (FileStream writer = condition == "locked"
+                    ? new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite) : null)
+                {
+                    if (capture.Observe(frame, 9999) != NativeUiCaptureStatus.Pending ||
+                        capture.Observe(frame, 10000) != NativeUiCaptureStatus.TimedOut)
+                        throw new InvalidOperationException("Capture timeout was not bounded for " + condition + ".");
+                }
+                File.WriteAllBytes(path, NativeUiTestPng);
+                if (capture.Observe(44, 10001) != NativeUiCaptureStatus.TimedOut)
+                    throw new InvalidOperationException("Late output relabelled a timeout as completion.");
+            }
+            string latePath = NativeUiCaptureTestPath();
+            var late = new NativeUiCaptureBoundary(latePath, 42, 10000);
+            File.WriteAllBytes(latePath, NativeUiTestPng);
+            if (late.Observe(43, 10000) != NativeUiCaptureStatus.TimedOut)
+                throw new InvalidOperationException("Output first observed at the deadline bypassed the timeout.");
+        }
+
+        private static void TestNativeUiCaptureFreshOutput()
+        {
+            string path = NativeUiCaptureTestPath();
+            File.WriteAllBytes(path, NativeUiTestPng);
+            bool refused = false;
+            try { new NativeUiCaptureBoundary(path, 42, 10000); }
+            catch (IOException) { refused = true; }
+            if (!refused || !File.ReadAllBytes(path).SequenceEqual(NativeUiTestPng))
+                throw new InvalidOperationException("An existing capture was reused or overwritten.");
+            path = NativeUiCaptureTestPath();
+            var capture = new NativeUiCaptureBoundary(path, 42, 10000);
+            byte[] invalid = NativeUiTestPng.ToArray();
+            invalid[0] = 0;
+            File.WriteAllBytes(path, invalid);
+            if (capture.Observe(43, 1) != NativeUiCaptureStatus.Pending)
+                throw new InvalidOperationException("A non-PNG file was accepted as capture output.");
         }
 
         // The no-input native UI scenario is a workspace scenario on the
