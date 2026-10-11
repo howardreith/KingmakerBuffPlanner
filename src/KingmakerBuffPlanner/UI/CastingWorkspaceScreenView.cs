@@ -105,21 +105,11 @@ namespace KingmakerBuffPlanner.UI
         private Button _readyOnlyButton;
         private Button _undoButton;
         private Button _runButton;
-        // Right-click spell description panel (everyday-use v1.2): a
-        // read-only, scrollable presentation of the exact concrete
-        // variant's native localized description. It never authors,
-        // targets, casts or persists anything. WP7 draws it as a spell
-        // scroll (title / meta / rule / body on the native paper) whose
-        // input policy is SpellScrollModalState.
-        private readonly SpellScrollModalState _inspectState = new SpellScrollModalState();
-        private RectTransform _inspectRoot;
-        private Text _inspectTitle;
-        private Text _inspectMeta;
-        private Text _inspectBody;
-        private ScrollRect _inspectScroll;
-        private RectTransform _inspectPanel;
-        private ParchmentSurface _inspectParchment;
-        private ParchmentRule _inspectRule;
+        // Native UI finish (UI-01): a right click shows the game's own
+        // description window (NativeDescriptionPresenter), read-only: it
+        // never authors, targets, casts or persists anything.
+        private NativeDescriptionPresenter _description;
+        private readonly Action<string> _log;
 
         internal CastingWorkspaceScreenView(
             StaticCanvas nativeCanvas,
@@ -127,8 +117,10 @@ namespace KingmakerBuffPlanner.UI
             Func<CastingWorkspaceInputs> inputsProvider,
             Func<CastingWorkspaceInputs> freshInputsProvider,
             Action close,
-            Action switchToClassic = null)
+            Action switchToClassic = null,
+            Action<string> log = null)
         {
+            _log = log ?? (value => { });
             if (nativeCanvas == null)
                 throw new ArgumentNullException("nativeCanvas");
             _session = session ?? throw new ArgumentNullException("session");
@@ -175,6 +167,8 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed) return;
             _disposed = true;
+            if (_description != null) _description.Dispose();
+            _description = null;
             if (_root != null) UnityEngine.Object.Destroy(_root.gameObject);
             _root = null;
         }
@@ -184,13 +178,9 @@ namespace KingmakerBuffPlanner.UI
         internal bool HandleEscape()
         {
             if (_disposed) return false;
-            // The description panel is the innermost surface: Escape closes
+            // The native description is the innermost window: Escape closes
             // it first, leaving the planner exactly as it was.
-            if (_inspectState.Handle(SpellScrollInput.Escape) == SpellScrollOutcome.Closed)
-            {
-                SyncSpellInspect();
-                return true;
-            }
+            if (NativeDescriptionPresenter.CloseIfOpen()) return true;
             if (_session.EditingFocusCastingId == null) return false;
             _session.ClearGraphFocus();
             RefreshView();
@@ -592,6 +582,7 @@ namespace KingmakerBuffPlanner.UI
             canvas.overrideSorting = true;
             canvas.sortingOrder = 32000;
             _root.gameObject.AddComponent<GraphicRaycaster>();
+            _description = new NativeDescriptionPresenter(canvas, _root, _log);
             CanvasGroup group = _root.gameObject.AddComponent<CanvasGroup>();
             group.alpha = 1f;
             group.interactable = true;
@@ -692,136 +683,25 @@ namespace KingmakerBuffPlanner.UI
 
         internal bool SpellInspectOpen
         {
-            get { return _inspectState.IsOpen && _inspectRoot != null && _inspectRoot.gameObject.activeSelf; }
-        }
-
-        internal void ShowSpellInspect(string title, string description, string durationText,
-            bool exactVariant)
-        {
-            if (_disposed || _frame == null) return;
-            if (_inspectRoot == null) BuildSpellInspect();
-            _inspectState.Open(SpellScrollContent.Compose(title, description, durationText, exactVariant));
-            SpellScrollContent content = _inspectState.Content;
-            _inspectTitle.text = content.Title;
-            _inspectMeta.text = content.Meta;
-            // The exact native localized description, read-only (a Text,
-            // never an input), unaltered.
-            _inspectBody.text = content.Body;
-            SyncSpellInspect();
-            if (_inspectScroll != null)
-            {
-                _inspectScroll.StopMovement();
-                _inspectScroll.verticalNormalizedPosition = 1f;
-            }
-            PropagateUiLayer();
+            get { return NativeDescriptionPresenter.IsOpen; }
         }
 
         internal void CloseSpellInspect()
         {
-            _inspectState.Close();
-            SyncSpellInspect();
+            NativeDescriptionPresenter.CloseIfOpen();
         }
 
-        // The scroll's GameObject shows exactly the policy's open state.
-        private void SyncSpellInspect()
+        // Runtime evidence only: the native description of an ability, as a
+        // right click on a part showing it opens it.
+        internal bool OpenDescriptionForRuntime(AbilityKey ability, bool exactVariant, string casterUnitId)
         {
-            if (_inspectRoot != null && _inspectRoot.gameObject.activeSelf != _inspectState.IsOpen)
-                _inspectRoot.gameObject.SetActive(_inspectState.IsOpen);
+            return _description != null && _description.Open(ability, exactVariant, casterUnitId);
         }
 
-        private void SpellInspectInput(SpellScrollInput input)
+        // Runtime layout probe only: a long text in the same native window.
+        internal bool OpenDescriptionTextForRuntime(string title, string text)
         {
-            if (_inspectState.Handle(input) == SpellScrollOutcome.Closed) SyncSpellInspect();
-        }
-
-        private void BuildSpellInspect()
-        {
-            _inspectRoot = KingmakerUiFactory.CreateRect("SpellInspect", _root);
-            KingmakerUiFactory.Stretch(_inspectRoot);
-            // Outside the scroll there is only the dimmed backdrop: it takes
-            // every press, click and wheel there (a click closes the
-            // description, SpellScrollModalState), so nothing falls through
-            // to the graph or the game. The scroll is the backdrop's sibling,
-            // so its own clicks never bubble to it.
-            RectTransform backdrop = KingmakerUiFactory.CreateRect("Backdrop", _inspectRoot);
-            KingmakerUiFactory.AddPanel(backdrop, new Color(0f, 0f, 0f, 0.35f));
-            KingmakerUiFactory.Stretch(backdrop);
-            SpellScrollBackdrop sink = backdrop.gameObject.AddComponent<SpellScrollBackdrop>();
-            sink.OutsideClick = () => SpellInspectInput(SpellScrollInput.ClickOutsideScroll);
-            sink.Wheel = () => SpellInspectInput(SpellScrollInput.WheelElsewhere);
-            // A fixed-size panel centred on the dimmed overlay. SetAnchors'
-            // offsets are edge insets, not a size: the earlier point anchor
-            // with insets 760/520 gave the panel a negative width and no
-            // height, so the description never rendered (D11, visible in
-            // beta-f0cf4f16r11-phys-sel-01 and beta-3c1c5d4ar13-phys-sel-01
-            // physical-cf-inspect.png); the Close button had the same fault.
-            RectTransform panel = KingmakerUiFactory.CreateRect("Panel", _inspectRoot);
-            KingmakerUiFactory.AddFramedPanel(panel, _theme.ParchmentPanel, _theme.GoldAccent, 2f);
-            CentreFixed(panel, new Vector2(0.5f, 0.5f),
-                new Vector2(SpellScrollLayout.PanelWidth, SpellScrollLayout.PanelHeight), Vector2.zero);
-            _inspectPanel = panel;
-            // WP7: the spell scroll - the native paper behind a centred
-            // title, the meta line, a scroll rule and the scrolling body.
-            _inspectParchment = ParchmentSurface.Create(ParchmentSurfaces.SpellScroll, panel,
-                ParchmentSurfaces.SpellScrollOutsets, ParchmentSurfaces.SpellScrollSheetOutsets,
-                ParchmentSurfaces.ScrollSheetUnitsPerTexel);
-            SpellScrollLayout layout = SpellScrollLayout.Compute(SpellScrollLayout.PanelWidth,
-                SpellScrollLayout.PanelHeight);
-            _inspectTitle = KingmakerUiFactory.CreateText("Title", panel, _theme, string.Empty,
-                SpellScrollLayout.TitleFontSize, TextAnchor.MiddleCenter);
-            _inspectTitle.fontStyle = FontStyle.Bold;
-            _inspectTitle.color = KingmakerUiFactory.ToColor(PlannerParchmentPalette.HeadingInk);
-            _inspectTitle.resizeTextForBestFit = true;
-            _inspectTitle.resizeTextMinSize = SpellScrollLayout.TitleMinimumFontSize;
-            _inspectTitle.resizeTextMaxSize = SpellScrollLayout.TitleFontSize;
-            Place(_inspectTitle.rectTransform, layout.Title.X, layout.Title.Y, layout.Title.Width,
-                layout.Title.Height);
-            _inspectMeta = KingmakerUiFactory.CreateText("Meta", panel, _theme, string.Empty,
-                SpellScrollLayout.MetaFontSize, TextAnchor.MiddleCenter);
-            _inspectMeta.fontStyle = FontStyle.Italic;
-            _inspectMeta.color = KingmakerUiFactory.ToColor(PlannerParchmentPalette.MetaInk);
-            Place(_inspectMeta.rectTransform, layout.Meta.X, layout.Meta.Y, layout.Meta.Width, layout.Meta.Height);
-            _inspectRule = ParchmentRule.Create("Rule", panel, _inspectParchment, true);
-            RectTransform rule = _inspectRule.Rect;
-            rule.anchorMin = new Vector2(0f, 1f);
-            rule.anchorMax = new Vector2(0f, 1f);
-            rule.pivot = new Vector2(0.5f, 0.5f);
-            rule.sizeDelta = new Vector2(layout.Rule.Width, layout.Rule.Height);
-            rule.anchoredPosition = new Vector2(layout.Rule.X + layout.Rule.Width / 2f,
-                -(layout.Rule.Y + layout.Rule.Height / 2f));
-            Button close = KingmakerUiFactory.CreateButton("Close", panel, _theme, "Close",
-                CloseSpellInspect);
-            Place(RectOf(close), layout.Close.X, layout.Close.Y, layout.Close.Width, layout.Close.Height);
-            // The description scrolls inside the planner's standard scroll
-            // view: the content's height follows the wrapped text through the
-            // view's layout group, so long text can be wheeled through; the
-            // bar appears only when the text overflows. The wheel over it
-            // reaches this ScrollRect first and stops there: the planner's
-            // scrolls beneath never see it.
-            RectTransform content;
-            _inspectScroll = KingmakerUiFactory.CreateScrollView("Description", panel, _theme, out content,
-                SpellScrollLayout.BodyScrollbarWidth);
-            _inspectScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
-            Place(RectOf(_inspectScroll), layout.Body.X, layout.Body.Y, layout.Body.Width, layout.Body.Height);
-            ContentSizeFitter fitter = content.gameObject.AddComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            _inspectBody = KingmakerUiFactory.CreateText("Body", content, _theme, string.Empty,
-                SpellScrollLayout.BodyFontSize, TextAnchor.UpperLeft);
-            _inspectBody.color = KingmakerUiFactory.ToColor(PlannerParchmentPalette.PrimaryInk);
-            _inspectBody.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _inspectBody.verticalOverflow = VerticalWrapMode.Overflow;
-            // On the paper the body sits straight on the sheet; the flat
-            // well and its outline are the exact fallback.
-            _inspectParchment.AddWash(RectOf(_inspectScroll).GetComponent<Image>(), 0f, 0f);
-            if (_nativeTheme != null)
-            {
-                _nativeTheme.RegisterParchment(_inspectParchment);
-                _nativeTheme.RegisterRule(_inspectRule);
-                // Built after the last rebuild pass: borrow the native fonts,
-                // button artwork and click sound now, not at the next refresh.
-                _nativeTheme.ApplyTo(_inspectRoot);
-            }
-            _inspectRoot.gameObject.SetActive(false);
+            return _description != null && _description.OpenText(title, text);
         }
 
         // What the open spell scroll drew and its input policy (runtime
@@ -836,9 +716,9 @@ namespace KingmakerBuffPlanner.UI
         {
             get
             {
-                if (_inspectParchment == null) return "spell-scroll=not-built";
-                return _inspectParchment.Evidence + "|" + _inspectRule.Evidence + "|input=" +
-                    SpellScrollModalState.OutsideClickPolicy;
+                return _description == null ? "description=not-built" : "description=native-description-window;" +
+                    _description.LiftEvidence + ";subject=" + (_description.LastSubject ?? "none") +
+                    (_description.LastFailure == null ? string.Empty : ";failure=" + _description.LastFailure);
             }
         }
 
@@ -861,12 +741,13 @@ namespace KingmakerBuffPlanner.UI
         {
             get
             {
-                if (!SpellInspectOpen || _inspectPanel == null) return null;
-                Canvas canvas = _inspectPanel.GetComponentInParent<Canvas>();
-                Camera camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay
-                    ? null : canvas.worldCamera;
+                RectTransform panel = NativeDescriptionPresenter.Panel;
+                if (!SpellInspectOpen || panel == null) return null;
+                Canvas canvas = panel.GetComponentInParent<Canvas>();
+                Camera camera = canvas == null || canvas.rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay
+                    ? null : canvas.rootCanvas.worldCamera;
                 var corners = new Vector3[4];
-                _inspectPanel.GetWorldCorners(corners);
+                panel.GetWorldCorners(corners);
                 Vector2 low = RectTransformUtility.WorldToScreenPoint(camera, corners[0]);
                 Vector2 high = RectTransformUtility.WorldToScreenPoint(camera, corners[2]);
                 if (low.x < 0f || low.y < 0f || high.x > Screen.width || high.y > Screen.height) return Vector2.zero;
@@ -876,26 +757,26 @@ namespace KingmakerBuffPlanner.UI
 
         internal Vector2? SpellInspectPanelCentreForRuntime
         {
-            get { return SpellInspectOpen ? ScreenCentre(_inspectPanel) : null; }
+            get { return SpellInspectOpen ? ScreenCentre(NativeDescriptionPresenter.Panel) : null; }
         }
 
         internal string SpellInspectTitleForRuntime
         {
-            get { return SpellInspectOpen && _inspectTitle != null ? _inspectTitle.text : null; }
+            get { return SpellInspectOpen ? NativeDescriptionPresenter.Title : null; }
         }
 
         internal string SpellInspectBodyForRuntime
         {
-            get { return SpellInspectOpen && _inspectBody != null ? _inspectBody.text : null; }
+            get { return SpellInspectOpen ? NativeDescriptionPresenter.Body : null; }
         }
 
         internal float SpellInspectOverflowForRuntime
         {
             get
             {
-                if (!SpellInspectOpen || _inspectScroll == null || _inspectScroll.content == null ||
-                    _inspectScroll.viewport == null) return 0f;
-                return _inspectScroll.content.rect.height - _inspectScroll.viewport.rect.height;
+                ScrollRect scroll = NativeDescriptionPresenter.Scroll;
+                if (!SpellInspectOpen || scroll == null || scroll.content == null || scroll.viewport == null) return 0f;
+                return scroll.content.rect.height - scroll.viewport.rect.height;
             }
         }
 
@@ -903,15 +784,17 @@ namespace KingmakerBuffPlanner.UI
         {
             get
             {
-                return SpellInspectOpen && _inspectScroll != null
-                    ? _inspectScroll.verticalNormalizedPosition : (float?)null;
+                ScrollRect scroll = NativeDescriptionPresenter.Scroll;
+                return SpellInspectOpen && scroll != null ? scroll.verticalNormalizedPosition : (float?)null;
             }
         }
 
-        // Wires right-click on one control to show the exact spell's
-        // native description.
+        // Wires right-click on one control to show the ability's native
+        // description: the caster's own spell or ability when the control
+        // stands for a casting or a chosen caster/source, else the base
+        // spell. The plan is never changed.
         private void AddSpellInspect(Component control, System.Func<CastingGraphView> view,
-            string spellTitle, string description, string durationText, bool exactVariant)
+            AbilityKey ability, bool exactVariant, string casterUnitId, string name)
         {
             if (control == null) return;
             RightClickProxy proxy = control.GetComponent<RightClickProxy>();
@@ -920,7 +803,8 @@ namespace KingmakerBuffPlanner.UI
             captured.OnRightClick = () =>
             {
                 _lastView = view();
-                ShowSpellInspect(spellTitle, description, durationText, exactVariant);
+                if (_description == null || !_description.Open(ability, exactVariant, casterUnitId))
+                    ShowNotice("No description is available for " + (string.IsNullOrEmpty(name) ? "this buff" : name) + ".");
             };
         }
 
@@ -1338,8 +1222,9 @@ namespace KingmakerBuffPlanner.UI
                 // Right-click reads the spell; it never selects, authors or
                 // mutates anything (everyday-use v1.2 E05).
                 AddSpellInspect(button, () => _session.BuildGraph(_freshInputs()),
-                    entry.Label, entry.Source.Description, entry.Source.DurationText,
-                    entry.Selected && view.SelectedSourceExact);
+                    entry.Selected && view.SelectedSourceExact ? view.SelectedSourceAbility : entry.Source.IconAbility,
+                    entry.Selected && view.SelectedSourceExact,
+                    entry.Selected && view.SelectedSourceExact ? view.SelectedCasterUnitId : null, entry.Label);
                 if (entry.Selected)
                 {
                     RectTransform rule = KingmakerUiFactory.CreateRect("Selected", rect);
@@ -1388,9 +1273,9 @@ namespace KingmakerBuffPlanner.UI
             // Right-click the selected-spell header: the exact variant's
             // description when a concrete row is selected, else base text.
             AddSpellInspect(_bannerIcon != null ? (Component)_bannerIcon : (Component)_bannerTitle,
-                () => _session.BuildGraph(_freshInputs()), view.SelectedSourceCaption,
-                view.SelectedSourceDescription, view.SelectedSourceDurationText,
-                view.SelectedSourceExact);
+                () => _session.BuildGraph(_freshInputs()), view.SelectedSourceAbility,
+                view.SelectedSourceExact, view.SelectedSourceExact ? view.SelectedCasterUnitId : null,
+                view.SelectedSourceCaption);
         }
 
         private GraphLayoutMetrics MetricsFor(float width)
@@ -1626,8 +1511,7 @@ namespace KingmakerBuffPlanner.UI
             ApplyRowHover(button, casting.Selected);
             button.onClick.AddListener(() => Command(() => _session.FocusGraphCasting(captured)));
             AddSpellInspect(button, () => _session.BuildGraph(_freshInputs()),
-                ChipInspectTitle(casting, _lastView),
-                casting.SpellDescription, casting.SpellDurationText, true);
+                casting.SpellAbility, true, casting.CasterUnitId, ChipInspectTitle(casting, _lastView));
             string status = (_session.ProblemNavigation.Active && casting.Selected
                 ? "Problem " + _session.ProblemNavigation.Position + " of " + _session.ProblemNavigation.Count +
                     " · Not ready" : casting.StatusLabel) +

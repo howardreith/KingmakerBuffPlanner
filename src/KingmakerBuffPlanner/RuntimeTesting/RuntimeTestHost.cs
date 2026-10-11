@@ -3483,9 +3483,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     !string.IsNullOrWhiteSpace(provider.Description));
             }
             catch (Exception) { described = null; }
+            // Native UI finish (UI-01): the description is the game's own
+            // window, opened for the described provider's exact ability.
             if (view != null && described != null)
-                view.ShowSpellInspect("#1 " + described.DisplayName, described.Description,
-                    described.DurationText, true);
+                view.OpenDescriptionForRuntime(described.Key.Ability, true, described.Key.CasterUnitId);
             _paperEvidence.Record["spellScrollOpened"] = view != null && view.SpellInspectOpen;
             _inspectionClock = Stopwatch.StartNew();
         }
@@ -3913,6 +3914,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // Every distinct native description in the fresh snapshot, joined
         // (repeated, labelled, only when the fixture's total is too short to
         // overflow the panel).
+        // Text as the player reads it: TextMeshPro rich-text tags removed.
+        private static string WithoutRichText(string value)
+        {
+            return value == null ? null : System.Text.RegularExpressions.Regex.Replace(value, "<[^>]+>", string.Empty);
+        }
+
         private static string LongNativeDescriptionText()
         {
             CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
@@ -4315,13 +4322,19 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 string body = view.SpellInspectBodyForRuntime;
                 ProviderSnapshot chipProvider = ChipProvider(_physicalRecord.InspectChip);
                 string expected = chipProvider == null ? null : chipProvider.Description;
+                // Native UI finish (UI-01): the description is the game's own
+                // window - its title is the spell's name (the initial in the
+                // native ornamental face) and its body holds the exact native
+                // description among the native metadata.
+                string shownTitle = WithoutRichText(_physicalRecord.InspectTitle);
                 _physicalRecord.InspectTitleNative = chipProvider != null &&
-                    !string.IsNullOrWhiteSpace(chipProvider.DisplayName) && _physicalRecord.InspectTitle != null &&
-                    _physicalRecord.InspectTitle.EndsWith(" " + chipProvider.DisplayName, StringComparison.Ordinal);
-                _physicalRecord.InspectBodyChars = body == null ? -1 : body.Length;
-                _physicalRecord.InspectExpectedChars = expected == null ? -1 : expected.Length;
-                _physicalRecord.InspectBodyNative = !string.IsNullOrWhiteSpace(expected) &&
-                    string.Equals(body, expected, StringComparison.Ordinal);
+                    !string.IsNullOrWhiteSpace(chipProvider.DisplayName) && shownTitle != null &&
+                    (shownTitle == chipProvider.DisplayName ||
+                     shownTitle.EndsWith(" " + chipProvider.DisplayName, StringComparison.Ordinal));
+                _physicalRecord.InspectBodyChars = body == null ? -1 : WithoutRichText(body).Length;
+                _physicalRecord.InspectExpectedChars = expected == null ? -1 : WithoutRichText(expected).Length;
+                _physicalRecord.InspectBodyNative = !string.IsNullOrWhiteSpace(expected) && body != null &&
+                    WithoutRichText(body).IndexOf(WithoutRichText(expected).Trim(), StringComparison.Ordinal) >= 0;
                 _physicalRecord.InspectOverflow = view.SpellInspectOverflowForRuntime;
                 _physicalRecord.InspectScrollBefore = view.SpellInspectScrollPositionForRuntime;
                 _physicalRecord.GraphScrollUnderInspectBefore = view.GraphScrollPositionForRuntime;
@@ -4348,8 +4361,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 // evidence); the physical wheel must then scroll it.
                 string longText = LongNativeDescriptionText();
                 _physicalRecord.LongProbeChars = longText.Length;
-                view.ShowSpellInspect("Layout probe: long native description text", longText,
-                    string.Empty, false);
+                view.OpenDescriptionTextForRuntime("Layout probe: long native description text", longText);
                 _physicalSettle = System.Diagnostics.Stopwatch.StartNew();
                 _physicalStep = 51;
                 return false;

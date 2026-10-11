@@ -453,34 +453,4 @@ namespace KingmakerBuffPlanner.UI
             }
         }
     }
-
-    // The dimmed backdrop behind the open spell scroll: the only thing under
-    // the pointer outside the scroll. It takes every press, click and wheel
-    // there, so none reaches the planner, the graph or the game, and it
-    // reports a click (any button, pressed and released on the backdrop) to
-    // the scroll's input policy. The scroll is its sibling, never its child,
-    // so clicks on the scroll never bubble here.
-    internal sealed class SpellScrollBackdrop : MonoBehaviour,
-        IPointerDownHandler, IPointerClickHandler, IScrollHandler
-    {
-        internal Action OutsideClick;
-        internal Action Wheel;
-
-        public void OnPointerDown(PointerEventData eventData)
-        {
-            eventData.Use();
-        }
-
-        public void OnPointerClick(PointerEventData eventData)
-        {
-            eventData.Use();
-            if (OutsideClick != null) OutsideClick();
-        }
-
-        public void OnScroll(PointerEventData eventData)
-        {
-            eventData.Use();
-            if (Wheel != null) Wheel();
-        }
-    }
 }

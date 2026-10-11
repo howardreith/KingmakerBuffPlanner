@@ -1724,7 +1724,8 @@ namespace KingmakerBuffPlanner.UI
                     // A runtime-test session selects the workspace itself and
                     // cannot switch planners (SetPlannerMode refuses there).
                     CastingWorkspaceDevSelection.Enabled ? (Action)null
-                        : () => SwitchPlannerFromScreen(PlannerMode.Classic));
+                        : () => SwitchPlannerFromScreen(PlannerMode.Classic),
+                    value => _log.Info(value));
                 _workspaceInputLease = lease;
                 lease = null;
                 SpellbookReconciliationOutcome reconciliation =

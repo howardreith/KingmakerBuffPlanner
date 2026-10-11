@@ -268,6 +268,7 @@
     <Compile Include="UI\HudStepGeometry.cs" />
     <Compile Include="UI\HudCellArt.cs" />
     <Compile Include="UI\NativeHudArt.cs" />
+    <Compile Include="UI\NativeDescriptionPresenter.cs" />
     <Compile Include="UI\BuffPlannerHudButtonController.cs" />
     <Compile Include="UI\BuffPlannerScreenController.cs" />
     <Compile Include="UI\BuffPlannerScreenView.cs" />
@@ -297,7 +298,6 @@
     <Compile Include="UI\NativeSpriteContract.cs" />
     <Compile Include="UI\ParchmentTreatment.cs" />
     <Compile Include="UI\PlannerParchmentPalette.cs" />
-    <Compile Include="UI\SpellScrollModal.cs" />
     <Compile Include="UI\PlannerParchment.cs" />
     <Compile Include="$(IntermediateOutputPath)BuildInfo.Generated.cs" />
   </ItemGroup>

@@ -704,6 +704,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     legacyLabel.fontSize : null;
             record.Capture = "nui-spellbook-" + index + ".png";
             NativeUiCapture(record.Capture);
+            // The footer pair as laid out for this character: the native
+            // Metamagic place and the planner's place, with their captions.
+            NativeUiFacts.Write(_request.EvidenceDirectory, "nui-facts-footer-" + index + ".json", new JObject
+            {
+                { "native", NativeUiFacts.Subtree(place, "MetamagicButtonPlace") },
+                { "planner", NativeUiFacts.Subtree(owned == null ? null : owned.transform.parent,
+                    BuffPlannerSpellbookEntryController.FooterPlaceName) }
+            });
             _nativeUi.Spellbooks.Add(record);
             // The retired entry sat at the service window's top right, above
             // the top bar; the footer pair's planner button lives in its own

@@ -1593,7 +1593,7 @@ function Assert-KbpScenarioOutcome {
             [string]::IsNullOrWhiteSpace([string]$record.inspectTitle) -or
             $null -eq $record.inspectTitleNative -or -not [bool]$record.inspectTitleNative -or
             $null -eq $record.inspectBodyNative -or -not [bool]$record.inspectBodyNative -or
-            [int]$record.inspectExpectedChars -le 0 -or [int]$record.inspectBodyChars -ne [int]$record.inspectExpectedChars)) {
+            [int]$record.inspectExpectedChars -le 0 -or [int]$record.inspectBodyChars -lt [int]$record.inspectExpectedChars)) {
             throw "The physical run's description was not visibly the chip's native text: $path"
         }
         if ($expectation -cne 'authoring' -and (

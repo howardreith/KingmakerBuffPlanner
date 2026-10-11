@@ -293,12 +293,10 @@ namespace KingmakerBuffPlanner.UI
     internal static class ParchmentSurfaces
     {
         internal const string WorkspaceFrame = "Frame";
-        internal const string SpellScroll = "SpellScroll";
 
         // The workspace frame sits 24 units inside the screen's left, right
         // and bottom edges and 60 below its top: these outsets stay on screen.
         internal static readonly ParchmentInsets WorkspaceFrameOutsets = new ParchmentInsets(12f, 18f, 12f, 24f);
-        internal static readonly ParchmentInsets SpellScrollOutsets = new ParchmentInsets(10f, 12f, 10f, 14f);
 
         // 0.4.2: the native card sheet. Its density at 1080 screen pixels
         // (0.5 units per texel; the native Journal card is drawn at 0.6 and
@@ -307,9 +305,7 @@ namespace KingmakerBuffPlanner.UI
         // surface's text, both scaled with the screen height
         // (ParchmentSheetGeometry).
         internal const float FrameSheetUnitsPerTexel = 0.5f;
-        internal const float ScrollSheetUnitsPerTexel = 0.35f;
         internal static readonly ParchmentInsets WorkspaceFrameSheetOutsets = new ParchmentInsets(20f, 24f, 20f, 10f);
-        internal static readonly ParchmentInsets SpellScrollSheetOutsets = new ParchmentInsets(14f, 17f, 14f, 7f);
 
         // A deeper shadow for the card over the dark table.
         internal const float SheetShadowOffsetX = 3f;

@@ -213,8 +213,10 @@ namespace KingmakerBuffPlanner.UI
             string statusLabel, string reasonText, IEnumerable<string> enhancementBadges,
             string costText, bool selected, CastingAuthoringState state, bool needsReview,
             bool shortInOnePass, bool redundantInOnePass = false,
-            string spellDescription = "", string spellDurationText = "", string spellTitle = "")
+            string spellDescription = "", string spellDurationText = "", string spellTitle = "",
+            AbilityKey spellAbility = null)
         {
+            SpellAbility = spellAbility;
             RedundantInOnePass = redundantInOnePass;
             SpellDescription = spellDescription ?? string.Empty;
             SpellDurationText = spellDurationText ?? string.Empty;
@@ -270,6 +272,9 @@ namespace KingmakerBuffPlanner.UI
         // display name), for the right-click description's title (D12: the
         // title was the provider key's last segment, e.g. "heighten-0").
         public string SpellTitle { get; private set; }
+        // The exact ability this casting casts (its provider's), for the
+        // native description window.
+        public AbilityKey SpellAbility { get; private set; }
         public IReadOnlyList<string> EnhancementBadges { get; private set; }
         public string CostText { get; private set; }
         public bool Selected { get; private set; }
@@ -426,6 +431,9 @@ namespace KingmakerBuffPlanner.UI
         // description is the exact variant's; false = base text.
         public bool SelectedSourceExact { get; internal set; }
         public AbilityKey SelectedSourceIcon { get; internal set; }
+        // The selected caster/source row's exact ability (the buff's base
+        // ability when no row is selected), for the native description.
+        public AbilityKey SelectedSourceAbility { get; internal set; }
         // True for a group buff, false for single target, null unknown.
         public bool? SelectedSourceIsGroup { get; internal set; }
         public string SelectedRoutineId { get; internal set; }

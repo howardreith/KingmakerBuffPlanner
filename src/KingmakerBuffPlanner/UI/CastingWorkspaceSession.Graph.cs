@@ -353,6 +353,8 @@ namespace KingmakerBuffPlanner.UI
             view.SelectedProviderKey = chosenRow == null ? null : chosenRow.ProviderKey;
             ProviderPlanningOption chosenOption = chosenRow == null ? null
                 : FindProviderOption(inputs, source, chosenRow.ProviderKey);
+            view.SelectedSourceAbility = chosenOption == null || chosenOption.Provider == null
+                ? view.SelectedSourceIcon : chosenOption.Provider.Key.Ability;
             // §4: the target lane shows the SAME eligibility the Add path
             // and the compiler judge — the draft's selected targeting
             // modifiers applied to the chosen option, with the complete
@@ -460,7 +462,8 @@ namespace KingmakerBuffPlanner.UI
                         whole.Readiness == ResolvedCastingReadiness.Blocked,
                     casting.IsExecutable && whole != null &&
                         whole.Readiness == ResolvedCastingReadiness.AlreadySatisfied,
-                    chipDescription, chipDuration, chipTitle));
+                    chipDescription, chipDuration, chipTitle,
+                    casting.Provider == null ? null : casting.Provider.Ability));
             }
             // Parallel castings (same caster, source and target) stay distinct.
             foreach (IGrouping<string, CastingGraphCasting> same in chips.GroupBy(value =>

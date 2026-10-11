@@ -137,8 +137,9 @@ namespace KingmakerBuffPlanner.UI
         }
 
         // A TextMeshPro label in the native face, material and ink of its
-        // role. Created inactive so TextMeshPro never falls back to its own
-        // default font while the native one is assigned.
+        // role. Created inactive with the native font, so TextMeshPro never
+        // loads its own default font; styled after activation, because its
+        // first activation applies TextMeshPro's default settings.
         internal TextMeshProUGUI Text(Transform parent, string name, string text, PlannerTextRole role,
             float size = 0f, TextAlignmentOptions alignment = TextAlignmentOptions.TopLeft)
         {
@@ -148,6 +149,8 @@ namespace KingmakerBuffPlanner.UI
             var rect = go.AddComponent<RectTransform>();
             rect.SetParent(parent, false);
             TextMeshProUGUI label = go.AddComponent<TextMeshProUGUI>();
+            if (BodyFont != null) label.font = BodyFont;
+            go.SetActive(true);
             Style(label, role, size);
             label.alignment = alignment;
             label.enableWordWrapping = true;
@@ -155,7 +158,6 @@ namespace KingmakerBuffPlanner.UI
             label.richText = true;
             label.raycastTarget = false;
             label.text = role == PlannerTextRole.Title ? Ornamented(text) : text ?? string.Empty;
-            go.SetActive(true);
             return label;
         }
 

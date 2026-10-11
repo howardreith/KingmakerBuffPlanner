@@ -360,8 +360,9 @@ namespace KingmakerBuffPlanner.UI
         }
 
         // The native Metamagic caption's face, material, size range, case and
-        // ink; created inactive so TextMeshPro never falls back to its own
-        // default font while the native one is assigned.
+        // ink. Created inactive with the native font, so TextMeshPro never
+        // loads its own default font; styled after activation, because its
+        // first activation applies TextMeshPro's default settings.
         private static void CreateCaption(RectTransform button, TMP_Text native, string caption)
         {
             var go = new GameObject("TextMeshPro Text");
@@ -369,8 +370,10 @@ namespace KingmakerBuffPlanner.UI
             go.layer = button.gameObject.layer;
             var rect = go.AddComponent<RectTransform>();
             rect.SetParent(button, false);
-            KingmakerUiFactory.Stretch(rect, 0, 0, 0, 0);
             TextMeshProUGUI label = go.AddComponent<TextMeshProUGUI>();
+            label.font = native.font;
+            go.SetActive(true);
+            KingmakerUiFactory.Stretch(rect, 0, 0, 0, 0);
             label.font = native.font;
             label.fontSharedMaterial = native.fontSharedMaterial;
             label.enableAutoSizing = native.enableAutoSizing;
@@ -389,7 +392,6 @@ namespace KingmakerBuffPlanner.UI
             label.richText = native.richText;
             label.raycastTarget = false;
             label.text = caption;
-            go.SetActive(true);
         }
 
         private void ForgetWindow()
