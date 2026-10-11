@@ -1,3 +1,9 @@
+> October 11 workflow task: follow [validation policy](docs/VALIDATION-POLICY.md)
+> and [current handoff](docs/WORKFLOW-RESET-HANDOFF.md). The dated candidate gaps
+> below are retained evidence, not instructions to restart acceptance/release.
+> Later publication records do not convert earlier NOT RUN checks into coverage
+> on newer bytes; preserve each record's original provenance.
+
 # Autonomous blockers — 0.4.2 owner-test candidate, 2026-10-10
 
 Open items (details in `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`): owner

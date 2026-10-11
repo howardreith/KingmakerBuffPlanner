@@ -1,3 +1,11 @@
+<!-- Owner workflow directive, 2026-10-11 -->
+Read [docs/VALIDATION-POLICY.md](docs/VALIDATION-POLICY.md) before selecting checks.
+Ordinary development/review uses scripts/Test-Development.ps1 with explicit
+test prefixes. Documentation needs text/link checks. Full source/live purity,
+layout matrices, packaging and release qualification are explicit boundaries,
+not prerequisites for each checkpoint. This policy governs old mission/handoff
+validation wording; do not resume an old campaign automatically.
+
 # AGENTS.md — Kingmaker Buff Planner
 
 ## Product boundary
@@ -67,7 +75,7 @@ Preserve branch semantics. Do not flatten conditional alternatives into an undif
 ## Runtime safety
 
 - Only repository-owned guarded scripts may stage/deploy/launch runtime scenarios.
-- The harness must prove source-only validation and `-WhatIf` purity before live use.
+- Before live use satisfy the existing launcher safety/source and `-WhatIf` purity requirements; the offline development selector does not bypass them.
 - Live `Mods` staging must be transactional, locked, recoverable, and restored exactly.
 - Only `KBP_AUTOMATION_WORKING` may be mutable. `KBP_AUTOMATION_BASELINE` is immutable and every other save is protected.
 - Stop on unexpected Steam, account, cloud, update, purchase, or credential UI.
