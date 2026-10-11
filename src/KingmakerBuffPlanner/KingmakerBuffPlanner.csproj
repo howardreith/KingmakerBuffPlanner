@@ -265,6 +265,9 @@
     <Compile Include="UI\CatalogLayoutDiagnostics.cs" />
     <Compile Include="UI\BuffPlannerUiContracts.cs" />
     <Compile Include="UI\PlannerNativeKit.cs" />
+    <Compile Include="UI\HudStepGeometry.cs" />
+    <Compile Include="UI\HudCellArt.cs" />
+    <Compile Include="UI\NativeHudArt.cs" />
     <Compile Include="UI\BuffPlannerHudButtonController.cs" />
     <Compile Include="UI\BuffPlannerScreenController.cs" />
     <Compile Include="UI\BuffPlannerScreenView.cs" />

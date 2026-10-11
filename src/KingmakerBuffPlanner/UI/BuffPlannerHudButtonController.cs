@@ -55,6 +55,17 @@ namespace KingmakerBuffPlanner.UI
         private HudInstallAttemptResult _lastAttemptResult = HudInstallAttemptResult.None;
         private HudCandidateTickResult _lastCandidateTickResult = HudCandidateTickResult.None;
         private bool _nativeTooltipActive;
+        // Native UI finish (UI-09): the stepped enclosure the cells sit in
+        // and the native art they are made from.
+        private static readonly string[] CellKinds = { "setup", "long", "important", "short" };
+        private static readonly Dictionary<string, HudCellArtResult> CellArtCache =
+            new Dictionary<string, HudCellArtResult>(StringComparer.Ordinal);
+        private static readonly Dictionary<int, HudPixels> NativeCellPixels = new Dictionary<int, HudPixels>();
+        private HudStepLayout _step;
+        private Image _nativeFrame;
+        private Vector2 _stepOrigin;
+        private readonly string[] _cellArtEvidence = new string[4];
+        private readonly Vector2[] _inkOffsets = new Vector2[4];
 
         internal BuffPlannerHudButtonController(
             PlannerUiSession session,
@@ -96,6 +107,7 @@ namespace KingmakerBuffPlanner.UI
         internal bool RowLeftAlignedWithNativeCluster { get; private set; }
         internal bool GlyphsCentered { get; private set; }
         internal bool VisibleHitboxesOwnRaycasts { get; private set; }
+        internal bool FrameEnclosesRow { get; private set; }
         internal string ButtonOrder { get { return "Setup|Long|Important|Short"; } }
         internal int RuntimeUnderlyingNativeActivationCount { get; private set; }
         internal string LastFailure { get { return _lastFailure; } }
@@ -151,25 +163,24 @@ namespace KingmakerBuffPlanner.UI
                     if (button == null) { entries.Add(index + ":null"); continue; }
                     var corners = new Vector3[4];
                     ((RectTransform)button.transform).GetWorldCorners(corners);
+                    Image face = button.GetComponent<Image>();
+                    Image highlight = button.targetGraphic as Image;
                     entries.Add(index + ":name=" + button.name +
                         ",id=" + button.gameObject.GetInstanceID() +
                         ",active=" + button.gameObject.activeInHierarchy +
                         ",interactable=" + button.interactable +
-                        ",tile=" + ColorEvidence((button.targetGraphic as Image) == null
-                            ? Color.clear : ((Image)button.targetGraphic).color) +
-                        ",nativeSkin=" + ((button.targetGraphic as Image) != null &&
-                            ((Image)button.targetGraphic).sprite != null) +
+                        ",tile=" + ColorEvidence(face == null ? Color.clear : face.color) +
+                        ",nativeSkin=" + (face != null && face.sprite != null && highlight != null &&
+                            highlight != face && highlight.sprite != null) +
                         ",transition=" + button.transition +
-                        ",iconTint=" + ColorEvidence(button.transform.Find("KBP.Icon") == null
-                            ? Color.clear : button.transform.Find("KBP.Icon").GetComponent<Image>().color) +
-                        ",spriteInk=" + SpriteInkEvidence(button.transform.Find("KBP.Icon") == null
-                            ? null : button.transform.Find("KBP.Icon").GetComponent<Image>()) +
-                        ",glyph=" + GlyphEvidence(button) +
+                        ",highlight=" + (highlight == null ? "missing" : highlight.name) +
+                        ",cellArt=" + (index < _cellArtEvidence.Length && _cellArtEvidence[index] != null
+                            ? _cellArtEvidence[index] : "missing") +
                         ",screenCenter=" + ScreenCenter((RectTransform)button.transform) +
                         ",corners=" + string.Join("|", corners.Select(value => value.ToString()).ToArray()));
                 }
                 return "root=" + RootInstanceId + ";host=" + AnchorPath +
-                    ";raycaster=" + RaycastCanvasPath + ";style=" +
+                    ";raycaster=" + RaycastCanvasPath + ";" + FrameEvidenceForRuntime + ";style=" +
                     (_nativeStyle == null ? "missing" : _nativeStyle.Evidence) + ";" +
                     string.Join(";", entries.ToArray());
             }
@@ -179,21 +190,6 @@ namespace KingmakerBuffPlanner.UI
         {
             return color.r.ToString("0.000") + "," + color.g.ToString("0.000") + "," +
                 color.b.ToString("0.000") + "," + color.a.ToString("0.000");
-        }
-
-        private static string SpriteInkEvidence(Image image)
-        {
-            if (image == null || image.sprite == null || image.sprite.texture == null)
-                return "missing";
-            Rect rect = image.sprite.rect;
-            Texture2D texture = image.sprite.texture;
-            for (int y = (int)rect.yMin; y < (int)rect.yMax; y++)
-                for (int x = (int)rect.xMin; x < (int)rect.xMax; x++)
-                {
-                    Color pixel = texture.GetPixel(x, y);
-                    if (pixel.a > 0.5f) return ColorEvidence(pixel);
-                }
-            return "transparent";
         }
 
         internal HudInstallAttemptResult TryInstall(UISectionHUDController hudHost)
@@ -274,38 +270,56 @@ namespace KingmakerBuffPlanner.UI
             if (_nativeStyle == null || !_nativeStyle.IsComplete)
                 return RejectHost("native-button-style-contract-incomplete",
                     HudInstallAttemptResult.RetryableNotReady);
+            // Native UI finish (UI-09): the owner's stepped enclosure (R12),
+            // measured from the live native grid and frame.
+            Image nativeFrame = NativeFrame(parent);
+            if (nativeFrame == null)
+                return RejectHost("native-frame-missing:" + GetPath(parent),
+                    HudInstallAttemptResult.RetryableNotReady);
+            string geometryFailure;
+            HudStepLayout step = MeasureStep(parent, nativeFrame, reference, out geometryFailure);
+            if (step == null)
+                return RejectHost("hud-step-geometry:" + geometryFailure,
+                    HudInstallAttemptResult.RetryableNotReady);
             AnchorPath = GetPath(parent);
             RaycastCanvasPath = GetPath(raycaster.transform);
+            _step = step;
+            _nativeFrame = nativeFrame;
             _root = KingmakerUiFactory.CreateRect(RootName, parent);
             _candidateOwned = true;
             _candidateHudIdentity = hudHost.GetInstanceID();
-            _root.anchorMin = new Vector2(0, 1);
-            _root.anchorMax = new Vector2(0, 1);
-            _root.pivot = new Vector2(0, 0);
-            float width = Mathf.Max(42f, reference.rect.width);
-            float height = Mathf.Max(42f, reference.rect.height);
-            _root.anchoredPosition = new Vector2(NativeGridLeftInset(parent), 8f);
-            _root.sizeDelta = new Vector2(width * 4f + 18f, height);
+            // The enclosure's own rect, from the native top row's top edge
+            // to the raised frame, on the panel's bottom-left corner.
+            _stepOrigin = new Vector2(0f, step.Strip.Y);
+            _root.anchorMin = Vector2.zero;
+            _root.anchorMax = Vector2.zero;
+            _root.pivot = Vector2.zero;
+            _root.anchoredPosition = _stepOrigin;
+            _root.sizeDelta = new Vector2(Mathf.Max(step.Corner.Right, step.Junction.Right),
+                step.RaisedTop - step.Strip.Y);
             LayoutElement rootLayout = _root.gameObject.AddComponent<LayoutElement>();
             rootLayout.ignoreLayout = true;
-            HorizontalLayoutGroup layout = _root.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 6;
-            layout.childControlWidth = false;
-            layout.childControlHeight = false;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
-
-            _buttons = new[]
+            float width = reference.rect.width;
+            float height = reference.rect.height;
+            try
             {
-                CreatePlannerButton("Setup", "setup", width, height, _openSetup,
-                    () => SetupTooltip()),
-                CreatePlannerButton("Long", "long", width, height,
-                    () => _quickExecute("long"), () => RoutineTooltip("long")),
-                CreatePlannerButton("Important", "important", width, height,
-                    () => _quickExecute("important"), () => RoutineTooltip("important")),
-                CreatePlannerButton("Short", "short", width, height,
-                    () => _quickExecute("short"), () => RoutineTooltip("short"))
-            };
+                Rect frameRegion = nativeFrame.sprite.rect;
+                foreach (HudFramePiece piece in step.FramePieces((int)frameRegion.width, (int)frameRegion.height,
+                        nativeFrame.rectTransform.rect.width, (int)nativeFrame.sprite.border.x,
+                        (int)nativeFrame.sprite.border.z))
+                    CreateFramePiece(piece, nativeFrame);
+                _buttons = CreateCells(width, height);
+            }
+            catch (Exception exception)
+            {
+                // Never a half-native HUD: without the native art the cells
+                // are not built at all, and the install retries.
+                DisposeOwnedRoot();
+                return RejectHost("native-cell-art:" + exception.GetType().Name + ":" + exception.Message,
+                    HudInstallAttemptResult.RetryableNotReady);
+            }
+            for (int index = 0; index < _buttons.Length; index++)
+                PlaceInStep((RectTransform)_buttons[index].transform, step.Cells[index]);
             _nativeTooltips = _buttons.Select(button => button == null ? null :
                 button.GetComponent<TooltipTrigger>()).Where(trigger => trigger != null).ToArray();
             foreach (Button button in _buttons) button.interactable = false;
@@ -326,12 +340,30 @@ namespace KingmakerBuffPlanner.UI
             _lastAttemptResult = HudInstallAttemptResult.CandidateCreated;
             _lastCandidateTickResult = HudCandidateTickResult.None;
             _log.Info("[KBP-HUD-STYLE] " + _nativeStyle.Evidence + ".");
+            _log.Info("[KBP-HUD-FRAME] " + FrameEvidenceForRuntime + ";cells=" +
+                string.Join("|", _cellArtEvidence.Select(value => value ?? "missing").ToArray()) + ".");
             _log.Info("[KBP-BOOT] HUD install attempted;attempt=" + _installAttempts +
                 ";candidateCreate=" + _candidateCreateCount + ";candidate=" + RootInstanceId +
                 ";hud=" + _candidateHudIdentity + ";anchor=" + AnchorInstanceId +
                 ";host=" + AnchorPath +
                 ";raycastCanvas=" + RaycastCanvasPath + ";deferredFrames=2.");
             return _lastAttemptResult;
+        }
+
+        // The four cells in the HUD's order (Setup, Long, Important, Short).
+        private Button[] CreateCells(float width, float height)
+        {
+            return new[]
+            {
+                CreatePlannerButton("Setup", "setup", width, height, _openSetup,
+                    () => SetupTooltip()),
+                CreatePlannerButton("Long", "long", width, height,
+                    () => _quickExecute("long"), () => RoutineTooltip("long")),
+                CreatePlannerButton("Important", "important", width, height,
+                    () => _quickExecute("important"), () => RoutineTooltip("important")),
+                CreatePlannerButton("Short", "short", width, height,
+                    () => _quickExecute("short"), () => RoutineTooltip("short"))
+            };
         }
 
         internal void RefreshAvailability()
@@ -375,18 +407,21 @@ namespace KingmakerBuffPlanner.UI
                     string alignmentFailure;
                     string glyphFailure;
                     string hitFailure;
+                    string frameFailure;
                     RowAboveNativeCluster = ValidateRowAboveCluster(out aboveFailure);
                     RowLeftAlignedWithNativeCluster = ValidateRowLeftAlignment(out alignmentFailure);
                     GlyphsCentered = ValidateGlyphCentering(out glyphFailure);
                     VisibleHitboxesOwnRaycasts = ValidateHitOwnership(out hitFailure);
+                    FrameEnclosesRow = ValidateEnclosure(out frameFailure);
                     if (!RowAboveNativeCluster || !RowLeftAlignedWithNativeCluster ||
-                        !GlyphsCentered || !VisibleHitboxesOwnRaycasts)
+                        !GlyphsCentered || !VisibleHitboxesOwnRaycasts || !FrameEnclosesRow)
                     {
                         HudCandidateTickResult validationResult =
                             _candidateValidation.RecordValidation(false);
                         _lastValidationFailure = !RowAboveNativeCluster ? aboveFailure :
                             !RowLeftAlignedWithNativeCluster ? alignmentFailure :
-                            !GlyphsCentered ? glyphFailure : hitFailure;
+                            !GlyphsCentered ? glyphFailure :
+                            !VisibleHitboxesOwnRaycasts ? hitFailure : frameFailure;
                         LogFailure(_lastValidationFailure);
                         if (validationResult == HudCandidateTickResult.Expired)
                         {
@@ -475,6 +510,14 @@ namespace KingmakerBuffPlanner.UI
             _nativeCluster = null;
             _nativeRaycaster = null;
             _nativeStyle = null;
+            _step = null;
+            _nativeFrame = null;
+            FrameEnclosesRow = false;
+            for (int index = 0; index < _cellArtEvidence.Length; index++)
+            {
+                _cellArtEvidence[index] = null;
+                _inkOffsets[index] = Vector2.zero;
+            }
             _candidateHudIdentity = 0;
             AnchorPath = string.Empty;
             RaycastCanvasPath = string.Empty;
@@ -578,12 +621,31 @@ namespace KingmakerBuffPlanner.UI
         // What frames the owned row and what its cells are drawn with.
         internal string FrameEvidenceForRuntime
         {
-            get { return "frame=floating-row;encloses=False;railUnderRow=native"; }
+            get
+            {
+                if (_step == null || _root == null) return "frame=missing;encloses=False;railUnderRow=native";
+                var pieces = new List<string>();
+                foreach (Transform child in _root)
+                    if (child.name.StartsWith("KBP.Frame.", StringComparison.Ordinal))
+                        pieces.Add(child.name.Substring("KBP.Frame.".Length) + "@" +
+                            PanelRect((RectTransform)child) + ":" + child.gameObject.activeInHierarchy);
+                return "frame=stepped-native;encloses=" + FrameEnclosesRow + ";railUnderRow=" +
+                    (FrameEnclosesRow ? "hidden" : "native") + ";raisedTop=" +
+                    _step.RaisedTop.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) +
+                    ";pieces=" + string.Join("|", pieces.ToArray());
+            }
         }
 
         internal string SkinEvidenceForRuntime
         {
-            get { return _nativeStyle == null ? "skin=missing" : "skin=formation-highlight;" + _nativeStyle.Evidence; }
+            get
+            {
+                return _nativeStyle == null ? "skin=missing" : "skin=native-cell-art;face=" +
+                    (_nativeStyle.BaseSprite == null ? "missing" : _nativeStyle.BaseSprite.name) +
+                    ";highlight=" + (_nativeStyle.TargetSprite == null ? "missing" : _nativeStyle.TargetSprite.name) +
+                    ";frame=" + (_nativeFrame == null || _nativeFrame.sprite == null ? "missing" : _nativeFrame.sprite.name) +
+                    ";" + _nativeStyle.Evidence;
+            }
         }
 
         internal Vector2 ButtonCenterForRuntime(string routineId)
@@ -677,18 +739,31 @@ namespace KingmakerBuffPlanner.UI
             Action action,
             Func<string> tooltip)
         {
+            // The native cell's own construction (Formation, kbpnui-facts-03):
+            // the idle art on the button itself, which takes the hits, and
+            // the hover art in a Highlight child the native colour tint
+            // fades in (hover), dims (pressed) and hides (idle, disabled).
+            // Both are the native cell art with this cell's glyph engraved.
+            int index = Array.IndexOf(CellKinds, iconKind);
             RectTransform rect = KingmakerUiFactory.CreateRect("KBP." + displayName, _root);
-            Image tile = rect.gameObject.AddComponent<Image>();
-            ButtonPF button = rect.gameObject.AddComponent<ButtonPF>();
-            button.targetGraphic = tile;
-            _nativeStyle.Apply(button, tile);
             rect.sizeDelta = new Vector2(width, height);
-            LayoutElement element = button.gameObject.GetComponent<LayoutElement>() ??
-                button.gameObject.AddComponent<LayoutElement>();
-            element.preferredWidth = width;
-            element.preferredHeight = height;
-            element.minWidth = width;
-            element.minHeight = height;
+            Image face = rect.gameObject.AddComponent<Image>();
+            face.sprite = CreateIcon(iconKind, _nativeStyle.BaseSprite, "Normal", index);
+            face.type = Image.Type.Simple;
+            face.material = _nativeStyle.BaseMaterial;
+            face.color = _nativeStyle.BaseColor;
+            face.raycastTarget = true;
+            RectTransform highlightRect = KingmakerUiFactory.CreateRect("Highlight", rect);
+            highlightRect.anchorMin = Vector2.zero;
+            highlightRect.anchorMax = Vector2.one;
+            highlightRect.offsetMin = Vector2.zero;
+            highlightRect.offsetMax = Vector2.zero;
+            Image highlight = highlightRect.gameObject.AddComponent<Image>();
+            ButtonPF button = rect.gameObject.AddComponent<ButtonPF>();
+            button.targetGraphic = highlight;
+            _nativeStyle.Apply(button, highlight);
+            highlight.sprite = CreateIcon(iconKind, _nativeStyle.TargetSprite, "Hover", index);
+            highlight.raycastTarget = false;
 
             button.onClick.AddListener(() => action());
             _listenerCount++;
@@ -699,64 +774,149 @@ namespace KingmakerBuffPlanner.UI
             TooltipTrigger nativeTooltip = button.gameObject.AddComponent<TooltipTrigger>();
             nativeTooltip.SetNameAndDescription(TooltipTitle(iconKind),
                 tooltip == null ? string.Empty : tooltip());
-
-            RectTransform iconRect = KingmakerUiFactory.CreateRect("KBP.Icon", button.transform);
-            float safeSize = Mathf.Max(20f, Mathf.Min(width, height) - 16f);
-            iconRect.anchorMin = new Vector2(0.5f, 0.5f);
-            iconRect.anchorMax = new Vector2(0.5f, 0.5f);
-            iconRect.pivot = new Vector2(0.5f, 0.5f);
-            iconRect.sizeDelta = new Vector2(safeSize, safeSize);
-            iconRect.localScale = Vector3.one;
-            Image icon = iconRect.gameObject.AddComponent<Image>();
-            icon.sprite = CreateIcon(iconKind);
-            iconRect.anchoredPosition = HudGlyphLayout.OpticalOffset(icon.sprite, safeSize);
-            icon.preserveAspect = true;
-            icon.material = _nativeStyle.IconMaterial;
-            icon.color = _nativeStyle.IconColor;
-            icon.raycastTarget = false;
             return button;
         }
 
-        private static float NativeGridLeftInset(RectTransform nativeCluster)
+        // The native frame image of the panel (exact 2.1.7b contract: the
+        // panel's "Background", a tiled 9-slice of TBM_backButton).
+        private static Image NativeFrame(RectTransform panel)
         {
-            if (nativeCluster == null) return 0f;
-            bool found = false;
-            float left = 0f;
-            foreach (Button button in nativeCluster.GetComponentsInChildren<Button>(true))
-            {
-                if (button == null || button.transform.parent != nativeCluster ||
-                    button.transform.name == RootName) continue;
-                RectTransform rect = button.transform as RectTransform;
-                if (rect == null) continue;
-                var corners = new Vector3[4];
-                rect.GetWorldCorners(corners);
-                foreach (Vector3 corner in corners)
-                {
-                    float local = nativeCluster.InverseTransformPoint(corner).x;
-                    if (!found || local < left) { left = local; found = true; }
-                }
-            }
-            return found ? left : 0f;
+            Transform background = panel.Find("Background");
+            Image image = background == null ? null : background.GetComponent<Image>();
+            return image == null || image.sprite == null || image.sprite.texture == null ||
+                !image.gameObject.activeInHierarchy ? null : image;
         }
 
+        // The native grid's square cells (the panel's own ButtonPF children
+        // the grid lays out), in panel units from its bottom-left corner.
+        private List<HudRect> NativeGridCells(RectTransform panel)
+        {
+            var cells = new List<HudRect>();
+            foreach (Transform child in panel)
+            {
+                if (child == null || child.name == RootName || !child.gameObject.activeInHierarchy ||
+                    child.GetComponent<ButtonPF>() == null) continue;
+                LayoutElement element = child.GetComponent<LayoutElement>();
+                if (element != null && element.ignoreLayout) continue;
+                HudRect rect = PanelRect(child as RectTransform, panel);
+                if (Mathf.Abs(rect.Width - rect.Height) < 1f) cells.Add(rect);
+            }
+            return cells;
+        }
+
+        private HudStepLayout MeasureStep(RectTransform panel, Image nativeFrame, RectTransform reference,
+            out string failure)
+        {
+            failure = string.Empty;
+            List<HudRect> cells = NativeGridCells(panel);
+            float[] lefts = cells.Select(cell => (float)Math.Round(cell.X, 1)).Distinct().OrderBy(value => value)
+                .ToArray();
+            float[] bottoms = cells.Select(cell => (float)Math.Round(cell.Y, 1)).Distinct().OrderBy(value => value)
+                .ToArray();
+            if (lefts.Length < 5 || bottoms.Length != 2)
+            {
+                failure = "native-grid:columns=" + lefts.Length + ";rows=" + bottoms.Length;
+                return null;
+            }
+            HudRect frame = PanelRect(nativeFrame.rectTransform, panel);
+            float unitsPerPixel = nativeFrame.pixelsPerUnit <= 0f ? 0f : 1f / nativeFrame.pixelsPerUnit;
+            HudStepLayout layout;
+            try
+            {
+                layout = HudStepLayout.Compute(lefts, reference.rect.width, reference.rect.height, bottoms[1],
+                    bottoms[1] - bottoms[0], frame.Top, unitsPerPixel);
+            }
+            catch (Exception exception)
+            {
+                failure = "native-metrics:" + exception.Message;
+                return null;
+            }
+            failure = layout.Violation(lefts, reference.rect.width, bottoms[1]);
+            if (failure != null) return null;
+            failure = string.Empty;
+            return layout;
+        }
+
+        private void CreateFramePiece(HudFramePiece piece, Image nativeFrame)
+        {
+            RectTransform rect = KingmakerUiFactory.CreateRect("KBP.Frame." + piece.Name, _root);
+            PlaceInStep(rect, piece.Target);
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.sprite = NativeHudArt.CreatePiece(nativeFrame.sprite, piece, _ownedSprites);
+            image.type = Image.Type.Simple;
+            image.material = nativeFrame.material;
+            image.color = nativeFrame.color;
+            image.raycastTarget = false;
+        }
+
+        private void PlaceInStep(RectTransform rect, HudRect target)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.zero;
+            rect.pivot = Vector2.zero;
+            rect.anchoredPosition = new Vector2(target.X - _stepOrigin.x, target.Y - _stepOrigin.y);
+            rect.sizeDelta = new Vector2(target.Width, target.Height);
+        }
+
+        // A rect in panel units from the panel's bottom-left corner.
+        private HudRect PanelRect(RectTransform rect, RectTransform panel = null)
+        {
+            panel = panel ?? _nativeCluster;
+            if (rect == null || panel == null) return new HudRect(0f, 0f, 0f, 0f);
+            var corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            Vector3 min = panel.InverseTransformPoint(corners[0]);
+            Vector3 max = panel.InverseTransformPoint(corners[2]);
+            Rect space = panel.rect;
+            return new HudRect(min.x - space.xMin, min.y - space.yMin, max.x - min.x, max.y - min.y);
+        }
+
+        // The owned row stands above the native top row, one native gap
+        // clear of it.
         private bool ValidateRowAboveCluster(out string failure)
         {
             failure = string.Empty;
-            if (_root == null || _nativeCluster == null)
+            if (_root == null || _nativeCluster == null || _buttons.Length != 4)
             {
                 failure = "row-or-native-cluster-null";
                 return false;
             }
-            Vector3[] rootCorners = new Vector3[4];
-            Vector3[] clusterCorners = new Vector3[4];
-            _root.GetWorldCorners(rootCorners);
-            _nativeCluster.GetWorldCorners(clusterCorners);
-            float rootBottom = rootCorners.Min(value => value.y);
-            float clusterTop = clusterCorners.Max(value => value.y);
-            bool valid = rootBottom >= clusterTop + 0.5f;
-            if (!valid) failure = "row-not-above-native-cluster:rootBottom=" + rootBottom +
-                ";clusterTop=" + clusterTop;
+            List<HudRect> native = NativeGridCells(_nativeCluster);
+            if (native.Count == 0)
+            {
+                failure = "native-grid-empty";
+                return false;
+            }
+            float nativeTop = native.Max(cell => cell.Top);
+            float rowBottom = _buttons.Min(button => PanelRect((RectTransform)button.transform).Y);
+            bool valid = rowBottom >= nativeTop + 0.5f;
+            if (!valid) failure = "row-not-above-native-row:rowBottom=" + rowBottom + ";nativeTop=" + nativeTop;
             return valid;
+        }
+
+        // The stepped enclosure stands: the measured geometry holds and
+        // every frame piece is shown.
+        private bool ValidateEnclosure(out string failure)
+        {
+            failure = string.Empty;
+            if (_step == null || _root == null || _nativeCluster == null)
+            {
+                failure = "enclosure-missing";
+                return false;
+            }
+            List<HudRect> native = NativeGridCells(_nativeCluster);
+            float[] lefts = native.Select(cell => (float)Math.Round(cell.X, 1)).Distinct().OrderBy(value => value)
+                .ToArray();
+            string violation = lefts.Length < 5 || native.Count == 0 ? "native-grid-changed"
+                : _step.Violation(lefts, _step.Cells[0].Width, native.Max(cell => cell.Y));
+            int pieces = 0;
+            foreach (Transform child in _root)
+                if (child.name.StartsWith("KBP.Frame.", StringComparison.Ordinal) &&
+                    child.gameObject.activeInHierarchy && child.GetComponent<Image>() != null &&
+                    child.GetComponent<Image>().sprite != null) pieces++;
+            if (violation == null && pieces < 3) violation = "frame-pieces:" + pieces;
+            if (violation != null) failure = "enclosure:" + violation;
+            return violation == null;
         }
 
         private bool ValidateHitOwnership(out string failure)
@@ -772,8 +932,9 @@ namespace KingmakerBuffPlanner.UI
             for (int index = 0; index < _buttons.Length; index++)
             {
                 Button button = _buttons[index];
+                Image face = button == null ? null : button.GetComponent<Image>();
                 if (button == null || !button.gameObject.activeInHierarchy ||
-                    button.targetGraphic == null || !button.targetGraphic.raycastTarget)
+                    face == null || !face.raycastTarget)
                 {
                     failure = "button-not-raycast-ready:index=" + index;
                     return false;
@@ -799,55 +960,50 @@ namespace KingmakerBuffPlanner.UI
             return true;
         }
 
+        // Each owned cell stands on its native column.
         private bool ValidateRowLeftAlignment(out string failure)
         {
             failure = string.Empty;
-            if (_root == null || _nativeCluster == null) return false;
-            var rootCorners = new Vector3[4]; _root.GetWorldCorners(rootCorners);
-            float rootLeft = rootCorners.Min(value => value.x);
-            float expectedLocal = NativeGridLeftInset(_nativeCluster);
-            float expectedWorld = _nativeCluster.TransformPoint(new Vector3(expectedLocal, 0, 0)).x;
-            bool aligned = Mathf.Abs(rootLeft - expectedWorld) <= 1.1f;
-            if (!aligned) failure = "row-left-misaligned:root=" + rootLeft + ";native=" + expectedWorld;
-            return aligned;
-        }
-
-        private bool ValidateGlyphCentering(out string failure)
-        {
-            failure = string.Empty;
-            foreach (Button button in _buttons)
+            if (_root == null || _nativeCluster == null || _buttons.Length != 4) return false;
+            float[] lefts = NativeGridCells(_nativeCluster).Select(cell => (float)Math.Round(cell.X, 1))
+                .Distinct().OrderBy(value => value).ToArray();
+            if (lefts.Length < 4)
             {
-                RectTransform icon = button == null ? null :
-                    button.transform.Find("KBP.Icon") as RectTransform;
-                RectTransform hitbox = button == null ? null : button.transform as RectTransform;
-                Image image = icon == null ? null : icon.GetComponent<Image>();
-                Vector2 expectedOffset = image == null ? Vector2.zero :
-                    HudGlyphLayout.OpticalOffset(image.sprite, icon == null ? 0f : icon.rect.width);
-                if (icon == null || hitbox == null || image == null || !image.preserveAspect ||
-                    icon.anchorMin != new Vector2(0.5f, 0.5f) ||
-                    icon.anchorMax != new Vector2(0.5f, 0.5f) || icon.pivot != new Vector2(0.5f, 0.5f) ||
-                    icon.localScale != Vector3.one ||
-                    Vector2.Distance(icon.anchoredPosition, expectedOffset) > 0.1f)
+                failure = "native-columns:" + lefts.Length;
+                return false;
+            }
+            for (int index = 0; index < 4; index++)
+            {
+                float left = PanelRect((RectTransform)_buttons[index].transform).X;
+                if (Mathf.Abs(left - lefts[index]) > 1.1f)
                 {
-                    failure = "glyph-not-centered:" + (button == null ? "missing" : button.name);
+                    failure = "cell-off-column:index=" + index + ";cell=" + left + ";native=" + lefts[index];
                     return false;
                 }
             }
             return true;
         }
 
-        private string GlyphEvidence(Button button)
+        // Each cell's glyph was engraved centred on its ink (HudCellArt)
+        // into both the idle and the hover art.
+        private bool ValidateGlyphCentering(out string failure)
         {
-            RectTransform hitbox = button == null ? null : button.transform as RectTransform;
-            RectTransform icon = button == null ? null : button.transform.Find("KBP.Icon") as RectTransform;
-            Image image = icon == null ? null : icon.GetComponent<Image>();
-            return icon == null || hitbox == null ? "missing" : "anchor=" + icon.anchorMin +
-                ",pivot=" + icon.pivot + ",position=" + icon.anchoredPosition +
-                ",size=" + icon.sizeDelta + ",scale=" + icon.localScale +
-                ",preserve=" + (image != null && image.preserveAspect) + ",rectCenterDelta=" +
-                Vector2.Distance(ScreenCenter(icon), ScreenCenter(hitbox)).ToString("F2") +
-                ",alphaCenterCorrection=" + HudGlyphLayout.OpticalOffset(
-                    image == null ? null : image.sprite, icon.rect.width);
+            failure = string.Empty;
+            for (int index = 0; index < _buttons.Length; index++)
+            {
+                Button button = _buttons[index];
+                Image face = button == null ? null : button.GetComponent<Image>();
+                Image highlight = button == null ? null : button.targetGraphic as Image;
+                if (face == null || face.sprite == null || highlight == null || highlight == face ||
+                    highlight.sprite == null || _cellArtEvidence[index] == null ||
+                    _inkOffsets[index].magnitude > 1f)
+                {
+                    failure = "glyph-not-centered:" + (button == null ? "missing" : button.name) +
+                        ";inkOffset=" + _inkOffsets[index];
+                    return false;
+                }
+            }
+            return true;
         }
 
         private Vector2 ScreenCenter(RectTransform rect)
@@ -956,12 +1112,14 @@ namespace KingmakerBuffPlanner.UI
                 _session.Model.Profile.Execution.Mode + " mode.";
         }
 
-        private Sprite CreateIcon(string kind)
+        // The owned glyph as a neutral alpha mask (64 x 64, white ink),
+        // engraved into the native cell art (HudCellArt): the idle art for
+        // "Normal", the hover art for "Hover". Composed once per native
+        // art and glyph.
+        private Sprite CreateIcon(string kind, Sprite nativeCell, string state, int index)
         {
             const int size = 64;
-            var texture = new Texture2D(size, size, TextureFormat.ARGB32, false);
-            texture.name = "KingmakerBuffPlanner." + kind + ".Icon";
-            texture.filterMode = FilterMode.Bilinear;
+            string cellName = "KingmakerBuffPlanner." + kind + ".Cell";
             Color clear = new Color(0, 0, 0, 0);
             Color ink = Color.white;
             Color[] pixels = Enumerable.Repeat(clear, size * size).ToArray();
@@ -1008,16 +1166,28 @@ namespace KingmakerBuffPlanner.UI
                             32 + (int)(Math.Sin(angle) * distance), 2);
                 }
             }
-            texture.SetPixels(pixels);
-            // The project-owned glyph is an alpha mask; the captured native icon material
-            // and tint provide every visible state color at runtime.
-            texture.Apply(false, false);
-            Sprite sprite = Sprite.Create(texture, new Rect(0, 0, size, size),
-                new Vector2(0.5f, 0.5f), 64f);
-            sprite.name = texture.name;
-            _ownedTextures.Add(texture);
-            _ownedSprites.Add(sprite);
-            return sprite;
+            if (nativeCell == null || nativeCell.texture == null)
+                throw new InvalidOperationException("native-cell-art-missing:" + state);
+            string key = nativeCell.GetInstanceID() + ":" + kind;
+            HudCellArtResult art;
+            if (!CellArtCache.TryGetValue(key, out art))
+            {
+                HudPixels native;
+                if (!NativeCellPixels.TryGetValue(nativeCell.GetInstanceID(), out native))
+                {
+                    native = NativeHudArt.Read(nativeCell);
+                    NativeCellPixels[nativeCell.GetInstanceID()] = native;
+                }
+                art = HudCellArt.Compose(native, pixels.Select(pixel => pixel.a).ToArray(), size);
+                CellArtCache[key] = art;
+            }
+            if (state == "Normal" && index >= 0 && index < _cellArtEvidence.Length)
+            {
+                _cellArtEvidence[index] = "native-composed:" + nativeCell.name + ";" + art.Evidence;
+                _inkOffsets[index] = new Vector2(art.InkOffsetX, art.InkOffsetY);
+            }
+            return NativeHudArt.CreateSprite(art.Pixels, cellName + "." + state, nativeCell.pixelsPerUnit,
+                _ownedTextures, _ownedSprites);
         }
 
         private static void DrawDisc(Action<int, int> set, int centerX, int centerY, int radius)
@@ -1074,8 +1244,10 @@ namespace KingmakerBuffPlanner.UI
             bool clickSoundActive,
             bool hoverSoundActive,
             Material iconMaterial,
-            Color iconColor)
+            Color iconColor,
+            Sprite baseSprite)
         {
+            BaseSprite = baseSprite;
             TargetSprite = targetSprite;
             TargetType = targetType;
             TargetMaterial = targetMaterial;
@@ -1102,7 +1274,12 @@ namespace KingmakerBuffPlanner.UI
         internal bool HoverSoundActive { get; private set; }
         internal Material IconMaterial { get; private set; }
         internal Color IconColor { get; private set; }
-        internal bool IsComplete { get { return TargetSprite != null; } }
+        // The native cell's idle art (the button's own image); IconMaterial
+        // and IconColor are that image's.
+        internal Sprite BaseSprite { get; private set; }
+        internal Material BaseMaterial { get { return IconMaterial; } }
+        internal Color BaseColor { get { return IconColor; } }
+        internal bool IsComplete { get { return TargetSprite != null && BaseSprite != null; } }
 
         internal string Evidence
         {
@@ -1126,7 +1303,8 @@ namespace KingmakerBuffPlanner.UI
                     ";clickSound=" + ClickSoundActive +
                     ";hoverSound=" + HoverSoundActive +
                     ";iconMaterial=" + (IconMaterial == null ? "default" : IconMaterial.name) +
-                    ";iconColor=" + ColorEvidence(IconColor);
+                    ";iconColor=" + ColorEvidence(IconColor) +
+                    ";baseSprite=" + (BaseSprite == null ? "missing" : BaseSprite.name);
             }
         }
 
@@ -1134,15 +1312,18 @@ namespace KingmakerBuffPlanner.UI
         {
             Image target = nativeButton == null ? null : nativeButton.targetGraphic as Image;
             if (target == null) return null;
-            Image icon = nativeButton.GetComponentsInChildren<Image>(true)
-                .Where(image => image != null && image != target && image.sprite != null)
-                .FirstOrDefault();
+            Image icon = nativeButton.GetComponent<Image>();
+            if (icon == target || icon == null || icon.sprite == null)
+                icon = nativeButton.GetComponentsInChildren<Image>(true)
+                    .Where(image => image != null && image != target && image.sprite != null)
+                    .FirstOrDefault();
             return new NativeHudButtonStyle(target.sprite, target.type, target.material,
                 target.color, nativeButton.transition, nativeButton.colors,
                 nativeButton.spriteState, nativeButton.navigation,
                 nativeButton.OnClickSoundActive, nativeButton.OnHoverSoundActive,
                 icon == null ? null : icon.material,
-                icon == null ? Color.white : icon.color);
+                icon == null ? Color.white : icon.color,
+                icon == null ? null : icon.sprite);
         }
 
         internal void Apply(ButtonPF ownedButton, Image ownedTarget)
@@ -1165,32 +1346,6 @@ namespace KingmakerBuffPlanner.UI
         {
             return color.r.ToString("0.000") + "," + color.g.ToString("0.000") + "," +
                 color.b.ToString("0.000") + "," + color.a.ToString("0.000");
-        }
-    }
-
-    internal static class HudGlyphLayout
-    {
-        internal static Vector2 OpticalOffset(Sprite sprite, float safeSize)
-        {
-            if (sprite == null || sprite.texture == null || safeSize <= 0f) return Vector2.zero;
-            Rect region = sprite.rect;
-            Texture2D texture = sprite.texture;
-            int minX = (int)region.xMax, minY = (int)region.yMax;
-            int maxX = (int)region.xMin - 1, maxY = (int)region.yMin - 1;
-            for (int y = (int)region.yMin; y < (int)region.yMax; y++)
-                for (int x = (int)region.xMin; x < (int)region.xMax; x++)
-                    if (texture.GetPixel(x, y).a > 0.05f)
-                    {
-                        minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
-                        minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
-                    }
-            if (maxX < minX || maxY < minY) return Vector2.zero;
-            float alphaCenterX = (minX + maxX + 1f) * 0.5f;
-            float alphaCenterY = (minY + maxY + 1f) * 0.5f;
-            float regionCenterX = region.xMin + region.width * 0.5f;
-            float regionCenterY = region.yMin + region.height * 0.5f;
-            return new Vector2(-(alphaCenterX - regionCenterX) / region.width * safeSize,
-                -(alphaCenterY - regionCenterY) / region.height * safeSize);
         }
     }
 

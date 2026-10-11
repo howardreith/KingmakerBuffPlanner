@@ -1945,9 +1945,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             ui.HudObjectEvidence.Contains("disabled=") &&
                             ui.HudObjectEvidence.Split(new[] { "nativeSkin=True" },
                                 StringSplitOptions.None).Length == 5 &&
-                            ui.HudObjectEvidence.Split(new[] { "spriteInk=1.000,1.000,1.000,1.000" },
-                                StringSplitOptions.None).Length == 5,
-                            "paths/ids/active/corners + captured native skin + four neutral alpha glyphs",
+                            // Native UI finish (UI-09): each cell is the native
+                            // cell art with its glyph engraved, inside the stepped
+                            // native enclosure (superseding neutral tinted glyphs).
+                            ui.HudObjectEvidence.Split(new[] { "cellArt=native-composed:" },
+                                StringSplitOptions.None).Length == 5 &&
+                            ui.HudObjectEvidence.Contains("frame=stepped-native;encloses=True;railUnderRow=hidden"),
+                            "paths/ids/active/corners + captured native skin + four native-composed cells in the stepped enclosure",
                             ui.HudObjectEvidence ?? "missing");
                         AddUiAssertion(result, "ui-text-native-pixel-path",
                             _liveRenderDiagnostics != null &&

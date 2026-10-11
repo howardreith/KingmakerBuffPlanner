@@ -552,7 +552,8 @@ function Assert-KbpRuntimeResult {
             ([regex]::Matches([string]$Result.uiHudObjectEvidence,
                 'nativeSkin=True')).Count -ne 4 -or
             ([regex]::Matches([string]$Result.uiHudObjectEvidence,
-                'spriteInk=1\.000,1\.000,1\.000,1\.000')).Count -ne 4 -or
+                'cellArt=native-composed:')).Count -ne 4 -or
+            -not ([string]$Result.uiHudObjectEvidence).Contains('frame=stepped-native;encloses=True;railUnderRow=hidden') -or
             -not ([string]$Result.uiHudObjectEvidence).Contains('style=targetSprite=True') -or
             -not ([string]$Result.uiHudObjectEvidence).Contains('highlighted=') -or
             -not ([string]$Result.uiHudObjectEvidence).Contains('pressed=') -or

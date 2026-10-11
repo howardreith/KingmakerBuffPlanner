@@ -625,6 +625,8 @@ $runtimeAutomationSource = Get-Content -LiteralPath (Join-Path $root 'scripts\Ru
 if ($runtimeAutomationSource.Contains('spriteInk=0\.961,0\.820,0\.420,1\.000') -or
     $runtimeAutomationSource.Contains('innerFrame=True') -or
     -not $runtimeAutomationSource.Contains('uiTooltipUsesNativeParchmentPresentation') -or
+    -not $runtimeAutomationSource.Contains('cellArt=native-composed:') -or
+    -not $runtimeHostSource.Contains('cellArt=native-composed:') -or
     -not $runtimeAutomationSource.Contains('uiSetupOpenSoundCount')) {
     throw 'Runtime evidence validation must not retain the retired dark/gold HUD criteria.'
 }

@@ -20,6 +20,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("native-window-takes-over-from-the-planner", TestNativeWindowTakeover);
             Run("native-ui-planner-copy", TestNativeUiPlannerCopy);
             Run("native-ui-game-log-lines", TestNativeUiGameLogLines);
+            Run("native-hud-stepped-enclosure-geometry", TestHudStepGeometry);
+            Run("native-hud-cell-art-composition", TestHudCellArt);
         }
 
         // The no-input native UI scenario is a workspace scenario on the
@@ -236,6 +238,93 @@ namespace KingmakerBuffPlanner.Tests
             if (!refusal.Contains("if (_castingWorkspace != null) return;") ||
                 !WithoutComments(uiRoot).Contains("WriteGameLog(CastingRunPresentation.GameLogLine(report, name),"))
                 throw new InvalidOperationException("Run results do not reach the game log as one line.");
+        }
+
+        // UI-09 (R12): from the live native metrics (kbpnui-facts-03: columns
+        // at 2/51/100/149/198/247, 48-unit cells, rows at 2.2 and 51.2, the
+        // frame's top at 116.8, TBM_backButton 668 x 252 at 0.5 units per
+        // pixel, slice borders 196/253, frame 363.89 wide) the four cells
+        // stand one native gap above the first four columns, the native top
+        // border rises one row over them, the step's rail stands after the
+        // fourth column, and the native rail it meets is redrawn from the
+        // exact texture columns the native tiled frame shows there.
+        private static void TestHudStepGeometry()
+        {
+            float[] lefts = { 2f, 51f, 100f, 149f, 198f, 247f };
+            HudStepLayout step = HudStepLayout.Compute(lefts, 48f, 48f, 51.2f, 49f, 116.8f, 0.5f);
+            Func<float, float, bool> near = (a, b) => Math.Abs(a - b) < 0.06f;
+            for (int index = 0; index < 4; index++)
+                if (!near(step.Cells[index].X, lefts[index]) || !near(step.Cells[index].Y, 100.2f) ||
+                    !near(step.Cells[index].Width, 48f) || !near(step.Cells[index].Height, 48f))
+                    throw new InvalidOperationException("Cell " + index + " is at " + step.Cells[index]);
+            if (step.StripRowsPx != 133 || !near(step.RaisedTop, 165.7f) ||
+                !near(step.Strip.X, 0f) || !near(step.Strip.Y, 99.2f) || !near(step.Strip.Right, 155f) ||
+                !near(step.Corner.X, 155f) || !near(step.Corner.Right, 215f) ||
+                !near(step.Junction.X, 198f) || !near(step.Junction.Y, 99.8f) || !near(step.Junction.Top, 113.8f))
+                throw new InvalidOperationException("The enclosure is wrong: strip " + step.Strip + ", corner " +
+                    step.Corner + ", junction " + step.Junction + ", top " + step.RaisedTop);
+            if (step.Violation(lefts, 48f, 51.2f) != null)
+                throw new InvalidOperationException("The enclosure violates R12: " + step.Violation(lefts, 48f, 51.2f));
+            string pieces = string.Join(" ", step.FramePieces(668, 252, 363.89f, 196, 253).Select(piece =>
+                piece.Name + ":" + piece.SourceX + "," + piece.SourceY + "," + piece.SourceWidth + "x" +
+                piece.SourceHeight + "@" + piece.Target).ToArray());
+            const string expected = "Strip:0,119,310x133@0.0,99.2,155.0x66.5 Corner:548,119,120x133@155.0,99.2,60.0x66.5 " +
+                "Junction:396,218,19x28@198.0,99.8,9.5x14.0 Junction:196,218,32x28@207.5,99.8,16.0x14.0";
+            if (pieces != expected) throw new InvalidOperationException("Frame pieces: " + pieces);
+            // A row off its native columns, or a frame over the native
+            // row, is refused.
+            float[] shifted = lefts.Select(value => value + 6f).ToArray();
+            if (step.Violation(shifted, 48f, 51.2f) != "cell-column:0" ||
+                step.Violation(lefts, 48f, 60f) == null)
+                throw new InvalidOperationException("An off-grid enclosure was accepted.");
+            bool refused = false;
+            try { HudStepLayout.Compute(lefts.Take(4).ToArray(), 48f, 48f, 51.2f, 49f, 116.8f, 0.5f); }
+            catch (ArgumentException) { refused = true; }
+            if (!refused) throw new InvalidOperationException("Four native columns were enough to step after.");
+        }
+
+        // UI-09: a cell drawn from native cell art keeps the native frame and
+        // alpha pixel for pixel, lifts the native icon out to plain stone,
+        // engraves the owned glyph centred on its ink in the native icon's
+        // own gold, and refuses art with no engraved icon to match.
+        private static void TestHudCellArt()
+        {
+            const int side = 60;
+            var rgba = new byte[side * side * 4];
+            for (int y = 0; y < side; y++)
+                for (int x = 0; x < side; x++)
+                {
+                    bool frame = x < 6 || y < 6 || x >= side - 6 || y >= side - 6;
+                    bool icon = (x - 30) * (x - 30) + (y - 30) * (y - 30) <= 64;
+                    byte[] color = frame ? new byte[] { 100, 95, 60 } : icon ? new byte[] { 170, 160, 100 }
+                        : new byte[] { 25, 25, 25 };
+                    int i = (y * side + x) * 4;
+                    rgba[i] = color[0]; rgba[i + 1] = color[1]; rgba[i + 2] = color[2];
+                    rgba[i + 3] = (byte)(x == 0 && y == 0 ? 0 : 255);
+                }
+            var mask = new float[64 * 64];
+            for (int y = 10; y <= 13; y++)
+                for (int x = 5; x <= 44; x++) mask[y * 64 + x] = 1f;
+            HudCellArtResult art = HudCellArt.Compose(new HudPixels(side, side, rgba), mask, 64);
+            Func<int, int, int[]> at = (x, y) => Enumerable.Range(0, 4)
+                .Select(channel => (int)art.Pixels.Rgba[(y * side + x) * 4 + channel]).ToArray();
+            if (!at(2, 30).SequenceEqual(new[] { 100, 95, 60, 255 }) || at(0, 0)[3] != 0 ||
+                !at(57, 57).SequenceEqual(new[] { 100, 95, 60, 255 }))
+                throw new InvalidOperationException("The native frame or alpha changed.");
+            if (at(30, 37).Take(3).Any(value => Math.Abs(value - 25) > 2))
+                throw new InvalidOperationException("The native icon was not lifted: " + string.Join(",", at(30, 37)));
+            if (!at(30, 30).Take(3).SequenceEqual(new[] { 170, 160, 100 }))
+                throw new InvalidOperationException("The glyph is not the native gold: " + string.Join(",", at(30, 30)));
+            if (Math.Abs(art.InkOffsetX) > 0.5f || Math.Abs(art.InkOffsetY) > 0.5f ||
+                !art.Evidence.Contains("ink=38x4"))
+                throw new InvalidOperationException("The glyph is not centred on its ink: " + art.Evidence);
+            var blank = (byte[])rgba.Clone();
+            for (int i = 0; i < side * side; i++)
+                if (blank[i * 4] == 170) { blank[i * 4] = 25; blank[i * 4 + 1] = 25; blank[i * 4 + 2] = 25; }
+            bool refused = false;
+            try { HudCellArt.Compose(new HudPixels(side, side, blank), mask, 64); }
+            catch (InvalidOperationException) { refused = true; }
+            if (!refused) throw new InvalidOperationException("Art with no native icon was accepted.");
         }
 
         // (actual, expected) pairs; actual values may repeat.
