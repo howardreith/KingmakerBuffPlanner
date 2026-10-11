@@ -133,6 +133,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     foreach (string file in NativeUiFacts.Previews(NativeUiFacts.Sprites(cluster),
                             _request.EvidenceDirectory, 48, _nativeUi.Notes))
                         _nativeUi.AddNote("preview:" + file);
+                    WriteNamedPreviews();
                     RecordHudGeometry(hud);
                     NativeUiCapture("nui-hud.png");
                     hud.BeginRuntimePhysicalObservation();
@@ -621,10 +622,44 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return unit == null ? "null" : unit.CharacterName + "#" + unit.Descriptor.Spellbooks.Count();
         }
 
+        // The service window's own character switch (its party portraits);
+        // the world selection follows it.
         private static void SelectUnit(UnitEntityData unit)
         {
-            if (unit == null || unit.View == null || SelectionManager.Instance == null) return;
-            SelectionManager.Instance.SelectUnit(unit.View, true, true, false);
+            if (unit == null) return;
+            Kingmaker.UI.Group.GroupController group = Kingmaker.UI.Group.GroupController.Instance;
+            if (group != null) group.SelectUnit(unit);
+            else if (unit.View != null && SelectionManager.Instance != null)
+                SelectionManager.Instance.SelectUnit(unit.View, true, true, false);
+        }
+
+        // Native sprites the planner borrows or matches, previewed by name
+        // wherever the campaign canvas holds them (bounded).
+        internal static readonly string[] NativeUiPreviewNames =
+        {
+            "spellbook_frame", "spellbook_frame_back", "spellbook_frame_back2", "map_mask_frame",
+            "spellbook_metamagic_decor_2", "button_normal", "button_hover", "button_pressed",
+            "main_menu_back", "spellbook_esc", "Inventory_Filter_Icon_Background_Normal",
+            "Inventory_Filter_Icon_Background_Selected", "dialogue_backsheet", "back_blockscroll",
+            "back_blockscroll_simple", "class_blockframe__no_left_border", "camp_frameportrait",
+            "camp_frameportrait_selected", "Separator_left", "Separator_middle", "Separator_right",
+            "border_line", "blockscroll_bottom", "CheckMark", "Checkmark", "SliderArea",
+            "ScrollBar_Big_Handler", "save_framemini", "Portrait_Frame", "Group_Char_Frame_Normal_Simple",
+            "blockframe", "Stat_Line", "Log_Decor_01"
+        };
+
+        private void WriteNamedPreviews()
+        {
+            var sprites = new Dictionary<string, Sprite>(StringComparer.Ordinal);
+            foreach (Image image in StaticCanvas.Instance.GetComponentsInChildren<Image>(true))
+                if (image != null && image.sprite != null && !sprites.ContainsKey(image.sprite.name) &&
+                        Array.IndexOf(NativeUiPreviewNames, image.sprite.name) >= 0)
+                    sprites[image.sprite.name] = image.sprite;
+            foreach (string missing in NativeUiPreviewNames.Where(name => !sprites.ContainsKey(name)))
+                _nativeUi.AddNote("preview-absent:" + missing);
+            foreach (string file in NativeUiFacts.Previews(sprites.Values, _request.EvidenceDirectory,
+                    NativeUiPreviewNames.Length, _nativeUi.Notes))
+                _nativeUi.AddNote("preview:" + file);
         }
 
         private static Transform SpellbookWindow()
@@ -682,7 +717,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (spellbook == null) { _nativeUi.Failures.Add("spellbook-window-missing"); return; }
             TooltipTrigger trigger = FirstSpellTrigger();
             SpellItemBase item = trigger == null ? null : trigger.GetComponentInParent<SpellItemBase>();
-            Transform itemRow = item == null ? null : item.transform.parent;
+            Transform itemRow = item == null ? null : item.transform;
+            _nativeUi.AddNote("spell-row:" + (itemRow == null ? "none" : NativeUiFacts.HierarchyPath(itemRow)));
             var facts = new JObject
             {
                 { "footer", NativeUiFacts.Subtree(spellbook.Find("Container_Book/MetamagicButtonPlace"), "MetamagicButtonPlace") },
@@ -699,13 +735,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _nativeUi.AddNote("preview:" + file);
         }
 
+        // A spell row of the open book page (never the metamagic mixer's or
+        // memorizing panel's slots).
         private static TooltipTrigger FirstSpellTrigger()
         {
             Transform spellbook = SpellbookWindow();
-            if (spellbook == null) return null;
-            return spellbook.GetComponentsInChildren<TooltipTrigger>(false)
+            Transform book = spellbook == null ? null : spellbook.Find("Container_Book/Book");
+            if (book == null) return null;
+            return book.GetComponentsInChildren<TooltipTrigger>(false)
                 .FirstOrDefault(trigger => trigger != null && trigger.isActiveAndEnabled &&
-                    trigger.GetComponentInParent<SpellItemBase>() != null);
+                    trigger.GetComponentInParent<SpellItem>() != null);
         }
 
         private static DescriptionWindow NativeDescriptionWindow()
