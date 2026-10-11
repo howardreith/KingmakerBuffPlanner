@@ -706,9 +706,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             NativeUiCapture(record.Capture);
             _nativeUi.Spellbooks.Add(record);
             // The retired entry sat at the service window's top right, above
-            // the top bar; the footer pair sits in the book's footer.
-            _nativeUi.SpellbookTopRightEntryAbsent = owned == null || place == null ||
-                owned.transform.IsChildOf(place) || owned.transform.parent == place.parent;
+            // the top bar; the footer pair's planner button lives in its own
+            // footer place on the spellbook.
+            _nativeUi.SpellbookTopRightEntryAbsent = owned == null || (owned.transform.parent != null &&
+                owned.transform.parent.name == BuffPlannerSpellbookEntryController.FooterPlaceName &&
+                owned.transform.parent.parent == spellbook);
         }
 
         private void WriteSpellbookFacts()

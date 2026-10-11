@@ -16,8 +16,8 @@ namespace KingmakerBuffPlanner.Tests
         {
             Run("spellbook-entry-native-close-is-the-service-window-top-close",
                 TestSpellbookNativeCloseResolution);
-            Run("spellbook-entry-placement-never-sits-under-the-native-close",
-                TestSpellbookEntryPlacement);
+            Run("spellbook-entry-pairs-with-metamagic-in-the-footer",
+                TestSpellbookFooterPair);
             Run("spellbook-entry-handoff-admission-and-recovery", TestSpellbookHandoffAdmission);
         }
 
@@ -85,50 +85,47 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("The scan path lost the exact native close.");
         }
 
-        private static void TestSpellbookEntryPlacement()
+        // Native UI finish (UI-10), superseding the top-right placement: the
+        // planner button pairs with METAMAGIC in the book's footer. From the
+        // native place (290.28 x 40 at x 629.34, plate 17 units past each
+        // side, footer paper about x 410-885): two native-height buttons of
+        // one width, METAMAGIC left, BUFF PLANNER right, a small gap, the
+        // shared plate widened over both and inside the paper. Without
+        // Metamagic the planner keeps its place and Metamagic is untouched.
+        private static void TestSpellbookFooterPair()
         {
-            // Service window local space at 1920x1080, pivot centred (y up).
-            var window = new PlacementRect(-960f, -540f, 960f, 540f);
-            var close = new PlacementRect(960f - 143f, 540f - 137f, 960f, 540f);
-            const float width = 170f, height = 36f;
-
-            // The legacy placement: 20/18 units inside the top-right corner.
-            var legacy = new PlacementRect(960f - 20f - width, 540f - 18f - height,
-                960f - 20f, 540f - 18f);
-            if (!legacy.Overlaps(close, 0f))
-                throw new InvalidOperationException("Fixture does not reproduce the legacy overlap.");
-
-            // Tabs centred in the top bar leave room left of the close button.
-            var tabs = new List<PlacementRect>();
-            for (int index = 0; index < 6; index++)
-                tabs.Add(new PlacementRect(-330f + index * 110f, 540f - 68f,
-                    -230f + index * 110f, 540f));
-            SpellbookEntryPlacementResult chosen = SpellbookEntryPlacement.Choose(
-                window, close, tabs, width, height);
-            if (!chosen.ConflictFree || chosen.Candidate != "left-of-native-close" ||
-                chosen.Rect.Overlaps(close, SpellbookEntryPlacement.ControlMargin) ||
-                tabs.Any(tab => chosen.Rect.Overlaps(tab, SpellbookEntryPlacement.ControlMargin)) ||
-                !chosen.Rect.Inside(window))
-                throw new InvalidOperationException("Top-bar placement was not conflict free: " +
-                    chosen.Candidate + " " + chosen.Rect);
-
-            // A native control in that spot moves the button below the close.
-            var crowded = new List<PlacementRect>(tabs) {
-                new PlacementRect(600f, 470f, 800f, 540f) };
-            SpellbookEntryPlacementResult below = SpellbookEntryPlacement.Choose(
-                window, close, crowded, width, height);
-            if (!below.ConflictFree || below.Candidate != "below-native-close" ||
-                below.Rect.YMax > close.YMin)
-                throw new InvalidOperationException("Crowded top bar did not fall back below Close.");
-
-            // Every candidate blocked: report the conflict and still never
-            // cover the native close.
-            var everywhere = new List<PlacementRect> { window };
-            SpellbookEntryPlacementResult blocked = SpellbookEntryPlacement.Choose(
-                window, close, everywhere, width, height);
-            if (blocked.ConflictFree || blocked.Conflict.Length == 0 ||
-                blocked.Rect.Overlaps(close, 0f))
-                throw new InvalidOperationException("Universal conflict was not reported honestly.");
+            const float nativeCentre = 629.34f, nativeWidth = 290.28f, plate = 17f;
+            SpellbookFooterLayout paired = SpellbookFooterLayout.Compute(nativeCentre, nativeWidth, true);
+            float metamagicLeft = paired.MetamagicCentre - paired.MetamagicWidth / 2f;
+            float metamagicRight = paired.MetamagicCentre + paired.MetamagicWidth / 2f;
+            float plannerLeft = paired.PlannerCentre - paired.PlannerWidth / 2f;
+            float plannerRight = paired.PlannerCentre + paired.PlannerWidth / 2f;
+            float gap = plannerLeft - metamagicRight;
+            float plateLeft = metamagicLeft - plate;
+            float plateRight = metamagicRight + plate + paired.PlateExtension;
+            if (!paired.Paired || paired.MetamagicWidth != paired.PlannerWidth || paired.PlannerWidth < 200f ||
+                gap < 0f || gap > 40f || Math.Abs(plateRight - (plannerRight + plate)) > 0.01f ||
+                plateLeft < 410f || plateRight > 885f)
+                throw new InvalidOperationException("The footer pair is wrong: " + paired.Describe() +
+                    ";gap=" + gap + ";plate=" + plateLeft + "-" + plateRight);
+            SpellbookFooterLayout alone = SpellbookFooterLayout.Compute(nativeCentre, nativeWidth, false);
+            if (alone.Paired || alone.MetamagicCentre != nativeCentre || alone.MetamagicWidth != nativeWidth ||
+                alone.PlateExtension != 0f || alone.PlannerCentre != paired.PlannerCentre ||
+                alone.PlannerWidth != paired.PlannerWidth)
+                throw new InvalidOperationException("Without Metamagic the footer is wrong: " + alone.Describe());
+            bool refused = false;
+            try { SpellbookFooterLayout.Compute(nativeCentre, 0f, true); }
+            catch (ArgumentException) { refused = true; }
+            if (!refused) throw new InvalidOperationException("A footer without a native place was laid out.");
+            // The production entry is the footer pair built from the native
+            // Metamagic button, restored on detach; the retired top-right
+            // placement is gone.
+            string source = ProductionSource("UI", "BuffPlannerSpellbookEntryController.cs");
+            if (!source.Contains("SpellbookFooterLayout.Compute(") || !source.Contains("_nativeFooter.Restore()") ||
+                !source.Contains("button.spriteState = footer.Apply.spriteState;") ||
+                !source.Contains("label.fontSharedMaterial = native.fontSharedMaterial;") ||
+                source.Contains("SpellbookEntryPlacement") || source.Contains("KingmakerUiFactory.CreateButton("))
+                throw new InvalidOperationException("The spellbook entry is not the native footer pair.");
         }
 
         private static void TestSpellbookHandoffAdmission()

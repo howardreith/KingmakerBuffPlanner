@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using Kingmaker;
 using Kingmaker.GameModes;
 using Kingmaker.UI;
+using Kingmaker.UI.Constructor;
 using Kingmaker.UI.ServiceWindow;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -12,20 +14,26 @@ namespace KingmakerBuffPlanner.UI
     // Owned Buff Planner button on the native spellbook tab, plus the guarded
     // handoff into the planner. The button is created and destroyed only by
     // this controller, never joins the native layout, and never touches
-    // native listeners. Discovery is a bounded exact-path/tolerant-scan
+    // native listeners; the only native state it changes is the Metamagic
+    // footer's geometry, put back exactly. Discovery is a bounded exact-path/tolerant-scan
     // lookup on a fixed cadence — no per-frame global hierarchy search.
     //
     // WP2B repair (the button did not open the planner):
     // - The button was pinned 20/18 units inside the spellbook's top-right
     //   corner, which is exactly where the service window's 143x137 top-bar
-    //   Close button sits; it now lives on the service window root as its
-    //   last child (above the top bar) and is placed by
-    //   SpellbookEntryPlacement against the live native controls.
+    //   Close button sits (superseded by the footer pair below).
     // - The close affordance was searched by name inside the spellbook,
     //   which holds no button named "Close"; the handoff therefore always
     //   refused. It is now the exact ServiceWindow/Top/Close button.
     // - Every handoff closes the native window first and waits until both
     //   the FullScreenUi mode and the window itself have released.
+    //
+    // Native UI finish (UI-10): the entry is BUFF PLANNER beside METAMAGIC
+    // in the book's footer (SpellbookFooterLayout), built from the native
+    // Metamagic button's own art, states, sounds and caption style; the
+    // top-right entry is gone. The native Metamagic place is narrowed and
+    // its plate widened over both while the planner button is attached, and
+    // restored exactly when it detaches.
     internal sealed class BuffPlannerSpellbookEntryController
     {
         internal const string ButtonName = "BuffPlannerSpellbookButton";
@@ -34,8 +42,8 @@ namespace KingmakerBuffPlanner.UI
         // The service window's tabs and top bar lay out after activation; the
         // placement is checked once more after this many frames.
         private const int PlacementSettleFrames = 30;
-        private const float ButtonDesignWidth = 170f;
-        private const float ButtonDesignHeight = 36f;
+        internal const string FooterPlaceName = "BuffPlannerButtonPlace";
+        internal const string NativeFooterPath = "Container_Book/MetamagicButtonPlace";
 
         private readonly Action<string> _log;
         private readonly Func<bool> _openPlanner;
@@ -44,8 +52,6 @@ namespace KingmakerBuffPlanner.UI
         private readonly Action<SpellbookHandoffRecovery, string> _recover;
         private readonly SpellbookHandoffStateMachine _handoff =
             new SpellbookHandoffStateMachine();
-        private PlannerUiTheme _theme;
-        private int _themeCanvasInstanceId;
         private int _tickSkip;
         private int _spellbookInstanceId;
         private string _spellbookLocator;
@@ -57,6 +63,9 @@ namespace KingmakerBuffPlanner.UI
         private UIWindow _handoffWindow;
         private Button _nativeClose;
         private Button _ownedButton;
+        private RectTransform _ownedPlace;
+        private Image _ownedPlate;
+        private NativeFooter _nativeFooter;
         private bool _handoffActive;
         private int _placementSettle;
         private string _unavailableReason;
@@ -74,7 +83,6 @@ namespace KingmakerBuffPlanner.UI
             // readiness, so "is open" alone is not success.
             _plannerPresentationReady = plannerPresentationReady ?? plannerOpen;
             _recover = recover ?? delegate { };
-            _theme = theme ?? PlannerUiTheme.Resolve(null);
         }
 
         internal SpellbookHandoffState HandoffState { get { return _handoff.State; } }
@@ -112,9 +120,12 @@ namespace KingmakerBuffPlanner.UI
             if (_ownedButton != null && (_spellbook == null ||
                     !_spellbook.gameObject.activeInHierarchy))
                 ForgetWindow();
-            if (_ownedButton != null && _placementSettle > 0 && --_placementSettle == 0)
+            // Every frame (a few comparisons): Metamagic shows or hides with
+            // the character, and the native window may lay its footer out
+            // again; the pair follows at once.
+            if (_ownedButton != null)
             {
-                try { PlaceOwnedButton("settled"); }
+                try { PlaceOwnedButton(_placementSettle > 0 && --_placementSettle == 0 ? "settled" : null); }
                 catch (Exception exception)
                 {
                     _log("[KBP-SPELLBOOK] placement failed: " + exception.Message);
@@ -232,139 +243,153 @@ namespace KingmakerBuffPlanner.UI
             _serviceWindow = serviceWindow;
             _serviceTabs = serviceWindow.GetComponent<UIWindow>();
             _nativeClose = nativeClose;
-            AttachOwnedButton(canvas);
+            AttachOwnedButton();
         }
 
-        private void AttachOwnedButton(StaticCanvas canvas)
+        private void AttachOwnedButton()
         {
-            if (_serviceWindow == null || _ownedButton != null) return;
-            ResolveThemeForCanvas(canvas);
+            if (_serviceWindow == null || _spellbook == null || _ownedButton != null) return;
             RetireStrays(_serviceWindow);
             RetireStrays(_spellbook);
-            _ownedButton = KingmakerUiFactory.CreateButton(ButtonName, _serviceWindow, _theme,
-                "BUFF PLANNER", BeginHandoff);
-            ButtonsAttachedForRuntime++;
-            // Last child of the service window: drawn and raycast above the
-            // native top bar and the spellbook page.
-            _ownedButton.transform.SetAsLastSibling();
-            // Out-of-layout, like the HUD row: a planner-owned control must
-            // never participate in native layout or the native layout will
-            // re-anchor it.
-            LayoutElement layout = _ownedButton.gameObject.AddComponent<LayoutElement>();
-            layout.ignoreLayout = true;
-            RectTransform buttonRect = (RectTransform)_ownedButton.transform;
-            // Explicit design size: percentage anchors of the native window
-            // produced a sliver-sized, caption-clipped control in RC1.
-            buttonRect.anchorMin = new Vector2(1f, 1f);
-            buttonRect.anchorMax = new Vector2(1f, 1f);
-            buttonRect.pivot = new Vector2(1f, 1f);
-            buttonRect.sizeDelta = new Vector2(ButtonDesignWidth, ButtonDesignHeight);
-            Text label = _ownedButton.GetComponentInChildren<Text>(true);
-            if (label != null)
+            NativeFooter footer = NativeFooter.Find(_spellbook);
+            if (footer == null)
             {
-                label.fontSize = 14;
-                label.resizeTextForBestFit = true;
-                label.resizeTextMinSize = 11;
-                label.resizeTextMaxSize = 14;
+                const string missing = "native-footer-missing:" + NativeFooterPath;
+                if (!string.Equals(missing, _unavailableReason, StringComparison.Ordinal))
+                    _log("[KBP-SPELLBOOK] entry unavailable;reason=" + missing + ".");
+                _unavailableReason = missing;
+                return;
             }
+            _nativeFooter = footer;
+            // The planner's place: the native Metamagic place's construction
+            // on the spellbook root (shown for every character, whether or
+            // not the book's footer is), drawn above the book.
+            _ownedPlace = KingmakerUiFactory.CreateRect(FooterPlaceName, _spellbook);
+            _ownedPlace.anchorMin = new Vector2(0.5f, 0.5f);
+            _ownedPlace.anchorMax = new Vector2(0.5f, 0.5f);
+            _ownedPlace.pivot = new Vector2(0.5f, 0.5f);
+            _ownedPlace.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            RectTransform plateRect = KingmakerUiFactory.CreateRect("ButtonPlace", _ownedPlace);
+            plateRect.anchorMin = footer.Plate.rectTransform.anchorMin;
+            plateRect.anchorMax = footer.Plate.rectTransform.anchorMax;
+            plateRect.offsetMin = footer.PlateOffsetMin;
+            plateRect.offsetMax = footer.PlateOffsetMax;
+            _ownedPlate = plateRect.gameObject.AddComponent<Image>();
+            CopyImage(footer.Plate, _ownedPlate);
+            RectTransform buttonRect = KingmakerUiFactory.CreateRect(ButtonName, _ownedPlace);
+            KingmakerUiFactory.Stretch(buttonRect, 0, 0, 0, 0);
+            Image face = buttonRect.gameObject.AddComponent<Image>();
+            CopyImage(footer.Apply.image, face);
+            ButtonPF button = buttonRect.gameObject.AddComponent<ButtonPF>();
+            button.targetGraphic = face;
+            button.transition = footer.Apply.transition;
+            button.spriteState = footer.Apply.spriteState;
+            button.colors = footer.Apply.colors;
+            button.navigation = footer.Apply.navigation;
+            var nativeButton = footer.Apply as ButtonPF;
+            if (nativeButton != null)
+            {
+                button.OnClickSoundActive = nativeButton.OnClickSoundActive;
+                button.OnHoverSoundActive = nativeButton.OnHoverSoundActive;
+            }
+            button.onClick.AddListener(BeginHandoff);
+            CreateCaption(buttonRect, footer.Label, "Buff Planner");
+            _ownedButton = button;
             _ownedButton.interactable = true;
-            // Complete native button states (normal/hover/pressed/disabled),
-            // not just a borrowed normal sprite: borrow through the same
-            // validated donor contract the planner surface uses. Fail-soft —
-            // the readable factory styling stays when donors are absent.
-            try
-            {
-                PlannerNativeTheme nativeTheme = PlannerNativeTheme.Resolve(canvas);
-                NativeThemeResource buttonDonor = nativeTheme.Resources.Get(
-                    NativeThemeCapability.Buttons);
-                if (buttonDonor != null)
-                    PlannerNativeTheme.ApplyButton((Button)buttonDonor.Components[0],
-                        _ownedButton);
-                NativeThemeResource bodyDonor = nativeTheme.Resources.Get(
-                    NativeThemeCapability.Body);
-                if (bodyDonor != null)
-                    foreach (Text buttonText in _ownedButton.GetComponentsInChildren<Text>(true))
-                        PlannerNativeTheme.ApplyText((Text)bodyDonor.Components[0], buttonText);
-                _log("[KBP-SPELLBOOK] native button states applied;summary=" +
-                    nativeTheme.Resources.Summary + ".");
-            }
-            catch (Exception exception)
-            {
-                _log("[KBP-SPELLBOOK] native button states unavailable;reason=" +
-                    exception.Message + ".");
-            }
-            Canvas.ForceUpdateCanvases();
-            KingmakerUiFactory.FitButtonToCaption(buttonRect, ButtonDesignWidth,
-                ButtonDesignHeight);
+            ButtonsAttachedForRuntime++;
+            // Above the book, below anything the spellbook opens over it.
+            Transform book = footer.Place.parent;
+            if (book != null && book.parent == _spellbook) _ownedPlace.SetSiblingIndex(book.GetSiblingIndex() + 1);
+            else _ownedPlace.SetAsLastSibling();
             PlaceOwnedButton("attached");
             _placementSettle = PlacementSettleFrames;
             _log("[KBP-SPELLBOOK] owned button attached;window=" + _spellbookInstanceId +
-                ";locator=" + _spellbookLocator +
-                ";parent=service-window-root;close=" + SpellbookWindowLocator.NativeClosePath +
-                ";theme=" + (_theme == null ? "missing" : _theme.ResolutionSummary) +
+                ";locator=" + _spellbookLocator + ";parent=spellbook-footer;close=" +
+                SpellbookWindowLocator.NativeClosePath + ";native=" + footer.Evidence +
                 ";screen=" + Screen.width + "x" + Screen.height + ".");
         }
 
-        // Ordered candidates against every active native control of the
-        // service window, in the service window's own local space.
+        // The pair in the footer: the native Metamagic place narrowed (or
+        // restored when Metamagic is hidden), the planner place beside it in
+        // the book container's own space, the shared native plate widened
+        // over both or the planner's own plate shown alone.
         private void PlaceOwnedButton(string stage)
         {
-            if (_ownedButton == null || _nativeClose == null) return;
-            var root = _serviceWindow as RectTransform;
-            var close = _nativeClose.transform as RectTransform;
-            var buttonRect = (RectTransform)_ownedButton.transform;
-            if (root == null || close == null) return;
-            Rect bounds = root.rect;
-            var window = new PlacementRect(bounds.xMin, bounds.yMin, bounds.xMax, bounds.yMax);
-            var controls = new List<PlacementRect>();
-            foreach (Selectable selectable in _serviceWindow.GetComponentsInChildren<Selectable>(false))
+            if (_ownedButton == null || _ownedPlace == null || _nativeFooter == null) return;
+            if (!_nativeFooter.Alive)
             {
-                if (selectable == null || selectable == _nativeClose || !selectable.IsActive())
-                    continue;
-                if (selectable.transform.IsChildOf(_ownedButton.transform)) continue;
-                var target = selectable.transform as RectTransform;
-                if (target != null) controls.Add(LocalRect(root, target));
+                _nativeFooter = null;
+                return;
             }
-            SpellbookEntryPlacementResult placement = SpellbookEntryPlacement.Choose(window,
-                LocalRect(root, close), controls, buttonRect.rect.width, buttonRect.rect.height);
-            buttonRect.anchoredPosition = new Vector2(placement.Rect.XMax - window.XMax,
-                placement.Rect.YMax - window.YMax);
-            string summary = placement.Candidate + ";rect=" + placement.Rect +
-                ";conflictFree=" + placement.ConflictFree +
-                (placement.ConflictFree ? string.Empty : ";conflict=" + placement.Conflict);
-            if (!string.Equals(summary, PlacementForRuntime, StringComparison.Ordinal))
-                _log("[KBP-SPELLBOOK] placement " + stage + ";candidate=" + summary +
-                    ";controls=" + controls.Count + ".");
+            bool metamagicShown = _nativeFooter.Apply.gameObject.activeInHierarchy;
+            SpellbookFooterLayout layout = SpellbookFooterLayout.Compute(_nativeFooter.OriginalCentre.x,
+                _nativeFooter.OriginalSize.x, metamagicShown);
+            if (metamagicShown) _nativeFooter.Pair(layout);
+            else _nativeFooter.Restore();
+            _ownedPlate.enabled = !metamagicShown;
+            Transform book = _nativeFooter.Place.parent;
+            Vector3 centre = book.TransformPoint(new Vector3(layout.PlannerCentre, _nativeFooter.OriginalCentre.y,
+                _nativeFooter.OriginalCentre.z));
+            Vector3 scale = book.lossyScale;
+            Vector3 parentScale = _spellbook.lossyScale;
+            _ownedPlace.localScale = new Vector3(SafeRatio(scale.x, parentScale.x), SafeRatio(scale.y, parentScale.y), 1f);
+            _ownedPlace.sizeDelta = new Vector2(layout.PlannerWidth, _nativeFooter.OriginalSize.y);
+            _ownedPlace.position = centre;
+            string summary = "footer-pair;" + layout.Describe();
+            if (stage != null && !string.Equals(summary, PlacementForRuntime, StringComparison.Ordinal))
+                _log("[KBP-SPELLBOOK] placement " + stage + ";candidate=" + summary + ".");
+            else if (!string.Equals(summary, PlacementForRuntime, StringComparison.Ordinal))
+                _log("[KBP-SPELLBOOK] placement changed;candidate=" + summary + ".");
             PlacementForRuntime = summary;
         }
 
-        private static PlacementRect LocalRect(RectTransform root, RectTransform target)
+        private static float SafeRatio(float value, float parent)
         {
-            var corners = new Vector3[4];
-            target.GetWorldCorners(corners);
-            float xMin = float.MaxValue, yMin = float.MaxValue;
-            float xMax = float.MinValue, yMax = float.MinValue;
-            foreach (Vector3 corner in corners)
-            {
-                Vector3 local = root.InverseTransformPoint(corner);
-                xMin = Math.Min(xMin, local.x);
-                yMin = Math.Min(yMin, local.y);
-                xMax = Math.Max(xMax, local.x);
-                yMax = Math.Max(yMax, local.y);
-            }
-            return new PlacementRect(xMin, yMin, xMax, yMax);
+            return Mathf.Abs(parent) < 0.0001f ? 1f : value / parent;
         }
 
-        // The boot-time theme resolves with no campaign canvas and therefore
-        // no native artwork; the button re-resolves against the live
-        // StaticCanvas so it borrows the native button sprite family.
-        private void ResolveThemeForCanvas(StaticCanvas canvas)
+        private static void CopyImage(Image native, Image owned)
         {
-            int canvasId = canvas == null || canvas.transform == null
-                ? 0 : canvas.transform.GetInstanceID();
-            if (_themeCanvasInstanceId == canvasId && _theme != null) return;
-            _theme = PlannerUiTheme.Resolve(canvas);
-            _themeCanvasInstanceId = canvasId;
+            owned.sprite = native.sprite;
+            owned.type = native.type;
+            owned.material = native.material;
+            owned.color = native.color;
+            owned.fillCenter = native.fillCenter;
+            owned.preserveAspect = native.preserveAspect;
+            owned.raycastTarget = native.raycastTarget;
+        }
+
+        // The native Metamagic caption's face, material, size range, case and
+        // ink; created inactive so TextMeshPro never falls back to its own
+        // default font while the native one is assigned.
+        private static void CreateCaption(RectTransform button, TMP_Text native, string caption)
+        {
+            var go = new GameObject("TextMeshPro Text");
+            go.SetActive(false);
+            go.layer = button.gameObject.layer;
+            var rect = go.AddComponent<RectTransform>();
+            rect.SetParent(button, false);
+            KingmakerUiFactory.Stretch(rect, 0, 0, 0, 0);
+            TextMeshProUGUI label = go.AddComponent<TextMeshProUGUI>();
+            label.font = native.font;
+            label.fontSharedMaterial = native.fontSharedMaterial;
+            label.enableAutoSizing = native.enableAutoSizing;
+            label.fontSizeMin = native.fontSizeMin;
+            label.fontSizeMax = native.fontSizeMax;
+            label.fontSize = native.enableAutoSizing ? native.fontSizeMax : native.fontSize;
+            label.fontStyle = native.fontStyle;
+            label.fontWeight = native.fontWeight;
+            label.color = native.color;
+            label.alignment = native.alignment;
+            label.characterSpacing = native.characterSpacing;
+            label.wordSpacing = native.wordSpacing;
+            label.enableWordWrapping = native.enableWordWrapping;
+            label.overflowMode = native.overflowMode;
+            label.margin = native.margin;
+            label.richText = native.richText;
+            label.raycastTarget = false;
+            label.text = caption;
+            go.SetActive(true);
         }
 
         private void ForgetWindow()
@@ -380,9 +405,14 @@ namespace KingmakerBuffPlanner.UI
 
         private void DetachOwnedButton()
         {
-            if (_ownedButton == null) return;
-            // Only the owned control is destroyed; nothing native is touched.
-            if (_ownedButton.gameObject != null) Retire(_ownedButton.gameObject);
+            // The native footer back exactly as it was; then only the owned
+            // place is destroyed.
+            if (_nativeFooter != null && _nativeFooter.Alive) _nativeFooter.Restore();
+            _nativeFooter = null;
+            if (_ownedPlace != null) Retire(_ownedPlace.gameObject);
+            else if (_ownedButton != null && _ownedButton.gameObject != null) Retire(_ownedButton.gameObject);
+            _ownedPlace = null;
+            _ownedPlate = null;
             _ownedButton = null;
         }
 
@@ -395,7 +425,8 @@ namespace KingmakerBuffPlanner.UI
             for (int index = 0; index < parent.childCount; index++)
             {
                 Transform child = parent.GetChild(index);
-                if (child != null && child.name == ButtonName) strays.Add(child.gameObject);
+                if (child != null && (child.name == ButtonName || child.name == FooterPlaceName))
+                    strays.Add(child.gameObject);
             }
             foreach (GameObject stray in strays) Retire(stray);
         }
@@ -416,7 +447,9 @@ namespace KingmakerBuffPlanner.UI
             for (int index = 0; index < parent.childCount; index++)
             {
                 Transform child = parent.GetChild(index);
-                if (child != null && child.name == ButtonName) count++;
+                if (child == null) continue;
+                if (child.name == ButtonName) count++;
+                else if (child.name == FooterPlaceName && child.Find(ButtonName) != null) count++;
             }
             return count;
         }
@@ -459,6 +492,116 @@ namespace KingmakerBuffPlanner.UI
             _handoffActive = false;
             _handoffWindow = null;
             ForgetWindow();
+        }
+
+        // The native Metamagic footer (exact 2.1.7b contract, kbpnui-facts-03):
+        // Container_Book/MetamagicButtonPlace (a horizontal layout group)
+        // holding the plate ButtonPlace (main_menu_back, out of layout,
+        // stretched past the place) and the ButtonPF Apply with its TMP
+        // caption. What pairing changes is recorded first and put back
+        // exactly by Restore.
+        private sealed class NativeFooter
+        {
+            internal RectTransform Place;
+            internal Button Apply;
+            internal Image Plate;
+            internal TMP_Text Label;
+            internal Vector3 OriginalCentre;
+            internal Vector2 OriginalSize;
+            private Vector2 _placePosition;
+            private Vector2 _applySize;
+            private Vector2 _applyPosition;
+            private Vector2 _labelSize;
+            private Vector2 _labelPosition;
+            internal Vector2 PlateOffsetMin;
+            internal Vector2 PlateOffsetMax;
+            private bool _paired;
+
+            internal static NativeFooter Find(Transform spellbook)
+            {
+                var place = spellbook == null ? null : spellbook.Find(NativeFooterPath) as RectTransform;
+                Transform apply = place == null ? null : place.Find("Apply");
+                Transform plate = place == null ? null : place.Find("ButtonPlace");
+                Button button = apply == null ? null : apply.GetComponent<Button>();
+                Image plateImage = plate == null ? null : plate.GetComponent<Image>();
+                TMP_Text label = apply == null ? null : apply.GetComponentInChildren<TMP_Text>(true);
+                if (place == null || place.parent == null || button == null || button.image == null ||
+                    plateImage == null || plateImage.sprite == null || label == null || label.font == null)
+                    return null;
+                return new NativeFooter
+                {
+                    Place = place,
+                    Apply = button,
+                    Plate = plateImage,
+                    Label = label,
+                    OriginalCentre = place.localPosition,
+                    OriginalSize = place.sizeDelta,
+                    _placePosition = place.anchoredPosition,
+                    _applySize = ((RectTransform)apply).sizeDelta,
+                    _applyPosition = ((RectTransform)apply).anchoredPosition,
+                    _labelSize = label.rectTransform.sizeDelta,
+                    _labelPosition = label.rectTransform.anchoredPosition,
+                    PlateOffsetMin = plateImage.rectTransform.offsetMin,
+                    PlateOffsetMax = plateImage.rectTransform.offsetMax
+                };
+            }
+
+            internal bool Alive
+            {
+                get { return Place != null && Apply != null && Plate != null && Label != null; }
+            }
+
+            internal string Evidence
+            {
+                get
+                {
+                    return "place=" + OriginalSize.x.ToString("0.00") + "x" + OriginalSize.y.ToString("0.00") +
+                        "@" + OriginalCentre.x.ToString("0.00") + "," + OriginalCentre.y.ToString("0.00") +
+                        ";plate=" + Plate.sprite.name + ";face=" + (Apply.image.sprite == null ? "none" : Apply.image.sprite.name) +
+                        ";caption=" + Label.font.name + "|" + Label.fontSharedMaterial.name;
+                }
+            }
+
+            internal void Pair(SpellbookFooterLayout layout)
+            {
+                float dx = layout.MetamagicCentre - OriginalCentre.x;
+                Vector2 position = _placePosition + new Vector2(dx, 0f);
+                var size = new Vector2(layout.MetamagicWidth, OriginalSize.y);
+                var apply = (RectTransform)Apply.transform;
+                var applySize = new Vector2(layout.MetamagicWidth, _applySize.y);
+                var applyPosition = new Vector2(_applyPosition.x - (_applySize.x - layout.MetamagicWidth) / 2f,
+                    _applyPosition.y);
+                var labelSize = new Vector2(layout.MetamagicWidth, _labelSize.y);
+                var labelPosition = new Vector2(_labelPosition.x - (_labelSize.x - layout.MetamagicWidth) / 2f,
+                    _labelPosition.y);
+                var plateMax = PlateOffsetMax + new Vector2(layout.PlateExtension, 0f);
+                if (_paired && Place.anchoredPosition == position && Place.sizeDelta == size &&
+                    apply.sizeDelta == applySize && Plate.rectTransform.offsetMax == plateMax) return;
+                Place.anchoredPosition = position;
+                Place.sizeDelta = size;
+                apply.sizeDelta = applySize;
+                apply.anchoredPosition = applyPosition;
+                Label.rectTransform.sizeDelta = labelSize;
+                Label.rectTransform.anchoredPosition = labelPosition;
+                Plate.rectTransform.offsetMax = plateMax;
+                _paired = true;
+                LayoutRebuilder.MarkLayoutForRebuild(Place);
+            }
+
+            internal void Restore()
+            {
+                if (!_paired) return;
+                Place.anchoredPosition = _placePosition;
+                Place.sizeDelta = OriginalSize;
+                ((RectTransform)Apply.transform).sizeDelta = _applySize;
+                ((RectTransform)Apply.transform).anchoredPosition = _applyPosition;
+                Label.rectTransform.sizeDelta = _labelSize;
+                Label.rectTransform.anchoredPosition = _labelPosition;
+                Plate.rectTransform.offsetMin = PlateOffsetMin;
+                Plate.rectTransform.offsetMax = PlateOffsetMax;
+                _paired = false;
+                LayoutRebuilder.MarkLayoutForRebuild(Place);
+            }
         }
 
         // Structural node access for the bounded locator: transforms only,
