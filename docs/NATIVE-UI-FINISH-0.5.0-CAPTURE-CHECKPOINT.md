@@ -1,3 +1,8 @@
+> Active owner-selected completion: see [current milestone](NATIVE-UI-FINISH-0.5.0-COMPLETION.md).
+> The current clean candidate is 3b5a2d7; the source/package and ordinary deferral
+> below remain historical. Do not rebuild or relabel them. Continuous game work
+> is explicitly selected; preserve all current runtime guards and supervised tasks.
+
 > Owner-selected continuous completion milestone, October 11: the four-hour
 > initial budget includes the required long purity prerequisite and two-size
 > observations. Work is active on candidate 743b1dc; earlier ordinary-budget

@@ -1,3 +1,36 @@
+> Current continuous milestone: clean product source
+> `3b5a2d747da8cd69de66d7459218af0fac99e915`, version 0.5.0, NUICV.
+> The new-byte six-action purity is supervised (PID 26140), Attempts 1 /
+> LeaseWaitSeconds 120, all five targets; both native resolutions stay inside
+> this same required window. Preserve watched runtime directories and freeze.
+> New local package is validated, NOT_RUN. No earlier PASS is relabeled.
+> Physical input now works through the guard: earlier 2c40f06 selection passed
+> 83/0 in 276.4977708 seconds, exit 0, with full protected-save restoration.
+> Spellbook delivered all twelve real actions but retained FAIL 82/1 because
+> both readers required retired placement prose; source 3b5a2d7 validates the
+> actual visible footer geometry. Focused C# 6/0 and consumer 34/0 passed.
+> Continue the authorized final native/physical/casting observations and actual
+> pictures. Sixteen-hour planning estimate is not a stop deadline. Receipt PARTIAL.
+> Earlier banners below are chronological evidence for their named inputs.
+
+> Current continuous milestone (October 12): clean product source
+> `10557953311bef81d5d85c693500e1c459b97981` preserves the 720p footer repair,
+> the held native success-log picture and explicit casting/HUD JSON state.
+> Its NUICS 0.5.0 local package is validated, NOT_RUN. Prior archives remain intact.
+> The 2c40f06 casting purity completed PASS, exit 0, 6711.8549948 seconds;
+> its instant game qualification passed 85/0, exit 0, 293.8677189 seconds,
+> with installation/protected-save restoration verified. Three actual active
+> screenshots were reviewed; its omitted casting JSON fields are not evidence.
+> Focused snapshot correction: C# 10/0, source 43/0, build 1/0; strict raw-state
+> reader 11/0 and helper parsers 4/0. Existing old Classic grant remains unused;
+> final genuine availability will be observed on repaired bytes, without extra casts.
+> Actual foreground access was observed during the cast; fresh guarded physical
+> spellbook retry `kbpnui-complete-spellbook-02` is supervised, with no guard bypass.
+> The revised sixteen-hour estimate is approximately 2026-10-12T10:28:29Z:
+> two measured ~112-minute final-input prerequisites plus feasible observations
+> and visual review. It is not a cancellation deadline. Receipt remains PARTIAL.
+> Historical banners below describe their original inputs and times.
+
 > Current continuous milestone (October 12): source
 > `354aed5edebc3b37f5aa91e89164d64ee77b3048` combines the actual 720p footer
 > repair with a fourth after-cast capture of the native success log after the
@@ -507,3 +540,151 @@ full selected prerequisites once per dependency, run serial native observations,
 review actual pictures, obtain new selection/grant-bound cast evidence, and
 finish local delivery records and guarded push. No publisher or old aggregate
 has been selected.
+
+## Explicit snapshot repair before final freeze — October 12
+
+The actual 2c40f06 instant run `kbpnui-complete-cast-01` passed runtime 85/0
+in 293.8677189 seconds (03:11:58.3000344Z–03:16:52.1662890Z), exit 0.
+The original completion, transaction, registry, mod and protected-save records
+prove restoration and game exit. Its three held active/recast/hover PNGs were
+opened and inspected: native paper, Active / Will skip, explicit first-card
+Will recast and readable source/receiver controls. They retain the 2c40f06
+DLL/package attribution. Five reports/runs were retained without an extra
+observation cast, and native log messages were recorded. The actual casting
+snapshot contains only `$id` fields, so no missing state field is treated as
+observed. The previously selected Classic grant remains unused; no false
+availability PASS is inferred from absent Booleans.
+
+The game JSON defaults suppress properties of anonymous projected objects.
+Source 1055795 replaces those projections with explicit JObject keys for
+casting IDs, caster/receiver, status/readiness/provider and actual HUD button
+name/availability/tint. Production availability, casting, staging and capture
+boundaries are unchanged. The new regression reproduces field-only game JSON
+defaults and verifies the real retained fields, restoring global defaults in
+finally. `Test-Development.ps1 -Only 'native-ui-snapshots,native-ui-capture,native-ui-game-log-lines,native-ui-record,qualification-driver-end-to-end,qualification-on-the-planner-pumped-host,classic-cast-grant-digest-allowance-and-judgement'`
+passed source 43/0, build 1/0 and C# 10/0, exit 0, 10.9836799 seconds.
+Log: `artifacts/native-ui-milestone-2026-10-11/focused-state-snapshot-json.log`.
+The supplemental shared reader requires actual Boolean availability and nonempty
+names in all owned/native HUD snapshots and complete casting state. Its focused
+valid/invalid JSON checks passed 11/0; four private helpers parse 4/0, 0.2335688
+seconds. These are focused checks, not live qualification.
+
+NUICS is a new clean detached owned worktree at
+`10557953311bef81d5d85c693500e1c459b97981`. DATA-local GamePath.props was copied
+from the owned NUICG candidate; no Codex profile/template was installed.
+`Build-Local.ps1` ran once in 5.8914389 seconds, exit 0, source 43/0, build 1/0,
+package validation 4/0, local creation 1/0. Exact version 0.5.0 identities:
+
+- ZIP: `042dd730dd30a1cf8a1620bcfec6d52567ca81dbce64e1b0b3b041f789569fd9`.
+- DLL: `3ea540ab25d69ef3e747ac5d173e85ee3a0262a6d4bbe23033799103e858fb9c`.
+- MVID: `521a21a0-fe12-4cd6-8001-b346c8760958`.
+- Installable archive: `C:\Dev\KingmakerBuffPlannerLab\package-archive\0.5.0-native-ui-completion-2026-10-12-1055795\KingmakerBuffPlanner-0.5.0.zip`.
+- Original path-bound build receipt: NUICS `artifacts/local-runtime/0.5.0/KingmakerBuffPlanner-0.5.0-local-runtime.zip.build-local.json`.
+- Candidate supervision/reader provenance: NUI `artifacts/native-ui-milestone-2026-10-11/candidate-1055795/`.
+
+This archive is NOT_RUN pending new game evidence. 354aed5 and eb36973 were
+never frozen or subjected to their own expensive prerequisite; both remain
+preserved NOT_RUN, so no full scan was wasted on their superseded bytes.
+The final RunIds use `kbpnui-state-`; ten fresh IDs had zero collisions across
+runtime/evidence/transaction/staging/backups/approval paths.
+
+The owned 2c40f06 four-action casting purity completed at
+03:10:09.5561510Z, PASS / numeric exit 0, 6711.8549948 seconds (111m52s),
+one attempt / lease wait 120, all five original targets. Both casting WhatIf
+routes used their actual run-bound grants; authoring and problems WhatIfs were
+in that same window. No default retries were used. Log/result are preserved
+in `candidate-2c40f06/casting-purity-window.log` and `casting-purity-result.json`.
+The 16-hour estimate through approximately 2026-10-12T10:28:29Z replaces the
+14-hour estimate because the final-input two prerequisites have an observed
+~112-minute cost and the concrete serialization defect changes the candidate.
+Continue supervision/restoration beyond that estimate when required.
+
+The original physical refusal remains FAIL 82/1 with restored original
+installation/saves. Read-only owned-game samples establish a subsequent actual
+resolution: at 03:15:56.4525153Z Game PID 16852 / UnityWndClass / session 2 was
+foreground and responsive. A fresh guarded spellbook retry on unchanged
+2c40f06 began 03:35:29.5031698Z; its game PID 12316 was foreground at
+03:38:20.8618264Z. This justifies a new physical attempt, without inferring the
+cause of the earlier refusal or bypassing the foreground/input guards. The
+retry must finish and its original cleanup must be verified before freeze or
+conflicting runtime work. Then freeze 1055795 and execute the selected final
+prerequisites/native/physical/casting batches and inspect actual new pictures.
+
+## Current final candidate and active prerequisite — October 12
+
+The guarded physical select route `kbpnui-complete-physical-select-01` on unchanged
+2c40f06 passed **83/0**, numeric exit **0**, in **276.4977708 seconds**, with original
+mod/registry/transaction restoration, game exit and protected saves verified.
+It delivered the existing default planner hotkey, HUD refusal click, routine click,
+graph wheel, catalogue native-popup right-click, popup wheel and nested/planner
+Escape. Its synthetic long description is labelled as such and cannot prove a
+genuine long spell description. No cast was authorized or dispatched. This
+corrects the earlier environment limitation only for actual observed routes;
+unsupported remapped bindings or absent typing are not inferred from a callback.
+
+The preceding physical spellbook retry `kbpnui-complete-spellbook-02` was
+**FAIL 82/1**, exit **1**, **246.0623565 seconds**, with complete original cleanup.
+Its twelve actual action ACKs and all four handoff cycles are retained. Only
+`button-placement-conflicts` was recorded: the current native controller reports
+`footer-pair;paired=False;metamagic=629.3/290.3;planner=757.3/210.0;plateExtension=0.0`
+for the actual no-book state, while both old readers required the retired marker.
+The original no-book and fault-recovery pictures were opened and reviewed.
+The original runtime FAIL is preserved; this is not a new game PASS.
+
+Product source **3b5a2d747da8cd69de66d7459218af0fac99e915** corrects both the in-game
+SpellbookEntryRecord and independent launcher reader. For current footer records,
+positive finite widths, native visibility, no occupied-pair overlap and sufficient
+plate extent are required. Unknown/incomplete footer prose cannot inject a legacy
+PASS marker. Historical top-close records keep their own interpretation. Actual
+topmost hit, owned control/listener counts, OS ACKs, exact-once handoff, recovery,
+Escape, plan/resource/effect invariants, save protection and restoration remain.
+
+`Test-Development.ps1 -Only 'spellbook-entry,native-ui-record' -Check SpellbookEntryEvidence`
+passed source **43/0**, build **1/0**, C# **6/0**, bounded PowerShell consumer **34/0**,
+exit **0**, **9.0009126 seconds**. Cases cover the current visible pair/no-book layout,
+historical layout, overlap, short plate, missing visibility, malformed data and
+invalid widths/coordinates. The coherent source diff was reviewed before packaging.
+No aggregate or publisher gate was selected.
+
+Clean detached NUICV built once with Build-Local.ps1 in **6.5156947 seconds**,
+exit **0**, source **43/0**, build **1/0**, package **4/0**, local creation **1/0**.
+Version 0.5.0 is **NOT_RUN** until this candidate's game evidence establishes otherwise:
+
+- ZIP SHA-256: `f4e06b737e6b8abbb7f92db18756a87ed59a36443ff7f8214a7df88069cbc130`.
+- DLL SHA-256: `56d9dac7dbfed31598510a64e4e48eabe4ae2874d4ccd1befc04eed531d2812f`.
+- Assembly MVID: `ee210562-a7b0-4ce3-81ac-bd4641b22a0f`.
+- Installable archive: `C:\Dev\KingmakerBuffPlannerLab\package-archive\0.5.0-native-ui-completion-2026-10-12-3b5a2d7\KingmakerBuffPlanner-0.5.0.zip`.
+- Original source/path-bound build receipt: `C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-NUICV\artifacts\local-runtime\0.5.0\KingmakerBuffPlanner-0.5.0-local-runtime.zip.build-local.json`.
+- Private supervision/reader provenance: `artifacts/native-ui-milestone-2026-10-11/candidate-3b5a2d7/`.
+
+Both actual package and packaged DLL bytes were verified. New ten `kbpnui-close-`
+RunIds have no evidence/staging/backup/transaction/approval collisions. Helpers
+parse 4/0. The strict availability reader is unchanged from its focused 11/0 check;
+missing/null/string Booleans or names are rejected. Provenance hashes use the
+actual clean runtime reader bytes, recording separately any NUI checkout newline
+difference; normalized checked-in source content matches. A preparation-only
+assertion caught that CRLF/LF difference before any runtime freeze, and was
+resolved by recording both identities, without overwriting previous artifacts.
+
+Fresh established boundary guards passed after the prior game restored. Freeze
+was created at **2026-10-12T03:49:51.4131521Z** under
+`runtime-backups/qualification-frozen/3b5a2d747da8cd69de66d7459218af0fac99e915/`.
+NUICS 1055795, NUICG 354aed5, NUICF eb36973, NUIC 2c40f06 and frozen NUIR 4dbfa33
+are all preserved. The three superseded candidates remain NOT_RUN; no expensive
+prerequisite was run on them.
+
+At **2026-10-12T03:50:20.7031030Z**, owned PID **26140** started
+`run-additional-purity.ps1 -Scope selection-physical -ExpectedCommit 3b5a2d747da8cd69de66d7459218af0fac99e915 -ExpectedZipSha256 f4e06b737e6b8abbb7f92db18756a87ed59a36443ff7f8214a7df88069cbc130`.
+Its existing Invoke-KbpLivePurityWindow uses **Attempts 1 / LeaseWaitSeconds 120**
+and all five full original runtime/state/staging/backup/evidence/Mods targets.
+Both native qualify WhatIfs (1080 and 720, timeout 600, direct Confirm false),
+zero-cost instant selection, animated Classic selection and physical spellbook/
+select WhatIfs (timeout 900) run in the same before/after inventory. Expected
+cost is about **112 minutes**, based on the completed original casting window.
+Logs/receipts are outside the inventoried roots. Do not stage a game, write into
+watched paths or replace the freeze while it runs. The sixteen-hour estimate
+remains approximately 2026-10-12T10:28:29Z, with authorized in-scope extensions.
+When successful, run the two native observations serially, verify original
+cleanup after each, open the new PNGs, run the fresh selections/physical routes,
+derive actual new run-bound grants, then execute the selected casting prerequisite
+and casting/authoring/problem observations. Do not finish at this record update.

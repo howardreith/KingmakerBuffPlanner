@@ -1,3 +1,36 @@
+> Current continuous milestone: clean product source
+> `3b5a2d747da8cd69de66d7459218af0fac99e915`, version 0.5.0, NUICV.
+> The new-byte six-action purity is supervised (PID 26140), Attempts 1 /
+> LeaseWaitSeconds 120, all five targets; both native resolutions stay inside
+> this same required window. Preserve watched runtime directories and freeze.
+> New local package is validated, NOT_RUN. No earlier PASS is relabeled.
+> Physical input now works through the guard: earlier 2c40f06 selection passed
+> 83/0 in 276.4977708 seconds, exit 0, with full protected-save restoration.
+> Spellbook delivered all twelve real actions but retained FAIL 82/1 because
+> both readers required retired placement prose; source 3b5a2d7 validates the
+> actual visible footer geometry. Focused C# 6/0 and consumer 34/0 passed.
+> Continue the authorized final native/physical/casting observations and actual
+> pictures. Sixteen-hour planning estimate is not a stop deadline. Receipt PARTIAL.
+> Earlier banners below are chronological evidence for their named inputs.
+
+> Current continuous milestone (October 12): clean product source
+> `10557953311bef81d5d85c693500e1c459b97981` preserves the 720p footer repair,
+> the held native success-log picture and explicit casting/HUD JSON state.
+> Its NUICS 0.5.0 local package is validated, NOT_RUN. Prior archives remain intact.
+> The 2c40f06 casting purity completed PASS, exit 0, 6711.8549948 seconds;
+> its instant game qualification passed 85/0, exit 0, 293.8677189 seconds,
+> with installation/protected-save restoration verified. Three actual active
+> screenshots were reviewed; its omitted casting JSON fields are not evidence.
+> Focused snapshot correction: C# 10/0, source 43/0, build 1/0; strict raw-state
+> reader 11/0 and helper parsers 4/0. Existing old Classic grant remains unused;
+> final genuine availability will be observed on repaired bytes, without extra casts.
+> Actual foreground access was observed during the cast; fresh guarded physical
+> spellbook retry `kbpnui-complete-spellbook-02` is supervised, with no guard bypass.
+> The revised sixteen-hour estimate is approximately 2026-10-12T10:28:29Z:
+> two measured ~112-minute final-input prerequisites plus feasible observations
+> and visual review. It is not a cancellation deadline. Receipt remains PARTIAL.
+> Historical banners below describe their original inputs and times.
+
 > October 12 current candidate: source 354aed5 includes the footer repair and
 > one bounded native success-log picture after releasing the planner; clean
 > NUICG local ZIP validated, NOT_RUN. See [continuous milestone](docs/NATIVE-UI-FINISH-0.5.0-COMPLETION.md).
