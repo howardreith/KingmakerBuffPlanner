@@ -1,21 +1,14 @@
-> Current continuous mission: clean product `624b5e929eb24a8d31ef9fe50cb4520d6fa2445d`,
-> version 0.5.0 in owned NUICZ; validated installable local archive **NOT_RUN**.
-> The prior 96b2f4b inventory completed **PASS, exit 0, 6317.920778 seconds**
-> at 2026-10-12T07:41:45Z with eleven WhatIf actions, Attempts 1, lease wait 120,
-> and all five original targets. It is not a prerequisite receipt for new bytes.
-> Current 624b5e9 freeze exited 0 in 38.8405194 seconds. Its own eleven-action
-> full-target prerequisite is now supervised by PID23484/session62865, started
-> 2026-10-12T07:44:10Z, Attempts 1 / LeaseWaitSeconds 120. Preserve watched paths.
-> Current candidate game routes remain NOT_RUN; receipt stays PARTIAL.
-> After this prerequisite, execute native1080/720 serially and inspect the originals;
-> continue physical typing/paused switching and read-only Advanced selections.
-> Fresh mechanical zero-cost, animated Classic and finite allowances then support
-> the selected six-action casting prerequisite and its six actual observations.
-> Every Advanced save remains unchanged; unsupported NativeUI/Advanced is refused.
-> Revised twenty-hour planning forecast remains 2026-10-12T14:28:29Z, not a timer.
-> Continue actual game observations, visual review, exact restoration, local delivery
-> and guarded push under the owner's selected longer milestone. No broad aggregate
-> or release campaign is implied. Earlier banners retain chronology and original inputs.
+> **Active October 12 completion:** product `b6016c710c24a6118d4e92eb391bdb0b1c036488`,
+> version 0.5.0, has a validated local ZIP but is **NOT_RUN** in Kingmaker.
+> The earlier 624b5e9 two-size native pictures remain attributed to those bytes;
+> its physical Spellbook boot request FAILED and was fully restored after a
+> verified graceful game exit. The exact new-source eleven-action full-history
+> purity is supervised, PID 26120, since 2026-10-12T10:54:47Z, one
+> attempt, 120-second lease wait, all five original targets. Preserve its watched
+> paths and launch no conflicting runtime route. Acceptance stays **PARTIAL**.
+> Continue the authorized observations, local delivery, and guarded push after
+> the actual prerequisite result. The 24-hour total forecast is a plan, not a
+> stop timer. [Exact protocol repair and current evidence](docs/NATIVE-UI-FINISH-0.5.0-PROTOCOL-REPAIR-CHECKPOINT.md).
 
 > Current continuous mission: clean product `624b5e929eb24a8d31ef9fe50cb4520d6fa2445d`,
 > version 0.5.0 in owned NUICZ; validated installable local archive **NOT_RUN**.

@@ -1,5 +1,8 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-12 native UI physical admission and changed-byte continuation
+
+DATA/NUI feature branch; product source `b6016c710c24a6118d4e92eb391bdb0b1c036488`, version 0.5.0. UMM proved the previous 624b5e9 physical Spellbook request was rejected at boot (`invalid-request:live-save-parameters`): its compiled protocol omitted the launcher's schema-2 tag. The timed-out owned process exited after a verified non-forced window close; repository recovery compared protected saves clean and restored registry/Mods, exit 0. The original run stays FAIL. The exact-shape protocol repair and negative regression checks passed focused C# 2/0; launcher arguments 24/0. A fresh clean b6016c7 package was validated (ZIP `2a9bbda222d8aa35ce0a9c90b208bc7b5eb95a48e34a933abf4221620331297c`, DLL `a5f54b48c8697b00b3c1f719443b92de48d0200eaefe2efdb1c93ab66a99bf11`) and remains NOT_RUN. Its one-attempt eleven-action full-history purity began 2026-10-12T10:54:47Z, PID 26120; no conflicting runtime route will start while it inventories. See [exact checkpoint](docs/NATIVE-UI-FINISH-0.5.0-PROTOCOL-REPAIR-CHECKPOINT.md). Acceptance remains PARTIAL; continue the selected game and visual work after actual prerequisite PASS.
 ## 2026-10-11 Codex native UI development checkpoint
 
 DATA/NUI; branch `codex/kingmaker-buff-planner-native-ui-finish-2026-10-10`;

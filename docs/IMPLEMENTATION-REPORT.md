@@ -1,3 +1,4 @@
+> **Active October 12 native UI mission:** the b6016c7 0.5.0 package is validated but NOT_RUN; its exact-byte eleven-action full-history purity is supervised. The earlier 624b5e9 native two-size runs remain historical, and its physical boot request failed before result but was restored cleanly. Acceptance remains PARTIAL. See [current protocol repair checkpoint](NATIVE-UI-FINISH-0.5.0-PROTOCOL-REPAIR-CHECKPOINT.md). Earlier records retain their named inputs.
 > Current screenshot repair: clean source 7410f92/version 0.5.0 has a validated
 > local package and focused offline capture checks; new game observations remain
 > NOT_RUN and receipt stays PARTIAL. Old frozen gate is now recorded FAILED;
