@@ -106,6 +106,7 @@ namespace KingmakerBuffPlanner.UI
         private TMP_Text _footerResult;
         private TMP_Text _footerSave;
         private Image _footerLedger;
+        private float _footerButtonsRight;
         private Button _footerRecovery;
         private string _shownSaveState;
         // True while the footer line shows a command's feedback (until the
@@ -1243,7 +1244,8 @@ namespace KingmakerBuffPlanner.UI
             _readyOnlyButton.gameObject.SetActive(false);
             // The one line starts after the save column and ends where the
             // buttons (and Ready Casts Only, when offered) begin.
-            float textRight = right + 198f;
+            _footerButtonsRight = right;
+            float textRight = right;
             _footerResult = _kit.Text(footer, "Result", string.Empty, PlannerTextRole.Body, 16f,
                 TextAlignmentOptions.MidlineLeft);
             _footerResult.enableAutoSizing = true;
@@ -2486,6 +2488,17 @@ namespace KingmakerBuffPlanner.UI
             if (problems) _readyOnlyButton.gameObject.SetActive(true);
             else if (view.SelectedRoutineGate != null && view.SelectedRoutineGate.BlockingCastings.Count == 0)
                 _readyOnlyButton.gameObject.SetActive(false);
+            // Reclaim the exceptional action's column while it is hidden.
+            // At a small viewport this keeps recovery messages beside the
+            // visible controls instead of ellipsizing into unused space.
+            float textRight = _footerButtonsRight +
+                (_readyOnlyButton.gameObject.activeSelf ? 198f : 0f);
+            if (_footerResult != null)
+                _footerResult.rectTransform.offsetMax = new Vector2(-textRight,
+                    _footerResult.rectTransform.offsetMax.y);
+            if (_footerLedger != null)
+                _footerLedger.rectTransform.offsetMax = new Vector2(-(textRight - 8f),
+                    _footerLedger.rectTransform.offsetMax.y);
             if (!_feedbackShown && _footerResult != null)
             {
                 bool problem;

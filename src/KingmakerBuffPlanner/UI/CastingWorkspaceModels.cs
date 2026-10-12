@@ -649,9 +649,8 @@ namespace KingmakerBuffPlanner.UI
             string value = saveState ?? string.Empty;
             if (value == "saved" || value == "saving") return null;
             if (value.StartsWith("save-failed:", StringComparison.Ordinal))
-                return "Your latest edit is NOT saved (" + value.Substring("save-failed:".Length) +
-                    "). It is kept here and the saved file is unchanged; runs refuse until it saves. " +
-                    "Retry save tries again (every new edit tries too).";
+                return "Edit not saved (" + value.Substring("save-failed:".Length) +
+                    "). Edit kept; file unchanged. Retry save before casting.";
             if (value == "save-refused:legacy-import")
                 return "Not saved: your previous plan could not be imported, and nothing is saved until " +
                     "it is. Repair or restore that file, then press Reload.";
