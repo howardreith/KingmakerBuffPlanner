@@ -110,6 +110,8 @@ namespace KingmakerBuffPlanner.Tests
                         { "physicalExpectation", expectation }
                     };
                     if (expectation == "cast") parameters["cfAllowance"] = "{}";
+                    if (expectation == "select") parameters["physicalSearchSchema"] = 2;
+                    if (expectation == "spellbook") parameters["physicalSpellbookSchema"] = 2;
                     o["parameters"] = parameters;
                 });
                 string rejection;

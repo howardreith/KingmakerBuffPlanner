@@ -9938,6 +9938,25 @@ namespace KingmakerBuffPlanner.Tests
             if (request == null || rejection.Length != 0 || request.Parameters.Count != 10)
                 throw new InvalidOperationException("A valid physical selection request was rejected: " +
                     rejection);
+            // The actual launcher adds one schema-2 evidence tag for each
+            // bounded physical UI route. Both must pass the host's boot check.
+            foreach (string expectation in new[] { "select", "spellbook" })
+            {
+                string schemaKey = expectation == "select" ? "physicalSearchSchema" : "physicalSpellbookSchema";
+                string schemaPath = WriteRequest(root, "physical-schema-" + expectation, o =>
+                {
+                    saveSet(o);
+                    var parameters = (Dictionary<string, object>)o["parameters"];
+                    parameters["physicalExpectation"] = expectation;
+                    parameters["expectedScreen"] = "1920x1080";
+                    parameters[schemaKey] = 2;
+                });
+                RuntimeTestRequest schemaRequest = ReadProtocol(
+                    new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, schemaPath }, out rejection);
+                if (schemaRequest == null || rejection.Length != 0 || schemaRequest.Parameters.Count != 12)
+                    throw new InvalidOperationException("The launcher's " + expectation +
+                        " schema-2 physical request was rejected at boot: " + rejection);
+            }
             // A blocked-only expectation is a non-casting request and
             // accepts no allowance or additional parameter.
             string problemValid = WriteRequest(root, "physical-problems-valid", o =>
@@ -10003,6 +10022,42 @@ namespace KingmakerBuffPlanner.Tests
                     {
                         saveSet(o);
                         o["scenario"] = "live-workspace-qual";
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "search-schema-on-spellbook", o =>
+                    {
+                        saveSet(o);
+                        var parameters = (Dictionary<string, object>)o["parameters"];
+                        parameters["physicalExpectation"] = "spellbook";
+                        parameters["physicalSearchSchema"] = 2;
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "spellbook-schema-on-select", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])["physicalSpellbookSchema"] = 2;
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "search-schema-wrong-value", o =>
+                    {
+                        saveSet(o);
+                        ((Dictionary<string, object>)o["parameters"])["physicalSearchSchema"] = 1;
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "spellbook-schema-string", o =>
+                    {
+                        saveSet(o);
+                        var parameters = (Dictionary<string, object>)o["parameters"];
+                        parameters["physicalExpectation"] = "spellbook";
+                        parameters["physicalSpellbookSchema"] = "2";
+                    }),
+                new KeyValuePair<string, Action<Dictionary<string, object>>>(
+                    "both-schema-tags", o =>
+                    {
+                        saveSet(o);
+                        var parameters = (Dictionary<string, object>)o["parameters"];
+                        parameters["physicalSearchSchema"] = 2;
+                        parameters["physicalSpellbookSchema"] = 2;
                     }),
                 new KeyValuePair<string, Action<Dictionary<string, object>>>(
                     "unknown-extra", o =>

@@ -590,8 +590,32 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             StringComparison.Ordinal))
                         throw new InvalidDataException("cf-allowance-only-with-cast-expectation");
                 }
+                // These optional schema tags make the launcher require its newer
+                // observation records. They confer no input or casting authority.
+                // A historical request without either tag keeps its old shape.
+                bool hasSearchSchema = request.Parameters.ContainsKey("physicalSearchSchema");
+                if (hasSearchSchema)
+                {
+                    if (!hasExpectation || !string.Equals(
+                            request.Parameters["physicalExpectation"] as string, "select", StringComparison.Ordinal))
+                        throw new InvalidDataException("physical-search-schema-only-with-select");
+                    if (!(request.Parameters["physicalSearchSchema"] is long) ||
+                        (long)request.Parameters["physicalSearchSchema"] != 2L)
+                        throw new InvalidDataException("physical-search-schema");
+                }
+                bool hasSpellbookSchema = request.Parameters.ContainsKey("physicalSpellbookSchema");
+                if (hasSpellbookSchema)
+                {
+                    if (!hasExpectation || !string.Equals(
+                            request.Parameters["physicalExpectation"] as string, "spellbook", StringComparison.Ordinal))
+                        throw new InvalidDataException("physical-spellbook-schema-only-with-spellbook");
+                    if (!(request.Parameters["physicalSpellbookSchema"] is long) ||
+                        (long)request.Parameters["physicalSpellbookSchema"] != 2L)
+                        throw new InvalidDataException("physical-spellbook-schema");
+                }
                 ValidateLiveSaveParameters(request, 9 + (hasScreen ? 1 : 0) +
-                    (hasExpectation ? 1 : 0) + (hasCfAllowance ? 1 : 0));
+                    (hasExpectation ? 1 : 0) + (hasCfAllowance ? 1 : 0) +
+                    (hasSearchSchema ? 1 : 0) + (hasSpellbookSchema ? 1 : 0));
                 return;
             }
             // The classic allowance exists only on the classic cast scenario,
