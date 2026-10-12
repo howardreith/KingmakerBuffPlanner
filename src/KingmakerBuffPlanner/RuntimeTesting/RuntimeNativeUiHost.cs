@@ -1184,6 +1184,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly Stopwatch _qualifiedUiCaptureClock = new Stopwatch();
         private readonly JObject _qualifiedUiObservation = new JObject();
         private bool _qualifiedUiOpened;
+        private bool _qualifiedUiPlanningOnly;
         private int _qualifiedUiRunsBefore;
         private string _qualifiedUiDocument;
         private CastingWorkspaceSession _qualifiedUiSession;
@@ -1215,7 +1216,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 switch (_qualifiedUiStep)
                 {
                     case 0:
+                        _qualifiedUiPlanningOnly = !_qualificationRecord.CastingScenario;
                         _qualifiedUiObservation["schemaVersion"] = 2;
+                        _qualifiedUiObservation["observationKind"] = _qualifiedUiPlanningOnly ? "selected-plan;no-casting" : "qualified-active-effects";
+                        _qualifiedUiObservation["recipe"] = _qualificationRecord.Selection.Recipe;
+                        _qualifiedUiObservation["castingScenario"] = _qualificationRecord.CastingScenario;
                         _qualifiedUiObservation["runId"] = _request.RunId;
                         _qualifiedUiObservation["sourceId"] = _qualificationRecord.Selection.SourceId;
                         _qualifiedUiObservation["screenWidth"] = Screen.width;
@@ -1263,8 +1268,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _qualifiedUiObservation["visibleLabels"] = JArray.FromObject(view.VisibleLabelsForRuntime());
                         _qualifiedUiObservation["nativeGameLogLines"] = JArray.FromObject(NativeUiFacts.GameLogMessages()
                             .Where(line => line.IndexOf("Buff Planner:", StringComparison.Ordinal) >= 0).ToArray());
-                        RequestQualifiedUiCapture("nui-qualified-active.png");
-                        _qualifiedUiStep = 3;
+                        RequestQualifiedUiCapture(_qualifiedUiPlanningOnly ? "nui-selected-plan.png" : "nui-qualified-active.png");
+                        _qualifiedUiStep = _qualifiedUiPlanningOnly ? 9 : 3;
                         return false;
                     case 3:
                         string recastId = _qualificationRecord.Selection.Castings[0].CastingId;
@@ -1302,7 +1307,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         if (_qualifiedUiClock.ElapsedMilliseconds < 800) return false;
                         _qualifiedUiObservation["hoverTargetStillPresentAtRequest"] = _qualifiedUiHovered != null &&
                             _qualifiedUiHovered.activeInHierarchy;
-                        RequestQualifiedUiCapture("nui-qualified-active-hover.png");
+                        RequestQualifiedUiCapture(_qualifiedUiPlanningOnly ? "nui-selected-plan-hover.png" : "nui-qualified-active-hover.png");
                         _qualifiedUiStep = 5;
                         return false;
                     case 5:
@@ -1327,6 +1332,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
                         if (!(bool)_qualifiedUiObservation["leaseReleased"])
                             throw new InvalidOperationException("Active probe did not release its input lease.");
+                        if (_qualifiedUiPlanningOnly)
+                        {
+                            _qualifiedUiObservation["gameplayVisibleAfterClose"] = NativeUiPauseWorldReleased();
+                            if (!(bool)_qualifiedUiObservation["gameplayVisibleAfterClose"])
+                                throw new InvalidOperationException("Selected-plan probe did not return to the world.");
+                            WriteQualifiedUiObservation(null);
+                            _qualifiedUiStep = 10;
+                            return true;
+                        }
                         // Read and picture the actual gameplay log after the
                         // owned planner has closed, not behind its parchment.
                         _qualifiedUiObservation["gameplayVisibleAtLogCapture"] = NativeUiPauseWorldReleased();
@@ -1406,7 +1420,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 : Path.GetFileName(_qualifiedUiCapture.Path);
             // No label or screenshot proves physical input or actual execution.
             // Active labels are judged with the native reads and visual review.
-            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "native-ui-active.json"),
+            AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory,
+                _qualifiedUiPlanningOnly ? "native-ui-selected-plan.json" : "native-ui-active.json"),
                 _qualifiedUiObservation.ToString(Formatting.Indented) + Environment.NewLine);
         }
 

@@ -5360,10 +5360,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!_qualificationDriver.Completed) return false;
             // The approved run has already finished. This bounded observation
             // reads native effects with temporary plan copies; it never calls Apply.
-            if (_qualificationRecord.CastingScenario && _qualificationRecord.TerminalReason == "completed" &&
+            bool qualifiedActive = _qualificationRecord.CastingScenario && _qualificationRecord.TerminalReason == "completed" &&
                 _qualificationRecord.Selection != null &&
-                _qualificationRecord.Selection.Recipe == CastingQualificationRecipe.ZeroCostMixed &&
-                !ObserveNativeUiAfterQualification()) return false;
+                _qualificationRecord.Selection.Recipe == CastingQualificationRecipe.ZeroCostMixed;
+            bool selectedAdvanced = !_qualificationRecord.CastingScenario &&
+                _request.Scenario == "live-cast-qual-select" && _request.ProfileId == "advanced-gunslinger-0136" &&
+                _qualificationRecord.Selection != null && _qualificationRecord.Violations().Count == 0 &&
+                (_qualificationRecord.Selection.Recipe == CastingQualificationRecipe.GroupMixed ||
+                 _qualificationRecord.Selection.Recipe == CastingQualificationRecipe.EnhancedDirect);
+            // Real discovered group/enhancement plans are pictured without a cast.
+            // Their selected-plan receipt is distinct from actual active-effect evidence.
+            if ((qualifiedActive || selectedAdvanced) && !ObserveNativeUiAfterQualification()) return false;
             PublishQualificationRecord();
             _liveInitialCatalogEvidence = "qualification-scenario;workspaceRoot=active;legacyScreen=closed";
             _workspaceInteractionEvidence = "qualification;recipe-authoring";
