@@ -1,3 +1,20 @@
+> Current selected completion mission: product `96b2f4b6396d3c9a961cc2dc6bd4b6a8327d9f18`,
+> version 0.5.0, validated clean local package **NOT_RUN**; acceptance **PARTIAL**.
+> The owned eleven-action full-target purity window is supervised; actual native
+> 1920x1080/1280x720, physical search/paused switching/authoring/blocker routes,
+> group/enhancement plans and genuine finite-resource observations are selected.
+> A separate later six-action prerequisite also includes the existing read-only
+> Advanced workspace at 1280x720 for genuine longer/prepared catalogue content.
+> Every Advanced save stays unchanged. NativeUI/Advanced remains refused.
+> These are continuing independently actionable tasks, not owner-only deferrals.
+> Existing 2c40f06 native two-size, zero-cost casting and physical select evidence
+> remains historical: its 720p footer defect and missing structured casting fields
+> are repaired in current source but still require current-byte game evidence.
+> The physical foreground route succeeded in later original 2c runs; the two
+> earlier spellbook failures and their restoration records are not relabeled.
+> Follow [the current completion record](NATIVE-UI-FINISH-0.5.0-COMPLETION.md).
+> All older receipts and manual lists below retain their original candidate scope.
+
 > Current milestone state: clean source `2c40f0633079248072c2f23a754905d665ef41d6`
 > and its unchanged 0.5.0 package passed native UI qualify at 1920x1080
 > and 1280x720: 85/0 assertions, 37 completed captures and nine ordinary/paused

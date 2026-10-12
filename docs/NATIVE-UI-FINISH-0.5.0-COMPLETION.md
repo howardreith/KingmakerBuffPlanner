@@ -990,3 +990,20 @@ and package boundaries, freeze current product once, execute the selected prereq
 with Attempts1/LeaseWait120, then the serial actual observations and original-image
 review. Complete restoration after every run. Do not resume the old failed4db aggregate
 or select a publisher, release reproducibility or unrelated layout campaign.
+
+## Source-unchanged genuine-content layout addition — 2026-10-12
+
+While current PID25996/S5 preserves all eleven preflight actions and watched paths,
+select the existing non-casting Advanced workspace route once at 1280x720 to inspect
+genuine prepared spells and longer catalogue labels at the smaller comparison size.
+This addresses UI-03/UI-06/CaseF through an existing supported display/scenario; it
+neither changes the product nor forces content or widens NativeUI fixture guards.
+Fresh `kbpnui-finish-advanced-workspace-720-01` passed collision checks, bringing the
+actual queue to seventeen named runs. Every save, including both Advanced copies,
+will be hashed unchanged around that observation. The active S5 command is unchanged.
+Its WhatIf is batched into separate `run-final-casting-purity.ps1` for the later S6,
+which now contains six actions; both updated private commands passed parsing.
+This is a declared acceptance dependency, not an additional full scan or binary build.
+Original source `96b2f4b`, DLL/ZIP/MVID and eighteen-hour forecast remain unchanged.
+Native Metamagic feat use and remapped physical keys remain pending actual capability
+assessment; absent prepared metamagic masks do not prove absence of feats.
