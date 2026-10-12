@@ -84,6 +84,29 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return true;
         }
 
+        // Runtime catalogue rows append two presentation fields to a stable
+        // source ID. Source IDs themselves contain pipes (and variants contain
+        // more than one), so consumers must split from the right rather than
+        // treating the row as exactly three pipe-separated values.
+        public static bool TryParseVisibleSource(string row, out string sourceId,
+            out string label, out bool selected)
+        {
+            sourceId = null;
+            label = null;
+            selected = false;
+            if (string.IsNullOrEmpty(row)) return false;
+            int selectedSeparator = row.LastIndexOf('|');
+            if (selectedSeparator <= 0 || selectedSeparator == row.Length - 1) return false;
+            int labelSeparator = row.LastIndexOf('|', selectedSeparator - 1);
+            if (labelSeparator <= 0) return false;
+            bool parsedSelected;
+            if (!bool.TryParse(row.Substring(selectedSeparator + 1), out parsedSelected)) return false;
+            sourceId = row.Substring(0, labelSeparator);
+            label = row.Substring(labelSeparator + 1, selectedSeparator - labelSeparator - 1);
+            selected = parsedSelected;
+            return sourceId.Length != 0;
+        }
+
         public string Query { get; set; }
         public string QuerySuffix { get; set; }
         // The tile the query names; it was not selected before the click.
@@ -275,6 +298,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool GraphOverflow { get; set; }
         public float? GraphScrollBefore { get; set; }
         public float? GraphScrollAfter { get; set; }
+        public int? GraphCaptureRequestFrame { get; set; }
+        public int? GraphCaptureCompletedFrame { get; set; }
+        public string GraphCaptureFailure { get; set; }
         public string GraphWheelEvidence
         {
             get
@@ -644,10 +670,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (VisibleAfterQuery.Count == 0) violations.Add("no-visible-tile");
             foreach (string tile in VisibleAfterQuery)
             {
-                string[] parts = tile.Split('|');
-                bool selected = parts.Length == 3 && parts[2] == "True";
-                bool matches = parts.Length == 3 && Query != null &&
-                    parts[1].IndexOf(Query, StringComparison.OrdinalIgnoreCase) >= 0;
+                string sourceId;
+                string label;
+                bool selected;
+                bool parsed = TryParseVisibleSource(tile, out sourceId, out label, out selected);
+                bool matches = parsed && Query != null &&
+                    label.IndexOf(Query, StringComparison.OrdinalIgnoreCase) >= 0;
                 if (!selected && !matches) violations.Add("unfiltered:" + tile);
             }
             if (TargetSource == null || !VisibleAfterQuery.Any(tile => tile.StartsWith(TargetSource + "|",

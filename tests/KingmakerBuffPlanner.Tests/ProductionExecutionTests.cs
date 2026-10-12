@@ -2533,6 +2533,8 @@ namespace KingmakerBuffPlanner.Tests
             if (directory == null) throw new InvalidOperationException("Repository root was not discoverable.");
             string host = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
                 "RuntimeTesting", "RuntimeTestHost.cs"));
+            string physicalSearchHost = File.ReadAllText(Path.Combine(directory.FullName, "src",
+                "KingmakerBuffPlanner", "RuntimeTesting", "RuntimePhysicalSearchHost.cs"));
             string writer = File.ReadAllText(Path.Combine(directory.FullName, "scripts", "New-KbpRunAllowance.ps1"));
             if (!host.Contains("int moonCastings = compiled.Castings.Count(value => value != null && value.RoutineId == \"long\");") ||
                 !host.Contains("{ \"castings\", moonCastings },") ||
@@ -2546,9 +2548,21 @@ namespace KingmakerBuffPlanner.Tests
             int durable = host.IndexOf("cold-seed:not-durable:", StringComparison.Ordinal);
             int routineClick = host.IndexOf("RequestPhysical(\"cf-routine-short\", \"click\"", StringComparison.Ordinal);
             int wheel = host.IndexOf("RequestPhysical(\"cf-wheel\", \"wheel\"", StringComparison.Ordinal);
+            int captureHold = host.IndexOf("if (_physicalGraphCapture != null) return ObservePhysicalGraphCapture(view);",
+                StringComparison.Ordinal);
+            int captureRequest = host.IndexOf("RequestPhysicalGraphCapture(\"physical-cf-graph-scrolled.png\");",
+                StringComparison.Ordinal);
+            int searchStart = host.IndexOf("return BeginPhysicalSearch(view);", StringComparison.Ordinal);
             if (shortSeed < 0 || durable < 0 || shortSeed > durable || routineClick < 0 || wheel < 0 || routineClick > wheel ||
                 PhysicalWorkspaceRecord.GraphOverflowCastings * 56 < 705)
                 throw new InvalidOperationException("The Short routine is not seeded to overflow before the wheel.");
+            if (captureHold < 0 || captureRequest < 0 || searchStart < 0 || captureHold > captureRequest ||
+                captureRequest > searchStart || !physicalSearchHost.Contains("new NativeUiCaptureBoundary(") ||
+                !physicalSearchHost.Contains("capture-exceeded-ten-second-boundary") ||
+                !physicalSearchHost.Contains("GraphCaptureCompletedFrame = Time.frameCount") ||
+                !host.Contains("{ \"graphCaptureCompletedFrame\", Nullable(record.GraphCaptureCompletedFrame) }") ||
+                !host.Contains("{ \"graphCaptureFailure\", record.GraphCaptureFailure }"))
+                throw new InvalidOperationException("The scrolled graph is not held through its bounded capture.");
         }
 
         private static void TestCfPhysicalGrantChain()
@@ -7432,6 +7446,20 @@ namespace KingmakerBuffPlanner.Tests
                 !PhysicalWorkspaceRecord.DeriveQuery("Light", out derivedQuery, out derivedSuffix) ||
                 derivedQuery != "ligh" || derivedSuffix != "t")
                 throw new InvalidOperationException("The physical query is not derived from a tile's first word.");
+            string parsedSource;
+            string parsedLabel;
+            bool parsedSelected;
+            if (!PhysicalWorkspaceRecord.TryParseVisibleSource(
+                    "effect|0123456789abcdef|Resistance|False", out parsedSource, out parsedLabel,
+                    out parsedSelected) || parsedSource != "effect|0123456789abcdef" ||
+                parsedLabel != "Resistance" || parsedSelected ||
+                !PhysicalWorkspaceRecord.TryParseVisibleSource(
+                    "variant|base-guid|variant-guid|Light|True", out parsedSource, out parsedLabel,
+                    out parsedSelected) || parsedSource != "variant|base-guid|variant-guid" ||
+                parsedLabel != "Light" || !parsedSelected ||
+                PhysicalWorkspaceRecord.TryParseVisibleSource(
+                    "effect|guid|Resistance|not-bool", out parsedSource, out parsedLabel, out parsedSelected))
+                throw new InvalidOperationException("Runtime catalogue rows do not preserve structural source IDs.");
             Func<PhysicalWorkspaceRecord> good = () =>
             {
                 var record = new PhysicalWorkspaceRecord
@@ -7454,6 +7482,16 @@ namespace KingmakerBuffPlanner.Tests
             if (good().Violations().Count != 0 || good().WheelEvidence != "scrolled")
                 throw new InvalidOperationException("A clean physical run was refused: " +
                     string.Join("|", good().Violations().ToArray()));
+            PhysicalWorkspaceRecord structural = good();
+            structural.TargetSource = "effect|0123456789abcdef";
+            structural.SelectedBeforeClick = "ability|fedcba9876543210";
+            structural.SelectedAfterClick = structural.TargetSource;
+            structural.VisibleAfterQuery.Clear();
+            structural.VisibleAfterQuery.Add("effect|0123456789abcdef|Resistance|False");
+            structural.VisibleAfterQuery.Add("ability|fedcba9876543210|Aid Another|True");
+            if (structural.Violations().Count != 0)
+                throw new InvalidOperationException("Structural source IDs made a clean physical record fail: " +
+                    string.Join("|", structural.Violations().ToArray()));
             var shapes = new Dictionary<string, Action<PhysicalWorkspaceRecord>>
             {
                 { "screen:1920x1200!=1920x1080", r => r.ScreenHeight = 1200 },

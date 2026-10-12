@@ -4276,13 +4276,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 if (settled < 1) return false;
                 if (view == null) return FinishPhysical("workspace-closed-early:wheel");
+                if (_physicalGraphCapture != null) return ObservePhysicalGraphCapture(view);
                 // Captured once, right after the forward wheel; the reverse
                 // recovery below must not overwrite the scroll evidence.
                 if (_physicalRecord.GraphScrollAfter == null)
                 {
                     _physicalRecord.GraphScrollAfter = view.GraphScrollPositionForRuntime;
-                    CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
-                        "physical-cf-graph-scrolled.png"));
+                    RequestPhysicalGraphCapture("physical-cf-graph-scrolled.png");
+                    return false;
                 }
                 if (_physicalRecord.SchemaVersion >= 2 && _physicalRecord.MoonExpectation == "select" &&
                     (_physicalRecord.PhysicalSearch == null || !_physicalRecord.PhysicalSearch.CleanupComplete))
@@ -4502,12 +4503,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.SelectedBeforeClick = view.SelectedSourceIdForRuntime;
                 foreach (string tile in view.VisibleSourcesForRuntime())
                 {
-                    string[] parts = tile.Split('|');
+                    string sourceId;
+                    string label;
+                    bool selected;
                     string query;
                     string suffix;
-                    if (parts.Length != 3 || parts[2] == "True" || parts[0] == _physicalRecord.SelectedBeforeClick ||
-                        !PhysicalWorkspaceRecord.DeriveQuery(parts[1], out query, out suffix)) continue;
-                    _physicalRecord.TargetSource = parts[0];
+                    if (!PhysicalWorkspaceRecord.TryParseVisibleSource(tile, out sourceId, out label, out selected) ||
+                        selected || sourceId == _physicalRecord.SelectedBeforeClick ||
+                        !PhysicalWorkspaceRecord.DeriveQuery(label, out query, out suffix)) continue;
+                    _physicalRecord.TargetSource = sourceId;
                     _physicalRecord.Query = query;
                     _physicalRecord.QuerySuffix = suffix;
                     break;
@@ -4761,6 +4765,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     ? (JToken)record.GraphScrollBefore.Value : JValue.CreateNull() },
                 { "graphScrollAfter", record.GraphScrollAfter.HasValue
                     ? (JToken)record.GraphScrollAfter.Value : JValue.CreateNull() },
+                { "graphCaptureRequestFrame", Nullable(record.GraphCaptureRequestFrame) },
+                { "graphCaptureCompletedFrame", Nullable(record.GraphCaptureCompletedFrame) },
+                { "graphCaptureFailure", record.GraphCaptureFailure },
                 { "graphWheelEvidence", record.GraphWheelEvidence },
                 { "inspectChip", record.InspectChip },
                 { "inspectOpened", record.InspectOpened },

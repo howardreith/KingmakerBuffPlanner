@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -14,6 +15,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private const int PhysicalSearchStartStep = 400;
         private NativeUiCaptureBoundary _physicalSearchCapture;
         private readonly Stopwatch _physicalSearchCaptureClock = new Stopwatch();
+        private NativeUiCaptureBoundary _physicalGraphCapture;
+        private readonly Stopwatch _physicalGraphCaptureClock = new Stopwatch();
         private string _physicalSearchOriginalText;
         private string _physicalSearchDocument;
         private bool _physicalSearchOwned;
@@ -26,15 +29,22 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 return FinishPhysical("search:missing-or-not-empty-at-start");
             string query = null, suffix;
             string[] active = view.CatalogueSourceIdsForRuntime;
-            string[] rows = view.VisibleSourcesForRuntime().Where(row =>
-                row.Split('|').Length == 3 && active.Contains(row.Split('|')[0])).ToArray();
-            foreach (string row in rows)
-                if (PhysicalWorkspaceRecord.DeriveQuery(WithoutRichText(row.Split('|')[1]), out query, out suffix)) break;
+            var rows = new List<KeyValuePair<string, string>>();
+            foreach (string row in view.VisibleSourcesForRuntime())
+            {
+                string sourceId;
+                string label;
+                bool selected;
+                if (PhysicalWorkspaceRecord.TryParseVisibleSource(row, out sourceId, out label, out selected) &&
+                    active.Contains(sourceId)) rows.Add(new KeyValuePair<string, string>(sourceId, label));
+            }
+            foreach (KeyValuePair<string, string> row in rows)
+                if (PhysicalWorkspaceRecord.DeriveQuery(WithoutRichText(row.Value), out query, out suffix)) break;
             if (query == null) return FinishPhysical("search:no-plain-query-from-available-source");
             var observation = new PhysicalSearchObservation { Query = query, ModeBefore = GameModeName() };
             observation.ExpectedSources.AddRange(rows.Where(row =>
-                WithoutRichText(row.Split('|')[1]).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
-                .Select(row => row.Split('|')[0]));
+                WithoutRichText(row.Value).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
+                .Select(row => row.Key));
             _physicalRecord.PhysicalSearch = observation;
             _physicalSearchOriginalText = view.SearchTextForRuntime;
             _physicalSearchDocument = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
@@ -123,8 +133,48 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             CaptureScreenshot(_physicalSearchCapture.Path);
         }
 
+        private void RequestPhysicalGraphCapture(string file)
+        {
+            _physicalGraphCapture = new NativeUiCaptureBoundary(Path.Combine(_request.EvidenceDirectory, file),
+                Time.frameCount, 10000);
+            _physicalRecord.GraphCaptureRequestFrame = _physicalGraphCapture.RequestFrame;
+            _physicalGraphCaptureClock.Restart();
+            CaptureScreenshot(_physicalGraphCapture.Path);
+        }
+
+        private bool ObservePhysicalGraphCapture(CastingWorkspaceScreenView view)
+        {
+            if (_physicalGraphCapture == null) return true;
+            if (view == null || !BuffPlannerUiRoot.IsCastingWorkspaceOpen)
+            {
+                _physicalRecord.GraphCaptureFailure = "workspace-state-changed-before-capture-completed";
+                return FinishPhysical("graph:capture:" + _physicalRecord.GraphCaptureFailure);
+            }
+            float? position = view.GraphScrollPositionForRuntime;
+            if (position == null || _physicalRecord.GraphScrollAfter == null ||
+                Math.Abs(position.Value - _physicalRecord.GraphScrollAfter.Value) > 0.001f)
+            {
+                _physicalRecord.GraphCaptureFailure = "scroll-state-changed-before-capture-completed";
+                return FinishPhysical("graph:capture:" + _physicalRecord.GraphCaptureFailure);
+            }
+            NativeUiCaptureStatus status = _physicalGraphCapture.Observe(Time.frameCount,
+                _physicalGraphCaptureClock.ElapsedMilliseconds);
+            if (status == NativeUiCaptureStatus.Pending) return false;
+            if (status == NativeUiCaptureStatus.TimedOut)
+            {
+                _physicalRecord.GraphCaptureFailure = "capture-exceeded-ten-second-boundary";
+                return FinishPhysical("graph:capture:" + _physicalRecord.GraphCaptureFailure);
+            }
+            _physicalRecord.GraphCaptureCompletedFrame = Time.frameCount;
+            _physicalGraphCapture = null;
+            _physicalGraphCaptureClock.Stop();
+            return false; // state changes occur in a subsequent Update
+        }
+
         private void RestorePhysicalSearch()
         {
+            _physicalGraphCapture = null;
+            _physicalGraphCaptureClock.Stop();
             if (!_physicalSearchOwned) return;
             CastingWorkspaceScreenView view = BuffPlannerUiRoot.CastingWorkspaceViewForRuntime;
             if (view == null) return; // destroyed view owns no live text focus
