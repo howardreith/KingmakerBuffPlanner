@@ -1253,7 +1253,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         }
                         session.SelectGraphBuff(_qualificationRecord.Selection.SourceId, inputs);
                         CastingGraphView graph = session.BuildGraph(inputs);
-                        string first = graph.Castings.Select(value => value.CastingId).FirstOrDefault();
+                        PlannedCasting enhanced = _qualifiedUiPlanningOnly
+                            ? _qualificationRecord.Selection.Castings.FirstOrDefault(value => value.Enhancements.Count > 0)
+                            : null;
+                        // The group recipe selects its group source already. For an
+                        // enhanced pair, focus the enhanced casting, not its plain witness.
+                        string first = enhanced == null
+                            ? graph.Castings.Select(value => value.CastingId).FirstOrDefault()
+                            : enhanced.CastingId;
+                        if (enhanced != null) session.SelectGraphBuff(enhanced.SourceId, inputs);
                         if (first != null) session.FocusGraphCasting(first);
                         view.RefreshView();
                         _qualifiedUiObservation["temporaryCopies"] = _qualifiedUiEdits;
@@ -1262,6 +1270,30 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         return false;
                     case 2:
                         if (_qualifiedUiClock.ElapsedMilliseconds < 1500) return false;
+                        if (_qualifiedUiPlanningOnly)
+                        {
+                            CastingGraphView selected = view.LastGraphForRuntime;
+                            _qualifiedUiObservation["qualificationSourceId"] = _qualificationRecord.Selection.SourceId;
+                            _qualifiedUiObservation["sourceId"] = selected.SelectedSourceId;
+                            _qualifiedUiObservation["planCopyContexts"] = new JArray(_qualificationRecord.Selection.Castings
+                                .Select(copy => new JObject
+                                {
+                                    { "castingId", copy.CastingId }, { "sourceId", copy.SourceId },
+                                    { "targetMode", copy.TargetMode.ToString() },
+                                    { "enhancementIds", new JArray(copy.Enhancements.Select(value => value.EnhancementId)) }
+                                }).ToArray());
+                            CastingGraphCasting focused = selected.CastingById(selected.FocusedCastingId);
+                            _qualifiedUiObservation["focusedCastingId"] = selected.FocusedCastingId;
+                            _qualifiedUiObservation["focusedTargetMode"] = focused == null ? null : focused.TargetMode.ToString();
+                            _qualifiedUiObservation["focusedSelected"] = focused != null && focused.Selected;
+                            _qualifiedUiObservation["focusedEnhancements"] = new JArray((selected.Inspector == null
+                                ? new CastingGraphEnhancementOption[0] : selected.Inspector.Enhancements)
+                                .Select(option => new JObject
+                                {
+                                    { "id", option.EnhancementId }, { "selected", option.Selected },
+                                    { "unavailableReason", option.UnavailableReason }, { "costText", option.CostText }
+                                }).ToArray());
+                        }
                         _qualifiedUiObservation["castings"] = new JArray(view.LastGraphForRuntime.Castings
                             .Select(value => NativeUiStateJson.Casting(value.CastingId, value.CasterUnitId,
                                 value.TargetUnitId, value.StatusLabel, value.Readiness.ToString(),
@@ -1320,7 +1352,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     case 9:
                         _qualifiedUiHovered = view.RootObject.GetComponentsInChildren<Button>(false)
                             .Where(button => button.name.StartsWith("Casting.", StringComparison.Ordinal) &&
-                                button.IsInteractable()).Select(button => button.gameObject).FirstOrDefault();
+                                button.IsInteractable() && (!_qualifiedUiPlanningOnly ||
+                                    button.name == "Casting." + view.LastGraphForRuntime.FocusedCastingId))
+                            .Select(button => button.gameObject).FirstOrDefault();
                         if (_qualifiedUiHovered != null)
                             Pointer(_qualifiedUiHovered, ExecuteEvents.pointerEnterHandler);
                         _qualifiedUiObservation["hoverDispatch"] = "Unity-pointer-callback;no-os-input";
