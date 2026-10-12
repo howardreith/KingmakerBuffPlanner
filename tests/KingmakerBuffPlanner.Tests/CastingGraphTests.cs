@@ -608,7 +608,8 @@ namespace KingmakerBuffPlanner.Tests
             string shutdown = SourceBlock(host, "internal void Shutdown(string reason)");
             Expect(shutdown.Contains("EndHoverClassic();"), "the host's shutdown leaves the Classic screen open");
             string enter = SourceBlock(host, "private void FinishWorkspaceInteraction()");
-            Expect(enter != null && enter.Contains("\"live-workspace-qual\"") && enter.Contains("_liveUiPhase = 140;"),
+            Expect(enter != null && enter.Contains("\"live-workspace-qual\"") &&
+                enter.Contains("_liveUiPhase = HoverScenarioPhase;"),
                 "the hover diagnostic is not limited to the standard workspace scenario");
             Expect(Occurrences(host, "PlannerUiReproduction.Rc6ButtonBehaviour = rc6;") == 1 &&
                 Occurrences(host, "Rc6ButtonBehaviour = true") == 0,

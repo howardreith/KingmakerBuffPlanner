@@ -1,3 +1,23 @@
+> **Active phase-collision repair:** exact d715 Advanced inspection passed in
+> 317.1809501 seconds with runtime PASS, complete/restored/protected-save clean
+> receipts and every Advanced save unchanged. The following 1920x1080 Advanced
+> workspace run `kbpnui-d715-advanced-workspace-01` produced valid planner,
+> interaction and budget screenshots, then FAILED before hover and close/reopen.
+> The compiled host's new removal pre-phase reused the existing hover phase 140;
+> dispatch therefore entered the removal terminal on a non-removal scenario.
+> Authoritative cleanup remains complete: Kingmaker exited, transaction Restored,
+> restoration verified, protected saves compared/clean, zero violations or
+> blocking entries, and all Advanced saves unchanged. The batch stopped before
+> the three selected-plan routes. The repair names the hover phases, moves removal
+> to unused 160/161, scopes both removal and native partial-phase dispatch to their
+> scenarios, and adds a cross-partial uniqueness regression. Focused validation
+> passed source 43/0, build 1/0 and selected C# 4/0 in 9.149 seconds. This observer
+> is compiled into the DLL, so d715 remains preserved evidence rather than being
+> relabelled. A clean successor candidate needs its own build, one-attempt purity
+> prerequisites and affected game observations. The concrete extension revises
+> the remaining estimate to approximately eight to ten hours; it is not a stop
+> timer. Acceptance remains **PARTIAL**.
+
 > **Active October 12 d715 candidate:** clean product and compiled observer source
 > `d7157cbc56d5a35716dcd6ba3e7ac660833c20cd`, version 0.5.0. Local ZIP
 > SHA-256 `d2067acd457b4c564223258e4cfc6684b36f6ab77577a314e4fbcfde36a4980d`;

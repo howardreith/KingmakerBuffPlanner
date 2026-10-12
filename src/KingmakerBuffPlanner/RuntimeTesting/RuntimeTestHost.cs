@@ -131,7 +131,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly List<string> _interactionCastIds = new List<string>();
         private readonly List<string> _interactionCastTargets = new List<string>();
         private string _interactionRetarget;
-        // Pointer-highlight diagnostic (phases 140 and 145).
+        // Pointer-highlight diagnostic. Keep every partial-host phase named:
+        // a removal phase once reused 140 and terminated this route before
+        // hover, close/reopen, and final render evidence.
+        private const int HoverScenarioPhase = 140;
+        private const int HoverReopenPhase = 145;
         private readonly HoverOwnershipRecord _hover = new HoverOwnershipRecord();
         private bool _hoverStarted;
         private bool _hoverReopenChecked;
@@ -330,7 +334,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     return;
                 }
                 _hoverStep = 0;
-                _liveUiPhase = 140;
+                _liveUiPhase = HoverScenarioPhase;
                 return;
             }
             TransitionToBisectionClose();
@@ -2637,19 +2641,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 return UpdateImport();
             }
-            if (_liveUiPhase == RemovalScenarioPrePhase)
+            if (_liveUiPhase == RemovalScenarioPrePhase &&
+                RuntimeTestProtocol.IsRemovalScenario(_request.Scenario))
             {
                 return UpdateRemovalScenarioBeforeOpen();
             }
-            if (_liveUiPhase == RemovalScenarioOpenPhase)
+            if (_liveUiPhase == RemovalScenarioOpenPhase &&
+                RuntimeTestProtocol.IsRemovalScenario(_request.Scenario))
             {
                 return UpdateRemovalScenarioOpened();
             }
-            if (_liveUiPhase == NativeUiPrePhase)
+            if (_liveUiPhase == NativeUiPrePhase &&
+                RuntimeTestProtocol.IsNativeUiScenario(_request.Scenario))
             {
                 return UpdateNativeUiBeforeOpen();
             }
-            if (_liveUiPhase == NativeUiOpenPhase)
+            if (_liveUiPhase == NativeUiOpenPhase &&
+                RuntimeTestProtocol.IsNativeUiScenario(_request.Scenario))
             {
                 return UpdateNativeUiOpened();
             }
@@ -2813,7 +2821,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 return UpdateWorkspaceInteraction();
             }
-            if (_liveUiPhase == 140 || _liveUiPhase == 145)
+            if (_liveUiPhase == HoverScenarioPhase || _liveUiPhase == HoverReopenPhase)
             {
                 return UpdateHoverOwnership();
             }
@@ -2874,7 +2882,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // The pointer-highlight diagnostic's close/reopen reading.
                     _hoverReopenChecked = true;
                     _hoverStep = 30;
-                    _liveUiPhase = 145;
+                    _liveUiPhase = HoverReopenPhase;
                     return false;
                 }
                 _liveUiPhase = RuntimeTestProtocol.IsReloadScenario(_request.Scenario) && reloadable ? 80 : 21;
@@ -7497,7 +7505,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             _hoverReopenChecked = true;
             EndHoverClassic();
             WriteHoverEvidence();
-            if (_liveUiPhase == 145) _liveUiPhase = 21;
+            if (_liveUiPhase == HoverReopenPhase) _liveUiPhase = 21;
             else TransitionToBisectionClose();
             return false;
         }

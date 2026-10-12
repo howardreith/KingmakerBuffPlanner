@@ -63,6 +63,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("spellbook-removal-request-routes-to-the-removal-press", TestRemovalRequestRouting);
             Run("spellbook-removal-no-input-scenario-judgement", TestRemovalScenarioJudgement);
             Run("spellbook-removal-no-input-scenario-admission-and-routing", TestRemovalScenarioAdmissionAndRouting);
+            Run("spellbook-removal-live-phase-ids-are-isolated", TestLivePhaseIdsAreIsolated);
         }
 
         // kbp042-removal-01: the exact request the launcher serialized for the
@@ -370,6 +371,49 @@ namespace KingmakerBuffPlanner.Tests
                 scenarioCode.IndexOf("ArmCastingFirstGrant", StringComparison.Ordinal) >= 0)
                 throw new InvalidOperationException("The removal scenario does not prepare and then press through " +
                     "the routine entry without OS input.");
+        }
+
+        private static void TestLivePhaseIdsAreIsolated()
+        {
+            string runtime = Path.Combine(FindRepositoryRoot(), "src", "KingmakerBuffPlanner", "RuntimeTesting");
+            string host = File.ReadAllText(Path.Combine(runtime, "RuntimeTestHost.cs")).Replace("\r\n", "\n");
+            string removal = File.ReadAllText(Path.Combine(runtime, "RuntimeSpellbookRemovalHost.cs"))
+                .Replace("\r\n", "\n");
+            string native = File.ReadAllText(Path.Combine(runtime, "RuntimeNativeUiHost.cs"))
+                .Replace("\r\n", "\n");
+            var phases = new Dictionary<int, string>();
+            foreach (string source in new[] { host, removal, native })
+            {
+                foreach (System.Text.RegularExpressions.Match match in
+                    System.Text.RegularExpressions.Regex.Matches(source,
+                        @"private const int (?<name>[A-Za-z0-9]+Phase) = (?<value>[0-9]+);"))
+                {
+                    string name = match.Groups["name"].Value;
+                    int value = int.Parse(match.Groups["value"].Value);
+                    string existing;
+                    if (phases.TryGetValue(value, out existing))
+                        throw new InvalidOperationException("Live UI phase collision: " + existing + " and " +
+                            name + " both use " + value + ".");
+                    phases.Add(value, name);
+                }
+            }
+            foreach (string required in new[]
+            {
+                "HoverScenarioPhase", "HoverReopenPhase", "RemovalScenarioPrePhase",
+                "RemovalScenarioOpenPhase", "NativeUiPrePhase", "NativeUiOpenPhase"
+            })
+                if (!phases.Values.Contains(required))
+                    throw new InvalidOperationException("Named live UI phase is missing: " + required + ".");
+
+            if (!System.Text.RegularExpressions.Regex.IsMatch(host,
+                    @"_liveUiPhase == RemovalScenarioPrePhase &&\s*RuntimeTestProtocol\.IsRemovalScenario") ||
+                !System.Text.RegularExpressions.Regex.IsMatch(host,
+                    @"_liveUiPhase == RemovalScenarioOpenPhase &&\s*RuntimeTestProtocol\.IsRemovalScenario") ||
+                !System.Text.RegularExpressions.Regex.IsMatch(host,
+                    @"_liveUiPhase == NativeUiPrePhase &&\s*RuntimeTestProtocol\.IsNativeUiScenario") ||
+                !System.Text.RegularExpressions.Regex.IsMatch(host,
+                    @"_liveUiPhase == NativeUiOpenPhase &&\s*RuntimeTestProtocol\.IsNativeUiScenario"))
+                throw new InvalidOperationException("A partial-host phase dispatch is not scoped to its scenario.");
         }
 
         // The native "removal" run's Unity-free judgement: a selection press

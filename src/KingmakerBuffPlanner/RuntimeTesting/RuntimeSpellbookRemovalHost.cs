@@ -246,8 +246,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         }
 
         // ---- live-workspace-removal (no synthetic input) ----------------
-        private const int RemovalScenarioPrePhase = 140;
-        private const int RemovalScenarioOpenPhase = 141;
+        private const int RemovalScenarioPrePhase = 160;
+        private const int RemovalScenarioOpenPhase = 161;
         private int _removalScenarioStep;
         private System.Diagnostics.Stopwatch _removalScenarioClock;
         private bool _removalScenarioWritten;
