@@ -69,6 +69,8 @@ cannot select deployment, launcher live purity, restore-install or publisher.
 `-Check RuntimeHarness` explicitly runs the existing bounded harness test and
 requires its already built, matching local package; the selector does not
 silently package a product to satisfy that prerequisite.
+`-Check PhysicalSearchEvidence` runs the bounded physical-search record reader
+against its positive and negative contract cases without launching Kingmaker.
 
 For launcher arguments, `scripts/Test-RuntimeLauncherArguments.ps1` exercises
 bounded direct invocation. A -File consumer repair also uses

@@ -1103,25 +1103,31 @@ function Assert-KbpPhysicalSearchObservation {
     param([Parameter(Mandatory = $true)]$Observation)
     $required = @('dispatch','cleanupDispatch','query','typedQuery','typedWithBindingLetter',
         'modeBefore','modeAfterQuery','modeAfterBindingLetter','focusedBeforeTyping','plannerStayedOpen',
-        'documentUnchanged','cleanupComplete','expectedSources','observedSources','sourcesAfterBindingLetter',
-        'captureFailure','captures')
+        'documentUnchanged','cleanupComplete','preservedSelectedSource','expectedSources','observedSources',
+        'expectedSourcesAfterBindingLetter','sourcesAfterBindingLetter','captureFailure','captures')
     foreach ($key in $required) {
         if ($null -eq $Observation.PSObject.Properties[$key]) { throw "Physical search observation missing $key." }
     }
     foreach ($key in @('focusedBeforeTyping','plannerStayedOpen','documentUnchanged','cleanupComplete')) {
         if ($Observation.$key -isnot [bool] -or -not $Observation.$key) { throw "Physical search actual Boolean failed: $key" }
     }
+    $expectedVisible = @($Observation.expectedSources) + @([string]$Observation.preservedSelectedSource)
+    $expectedVisible = @($expectedVisible | Select-Object -Unique)
     if ($Observation.dispatch -cne 'physical-os-input' -or $Observation.cleanupDispatch -cne 'view-callback' -or
         [string]$Observation.query -cnotmatch '^[a-z]{1,31}$' -or
         $Observation.typedQuery -cne $Observation.query -or $Observation.typedWithBindingLetter -cne ($Observation.query+'b') -or
         [string]::IsNullOrEmpty([string]$Observation.modeBefore) -or
         $Observation.modeBefore -cne $Observation.modeAfterQuery -or
         $Observation.modeBefore -cne $Observation.modeAfterBindingLetter -or
+        [string]::IsNullOrEmpty([string]$Observation.preservedSelectedSource) -or
         @($Observation.expectedSources).Count -eq 0 -or
         @($Observation.expectedSources | Select-Object -Unique).Count -ne @($Observation.expectedSources).Count -or
         @($Observation.observedSources | Select-Object -Unique).Count -ne @($Observation.observedSources).Count -or
-        @((Compare-Object @($Observation.expectedSources) @($Observation.observedSources) -CaseSensitive)).Count -ne 0 -or
-        $null -eq $Observation.sourcesAfterBindingLetter -or [int]$Observation.sourcesAfterBindingLetter -ne 0 -or
+        @((Compare-Object $expectedVisible @($Observation.observedSources) -CaseSensitive)).Count -ne 0 -or
+        $null -eq $Observation.expectedSourcesAfterBindingLetter -or
+        [int]$Observation.expectedSourcesAfterBindingLetter -lt 0 -or
+        $null -eq $Observation.sourcesAfterBindingLetter -or
+        [int]$Observation.sourcesAfterBindingLetter -ne [int]$Observation.expectedSourcesAfterBindingLetter -or
         $null -ne $Observation.captureFailure -or @($Observation.captures).Count -ne 2) {
         throw 'Physical typing, native owner, row membership or capture outcome failed.'
     }

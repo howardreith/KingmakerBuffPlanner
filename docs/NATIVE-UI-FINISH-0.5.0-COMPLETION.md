@@ -1,3 +1,24 @@
+> **Active October 12 d715 candidate:** clean product and compiled observer source
+> `d7157cbc56d5a35716dcd6ba3e7ac660833c20cd`, version 0.5.0. Local ZIP
+> SHA-256 `d2067acd457b4c564223258e4cfc6684b36f6ab77577a314e4fbcfde36a4980d`;
+> DLL SHA-256 `5d60de1eb63fb4a7ef73a249cf0aa747fa0b2076c7d54284ab6490ff0d38bdfb`;
+> MVID `58d8fe2e-30eb-4ddf-a924-acfc5eccd22c`. Its selection/physical
+> whole-history purity prerequisite passed once, exit 0, in 8789.4091669 seconds
+> with Attempts 1, LeaseWaitSeconds 120, eleven WhatIf calls and all five targets.
+> Native 1080p, native 720p, zero-cost selection, Classic selection and physical
+> Spellbook runs passed and restored. The physical-search game record also passed:
+> all eleven physical acknowledgements arrived, both captures completed on later
+> frames, the plan stayed unchanged and guarded restoration/protected-save checks
+> passed. Its post-run wrapper exited 1 because the PowerShell reader still assumed
+> filtering removed the selected catalogue row. The immutable record instead shows
+> the product's intentional selected-row preservation. The bounded reader now uses
+> that recorded contract and has positive/negative regression coverage; focused
+> validation passed source 43/0, build 1/0, selected C# 1/0 and reader 20/0 in
+> 6.730 seconds. This reader-only correction does not change or relabel the d715
+> product bytes. Remaining Advanced and allowance-bound observations continue on
+> that exact candidate. Acceptance remains **PARTIAL** pending those runs and final
+> screenshot review. Historical banners below retain their original attribution.
+
 > **Active October 12 completion:** product `b6016c710c24a6118d4e92eb391bdb0b1c036488`,
 > version 0.5.0, has a validated local ZIP but is **NOT_RUN** in Kingmaker.
 > The earlier 624b5e9 two-size native pictures remain attributed to those bytes;
