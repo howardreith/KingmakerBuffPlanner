@@ -1,3 +1,22 @@
+> Current continuous mission: clean product `96b2f4b6396d3c9a961cc2dc6bd4b6a8327d9f18`,
+> version 0.5.0 in owned `KingmakerBuffPlanner-NUICY`; validated local ZIP **NOT_RUN**.
+> Reused bounded observers now hold actual selected group/enhancement plan pictures
+> and observe genuine spent finite prepared resources after an approved qualification.
+> They restore temporary plan edits through Undo and submit no additional casts.
+> Physical search and deliberately paused Planner-to-Spellbook B dispatch remain selected.
+> Old 3b5a2d7 prerequisite completed **PASS, exit 0, 6534.7207909 seconds** with
+> all five inventory targets, six WhatIf calls, Attempts 1 and lease wait 120.
+> It establishes no purity or game evidence for these changed compiled bytes.
+> Current eleven-action selection/physical prerequisite and sixteen actual routes
+> are selected, followed by a five-action casting prerequisite with fresh mechanical
+> allowances: zero-cost instant, one-plan animated Classic, existing finite-direct-mixed
+> instant, physical authoring and blocker navigation. Every Advanced save, including
+> both fixture copies, must remain unchanged; unsupported NativeUI/Advanced remains refused.
+> New candidate runtime **NOT_RUN**, acceptance **PARTIAL** until actual runs and PNG review.
+> Continue the authorized longer milestone through restoration, pictures, local delivery
+> and guarded push. Eighteen-hour planning estimate remains a forecast, not a deadline.
+> Earlier banners below retain chronology and their original source attribution.
+
 > Current continuous milestone: clean product `bad10d978b8e3c79bead55bb4e8969e6126769c2`,
 > version 0.5.0 in owned NUICW; local package validated, **NOT_RUN**.
 > Physical search uses real OS typing. Spellbook schema 2 now requires an

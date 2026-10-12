@@ -1,3 +1,22 @@
+> Current continuous mission: clean product `96b2f4b6396d3c9a961cc2dc6bd4b6a8327d9f18`,
+> version 0.5.0 in owned `KingmakerBuffPlanner-NUICY`; validated local ZIP **NOT_RUN**.
+> Reused bounded observers now hold actual selected group/enhancement plan pictures
+> and observe genuine spent finite prepared resources after an approved qualification.
+> They restore temporary plan edits through Undo and submit no additional casts.
+> Physical search and deliberately paused Planner-to-Spellbook B dispatch remain selected.
+> Old 3b5a2d7 prerequisite completed **PASS, exit 0, 6534.7207909 seconds** with
+> all five inventory targets, six WhatIf calls, Attempts 1 and lease wait 120.
+> It establishes no purity or game evidence for these changed compiled bytes.
+> Current eleven-action selection/physical prerequisite and sixteen actual routes
+> are selected, followed by a five-action casting prerequisite with fresh mechanical
+> allowances: zero-cost instant, one-plan animated Classic, existing finite-direct-mixed
+> instant, physical authoring and blocker navigation. Every Advanced save, including
+> both fixture copies, must remain unchanged; unsupported NativeUI/Advanced remains refused.
+> New candidate runtime **NOT_RUN**, acceptance **PARTIAL** until actual runs and PNG review.
+> Continue the authorized longer milestone through restoration, pictures, local delivery
+> and guarded push. Eighteen-hour planning estimate remains a forecast, not a deadline.
+> Earlier banners below retain chronology and their original source attribution.
+
 > Current continuous milestone: clean product `bad10d978b8e3c79bead55bb4e8969e6126769c2`,
 > version 0.5.0 in owned NUICW; local package validated, **NOT_RUN**.
 > Physical search uses real OS typing. Spellbook schema 2 now requires an
@@ -914,3 +933,60 @@ mechanical allowances and the separate casting purity, then the selected
 instant/one-plan animated/physical-authoring/problem observations. The eighteen-
 hour estimate and original selected milestone continue. No new broad aggregate
 or release/publisher campaign is selected.
+
+## Current feasible-state batch preparation — 2026-10-12
+
+This remains the same explicitly selected completion mission on DATA, branch
+`codex/kingmaker-buff-planner-native-ui-finish-2026-10-10`. Product source is
+`96b2f4b6396d3c9a961cc2dc6bd4b6a8327d9f18`; documentation commits do not relabel it.
+1484473 added the small selected-plan observation (focused 10/0); its validated
+NOT_RUN package and NUICX remain preserved. 96b2f4b extends the existing post-run
+observation to the previously qualified finite recipe. Its temporary copies recast
+policy is edited after the real native qualification to expose actual exhaustion;
+no native resource, tint, enabled flag or effect is manufactured, and no observer
+Apply occurs. Initial active and later recast cards and native resource pools are
+recorded separately. Existing zero-cost behavior remains unchanged.
+
+`Test-Development.ps1 -Only 'qualification-finite-recipe,qualification-driver,graph-capacity,graph-spontaneous-pool,graph-at-will,native-ui-capture,native-ui-record'`
+passed source 43/0, build 1/0 and C# **12/0**, exit 0 in 6.152611599999999 seconds.
+The initial compile refusal (missing namespace import, no game) is preserved and
+corrected. Pure private actual-consumer checks passed selected-plan **16/0**, finite
+resource **14/0** and seven helper parsers, exit 0 in 0.33154859999999997 seconds.
+Two earlier reader fixture mistakes (nested array and legacy PowerShell encoding)
+retain their failed logs; production guards were not weakened. Earlier physical
+13/50/14/24/8 checks remain their separately recorded source-and-patch evidence.
+
+Clean owned NUICY `Build-Local.ps1` ran once, source 43/0, build 1/0, package 4/0,
+local archive 1/0, exit 0 in 4.2157441 seconds. Installable archive:
+`C:\Dev\KingmakerBuffPlannerLab\package-archive\0.5.0-native-ui-completion-2026-10-12-96b2f4b\KingmakerBuffPlanner-0.5.0.zip`.
+ZIP `34557657afbf522a7135169a613c3fdfc8f35acadd2c52a93cc1f122f431c220`;
+DLL `4cf5873d192f07a2f64a7ec95b13d631b2de198d27f6ec89777d12004e629950`;
+MVID `0629c2a3-b25f-4ee3-b6b4-b069d06028a5`. Original path-bound build receipt,
+archive transport hashes and allowlisted contents were checked. No rebuild to
+stamp this later documentation is selected. Runtime status remains NOT_RUN.
+
+Current supervised preparation, helper/reader hashes and fresh sixteen RunId collision
+checks are in `artifacts/native-ui-milestone-2026-10-11/candidate-96b2f4b/`.
+`kbpnui-finish-final-1080-01` and `kbpnui-finish-final-720-01` preserve qualify/full-user/
+Automation/timeout600/direct Confirm false. Remaining fresh RunIds in the collision
+record cover selections, physical spellbook/search/authoring/problems, zero-cost
+and Classic casts, read-only Advanced inspect/workspace/group/enhancement/finite
+selection, and the independently allowance-bound finite cast. Advanced uses its
+original approved sealed profile and working fixture, with additional before/after
+hash snapshots proving every save unchanged. Only Automation WORKING may be mutable.
+This supplies no new Advanced save-mutation exception or NativeUI fixture permission.
+
+The owned prior PID26140 scan completed 2026-10-12T05:39:15.4230779Z: numeric exit0,
+6534.7207909 seconds, six WhatIf calls, Attempts1/LeaseWaitSeconds120, all original
+five targets. Its product 3b5a2d7 / ZIP f4e06b73 identity is preserved in its original
+result; no live run on that obsolete candidate is added just for a run count.
+The current candidate still needs its own eleven-action full target purity window,
+then serial native1080/720 with full restored/protected receipts before the next run.
+The later five-action prerequisite needs actual fresh source-bound selections,
+freeze and grants (mechanical budget at most24), not copies of earlier allowances.
+
+Exact next action: verify current no-game/lease/transaction/Steam/profile/fixture/display
+and package boundaries, freeze current product once, execute the selected prerequisite
+with Attempts1/LeaseWait120, then the serial actual observations and original-image
+review. Complete restoration after every run. Do not resume the old failed4db aggregate
+or select a publisher, release reproducibility or unrelated layout campaign.
