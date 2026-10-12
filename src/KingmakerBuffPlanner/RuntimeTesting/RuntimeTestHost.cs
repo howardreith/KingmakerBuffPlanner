@@ -3997,6 +3997,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // closes the inspect first and the workspace second.
         private bool UpdatePhysicalCastingFirst(CastingWorkspaceScreenView view, double settled)
         {
+            if (_physicalStep >= PhysicalSearchStartStep && _physicalStep <= PhysicalSearchStartStep + 4)
+                return UpdatePhysicalSearch(view, settled);
             if (_physicalStep >= CombatStartStep && _physicalStep < CombatStartStep + 10)
                 return UpdateCombatPress(view, settled);
             if (_physicalStep >= AuthoringStartStep && _physicalStep < AuthoringStartStep + 30)
@@ -4282,6 +4284,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
                         "physical-cf-graph-scrolled.png"));
                 }
+                if (_physicalRecord.SchemaVersion >= 2 && _physicalRecord.MoonExpectation == "select" &&
+                    (_physicalRecord.PhysicalSearch == null || !_physicalRecord.PhysicalSearch.CleanupComplete))
+                    return BeginPhysicalSearch(view);
                 string chip = view.InspectTargetPartForRuntime;
                 if (chip == null && _physicalRecord.GraphOverflow && _physicalWheelBacks < 2)
                 {
@@ -4446,6 +4451,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.MoonExpectation = NormalizedMoonExpectation(
                     _request.Parameters.TryGetValue("physicalExpectation", out expectation)
                         ? expectation as string : null);
+                if (_physicalRecord.CastingFirst && _physicalRecord.MoonExpectation == "select")
+                    _physicalRecord.SchemaVersion = 2;
                 // Casting-first: the isolation probe covers the planner's own
                 // gestures (step 3 on), not the moon run's legitimate casts.
                 if (!_physicalRecord.CastingFirst) BuffPlannerUiRoot.BeginPhysicalInputProbe();
@@ -4596,6 +4603,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             if (PhysicalProblemsRequested) return FinishProblemNavigation(failure);
             if (PhysicalSpellbookRequested) return FinishSpellbookEntry(failure);
+            try { RestorePhysicalSearch(); }
+            catch (Exception exception) { _physicalRecord.Failures.Add("search:cleanup:" + exception.Message); }
             if (failure != null) _physicalRecord.Failures.Add(failure);
             // The single-use exception ends with this scenario, used or not.
             if (_physicalGrant != null)
@@ -4644,7 +4653,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             PhysicalWorkspaceRecord record = _physicalRecord;
             var published = new JObject
             {
-                { "schemaVersion", 1 },
+                { "schemaVersion", record.SchemaVersion },
+                { "physicalSearch", record.PhysicalSearch == null ? null : record.PhysicalSearch.ToJson() },
                 { "runId", _request.RunId },
                 { "expectedScreen", record.ExpectedScreen },
                 { "screen", record.ScreenWidth + "x" + record.ScreenHeight },

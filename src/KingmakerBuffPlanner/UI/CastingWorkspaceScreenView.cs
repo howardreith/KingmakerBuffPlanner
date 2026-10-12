@@ -611,6 +611,13 @@ namespace KingmakerBuffPlanner.UI
                 EventSystem.current.SetSelectedGameObject(null);
         }
 
+        // Owned probe cleanup uses the real view binding and releases text focus.
+        internal void RestoreSearchForRuntime(string text)
+        {
+            if (_buffSearch != null) _buffSearch.text = text ?? string.Empty;
+            FocusSearchForRuntime(false);
+        }
+
         // "<sourceId>|<label>|<selected>" for every catalogue entry shown now.
         internal IList<string> VisibleSourcesForRuntime()
         {

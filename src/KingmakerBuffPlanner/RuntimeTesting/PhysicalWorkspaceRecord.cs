@@ -12,6 +12,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
     // physical planner hotkey. Judged Unity-free.
     public sealed class PhysicalWorkspaceRecord
     {
+        public int SchemaVersion { get; set; } = 1;
+        public PhysicalSearchObservation PhysicalSearch { get; set; }
+
         // Every physical action the run requests, in order.
         public static readonly string[] Actions =
         {
@@ -55,6 +58,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 if (MoonExpectation == "authoring") return AuthoringActions;
                 if (MoonExpectation == "combat") return new[] { "cf-moon-combat" }.Concat(CastingActions);
+                if (SchemaVersion >= 2 && MoonExpectation == "select")
+                    return CastingActions.Concat(PhysicalSearchObservation.Actions);
                 return CastingActions;
             }
         }
@@ -589,6 +594,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (!Acknowledged.Contains(action))
                         violations.Add("unacknowledged:" + action);
                 violations.AddRange(MoonViolations());
+                if (SchemaVersion >= 2 && MoonExpectation == "select")
+                {
+                    if (PhysicalSearch == null) violations.Add("search:observation-missing");
+                    else violations.AddRange(PhysicalSearch.Violations());
+                }
                 if (MoonExpectation == "combat") violations.AddRange(CombatViolations());
                 if (MoonExpectation == "removal") violations.AddRange(RemovalViolations());
                 if (MoonExpectation == "authoring") violations.AddRange(AuthoringViolations());

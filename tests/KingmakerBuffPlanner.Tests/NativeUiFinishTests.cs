@@ -55,6 +55,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("native-pause-restoration-queued-mode", TestPauseRestoreQueuedMode);
             Run("native-pause-restoration-original-state", TestPauseRestoreOriginalState);
             Run("native-pause-restoration-bounded-timeout", TestPauseRestoreTimeout);
+            Run("physical-search-record-capture-and-history", TestPhysicalSearchObservation);
             Run("native-ui-snapshots-retain-state-under-game-json-defaults", TestNativeUiStateJson);
             Run("native-ui-capture-holds-frame-and-output", TestNativeUiCaptureBoundary);
             Run("native-ui-capture-bounded-timeout", TestNativeUiCaptureTimeout);
@@ -68,6 +69,43 @@ namespace KingmakerBuffPlanner.Tests
             Run("native-hud-stepped-enclosure-geometry", TestHudStepGeometry);
             Run("native-hud-cell-art-composition", TestHudCellArt);
             Run("native-source-tabs-share-one-caption-size", TestSourceTabLayout);
+        }
+
+        private static void TestPhysicalSearchObservation()
+        {
+            Func<PhysicalSearchObservation> good = () =>
+            {
+                var value = new PhysicalSearchObservation {
+                    Query = "ligh", TypedQuery = "ligh", TypedWithBindingLetter = "lighb",
+                    ModeBefore = "FullScreenUI", ModeAfterQuery = "FullScreenUI", ModeAfterBindingLetter = "FullScreenUI",
+                    FocusedBeforeTyping = true, PlannerStayedOpen = true, DocumentUnchanged = true,
+                    CleanupComplete = true, SourcesAfterBindingLetter = 0 };
+                value.ExpectedSources.Add("light-spell"); value.ObservedSources.Add("light-spell");
+                value.Captures.Add(new JObject { { "file", "physical-cf-search-filtered.png" }, { "requestFrame", 10 }, { "completedFrame", 11 } });
+                value.Captures.Add(new JObject { { "file", "physical-cf-search-binding-text.png" }, { "requestFrame", 20 }, { "completedFrame", 21 } });
+                return value;
+            };
+            Expect(good().Violations().Count == 0, "Complete physical search state must pass.");
+            foreach (Action<PhysicalSearchObservation> breakState in new Action<PhysicalSearchObservation>[] {
+                v => v.FocusedBeforeTyping = false, v => v.TypedQuery = "lig", v => v.TypedWithBindingLetter = "ligh",
+                v => v.ModeAfterBindingLetter = "Spellbook", v => v.ObservedSources.Clear(),
+                v => v.SourcesAfterBindingLetter = 1, v => v.DocumentUnchanged = false, v => v.CleanupComplete = false,
+                v => v.Captures[0]["completedFrame"] = 10, v => v.CaptureFailure = "timeout" })
+            {
+                PhysicalSearchObservation value = good(); breakState(value);
+                Expect(value.Violations().Count != 0, "Incomplete typing, isolation, cleanup or capture must fail.");
+            }
+            var historical = new PhysicalWorkspaceRecord { MoonExpectation = "select", CastingFirst = true };
+            Expect(historical.ExpectedCastingActions.SequenceEqual(PhysicalWorkspaceRecord.CastingActions),
+                "Historical schema 1 keeps its original action interpretation.");
+            historical.SchemaVersion = 2;
+            Expect(PhysicalSearchObservation.Actions.All(action => historical.ExpectedCastingActions.Contains(action)) &&
+                historical.Violations().Contains("search:observation-missing"),
+                "New schema cannot omit the physical search observation.");
+            JObject raw = good().ToJson();
+            Expect(raw["focusedBeforeTyping"].Type == JTokenType.Boolean &&
+                (string)raw["dispatch"] == "physical-os-input" && (string)raw["cleanupDispatch"] == "view-callback",
+                "Physical delivery and callback cleanup must remain distinct in raw evidence.");
         }
 
         private static void TestPauseRestoreWorldBoundary()

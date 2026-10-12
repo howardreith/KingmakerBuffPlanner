@@ -95,6 +95,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\LegacyProfileFixture.cs"><Link>RuntimeTesting\LegacyProfileFixture.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Persistence\PersistenceMessages.cs"><Link>Persistence\PersistenceMessages.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\PhysicalWorkspaceRecord.cs"><Link>RuntimeTesting\PhysicalWorkspaceRecord.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\PhysicalSearchObservation.cs"><Link>RuntimeTesting\PhysicalSearchObservation.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\ProblemNavigationRecord.cs"><Link>RuntimeTesting\ProblemNavigationRecord.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\SpellbookEntryRecord.cs"><Link>RuntimeTesting\SpellbookEntryRecord.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\NativeUiRecord.cs"><Link>RuntimeTesting\NativeUiRecord.cs</Link></Compile>

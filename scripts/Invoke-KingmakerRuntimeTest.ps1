@@ -502,6 +502,7 @@ try {
         # What the physical scenario expects of the moon press (see
         # -PhysicalExpectation): the host judges accordingly.
         $scenarioParameters.physicalExpectation = $PhysicalExpectation
+        if ($PhysicalExpectation -ceq 'select') { $scenarioParameters.physicalSearchSchema = 2 }
     }
     if ($null -ne $displaySize) {
         # The host judges the screen it actually got against this size.

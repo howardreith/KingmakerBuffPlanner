@@ -1098,6 +1098,43 @@ function Assert-KbpProblemNavigationOutcome {
         }
     }
 }
+# Actual physical search facts; no missing Boolean is interpreted as false.
+function Assert-KbpPhysicalSearchObservation {
+    param([Parameter(Mandatory = $true)]$Observation)
+    $required = @('dispatch','cleanupDispatch','query','typedQuery','typedWithBindingLetter',
+        'modeBefore','modeAfterQuery','modeAfterBindingLetter','focusedBeforeTyping','plannerStayedOpen',
+        'documentUnchanged','cleanupComplete','expectedSources','observedSources','sourcesAfterBindingLetter',
+        'captureFailure','captures')
+    foreach ($key in $required) {
+        if ($null -eq $Observation.PSObject.Properties[$key]) { throw "Physical search observation missing $key." }
+    }
+    foreach ($key in @('focusedBeforeTyping','plannerStayedOpen','documentUnchanged','cleanupComplete')) {
+        if ($Observation.$key -isnot [bool] -or -not $Observation.$key) { throw "Physical search actual Boolean failed: $key" }
+    }
+    if ($Observation.dispatch -cne 'physical-os-input' -or $Observation.cleanupDispatch -cne 'view-callback' -or
+        [string]$Observation.query -cnotmatch '^[a-z]{1,31}$' -or
+        $Observation.typedQuery -cne $Observation.query -or $Observation.typedWithBindingLetter -cne ($Observation.query+'b') -or
+        [string]::IsNullOrEmpty([string]$Observation.modeBefore) -or
+        $Observation.modeBefore -cne $Observation.modeAfterQuery -or
+        $Observation.modeBefore -cne $Observation.modeAfterBindingLetter -or
+        @($Observation.expectedSources).Count -eq 0 -or
+        @($Observation.expectedSources | Select-Object -Unique).Count -ne @($Observation.expectedSources).Count -or
+        @($Observation.observedSources | Select-Object -Unique).Count -ne @($Observation.observedSources).Count -or
+        @((Compare-Object @($Observation.expectedSources) @($Observation.observedSources) -CaseSensitive)).Count -ne 0 -or
+        $null -eq $Observation.sourcesAfterBindingLetter -or [int]$Observation.sourcesAfterBindingLetter -ne 0 -or
+        $null -ne $Observation.captureFailure -or @($Observation.captures).Count -ne 2) {
+        throw 'Physical typing, native owner, row membership or capture outcome failed.'
+    }
+    foreach ($file in @('physical-cf-search-filtered.png','physical-cf-search-binding-text.png')) {
+        $capture = @($Observation.captures | Where-Object {$_.file -ceq $file})
+        if ($capture.Count -ne 1 -or $null -eq $capture[0].PSObject.Properties['requestFrame'] -or
+            $null -eq $capture[0].PSObject.Properties['completedFrame'] -or
+            [int]$capture[0].completedFrame -le [int]$capture[0].requestFrame) {
+            throw 'Physical search capture did not hold its actual state through a later frame.'
+        }
+    }
+}
+
 # Interpret current native footer geometry and historical placement receipts.
 # The entry controller obtains paired from real native activeInHierarchy.
 function Test-KbpSpellbookPlacement {
@@ -1501,6 +1538,24 @@ function Assert-KbpScenarioOutcome {
         if ([string]::IsNullOrEmpty($expectation)) { $expectation = 'cast' }
         $expected = @('cf-moon', 'cf-routine-short', 'cf-wheel', 'cf-right-click', 'cf-inspect-wheel', 'cf-long-wheel',
             'cf-escape-inspect', 'cf-escape-close')
+        if ($expectation -ceq 'select') {
+            $expectedSearchSchema = if ($Request.parameters -is [System.Collections.IDictionary]) {
+                if ($Request.parameters.Contains('physicalSearchSchema')) { [int]$Request.parameters['physicalSearchSchema'] } else { 1 }
+            } elseif ($null -ne $Request.parameters.PSObject.Properties['physicalSearchSchema']) {
+                [int]$Request.parameters.physicalSearchSchema
+            } else { 1 }
+            if ($expectedSearchSchema -ge 2 -and [int]$record.schemaVersion -ne 2) { throw 'New physical search requires schema 2.' }
+            if ([int]$record.schemaVersion -eq 2) {
+                Assert-KbpPhysicalSearchObservation $record.physicalSearch
+                $expected += @('cf-search-focus','cf-search-query','cf-search-binding-text')
+                foreach ($file in @('physical-cf-search-filtered.png','physical-cf-search-binding-text.png')) {
+                    $shot = Join-Path $directory $file
+                    if (-not (Test-Path -LiteralPath $shot -PathType Leaf) -or (Get-Item -LiteralPath $shot).Length -lt 1024) {
+                        throw "Physical search screenshot missing: $file"
+                    }
+                }
+            }
+        }
         $conditional = @('cf-menu-close-1', 'cf-menu-close-2', 'cf-menu-close-3',
             'cf-wheel-back-1', 'cf-wheel-back-2')
         # 0.4.0: the combat run presses the moon in combat first; the
@@ -1709,6 +1764,15 @@ function Assert-KbpScenarioOutcome {
                 [string]$sent.actionId -cne $actionId -or [string]$ack.actionId -cne $actionId -or
                 [string]$ack.action -cne [string]$sent.action -or $failed) {
                 throw "Physical action $actionId was not delivered as the game requested it."
+            }
+            if ($actionId -ceq 'cf-search-focus' -and [string]$sent.action -cne 'click') {
+                throw 'Search focus was not physically clicked.'
+            }
+            if ($actionId -ceq 'cf-search-query' -or $actionId -ceq 'cf-search-binding-text') {
+                $text = if ($actionId -ceq 'cf-search-query') { [string]$record.physicalSearch.query } else { 'b' }
+                if ([string]$sent.action -cne 'type' -or [string]$sent.text -cne $text -or [string]$ack.text -cne $text) {
+                    throw 'Physical search text differs from its single-shot request/ACK.'
+                }
             }
             if ([string]$ack.processId -cne [string]$orchestration.kingmakerProcessId) {
                 throw "Physical action $actionId was acknowledged for another process."

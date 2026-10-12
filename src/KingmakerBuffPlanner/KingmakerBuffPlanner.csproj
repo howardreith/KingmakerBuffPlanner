@@ -147,6 +147,8 @@
     <Compile Include="RuntimeTesting\RuntimeSpellbookRemovalHost.cs" />
     <Compile Include="Persistence\PersistenceMessages.cs" />
     <Compile Include="RuntimeTesting\PhysicalWorkspaceRecord.cs" />
+    <Compile Include="RuntimeTesting\PhysicalSearchObservation.cs" />
+    <Compile Include="RuntimeTesting\RuntimePhysicalSearchHost.cs" />
     <Compile Include="RuntimeTesting\ProblemNavigationRecord.cs" />
     <Compile Include="RuntimeTesting\RuntimeProblemNavigationHost.cs" />
     <Compile Include="RuntimeTesting\RuntimePolicyAuthoringHost.cs" />
