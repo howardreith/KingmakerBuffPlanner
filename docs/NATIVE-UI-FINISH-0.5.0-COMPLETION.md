@@ -1132,9 +1132,156 @@ raw staging or replace purity checks. PID23484/session62865, started
 LeaseWaitSeconds 120; logs and numeric receipts are outside the inventory roots.
 Actual native1080/720 and remaining selected routes are still NOT_RUN.
 
+## Atlas and physical-target candidate observations — October 12
+
+Clean product source `dd5307cc6d1bf3c600a7ab669bf971229a3dbc0d`, version
+0.5.0, ZIP `979c3355e71a06f4bcc456f1f4f452c6043e30a8827abd7ff9ecdf28f06a4017`,
+DLL `970c2dabc242956ce0b5c54dff1889fd7783b0eac38e0b2cf3ad6311bf081bb4`
+and MVID `253e669c-51b1-4134-bef5-35a82383f1e8` passed its exact-source
+eleven-action whole-history prerequisite once: exit 0, 7851.1081375 seconds,
+Attempts 1, LeaseWaitSeconds 120 and all five original targets.
+
+The following guarded runs completed on those exact bytes. Each successful row
+has its original PASS runtime result, complete game exit, transaction/registry/
+Mods restoration and clean protected-save comparison:
+
+| RunId | Scope | Exit | Seconds | Result |
+| --- | --- | ---: | ---: | --- |
+| `kbpnui-atlas-final-1080-01` | native UI, 1920x1080 | 0 | 442.3178701 | PASS |
+| `kbpnui-atlas-final-720-01` | native UI, 1280x720 | 0 | 425.4080667 | PASS |
+| `kbpnui-atlas-cast-select-01` | zero-cost selection | 0 | 294.1569459 | PASS |
+| `kbpnui-atlas-classic-select-01` | animated Classic selection | 0 | 287.2427416 | PASS |
+| `kbpnui-atlas-spellbook-01` | physical spellbook and paused switch | 0 | 314.6136492 | PASS |
+| `kbpnui-atlas-physical-select-01` | physical search/selection | 1 | 263.6134133 | FAIL |
+
+Original 1080p and 720p PNG review found the native popup, held Metamagic and
+casting-card popup states, spellbook pair, parchment hierarchy, compact sidebar,
+catalogue filters, HUD, game log and responsive layout visually sound. In
+particular, the earlier 720p wrong-atlas glyph corruption is absent and the
+Abilities caption remains readable. The spellbook physical run delivered all
+thirteen expected OS acknowledgements, including the paused Planner-to-Spellbook
+binding, with verified foreground coordinates and zero world/casting input.
+
+The physical selection failed before typing with
+`search:no-plain-query-from-available-source`. Its launcher completion still
+records complete restoration and protected saves clean, its transaction is
+Restored, and no game, claim or lease remained. Source inspection and the actual
+record established the observer defect: catalogue rows append label and selected
+state with pipe delimiters, while real stable IDs such as `effect|<guid>` and
+`variant|<base>|<variant>` also contain pipes. The consumer wrongly required
+exactly three fields. Its requested `physical-cf-graph-scrolled.png` also showed
+the world because failure cleanup closed the planner before the frame-end engine
+capture completed. Neither failure is a product UI defect or a PASS.
+
+## Current exact candidate after physical evidence repair — October 12
+
+Source `e37fd305e16733fd414901fee63f1233bd91cb4b` parses runtime catalogue rows
+from the right, preserving structural source IDs in both physical consumers and
+record judgement. The scrolled graph now stays open at the recorded position
+through a later-frame, complete-PNG boundary. A ten-second timeout and the
+request/completion frames or exact failure are written to the physical record;
+the next input is issued on a later Update. Cleanup still restores search focus,
+text and ownership.
+
+Focused validation used the repository-owned development runner only:
+`Test-Development.ps1 -Only physical-workspace,cold-moon,physical-search-record,native-ui-capture`.
+Actual result: source 43/0, build 1/0 and selected C# 6/0, exit 0 in 6.3 seconds.
+The earlier two split invocations passed 2/0 and 4/0 respectively. Guarded-push
+WhatIf and the actual guarded push passed; the remote feature branch was verified
+at `e37fd305e16733fd414901fee63f1233bd91cb4b`.
+
+The clean detached NUICP candidate was built once through `Build-Local.ps1`:
+source 43/0, build 1/0, package validation 4/0 and local creation 1/0, exit 0.
+Exact version 0.5.0 identities are:
+
+- ZIP `5f1ae936c6c5eba677c4b515a458ffb307ec7049d6b5f8033b02ef0623394650`.
+- DLL `75b2e1e64c8315fc99a4c8ab7ef0e3282f2e36f52387d8e2bfafbef4f9aed6ef`.
+- MVID `d002f496-a252-4211-a994-5065316b9163`.
+- Candidate worktree `C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-NUICP`.
+
+The inspected freeze helper copied that ZIP and its original path-bound receipt
+to `runtime-backups\qualification-frozen\e37fd305e16733fd414901fee63f1233bd91cb4b`,
+verified the packaged DLL stream, and wrote the exclusive `FREEZE.json`: exit 0,
+42.2314042 seconds, frozen at 2026-10-12T16:51:37.3642714Z. Current-boundary
+preflight then passed in 50.9703347 seconds: exact clean source/package/MVID,
+no game/foreign lease/unresolved transaction/save violation, Steam safety,
+Automation and Advanced fixture/profile bindings, both required display sizes,
+and zero collisions for seventeen fresh `kbpnui-e37-*` RunIds.
+
+The old 4dbfa33 test's captured child output is empty: its nonzero exit is known,
+but the preserved log cannot identify the child's underlying exception. Frozen
+source proves that sentinel omitted `-Confirm:$false` and reached its confirmation
+decision only after read-only preflights. The selected route invokes the current
+launcher directly with explicit `-Confirm:$false`; current focused argument and
+real child-process checks already passed. No old non-WhatIf launcher replay or
+aggregate restart is selected.
+
+At this checkpoint the supervised prerequisite was one eleven-WhatIf full-history window on exact
+e37fd30 bytes, all five targets, Attempts 1 and LeaseWaitSeconds 120, started
+2026-10-12T16:53:25.7436692Z under owned PID 28400. Its external log and numeric
+receipt are in `candidate-e37fd30/`. Actual e37fd30 game observations remain
+NOT_RUN until that receipt is complete and PASS. The concrete compiled observer
+repair extends the remaining estimate to eight to ten hours for both exact-byte
+windows, serial selected observations, picture review, delivery records and
+guarded push; this remains an estimate rather than a stop condition.
+
 Private helper hashes were refreshed, including the separately inspected
 fresh-allowance helper and its absolute original build-manifest path. No grants
 exist yet: each requires its actual successful final-source selection. No
 concrete additional product defect was found in preparation; do not churn the
 frozen candidate before seeing its real game evidence. Continue the selected
 ordinary/noncasting observations, then bounded casting and visual review.
+
+## Exact e37fd30 observation outcome and selected-row repair — October 12
+
+The e37fd30 whole-history prerequisite completed naturally: exit 0, PASS,
+8777.5255261 seconds, 2026-10-12T16:53:25.7436692Z through
+2026-10-12T19:19:43.2662712Z, Attempts 1, LeaseWaitSeconds 120, eleven WhatIf
+calls and all five original targets. Immediate Windows PowerShell 5.1 boundary
+checks found no game process, foreign lease, unresolved transaction or
+unacknowledged save violation; NUICP remained clean at the exact source and ZIP.
+
+The following guarded runs then used exact e37fd30 bytes. Every run, including
+the failing observation, restored the runtime transaction and registry, left
+protected saves clean and exited the game before the next run:
+
+| RunId | Scope | Exit | Seconds | Result |
+| --- | --- | ---: | ---: | --- |
+| `kbpnui-e37-final-1080-01` | native UI, 1920x1080 | 0 | 432.8527208 | PASS |
+| `kbpnui-e37-final-720-01` | native UI, 1280x720 | 0 | 408.9862976 | PASS |
+| `kbpnui-e37-cast-select-01` | zero-cost selection | 0 | 293.5561557 | PASS |
+| `kbpnui-e37-classic-select-01` | animated Classic selection | 0 | 295.6630020 | PASS |
+| `kbpnui-e37-spellbook-01` | physical spellbook and paused switch | 0 | 322.3992662 | PASS |
+| `kbpnui-e37-physical-select-01` | physical search/selection | 1 | 270.7874855 | FAIL |
+
+The two native UI records are schema 4 with all 37 captures complete, no missing
+observation, failure or violation, nine window switches, thirteen planning steps,
+pause restored and plan lease released. Original-PNG inspection at both sizes
+found the held planner, casting popup, native spell popup and Metamagic states
+correctly framed and readable. At 720p the Abilities caption fits; long selected
+text is ellipsized in its row while its full identity remains readable in the
+header. Linzi and Tartuccio opened and returned from Metamagic. Hedwirg's genuine
+unavailable Metamagic state did not disable the independent Planner action.
+
+The physical search run delivered six expected OS acknowledgements and correctly
+held both graph captures through complete later-frame PNG boundaries. Its record
+passed physical typing, focus, mode, plan-integrity, cleanup and capture checks,
+but failed `search:filter-membership`: after typing `ligh`, the two matching Light
+sources were visible together with the selected Resistance source; after typing
+`lighb`, only that selected source remained. This is the product's intentional
+selected-row behavior, stated in `CastingWorkspaceScreenView`, rather than a UI
+defect. The new observer had incorrectly required exact query membership and zero
+rows after the binding letter. The wrapper's exception-path summary called
+restoration unrecorded because it did not reread the launcher receipts; the
+authoritative launcher completion, transaction and save comparison all record
+successful restoration.
+
+The next compiled observer revision now records the selected source separately,
+requires query matches plus that preserved selection, calculates the expected
+post-binding count from the same rule, and still rejects missing or foreign rows,
+an absent selected source, count mismatch, changed ownership or plan, incomplete
+capture and cleanup failure. Focused validation command
+`Test-Development.ps1 -Only physical-search-record,physical-workspace,cold-moon,native-ui-capture`
+passed source 43/0, build 1/0 and selected C# 6/0, exit 0 in 9.7 seconds. This
+observer is part of the DLL, so e37fd30 evidence remains attributed to e37fd30;
+the correction requires a newly identified candidate and affected observations.

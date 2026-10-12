@@ -30,21 +30,33 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             string query = null, suffix;
             string[] active = view.CatalogueSourceIdsForRuntime;
             var rows = new List<KeyValuePair<string, string>>();
+            string selectedSource = null;
             foreach (string row in view.VisibleSourcesForRuntime())
             {
                 string sourceId;
                 string label;
                 bool selected;
                 if (PhysicalWorkspaceRecord.TryParseVisibleSource(row, out sourceId, out label, out selected) &&
-                    active.Contains(sourceId)) rows.Add(new KeyValuePair<string, string>(sourceId, label));
+                    active.Contains(sourceId))
+                {
+                    rows.Add(new KeyValuePair<string, string>(sourceId, label));
+                    if (selected) selectedSource = sourceId;
+                }
             }
             foreach (KeyValuePair<string, string> row in rows)
-                if (PhysicalWorkspaceRecord.DeriveQuery(WithoutRichText(row.Value), out query, out suffix)) break;
-            if (query == null) return FinishPhysical("search:no-plain-query-from-available-source");
-            var observation = new PhysicalSearchObservation { Query = query, ModeBefore = GameModeName() };
+                if (row.Key != selectedSource &&
+                    PhysicalWorkspaceRecord.DeriveQuery(WithoutRichText(row.Value), out query, out suffix)) break;
+            if (query == null || selectedSource == null)
+                return FinishPhysical("search:no-plain-query-or-selected-source");
+            var observation = new PhysicalSearchObservation {
+                Query = query, ModeBefore = GameModeName(), PreservedSelectedSource = selectedSource };
+            // The catalogue deliberately keeps its selected row visible even when it does not match the query.
             observation.ExpectedSources.AddRange(rows.Where(row =>
                 WithoutRichText(row.Value).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
                 .Select(row => row.Key));
+            observation.ExpectedSourcesAfterBindingLetter = rows.Where(row => row.Key == selectedSource ||
+                WithoutRichText(row.Value).IndexOf(query + "b", StringComparison.OrdinalIgnoreCase) >= 0)
+                .Select(row => row.Key).Distinct(StringComparer.Ordinal).Count();
             _physicalRecord.PhysicalSearch = observation;
             _physicalSearchOriginalText = view.SearchTextForRuntime;
             _physicalSearchDocument = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;

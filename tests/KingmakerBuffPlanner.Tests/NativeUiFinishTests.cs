@@ -94,8 +94,10 @@ namespace KingmakerBuffPlanner.Tests
                     Query = "ligh", TypedQuery = "ligh", TypedWithBindingLetter = "lighb",
                     ModeBefore = "FullScreenUI", ModeAfterQuery = "FullScreenUI", ModeAfterBindingLetter = "FullScreenUI",
                     FocusedBeforeTyping = true, PlannerStayedOpen = true, DocumentUnchanged = true,
-                    CleanupComplete = true, SourcesAfterBindingLetter = 0 };
-                value.ExpectedSources.Add("light-spell"); value.ObservedSources.Add("light-spell");
+                    CleanupComplete = true, PreservedSelectedSource = "selected-resistance",
+                    ExpectedSourcesAfterBindingLetter = 1, SourcesAfterBindingLetter = 1 };
+                value.ExpectedSources.Add("light-spell");
+                value.ObservedSources.Add("light-spell"); value.ObservedSources.Add("selected-resistance");
                 value.Captures.Add(new JObject { { "file", "physical-cf-search-filtered.png" }, { "requestFrame", 10 }, { "completedFrame", 11 } });
                 value.Captures.Add(new JObject { { "file", "physical-cf-search-binding-text.png" }, { "requestFrame", 20 }, { "completedFrame", 21 } });
                 return value;
@@ -104,7 +106,9 @@ namespace KingmakerBuffPlanner.Tests
             foreach (Action<PhysicalSearchObservation> breakState in new Action<PhysicalSearchObservation>[] {
                 v => v.FocusedBeforeTyping = false, v => v.TypedQuery = "lig", v => v.TypedWithBindingLetter = "ligh",
                 v => v.ModeAfterBindingLetter = "Spellbook", v => v.ObservedSources.Clear(),
-                v => v.SourcesAfterBindingLetter = 1, v => v.DocumentUnchanged = false, v => v.CleanupComplete = false,
+                v => v.ObservedSources.Add("foreign"), v => v.PreservedSelectedSource = null,
+                v => v.SourcesAfterBindingLetter = 0, v => v.ExpectedSourcesAfterBindingLetter = -1,
+                v => v.DocumentUnchanged = false, v => v.CleanupComplete = false,
                 v => v.Captures[0]["completedFrame"] = 10, v => v.CaptureFailure = "timeout" })
             {
                 PhysicalSearchObservation value = good(); breakState(value);
@@ -121,6 +125,9 @@ namespace KingmakerBuffPlanner.Tests
             Expect(raw["focusedBeforeTyping"].Type == JTokenType.Boolean &&
                 (string)raw["dispatch"] == "physical-os-input" && (string)raw["cleanupDispatch"] == "view-callback",
                 "Physical delivery and callback cleanup must remain distinct in raw evidence.");
+            Expect((string)raw["preservedSelectedSource"] == "selected-resistance" &&
+                (int)raw["expectedSourcesAfterBindingLetter"] == 1,
+                "Search evidence must distinguish the selected-row exception from query matches.");
         }
 
         private static void TestPauseRestoreWorldBoundary()

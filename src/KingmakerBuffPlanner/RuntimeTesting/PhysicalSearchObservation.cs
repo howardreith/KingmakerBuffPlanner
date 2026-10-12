@@ -24,8 +24,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool DocumentUnchanged { get; set; }
         public bool CleanupComplete { get; set; }
         public string CaptureFailure { get; set; }
+        public string PreservedSelectedSource { get; set; }
         public List<string> ExpectedSources { get; } = new List<string>();
         public List<string> ObservedSources { get; } = new List<string>();
+        public int ExpectedSourcesAfterBindingLetter { get; set; } = -1;
         public int SourcesAfterBindingLetter { get; set; } = -1;
         public List<JObject> Captures { get; } = new List<JObject>();
 
@@ -37,8 +39,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!FocusedBeforeTyping || !PlannerStayedOpen || string.IsNullOrEmpty(ModeBefore) ||
                 ModeBefore != ModeAfterQuery || ModeBefore != ModeAfterBindingLetter)
                 failures.Add("search:typing-changed-native-owner");
-            if (ExpectedSources.Count == 0 || !ExpectedSources.OrderBy(v => v, StringComparer.Ordinal)
-                .SequenceEqual(ObservedSources.OrderBy(v => v, StringComparer.Ordinal)) || SourcesAfterBindingLetter != 0)
+            IEnumerable<string> expectedVisible = ExpectedSources.Concat(
+                string.IsNullOrEmpty(PreservedSelectedSource)
+                    ? Enumerable.Empty<string>()
+                    : new[] { PreservedSelectedSource }).Distinct(StringComparer.Ordinal);
+            if (ExpectedSources.Count == 0 || string.IsNullOrEmpty(PreservedSelectedSource) ||
+                !expectedVisible.OrderBy(v => v, StringComparer.Ordinal)
+                    .SequenceEqual(ObservedSources.OrderBy(v => v, StringComparer.Ordinal)) ||
+                ExpectedSourcesAfterBindingLetter < 0 ||
+                SourcesAfterBindingLetter != ExpectedSourcesAfterBindingLetter)
                 failures.Add("search:filter-membership");
             if (!DocumentUnchanged || !CleanupComplete) failures.Add("search:intent-or-cleanup");
             if (CaptureFailure != null || Captures.Count != 2 || Captures.Any(c =>
@@ -55,8 +64,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 { "modeBefore", ModeBefore }, { "modeAfterQuery", ModeAfterQuery },
                 { "modeAfterBindingLetter", ModeAfterBindingLetter }, { "focusedBeforeTyping", FocusedBeforeTyping },
                 { "plannerStayedOpen", PlannerStayedOpen }, { "documentUnchanged", DocumentUnchanged },
-                { "cleanupComplete", CleanupComplete }, { "expectedSources", new JArray(ExpectedSources) },
-                { "observedSources", new JArray(ObservedSources) }, { "sourcesAfterBindingLetter", SourcesAfterBindingLetter },
+                { "cleanupComplete", CleanupComplete }, { "preservedSelectedSource", PreservedSelectedSource },
+                { "expectedSources", new JArray(ExpectedSources) }, { "observedSources", new JArray(ObservedSources) },
+                { "expectedSourcesAfterBindingLetter", ExpectedSourcesAfterBindingLetter },
+                { "sourcesAfterBindingLetter", SourcesAfterBindingLetter },
                 { "captureFailure", CaptureFailure }, { "captures", new JArray(Captures) }
             };
         }
