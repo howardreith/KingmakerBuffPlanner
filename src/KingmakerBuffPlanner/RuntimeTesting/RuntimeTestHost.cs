@@ -5771,6 +5771,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 try { ReleaseNativeUiProbes(); }
                 catch (Exception exception) { _log.Error("[KBP-NUI] probe cleanup failed at shutdown.", exception); }
             }
+            if (PhysicalSpellbookRequested)
+            {
+                try { RestoreSpellbookPauseAtShutdown(); }
+                catch (Exception exception) { _log.Error("[KBP-SPELLBOOK] pause cleanup failed at shutdown.", exception); }
+            }
             if (_qualifiedUiStep > 0 && _qualifiedUiStep < 10)
             {
                 try

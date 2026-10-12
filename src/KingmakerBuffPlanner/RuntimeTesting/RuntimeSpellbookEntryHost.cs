@@ -38,6 +38,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private int _spellbookOpensBefore;
         private int _spellbookRunsBefore;
         private string _spellbookProfilePath;
+        private bool _spellbookPauseOwned;
+        private bool _spellbookPauseCleanupFailed;
+        private NativeUiPauseRestoration _spellbookPauseRestore;
+        private readonly System.Diagnostics.Stopwatch _spellbookPauseClock = new System.Diagnostics.Stopwatch();
+        private string _spellbookPendingFailure;
+        private NativeUiCaptureBoundary _spellbookCapture;
+        private readonly System.Diagnostics.Stopwatch _spellbookCaptureClock = new System.Diagnostics.Stopwatch();
+        private string _spellbookLastCaptureFile;
+        private string _spellbookCaptureState;
+
 
         private bool PhysicalSpellbookRequested
         {
@@ -51,6 +61,68 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private bool UpdateSpellbookEntry(double settled)
         {
+            if (_physicalStep == SpellbookStartStep + 4)
+            {
+                if (!_spellbookPauseOwned)
+                {
+                    if (!NativeUiPauseWorldReleased())
+                    {
+                        if (_spellbookPauseClock.ElapsedMilliseconds < 10000) return false;
+                        return FinishSpellbookEntry("pause:world-not-released");
+                    }
+                    _spellbookRecord.Pause.OriginalPaused = Kingmaker.Game.Instance.IsPaused;
+                    _spellbookRecord.Pause.PauseAppliedAtWorld = true;
+                    _spellbookPauseOwned = true;
+                    Kingmaker.Game.Instance.IsPaused = true;
+                }
+                if (!Kingmaker.Game.Instance.IsPaused)
+                {
+                    if (_spellbookPauseClock.ElapsedMilliseconds < 10000) return false;
+                    return FinishSpellbookEntry("pause:did-not-activate");
+                }
+                _spellbookRecord.Pause.PausedBeforeKey = true;
+                return RequestSpellbookOpen(2);
+            }
+            if (_physicalStep == SpellbookStartStep + 5 || _physicalStep == SpellbookStartStep + 6)
+            {
+                NativeUiPauseRestoreStatus status = _spellbookPauseRestore.Observe(NativeUiPauseWorldReleased(),
+                    Kingmaker.Game.Instance.IsPaused, _spellbookPauseClock.ElapsedMilliseconds,
+                    value => Kingmaker.Game.Instance.IsPaused = value);
+                if (status == NativeUiPauseRestoreStatus.Pending) return false;
+                _spellbookRecord.Pause.OriginalPauseRestored = status == NativeUiPauseRestoreStatus.Restored &&
+                    Kingmaker.Game.Instance.IsPaused == _spellbookRecord.Pause.OriginalPaused;
+                _spellbookPauseOwned = status != NativeUiPauseRestoreStatus.Restored;
+                if (status == NativeUiPauseRestoreStatus.TimedOut)
+                {
+                    _spellbookPauseCleanupFailed = true;
+                    _spellbookRecord.Failures.Add("pause:restore-timeout");
+                }
+                if (_physicalStep == SpellbookStartStep + 6 || status == NativeUiPauseRestoreStatus.TimedOut)
+                    return FinishSpellbookEntry(_spellbookPendingFailure);
+                return RequestSpellbookOpen(3);
+            }
+            if (_spellbookCapture != null)
+            {
+                try
+                {
+                    if (SpellbookCaptureState() != _spellbookCaptureState)
+                        throw new InvalidOperationException("Spellbook state changed before capture completed.");
+                    NativeUiCaptureStatus status = _spellbookCapture.Observe(Time.frameCount,
+                        _spellbookCaptureClock.ElapsedMilliseconds);
+                    if (status == NativeUiCaptureStatus.Pending) return false;
+                    if (status == NativeUiCaptureStatus.TimedOut) throw new IOException("Spellbook capture exceeded ten seconds.");
+                    _spellbookRecord.Pause.Captures.Add(new JObject {
+                        { "file", Path.GetFileName(_spellbookCapture.Path) },
+                        { "requestFrame", _spellbookCapture.RequestFrame }, { "completedFrame", Time.frameCount } });
+                    _spellbookCapture = null;
+                    return false;
+                }
+                catch (Exception exception)
+                {
+                    _spellbookRecord.Pause.CaptureFailure = exception.Message;
+                    return FinishSpellbookEntry("capture:" + exception.Message);
+                }
+            }
             BuffPlannerSpellbookEntryController entry = BuffPlannerUiRoot.SpellbookEntryForRuntime;
             if (entry == null) return FinishSpellbookEntry("spellbook-entry-controller-missing");
             if (_physicalStep == SpellbookStartStep)
@@ -62,6 +134,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     return RequestPhysical("sb-menu-close-" + _physicalMenuCloseAttempts,
                         "key-escape", Vector2.zero, null, SpellbookStartStep);
                 }
+                _spellbookRecord.SchemaVersion = 2;
+                _spellbookRecord.Pause = new SpellbookPauseObservation();
                 _spellbookRecord.RunId = _request.RunId;
                 _spellbookRecord.SourceCommit = _request.ExpectedCommit;
                 _spellbookRecord.PackageSha256 = _request.ExpectedPackageSha256;
@@ -104,8 +178,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if ((!shown || !entry.IsAttached || settled < 1.5) && settled < SpellbookWaitSeconds)
                     return false;
                 ObserveSpellbookOffered(entry, shown);
-                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
-                    "spellbook-" + SpellbookEntryRecord.CycleSuffix(_spellbookCycleNumber) + "-open.png"));
+                if (_spellbookCycleNumber == 2) _spellbookRecord.Pause.PausedWithSpellbook = Kingmaker.Game.Instance.IsPaused;
+                if (RequestSpellbookCapture("spellbook-" + SpellbookEntryRecord.CycleSuffix(_spellbookCycleNumber) + "-open.png")) return false;
                 if (!_spellbookCycle.ButtonAttached || !_spellbookCycle.ButtonX.HasValue)
                     return FinishSpellbookEntry("spellbook-button-not-offered:" + _spellbookCycleNumber);
                 if (_spellbookCycle.FaultInjected)
@@ -133,10 +207,24 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if ((!settledHandoff || !recovered || settled < 1.0) && settled < SpellbookWaitSeconds)
                     return false;
                 ObserveSpellbookClicked(entry);
-                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory,
-                    "spellbook-" + SpellbookEntryRecord.CycleSuffix(_spellbookCycleNumber) + "-after-click.png"));
+                if (_spellbookCycleNumber == 2) _spellbookRecord.Pause.PausedWithPlanner = Kingmaker.Game.Instance.IsPaused;
+                if (RequestSpellbookCapture("spellbook-" + SpellbookEntryRecord.CycleSuffix(_spellbookCycleNumber) + "-after-click.png")) return false;
+                if (_spellbookCycleNumber == 2)
+                    return RequestPhysical("sb-switch-2", "key", Vector2.zero,
+                        ",\"vk\":" + _spellbookRecord.OpenSpellsVirtualKey, SpellbookStartStep + 7);
                 return RequestPhysical("sb-escape-" + SpellbookEntryRecord.CycleSuffix(_spellbookCycleNumber),
                     "key-escape", Vector2.zero, null, SpellbookEscapedStep);
+            }
+            if (_physicalStep == SpellbookStartStep + 7)
+            {
+                if ((!NativeSpellbookShown() || BuffPlannerUiRoot.IsCastingWorkspaceOpen || settled < 1.5) &&
+                    settled < SpellbookWaitSeconds) return false;
+                _spellbookRecord.Pause.PlannerClosedAfterSwitch = !BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                _spellbookRecord.Pause.SpellbookShownAfterSwitch = NativeSpellbookShown();
+                _spellbookRecord.Pause.LeaseReleasedAfterSwitch = !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
+                _spellbookRecord.Pause.PausedAfterSwitch = Kingmaker.Game.Instance.IsPaused;
+                if (RequestSpellbookCapture("spellbook-2-paused-switch.png")) return false;
+                return RequestPhysical("sb-escape-2", "key-escape", Vector2.zero, null, SpellbookEscapedStep);
             }
             if (_physicalStep == SpellbookEscapedStep)
             {
@@ -149,9 +237,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _spellbookCycle.NativeMenuOpenAfterEscape = BuffPlannerUiRoot.NativeEscMenuOpenForRuntime;
                 _spellbookCycle.OwnedButtonsAfterEscape = OwnedSpellbookButtons();
                 _spellbookCycle.PlannerRootsAfterEscape = BuffPlannerUiRoot.PlannerRootCountForRuntime();
+                if (_spellbookCycleNumber == 2)
+                {
+                    _spellbookRecord.Pause.PausedAfterEscape = Kingmaker.Game.Instance.IsPaused;
+                    BeginSpellbookPauseRestore(SpellbookStartStep + 5);
+                    return false;
+                }
                 if (_spellbookCycleNumber <= SpellbookEntryRecord.OrdinaryCycles)
                     return RequestSpellbookOpen(_spellbookCycleNumber + 1);
-                CaptureScreenshot(Path.Combine(_request.EvidenceDirectory, "spellbook-closed.png"));
+                if (RequestSpellbookCapture("spellbook-closed.png")) return false;
                 return FinishSpellbookEntry(null);
             }
             return false;
@@ -159,6 +253,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private bool RequestSpellbookOpen(int cycle)
         {
+            if (cycle == 2 && !_spellbookRecord.Pause.PauseAppliedAtWorld)
+            {
+                _spellbookPauseClock.Restart();
+                _physicalStep = SpellbookStartStep + 4;
+                return false;
+            }
             _spellbookCycleNumber = cycle;
             _spellbookCycle = new SpellbookCycleObservation {
                 Cycle = cycle, FaultInjected = cycle > SpellbookEntryRecord.OrdinaryCycles };
@@ -289,8 +389,56 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return File.Exists(path) ? ProblemFileHash(path) : "absent";
         }
 
+        private bool RequestSpellbookCapture(string file)
+        {
+            if (_spellbookLastCaptureFile == file) return false;
+            _spellbookLastCaptureFile = file;
+            _spellbookCaptureState = SpellbookCaptureState();
+            _spellbookCapture = new NativeUiCaptureBoundary(Path.Combine(_request.EvidenceDirectory, file), Time.frameCount, 10000);
+            _spellbookCaptureClock.Restart();
+            CaptureScreenshot(_spellbookCapture.Path);
+            return true;
+        }
+
+        private static string SpellbookCaptureState()
+        {
+            return GameModeName() + "|" + BuffPlannerUiRoot.IsCastingWorkspaceOpen + "|" +
+                NativeSpellbookShown() + "|" + Kingmaker.Game.Instance.IsPaused;
+        }
+
+        private void BeginSpellbookPauseRestore(int step)
+        {
+            _spellbookPauseRestore = new NativeUiPauseRestoration(_spellbookRecord.Pause.OriginalPaused, 10000);
+            _spellbookPauseClock.Restart();
+            _physicalStep = step;
+        }
+
+        private void RestoreSpellbookPauseAtShutdown()
+        {
+            if (!_spellbookPauseOwned) return;
+            try { if (BuffPlannerUiRoot.IsCastingWorkspaceOpen) CloseProbeWorkspace(); }
+            finally
+            {
+                try { if (NativeServiceWindowShown()) CloseNativeServiceWindow(); }
+                finally
+                {
+                    Kingmaker.Game.Instance.IsPaused = _spellbookRecord.Pause.OriginalPaused;
+                    _spellbookRecord.Pause.OriginalPauseRestored = Kingmaker.Game.Instance.IsPaused == _spellbookRecord.Pause.OriginalPaused;
+                    _spellbookPauseOwned = false;
+                }
+            }
+        }
+
         private bool FinishSpellbookEntry(string failure)
         {
+            if (_spellbookPauseOwned && !_spellbookPauseCleanupFailed)
+            {
+                _spellbookPendingFailure = failure;
+                if (BuffPlannerUiRoot.IsCastingWorkspaceOpen) CloseProbeWorkspace();
+                if (NativeServiceWindowShown()) CloseNativeServiceWindow();
+                BeginSpellbookPauseRestore(SpellbookStartStep + 6);
+                return false;
+            }
             if (failure != null) _spellbookRecord.Failures.Add(failure);
             try
             {
@@ -330,7 +478,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             var serializer = JsonSerializer.Create(new JsonSerializerSettings {
                 ContractResolver = new CamelCasePropertyNamesContractResolver() });
             JObject record = JObject.FromObject(_spellbookRecord, serializer);
-            record["schemaVersion"] = 1;
+            record["schemaVersion"] = _spellbookRecord.SchemaVersion;
             record["violations"] = new JArray(_spellbookRecord.Violations());
             AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "physical-spellbook-entry.json"),
                 record.ToString(Formatting.Indented));

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json.Linq;
 
 namespace KingmakerBuffPlanner.RuntimeTesting
 {
@@ -55,9 +56,45 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public int PlannerRootsAfterEscape { get; set; }
     }
 
+    // One deliberately paused physical B -> native button -> Escape cycle.
+    public sealed class SpellbookPauseObservation
+    {
+        public bool OriginalPaused { get; set; }
+        public bool PauseAppliedAtWorld { get; set; }
+        public bool PausedBeforeKey { get; set; }
+        public bool PausedWithSpellbook { get; set; }
+        public bool PausedWithPlanner { get; set; }
+        public bool PausedAfterEscape { get; set; }
+        public bool PlannerClosedAfterSwitch { get; set; }
+        public bool SpellbookShownAfterSwitch { get; set; }
+        public bool LeaseReleasedAfterSwitch { get; set; }
+        public bool PausedAfterSwitch { get; set; }
+        public bool OriginalPauseRestored { get; set; }
+        public string CaptureFailure { get; set; }
+        public List<JObject> Captures { get; } = new List<JObject>();
+        public static readonly string[] CaptureFiles = new[] { "1", "2", "3", "fault" }
+            .SelectMany(suffix => new[] { "spellbook-" + suffix + "-open.png",
+                "spellbook-" + suffix + "-after-click.png" }).Concat(new[] { "spellbook-2-paused-switch.png", "spellbook-closed.png" }).ToArray();
+        public IList<string> Violations()
+        {
+            var failures = new List<string>();
+            if (!PauseAppliedAtWorld || !PausedBeforeKey || !PausedWithSpellbook || !PausedWithPlanner ||
+                !PausedAfterEscape || !OriginalPauseRestored || !PlannerClosedAfterSwitch ||
+                !SpellbookShownAfterSwitch || !LeaseReleasedAfterSwitch || !PausedAfterSwitch)
+                failures.Add("pause:physical-state-or-restoration");
+            if (CaptureFailure != null || Captures.Count != CaptureFiles.Length || CaptureFiles.Any(file =>
+                Captures.Count(c => c.Value<string>("file") == file &&
+                    c.Value<int>("completedFrame") > c.Value<int>("requestFrame")) != 1))
+                failures.Add("pause:capture-boundary");
+            return failures;
+        }
+    }
+
     public sealed class SpellbookEntryRecord
     {
         public const int OrdinaryCycles = 3;
+        public int SchemaVersion { get; set; } = 1;
+        public SpellbookPauseObservation Pause { get; set; }
         public string RunId { get; set; }
         public string SourceCommit { get; set; }
         public string PackageSha256 { get; set; }
@@ -109,7 +146,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public IList<string> Violations()
         {
             var failures = new List<string>(Failures);
+            if (SchemaVersion >= 2)
+            {
+                if (Pause == null) failures.Add("pause:observation-missing");
+                else failures.AddRange(Pause.Violations());
+            }
             IList<string> expected = ExpectedActions();
+            if (SchemaVersion >= 2) expected.Add("sb-switch-2");
             if (expected.Any(action => !Acknowledged.Contains(action)) ||
                 Acknowledged.Any(action => !expected.Contains(action) &&
                     !action.StartsWith("sb-menu-close-", StringComparison.Ordinal)))

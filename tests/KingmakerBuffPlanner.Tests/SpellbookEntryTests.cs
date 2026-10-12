@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json.Linq;
 using KingmakerBuffPlanner.UI;
 using KingmakerBuffPlanner.RuntimeTesting;
 
@@ -20,7 +21,35 @@ namespace KingmakerBuffPlanner.Tests
             Run("spellbook-entry-pairs-with-metamagic-in-the-footer",
                 TestSpellbookFooterPair);
             Run("spellbook-entry-record-current-and-historical-placement", TestSpellbookEntryPlacementRecord);
+            Run("spellbook-entry-physical-paused-state-and-capture", TestSpellbookPausedPhysicalRecord);
             Run("spellbook-entry-handoff-admission-and-recovery", TestSpellbookHandoffAdmission);
+        }
+
+        private static void TestSpellbookPausedPhysicalRecord()
+        {
+            Func<SpellbookPauseObservation> good = () => {
+                var value = new SpellbookPauseObservation { PauseAppliedAtWorld = true, PausedBeforeKey = true,
+                    PausedWithSpellbook = true, PausedWithPlanner = true, PausedAfterEscape = true, OriginalPauseRestored = true,
+                    PlannerClosedAfterSwitch = true, SpellbookShownAfterSwitch = true, LeaseReleasedAfterSwitch = true, PausedAfterSwitch = true };
+                foreach (string file in SpellbookPauseObservation.CaptureFiles)
+                    value.Captures.Add(new JObject { { "file", file }, { "requestFrame", 10 }, { "completedFrame", 11 } });
+                return value;
+            };
+            Expect(good().Violations().Count == 0, "Complete paused physical cycle must pass.");
+            foreach (Action<SpellbookPauseObservation> breakState in new Action<SpellbookPauseObservation>[] {
+                v => v.PauseAppliedAtWorld = false, v => v.PausedBeforeKey = false, v => v.PausedWithSpellbook = false,
+                v => v.PausedWithPlanner = false, v => v.PausedAfterEscape = false, v => v.OriginalPauseRestored = false,
+                v => v.PlannerClosedAfterSwitch = false, v => v.SpellbookShownAfterSwitch = false,
+                v => v.LeaseReleasedAfterSwitch = false, v => v.PausedAfterSwitch = false,
+                v => v.Captures[0]["completedFrame"] = 10, v => v.Captures.RemoveAt(0), v => v.CaptureFailure = "timeout" })
+            {
+                var value = good(); breakState(value);
+                Expect(value.Violations().Count != 0, "Missing paused state, restoration or held capture must fail.");
+            }
+            var historical = new SpellbookEntryRecord();
+            Expect(!historical.Violations().Contains("pause:observation-missing"), "Schema 1 retains its original interpretation.");
+            historical.SchemaVersion = 2;
+            Expect(historical.Violations().Contains("pause:observation-missing"), "New schema requires the physical paused cycle.");
         }
 
         private static ThemeNode NativeServiceWindowFixture(out ThemeNode serviceWindow,

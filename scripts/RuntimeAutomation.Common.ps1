@@ -1166,6 +1166,26 @@ function Test-KbpSpellbookPlacement {
         ($metamagicRight + $values.extension) -ge ($plannerRight - 0.11)
 }
 
+function Assert-KbpSpellbookPauseObservation {
+    param([Parameter(Mandatory=$true)]$Observation)
+    foreach($key in @('originalPaused','pauseAppliedAtWorld','pausedBeforeKey','pausedWithSpellbook',
+        'pausedWithPlanner','pausedAfterEscape','originalPauseRestored','plannerClosedAfterSwitch',
+        'spellbookShownAfterSwitch','leaseReleasedAfterSwitch','pausedAfterSwitch')) {
+        if($null -eq $Observation.PSObject.Properties[$key] -or $Observation.$key -isnot [bool] -or
+            ($key -cne 'originalPaused' -and -not $Observation.$key)){throw "Physical spellbook pause fact invalid: $key"}
+    }
+    if($null -eq $Observation.PSObject.Properties['captureFailure'] -or $null -ne $Observation.captureFailure -or
+        $null -eq $Observation.PSObject.Properties['captures'] -or @($Observation.captures).Count -ne 10){throw 'Physical spellbook capture outcome incomplete.'}
+    $files=@('1','2','3','fault') | ForEach-Object {"spellbook-$_-open.png";"spellbook-$_-after-click.png"}
+    $files+=@('spellbook-2-paused-switch.png','spellbook-closed.png')
+    foreach($file in $files){
+        $capture=@($Observation.captures | Where-Object {$_.file -ceq $file})
+        if($capture.Count -ne 1 -or $null -eq $capture[0].PSObject.Properties['requestFrame'] -or
+            $null -eq $capture[0].PSObject.Properties['completedFrame'] -or
+            [int]$capture[0].completedFrame -le [int]$capture[0].requestFrame){throw 'Physical spellbook screenshot lacked a later capture boundary.'}
+    }
+}
+
 # WP2B: the guarded spellbook handoff, judged independently of the host.
 function Assert-KbpSpellbookEntryOutcome {
     param([Parameter(Mandatory = $true)]$Request)
@@ -1182,7 +1202,7 @@ function Assert-KbpSpellbookEntryOutcome {
     foreach ($key in $required) {
         if ($null -eq $record.PSObject.Properties[$key]) { throw "Physical spellbook evidence is missing $key." }
     }
-    if ([int]$record.schemaVersion -ne 1 -or [string]$record.runId -cne [string]$Request.runId -or
+    if ([int]$record.schemaVersion -notin @(1,2) -or [string]$record.runId -cne [string]$Request.runId -or
         [string]$record.sourceCommit -cne [string]$Request.expectedCommit -or
         [string]$record.packageSha256 -cne [string]$Request.expectedPackageSha256 -or
         [string]$record.dllSha256 -cne [string]$Request.expectedDllSha256 -or
@@ -1190,10 +1210,20 @@ function Assert-KbpSpellbookEntryOutcome {
         @($record.failures).Count -ne 0 -or @($record.violations).Count -ne 0) {
         throw 'Physical spellbook evidence does not match this candidate-bound request or has violations.'
     }
+    $expectedSchema = if($Request.parameters -is [System.Collections.IDictionary]) {
+        if($Request.parameters.Contains('physicalSpellbookSchema')){[int]$Request.parameters['physicalSpellbookSchema']}else{1}
+    } elseif($null -ne $Request.parameters.PSObject.Properties['physicalSpellbookSchema']) {[int]$Request.parameters.physicalSpellbookSchema}else{1}
+    if($expectedSchema -ge 2 -and [int]$record.schemaVersion -ne 2){throw 'New physical spellbook request requires schema 2.'}
+    if([int]$record.schemaVersion -eq 2){
+        Assert-KbpSpellbookPauseObservation $record.pause
+        $closed=Join-Path $directory 'spellbook-closed.png'
+        if(-not(Test-Path -LiteralPath $closed -PathType Leaf) -or (Get-Item -LiteralPath $closed).Length -lt 1024){throw 'Physical spellbook closed screenshot missing.'}
+    }
     $actions = @()
     foreach ($suffix in @('1', '2', '3', 'fault')) {
         $actions += @("sb-open-$suffix", "sb-click-$suffix", "sb-escape-$suffix")
     }
+    if([int]$record.schemaVersion -eq 2){$actions+=@('sb-switch-2')}
     $acknowledged = @($record.acknowledged | ForEach-Object { [string]$_ })
     if (@($actions | Where-Object { $acknowledged -cnotcontains $_ }).Count -ne 0 -or
         @($acknowledged | Where-Object { ($actions + @('sb-menu-close-1', 'sb-menu-close-2',
@@ -1202,7 +1232,7 @@ function Assert-KbpSpellbookEntryOutcome {
     }
     foreach ($action in $acknowledged) {
         $ack = Read-KbpJson (Join-Path $directory ("physical-input-{0}.ack.json" -f $action))
-        $expectedAction = if ($action -like 'sb-open-*') { 'key' }
+        $expectedAction = if ($action -like 'sb-open-*' -or $action -ceq 'sb-switch-2') { 'key' }
             elseif ($action -like 'sb-click-*') { 'click' } else { 'key-escape' }
         $failureProperty = $ack.PSObject.Properties['deliveryFailed']
         $deliveryFailed = $null -ne $failureProperty -and [bool]$failureProperty.Value

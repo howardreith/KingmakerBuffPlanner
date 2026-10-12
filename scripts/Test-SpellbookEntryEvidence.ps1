@@ -60,7 +60,42 @@ function New-SpellbookEvidence {
         selectionUnchanged = $true; acknowledged = $actions; failures = @(); violations = @(); cycles = $cycles
     }
 }
+function Add-NewSpellbookPauseEvidence {
+    param($Record,[string]$Directory)
+    $Record.schemaVersion=2
+    $captures=@()
+    foreach($suffix in @('1','2','3','fault')){foreach($file in @("spellbook-$suffix-open.png","spellbook-$suffix-after-click.png")){
+        $captures+=[ordered]@{file=$file;requestFrame=10;completedFrame=11}
+    }}
+    $captures+=[ordered]@{file='spellbook-2-paused-switch.png';requestFrame=10;completedFrame=11}
+    $captures+=[ordered]@{file='spellbook-closed.png';requestFrame=10;completedFrame=11}
+    $Record.pause=[ordered]@{originalPaused=$false;pauseAppliedAtWorld=$true;pausedBeforeKey=$true;
+        pausedWithSpellbook=$true;pausedWithPlanner=$true;pausedAfterEscape=$true;originalPauseRestored=$true;
+        plannerClosedAfterSwitch=$true;spellbookShownAfterSwitch=$true;leaseReleasedAfterSwitch=$true;pausedAfterSwitch=$true;
+        captureFailure=$null;captures=$captures}
+    $Record.acknowledged+=@('sb-switch-2')
+    Write-KbpJsonAtomic (Join-Path $Directory 'physical-input-sb-switch-2.ack.json') ([ordered]@{runId='spellbook-test';actionId='sb-switch-2';action='key'})
+    [IO.File]::WriteAllBytes((Join-Path $Directory 'spellbook-2-paused-switch.png'),(New-Object byte[] 2048))
+    [IO.File]::WriteAllBytes((Join-Path $Directory 'spellbook-closed.png'),(New-Object byte[] 2048))
+}
 $cases = [ordered]@{
+    'valid-paused-schema2' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d}
+    'new-required-historical-schema' = $null
+    'paused-schema-missing-observation' = {param($r,$d) $r.schemaVersion=2}
+    'paused-world-not-applied' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d; $r.pause.pauseAppliedAtWorld=$false}
+    'paused-before-key-missing' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d; $r.pause.pausedBeforeKey=$false}
+    'paused-native-not-held' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d; $r.pause.pausedWithSpellbook=$false}
+    'paused-planner-not-held' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d; $r.pause.pausedWithPlanner=$false}
+    'paused-escape-lost-pause' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d; $r.pause.pausedAfterEscape=$false}
+    'paused-original-not-restored' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d; $r.pause.originalPauseRestored=$false}
+    'paused-switch-left-planner' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d; $r.pause.plannerClosedAfterSwitch=$false}
+    'paused-switch-no-native' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d; $r.pause.spellbookShownAfterSwitch=$false}
+    'paused-switch-lease-held' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d; $r.pause.leaseReleasedAfterSwitch=$false}
+    'paused-switch-unpaused' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d; $r.pause.pausedAfterSwitch=$false}
+    'paused-false-is-string' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d; $r.pause.originalPaused='false'}
+    'paused-capture-same-frame' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d; $r.pause.captures[2].completedFrame=10}
+    'paused-capture-missing' = {param($r,$d) Add-NewSpellbookPauseEvidence $r $d; $r.pause.captures=@($r.pause.captures[0])}
+
     'valid' = $null
     'valid-footer-pair' = { param($r, $d) foreach ($cycle in $r.cycles) {
         $cycle.placement = 'footer-pair;paired=True;metamagic=537.3/210.0;planner=757.3/210.0;plateExtension=220.0' } }
@@ -124,6 +159,7 @@ try {
             expectedCommit = $commit; expectedPackageSha256 = $hash; expectedDllSha256 = $hash
             parameters = [PSCustomObject]@{ physicalExpectation = 'spellbook' }
         }
+        if($case.Key -ceq 'new-required-historical-schema'){ $request.parameters | Add-Member -NotePropertyName physicalSpellbookSchema -NotePropertyValue 2 }
         $rejected = $false
         try { Assert-KbpScenarioOutcome $request } catch { $rejected = $true }
         if ($rejected -ne ($case.Key -notlike 'valid*')) { throw "Spellbook evidence case failed: $($case.Key)" }
