@@ -1,3 +1,23 @@
+> Current continuous milestone: clean product `bad10d978b8e3c79bead55bb4e8969e6126769c2`,
+> version 0.5.0 in owned NUICW; local package validated, **NOT_RUN**.
+> Physical search uses real OS typing. Spellbook schema 2 now requires an
+> actual B press from the deliberately paused open Planner, native window
+> shown/planner dismissed/lease released, physical Escape and original pause
+> restoration. All ten spellbook PNGs hold state through the shared ten-second
+> capture boundary. Historical schema 1 retains its original interpretation.
+> Focused C# 13/0, spellbook reader 50/0, search reader 14/0, direct 24/0
+> and real -File 8/0 passed, exit 0 in 10.3245286 seconds. Clean package
+> built once in 4.5511808 seconds. 95cb40b is preserved validated NOT_RUN.
+> The unchanged 3b5a2d7 six-action purity is still owned by PID 26140.
+> Its final result retains those inputs; preserve all watched runtime paths.
+> New bad10d9 eight-action purity and actual native 1080/720, physical and
+> read-only Advanced observations remain selected, followed by fresh exact
+> casting allowances and their four-action prerequisite. No Advanced save
+> mutation or unsupported NativeUI fixture is selected. Continue through
+> actual pictures, restoration, local delivery and guarded push. Receipt PARTIAL.
+> Eighteen-hour planning estimate remains a forecast, not a stop deadline.
+> Earlier banners below are chronological evidence for their named inputs.
+
 > Current continuous milestone: clean product source `95cb40b229a2aee954cfcecf8de2bb9c16ab5d2c`,
 > version 0.5.0, owned NUICQ. Local ZIP/DLL are validated and **NOT_RUN**.
 > Physical select schema 2 adds actual guarded search typing, B containment,
@@ -801,3 +821,96 @@ the owned prior scan must finish safely. This estimate is not a stop condition.
 The selected acceptance milestone continues; ordinary corrections still use
 focused checks. Aggregate SourceOnly, publisher, release reproducibility and
 unrelated layout/compatibility campaigns remain deliberately unselected.
+
+
+## Deliberately paused physical switch — October 12
+
+A source feasibility audit confirmed the existing foreground-verified spellbook
+route can deliver the actual native letter binding while the planner is open.
+Source `bad10d978b8e3c79bead55bb4e8969e6126769c2` adds that observation to
+its second ordinary cycle. In released world mode, the native Game.IsPaused
+setter establishes a deliberate pause. The existing native binding opens
+Spellbook, the existing owned button opens Planner, and one additional guarded
+physical native-letter request (`sb-switch-2`) must dismiss the paused Planner,
+show Spellbook, release the planner's own lease and retain pause. Physical
+Escape returns to world mode; the already-tested bounded pause restorer waits
+for the observed original state before starting cycle three. Setup/restoration
+through the native setter is distinct from physical key/click/Escape delivery.
+The actor reads the actual current binding, without remapping it.
+
+The current schema requires thirteen candidate-bound OS acknowledgments and
+ten actual PNG captures. Spellbook images now reuse the existing later-frame,
+complete-PNG, exclusive-writer boundary, with an unchanged ten-second timeout.
+The observed mode/planner/native-spellbook/pause state stays fixed until each
+image completes; the next input is issued in a later Update. Capture failure
+and failed pause restoration remain failures, with normal owned cleanup and
+shutdown best-effort restoration. No casting, grant, plan edit, keyboard
+restriction change or fixture widening is introduced. Schema 1 keeps its
+historical twelve-action interpretation; the schema-2 producer and actual
+shared child-output consumer require the new observations.
+
+Focused validation, one supervised invocation:
+
+```powershell
+.\scripts\Test-Development.ps1 -Only 'spellbook-entry,native-pause-restoration,native-ui-capture,physical-search'
+.\scripts\Test-SpellbookEntryEvidence.ps1
+.\scripts\Test-PhysicalSearchEvidence.ps1
+.\scripts\Test-RuntimeLauncherArguments.ps1
+.\scripts\Test-RuntimeLauncherFileArguments.ps1
+```
+
+Actual result: source 43/0, build 1/0, C# **13/0**, spellbook evidence
+**50/0**, search evidence **14/0**, direct launcher **24/0**, real -File
+**8/0**, numeric exit **0** in **10.3245286 seconds**,
+`2026-10-12T04:59:43.0004368Z` to `04:59:53.3297904Z`. Logs/results:
+`focused-physical-pause-switch.log` and `focused-physical-pause-switch-result.json`
+under the existing milestone artifact root. The earlier preparatory cycle
+without the extra Planner-to-Spellbook B press passed 13/0 + 46/0 + 14/0 +
+24/0 + 8/0 in 15.8438895 seconds; its separate log is preserved as source-only
+evidence of that smaller patch. Ambiguous textual edit anchors stopped safely
+and were scoped to the actual spellbook consumer before validation. No failed
+source test or runtime verdict was relabeled. The development DLL
+`0b4db07320e573a6564b29063af1a58b6439b7bbbda62458a562ba76bdc9cc7d`
+was built from 51fd8ce plus its then-uncommitted patch; it is not the clean
+packaged candidate.
+
+Owned clean NUICW built once using `Build-Local.ps1`, exit 0 in **4.5511808
+seconds**, source 43/0, build 1/0, package 4/0, local creation 1/0:
+
+- Clean product source: `bad10d978b8e3c79bead55bb4e8969e6126769c2`.
+- Version: `0.5.0`.
+- ZIP: `b1f556879be8d7d890a905dfea04063339fa3000a8d977b05ab698aefcbd7378`.
+- DLL: `2df91f0d3dc1de447875033d74fa3758bb87c368a01f8a5b08c414dc99bd1c61`.
+- MVID: `d49b5dc8-acc9-4819-90fe-95215419a44a`.
+- Installable copy: `C:\Dev\KingmakerBuffPlannerLab\package-archive\0.5.0-native-ui-completion-2026-10-12-bad10d9\KingmakerBuffPlanner-0.5.0.zip`.
+- Original path-bound receipt: NUICW `artifacts/local-runtime/0.5.0/KingmakerBuffPlanner-0.5.0-local-runtime.zip.build-local.json`.
+- Separate supervision: `candidate-bad10d9/`; twelve fresh `kbpnui-finish-`
+  RunIds, zero collisions; twenty-one actual clean source/harness/reader hashes
+  and development test-binary provenance, private supervisor syntax 4/0.
+
+The actual archive allowlist, Info version, transported ZIP and packaged DLL
+were checked. 95cb40b and every earlier artifact/worktree remain preserved;
+no expensive window was started on superseded 95cb40b. The unchanged owned
+3b5a2d7 scan passed its six WhatIf action preflights and is inventorying after
+state; its numeric final outcome is still pending. Do not write its watched
+paths, freeze a new candidate or start the new window until it finishes.
+No observed permission, case-selection or pause result from that source is
+new-byte game evidence.
+
+Historical 2c40f06 local archive summaries now include the actual completed
+instant and physical-selection results and both spellbook failures. Their
+prior manifest/notes snapshots and every original runtime record are retained.
+In particular its physical right-click target was `chip:seed-short-1`, not a
+catalogue tile. Its synthetic long popup remains synthetic. Its missing raw
+casting fields and 720p footer truncation remain limitations on those bytes.
+
+The current acceptance result remains PARTIAL, with new candidate observations
+NOT_RUN. Next action is the owned 3b5a2d7 prerequisite's numeric completion,
+then the verified clean runtime boundary and one freeze of bad10d9. Run its
+one-attempt, lease-120, full-five-target eight-action purity; execute serial
+native 1080/720 and the selected physical/read-only Advanced routes on that
+package; inspect actual pictures. Obtain actual new-source selections, fresh
+mechanical allowances and the separate casting purity, then the selected
+instant/one-plan animated/physical-authoring/problem observations. The eighteen-
+hour estimate and original selected milestone continue. No new broad aggregate
+or release/publisher campaign is selected.

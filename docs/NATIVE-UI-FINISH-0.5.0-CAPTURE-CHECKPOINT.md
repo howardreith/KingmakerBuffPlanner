@@ -1,3 +1,9 @@
+> Current continuous milestone candidate is clean bad10d9 in NUICW, validated NOT_RUN.
+> See [current completion record](NATIVE-UI-FINISH-0.5.0-COMPLETION.md).
+> Preserve PID 26140's unchanged 3b5a2d7 prerequisite through numeric completion,
+> then freeze/run the new exact-input milestone. Eighteen hours is an estimate.
+> Earlier records below retain their original inputs and chronology.
+
 > Current continuous milestone uses clean product 95cb40b in NUICQ, NOT_RUN.
 > See [current completion record](NATIVE-UI-FINISH-0.5.0-COMPLETION.md).
 > Preserve PID 26140's unchanged 3b5a2d7 purity until its numeric result.

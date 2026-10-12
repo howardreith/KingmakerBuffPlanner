@@ -1,3 +1,23 @@
+> Current continuous milestone: clean product `bad10d978b8e3c79bead55bb4e8969e6126769c2`,
+> version 0.5.0 in owned NUICW; local package validated, **NOT_RUN**.
+> Physical search uses real OS typing. Spellbook schema 2 now requires an
+> actual B press from the deliberately paused open Planner, native window
+> shown/planner dismissed/lease released, physical Escape and original pause
+> restoration. All ten spellbook PNGs hold state through the shared ten-second
+> capture boundary. Historical schema 1 retains its original interpretation.
+> Focused C# 13/0, spellbook reader 50/0, search reader 14/0, direct 24/0
+> and real -File 8/0 passed, exit 0 in 10.3245286 seconds. Clean package
+> built once in 4.5511808 seconds. 95cb40b is preserved validated NOT_RUN.
+> The unchanged 3b5a2d7 six-action purity is still owned by PID 26140.
+> Its final result retains those inputs; preserve all watched runtime paths.
+> New bad10d9 eight-action purity and actual native 1080/720, physical and
+> read-only Advanced observations remain selected, followed by fresh exact
+> casting allowances and their four-action prerequisite. No Advanced save
+> mutation or unsupported NativeUI fixture is selected. Continue through
+> actual pictures, restoration, local delivery and guarded push. Receipt PARTIAL.
+> Eighteen-hour planning estimate remains a forecast, not a stop deadline.
+> Earlier banners below are chronological evidence for their named inputs.
+
 > Current continuous milestone: clean product source `95cb40b229a2aee954cfcecf8de2bb9c16ab5d2c`,
 > version 0.5.0, owned NUICQ. Local ZIP/DLL are validated and **NOT_RUN**.
 > Physical select schema 2 adds actual guarded search typing, B containment,
