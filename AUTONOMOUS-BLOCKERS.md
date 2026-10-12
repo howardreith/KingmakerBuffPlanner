@@ -1,3 +1,14 @@
+> October 12 continuous work: see [current completion record](docs/NATIVE-UI-FINISH-0.5.0-COMPLETION.md).
+> Source eb36973 repairs an actual 720p save-message defect, has a validated
+> local ZIP, and remains NOT_RUN. The earlier 2c40f06 native runs passed 85/0
+> at both sizes; all 74 original pictures were reviewed. Its owned casting
+> purity remains supervised (PID 8964; Attempts 1, LeaseWaitSeconds 120).
+> Physical spellbook failed before key delivery (82/1, exit 1), with original
+> installation/protected-save restoration verified. Foreground access is an
+> observed environment limitation; do not assume a historical console cause.
+> The revised fourteen-hour estimate is not a cancellation deadline. Continue
+> useful work and current-policy focused corrections; do not resume old gates.
+
 > Current milestone state: clean source `2c40f0633079248072c2f23a754905d665ef41d6`
 > and its unchanged 0.5.0 package passed native UI qualify at 1920x1080
 > and 1280x720: 85/0 assertions, 37 completed captures and nine ordinary/paused

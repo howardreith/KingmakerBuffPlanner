@@ -1,15 +1,19 @@
-> Current milestone state: clean source `2c40f0633079248072c2f23a754905d665ef41d6`
-> and its unchanged 0.5.0 package passed native UI qualify at 1920x1080
-> and 1280x720: 85/0 assertions, 37 completed captures and nine ordinary/paused
-> switches in each run; original pause state, game exit, registry/mod restoration
-> and protected-save checks are verified. The full six-action purity window
-> passed with exit 0 in 5902.4443505 seconds (one attempt, lease wait 120).
-> Visual review has begun on original PNGs. Casting selection, genuine active
-> and disabled availability observations, physical routes and their remaining
-> pictures are still in progress; acceptance remains PARTIAL.
-> Revised eleven-hour planning estimate remains approximately 2026-10-12T05:28:29Z;
-> this estimate is not a cancellation deadline. Earlier candidates and failures
-> below retain their original inputs and chronology.
+> Current continuous milestone (October 12): clean footer-correction source
+> `eb36973364f1fa7bf174fa4e5e0169b89104902d` has a validated local 0.5.0 ZIP
+> and remains NOT_RUN. Its owned clean worktree is KingmakerBuffPlanner-NUICF.
+> All 74 original screenshots from 2c40f06's two 85/0 native runs have now
+> been visually inspected. One concrete 720p save-message truncation is repaired
+> in the new source; those earlier game results are not relabeled.
+> The owned casting purity on unchanged 2c40f06 remains active, one attempt,
+> lease wait 120, with supervision outside its five targets. It will finish
+> normally before any further game or freeze writes. The physical spellbook
+> attempt failed before input delivery (82/1, exit 1); original receipts prove
+> game exit, installation restoration and clean protected saves. Its foreground
+> limitation is recorded precisely, without assuming a console-window cause.
+> Acceptance remains PARTIAL. Revised fourteen-hour planning estimate:
+> approximately 2026-10-12T08:28:29Z, because the actual visual defect requires
+> observations on changed bytes. This estimate is not a cancellation deadline.
+> Current validation policy and every runtime guard remain effective.
 
 # Native UI completion milestone — October 11, 2026
 
@@ -359,3 +363,90 @@ The candidate supervision and first visual manifest are under
 Source, ZIP, DLL and MVID remain the identities recorded in the 2c40f06 section.
 The zero-cost-mixed non-casting selection is now active; Classic selection,
 existing permitted physical routes and allowance-bound casts continue next.
+
+## Actual first visual review and footer correction — October 12
+
+All 37 original captures from each of `kbpnui-complete-final-1080-02` and
+`kbpnui-complete-final-720-02` were opened at their original resolution. The
+nearby private `candidate-2c40f06/native-batch-visual-review.json` records their
+SHA-256s, actual loaded identities, observations and the one concrete defect.
+The native popup, stepped HUD frame, preserved tooltips, quieter sidebar,
+shared paper, readable filter captions and correct held Metamagic/Return
+pictures look coherent. All nine native-window pictures show their requested
+window without a planner overlay. The key observations remain binding-callback
+checks, not physical dispatch. A genuine long catalogue, prepared caster,
+Metamagic feat application, groups and enhancements are not supplied by this
+Automation fixture. Linzi and Tartuccio are spontaneous Bard/Sorcerer casters.
+
+At 720p the original save-failure paragraph ends at `runs refus...`. Not saved
+and Retry save are visible, but the recovery explanation is incomplete. The
+footer also reserves 198 units for Ready Casts Only while that action is hidden.
+Source `eb36973364f1fa7bf174fa4e5e0169b89104902d` reclaims that unused column,
+reserves it again when offered, and keeps the failed-autosave message concise:
+error kind, edit kept, file unchanged, and Retry save before casting. Persistence,
+Undo, recovery/refusal rules, native actions and capture sequencing are unchanged.
+
+Actual `Test-Development.ps1 -Only
+'footer-save-status-is-honest-and-recoverable,footer-names-the-run-and-no-ceremony,native-ui-planner-copy,native-ui-record'`
+passed: source 43/0, production build 1/0, selected C# 5/0, exit 0,
+12.4225082 seconds. The diff was reviewed and `git diff --check` passed. This
+was a pre-commit build over the coherent two-file patch; its DLL
+`2da18ecfc95a8baaef8b863f34d418a66af831e08fa26ae0e15450e060ef69c7`
+is development validation, not the clean candidate.
+
+The new owned clean detached worktree is
+`C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-NUICF` at eb36973.
+The first Build-Local invocation refused missing machine-local GamePath.props
+(exit 1, 2.2896402 seconds) before packaging. The inspected path file was copied
+from the existing DATA candidate, pointing to the verified local Kingmaker
+installation; no other machine profile or Codex home configuration was copied.
+The subsequent clean `Build-Local.ps1` passed source 43/0, build 1/0, package
+validation 4/0 and local creation 1/0, exit 0 in 3.8263646 seconds. It built once:
+
+- Product source: `eb36973364f1fa7bf174fa4e5e0169b89104902d`; version 0.5.0.
+- ZIP: `f992c35e23570e2137dc07f9f70601c5a3a107787b82a0fe1ce5e6fcd9634232`.
+- DLL: `ef3d047ccfebbb4a5b4c54354a110077b37e2a9914245e91320d84d94d4b05a8`.
+- MVID: `09a0e441-5ef7-4e1d-9f4c-c65ea2f417d9`.
+- Standard installable copy:
+  `C:\Dev\KingmakerBuffPlannerLab\package-archive\0.5.0-native-ui-completion-2026-10-12-eb36973\KingmakerBuffPlanner-0.5.0.zip`.
+- Actual original receipt retains its NUICF package path. The standard copy's
+  four entries and packaged DLL hash were verified without rebuilding.
+- New candidate runtime status: **NOT_RUN**. Earlier candidate/package/evidence
+  identities remain separate. No publisher or unrelated broad aggregate ran.
+
+`kbpnui-complete-cast-select-01` and `kbpnui-complete-classic-select-01` on clean
+2c40f06 each passed 85/0 and restored cleanly (exit 0; 203.9957398 and
+210.8847159 seconds). Their existing allowance builder created fresh grants for
+`kbpnui-complete-cast-01` (zero-cost-mixed instant, maximum eight submissions)
+and `kbpnui-complete-classic-cast-01` (animated Long plan digest
+`ec085180434a3fa9b98c28bb6a04516963352c6ce39a2d0a00b619860325fc1a`,
+maximum one submission). These grants belong to 2c40f06 and cannot authorize
+changed candidate bytes. The selected casting prerequisite began
+2026-10-12T01:18:17.7053341Z, PID 8964, exactly one attempt and lease wait 120.
+It includes both actual casting WhatIf routes plus authoring/problems WhatIf,
+with all five existing targets. It is still supervised and has no completion
+claim in this record.
+
+The actual physical spellbook attempt `kbpnui-complete-spellbook-01` ran on
+2c40f06 at 1920x1080: 82 PASS / 1 FAIL, numeric exit 1, 182.6265162 seconds.
+The single acknowledgement for the recorded B binding refused foreground
+activation before delivery. Every sampled game window was non-minimized and
+not foreground. Original run-completion and transaction receipts verify game
+exit, registry/mod restoration and clean protected saves, although the failed
+scenario's complete flag is false. The supervisor's false postcondition fields
+are not evidence that restoration failed. A later read-only session 2,
+WinSta0/Default probe returned foreground handle zero. The original failure
+has no foreground class/Win32 diagnostic; a console cause is not established.
+Private `physical-spellbook-failure-audit.json` preserves these distinctions.
+No physical guard was weakened and no blind retry is selected. Later permitted
+game samples will be checked for an actual environment change; other source,
+visual and casting work continues.
+
+The ordinary focused check remains bounded. The longer selected milestone now
+has a fourteen-hour estimate (approximately 2026-10-12T08:28:29Z), revised for
+the demonstrated visual correction and required new-byte observations. This is
+not a process-kill deadline. Continue supervision of the owned 2c40f06 purity,
+then its already selected active/disabled observations. Once restored, execute
+the new candidate's required guarded prerequisites and serial native/casting
+observations, review its actual pictures, finish acceptance records and guarded
+push. Do not restart the old failed aggregate or substitute old candidate PASS.
