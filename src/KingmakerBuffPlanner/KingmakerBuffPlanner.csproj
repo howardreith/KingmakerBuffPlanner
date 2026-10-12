@@ -269,6 +269,7 @@
     <Compile Include="UI\CatalogUiDiagnostics.cs" />
     <Compile Include="UI\CatalogLayoutDiagnostics.cs" />
     <Compile Include="UI\BuffPlannerUiContracts.cs" />
+    <Compile Include="UI\NativeTextMaterialSelection.cs" />
     <Compile Include="UI\PlannerNativeKit.cs" />
     <Compile Include="UI\HudStepGeometry.cs" />
     <Compile Include="UI\HudCellArt.cs" />

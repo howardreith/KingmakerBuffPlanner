@@ -48,6 +48,7 @@
     <Compile Include="ShadowCloneCatalogueTests.cs" />
     <Compile Include="SpellbookRemovalTests.cs" />
     <Compile Include="NativeUiFinishTests.cs" />
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeTextMaterialSelection.cs"><Link>UI\NativeTextMaterialSelection.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\ShareCastingModifierAdapter.cs"><Link>GameAdapters\ShareCastingModifierAdapter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\EnhancementLeaseCleanup.cs"><Link>GameAdapters\EnhancementLeaseCleanup.cs</Link></Compile>
     <Compile Include="TestBuildInfo.cs" />

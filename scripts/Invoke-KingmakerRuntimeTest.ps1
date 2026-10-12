@@ -677,34 +677,36 @@ public static class KbpPhysicalInput {
       if (attachedTarget) AttachThreadInput(ownThread, targetThread, false);
     }
   }
-  public static void RightClick(IntPtr window) {
-    if (window == IntPtr.Zero || GetForegroundWindow() != window)
-      throw new InvalidOperationException("Kingmaker lost foreground before right-click; refusing blind click.");
-    Point cursor;
-    Rect client;
-    if (!GetCursorPos(out cursor) || !GetClientRect(window, out client) ||
-        !ScreenToClient(window, ref cursor))
-      throw new InvalidOperationException("Kingmaker right-click-position verification failed.");
-    if (cursor.X < 0 || cursor.Y < 0 || cursor.X > client.Right || cursor.Y > client.Bottom)
-      throw new InvalidOperationException("Cursor drifted outside Kingmaker client; refusing blind right-click.");
-    mouse_event(0x0008, 0, 0, 0, UIntPtr.Zero);
-    mouse_event(0x0010, 0, 0, 0, UIntPtr.Zero);
+  public static string RightClickAt(IntPtr window, double x, double y, int unityWidth, int unityHeight) {
+    return ClickAt(window, x, y, unityWidth, unityHeight, 0x0008, 0x0010, "right-click");
   }
-  public static void Click(IntPtr window) {
-    // Revalidate ownership immediately before injection (review F7): the
-    // game must still be foreground AND the cursor must still be inside
-    // its client rect; focus or pointer drift aborts without clicking.
-    if (window == IntPtr.Zero || GetForegroundWindow() != window)
-      throw new InvalidOperationException("Kingmaker lost foreground before click; refusing blind click.");
-    Point cursor;
+  public static string ClickAt(IntPtr window, double x, double y, int unityWidth, int unityHeight) {
+    return ClickAt(window, x, y, unityWidth, unityHeight, 0x0002, 0x0004, "click");
+  }
+  private static string ClickAt(IntPtr window, double x, double y, int unityWidth, int unityHeight,
+      uint down, uint up, string label) {
+    // Kingmaker can warp the OS pointer while paused. The earlier hover move
+    // therefore cannot authorize a later click: re-aim, verify the exact
+    // client point, and inject immediately while the game owns foreground.
+    if (window == IntPtr.Zero || !Activate(window) || GetForegroundWindow() != window)
+      throw new InvalidOperationException("Kingmaker lost foreground before " + label + "; refusing blind click.");
     Rect client;
-    if (!GetCursorPos(out cursor) || !GetClientRect(window, out client) ||
-        !ScreenToClient(window, ref cursor))
-      throw new InvalidOperationException("Kingmaker click-position verification failed.");
-    if (cursor.X < 0 || cursor.Y < 0 || cursor.X > client.Right || cursor.Y > client.Bottom)
-      throw new InvalidOperationException("Cursor drifted outside Kingmaker client; refusing blind click.");
-    mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
-    mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+    if (!GetClientRect(window, out client))
+      throw new InvalidOperationException("Kingmaker client bounds lookup failed before " + label + ".");
+    Point target = MapToClient(x, y, unityWidth, unityHeight, client.Right, client.Bottom);
+    string mapping = DescribeMapping(unityWidth, unityHeight, client.Right, client.Bottom) +
+      ";client=" + target.X + "," + target.Y;
+    Point screen = target;
+    if (!ClientToScreen(window, ref screen) || !SetCursorPos(screen.X, screen.Y))
+      throw new InvalidOperationException("Kingmaker cursor re-aim failed before " + label + ".");
+    Point cursor;
+    if (!GetCursorPos(out cursor) || !ScreenToClient(window, ref cursor))
+      throw new InvalidOperationException("Kingmaker " + label + "-position verification failed.");
+    if (Math.Abs(cursor.X - target.X) > 1 || Math.Abs(cursor.Y - target.Y) > 1)
+      throw new InvalidOperationException("Cursor moved away from the requested Kingmaker target; refusing blind " + label + ".");
+    mouse_event(down, 0, 0, 0, UIntPtr.Zero);
+    mouse_event(up, 0, 0, 0, UIntPtr.Zero);
+    return mapping + ";verifiedClient=" + cursor.X + "," + cursor.Y;
   }
   // Lowercase letters and digits only, each a verified foreground key press
   // (KeyDown refuses when the game is not the foreground window).
@@ -975,9 +977,13 @@ public static class KbpPhysicalInput {
                                 [int]$physical.unityScreenWidth, [int]$physical.unityScreenHeight)
                             Start-Sleep -Milliseconds 250
                             if ([string]$physical.action -eq 'click') {
-                                [KbpPhysicalInput]::Click($process.MainWindowHandle)
+                                $deliveryDetail = [KbpPhysicalInput]::ClickAt($process.MainWindowHandle,
+                                    [double]$physical.x, [double]$physical.y,
+                                    [int]$physical.unityScreenWidth, [int]$physical.unityScreenHeight)
                             } elseif ([string]$physical.action -eq 'rightclick') {
-                                [KbpPhysicalInput]::RightClick($process.MainWindowHandle)
+                                $deliveryDetail = [KbpPhysicalInput]::RightClickAt($process.MainWindowHandle,
+                                    [double]$physical.x, [double]$physical.y,
+                                    [int]$physical.unityScreenWidth, [int]$physical.unityScreenHeight)
                             } elseif ([string]$physical.action -eq 'wheel') {
                                 [KbpPhysicalInput]::Wheel($process.MainWindowHandle, [int]$physical.delta)
                             } elseif ([string]$physical.action -ne 'hover') {

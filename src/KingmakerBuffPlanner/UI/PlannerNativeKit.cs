@@ -108,11 +108,18 @@ namespace KingmakerBuffPlanner.UI
                     BodyFont = font;
                 if (string.Equals(font.name, InitialFontName, StringComparison.Ordinal)) HasInitialFont = true;
             }
+            int bodyAtlas = MaterialAtlasInstanceId(BodyFont == null ? null : BodyFont.material);
             foreach (Material material in Resources.FindObjectsOfTypeAll<Material>())
-                if (material != null && !_materials.ContainsKey(material.name) &&
-                    (material.name == BodyMaterialName || material.name == ButtonMaterialName ||
-                     material.name == ActionMaterialName))
+            {
+                if (material == null || _materials.ContainsKey(material.name)) continue;
+                if (NativeTextMaterialSelection.Matches(BodyMaterialName, material.name,
+                        bodyAtlas, MaterialAtlasInstanceId(material)) ||
+                    NativeTextMaterialSelection.Matches(ButtonMaterialName, material.name,
+                        bodyAtlas, MaterialAtlasInstanceId(material)) ||
+                    NativeTextMaterialSelection.Matches(ActionMaterialName, material.name,
+                        bodyAtlas, MaterialAtlasInstanceId(material)))
                     _materials[material.name] = material;
+            }
             if (canvas == null) return;
             foreach (Image image in canvas.GetComponentsInChildren<Image>(true))
                 if (image != null && image.sprite != null && !_sprites.ContainsKey(image.sprite.name) &&
@@ -124,6 +131,12 @@ namespace KingmakerBuffPlanner.UI
         {
             Sprite sprite;
             return name != null && _sprites.TryGetValue(name, out sprite) && sprite != null ? sprite : null;
+        }
+
+        private static int MaterialAtlasInstanceId(Material material)
+        {
+            Texture texture = material == null ? null : material.mainTexture;
+            return texture == null ? 0 : texture.GetInstanceID();
         }
 
         internal string Evidence

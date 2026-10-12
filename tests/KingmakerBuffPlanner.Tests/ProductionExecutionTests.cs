@@ -7901,9 +7901,13 @@ namespace KingmakerBuffPlanner.Tests
             if (helperEnd < 0) helperEnd = launcher.Length;
             string helper = launcher.Substring(classStart, helperEnd - classStart);
             if (!helper.Contains("[DllImport(\"user32.dll\")] static extern bool SetProcessDPIAware();") ||
-                !helper.Contains("static KbpPhysicalInput() { try { SetProcessDPIAware(); } catch { } }"))
+                !helper.Contains("static KbpPhysicalInput() { try { SetProcessDPIAware(); } catch { } }") ||
+                !helper.Contains("public static string ClickAt(IntPtr window, double x, double y, int unityWidth, int unityHeight)") ||
+                !helper.Contains("Math.Abs(cursor.X - target.X) > 1 || Math.Abs(cursor.Y - target.Y) > 1") ||
+                !launcher.Contains("$deliveryDetail = [KbpPhysicalInput]::ClickAt($process.MainWindowHandle,"))
                 throw new InvalidOperationException("The physical input helper does not declare process DPI " +
-                    "awareness before its coordinate math; windowed cursor aims drift by the DPI scale.");
+                    "awareness and re-aim at the exact target immediately before a click; windowed cursor " +
+                    "aims can drift or be warped between hover and injection.");
         }
 
         // The preview guide is safety-relevant operator documentation: the

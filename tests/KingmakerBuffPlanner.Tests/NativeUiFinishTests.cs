@@ -69,6 +69,21 @@ namespace KingmakerBuffPlanner.Tests
             Run("native-hud-stepped-enclosure-geometry", TestHudStepGeometry);
             Run("native-hud-cell-art-composition", TestHudCellArt);
             Run("native-source-tabs-share-one-caption-size", TestSourceTabLayout);
+            Run("native-text-material-matches-selected-font-atlas", TestNativeTextMaterialSelection);
+        }
+
+        private static void TestNativeTextMaterialSelection()
+        {
+            const string role = "NexusSerif-Regular SDF - Cue Answer";
+            Expect(NativeTextMaterialSelection.Matches(role, role, 42, 42),
+                "A named role material on the selected font atlas must be accepted.");
+            Expect(!NativeTextMaterialSelection.Matches(role, role, 42, 17),
+                "A same-name fallback material on another font atlas must be refused.");
+            Expect(!NativeTextMaterialSelection.Matches(role,
+                    "NexusSerif-Regular SDF - ButtonLabel", 42, 42),
+                "A material from another text role must be refused.");
+            Expect(!NativeTextMaterialSelection.Matches(role, role, 0, 0),
+                "An unresolved atlas must retain the font's default material.");
         }
 
         private static void TestPhysicalSearchObservation()
