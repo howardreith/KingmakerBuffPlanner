@@ -15,6 +15,7 @@ using Kingmaker.UI.ServiceWindow;
 using Kingmaker.UI.Tooltip;
 using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Planning;
+using KingmakerBuffPlanner.Execution;
 using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.UI;
@@ -1272,11 +1273,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _qualifiedUiStep = _qualifiedUiPlanningOnly ? 9 : 3;
                         return false;
                     case 3:
-                        string recastId = _qualificationRecord.Selection.Castings[0].CastingId;
-                        _qualifiedUiSession.FocusGraphCasting(recastId);
-                        if (_qualifiedUiSession.Document.Castings.First(value => value.CastingId == recastId)
-                            .ExistingEffectPolicy != ExistingEffectPolicy.Overwrite)
+                        // The finite recipe already spent real native slots. Recast each
+                        // temporary copy so an active-effect skip cannot hide exhaustion.
+                        // This changes plan policy only; it never submits another cast.
+                        var recastCopies = _qualificationRecord.Selection.Recipe == CastingQualificationRecipe.FiniteDirectMixed
+                            ? _qualificationRecord.Selection.Castings.ToArray()
+                            : _qualificationRecord.Selection.Castings.Take(1).ToArray();
+                        foreach (PlannedCasting copy in recastCopies)
                         {
+                            _qualifiedUiSession.FocusGraphCasting(copy.CastingId);
+                            if (_qualifiedUiSession.Document.Castings.First(value => value.CastingId == copy.CastingId)
+                                .ExistingEffectPolicy == ExistingEffectPolicy.Overwrite) continue;
                             AuthoringEditResult edited = _qualifiedUiSession.SetFocusedRecastPolicy(ExistingEffectPolicy.Overwrite);
                             if (!edited.Applied) throw new InvalidOperationException("Active probe recast edit refused: " + edited.Reason);
                             _qualifiedUiEdits++;
@@ -1288,6 +1295,24 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     case 8:
                         if (_qualifiedUiClock.ElapsedMilliseconds < 1500) return false;
                         _qualifiedUiObservation["recastLabels"] = JArray.FromObject(view.VisibleLabelsForRuntime());
+                        _qualifiedUiObservation["recastCastings"] = new JArray(view.LastGraphForRuntime.Castings
+                            .Select(value => NativeUiStateJson.Casting(value.CastingId, value.CasterUnitId,
+                                value.TargetUnitId, value.StatusLabel, value.Readiness.ToString(),
+                                value.SourceProviderKey)).ToArray());
+                        if (_qualificationRecord.Selection.Recipe == CastingQualificationRecipe.FiniteDirectMixed)
+                        {
+                            // Snapshot real resources, including exact prepared-token availability.
+                            // No tint, enabled flag, pool or game effect is forced by this observer.
+                            CastingWorkspaceInputs actual = BuffPlannerUiRoot.CastingWorkspaceFreshInputsForRuntime();
+                            _qualifiedUiObservation["resourcePoolsAtRecast"] = new JArray(actual.Snapshot.ResourcePools
+                                .Select(pool => new JObject
+                                {
+                                    { "key", pool.PoolKey }, { "kind", pool.Kind.ToString() },
+                                    { "capacity", pool.Capacity }, { "remaining", pool.Remaining },
+                                    { "tokens", new JArray(pool.Tokens.Select(token => new JObject
+                                        { { "id", token.TokenId }, { "available", token.Available } }).ToArray()) }
+                                }).ToArray());
+                        }
                         _qualifiedUiObservation["temporaryEdits"] = _qualifiedUiEdits;
                         RequestQualifiedUiCapture("nui-qualified-recast.png");
                         _qualifiedUiStep = 9;

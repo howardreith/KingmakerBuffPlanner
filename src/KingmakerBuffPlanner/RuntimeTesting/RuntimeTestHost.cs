@@ -5362,7 +5362,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             // reads native effects with temporary plan copies; it never calls Apply.
             bool qualifiedActive = _qualificationRecord.CastingScenario && _qualificationRecord.TerminalReason == "completed" &&
                 _qualificationRecord.Selection != null &&
-                _qualificationRecord.Selection.Recipe == CastingQualificationRecipe.ZeroCostMixed;
+                (_qualificationRecord.Selection.Recipe == CastingQualificationRecipe.ZeroCostMixed ||
+                 _qualificationRecord.Selection.Recipe == CastingQualificationRecipe.FiniteDirectMixed);
             bool selectedAdvanced = !_qualificationRecord.CastingScenario &&
                 _request.Scenario == "live-cast-qual-select" && _request.ProfileId == "advanced-gunslinger-0136" &&
                 _qualificationRecord.Selection != null && _qualificationRecord.Violations().Count == 0 &&
