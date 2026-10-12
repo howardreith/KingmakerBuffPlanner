@@ -1215,7 +1215,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 switch (_qualifiedUiStep)
                 {
                     case 0:
-                        _qualifiedUiObservation["schemaVersion"] = 1;
+                        _qualifiedUiObservation["schemaVersion"] = 2;
                         _qualifiedUiObservation["runId"] = _request.RunId;
                         _qualifiedUiObservation["sourceId"] = _qualificationRecord.Selection.SourceId;
                         _qualifiedUiObservation["screenWidth"] = Screen.width;
@@ -1326,6 +1326,31 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                             !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
                         if (!(bool)_qualifiedUiObservation["leaseReleased"])
                             throw new InvalidOperationException("Active probe did not release its input lease.");
+                        // Read and picture the actual gameplay log after the
+                        // owned planner has closed, not behind its parchment.
+                        _qualifiedUiObservation["gameplayVisibleAtLogCapture"] = NativeUiPauseWorldReleased();
+                        if (!(bool)_qualifiedUiObservation["gameplayVisibleAtLogCapture"])
+                            throw new InvalidOperationException("The gameplay log is still behind a native window.");
+                        _qualifiedUiObservation["nativeGameLogAfterClose"] = JArray.FromObject(
+                            NativeUiFacts.GameLogMessages().Where(line =>
+                                line.IndexOf("Buff Planner:", StringComparison.Ordinal) >= 0).ToArray());
+                        RequestQualifiedUiCapture("nui-qualified-game-log.png");
+                        _qualifiedUiStep = 7;
+                        return false;
+                    case 7:
+                        // Capture completion already held this state through a
+                        // later frame. No Apply or other game action follows it.
+                        _qualifiedUiObservation["gameplayVisibleAfterLogCapture"] = NativeUiPauseWorldReleased();
+                        if (!(bool)_qualifiedUiObservation["gameplayVisibleAfterLogCapture"])
+                            throw new InvalidOperationException("The gameplay log capture lost its native window state.");
+                        _qualifiedUiObservation["runsAfter"] = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
+                        _qualifiedUiObservation["noAdditionalRun"] =
+                            _qualifiedUiRunsBefore == BuffPlannerUiRoot.CastingRunsStartedForRuntime;
+                        _qualifiedUiObservation["leaseReleased"] =
+                            !BuffPlannerUiRoot.IsCastingWorkspaceInputLeaseHeldForRuntime;
+                        if (!(bool)_qualifiedUiObservation["noAdditionalRun"] ||
+                            !(bool)_qualifiedUiObservation["leaseReleased"])
+                            throw new InvalidOperationException("Gameplay log capture changed the run count or retained input.");
                         WriteQualifiedUiObservation(null);
                         _qualifiedUiStep = 10;
                         return true;
