@@ -62,6 +62,22 @@ function New-SpellbookEvidence {
 }
 $cases = [ordered]@{
     'valid' = $null
+    'valid-footer-pair' = { param($r, $d) foreach ($cycle in $r.cycles) {
+        $cycle.placement = 'footer-pair;paired=True;metamagic=537.3/210.0;planner=757.3/210.0;plateExtension=220.0' } }
+    'valid-footer-no-book' = { param($r, $d) foreach ($cycle in $r.cycles) {
+        $cycle.placement = 'footer-pair;paired=False;metamagic=629.3/290.3;planner=757.3/210.0;plateExtension=0.0' } }
+    'footer-overlap' = { param($r, $d) $r.cycles[0].placement =
+        'footer-pair;paired=True;metamagic=629.3/290.3;planner=757.3/210.0;plateExtension=220.0' }
+    'footer-plate-short' = { param($r, $d) $r.cycles[0].placement =
+        'footer-pair;paired=True;metamagic=537.3/210.0;planner=757.3/210.0;plateExtension=0.0' }
+    'footer-malformed-with-old-marker' = { param($r, $d) $r.cycles[0].placement =
+        'footer-pair;paired=True;conflictFree=True' }
+    'footer-missing-visibility' = { param($r, $d) $r.cycles[0].placement =
+        'footer-pair;metamagic=537.3/210.0;planner=757.3/210.0;plateExtension=220.0' }
+    'footer-invalid-width' = { param($r, $d) $r.cycles[0].placement =
+        'footer-pair;paired=False;metamagic=629.3/290.3;planner=757.3/0.0;plateExtension=0.0' }
+    'footer-invalid-coordinate' = { param($r, $d) $r.cycles[0].placement =
+        'footer-pair;paired=True;metamagic=NaN/210.0;planner=757.3/210.0;plateExtension=220.0' }
     'valid-with-menu-veil' = { param($r, $d)
         $r.acknowledged = @($r.acknowledged) + @('sb-menu-close-1')
         Write-KbpJsonAtomic (Join-Path $d 'physical-input-sb-menu-close-1.ack.json') ([ordered]@{

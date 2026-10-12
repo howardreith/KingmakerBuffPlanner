@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace KingmakerBuffPlanner.RuntimeTesting
 {
@@ -131,7 +133,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 if (!OnScreen(cycle.ButtonX, cycle.ButtonY) || cycle.ButtonWidth < 40f ||
                     cycle.ButtonHeight < 16f || !cycle.TopmostHitIsOwned)
                     failures.Add("button-not-visible-and-topmost" + at);
-                if (cycle.Placement == null || !cycle.Placement.Contains("conflictFree=True"))
+                if (!PlacementIsConflictFree(cycle.Placement))
                     failures.Add("button-placement-conflicts" + at);
                 if (cycle.NativeCloseInvocations != 1 || cycle.OpenerInvocations != 1 ||
                     cycle.NativeReleases != 1)
@@ -168,6 +170,38 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 !SelectionUnchanged)
                 failures.Add("input-leaked-to-the-game-world");
             return failures;
+        }
+
+        // The native footer reports the actual Metamagic visibility and the
+        // two local rectangles. Hidden Metamagic does not occupy a hit area.
+        // Retain the interpretation of historical top-close records.
+        public static bool PlacementIsConflictFree(string placement)
+        {
+            if (placement == null) return false;
+            if (!placement.StartsWith("footer-pair;", StringComparison.Ordinal))
+                return placement.Contains("conflictFree=True") && !placement.Contains("conflictFree=False");
+            const string number = @"[+-]?\d+(?:\.\d+)?";
+            Match match = Regex.Match(placement, @"\Afooter-pair;paired=(?<paired>True|False);metamagic=(?<mx>" +
+                number + @")/(?<mw>" + number + @");planner=(?<px>" + number + @")/(?<pw>" + number +
+                @");plateExtension=(?<extension>" + number + @")\z");
+            if (!match.Success) return false;
+            var values = new Dictionary<string, double>();
+            foreach (string key in new[] { "mx", "mw", "px", "pw", "extension" })
+            {
+                double value;
+                if (!double.TryParse(match.Groups[key].Value, NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out value) || double.IsNaN(value) || double.IsInfinity(value))
+                    return false;
+                values.Add(key, value);
+            }
+            if (values["mw"] <= 0 || values["pw"] <= 0 || values["extension"] < 0) return false;
+            if (match.Groups["paired"].Value == "False") return values["extension"] == 0;
+            double metamagicRight = values["mx"] + values["mw"] / 2;
+            double plannerLeft = values["px"] - values["pw"] / 2;
+            double plannerRight = values["px"] + values["pw"] / 2;
+            // Diagnostic coordinates are rounded to one decimal place.
+            return plannerLeft >= metamagicRight - 0.11 &&
+                metamagicRight + values["extension"] >= plannerRight - 0.11;
         }
 
         private bool OnScreen(float? x, float? y)

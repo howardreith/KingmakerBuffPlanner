@@ -1098,6 +1098,37 @@ function Assert-KbpProblemNavigationOutcome {
         }
     }
 }
+# Interpret current native footer geometry and historical placement receipts.
+# The entry controller obtains paired from real native activeInHierarchy.
+function Test-KbpSpellbookPlacement {
+    param([AllowNull()][string]$Placement)
+    if ([string]::IsNullOrEmpty($Placement)) { return $false }
+    if (-not $Placement.StartsWith('footer-pair;', [StringComparison]::Ordinal)) {
+        return $Placement.Contains('conflictFree=True') -and -not $Placement.Contains('conflictFree=False')
+    }
+    $number = '[+-]?\d+(?:\.\d+)?'
+    $pattern = '\Afooter-pair;paired=(?<paired>True|False);metamagic=(?<mx>' + $number +
+        ')/(?<mw>' + $number + ');planner=(?<px>' + $number + ')/(?<pw>' + $number +
+        ');plateExtension=(?<extension>' + $number + ')\z'
+    $match = [regex]::Match($Placement, $pattern)
+    if (-not $match.Success) { return $false }
+    $values = @{}
+    foreach ($key in @('mx','mw','px','pw','extension')) {
+        $value = 0.0
+        if (-not [double]::TryParse($match.Groups[$key].Value, [Globalization.NumberStyles]::Float,
+            [Globalization.CultureInfo]::InvariantCulture, [ref]$value) -or
+            [double]::IsNaN($value) -or [double]::IsInfinity($value)) { return $false }
+        $values[$key] = $value
+    }
+    if ($values.mw -le 0 -or $values.pw -le 0 -or $values.extension -lt 0) { return $false }
+    if ($match.Groups['paired'].Value -ceq 'False') { return $values.extension -eq 0 }
+    $metamagicRight = $values.mx + $values.mw / 2
+    $plannerLeft = $values.px - $values.pw / 2
+    $plannerRight = $values.px + $values.pw / 2
+    return $plannerLeft -ge ($metamagicRight - 0.11) -and
+        ($metamagicRight + $values.extension) -ge ($plannerRight - 0.11)
+}
+
 # WP2B: the guarded spellbook handoff, judged independently of the host.
 function Assert-KbpSpellbookEntryOutcome {
     param([Parameter(Mandatory = $true)]$Request)
@@ -1169,7 +1200,7 @@ function Assert-KbpSpellbookEntryOutcome {
             -not [bool]$cycle.spellbookShown -or -not [bool]$cycle.buttonAttached -or
             -not [bool]$cycle.buttonInteractable -or [bool]$cycle.plannerOpenBeforeClick -or
             [int]$cycle.ownedButtonCount -ne 1 -or [int]$cycle.listenerCount -ne 1 -or
-            -not [bool]$cycle.topmostHitIsOwned -or [string]$cycle.placement -cnotlike '*conflictFree=True*' -or
+            -not [bool]$cycle.topmostHitIsOwned -or -not (Test-KbpSpellbookPlacement ([string]$cycle.placement)) -or
             $null -eq $cycle.buttonX -or [double]$cycle.buttonX -le 0 -or
             [double]$cycle.buttonX -ge [int]$record.screenWidth -or $null -eq $cycle.buttonY -or
             [double]$cycle.buttonY -le 0 -or [double]$cycle.buttonY -ge [int]$record.screenHeight -or

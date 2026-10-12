@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using KingmakerBuffPlanner.UI;
+using KingmakerBuffPlanner.RuntimeTesting;
 
 namespace KingmakerBuffPlanner.Tests
 {
@@ -18,6 +19,7 @@ namespace KingmakerBuffPlanner.Tests
                 TestSpellbookNativeCloseResolution);
             Run("spellbook-entry-pairs-with-metamagic-in-the-footer",
                 TestSpellbookFooterPair);
+            Run("spellbook-entry-record-current-and-historical-placement", TestSpellbookEntryPlacementRecord);
             Run("spellbook-entry-handoff-admission-and-recovery", TestSpellbookHandoffAdmission);
         }
 
@@ -126,6 +128,24 @@ namespace KingmakerBuffPlanner.Tests
                 !source.Contains("label.fontSharedMaterial = native.fontSharedMaterial;") ||
                 source.Contains("SpellbookEntryPlacement") || source.Contains("KingmakerUiFactory.CreateButton("))
                 throw new InvalidOperationException("The spellbook entry is not the native footer pair.");
+        }
+
+        private static void TestSpellbookEntryPlacementRecord()
+        {
+            string paired = "footer-pair;" + SpellbookFooterLayout.Compute(629.34f, 290.28f, true).Describe();
+            string alone = "footer-pair;" + SpellbookFooterLayout.Compute(629.34f, 290.28f, false).Describe();
+            foreach (string valid in new[] { paired, alone, "left-of-native-close;conflictFree=True" })
+                if (!SpellbookEntryRecord.PlacementIsConflictFree(valid))
+                    throw new InvalidOperationException("Safe current/historical placement refused: " + valid);
+            foreach (string invalid in new[] {
+                null, "", "below-native-close;conflictFree=False",
+                "footer-pair;paired=True;metamagic=629.3/290.3;planner=757.3/210.0;plateExtension=220.0",
+                paired.Replace("plateExtension=220.0", "plateExtension=0.0"),
+                alone.Replace("planner=757.3/210.0", "planner=757.3/0.0"),
+                paired.Replace("537.3", "NaN"), paired.Replace("paired=True;", ""),
+                "footer-pair;paired=True;conflictFree=True" })
+                if (SpellbookEntryRecord.PlacementIsConflictFree(invalid))
+                    throw new InvalidOperationException("Unsafe or incomplete placement accepted: " + invalid);
         }
 
         private static void TestSpellbookHandoffAdmission()
