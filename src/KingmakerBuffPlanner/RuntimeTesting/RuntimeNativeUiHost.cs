@@ -1256,9 +1256,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         return false;
                     case 2:
                         if (_qualifiedUiClock.ElapsedMilliseconds < 1500) return false;
-                        _qualifiedUiObservation["castings"] = JArray.FromObject(view.LastGraphForRuntime.Castings
-                            .Select(value => new { value.CastingId, value.CasterUnitId, value.TargetUnitId,
-                                value.StatusLabel, value.Readiness, value.SourceProviderKey }).ToArray());
+                        _qualifiedUiObservation["castings"] = new JArray(view.LastGraphForRuntime.Castings
+                            .Select(value => NativeUiStateJson.Casting(value.CastingId, value.CasterUnitId,
+                                value.TargetUnitId, value.StatusLabel, value.Readiness.ToString(),
+                                value.SourceProviderKey)).ToArray());
                         _qualifiedUiObservation["visibleLabels"] = JArray.FromObject(view.VisibleLabelsForRuntime());
                         _qualifiedUiObservation["nativeGameLogLines"] = JArray.FromObject(NativeUiFacts.GameLogMessages()
                             .Where(line => line.IndexOf("Buff Planner:", StringComparison.Ordinal) >= 0).ToArray());
@@ -1533,12 +1534,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return new JObject
             {
                 { "sessionExecuting", BuffPlannerUiRoot.IsExecutingForRuntime },
-                { "owned", JArray.FromObject(owned.Select(button => new
-                    { button.name, button.interactable, highlight = HighlightTint(button) }).ToArray()) },
-                { "native", JArray.FromObject(hud == null || hud.NativeClusterForRuntime == null ? new object[0]
+                { "owned", new JArray(owned.Select(button => NativeUiStateJson.HudButton(
+                    button.name, button.interactable, HighlightTint(button))).ToArray()) },
+                { "native", new JArray(hud == null || hud.NativeClusterForRuntime == null ? new JObject[0]
                     : hud.NativeClusterForRuntime.GetComponentsInChildren<Button>(false)
-                        .Where(button => !owned.Contains(button)).Select(button => (object)new
-                            { button.name, button.interactable }).ToArray()) }
+                        .Where(button => !owned.Contains(button)).Select(button =>
+                            NativeUiStateJson.HudButton(button.name, button.interactable, null)).ToArray()) }
             };
         }
 

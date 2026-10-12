@@ -12,12 +12,50 @@ namespace KingmakerBuffPlanner.Tests
     internal static partial class Program
     {
         // Native UI finish (KBP_NATIVE_UI_FINISH_2026-10-10).
+        private sealed class NativeUiFieldsOnlyContractResolver : Newtonsoft.Json.Serialization.DefaultContractResolver
+        {
+            protected override List<System.Reflection.MemberInfo> GetSerializableMembers(Type objectType)
+            {
+                return base.GetSerializableMembers(objectType).Where(member =>
+                    member.MemberType == System.Reflection.MemberTypes.Field).ToList();
+            }
+        }
+
+        private static void TestNativeUiStateJson()
+        {
+            Func<Newtonsoft.Json.JsonSerializerSettings> previous = Newtonsoft.Json.JsonConvert.DefaultSettings;
+            try
+            {
+                Newtonsoft.Json.JsonConvert.DefaultSettings = () => new Newtonsoft.Json.JsonSerializerSettings
+                {
+                    ContractResolver = new NativeUiFieldsOnlyContractResolver(),
+                    PreserveReferencesHandling = Newtonsoft.Json.PreserveReferencesHandling.Objects
+                };
+                JObject omitted = JObject.FromObject(new { name = "setup", interactable = false });
+                Expect(omitted.Property("name") == null && omitted.Property("interactable") == null,
+                    "The matched field-only contract must reproduce the missing anonymous state.");
+                JObject button = JObject.Parse(NativeUiStateJson.HudButton("setup", false,
+                    new[] { 1f, 0.5f, 0.25f, 0f }).ToString());
+                JObject casting = JObject.Parse(NativeUiStateJson.Casting("cast-1", "caster", "target",
+                    "Active - Will skip", "AlreadyActive", "provider").ToString());
+                Expect((string)button["name"] == "setup" && button["interactable"].Type == JTokenType.Boolean &&
+                    !(bool)button["interactable"] && (float)button["highlight"][1] == 0.5f,
+                    "The actual unavailable flag, control identity and rendered tint must survive game defaults.");
+                Expect((string)casting["CastingId"] == "cast-1" && (string)casting["CasterUnitId"] == "caster" &&
+                    (string)casting["TargetUnitId"] == "target" && (string)casting["SourceProviderKey"] == "provider" &&
+                    (string)casting["Readiness"] == "AlreadyActive" && (string)casting["StatusLabel"] == "Active - Will skip",
+                    "Casting state and exact source/receiver identities must survive game defaults.");
+            }
+            finally { Newtonsoft.Json.JsonConvert.DefaultSettings = previous; }
+        }
+
         private static void RunNativeUiFinishTests(string root)
         {
             Run("native-pause-restoration-world-boundary", TestPauseRestoreWorldBoundary);
             Run("native-pause-restoration-queued-mode", TestPauseRestoreQueuedMode);
             Run("native-pause-restoration-original-state", TestPauseRestoreOriginalState);
             Run("native-pause-restoration-bounded-timeout", TestPauseRestoreTimeout);
+            Run("native-ui-snapshots-retain-state-under-game-json-defaults", TestNativeUiStateJson);
             Run("native-ui-capture-holds-frame-and-output", TestNativeUiCaptureBoundary);
             Run("native-ui-capture-bounded-timeout", TestNativeUiCaptureTimeout);
             Run("native-ui-capture-refuses-stale-output", TestNativeUiCaptureFreshOutput);
@@ -811,7 +849,7 @@ namespace KingmakerBuffPlanner.Tests
                 { "popup-not-same-spell", r => r.PopupSameSpell =
                     NativeUiRecord.SameDescriptionTitle(EarPiercingScreamTitle, r.PlannerPopupTitle) },
                 { "retired-label:Planner: Casting-first", r => r.PlannerVisibleLabels.Add("Planner: Casting-first") },
-                { "planner-title:Buff Planner — casting plan", r => r.PlannerTitle = "Buff Planner — casting plan" },
+                { "planner-title:Buff Planner â€” casting plan", r => r.PlannerTitle = "Buff Planner â€” casting plan" },
                 { "switch:inventory:planner-stayed", r => r.Switches[0].PlannerOpenAfter = true },
                 { "switch:character:native-lost-full-screen-mode", r => r.Switches[1].FullScreenModeWhileNative = false },
                 { "switch:spellbook:pause-changed", r => r.Switches[2].PausedAfterClose = true },

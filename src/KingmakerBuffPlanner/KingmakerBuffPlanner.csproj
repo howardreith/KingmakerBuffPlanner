@@ -154,6 +154,7 @@
     <Compile Include="RuntimeTesting\RuntimeSpellbookEntryHost.cs" />
     <Compile Include="RuntimeTesting\NativeUiRecord.cs" />
     <Compile Include="RuntimeTesting\NativeUiCaptureBoundary.cs" />
+    <Compile Include="RuntimeTesting\NativeUiStateJson.cs" />
     <Compile Include="RuntimeTesting\NativeUiPauseRestoration.cs" />
     <Compile Include="RuntimeTesting\NativeUiFacts.cs" />
     <Compile Include="RuntimeTesting\RuntimeNativeUiHost.cs" />
