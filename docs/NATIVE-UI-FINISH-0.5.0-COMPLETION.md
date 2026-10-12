@@ -1,5 +1,24 @@
 > Current continuous mission: clean product `624b5e929eb24a8d31ef9fe50cb4520d6fa2445d`,
 > version 0.5.0 in owned NUICZ; validated installable local archive **NOT_RUN**.
+> The prior 96b2f4b inventory completed **PASS, exit 0, 6317.920778 seconds**
+> at 2026-10-12T07:41:45Z with eleven WhatIf actions, Attempts 1, lease wait 120,
+> and all five original targets. It is not a prerequisite receipt for new bytes.
+> Current 624b5e9 freeze exited 0 in 38.8405194 seconds. Its own eleven-action
+> full-target prerequisite is now supervised by PID23484/session62865, started
+> 2026-10-12T07:44:10Z, Attempts 1 / LeaseWaitSeconds 120. Preserve watched paths.
+> Current candidate game routes remain NOT_RUN; receipt stays PARTIAL.
+> After this prerequisite, execute native1080/720 serially and inspect the originals;
+> continue physical typing/paused switching and read-only Advanced selections.
+> Fresh mechanical zero-cost, animated Classic and finite allowances then support
+> the selected six-action casting prerequisite and its six actual observations.
+> Every Advanced save remains unchanged; unsupported NativeUI/Advanced is refused.
+> Revised twenty-hour planning forecast remains 2026-10-12T14:28:29Z, not a timer.
+> Continue actual game observations, visual review, exact restoration, local delivery
+> and guarded push under the owner's selected longer milestone. No broad aggregate
+> or release campaign is implied. Earlier banners retain chronology and original inputs.
+
+> Current continuous mission: clean product `624b5e929eb24a8d31ef9fe50cb4520d6fa2445d`,
+> version 0.5.0 in owned NUICZ; validated installable local archive **NOT_RUN**.
 > Selected-source pictures now focus the enhanced casting and its hover; the group
 > recipe already selected its group source. Explicit copy/source/focused-sidebar
 > metadata permits strict visible-row checks while retaining complete mixed-recipe
@@ -1090,3 +1109,39 @@ selected/physical/Advanced routes, fresh grants/S6/approvedcasts, original pictu
 review and coherent local delivery/guarded push. No aggregate restart, publisher,
 release reproducibility or unrelated qualification is selected. Do not finish while
 an owned long task still requires supervision or restoration.
+
+## 2026-10-12T07:44Z — prior owned inventory completed; final source frozen
+
+The 96b2f4b supervisor PID25996/session79092 completed naturally, numeric exit 0,
+PASS in 6317.920778 seconds. All eleven preflights completed inside its unchanged
+five-target before/after window, one attempt and lease wait 120. Original output
+and `candidate-96b2f4b/selection-physical-purity-result.json` remain attributed to
+that exact source and package; no live run was launched for the obsolete candidate.
+
+The source-unchanged final 624b5e9 candidate was then frozen through the inspected
+helper after current ownership, transaction and save-violation checks. Freeze exit
+0, 38.8405194 seconds, frozenAt 2026-10-12T07:43:48.9706461Z. ZIP
+`bb87b0cbec1494ee35fb3a1b344288b5b9155f326ded4fcba96c6a9e69ecd15e`, DLL
+`eaf285cadb4d02abd7c73eaa8954224ac2b8aea3433bc90b4f68bf021fb1805f`, MVID
+`e07a0b2f-d590-4fcf-a17b-12aab2c9e32c`; actual archive DLL stream was checked.
+The repository build manifest stayed bound to NUICZ; documentation commits did
+not trigger a rebuild or relabel the product.
+
+Command now supervised: `powershell.exe -NoProfile -NonInteractive
+-ExecutionPolicy Bypass -File artifacts/native-ui-milestone-2026-10-11/
+candidate-624b5e9/run-additional-purity.ps1 -Scope selection-physical
+-ExpectedCommit 624b5e929eb24a8d31ef9fe50cb4520d6fa2445d
+-ExpectedZipSha256 bb87b0cbec1494ee35fb3a1b344288b5b9155f326ded4fcba96c6a9e69ecd15e`.
+The private supervisor invokes the actual repository launcher directly with
+`-WhatIf -Confirm:$false`, retaining all original guards; it does not perform
+raw staging or replace purity checks. PID23484/session62865, started
+2026-10-12T07:44:10.2489992Z. Eleven preflights, all five targets, Attempts 1,
+LeaseWaitSeconds 120; logs and numeric receipts are outside the inventory roots.
+Actual native1080/720 and remaining selected routes are still NOT_RUN.
+
+Private helper hashes were refreshed, including the separately inspected
+fresh-allowance helper and its absolute original build-manifest path. No grants
+exist yet: each requires its actual successful final-source selection. No
+concrete additional product defect was found in preparation; do not churn the
+frozen candidate before seeing its real game evidence. Continue the selected
+ordinary/noncasting observations, then bounded casting and visual review.
