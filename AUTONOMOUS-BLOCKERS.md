@@ -1,3 +1,20 @@
+> Current continuous milestone: clean product source `95cb40b229a2aee954cfcecf8de2bb9c16ab5d2c`,
+> version 0.5.0, owned NUICQ. Local ZIP/DLL are validated and **NOT_RUN**.
+> Physical select schema 2 adds actual guarded search typing, B containment,
+> active-row membership and two held captures; callback cleanup remains separate.
+> Focused C# 11/0, raw-state reader 14/0, launcher direct 24/0 and actual -File
+> 8/0 passed, exit 0 in 7.2342248 seconds. Clean local build completed once
+> in 4.1396548 seconds after a preserved pre-compilation local-properties refusal.
+> The unchanged 3b5a2d7 six-action purity remains owned by PID 26140; preserve
+> its freeze and watched runtime paths. Its result will retain its original inputs.
+> The new candidate's eight-action purity is NOT_RUN: native two sizes, both
+> selections, physical spellbook/search, and existing approved read-only Advanced
+> inspect/workspace. Advanced routes compare every save unchanged; NativeUI still
+> refuses Advanced. No new casting allowance or save-mutation authority is inferred.
+> Continue through actual new-byte native/input/casting pictures and local delivery.
+> Eighteen-hour planning estimate is not a stopping deadline. Receipt PARTIAL.
+> Earlier banners below are chronological evidence for their named inputs.
+
 > Current continuous milestone: clean product source
 > `3b5a2d747da8cd69de66d7459218af0fac99e915`, version 0.5.0, NUICV.
 > The new-byte six-action purity is supervised (PID 26140), Attempts 1 /

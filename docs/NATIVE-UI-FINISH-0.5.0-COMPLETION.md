@@ -1,3 +1,20 @@
+> Current continuous milestone: clean product source `95cb40b229a2aee954cfcecf8de2bb9c16ab5d2c`,
+> version 0.5.0, owned NUICQ. Local ZIP/DLL are validated and **NOT_RUN**.
+> Physical select schema 2 adds actual guarded search typing, B containment,
+> active-row membership and two held captures; callback cleanup remains separate.
+> Focused C# 11/0, raw-state reader 14/0, launcher direct 24/0 and actual -File
+> 8/0 passed, exit 0 in 7.2342248 seconds. Clean local build completed once
+> in 4.1396548 seconds after a preserved pre-compilation local-properties refusal.
+> The unchanged 3b5a2d7 six-action purity remains owned by PID 26140; preserve
+> its freeze and watched runtime paths. Its result will retain its original inputs.
+> The new candidate's eight-action purity is NOT_RUN: native two sizes, both
+> selections, physical spellbook/search, and existing approved read-only Advanced
+> inspect/workspace. Advanced routes compare every save unchanged; NativeUI still
+> refuses Advanced. No new casting allowance or save-mutation authority is inferred.
+> Continue through actual new-byte native/input/casting pictures and local delivery.
+> Eighteen-hour planning estimate is not a stopping deadline. Receipt PARTIAL.
+> Earlier banners below are chronological evidence for their named inputs.
+
 > Current continuous milestone: clean product source
 > `3b5a2d747da8cd69de66d7459218af0fac99e915`, version 0.5.0, NUICV.
 > The new-byte six-action purity is supervised (PID 26140), Attempts 1 /
@@ -688,3 +705,99 @@ When successful, run the two native observations serially, verify original
 cleanup after each, open the new PNGs, run the fresh selections/physical routes,
 derive actual new run-bound grants, then execute the selected casting prerequisite
 and casting/authoring/problem observations. Do not finish at this record update.
+
+
+## Physical text-entry feasibility and clean candidate — October 12
+
+The existing launcher already permits foreground-verified, single-shot lowercase
+text typing. Its CastingFirst selection route had never exercised the field.
+Source `95cb40b229a2aee954cfcecf8de2bb9c16ab5d2c` uses that existing route
+and three existing input requests: click search, type four letters derived from
+an actually available source, then type `b`. It compares real active catalogue
+rows, actual field text and focus, unchanged native mode/planner/document, and
+holds two screenshots through the shared later-frame, complete-PNG boundary.
+Timeout remains ten seconds. Cleanup clears the field through its actual view
+binding, explicitly recorded as callback cleanup, not physical-input evidence.
+Schema 2 requires these facts for new selection requests; schema 1 retains its
+historical eight-action interpretation. No physical restriction or fixture
+family is widened. This is observer code compiled into the DLL.
+
+One focused invocation used:
+
+```powershell
+.\scripts\Test-Development.ps1 -Only 'physical-search,native-ui-snapshots,native-ui-capture,native-ui-record,spellbook-entry'
+.\scripts\Test-PhysicalSearchEvidence.ps1
+.\scripts\Test-RuntimeLauncherArguments.ps1
+.\scripts\Test-RuntimeLauncherFileArguments.ps1
+```
+
+Actual result: source 43/0, build 1/0, C# 11/0, raw-state reader 14/0,
+direct argument 24/0 and real child-process 8/0; numeric exit 0, **7.2342248
+seconds**, `2026-10-12T04:21:48.8340032Z` to `04:21:56.0679409Z`.
+Logs/results are under `artifacts/native-ui-milestone-2026-10-11/`, named
+`focused-physical-search-final.log` and `focused-physical-search-final-result.json`.
+The development build was made from d08fac6 plus the then-uncommitted patch;
+it is not the clean packaged binary. Two earlier 10/1 fixture-test failures
+remain recorded: the test omitted CastingFirst, and the first attempted edit
+refused on Windows text encoding before changing it. Source behavior was not
+weakened. The final fixture sets the actual branch under test.
+
+Clean detached NUICQ preserves NUICV/NUIR and every prior candidate.
+`Build-Local.ps1` completed once with source 43/0, build 1/0, package 4/0 and
+local creation 1/0, exit 0 in **4.1396548 seconds**, `04:31:25.2613236Z`
+to `04:31:29.4003784Z`. A setup typo looked for LocalGamePath.props instead
+of DATA's actual GamePath.props; its 2.442119-second pre-compilation refusal
+and numeric exit 1 are preserved separately. No candidate package existed
+or was removed by that failed invocation. The verified DATA-local properties
+were then copied, without installing any machine profile. Version 0.5.0:
+
+- Product source: `95cb40b229a2aee954cfcecf8de2bb9c16ab5d2c`.
+- ZIP: `1076edee59c0b2e1bd3d934ecb892669f49786f87cf9dfa63113a2756fd7c9d8`.
+- DLL: `3c4b349a07473153f7ca31e36de5f29ca68b9df6810015914acfa317f9f0f437`.
+- MVID: `e2624a10-10c2-4558-8295-bed4f8f10b6e`.
+- Installable copy: `C:\Dev\KingmakerBuffPlannerLab\package-archive\0.5.0-native-ui-completion-2026-10-12-95cb40b\KingmakerBuffPlanner-0.5.0.zip`.
+- Original path-bound receipt: NUICQ `artifacts/local-runtime/0.5.0/KingmakerBuffPlanner-0.5.0-local-runtime.zip.build-local.json`.
+
+All four allowlisted entries, Info version, archive transport, packaged DLL
+bytes and clean source were checked. Preparation/provenance is separate from
+runtime evidence at `candidate-95cb40b/`; twenty actual clean-checkout
+source/reader hashes and the development test EXE's distinct provenance are
+recorded. A test-EXE lookup in the clean worktree refused after archive/helper
+creation; only the missing provenance was resumed using its actual development
+path. No archive/evidence was overwritten. Twelve fresh `kbpnui-input-` RunIds
+were checked for collisions; none existed. Private supervisor syntax: 4/0.
+
+The owner-approved Advanced copy exists and the established binding/profile
+checks passed read-only. Current profile digest is
+`088553867688dd3c09a5c5ad593d551682ed0977a5ed5db3f0163d6305fc02b7`;
+the previously complete non-casting inspection is `advanced-inspect-20260924-01`.
+The preserved capability receipt identifies genuine prepared books, groups,
+rod/enhancement pools and substantial content. The existing
+`live-advanced-inspect` and `live-workspace-qual` routes can observe these
+through their normal native controls without casting or saving the campaign.
+They are selected narrowly under their established `advanced-gunslinger-0136`
+profile and guarded read-only loader, with an extra before/after snapshot of
+**every save** including both Advanced copies. The native-UI scenario's explicit
+Advanced refusal remains unchanged. This selects no Advanced casting, fixture
+bootstrap or save-mutation exception. Budget for these two observations is
+approximately twenty minutes after the already-required new purity window.
+
+At this record, the unchanged 3b5a2d7 scan remains active under PID 26140.
+Its six-action window must complete and retain its own numeric outcome before
+new runtime writes or freezing another candidate. It cannot establish purity
+for the compiled typing change. The next new-input window has eight WhatIf
+actions, including both native resolutions in one full five-target inventory,
+Attempts 1 and LeaseWaitSeconds 120. No blind retry is selected. After the
+verified boundary, freeze NUICQ, run that window, then serial native 1080/720,
+selected guarded inputs and read-only Advanced pictures. Obtain fresh mechanical
+run-bound casting allowances from actual new-input selections and perform the
+separate four-action casting purity before the already-selected instant and
+one-plan Classic observations.
+
+The estimate is revised from sixteen to **eighteen hours**, through approximately
+`2026-10-12T12:28:29Z`, because a feasible physical typing gap changes the
+compiled observer and needs its own actual-byte prerequisite/evidence, while
+the owned prior scan must finish safely. This estimate is not a stop condition.
+The selected acceptance milestone continues; ordinary corrections still use
+focused checks. Aggregate SourceOnly, publisher, release reproducibility and
+unrelated layout/compatibility campaigns remain deliberately unselected.

@@ -1,3 +1,10 @@
+> Current continuous milestone uses clean product 95cb40b in NUICQ, NOT_RUN.
+> See [current completion record](NATIVE-UI-FINISH-0.5.0-COMPLETION.md).
+> Preserve PID 26140's unchanged 3b5a2d7 purity until its numeric result.
+> New candidate eight-action purity and actual native/input/casting evidence
+> remain authorized; this is an eighteen-hour estimate, not a stop deadline.
+> Earlier checkpoint instructions and identities below retain their chronology.
+
 > Active owner-selected completion: see [current milestone](NATIVE-UI-FINISH-0.5.0-COMPLETION.md).
 > The current clean candidate is 3b5a2d7; the source/package and ordinary deferral
 > below remain historical. Do not rebuild or relabel them. Continuous game work
