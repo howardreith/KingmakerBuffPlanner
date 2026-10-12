@@ -1,3 +1,22 @@
+> Current continuous mission: clean product `624b5e929eb24a8d31ef9fe50cb4520d6fa2445d`,
+> version 0.5.0 in owned NUICZ; validated installable local archive **NOT_RUN**.
+> Selected-source pictures now focus the enhanced casting and its hover; the group
+> recipe already selected its group source. Explicit copy/source/focused-sidebar
+> metadata permits strict visible-row checks while retaining complete mixed-recipe
+> identities. No additional cast or manufactured availability is introduced.
+> Focused C#10/0, selected-context reader32/0, finite reader14/0 and eight parsers passed.
+> The owned prior 96b2f4b scan remains PID25996/session79092; preserve its watched
+> paths through safe natural completion and retain its original-input numeric result.
+> Current 624b5e9 prerequisite and game routes are NOT_RUN; do not reuse the older scan.
+> Eleven-action full-target prerequisite, native1080/720, physical and read-only
+> Advanced selections remain selected; the later six-action prerequisite uses fresh
+> mechanical zero-cost/Classic/finite allowances and includes genuine Advanced720 content.
+> Every Advanced save stays unchanged; NativeUI/Advanced remains refused.
+> Revised **twenty-hour** forecast is 2026-10-12T14:28:29Z, allowing the required
+> changed-byte prerequisite and safe completion of the old one. It is not a stop timer.
+> Continue actual observations, pictures, exact restoration, local delivery and
+> guarded push. Acceptance PARTIAL. Earlier banners retain chronology and original inputs.
+
 > Current continuous mission: clean product `96b2f4b6396d3c9a961cc2dc6bd4b6a8327d9f18`,
 > version 0.5.0 in owned `KingmakerBuffPlanner-NUICY`; validated local ZIP **NOT_RUN**.
 > Reused bounded observers now hold actual selected group/enhancement plan pictures
@@ -1007,3 +1026,67 @@ This is a declared acceptance dependency, not an additional full scan or binary 
 Original source `96b2f4b`, DLL/ZIP/MVID and eighteen-hour forecast remain unchanged.
 Native Metamagic feat use and remapped physical keys remain pending actual capability
 assessment; absent prepared metamagic masks do not prove absence of feats.
+
+## Exact selected-context correction and revised forecast — 2026-10-12
+
+The pre-game context audit found one actual observation gap: enhanced-direct's
+first witness is plain, so it must focus the genuinely enhanced casting instead.
+Group-mixed already selects its group source; the initial theory that its focused
+row was the plain witness was rejected by its recipe constructor and graph code.
+A mixed recipe contains other-source castings that are not visible in the selected
+buff graph. The prior unrun private reader incorrectly required every recipe row
+on that image. Current observer explicitly records every copy's source/mode/
+enhancement IDs, actual selected source, focused ID/mode/selected Boolean, actual
+inspector enhancement choices, and focused hover. The reader retains complete
+qualification membership, derives the exact selected-source subset and requires
+actual group focus or a genuinely selected enhancement rather than the plain witness.
+No existing PASS is reinterpreted and no missing observation is invented.
+
+`Test-Development.ps1 -Only 'graph-selection,graph-group,graph-enhancement,qualification-driver,native-ui-capture,native-ui-record'`
+passed source43/0, build1/0, C#10/0, exit0 in 6.3119988 seconds after
+the final focused-hover correction (3ce7868 plus patch; development DLL4ec7cc27).
+The earlier pre-hover10/0 result11.8800089s remains its own provenance. Pure actual
+source/sidebar consumer checks passed32/0, including correct mixed-source group and
+two-row enhancement positives, rejection of plain focus, missing/false/string
+chosen-enhancement state, foreign/missing copy/visible rows and wrong hover. Finite
+reader14/0 and all8 helper parsers passed; exit0 in 0.5952278999999999 seconds.
+These remain focused integration checks, not rendered-quality evidence.
+
+Clean NUICZ source `624b5e929eb24a8d31ef9fe50cb4520d6fa2445d` was built once through
+Build-Local: source43/0, build1/0, package4/0, local1/0, exit0 in 4.4303171 seconds.
+Installable ZIP:
+`C:\Dev\KingmakerBuffPlannerLab\package-archive\0.5.0-native-ui-completion-2026-10-12-624b5e9\KingmakerBuffPlanner-0.5.0.zip`.
+ZIP `bb87b0cbec1494ee35fb3a1b344288b5b9155f326ded4fcba96c6a9e69ecd15e`;
+DLL `eaf285cadb4d02abd7c73eaa8954224ac2b8aea3433bc90b4f68bf021fb1805f`;
+MVID `e07a0b2f-d590-4fcf-a17b-12aab2c9e32c`; version0.5.0. Actual ZIP content,
+DLL transport, original path-bound receipt, metadata and cleanliness were checked.
+The package is validated **NOT_RUN**, acceptance PARTIAL; no final game claim yet.
+
+Seventeen fresh `kbpnui-wrap-*` IDs passed collision checks. Source-bound helpers,
+32/14 reader outcomes, original clean build receipt and all hashes are under
+`artifacts/native-ui-milestone-2026-10-11/candidate-624b5e9/`. Current package freeze
+and inventory remain NOT_RUN until the still-owned96b scan completes. Do not write
+into its watched runtime-state/staging/backups/evidence/GameMods targets or cancel
+it without a verified safe established path. No such cancellation is selected.
+Its final status/exit will remain attributed to96b2f4b/ZIP34557657; no obsolete game
+run is added simply to reuse it or add a count. All older worktrees/archive/evidence,
+including the frozen4db fallback, remain preserved.
+
+The continuing owner instruction authorizes necessary in-scope budget extensions.
+Revised twenty-hour forecast ends about2026-10-12T14:28:29Z: the compiled enhancement
+context fix needs its own exact-byte prerequisite and actual group/enhancement
+images, while safe completion of the prior scan remains mandatory. This is a scope
+estimate, not permission to kill a process or stop useful work. Ordinary corrections
+retain focused validation. Eleven-action S5 includes both native WhatIfs in the same
+full five-target window, Attempts1/lease120. S6's six actions bind fresh actual
+zero-cost/Classic/finite grants and also include the read-only Advanced720 workspace,
+physical authoring and problems. Every save including both Advanced copies stays
+unchanged around its approved routes. Unsupported NativeUI/Advanced is still refused.
+
+Exact next action: supervise PID25996 to its numeric terminal result, then current
+boundary checks/freeze624b5e9 once and its selected single-attempt S5; serial native
+1080 then720 with complete restored/protected receipts between, remaining actual
+selected/physical/Advanced routes, fresh grants/S6/approvedcasts, original picture
+review and coherent local delivery/guarded push. No aggregate restart, publisher,
+release reproducibility or unrelated qualification is selected. Do not finish while
+an owned long task still requires supervision or restoration.

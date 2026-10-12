@@ -1,3 +1,22 @@
+> Current continuous mission: clean product `624b5e929eb24a8d31ef9fe50cb4520d6fa2445d`,
+> version 0.5.0 in owned NUICZ; validated installable local archive **NOT_RUN**.
+> Selected-source pictures now focus the enhanced casting and its hover; the group
+> recipe already selected its group source. Explicit copy/source/focused-sidebar
+> metadata permits strict visible-row checks while retaining complete mixed-recipe
+> identities. No additional cast or manufactured availability is introduced.
+> Focused C#10/0, selected-context reader32/0, finite reader14/0 and eight parsers passed.
+> The owned prior 96b2f4b scan remains PID25996/session79092; preserve its watched
+> paths through safe natural completion and retain its original-input numeric result.
+> Current 624b5e9 prerequisite and game routes are NOT_RUN; do not reuse the older scan.
+> Eleven-action full-target prerequisite, native1080/720, physical and read-only
+> Advanced selections remain selected; the later six-action prerequisite uses fresh
+> mechanical zero-cost/Classic/finite allowances and includes genuine Advanced720 content.
+> Every Advanced save stays unchanged; NativeUI/Advanced remains refused.
+> Revised **twenty-hour** forecast is 2026-10-12T14:28:29Z, allowing the required
+> changed-byte prerequisite and safe completion of the old one. It is not a stop timer.
+> Continue actual observations, pictures, exact restoration, local delivery and
+> guarded push. Acceptance PARTIAL. Earlier banners retain chronology and original inputs.
+
 > Current continuous mission: clean product `96b2f4b6396d3c9a961cc2dc6bd4b6a8327d9f18`,
 > version 0.5.0 in owned `KingmakerBuffPlanner-NUICY`; validated local ZIP **NOT_RUN**.
 > Reused bounded observers now hold actual selected group/enhancement plan pictures
