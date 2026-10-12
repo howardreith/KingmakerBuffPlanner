@@ -1,19 +1,19 @@
-> Current continuous milestone (October 12): clean footer-correction source
-> `eb36973364f1fa7bf174fa4e5e0169b89104902d` has a validated local 0.5.0 ZIP
-> and remains NOT_RUN. Its owned clean worktree is KingmakerBuffPlanner-NUICF.
-> All 74 original screenshots from 2c40f06's two 85/0 native runs have now
-> been visually inspected. One concrete 720p save-message truncation is repaired
-> in the new source; those earlier game results are not relabeled.
-> The owned casting purity on unchanged 2c40f06 remains active, one attempt,
-> lease wait 120, with supervision outside its five targets. It will finish
-> normally before any further game or freeze writes. The physical spellbook
-> attempt failed before input delivery (82/1, exit 1); original receipts prove
-> game exit, installation restoration and clean protected saves. Its foreground
-> limitation is recorded precisely, without assuming a console-window cause.
-> Acceptance remains PARTIAL. Revised fourteen-hour planning estimate:
-> approximately 2026-10-12T08:28:29Z, because the actual visual defect requires
-> observations on changed bytes. This estimate is not a cancellation deadline.
-> Current validation policy and every runtime guard remain effective.
+> Current continuous milestone (October 12): source
+> `354aed5edebc3b37f5aa91e89164d64ee77b3048` combines the actual 720p footer
+> repair with a fourth after-cast capture of the native success log after the
+> owned planner releases input. Its clean NUICG 0.5.0 ZIP is validated and NOT_RUN.
+> This compiled observer change has its own DLL/package identity; earlier
+> candidates, archives and receipts are preserved. No earlier PASS is relabeled.
+> The owned casting purity on unchanged 2c40f06 remains supervised (PID 8964),
+> one attempt and lease wait 120, with all five targets. All four WhatIf routes
+> ran; the after inventory still needs completion. No conflicting runtime writes.
+> All 74 earlier native pictures were reviewed; a real 720p truncation was fixed.
+> Physical spellbook failed before key delivery (82/1, exit 1), with original
+> installation/protected-save restoration verified. Foreground access remains
+> an observed limitation; no console cause is inferred and no guard is bypassed.
+> Receipt PARTIAL. The fourteen-hour estimate remains approximately
+> 2026-10-12T08:28:29Z; this is not a stop or process-kill deadline. Continuous
+> work and current-policy focused checks continue through the selected milestone.
 
 # Native UI completion milestone — October 11, 2026
 
@@ -450,3 +450,60 @@ then its already selected active/disabled observations. Once restored, execute
 the new candidate's required guarded prerequisites and serial native/casting
 observations, review its actual pictures, finish acceptance records and guarded
 push. Do not restart the old failed aggregate or substitute old candidate PASS.
+
+## Final preparation adds a visible success log — October 12, 02:27 UTC
+
+Source inspection found one independently actionable evidence gap before the
+new candidate's freeze or expensive prerequisite: the after-qualification probe
+read the actual native BattleLogView lines, but all three pictures covered the
+planner. Source `354aed5edebc3b37f5aa91e89164d64ee77b3048` adds exactly one
+`nui-qualified-game-log.png` after the owned planner closes and its lease is
+released. It uses the existing later-frame/complete-PNG/ten-second boundary,
+checks the released native gameplay mode before and after capture, and
+rechecks run count and input release. It does not call Apply or spend an
+additional allowance. The after-qualification raw record is now schema 2;
+original schema-1 records remain associated with their original candidates.
+The main native UI record stays schema 4. No runtime or fixture guard changed.
+
+Actual focused command:
+`Test-Development.ps1 -Only 'native-ui-capture,native-ui-game-log-lines,qualification-driver-end-to-end,qualification-on-the-planner-pumped-host,native-ui-record'`.
+Result: source 43/0, build 1/0, C# 8/0, numeric exit 0, 10.3190622 seconds.
+Diff review and `git diff --check` passed. Its pre-commit DLL was
+`81ffc0120ed57d48bf6c899095e60600a9ddd6356c8187a2fc32c22a219bb076`
+over documentation HEAD 8a90df0 plus the coherent observer patch. It is not
+the clean delivered build. The actual logs and numeric receipt are under
+`artifacts/native-ui-milestone-2026-10-11/focused-success-log-capture*`.
+
+A separate owned clean detached worktree NUICG preserves NUIC/NUICF/NUIR and
+all their outputs. Its one clean `Build-Local.ps1` invocation passed source
+43/0, build 1/0, package 4/0 and local creation 1/0, exit 0 in 4.9029578 seconds.
+Four package entries, Info version and actual packaged DLL bytes were verified:
+
+- Product source: `354aed5edebc3b37f5aa91e89164d64ee77b3048`; version 0.5.0.
+- ZIP SHA-256: `3e3f256dc719fdbda963a32ebde47f62ac9c74e90c42cfdbcdf6ce7cb55b583a`.
+- DLL SHA-256: `530fbaa03cda60416ec40e523fe4651a271f3a2a78e2900140d1bd3f2eb39d02`.
+- MVID: `c4bf27b4-561b-4b73-a2c2-0784edb489a3`.
+- Installable local copy:
+  `C:\Dev\KingmakerBuffPlannerLab\package-archive\0.5.0-native-ui-completion-2026-10-12-354aed5\KingmakerBuffPlanner-0.5.0.zip`.
+- Original source-bound receipt remains at NUICG's original Build-Local path;
+  the standard copy does not rewrite it or rebuild the DLL.
+- Runtime status remains **NOT_RUN**. eb36973's archive also remains NOT_RUN.
+
+Private preparation, collision check (ten new RunIds, zero collisions), helper
+parse checks (3/0), harness/reader hashes and original build receipt are under
+`artifacts/native-ui-milestone-2026-10-11/candidate-354aed5/`.
+The private supervisor records owner display selection for casting routes;
+actual dimensions come from candidate native records, not an unused wrapper
+default. New schema-2 observations require all four named pictures and their
+capture boundaries; the unchanged 2c40f06 supervisor retains its original
+three-capture interpretation. Derived comparison crops keep original PNG
+hashes unchanged and do not count donor exports as game screenshots.
+
+This bounded addition does not add another full scan to the fourteen-hour
+estimate because the superseded footer-only candidate had not started its
+prerequisites. Continue supervised completion of the current owned 2c40f06
+window and its selected casts; then freeze the clean new candidate, use the
+full selected prerequisites once per dependency, run serial native observations,
+review actual pictures, obtain new selection/grant-bound cast evidence, and
+finish local delivery records and guarded push. No publisher or old aggregate
+has been selected.

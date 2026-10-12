@@ -1,3 +1,12 @@
+> October 12 current candidate: source 354aed5 includes the footer repair and
+> one bounded native success-log picture after releasing the planner; clean
+> NUICG local ZIP validated, NOT_RUN. See [continuous milestone](docs/NATIVE-UI-FINISH-0.5.0-COMPLETION.md).
+> The owned 2c40f06 casting purity still runs with Attempts 1 / lease wait 120;
+> preserve its five watched targets and complete its cleanup before game writes.
+> Physical input remains limited by actual foreground refusal; original
+> restoration/protected saves are verified. Fourteen-hour estimate is not a
+> cancellation deadline. Keep current-policy focused corrections and continue.
+
 > October 12 continuous work: see [current completion record](docs/NATIVE-UI-FINISH-0.5.0-COMPLETION.md).
 > Source eb36973 repairs an actual 720p save-message defect, has a validated
 > local ZIP, and remains NOT_RUN. The earlier 2c40f06 native runs passed 85/0
