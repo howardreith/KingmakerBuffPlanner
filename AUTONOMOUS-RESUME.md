@@ -1,10 +1,17 @@
-> Owner-selected continuous completion milestone, October 11: the original
-> four-hour estimate is now eleven hours after two observed probe defects.
-> Current clean source is `2c40f0633079248072c2f23a754905d665ef41d6`; its
-> version 0.5.0 package remains NOT_RUN while the selected full purity window
-> runs. Prior 743b1dc and dc60a37 game attempts FAILED and restored exactly.
-> Follow the [current milestone](docs/NATIVE-UI-FINISH-0.5.0-COMPLETION.md)
-> and current validation policy. Earlier budget deferrals are historical.
+> Current milestone state: clean source `2c40f0633079248072c2f23a754905d665ef41d6`
+> and its unchanged 0.5.0 package passed native UI qualify at 1920x1080
+> and 1280x720: 85/0 assertions, 37 completed captures and nine ordinary/paused
+> switches in each run; original pause state, game exit, registry/mod restoration
+> and protected-save checks are verified. The full six-action purity window
+> passed with exit 0 in 5902.4443505 seconds (one attempt, lease wait 120).
+> Visual review has begun on original PNGs. Casting selection, genuine active
+> and disabled availability observations, physical routes and their remaining
+> pictures are still in progress; acceptance remains PARTIAL.
+> Revised eleven-hour planning estimate remains approximately 2026-10-12T05:28:29Z;
+> this estimate is not a cancellation deadline. Earlier candidates and failures
+> below retain their original inputs and chronology.
+
+> Follow the [current milestone](docs/NATIVE-UI-FINISH-0.5.0-COMPLETION.md).
 
 # Current native UI capture checkpoint - October 11, 2026
 

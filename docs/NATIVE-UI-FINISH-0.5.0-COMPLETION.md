@@ -1,16 +1,15 @@
-> Current milestone state (supersedes dated notes below): the 743b1dc and
-> dc60a37 1080p attempts FAILED, with original game exit, registry/mod restoration
-> and clean protected-save receipts. The dc60a37 run passed all nine ordinary and
-> paused switches but did not restore the probe's original pause state.
-> Verified installed DoStopMode refuses stopping Pause beneath FullScreenUi.
-> Repair source 2c40f0633079248072c2f23a754905d665ef41d6 closes the owned
-> window, waits for world release and observes the actual original state before
-> reopening. Classic capture release uses the same bounded observation.
-> Focused source 43/0, build 1/0 and selected C# 23/0 passed in 5.7201224 seconds.
-> The new clean 0.5.0 package is NOT_RUN; its fresh full-purity scan is active
-> (PID 17844, started 22:54:11.9563390Z) outside all watched paths for supervision.
-> Revised planning estimate: eleven hours, approximately 2026-10-12T05:28:29Z.
-> Acceptance remains PARTIAL. This estimate is not a cancellation deadline.
+> Current milestone state: clean source `2c40f0633079248072c2f23a754905d665ef41d6`
+> and its unchanged 0.5.0 package passed native UI qualify at 1920x1080
+> and 1280x720: 85/0 assertions, 37 completed captures and nine ordinary/paused
+> switches in each run; original pause state, game exit, registry/mod restoration
+> and protected-save checks are verified. The full six-action purity window
+> passed with exit 0 in 5902.4443505 seconds (one attempt, lease wait 120).
+> Visual review has begun on original PNGs. Casting selection, genuine active
+> and disabled availability observations, physical routes and their remaining
+> pictures are still in progress; acceptance remains PARTIAL.
+> Revised eleven-hour planning estimate remains approximately 2026-10-12T05:28:29Z;
+> this estimate is not a cancellation deadline. Earlier candidates and failures
+> below retain their original inputs and chronology.
 
 # Native UI completion milestone — October 11, 2026
 
@@ -327,3 +326,36 @@ bytes, then restoration/protected-save verification, second size and picture
 review; continue the already selected dependent observations and final delivery.
 The eleven-hour estimate records the extra mandatory current-input scan caused
 by this concrete defect; it authorizes no killing of active work or guard bypass.
+
+## Completed native UI batch — October 12, 00:48 UTC
+
+Both guarded invocations used `live-workspace-native-ui -NativeUiStage qualify`,
+`full-user`, `Automation`, timeout 600 and direct-script `-Confirm:$false`.
+The owned clean NUIC checkout stayed at 2c40f06. No rebuild accompanied records.
+
+| RunId | Display | Exit | Supervision seconds | Actual runtime result |
+|---|---|---|---|---|
+| `kbpnui-complete-final-1080-02` | `windowed-1920x1080` | 0 | 405.4946394 | PASS, 85/0; 37 captures; pause/restoration/protected checks clean |
+| `kbpnui-complete-final-720-02` | `windowed-1280x720` | 0 | 325.9627675 | PASS, 85/0; 37 captures; pause/restoration/protected checks clean |
+
+Each original `run-completion.json` confirms complete=true, game exited,
+restoration verified and protected saves compared/clean. Each transaction is
+Restored with restorationVerified=true. The first run was checked before the
+second began. Raw native records have no violations or missing captures.
+
+Original-image review confirms the Metamagic capture holds that mode, the
+Resistance spellbook and casting-card popups match native composition, the
+1080p stepped HUD enclosure has no doubled outer rail, and the 720p filter
+captions fit at measured size 10. Both-size planner/footer and spellbook pair
+are readable without essential-control overlap. These observations do not
+prove physical dispatch, genuine long content, larger UI scale or a new fixture.
+The actual pictured casters are a Bard and Sorcerer, both spontaneous, and
+Hedwirg without a book; prepared and multi-source caster coverage is absent.
+The native Metamagic page explicitly reports no metamagic feats.
+
+Current original raw evidence is under `runtime-evidence\<RunId>\`.
+The candidate supervision and first visual manifest are under
+`artifacts/native-ui-milestone-2026-10-11/candidate-2c40f06/`.
+Source, ZIP, DLL and MVID remain the identities recorded in the 2c40f06 section.
+The zero-cost-mixed non-casting selection is now active; Classic selection,
+existing permitted physical routes and allowance-bound casts continue next.
