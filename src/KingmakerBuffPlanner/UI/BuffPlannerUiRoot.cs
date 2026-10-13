@@ -738,13 +738,20 @@ namespace KingmakerBuffPlanner.UI
                 sb.Append(";alpha=").Append(group.alpha.ToString("F2"))
                     .Append(";blocksRaycasts=").Append(group.blocksRaycasts)
                     .Append(";interactable=").Append(group.interactable);
-            UnityEngine.UI.Text[] texts =
+            UnityEngine.UI.Text[] legacyTexts =
                 root.GetComponentsInChildren<UnityEngine.UI.Text>(true);
+            TMPro.TMP_Text[] tmpTexts =
+                root.GetComponentsInChildren<TMPro.TMP_Text>(true);
             int renderableTexts = 0;
-            foreach (UnityEngine.UI.Text text in texts)
+            foreach (UnityEngine.UI.Text text in legacyTexts)
                 if (text != null && text.gameObject.activeInHierarchy &&
                     text.font != null && text.enabled) renderableTexts++;
-            sb.Append(";texts=").Append(texts.Length)
+            foreach (TMPro.TMP_Text text in tmpTexts)
+                if (text != null && text.gameObject.activeInHierarchy &&
+                    text.font != null && text.enabled) renderableTexts++;
+            sb.Append(";texts=").Append(legacyTexts.Length + tmpTexts.Length)
+                .Append(";legacyTexts=").Append(legacyTexts.Length)
+                .Append(";tmpTexts=").Append(tmpTexts.Length)
                 .Append(";renderableTexts=").Append(renderableTexts)
                 .Append(";rootLayer=").Append(root.layer);
             Canvas rootCanvas = canvas == null ? null : canvas.rootCanvas;
@@ -804,6 +811,11 @@ namespace KingmakerBuffPlanner.UI
                 sink.Append(":Txt").Append(text.enabled ? "+" : "-")
                     .Append("a").Append(text.color.a.ToString("F2"))
                     .Append("l").Append(text.text.Length);
+            TMPro.TMP_Text tmpText = node.GetComponent<TMPro.TMP_Text>();
+            if (tmpText != null)
+                sink.Append(":TMP").Append(tmpText.enabled ? "+" : "-")
+                    .Append("a").Append(tmpText.color.a.ToString("F2"))
+                    .Append("l").Append(tmpText.text.Length);
             for (int i = 0; i < node.childCount; i++)
                 AppendNodeDump(node.GetChild(i), depth + 1, maxDepth, sink);
         }
