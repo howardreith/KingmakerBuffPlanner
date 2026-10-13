@@ -1,3 +1,12 @@
+> **Current October 13 resume:** do not restart the older campaigns below.
+> Exact candidate `dfbaa5f` completed the two selected purity windows and all 17
+> selected game observations with clean restoration. Publisher v5 was safely
+> interrupted during read-only inventory after the scope correction; no numeric
+> exit, tag, draft, upload, or release exists. Local delivery is complete. See
+> [the final evidence record](docs/NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md).
+> Do not restart a publisher or broad campaign. Later reader/documentation
+> commits must not relabel the exact tested candidate.
+>
 > **Active October 12 completion:** product `b6016c710c24a6118d4e92eb391bdb0b1c036488`,
 > version 0.5.0, has a validated local ZIP but is **NOT_RUN** in Kingmaker.
 > The earlier 624b5e9 two-size native pictures remain attributed to those bytes;

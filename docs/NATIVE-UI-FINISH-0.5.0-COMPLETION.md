@@ -1,3 +1,15 @@
+> **Current October 13 result:** exact product source
+> `dfbaa5fbd0aba901b2e03c950dd7735f28ed226c`, ZIP
+> `2e2dbe33cb4ccb65762829042e5f96076882c3030dc3bc24e1df5fff51e31501`,
+> and DLL
+> `63f5749780fa2e30491318b91b8222e8184f882a2e6de1f4c611d51e3d512bf9`
+> completed the selected purity windows and 17 game observations. Acceptance is
+> PARTIAL only for the narrow owner observations listed in the
+> [final evidence record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md). Publisher
+> v5 is safely INTERRUPTED at a read-only boundary; no release mutation occurred.
+> Local delivery is complete and no replacement broad campaign is selected.
+> All older active-phase banners below are historical and keep their named inputs.
+>
 > **Active phase-collision repair:** exact d715 Advanced inspection passed in
 > 317.1809501 seconds with runtime PASS, complete/restored/protected-save clean
 > receipts and every Advanced save unchanged. The following 1920x1080 Advanced

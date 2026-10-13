@@ -1,3 +1,15 @@
+## Current native UI completion - October 13, 2026
+
+Exact product source `dfbaa5fbd0aba901b2e03c950dd7735f28ed226c`
+completed the selected two one-attempt purity windows, 17 guarded game
+observations, restoration, and original-resolution picture review. Publisher v5
+is safely INTERRUPTED at a read-only boundary with no tag or release; local
+delivery is complete. Overall UI acceptance remains PARTIAL for three owner
+observations that require campaign content/settings absent from the guarded
+fixtures. See the
+[final evidence record](../docs/NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md).
+Do not restart a publisher or dated campaign, or relabel the tested package.
+
 ## Current owner workflow directive - October 11, 2026
 
 Read ../docs/VALIDATION-POLICY.md. Development and review default to focused

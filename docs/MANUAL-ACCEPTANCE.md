@@ -1,3 +1,12 @@
+> **Current October 13 owner-only remainder:** the exact `dfbaa5f` candidate has
+> completed the independently actionable game and visual work. The smallest
+> remaining list is: (1) an organic long/localized spell popup in a real
+> campaign; (2) a custom remapped native window key; and (3) UI scale above
+> 100% with a genuinely long catalogue, including first/last rows and hover.
+> These map to UI-01, UI-02, UI-03, and UI-06. Exact evidence and procedure are
+> in the [final record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md). Older manual
+> lists below remain useful background but include states now observed.
+>
 > **Active October 12 completion:** product `b6016c710c24a6118d4e92eb391bdb0b1c036488`,
 > version 0.5.0, has a validated local ZIP but is **NOT_RUN** in Kingmaker.
 > The earlier 624b5e9 two-size native pictures remain attributed to those bytes;

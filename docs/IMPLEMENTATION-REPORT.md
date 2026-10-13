@@ -1,3 +1,14 @@
+> **Current October 13 native UI result:** exact source `dfbaa5f`, ZIP
+> `2e2dbe33cb4ccb65762829042e5f96076882c3030dc3bc24e1df5fff51e31501`,
+> and DLL
+> `63f5749780fa2e30491318b91b8222e8184f882a2e6de1f4c611d51e3d512bf9`
+> completed both selected purity windows and 17 guarded game observations with
+> clean restoration. Exact implementation behavior, visual review, RunIds,
+> acceptance, and remaining owner observations are in the
+> [final evidence record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md). Publisher
+> v5 is safely INTERRUPTED at a read-only boundary with no tag or release. The
+> tested local ZIP is the current delivery; older status banners are historical.
+>
 > **Active October 12 native UI mission:** the b6016c7 0.5.0 package is validated but NOT_RUN; its exact-byte eleven-action full-history purity is supervised. The earlier 624b5e9 native two-size runs remain historical, and its physical boot request failed before result but was restored cleanly. Acceptance remains PARTIAL. See [current protocol repair checkpoint](NATIVE-UI-FINISH-0.5.0-PROTOCOL-REPAIR-CHECKPOINT.md). Earlier records retain their named inputs.
 > Current screenshot repair: clean source 7410f92/version 0.5.0 has a validated
 > local package and focused offline capture checks; new game observations remain

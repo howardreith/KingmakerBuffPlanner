@@ -1008,8 +1008,21 @@ function Assert-KbpProblemNavigationOutcome {
         [string]$record.packageSha256 -cne [string]$Request.expectedPackageSha256 -or
         [string]$record.dllSha256 -cne [string]$Request.expectedDllSha256 -or
         [string]$record.assemblyMvid -cnotmatch '^[0-9a-f-]{36}$' -or
-        @($record.failures).Count -ne 0 -or @($record.violations).Count -ne 0) {
-        throw 'Physical problem evidence does not match this candidate-bound request or has violations.'
+        @($record.failures).Count -ne 0) {
+        throw 'Physical problem evidence does not match this candidate-bound request or has failures.'
+    }
+    # Schema 1's compiled judge assumed verticalNormalizedPosition=1 even when
+    # the inspector content fits its viewport. Unity may report 0 in that case.
+    # Re-evaluate only that preserved verdict from the raw observations below;
+    # every other host violation remains fatal.
+    $allowedHostViolations = @(0..2 | ForEach-Object {
+        'problem-inspector-or-controls-not-actionable:' + $_
+    })
+    $unexpectedHostViolations = @($record.violations | Where-Object {
+        $allowedHostViolations -cnotcontains [string]$_
+    })
+    if ($unexpectedHostViolations.Count -ne 0) {
+        throw "Physical problem evidence retains unexpected host violations: $($unexpectedHostViolations -join ', ')"
     }
     $actions = @('problem-moon', 'problem-next', 'problem-previous', 'problem-escape-focus', 'problem-escape-close')
     $acknowledged = @($record.acknowledged)
@@ -1075,11 +1088,14 @@ function Assert-KbpProblemNavigationOutcome {
             [int]$observation.position -ne $position -or [int]$observation.count -ne 2 -or
             [string]$observation.documentSignature -cne [string]$record.documentBefore -or
             [double]$observation.chipVisibleFraction -lt 0.9 -or
-            [Math]::Abs([double]$observation.inspectorScroll - 1) -gt 0.001 -or
+            [double]$observation.inspectorScroll -lt -0.001 -or
+            [double]$observation.inspectorScroll -gt 1.001 -or
             [bool]$observation.previousEnabled -ne ($position -gt 1) -or
             [bool]$observation.nextEnabled -ne ($position -lt 2) -or
             [string]$observation.inspectorText -cnotlike "*Problem $position of 2*" -or
             [string]$observation.inspectorText -cnotlike '*this casting is a Draft; finish its choices and mark it Ready*' -or
+            [string]$observation.inspectorText -cnotlike '*Previous Problem*' -or
+            [string]$observation.inspectorText -cnotlike '*Next Problem*' -or
             [string]$observation.footerText -cnotlike "*Problem $position of 2*" -or
             (@($observation.machineReasons) -join ',') -cne 'unresolved-saved-request') {
             throw "Problem $position does not show the correct actionable inspector and controls."

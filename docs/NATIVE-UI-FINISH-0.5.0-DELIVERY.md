@@ -1,3 +1,15 @@
+> **Current October 13 result:** exact product source
+> `dfbaa5fbd0aba901b2e03c950dd7735f28ed226c`, ZIP
+> `2e2dbe33cb4ccb65762829042e5f96076882c3030dc3bc24e1df5fff51e31501`,
+> and DLL
+> `63f5749780fa2e30491318b91b8222e8184f882a2e6de1f4c611d51e3d512bf9`
+> completed both purity windows and all selected game work. Seven UI items PASS;
+> UI-01, UI-02, UI-03, and UI-06 remain PARTIAL for three precise owner
+> observations. See the [final evidence and delivery record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md).
+> Publisher v5 is safely INTERRUPTED at a read-only boundary; no tag, upload, or
+> release exists. The tested ZIP is the local delivery. Older status banners are
+> historical; current publication scope is recorded in the final evidence.
+>
 > **Active October 12 completion:** product `b6016c710c24a6118d4e92eb391bdb0b1c036488`,
 > version 0.5.0, has a validated local ZIP but is **NOT_RUN** in Kingmaker.
 > The earlier 624b5e9 two-size native pictures remain attributed to those bytes;

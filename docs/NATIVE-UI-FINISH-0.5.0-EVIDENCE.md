@@ -1,3 +1,12 @@
+> **Current October 13 evidence:** the selected `dfbaa5f` candidate completed
+> two one-attempt whole-history purity windows and 17 guarded game observations,
+> including exact 1920x1080 and 1280x720 UI/Advanced pictures. All transactions
+> restored and protected-save comparisons are clean. Exact identities, RunIds,
+> counts, image-review findings, the preserved runtime FAIL plus reader-only
+> reinterpretation, and per-item acceptance are in the
+> [final evidence record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md). Older
+> status banners below retain chronology only.
+>
 > **Active October 12 completion:** product `b6016c710c24a6118d4e92eb391bdb0b1c036488`,
 > version 0.5.0, has a validated local ZIP but is **NOT_RUN** in Kingmaker.
 > The earlier 624b5e9 two-size native pictures remain attributed to those bytes;

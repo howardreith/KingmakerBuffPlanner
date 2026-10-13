@@ -1,3 +1,12 @@
+> **Current October 13 blockers:** no independently actionable implementation,
+> runtime, restoration, or package blocker is known. The remaining
+> UI receipt limits require an organic long/localized spell, a custom remapped
+> binding, and UI scale above default with a long real catalogue. Publisher v5
+> is safely INTERRUPTED at a read-only boundary under the corrected scope; no
+> release mutation occurred and no replacement campaign is selected. See the
+> [final evidence record](docs/NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md).
+> Older blocker text below retains historical inputs only.
+>
 > **Active October 12 completion:** product `b6016c710c24a6118d4e92eb391bdb0b1c036488`,
 > version 0.5.0, has a validated local ZIP but is **NOT_RUN** in Kingmaker.
 > The earlier 624b5e9 two-size native pictures remain attributed to those bytes;

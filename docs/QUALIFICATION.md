@@ -1,3 +1,13 @@
+> **Current October 13 native UI qualification:** exact source `dfbaa5f`, ZIP
+> `2e2dbe33cb4ccb65762829042e5f96076882c3030dc3bc24e1df5fff51e31501`,
+> and DLL
+> `63f5749780fa2e30491318b91b8222e8184f882a2e6de1f4c611d51e3d512bf9`
+> completed both selected whole-history purity windows and 17 guarded game
+> observations with restoration/protected-save evidence. Overall UI acceptance
+> remains honestly PARTIAL for three owner observations. See the
+> [final evidence record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md). Older
+> native UI status blocks below retain their original inputs and chronology.
+>
 > **Active October 12 native UI mission:** the b6016c7 0.5.0 package is validated but NOT_RUN; its exact-byte eleven-action full-history purity is supervised. The earlier 624b5e9 native two-size runs remain historical, and its physical boot request failed before result but was restored cleanly. Acceptance remains PARTIAL. See [current protocol repair checkpoint](NATIVE-UI-FINISH-0.5.0-PROTOCOL-REPAIR-CHECKPOINT.md). Earlier records retain their named inputs.
 > Current screenshot repair: clean source 7410f92/version 0.5.0 has a validated
 > local package and focused offline capture checks; new game observations remain

@@ -63,19 +63,17 @@ restore the backup.
 The automated in-game checks use the disposable automation campaign only.
 The exact runs, builds and results are in `docs/QUALIFICATION.md`.
 
-- **Checked:** the HUD row and frame, idle and hover; the spellbook pair for
-  two casters and a character who cannot cast; the game's description window
-  from the planner and its Escape order; switching to the inventory,
-  character sheet and spellbook and back; typing in the search not
-  triggering game keys; a failed save shown with **Retry save** and then
-  saved; adding, moving, reordering, changing the caster and removing
-  castings, each with Undo; a refused HUD press and the routines of a
-  guarded casting run in the game log; the planner, HUD and spellbook again
-  at 1280x720.
-- **Not checked:** physical mouse and keyboard input (the checks press the
-  same controls without moving the mouse); remapped keys; very long buff
-  names in a crowded party; prepared casters, pets and metamagic variants
-  (the test party has none).
+- **Checked:** the HUD row, frame, tooltips, idle, hover, pressed and genuine
+  execution-disabled states; the spellbook pair, Metamagic entry and Return,
+  and unavailable planner action; native and casting-card description
+  windows and their Escape/close order; normal and paused window switching;
+  physical mouse and keyboard search, selection, authoring, Undo and blocked
+  navigation; catalogue filters; active skip/recast; Advanced groups,
+  enhancements and finite prepared resources; casts, refusals and results in
+  the game log; and the planner/HUD/spellbook at 1920x1080 and 1280x720.
+- **Not checked:** an organic long or localized spell description (the
+  in-game bounded layout probe was used), a custom remapped binding, and UI
+  scale above the default with a genuinely long campaign catalogue.
 
 ---
 

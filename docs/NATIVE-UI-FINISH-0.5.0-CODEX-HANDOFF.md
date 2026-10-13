@@ -1,3 +1,10 @@
+> **Handoff completed October 13:** exact product `dfbaa5f`, ZIP `2e2dbe33...`,
+> and DLL `63f57497...` completed the selected guarded purity, game, restoration,
+> and picture-review work. Publisher v5 was safely interrupted during read-only
+> inventory after the scope correction; no tag or release exists. Continue from the
+> [final evidence record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md); do not
+> restart a publisher or historical sequence, or relabel the tested package.
+>
 > Owner-selected continuous completion milestone, October 11: the four-hour
 > initial budget includes the required long purity prerequisite and two-size
 > observations. Work is active on candidate 743b1dc; earlier ordinary-budget

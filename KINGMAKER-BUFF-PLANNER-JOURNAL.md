@@ -1,5 +1,74 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-13 native UI exact-candidate completion
+
+DATA/NUI feature branch; exact product and compiled observer source
+`dfbaa5fbd0aba901b2e03c950dd7735f28ed226c`, version 0.5.0, ZIP
+`2e2dbe33cb4ccb65762829042e5f96076882c3030dc3bc24e1df5fff51e31501`,
+DLL `63f5749780fa2e30491318b91b8222e8184f882a2e6de1f4c611d51e3d512bf9`,
+MVID `f26b6def-ca6d-4356-a103-6cfb8e691bf2`. Selection/physical purity passed
+exit 0 in 9235.6373952 seconds with 11 WhatIf calls; casting purity passed exit
+0 in 8735.8987377 seconds with six. Both used one attempt, a 120-second lease
+wait, and all five targets. Seventeen selected game observations completed;
+all transactions restored and every protected-save comparison is clean.
+
+The exact 1920x1080/1280x720 pictures and Advanced states were reviewed at
+original resolution. Seven UI items PASS. UI-01/UI-02/UI-03/UI-06 remain
+PARTIAL only for organic long/localized content, a custom remapped binding, and
+above-default UI scale with a long real catalogue. The problem-navigation
+runtime FAIL is preserved; a focused version-2 reader independently establishes
+PASS from immutable raw observations without changing candidate bytes. The
+tested ZIP is the finished local delivery. Full identities, RunIds, counts,
+visual findings, and owner checks are in
+[the final evidence record](docs/NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md).
+
+Publisher v4 began 2026-10-13T10:33:40Z on clean default-branch source
+`dfbaa5f`. Its mandated source-only gate nests four full-history purity windows
+before the two deterministic builds. The first current-history window completed
+PASS=5/0 in approximately 131 minutes; the larger history includes the completed
+candidate evidence. Four such windows revise the estimate to roughly nine hours
+from publisher start. This mandatory release dependency explains the extension
+beyond the original four-hour milestone estimate; work continues under
+supervision without receipt reuse, target pruning, or guard changes. Following
+the first window, launcher arguments passed 24/0 and the real child-process
+assertion cases passed 8/0, including the corrected native-fixture consumer.
+
+Publisher v4 later exited 1 after 12769.6271215 seconds before tag/release:
+the launcher WhatIf child correctly rejected the copied local-build sidecar,
+whose absolute `packagePath` still named NUICP. The package itself passed 4/0
+and retained exact tested hash `2e2dbe33...1501`. A single repository-owned
+`Build-Local.ps1` run in clean REL041 at the same source passed source 43/0,
+build 1/0, package 4/0, local package 1/0 and reproduced both exact DLL/ZIP
+hashes. The actual separate `powershell.exe -File` launcher WhatIf then passed
+exit 0 with no mutation. V4 remains preserved; v5 began 2026-10-13T14:09:24Z
+with fresh supervision files and the correct path-bound receipt.
+
+The owner then corrected scope: a local candidate and honest acceptance do not
+require release publication. V5 was `Publish-Release.ps1 -Publish
+-ConfirmHumanAcceptance`, capable of creating/pushing `v0.5.0` and uploading a
+public GitHub release. Its clean REL041 worktree was frozen at `dfbaa5f`; these
+records were edited separately in NUI. At 2026-10-13T17:02:36.4790560Z, owned
+PID 5960 had no children and was stopped at a verified read-only boundary while
+`Test-RuntimeLauncherFileWhatIf.ps1` built its second before-manifest. The first
+deployment purity window had passed 5/0, followed by launcher arguments 24/0
+and shared child cases 8/0; no completion percentage existed. No deployment or
+fixture lock, Kingmaker process, new transaction, or cleanup obligation existed.
+V5 is **INTERRUPTED** with no numeric exit. Its 31,874-byte log has SHA-256
+`4903a225bdd9d49490054553688111206559fb36edf0675dbe288c2f18c89e28`.
+No local/remote `v0.5.0` tag or GitHub release exists.
+
+At that boundary, the remaining publisher work was estimated at six to seven
+hours from three unfinished purity windows at the first window's roughly
+131-minute duration plus deterministic builds. This is timing extrapolation;
+the script exposed no measured completion percentage or per-file counter.
+
+`main` and `origin/main` already reached `dfbaa5f` by fast-forward and guarded
+push under the owner's intervening request, “Can you finish up the work, push it,
+and do a release?” The scope correction made no branch change or revert. No
+publisher or equivalent broad campaign will be restarted. Final reader/evidence
+changes remain a distinct feature-branch commit and do not relabel candidate
+bytes.
+
 ## 2026-10-12 native UI physical admission and changed-byte continuation
 
 DATA/NUI feature branch; product source `b6016c710c24a6118d4e92eb391bdb0b1c036488`, version 0.5.0. UMM proved the previous 624b5e9 physical Spellbook request was rejected at boot (`invalid-request:live-save-parameters`): its compiled protocol omitted the launcher's schema-2 tag. The timed-out owned process exited after a verified non-forced window close; repository recovery compared protected saves clean and restored registry/Mods, exit 0. The original run stays FAIL. The exact-shape protocol repair and negative regression checks passed focused C# 2/0; launcher arguments 24/0. A fresh clean b6016c7 package was validated (ZIP `2a9bbda222d8aa35ce0a9c90b208bc7b5eb95a48e34a933abf4221620331297c`, DLL `a5f54b48c8697b00b3c1f719443b92de48d0200eaefe2efdb1c93ab66a99bf11`) and remains NOT_RUN. Its one-attempt eleven-action full-history purity began 2026-10-12T10:54:47Z, PID 26120; no conflicting runtime route will start while it inventories. See [exact checkpoint](docs/NATIVE-UI-FINISH-0.5.0-PROTOCOL-REPAIR-CHECKPOINT.md). Acceptance remains PARTIAL; continue the selected game and visual work after actual prerequisite PASS.

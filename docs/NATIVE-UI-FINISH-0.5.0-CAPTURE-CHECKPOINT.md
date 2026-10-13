@@ -1,3 +1,12 @@
+> **Closed by the October 13 exact-candidate milestone:** source `dfbaa5f`, ZIP
+> `2e2dbe33cb4ccb65762829042e5f96076882c3030dc3bc24e1df5fff51e31501`,
+> and DLL
+> `63f5749780fa2e30491318b91b8222e8184f882a2e6de1f4c611d51e3d512bf9`
+> completed the selected two-size and related game observations after two
+> one-attempt purity windows. See the
+> [final evidence record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md). Planned
+> commands and NOT_RUN banners below are preserved as historical input records.
+>
 > **Active October 12 completion:** product `b6016c710c24a6118d4e92eb391bdb0b1c036488`,
 > version 0.5.0, has a validated local ZIP but is **NOT_RUN** in Kingmaker.
 > The earlier 624b5e9 two-size native pictures remain attributed to those bytes;
