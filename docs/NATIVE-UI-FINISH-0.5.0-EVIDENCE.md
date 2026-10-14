@@ -4,7 +4,9 @@
 > restored and protected-save comparisons are clean. Exact identities, RunIds,
 > counts, image-review findings, the preserved runtime FAIL plus bounded manual
 > adjudication, and per-item acceptance are in the
-> [final evidence record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md). Older
+> [final evidence record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md). The exact
+> tested ZIP is published as the [v0.5.0-rc.1 human-review prerelease](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.0-rc.1);
+> human acceptance and stable qualification are not claimed. Older
 > status banners below retain chronology only.
 >
 > **Active October 12 completion:** product `b6016c710c24a6118d4e92eb391bdb0b1c036488`,

@@ -1,8 +1,9 @@
 > **Current October 13 progress:** independently actionable implementation,
 > focused validation, guarded purity, 17 selected game observations, restoration,
 > and original-resolution picture review are complete on exact source `dfbaa5f`.
-> Publisher v5 is safely INTERRUPTED during read-only inventory with no release
-> mutation. Local delivery and final records are complete. See the
+> Publisher v5 remains INTERRUPTED during read-only inventory and its aggregate is
+> not claimed. The exact artifact is published as human-review prerelease
+> [v0.5.0-rc.1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.0-rc.1); local delivery and final records are complete. See the
 > [final evidence record](../docs/NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md).
 > Older next-action text is historical; do not restart prior campaigns.
 >

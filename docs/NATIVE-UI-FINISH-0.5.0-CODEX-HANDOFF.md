@@ -1,7 +1,8 @@
 > **Handoff completed October 13:** exact product `dfbaa5f`, ZIP `2e2dbe33...`,
 > and DLL `63f57497...` completed the selected guarded purity, game, restoration,
 > and picture-review work. Publisher v5 was safely interrupted during read-only
-> inventory after the scope correction; no tag or release exists. Continue from the
+> inventory after the scope correction and remains INTERRUPTED. The exact tested
+> artifact is published as human-review prerelease [v0.5.0-rc.1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.0-rc.1). Continue from the
 > [final evidence record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md); do not
 > restart a publisher or historical sequence, or relabel the tested package.
 >

@@ -6,8 +6,9 @@
 > completed both purity windows and all selected game work. Seven UI items PASS;
 > UI-01, UI-02, UI-03, and UI-06 remain PARTIAL for three precise owner
 > observations. See the [final evidence and delivery record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md).
-> Publisher v5 is safely INTERRUPTED at a read-only boundary; no tag, upload, or
-> release exists. The tested ZIP is the local delivery. Older status banners are
+> Publisher v5 remains INTERRUPTED at a read-only boundary and its aggregate is
+> not claimed. The unchanged tested ZIP is the local delivery and is published
+> as human-review prerelease [v0.5.0-rc.1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.0-rc.1). Older status banners are
 > historical; current publication scope is recorded in the final evidence.
 >
 > **Active October 12 completion:** product `b6016c710c24a6118d4e92eb391bdb0b1c036488`,

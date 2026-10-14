@@ -1,9 +1,10 @@
 > **Current October 13 blockers:** no independently actionable implementation,
-> runtime, restoration, or package blocker is known. The remaining
-> UI receipt limits require an organic long/localized spell, a custom remapped
-> binding, and UI scale above default with a long real catalogue. Publisher v5
-> is safely INTERRUPTED at a read-only boundary under the corrected scope; no
-> release mutation occurred and no replacement campaign is selected. See the
+> restoration, packaging, integration, or prerelease-publication blocker remains.
+> `v0.5.0-rc.1` is the exact tested human-review artifact and remains PARTIAL.
+> Owner review still needs: an organic long/localized spell; one supported
+> custom remapping with switching/pause preservation; and enlarged UI scale with
+> long real catalogue first/last/hover review. The interrupted stable publisher
+> remains INTERRUPTED and no replacement campaign is selected. See the
 > [final evidence record](docs/NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md).
 > Older blocker text below retains historical inputs only.
 >

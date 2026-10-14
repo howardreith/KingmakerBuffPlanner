@@ -3,8 +3,9 @@
 Exact product source `dfbaa5fbd0aba901b2e03c950dd7735f28ed226c`
 completed the selected two one-attempt purity windows, 17 guarded game
 observations, restoration, and original-resolution picture review. Publisher v5
-is safely INTERRUPTED at a read-only boundary with no tag or release; local
-delivery is complete. Overall UI acceptance remains PARTIAL for three owner
+remains INTERRUPTED at a read-only boundary and its aggregate is not claimed.
+The unchanged exact artifact is published as human-review prerelease
+[v0.5.0-rc.1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.0-rc.1); local delivery is complete. Overall UI acceptance remains PARTIAL for three owner
 observations that require campaign content/settings absent from the guarded
 fixtures. See the
 [final evidence record](../docs/NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md).

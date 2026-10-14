@@ -1,3 +1,9 @@
+> **Human-review publication:** the unchanged tested 0.5.0 artifact is available
+> as [v0.5.0-rc.1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.0-rc.1).
+> RC1 is a prerelease, is not Latest, and does not claim owner acceptance or the
+> interrupted stable publisher's aggregate qualification. Download the named
+> installable ZIP asset, not GitHub's automatic source archive.
+>
 # Kingmaker Buff Planner 0.5.0
 
 0.5.0 makes the planner look and behave like one of the game's own windows.

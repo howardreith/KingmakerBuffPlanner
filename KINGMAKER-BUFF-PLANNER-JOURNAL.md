@@ -1,5 +1,36 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-13 RC1 human-review prerelease publication
+
+The bounded reader/evidence correction is commit
+`aca3ce4f90f5dd615d3e0a8ceaa71f90c7ce319f`; it was guarded-pushed on the
+native UI feature branch, fast-forwarded into `main`, and guarded-pushed there.
+The delta after tested product source `dfbaa5f` changes records and PowerShell
+evidence reading only. It changes no compiled source, resource, package input,
+runtime dependency, DLL, or ZIP.
+
+Annotated tag `v0.5.0-rc.1` has tag object
+`08815ea5534f5ccbe986e2ab0063ff762371dc0a` and peels exactly to tested product
+source `dfbaa5fbd0aba901b2e03c950dd7735f28ed226c`. The artifact-only GitHub
+human-review prerelease is published at
+https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.0-rc.1.
+It is `prerelease=true`, `draft=false`, and explicitly not Latest; stable
+`v0.4.3` remains Latest. The interrupted stable publisher remains INTERRUPTED
+and its aggregate qualification is not claimed.
+
+The installable attachment is the unchanged
+`KingmakerBuffPlanner-0.5.0-local-runtime.zip`, SHA-256
+`2e2dbe33cb4ccb65762829042e5f96076882c3030dc3bc24e1df5fff51e31501`.
+Its packaged DLL remains SHA-256
+`63f5749780fa2e30491318b91b8222e8184f882a2e6de1f4c611d51e3d512bf9`, MVID
+`f26b6def-ca6d-4356-a103-6cfb8e691bf2`, embedded source `dfbaa5f`, and internal
+version 0.5.0. The draft download-back compared all eight assets byte-for-byte
+(8/0), its checksum manifest verified seven payloads (7/0), and the downloaded
+package passed strict validation 4/0. A fresh post-publication ZIP download
+matched the same hash. The screenshot bundle and four original PNG assets stay
+separate from the installable ZIP. The acceptance receipt remains PARTIAL: seven
+items pass and four await the three named owner observations.
+
 ## 2026-10-13 conservative reader correction and RC1 authorization
 
 The owner authorized an artifact-only `v0.5.0-rc.1` human-review prerelease,

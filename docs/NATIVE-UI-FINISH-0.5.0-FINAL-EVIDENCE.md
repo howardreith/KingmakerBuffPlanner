@@ -255,20 +255,54 @@ restriction, or acceptance rule was weakened to close them.
 
 ## Local delivery and repository state
 
-The tested local 0.5.0 ZIP above is the delivery artifact. No rebuild is needed
-for these reader/documentation changes, and they do not relabel its bytes.
-Publisher v5 is **INTERRUPTED** at a safe read-only boundary; no numeric exit was
-captured. No local or remote `v0.5.0` tag, GitHub draft, upload, or public release
-exists. `main`, `origin/main`, the feature branch, and its remote were all at
-`dfbaa5fbd0aba901b2e03c950dd7735f28ed226c` when the correction was received.
-The feature worktree alone contains this final reader/evidence record for a
-coherent guarded feature-branch commit; `main` remains unchanged.
+The tested local 0.5.0 ZIP above remains the delivery artifact. The conservative
+reader/evidence correction is commit
+`aca3ce4f90f5dd615d3e0a8ceaa71f90c7ce319f`; it was guarded-pushed on the
+native UI feature branch, fast-forwarded into `main`, and guarded-pushed there.
+The changes after product source `dfbaa5f` affect records and PowerShell evidence
+reading only. They do not alter compiled product source, resources, package
+inputs, runtime dependencies, the DLL, or the ZIP.
 
-## Human-review prerelease decision
+Publisher v5 remains **INTERRUPTED** at a safe read-only boundary with no numeric
+exit. Its aggregate qualification is not claimed or replaced. No stable
+`v0.5.0` release was created, and stable `v0.4.3` remains GitHub's Latest
+release.
 
-The owner selected an artifact-only `v0.5.0-rc.1` prerelease of the unchanged
-tested ZIP for human review. The internal mod version remains 0.5.0. This scoped
-decision does not convert the interrupted stable publisher into a PASS, claim
-human acceptance, or relax the normal stable-release requirements. The annotated
-review tag must point to product source `dfbaa5f`, while its annotation and
-release notes identify the later integrated reader/evidence commit separately.
+## Human-review prerelease publication
+
+The owner explicitly selected an artifact-only prerelease of the existing tested
+ZIP. Annotated tag `v0.5.0-rc.1` has tag object
+`08815ea5534f5ccbe986e2ab0063ff762371dc0a` and peels exactly to tested product
+source `dfbaa5fbd0aba901b2e03c950dd7735f28ed226c`. It does not point at the later
+reader/evidence commit. The public review page is:
+
+https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.0-rc.1
+
+GitHub reports `draft=false`, `prerelease=true`, target commitish `dfbaa5f`,
+eight uploaded assets, and publication at `2026-10-14T00:50:23Z`. The explicit
+non-Latest check returned stable `v0.4.3`.
+
+The installable attachment is
+`KingmakerBuffPlanner-0.5.0-local-runtime.zip`, SHA-256
+`2e2dbe33cb4ccb65762829042e5f96076882c3030dc3bc24e1df5fff51e31501`.
+`SHA256SUMS.txt` has SHA-256
+`a04cfde5edb90ba5a3b545ff9e523085e9a956ad334ca6fee2a53c32d3372343`.
+The provenance asset has SHA-256
+`710638dfee3ac619caa92c9e6f26a136d033b6c2ddd8638e1610c42b021374c2`,
+and the four-image bundle has SHA-256
+`44632ecb1011ab214020e70f2b4619b7516c3bea117be5d17664c9866c53e58e`.
+The four PNGs are byte-identical copies of the representative reviewed images
+and remain separate from the installable mod.
+
+Before publication, all eight draft assets were downloaded into a fresh
+directory and compared byte-for-byte with the staged files: PASS 8/0. The
+downloaded checksum file verified its seven payloads: PASS 7/0. The downloaded
+installable ZIP passed strict package validation 4/0 and independently reported
+ZIP/DLL hashes, MVID, internal version, and embedded source exactly as stated in
+this record. After publication, a second fresh installable-asset download again
+matched ZIP SHA-256 `2e2dbe33...1501`.
+
+This remains a **human-review prerelease** with an overall **PARTIAL** receipt.
+It does not assert the three owner observations, human acceptance, or stable
+publisher success. GitHub's automatic source archives are source snapshots; the
+named attached ZIP is the installable mod.

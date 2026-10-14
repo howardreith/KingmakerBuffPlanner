@@ -1,11 +1,13 @@
-> **Current October 13 resume:** do not restart the older campaigns below.
-> Exact candidate `dfbaa5f` completed the two selected purity windows and all 17
-> selected game observations with clean restoration. Publisher v5 was safely
-> interrupted during read-only inventory after the scope correction; no numeric
-> exit, tag, draft, upload, or release exists. Local delivery is complete. See
-> [the final evidence record](docs/NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md).
-> Do not restart a publisher or broad campaign. Later reader/documentation
-> commits must not relabel the exact tested candidate.
+> **Current October 13 resume:** exact product `dfbaa5f`, internal version
+> 0.5.0, is published as artifact-only human-review prerelease `v0.5.0-rc.1`.
+> The annotated tag targets the product commit; later reader/evidence records do
+> not relabel its DLL or ZIP. Main and the native UI feature branch include the
+> conservative schema-1 reader correction. Receipt remains PARTIAL (7 PASS,
+> 4 PARTIAL) pending the three owner observations in the
+> [final evidence record](docs/NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md).
+> Do not restart the interrupted stable publisher or a broad campaign. Stable
+> publication, Latest status, permanent installation, and human acceptance are
+> not claimed.
 >
 > **Active October 12 completion:** product `b6016c710c24a6118d4e92eb391bdb0b1c036488`,
 > version 0.5.0, has a validated local ZIP but is **NOT_RUN** in Kingmaker.

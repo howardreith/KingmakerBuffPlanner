@@ -6,7 +6,8 @@
 > completed the selected purity windows and 17 game observations. Acceptance is
 > PARTIAL only for the narrow owner observations listed in the
 > [final evidence record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md). Publisher
-> v5 is safely INTERRUPTED at a read-only boundary; no release mutation occurred.
+> v5 remains INTERRUPTED at a read-only boundary and its aggregate is not claimed.
+> The exact artifact is published as human-review prerelease [v0.5.0-rc.1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.0-rc.1).
 > Local delivery is complete and no replacement broad campaign is selected.
 > All older active-phase banners below are historical and keep their named inputs.
 >
