@@ -273,3 +273,14 @@ observation or compilation for actual dispatch evidence.
 - The fixture-bootstrap meta-test failure and the deliberately stopped broad
   wrapper are retained as failures/partial attempts, not hidden as PASS.
 
+## Delivery provenance
+
+`scripts/Test-GuardedPush.ps1` passed 6/0 without mutation. The project-owned
+helper then fast-forward pushed and remotely verified the correction plus first
+complete receipt checkpoint at
+`d69e9a3d6b05e26fb82f5fa8d61ffdaf5ff48494` on
+`codex/kingmaker-buff-planner-human-feedback`. This delivery record is a later
+documentation-only delta; it does not change or relabel packaged product source
+`e06d803400893f4cd68d0066ae2421d0085db243`, its DLL or its ZIP. No main merge,
+tag or release was made.
+
