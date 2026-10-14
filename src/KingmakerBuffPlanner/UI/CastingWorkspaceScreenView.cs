@@ -128,6 +128,7 @@ namespace KingmakerBuffPlanner.UI
         private Button _resourcesButton;
         private RectTransform _resources;
         private RectTransform _resourcesDialog;
+        private Image _resourcesOpaqueBacking;
         private RectTransform _resourcesContent;
         private ScrollRect _resourcesScroll;
         private TMP_Text _resourcesSummary;
@@ -342,6 +343,18 @@ namespace KingmakerBuffPlanner.UI
                 if (lower.x < 0f || lower.y < 0f || upper.x > Screen.width || upper.y > Screen.height)
                     return null;
                 return new Vector2(upper.x - lower.x, upper.y - lower.y);
+            }
+        }
+
+        internal bool ResourcesOpaqueParchmentForRuntime
+        {
+            get
+            {
+                return ResourcesOpenForRuntime && _resourcesOpaqueBacking != null &&
+                    _resourcesOpaqueBacking.gameObject.activeInHierarchy &&
+                    _resourcesOpaqueBacking.color.a >= 0.99f && _resourcesDialog != null &&
+                    _resourcesOpaqueBacking.transform.GetSiblingIndex() <
+                        _resourcesDialog.transform.GetSiblingIndex();
             }
         }
 
@@ -1599,6 +1612,17 @@ namespace KingmakerBuffPlanner.UI
             Button dismiss = modalBlocker.gameObject.AddComponent<Button>();
             dismiss.targetGraphic = blocker;
             dismiss.onClick.AddListener(CloseResources);
+
+            // PaperSlip preserves the approved native parchment texture, but
+            // that sprite contains translucent regions. Back the complete
+            // dialog bounds with opaque parchment so planner labels can never
+            // bleed through its header, scope controls or summary.
+            RectTransform opaqueBacking = KingmakerUiFactory.CreateRect("OpaqueParchment", _resources);
+            KingmakerUiFactory.SetAnchors(opaqueBacking, 0.10f, 0.08f, 0.90f, 0.92f);
+            Color opaqueParchment = _theme.ParchmentRaised;
+            opaqueParchment.a = 1f;
+            _resourcesOpaqueBacking = KingmakerUiFactory.AddPanel(opaqueBacking, opaqueParchment);
+            _resourcesOpaqueBacking.raycastTarget = false;
 
             RectTransform dialog = KingmakerUiFactory.CreateRect("Dialog", _resources);
             _resourcesDialog = dialog;

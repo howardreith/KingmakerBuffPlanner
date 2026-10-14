@@ -140,8 +140,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // the explicit-edit/continuous-assignment gesture contract. Schema 6
         // adds visible accounting-cell/layer observations, both scope
         // transitions, reopening, and the inspection-only focus contract.
+        // Schema 7 proves the whole Resources dialog has an opaque backing and
+        // reserves two legal recipients when seeding the planning probe.
         // Historical records prove only what they observed.
-        public int SchemaVersion { get; set; } = 6;
+        public int SchemaVersion { get; set; } = 7;
         public string RunId { get; set; }
         public string Stage { get; set; }
         public int ScreenWidth { get; set; }
@@ -232,6 +234,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool ResourcesClosedBetweenOpens { get; set; }
         public bool ResourcesReopened { get; set; }
         public bool ResourcesReopenedCloseFocused { get; set; }
+        public bool ResourcesOpaqueParchment { get; set; }
         public string ResourcesSaveStatus { get; set; }
         public bool ResourcesClosedByEscape { get; set; }
         public string ResourcesDocumentBefore { get; set; }
@@ -267,6 +270,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool PlanningRestored { get; set; }
         public int RunsStarted { get; set; }
 
+        public static int PlanningSeedCastingCount(int legalRecipientCount)
+        {
+            if (legalRecipientCount < 3) return 0;
+            return Math.Min(2, legalRecipientCount - 2);
+        }
+
         public void AddNote(string note)
         {
             if (!string.IsNullOrEmpty(note)) Notes.Add(note);
@@ -276,7 +285,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             var violations = new List<string>();
             if (SchemaVersion != 1 && SchemaVersion != 2 && SchemaVersion != 3 &&
-                SchemaVersion != 4 && SchemaVersion != 5 && SchemaVersion != 6)
+                SchemaVersion != 4 && SchemaVersion != 5 && SchemaVersion != 6 &&
+                SchemaVersion != 7)
                 violations.Add("schema:" + SchemaVersion);
             if (Stage != FactsStage && Stage != QualifyStage) violations.Add("stage:" + (Stage ?? "null"));
             violations.AddRange(Failures.Select(value => "failure:" + value));
@@ -307,6 +317,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 foreach (string violation in HumanFeedbackViolations()) yield return violation;
             if (SchemaVersion >= 6)
                 foreach (string violation in HumanFeedbackCorrectionViolations()) yield return violation;
+            if (SchemaVersion >= 7 && !ResourcesOpaqueParchment)
+                yield return "resources:dialog-not-opaque";
             // UI-09: four cells the size of the native cells, one per native
             // column, on a third row above the native rows, inside the frame.
             if (PlannerHudButtons != 4) yield return "hud-planner-buttons:" + PlannerHudButtons;

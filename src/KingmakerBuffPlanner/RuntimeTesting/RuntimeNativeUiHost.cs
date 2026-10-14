@@ -569,6 +569,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _nativeUi.ResourcesOpened = view != null && view.ResourcesOpenForRuntime;
                     _nativeUi.ResourcesTopmost = view != null && view.ResourcesTopmostForRuntime;
                     _nativeUi.ResourcesCloseFocused = view != null && view.ResourcesCloseFocusedForRuntime;
+                    _nativeUi.ResourcesOpaqueParchment = view != null &&
+                        view.ResourcesOpaqueParchmentForRuntime;
                     _nativeUi.ResourcesScrollClips = view != null && view.ResourcesScrollClipsForRuntime;
                     _nativeUi.ResourcesScrollOverflow = view == null
                         ? -1f : view.ResourcesScrollOverflowForRuntime;
@@ -2383,7 +2385,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         // A representative casting state through session commands: one
         // single-target buff both fixture casters know, one caster and
-        // source, two recipients, the first casting focused.
+        // source, up to two recipients while reserving two legal recipients
+        // for the continuous-assignment script, the first casting focused.
         private string AuthorNativeUiCastings(CastingWorkspaceSession session)
         {
             CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
@@ -2405,9 +2408,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             CastingGraphSourceRow row = selected == null ? null : selected.Sources.FirstOrDefault(value => value.Usable);
             if (row != null && !row.Selected) session.ClickGraphSource(row.ProviderKey, inputs);
             view = session.BuildGraph(inputs);
+            List<CastingGraphTargetNode> availableTargets = view.Targets.Where(value =>
+                value.Legality == CastingGraphTargetLegality.Legal && value.CastingIds.Count == 0).ToList();
+            int seedCount = NativeUiRecord.PlanningSeedCastingCount(availableTargets.Count);
+            if (seedCount == 0)
+                return "author:planning-fixture-needs-three-legal-targets:" + availableTargets.Count;
             int added = 0;
-            foreach (CastingGraphTargetNode target in view.Targets.Where(value =>
-                    value.Legality == CastingGraphTargetLegality.Legal && value.CastingIds.Count == 0).Take(2))
+            foreach (CastingGraphTargetNode target in availableTargets.Take(seedCount))
             {
                 CastingGraphClickResult result = session.ClickGraphRecipient(target.UnitId, inputs);
                 if (result != null && result.Outcome == CastingGraphClickOutcome.Added) added++;

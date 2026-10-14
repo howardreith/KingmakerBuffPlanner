@@ -63,6 +63,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("native-ui-scenario-admission", TestNativeUiScenarioAdmission);
             Run("native-ui-record-facts-judgement", TestNativeUiFactsJudgement);
             Run("native-ui-record-qualify-judgement", TestNativeUiQualifyJudgement);
+            Run("native-ui-planning-seed-reserves-two-recipients", TestNativeUiPlanningSeed);
             Run("native-window-takes-over-from-the-planner", TestNativeWindowTakeover);
             Run("native-ui-planner-copy", TestNativeUiPlannerCopy);
             Run("native-ui-game-log-lines", TestNativeUiGameLogLines);
@@ -654,6 +655,17 @@ namespace KingmakerBuffPlanner.Tests
             return record;
         }
 
+        private static void TestNativeUiPlanningSeed()
+        {
+            Expect(NativeUiRecord.PlanningSeedCastingCount(2) == 0,
+                "A two-recipient fixture cannot both seed and reserve two recipients.");
+            Expect(NativeUiRecord.PlanningSeedCastingCount(3) == 1,
+                "The three-recipient Automation fixture must seed one casting and reserve two.");
+            Expect(NativeUiRecord.PlanningSeedCastingCount(4) == 2 &&
+                NativeUiRecord.PlanningSeedCastingCount(8) == 2,
+                "A larger fixture must retain the representative two-casting seed cap.");
+        }
+
         // The facts stage judges only that the native contracts and frames
         // were captured, and that nothing ran.
         private static void TestNativeUiFactsJudgement()
@@ -777,6 +789,7 @@ namespace KingmakerBuffPlanner.Tests
             record.ResourcesClosedBetweenOpens = true;
             record.ResourcesReopened = true;
             record.ResourcesReopenedCloseFocused = true;
+            record.ResourcesOpaqueParchment = true;
             record.ResourcesSaveStatus = "Saved";
             record.ResourcesClosedByEscape = true;
             record.ResourcesDocumentBefore = "doc";
@@ -875,6 +888,11 @@ namespace KingmakerBuffPlanner.Tests
             schema5.ResourcesReopened = false;
             if (schema5.Violations().Count != 0)
                 throw new InvalidOperationException("A schema-5 verdict was relabelled by correction requirements.");
+            NativeUiRecord schema6 = QualifiedNativeUiRecord();
+            schema6.SchemaVersion = 6;
+            schema6.ResourcesOpaqueParchment = false;
+            if (schema6.Violations().Count != 0)
+                throw new InvalidOperationException("A schema-6 verdict was relabelled by opaque-dialog requirements.");
             legacy.SchemaVersion = 2;
             foreach (string missing in new[] { "source-tabs:missing-captions", "casting-popup:missing",
                     "catalogue-filters:missing-categories" })
@@ -919,7 +937,7 @@ namespace KingmakerBuffPlanner.Tests
                 { "spellbook-pair-height-or-baseline:Linzi", r => r.Spellbooks[0].PlannerRect = new[] { 1600f, 100f, 150f, 30f } },
                 { "spellbook-top-right-entry-present", r => r.SpellbookTopRightEntryAbsent = false },
                 { "popup-presenter:planner-scroll", r => r.PlannerPopupPresenter = "planner-scroll" },
-                { "schema:7", r => r.SchemaVersion = 7 },
+                { "schema:8", r => r.SchemaVersion = 8 },
                 { "pause:inventory:not-paused-before", r => r.Switches[4].PausedBefore = false },
                 { "pause:not-restored", r => r.OwnedPauseRestored = false },
                 { "unavailable-metamagic:no-view", r => r.Spellbooks.RemoveAt(1) },
@@ -987,6 +1005,7 @@ namespace KingmakerBuffPlanner.Tests
                 { "resources:accounting-cells-wrong-layer", r => r.ResourcesReopenedCellsUseNativeLayer = false },
                 { "resources:scope-transition", r => r.ResourcesSelectedAgainScope = "AllRoutinesNoRest" },
                 { "resources:reopen", r => r.ResourcesReopened = false },
+                { "resources:dialog-not-opaque", r => r.ResourcesOpaqueParchment = false },
                 { "availability-policy-caption:none", r => r.AvailabilityPolicyCaption = null },
                 { "run-caption:RUN LONG", r => r.RunCaption = "RUN LONG" },
                 { "planning-contract-missing:arm-retarget:ok", r => r.PlanningSteps.Remove("arm-retarget:ok") },
