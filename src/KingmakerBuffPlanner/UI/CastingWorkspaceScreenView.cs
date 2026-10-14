@@ -61,6 +61,8 @@ namespace KingmakerBuffPlanner.UI
         private bool _importAnnounced;
         private float _reloadArmedUntil;
         private CastingGraphView _lastView;
+        private string _nextRefreshCause;
+        private double? _nextCommandAndPersistenceMilliseconds;
         private GraphLayoutResult _lastLayout;
         private GraphLayoutMetrics _lastMetrics;
 
@@ -114,9 +116,16 @@ namespace KingmakerBuffPlanner.UI
         private bool _feedbackShown;
         private Button _resourcesButton;
         private RectTransform _resources;
-        private TMP_Text _resourcesBody;
+        private RectTransform _resourcesContent;
+        private ScrollRect _resourcesScroll;
+        private TMP_Text _resourcesSummary;
+        private TMP_Text _resourcesSaveStatus;
+        private Button _resourcesCloseButton;
+        private Button _resourcesSelectedScopeButton;
+        private Button _resourcesAllScopeButton;
+        private WorkspaceResourceScope _resourceScope = WorkspaceResourceScope.SelectedRoutine;
         private Button _modeButton;
-        private Button _readyOnlyButton;
+        private Button _policyButton;
         private Button _undoButton;
         private Button _runButton;
         // Native UI finish (UI-01): a right click shows the game's own
@@ -204,8 +213,7 @@ namespace KingmakerBuffPlanner.UI
             // Then the Resources details, if shown.
             if (_resources != null && _resources.gameObject.activeSelf)
             {
-                _resources.gameObject.SetActive(false);
-                if (_resourcesButton != null) _kit.SetSelected(_resourcesButton, false);
+                CloseResources();
                 return true;
             }
             if (_session.EditingFocusCastingId == null) return false;
@@ -324,14 +332,27 @@ namespace KingmakerBuffPlanner.UI
         internal void RefreshView()
         {
             if (_disposed) return;
+            long totalStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+            string cause = _lastView == null ? "cold-open"
+                : (_nextRefreshCause ?? "warm-refresh");
+            _nextRefreshCause = null;
+            double commandAndPersistenceMilliseconds =
+                _nextCommandAndPersistenceMilliseconds ?? 0d;
+            _nextCommandAndPersistenceMilliseconds = null;
             PlaceHeaderRule();
             float cataloguePosition = CatalogueScroll() == null ? 1f
                 : CatalogueScroll().verticalNormalizedPosition;
             float inspectorPosition = _inspectorScroll == null ? 1f
                 : _inspectorScroll.verticalNormalizedPosition;
+            long stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             CastingWorkspaceInputs inputs = _inputs();
+            double inputMilliseconds = ElapsedMilliseconds(stageStarted);
+            stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             CastingGraphView view = _session.BuildGraph(inputs);
+            double calculationMilliseconds = ElapsedMilliseconds(stageStarted);
+            stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             _session.PresentForReview(inputs);
+            double reviewMilliseconds = ElapsedMilliseconds(stageStarted);
             _lastView = view;
             if (!_importAnnounced && _footerResult != null)
             {
@@ -341,21 +362,43 @@ namespace KingmakerBuffPlanner.UI
                     DescribeImport(_session);
                 if (import != null) Feedback(import);
             }
+            stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             RebuildHeader(view);
             RebuildCatalogue(view);
             RebuildBanner(view);
             RebuildGraph(view);
             RebuildInspector(view);
             RebuildFooter(view);
+            double regionMilliseconds = ElapsedMilliseconds(stageStarted);
             // Borrowed native artwork, fonts and the click sound reach the
             // rebuilt controls; every control is pointer-highlighted only.
+            stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             if (_nativeTheme != null) _nativeTheme.ApplyTo(_root);
             KingmakerUiFactory.OwnPointerHighlights(_root);
             PropagateUiLayer();
+            double themeMilliseconds = ElapsedMilliseconds(stageStarted);
+            stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             Canvas.ForceUpdateCanvases();
             if (CatalogueScroll() != null) CatalogueScroll().verticalNormalizedPosition = cataloguePosition;
             if (_inspectorScroll != null) _inspectorScroll.verticalNormalizedPosition = inspectorPosition;
             RevealPendingProblem();
+            double layoutMilliseconds = ElapsedMilliseconds(stageStarted);
+            _log("[KBP-WORKSPACE-PERF] cause=" + cause +
+                ";commandAndPersistenceMs=" +
+                    commandAndPersistenceMilliseconds.ToString("F3") +
+                ";inputMs=" + inputMilliseconds.ToString("F3") +
+                ";calculationMs=" + calculationMilliseconds.ToString("F3") +
+                ";reviewMs=" + reviewMilliseconds.ToString("F3") +
+                ";regionsMs=" + regionMilliseconds.ToString("F3") +
+                ";themeMs=" + themeMilliseconds.ToString("F3") +
+                ";layoutMs=" + layoutMilliseconds.ToString("F3") +
+                ";presentedRefreshMs=" + ElapsedMilliseconds(totalStarted).ToString("F3"));
+        }
+
+        private static double ElapsedMilliseconds(long startedAt)
+        {
+            return (System.Diagnostics.Stopwatch.GetTimestamp() - startedAt) * 1000.0 /
+                System.Diagnostics.Stopwatch.Frequency;
         }
 
         // Geometry-only resize handling: no additional compiler or readiness
@@ -867,12 +910,14 @@ namespace KingmakerBuffPlanner.UI
         // right click on a part showing it opens it.
         internal bool OpenDescriptionForRuntime(AbilityKey ability, bool exactVariant, string casterUnitId)
         {
+            CloseResources();
             return _description != null && _description.Open(ability, exactVariant, casterUnitId);
         }
 
         // Runtime layout probe only: a long text in the same native window.
         internal bool OpenDescriptionTextForRuntime(string title, string text)
         {
+            CloseResources();
             return _description != null && _description.OpenText(title, text);
         }
 
@@ -974,6 +1019,7 @@ namespace KingmakerBuffPlanner.UI
             RightClickProxy captured = proxy;
             captured.OnRightClick = () =>
             {
+                CloseResources();
                 _lastView = view();
                 if (_description == null || !_description.Open(ability, exactVariant, casterUnitId))
                     ShowNotice("No description is available for " + (string.IsNullOrEmpty(name) ? "this buff" : name) + ".");
@@ -1214,21 +1260,23 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(RectOf(_footerRecovery), 0f, 0.04f, 0f, 0.5f);
             RectOf(_footerRecovery).offsetMax = new Vector2(SaveColumn - 8f, RectOf(_footerRecovery).offsetMax.y);
             _footerRecovery.gameObject.SetActive(false);
-            string[] names = { "Resources", "ExecutionMode", "Undo", "Run" };
-            string[] captions = { "Resources", ModeCaption(), "Undo",
+            string[] names = { "Resources", "AvailabilityPolicy", "ExecutionMode", "Undo", "Run" };
+            string[] captions = { "Resources", PolicyCaption(), ModeCaption(), "Undo",
                 WorkspaceFooterText.RunCaption(_session.RoutineDisplayName(_session.SelectedRoutineId)) };
             Action[] actions =
             {
-                ToggleResources, ToggleModeCommand, UndoCommand,
-                () => RunApply(CastingApplyMode.Ordinary)
+                ToggleResources, ToggleAvailabilityPolicyCommand, ToggleModeCommand, UndoCommand,
+                RunApply
             };
-            float[] widths = { 140f, 176f, 100f, 176f };
+            float[] widths = { 128f, 168f, 154f, 88f, 176f };
             float right = 0f;
             for (int index = names.Length - 1; index >= 0; index--)
             {
                 Action action = actions[index];
-                Button button = _kit.Button(footer, names[index], captions[index], () => Command(action),
-                    names[index] == "Run" ? PlannerTextRole.Action : PlannerTextRole.Button,
+                Action invoke = names[index] == "Resources"
+                    ? action : (Action)(() => Command(action));
+                Button button = _kit.Button(footer, names[index], captions[index], invoke,
+                    PlannerTextRole.Button,
                     names[index] == "Run" ? 19f : 16f);
                 RectTransform rect = RectOf(button);
                 KingmakerUiFactory.SetAnchors(rect, 1f, 0.12f, 1f, 0.88f);
@@ -1237,18 +1285,11 @@ namespace KingmakerBuffPlanner.UI
                 rect.anchoredPosition = new Vector2(-right, 0f);
                 right += widths[index] + 8f;
                 if (names[index] == "Resources") _resourcesButton = button;
+                if (names[index] == "AvailabilityPolicy") _policyButton = button;
                 if (names[index] == "ExecutionMode") _modeButton = button;
                 if (names[index] == "Undo") _undoButton = button;
                 if (names[index] == "Run") _runButton = button;
             }
-            _readyOnlyButton = _kit.Button(footer, "ReadyOnly", "Ready Casts Only",
-                () => Command(() => RunApply(CastingApplyMode.ReadyCastsOnly)), PlannerTextRole.Button, 16f);
-            RectTransform ready = RectOf(_readyOnlyButton);
-            KingmakerUiFactory.SetAnchors(ready, 1f, 0.12f, 1f, 0.88f);
-            ready.pivot = new Vector2(1f, 0.5f);
-            ready.sizeDelta = new Vector2(190f, 0f);
-            ready.anchoredPosition = new Vector2(-right, 0f);
-            _readyOnlyButton.gameObject.SetActive(false);
             // The one line starts after the save column and ends where the
             // buttons (and Ready Casts Only, when offered) begin.
             _footerButtonsRight = right;
@@ -1277,56 +1318,198 @@ namespace KingmakerBuffPlanner.UI
         private void BuildResources(RectTransform frame)
         {
             _resources = KingmakerUiFactory.CreateRect("ResourceDetails", frame);
-            KingmakerUiFactory.SetAnchors(_resources, 0.50f, 0.088f, 0.972f, 0.52f);
-            if (_kit.Paint(_resources, PlannerNativeKit.PaperSlip, Color.white, true) == null)
-                KingmakerUiFactory.AddFramedPanel(_resources, _theme.ParchmentRaised, _theme.GoldAccent);
-            _kit.Frame(_resources, PlannerNativeKit.ThinFrame, Color.white);
-            TextMeshProUGUI heading = _kit.Text(_resources, "Heading", "Resources", PlannerTextRole.Heading, 19f,
+            KingmakerUiFactory.Stretch(_resources);
+            RectTransform modalBlocker = KingmakerUiFactory.CreateRect("Blocker", _resources);
+            KingmakerUiFactory.Stretch(modalBlocker);
+            Image blocker = KingmakerUiFactory.AddPanel(modalBlocker,
+                new Color(0.08f, 0.05f, 0.03f, 0.58f));
+            blocker.raycastTarget = true;
+            Button dismiss = modalBlocker.gameObject.AddComponent<Button>();
+            dismiss.targetGraphic = blocker;
+            dismiss.onClick.AddListener(CloseResources);
+
+            RectTransform dialog = KingmakerUiFactory.CreateRect("Dialog", _resources);
+            KingmakerUiFactory.SetAnchors(dialog, 0.10f, 0.08f, 0.90f, 0.92f);
+            Image paper = _kit.Paint(dialog, PlannerNativeKit.PaperSlip, Color.white, true);
+            if (paper == null)
+                paper = KingmakerUiFactory.AddFramedPanel(dialog, _theme.ParchmentRaised,
+                    _theme.GoldAccent);
+            paper.color = Color.white;
+            paper.raycastTarget = true;
+            _kit.Frame(dialog, PlannerNativeKit.ThinFrame, Color.white);
+            TextMeshProUGUI heading = _kit.Text(dialog, "Heading", "Resources", PlannerTextRole.Heading, 22f,
                 TextAlignmentOptions.TopLeft);
-            KingmakerUiFactory.SetAnchors(heading.rectTransform, 0f, 1f, 1f, 1f, 22f, 22f, 0f, 0f);
+            KingmakerUiFactory.SetAnchors(heading.rectTransform, 0f, 1f, 1f, 1f, 24f, 160f, 0f, 0f);
             heading.rectTransform.pivot = new Vector2(0.5f, 1f);
-            heading.rectTransform.sizeDelta = new Vector2(-44f, 26f);
-            heading.rectTransform.anchoredPosition = new Vector2(0f, -16f);
-            _resourcesBody = _kit.Text(_resources, "Body", string.Empty, PlannerTextRole.Body, 15f,
+            heading.rectTransform.sizeDelta = new Vector2(-184f, 34f);
+            heading.rectTransform.anchoredPosition = new Vector2(0f, -18f);
+            _resourcesCloseButton = _kit.Button(dialog, "Close", "Close", CloseResources,
+                PlannerTextRole.Button, 16f);
+            KingmakerUiFactory.SetAnchors(RectOf(_resourcesCloseButton), 1f, 1f, 1f, 1f);
+            RectOf(_resourcesCloseButton).pivot = new Vector2(1f, 1f);
+            RectOf(_resourcesCloseButton).sizeDelta = new Vector2(118f, 34f);
+            RectOf(_resourcesCloseButton).anchoredPosition = new Vector2(-22f, -16f);
+
+            _resourcesSelectedScopeButton = _kit.Button(dialog, "SelectedRoutineScope",
+                "Selected routine", () => SetResourceScope(WorkspaceResourceScope.SelectedRoutine),
+                PlannerTextRole.Button, 15f);
+            KingmakerUiFactory.SetAnchors(RectOf(_resourcesSelectedScopeButton), 0f, 1f, 0f, 1f);
+            RectOf(_resourcesSelectedScopeButton).pivot = new Vector2(0f, 1f);
+            RectOf(_resourcesSelectedScopeButton).sizeDelta = new Vector2(190f, 34f);
+            RectOf(_resourcesSelectedScopeButton).anchoredPosition = new Vector2(24f, -58f);
+            _resourcesAllScopeButton = _kit.Button(dialog, "AllRoutinesScope",
+                "All routines - no rest", () => SetResourceScope(WorkspaceResourceScope.AllRoutinesNoRest),
+                PlannerTextRole.Button, 15f);
+            KingmakerUiFactory.SetAnchors(RectOf(_resourcesAllScopeButton), 0f, 1f, 0f, 1f);
+            RectOf(_resourcesAllScopeButton).pivot = new Vector2(0f, 1f);
+            RectOf(_resourcesAllScopeButton).sizeDelta = new Vector2(220f, 34f);
+            RectOf(_resourcesAllScopeButton).anchoredPosition = new Vector2(222f, -58f);
+
+            _resourcesSummary = _kit.Text(dialog, "Summary", string.Empty, PlannerTextRole.Body, 15f,
                 TextAlignmentOptions.TopLeft);
-            _resourcesBody.enableAutoSizing = true;
-            _resourcesBody.fontSizeMin = 11f;
-            _resourcesBody.fontSizeMax = 15f;
-            KingmakerUiFactory.Stretch(_resourcesBody.rectTransform, 22f, 22f, 16f, 48f);
+            _resourcesSummary.enableWordWrapping = true;
+            _resourcesSummary.overflowMode = TextOverflowModes.Ellipsis;
+            KingmakerUiFactory.SetAnchors(_resourcesSummary.rectTransform, 0f, 1f, 1f, 1f,
+                24f, 24f, 0f, 0f);
+            _resourcesSummary.rectTransform.pivot = new Vector2(0.5f, 1f);
+            _resourcesSummary.rectTransform.sizeDelta = new Vector2(-48f, 48f);
+            _resourcesSummary.rectTransform.anchoredPosition = new Vector2(0f, -98f);
+
+            _resourcesScroll = KingmakerUiFactory.CreateScrollView("Accounting", dialog,
+                _theme, out _resourcesContent, 16f);
+            KingmakerUiFactory.Stretch(RectOf(_resourcesScroll), 22f, 22f, 54f, 152f);
+            ContentSizeFitter fitter = _resourcesContent.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            NativeScrollbar(_resourcesScroll);
+            _resourcesSaveStatus = _kit.Text(dialog, "SaveStatus", string.Empty,
+                PlannerTextRole.Small, 13f, TextAlignmentOptions.MidlineLeft);
+            _resourcesSaveStatus.enableWordWrapping = false;
+            _resourcesSaveStatus.overflowMode = TextOverflowModes.Ellipsis;
+            KingmakerUiFactory.SetAnchors(_resourcesSaveStatus.rectTransform,
+                0f, 0f, 1f, 0f, 24f, 24f, 0f, 0f);
+            _resourcesSaveStatus.rectTransform.pivot = new Vector2(0.5f, 0f);
+            _resourcesSaveStatus.rectTransform.sizeDelta = new Vector2(-48f, 28f);
+            _resourcesSaveStatus.rectTransform.anchoredPosition = new Vector2(0f, 18f);
             _resources.gameObject.SetActive(false);
         }
 
         private void ToggleResources()
         {
             if (_resources == null) return;
-            _resources.gameObject.SetActive(!_resources.gameObject.activeSelf);
-            _resources.SetAsLastSibling();
-        }
-
-        private void RebuildResources(CastingGraphView view)
-        {
-            if (_resourcesBody == null) return;
-            string shortfall = WorkspaceFooterText.WholePlan(view.OnePassShortCount);
-            var text = new System.Text.StringBuilder();
-            text.Append("<b>").Append(view.SelectedRunLabel).Append("</b>\n");
-            AppendBudget(text, view.SelectedRunBudget);
-            text.Append("\n<b>").Append(view.OnePassLabel).Append("</b>\n");
-            if (shortfall.Length != 0)
-                text.Append("<color=#").Append(ColorUtility.ToHtmlStringRGB(BlockedInk)).Append('>')
-                    .Append(shortfall).Append("</color>\n");
-            AppendBudget(text, view.OnePassBudget);
-            _resourcesBody.text = text.ToString();
-            if (_resourcesButton != null) _kit.SetSelected(_resourcesButton, _resources.gameObject.activeSelf);
-        }
-
-        private static void AppendBudget(System.Text.StringBuilder text, IReadOnlyList<string> budget)
-        {
-            if (budget == null || budget.Count == 0)
+            if (_resources.gameObject.activeSelf)
             {
-                text.Append("Nothing spent yet.\n");
+                CloseResources();
                 return;
             }
-            foreach (string line in budget) text.Append("· ").Append(line).Append('\n');
+            NativeDescriptionPresenter.CloseIfOpen();
+            try { RebuildResources(); }
+            catch (Exception exception)
+            {
+                Feedback("Resources could not be prepared: " + exception.Message, true);
+                _log("[KBP-WORKSPACE] Resources refused: " + exception);
+                return;
+            }
+            _resources.gameObject.SetActive(true);
+            _resources.SetAsLastSibling();
+            if (_resourcesButton != null) _kit.SetSelected(_resourcesButton, true);
+            if (EventSystem.current != null && _resourcesCloseButton != null)
+                EventSystem.current.SetSelectedGameObject(_resourcesCloseButton.gameObject);
+        }
+
+        private void CloseResources()
+        {
+            if (_resources == null || !_resources.gameObject.activeSelf) return;
+            _resources.gameObject.SetActive(false);
+            if (_resourcesButton != null) _kit.SetSelected(_resourcesButton, false);
+            if (EventSystem.current != null && _resourcesButton != null)
+                EventSystem.current.SetSelectedGameObject(_resourcesButton.gameObject);
+        }
+
+        private void SetResourceScope(WorkspaceResourceScope scope)
+        {
+            if (_resourceScope == scope) return;
+            WorkspaceResourceScope prior = _resourceScope;
+            _resourceScope = scope;
+            try { RebuildResources(); }
+            catch (Exception exception)
+            {
+                _resourceScope = prior;
+                Feedback("Resources could not change scope: " + exception.Message, true);
+                _log("[KBP-WORKSPACE] Resources scope refused: " + exception);
+            }
+        }
+
+        private void RebuildResources()
+        {
+            if (_resourcesContent == null) return;
+            WorkspaceResourceReport report = _session.BuildResourceReport(_inputs(), _resourceScope);
+            _resourcesSummary.text = report.ScopeLabel + " · " + report.Summary;
+            string saveState = _session.FooterSaveState;
+            string saveProblem = WorkspaceFooterText.SaveProblem(saveState);
+            string recovery = WorkspaceFooterText.RecoveryAction(saveState);
+            _resourcesSaveStatus.text = saveProblem == null
+                ? WorkspaceFooterText.SaveStatus(saveState)
+                : saveProblem + (recovery == null ? string.Empty
+                    : " Close Resources to " + recovery + ".");
+            _resourcesSaveStatus.color = saveProblem == null
+                ? PlannerNativeKit.SecondaryInk : BlockedInk;
+            _kit.SetSelected(_resourcesSelectedScopeButton,
+                _resourceScope == WorkspaceResourceScope.SelectedRoutine);
+            _kit.SetSelected(_resourcesAllScopeButton,
+                _resourceScope == WorkspaceResourceScope.AllRoutinesNoRest);
+            float position = _resourcesScroll == null ? 1f
+                : _resourcesScroll.verticalNormalizedPosition;
+            KingmakerUiFactory.DestroyChildren(_resourcesContent);
+            ResourceTableRow("Columns", "Resource", "Available now", "Saved need", "Would spend", "Short",
+                PlannerTextRole.Strong, false);
+            if (report.Groups.Count == 0)
+            {
+                TMP_Text empty = _kit.Text(_resourcesContent, "Empty",
+                    "This scope has no resource-bearing castings.", PlannerTextRole.Body, 15f,
+                    TextAlignmentOptions.TopLeft);
+                KingmakerUiFactory.AddLayout(empty.rectTransform, 34f);
+            }
+            foreach (WorkspaceResourceGroup group in report.Groups)
+            {
+                TMP_Text heading = _kit.Text(_resourcesContent, "Group." + group.Key,
+                    group.Label, PlannerTextRole.Heading, 17f, TextAlignmentOptions.MidlineLeft);
+                KingmakerUiFactory.AddLayout(heading.rectTransform, 32f);
+                foreach (WorkspaceResourceRow row in group.Rows)
+                    ResourceTableRow("Pool." + row.Category + "." + row.PoolKey,
+                        row.Label, row.AvailableText, row.NeededText,
+                        row.WouldSpendText, row.ShortText, PlannerTextRole.Body,
+                        row.ShortBy != 0);
+            }
+            Canvas.ForceUpdateCanvases();
+            if (_resourcesScroll != null)
+                _resourcesScroll.verticalNormalizedPosition = position;
+        }
+
+        private void ResourceTableRow(string name, string resource, string available,
+            string needed, string spend, string shortBy, PlannerTextRole role, bool problem)
+        {
+            RectTransform row = KingmakerUiFactory.CreateRect(name, _resourcesContent);
+            KingmakerUiFactory.AddLayout(row, 36f);
+            ResourceCell(row, "Resource", resource, 0f, 0.46f, role, problem);
+            ResourceCell(row, "AvailableNow", available, 0.46f, 0.60f, role, false);
+            ResourceCell(row, "Needed", needed, 0.60f, 0.74f, role, false);
+            ResourceCell(row, "Spend", spend, 0.74f, 0.88f, role, false);
+            ResourceCell(row, "Short", shortBy, 0.88f, 1f, role, problem);
+        }
+
+        private void ResourceCell(RectTransform row, string name, string value,
+            float from, float to, PlannerTextRole role, bool problem)
+        {
+            TextMeshProUGUI text = _kit.Text(row, name, value, role, 14f,
+                from == 0f ? TextAlignmentOptions.MidlineLeft : TextAlignmentOptions.MidlineRight);
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 10f;
+            text.fontSizeMax = 14f;
+            text.enableWordWrapping = false;
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            if (problem) text.color = BlockedInk;
+            KingmakerUiFactory.SetAnchors(text.rectTransform, from, 0f, to, 1f,
+                from == 0f ? 4f : 5f, to == 1f ? 4f : 5f, 0f, 0f);
         }
 
         // The passive save status and its exceptional recovery action,
@@ -1400,7 +1583,7 @@ namespace KingmakerBuffPlanner.UI
                 string captured = routine.RoutineId;
                 Button tab = _kit.Button(_routineBar, "Routine." + captured,
                     routine.Name + " (" + routine.CastingCount + ")", () => Command(() =>
-                        _session.SelectRoutine(captured)), PlannerTextRole.Button, 16f);
+                        _session.SelectRoutine(captured), "routine-switch"), PlannerTextRole.Button, 16f);
                 _kit.SetSelected(tab, routine.Selected);
                 RectTransform rect = RectOf(tab);
                 KingmakerUiFactory.SetAnchors(rect, 0f, 0.08f, 0f, 0.92f);
@@ -1440,10 +1623,11 @@ namespace KingmakerBuffPlanner.UI
                 Button button = rect.gameObject.AddComponent<Button>();
                 button.targetGraphic = background;
                 ApplyRowHover(button, entry.Selected);
-                button.onClick.AddListener(() => Command(() => _session.SelectGraphBuff(captured, _inputs())));
+                button.onClick.AddListener(() => Command(
+                    () => _session.SelectGraphBuff(captured, _inputs()), "buff-switch"));
                 // Right-click reads the spell; it never selects, authors or
                 // mutates anything (everyday-use v1.2 E05).
-                AddSpellInspect(button, () => _session.BuildGraph(_freshInputs()),
+                AddSpellInspect(button, () => _session.BuildGraph(_inputs()),
                     entry.Selected && view.SelectedSourceExact ? view.SelectedSourceAbility : entry.Source.IconAbility,
                     entry.Selected && view.SelectedSourceExact,
                     entry.Selected && view.SelectedSourceExact ? view.SelectedCasterUnitId : null, entry.Label);
@@ -1496,7 +1680,7 @@ namespace KingmakerBuffPlanner.UI
             // Right-click the selected-spell header: the exact variant's
             // description when a concrete row is selected, else base text.
             AddSpellInspect(_bannerIcon != null ? (Component)_bannerIcon : (Component)_bannerTitle,
-                () => _session.BuildGraph(_freshInputs()), view.SelectedSourceAbility,
+                () => _session.BuildGraph(_inputs()), view.SelectedSourceAbility,
                 view.SelectedSourceExact, view.SelectedSourceExact ? view.SelectedCasterUnitId : null,
                 view.SelectedSourceCaption);
         }
@@ -1630,7 +1814,7 @@ namespace KingmakerBuffPlanner.UI
                 button.targetGraphic = background;
                 ApplyRowHover(button, caster.Selected);
                 button.onClick.AddListener(() => Command(() =>
-                    SurfaceClick(_session.ClickGraphCaster(captured, _inputs()))));
+                    SurfaceClick(_session.ClickGraphCaster(captured, _inputs())), "provider-switch"));
             }
             if (caster.Selected)
             {
@@ -1674,7 +1858,7 @@ namespace KingmakerBuffPlanner.UI
                 ApplyRowHover(button, row.Selected);
                 string key = row.ProviderKey;
                 button.onClick.AddListener(() => Command(() =>
-                    SurfaceClick(_session.ClickGraphSource(key, _inputs()))));
+                    SurfaceClick(_session.ClickGraphSource(key, _inputs())), "provider-switch"));
                 TextMeshProUGUI label = _kit.Text(rect, "Label", row.Label + (row.IsGroup ? " · group" : string.Empty),
                     PlannerTextRole.Strong, 15f, TextAlignmentOptions.TopLeft);
                 if (row.Selected) label.color = PlannerNativeKit.Burgundy;
@@ -1716,7 +1900,7 @@ namespace KingmakerBuffPlanner.UI
             button.targetGraphic = background;
             ApplyRowHover(button, false);
             button.onClick.AddListener(() => Command(() =>
-                SurfaceClick(_session.ClickGraphRecipient(captured, _inputs()))));
+                SurfaceClick(_session.ClickGraphRecipient(captured, _inputs())), "recipient-toggle"));
             Image portrait = AddPortrait(rect, target.UnitId, 62f, 8f);
             if (portrait != null && illegal) portrait.color = new Color(0.55f, 0.50f, 0.48f, 0.75f);
             TextMeshProUGUI name = _kit.Text(rect, "Name", target.DisplayName, PlannerTextRole.Strong, 16f,
@@ -1754,7 +1938,7 @@ namespace KingmakerBuffPlanner.UI
             button.targetGraphic = background;
             ApplyRowHover(button, casting.Selected);
             button.onClick.AddListener(() => Command(() => _session.FocusGraphCasting(captured)));
-            AddSpellInspect(button, () => _session.BuildGraph(_freshInputs()),
+            AddSpellInspect(button, () => _session.BuildGraph(_inputs()),
                 casting.SpellAbility, true, casting.CasterUnitId, ChipInspectTitle(casting, _lastView));
             string status = (_session.ProblemNavigation.Active && casting.Selected
                 ? "Problem " + _session.ProblemNavigation.Position + " of " + _session.ProblemNavigation.Count +
@@ -2015,6 +2199,21 @@ namespace KingmakerBuffPlanner.UI
             Line("Headline", RelationLine(view, inspector), PlannerTextRole.Strong, 18f, null);
             string source = SourceCaption(view, chip);
             if (source.Length != 0) Line("Source", source, PlannerTextRole.Secondary, 15f, null);
+            RectTransform change = Row("ExplicitChange", 32f);
+            RowButton(change, "ChangeRecipient",
+                _session.GraphEditIntent == CastingGraphEditIntent.ChangeRecipient
+                    ? "Cancel recipient change" : "Change recipient",
+                ToggleRecipientEditCommand, 0f, 0.5f);
+            RowButton(change, "ChangeProvider",
+                _session.GraphEditIntent == CastingGraphEditIntent.ChangeProvider
+                    ? "Cancel caster change" : "Change caster/source",
+                ToggleProviderEditCommand, 0.5f, 1f);
+            if (_session.GraphEditIntent == CastingGraphEditIntent.ChangeRecipient)
+                Line("ChangeRecipientHint", "Choose the new recipient once; the control then turns off.",
+                    PlannerTextRole.Small, 13f, Burgundy);
+            else if (_session.GraphEditIntent == CastingGraphEditIntent.ChangeProvider)
+                Line("ChangeProviderHint", "Choose the new caster and exact source once; the control then turns off.",
+                    PlannerTextRole.Small, 13f, Burgundy);
             // 3. The one outcome line.
             string status = chip == null ? "Not shown in this routine" : chip.StatusLabel;
             Line("CastingStatus", status, PlannerTextRole.Strong, 16f,
@@ -2305,9 +2504,10 @@ namespace KingmakerBuffPlanner.UI
         // Commands (all go through the session; the view refreshes after)
         // ------------------------------------------------------------------
 
-        private void Command(Action action)
+        private void Command(Action action, string refreshCause = "command")
         {
             if (_disposed) return;
+            long commandStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             // A command's feedback lasts until the next command; without one
             // the footer shows Run's status again.
             _feedbackShown = false;
@@ -2321,6 +2521,8 @@ namespace KingmakerBuffPlanner.UI
                 Feedback("That did not work: " + exception.Message, true);
                 Debug.LogError("[KBP-WORKSPACE] command failed: " + exception);
             }
+            _nextCommandAndPersistenceMilliseconds = ElapsedMilliseconds(commandStarted);
+            _nextRefreshCause = refreshCause;
             RefreshView();
         }
 
@@ -2336,6 +2538,10 @@ namespace KingmakerBuffPlanner.UI
                     return;
                 case CastingGraphClickOutcome.Focused:
                     Feedback("Selected the casting this recipient already has.");
+                    return;
+                case CastingGraphClickOutcome.DisambiguationRequired:
+                    Feedback("More than one saved casting matches. Select a casting card, then use Remove casting.",
+                        true);
                     return;
                 case CastingGraphClickOutcome.Removed:
                     Feedback("Casting removed (Undo restores it).");
@@ -2413,6 +2619,39 @@ namespace KingmakerBuffPlanner.UI
             Feedback(WorkspaceFooterText.ModeChanged(_session.ExecutionMode));
         }
 
+        private void ToggleAvailabilityPolicyCommand()
+        {
+            string next = _session.AvailabilityPolicy == ExecutionProfile.RequireFullPlan
+                ? ExecutionProfile.CastAvailable : ExecutionProfile.RequireFullPlan;
+            _session.SetAvailabilityPolicy(next);
+            PlannerNativeKit.SetCaption(_policyButton, PolicyCaption());
+            Feedback(next == ExecutionProfile.CastAvailable
+                ? "Cast available: ready castings run in authored order; every omission is reported."
+                : "Require full plan: any unavailable requested casting refuses the run.");
+        }
+
+        private void ToggleRecipientEditCommand()
+        {
+            if (_session.GraphEditIntent == CastingGraphEditIntent.ChangeRecipient)
+            {
+                _session.CancelGraphEditIntent();
+                Feedback("Recipient change cancelled.");
+                return;
+            }
+            Surface(_session.BeginChangeRecipient(), "change recipient");
+        }
+
+        private void ToggleProviderEditCommand()
+        {
+            if (_session.GraphEditIntent == CastingGraphEditIntent.ChangeProvider)
+            {
+                _session.CancelGraphEditIntent();
+                Feedback("Caster/source change cancelled.");
+                return;
+            }
+            Surface(_session.BeginChangeProvider(), "change caster/source");
+        }
+
         private void UndoCommand()
         {
             if (!_session.Undo()) Feedback("Nothing to undo.");
@@ -2421,6 +2660,12 @@ namespace KingmakerBuffPlanner.UI
         private string ModeCaption()
         {
             return _session.ExecutionMode == "instant" ? "Mode: Instant" : "Mode: Animated";
+        }
+
+        private string PolicyCaption()
+        {
+            return _session.AvailabilityPolicy == ExecutionProfile.CastAvailable
+                ? "Cast available" : "Require full plan";
         }
 
         // The footer's standing line when no command has just spoken: an
@@ -2444,11 +2689,15 @@ namespace KingmakerBuffPlanner.UI
             bool allowed = gate != null && gate.Allowed;
             problem = !allowed && view.RoutineCastingCount != 0;
             return WorkspaceFooterText.RunStatus(_session.DispatchDisposition, view.SelectedRoutineName,
-                view.RoutineCastingCount, allowed, executable, notReady, otherBlock, view.OnePassShortCount);
+                view.RoutineCastingCount, allowed, executable, notReady, otherBlock,
+                view.OnePassShortCount,
+                _session.ApplyMode == CastingApplyMode.ReadyCastsOnly,
+                gate == null ? 0 : gate.Omissions.Count);
         }
 
-        private void RunApply(CastingApplyMode mode)
+        private void RunApply()
         {
+            CastingApplyMode mode = _session.ApplyMode;
             string name = _session.RoutineDisplayName(_session.SelectedRoutineId);
             CastingWorkspaceInputs inputs;
             try { inputs = _freshInputs(); }
@@ -2462,9 +2711,6 @@ namespace KingmakerBuffPlanner.UI
                 return;
             }
             WorkspaceApplyResult result = _session.Apply(mode, _session.SelectedRoutineId, inputs);
-            if (!result.Allowed && result.BlockingCastings.Count != 0 &&
-                mode == CastingApplyMode.Ordinary)
-                _readyOnlyButton.gameObject.SetActive(true);
             if (result.Allowed && result.Dispatch != null && result.Dispatch.Submitted)
             {
                 // The run proceeds in the world; the result is reported at its end.
@@ -2492,14 +2738,7 @@ namespace KingmakerBuffPlanner.UI
                     Feedback(_session.LastAttemptMessage, true);
             }
             _showedProblems = problems;
-            if (problems) _readyOnlyButton.gameObject.SetActive(true);
-            else if (view.SelectedRoutineGate != null && view.SelectedRoutineGate.BlockingCastings.Count == 0)
-                _readyOnlyButton.gameObject.SetActive(false);
-            // Reclaim the exceptional action's column while it is hidden.
-            // At a small viewport this keeps recovery messages beside the
-            // visible controls instead of ellipsizing into unused space.
-            float textRight = _footerButtonsRight +
-                (_readyOnlyButton.gameObject.activeSelf ? 198f : 0f);
+            float textRight = _footerButtonsRight;
             if (_footerResult != null)
                 _footerResult.rectTransform.offsetMax = new Vector2(-textRight,
                     _footerResult.rectTransform.offsetMax.y);
@@ -2512,12 +2751,15 @@ namespace KingmakerBuffPlanner.UI
                 _footerResult.text = FooterStatus(view, out problem);
                 _footerResult.color = problem ? BlockedInk : PlannerNativeKit.BodyInk;
             }
-            RebuildResources(view);
+            if (_resources != null && _resources.gameObject.activeSelf)
+                RebuildResources();
             if (_undoButton != null) PlannerNativeKit.SetEnabled(_undoButton, _session.CanUndo);
             // Run runs the SELECTED routine, so it says which one.
             if (_runButton != null)
                 PlannerNativeKit.SetCaption(_runButton, WorkspaceFooterText.RunCaption(
                     _session.RoutineDisplayName(_session.SelectedRoutineId)));
+            if (_policyButton != null)
+                PlannerNativeKit.SetCaption(_policyButton, PolicyCaption());
             ShowSaveState();
         }
 

@@ -420,7 +420,7 @@ namespace KingmakerBuffPlanner.Tests
                 { CastingGraphText.CatalogueCount(0, 1, "Long"), "1 in other routines" },
                 { CastingGraphText.CatalogueCount(0, 0, "Long"), string.Empty },
                 { WorkspaceFooterText.RunStatus("native-casting-enabled", "Long", 3, false, 1, 2, null, 0),
-                    "Long cannot run: 2 castings are not ready (marked in red). Ready Casts Only runs the other 1." },
+                    "Long cannot run: 2 castings are not ready (marked in red). Choose Cast available to run the other 1." },
                 { WorkspaceFooterText.RunStatus("native-casting-enabled", "Long", 2, true, 2, 0, null, 1),
                     "Run Long casts 2 castings. 1 casting is short if every routine runs without rest (see Resources)." },
                 { WorkspaceFooterText.RunStatus("native-casting-enabled", "Long", 1, true, 0, 0, null, 0),

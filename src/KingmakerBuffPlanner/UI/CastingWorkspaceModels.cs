@@ -579,7 +579,8 @@ namespace KingmakerBuffPlanner.UI
         // Run does now, or exactly why it cannot (the count of castings that
         // are not ready and where they are marked).
         public static string RunStatus(string disposition, string routineName, int castings,
-            bool allowed, int executable, int notReady, string otherBlock, int shortInOnePass)
+            bool allowed, int executable, int notReady, string otherBlock, int shortInOnePass,
+            bool castAvailable = false, int omissions = 0)
         {
             string value = disposition ?? string.Empty;
             if (value == "native-casting-busy")
@@ -592,14 +593,23 @@ namespace KingmakerBuffPlanner.UI
             if (notReady > 0)
                 return routineName + " cannot run: " + (notReady == 1 ? "1 casting is" : notReady + " castings are") +
                     " not ready (marked in red)." +
-                    (executable > 0 ? " Ready Casts Only runs the other " + executable + "." : string.Empty);
+                    (executable > 0 ? " Choose Cast available to run the other " + executable + "." : string.Empty);
             if (!allowed)
                 return routineName + " cannot run: " + (string.IsNullOrEmpty(otherBlock) ? "see the marked castings" : otherBlock) + ".";
             string shortage = shortInOnePass <= 0 ? string.Empty
                 : " " + (shortInOnePass == 1 ? "1 casting is" : shortInOnePass + " castings are") +
                     " short if every routine runs without rest (see Resources).";
-            if (executable == 0) return "Nothing to cast in " + routineName + ": every casting is already active." + shortage;
-            return "Run " + routineName + " casts " + executable + (executable == 1 ? " casting." : " castings.") + shortage;
+            if (executable == 0) return castAvailable && omissions != 0
+                ? "Nothing available to cast in " + routineName + "; " + omissions +
+                    (omissions == 1 ? " saved casting is omitted." : " saved castings are omitted.") + shortage
+                : "Nothing to cast in " + routineName + ": every casting is already active." + shortage;
+            string omitted = !castAvailable || omissions == 0 ? string.Empty
+                : " " + omissions + (omissions == 1
+                    ? " saved casting will be omitted." : " saved castings will be omitted.");
+            string noun = castAvailable
+                ? (executable == 1 ? " available casting." : " available castings.")
+                : (executable == 1 ? " casting." : " castings.");
+            return "Run " + routineName + " casts " + executable + noun + omitted + shortage;
         }
 
         // The Run button names the routine it runs: the selected one.
@@ -612,7 +622,7 @@ namespace KingmakerBuffPlanner.UI
         {
             return routineName + " was not cast: " +
                 (notReady == 1 ? "1 casting is" : notReady + " castings are") +
-                " not ready (red lines and cards). Fix them, or use Ready Casts Only to run the ready ones.";
+                " not ready (red lines and cards). Fix them, or choose Cast available to run the ready ones.";
         }
 
         // The mode change is an edit like any other: it saves itself, and

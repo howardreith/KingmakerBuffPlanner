@@ -648,7 +648,8 @@ namespace KingmakerBuffPlanner.UI
                 if (!legal) return string.IsNullOrEmpty(reason) ? "Cannot receive it" : reason;
                 return group ? "Click to centre it here" : "Click to move it here";
             }
-            if (otherCastingLabel != null) return "Has casting " + otherCastingLabel + " · click to select it";
+            if (otherCastingLabel != null)
+                return "Has casting " + otherCastingLabel + " · click to remove it";
             if (unknown) return "Choose a caster first";
             if (!legal) return reason ?? string.Empty;
             return group ? "Click to centre a casting here" : "Click to add a casting";

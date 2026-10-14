@@ -24,11 +24,11 @@ namespace KingmakerBuffPlanner.Tests
         private static void RunDirectManipulationTests(string root)
         {
             Run("direct-manipulation-add-then-same-portrait-removes", () => TestClickAddThenRemove(root));
-            Run("direct-manipulation-focus-existing-then-remove", () => TestClickFocusExistingThenRemove(root));
-            Run("direct-manipulation-retarget-and-illegal-refusal", () => TestClickRetarget(root));
-            Run("direct-manipulation-group-recentre-and-remove", () => TestClickGroup(root));
-            Run("direct-manipulation-legacy-duplicates-one-at-a-time", () => TestClickLegacyDuplicates(root));
-            Run("direct-manipulation-provider-change-through-graph", () => TestGraphProviderChange(root));
+            Run("direct-manipulation-existing-assignment-toggles-off", () => TestClickFocusExistingThenRemove(root));
+            Run("direct-manipulation-explicit-retarget-and-illegal-refusal", () => TestClickRetarget(root));
+            Run("direct-manipulation-explicit-group-recentre-and-normal-remove", () => TestClickGroup(root));
+            Run("direct-manipulation-legacy-duplicates-require-disambiguation", () => TestClickLegacyDuplicates(root));
+            Run("direct-manipulation-explicit-provider-change-through-graph", () => TestGraphProviderChange(root));
             Run("direct-manipulation-share-shown-only-where-it-applies", () => TestShareVisibility(root));
             Run("direct-manipulation-legacy-disabled-loads-and-removes", () => TestLegacyDisabled(root));
             Run("direct-manipulation-retired-group-coverage-migrates", () => TestRetiredGroupCoverage(root));
@@ -73,15 +73,10 @@ namespace KingmakerBuffPlanner.Tests
             string one = GraphAdd(session, inputs, GraphSourceA, "unit-cleric", null, "unit-t1");
             string two = GraphAdd(session, inputs, GraphSourceA, "unit-cleric", null, "unit-t2");
             session.ClearGraphFocus();
-            string signature = session.DocumentIntentSignature();
-            CastingGraphClickResult focused = session.ClickGraphRecipient("unit-t1", inputs);
-            Expect(focused.Outcome == CastingGraphClickOutcome.Focused && focused.CastingId == one &&
-                session.EditingFocusCastingId == one && session.DocumentIntentSignature() == signature,
-                "a recipient with a casting was not focused without an edit");
             CastingGraphClickResult removed = session.ClickGraphRecipient("unit-t1", inputs);
             Expect(removed.Outcome == CastingGraphClickOutcome.Removed &&
                 session.Document.Castings.Select(value => value.CastingId).SequenceEqual(new[] { two }),
-                "the focused casting was not removed alone");
+                "a normal recipient toggle did not remove that assignment alone");
         }
 
         private static void TestClickRetarget(string root)
@@ -91,6 +86,7 @@ namespace KingmakerBuffPlanner.Tests
             string dir = Path.Combine(root, "graph-dm-retarget");
             string one = GraphAdd(session, inputs, GraphSourceB, "unit-cleric", null, "unit-t1");
             PlannedCasting before = session.Document.Castings.Single();
+            Expect(session.BeginChangeRecipient().Applied, "change-recipient was not armed");
             CastingGraphClickResult moved = session.ClickGraphRecipient("unit-t2", inputs);
             PlannedCasting after = session.Document.Castings.Single();
             Expect(moved.Outcome == CastingGraphClickOutcome.Retargeted && after.CastingId == one &&
@@ -104,6 +100,7 @@ namespace KingmakerBuffPlanner.Tests
             string signature = session.DocumentIntentSignature();
             foreach (string illegal in new[] { "unit-t3", "unit-t4" })
             {
+                Expect(session.BeginChangeRecipient().Applied, "change-recipient retry was not armed");
                 CastingGraphClickResult refused = session.ClickGraphRecipient(illegal, inputs);
                 Expect(refused.Outcome == CastingGraphClickOutcome.Refused && refused.Edit != null &&
                     WorkspaceRefusalText.Describe(refused.Edit.Reason).Length != 0 &&
@@ -113,6 +110,7 @@ namespace KingmakerBuffPlanner.Tests
             // A recipient that already has a casting of this buff here.
             string other = GraphAdd(session, inputs, GraphSourceB, "unit-cleric", null, "unit-t1");
             session.FocusGraphCasting(one);
+            Expect(session.BeginChangeRecipient().Applied, "change-recipient duplicate check was not armed");
             CastingGraphClickResult doubled = session.ClickGraphRecipient("unit-t1", inputs);
             Expect(doubled.Outcome == CastingGraphClickOutcome.Refused &&
                 doubled.Edit.Reason == "recipient-already-has-casting:" + other &&
@@ -134,6 +132,7 @@ namespace KingmakerBuffPlanner.Tests
                 session.Document.Castings.Single().TargetMode == CastingTargetMode.CasterCenteredOrigin,
                 "the group casting was not added caster-centred");
             string id = added.CastingId;
+            Expect(session.BeginChangeRecipient().Applied, "change-recipient was not armed for the group");
             CastingGraphClickResult recentred = session.ClickGraphRecipient("unit-t1", inputs);
             PlannedCasting moved = session.Document.Castings.Single();
             Expect(recentred.Outcome == CastingGraphClickOutcome.Recentred && moved.CastingId == id &&
@@ -141,6 +140,7 @@ namespace KingmakerBuffPlanner.Tests
                 moved.RequiredCoverageUnitIds.Count == 0, "the group casting was not re-centred in place");
             // unit-t2 is no legal centre for this ability.
             string signature = session.DocumentIntentSignature();
+            Expect(session.BeginChangeRecipient().Applied, "group change-recipient retry was not armed");
             CastingGraphClickResult illegal = session.ClickGraphRecipient("unit-t2", inputs);
             Expect(illegal.Outcome == CastingGraphClickOutcome.Refused &&
                 illegal.Edit.Reason == "origin-anchor-illegal:unit-t2" &&
@@ -149,6 +149,7 @@ namespace KingmakerBuffPlanner.Tests
             // prediction reached members this centre does not.
             ResolvedCasting compiled = session.CompileForRuntime(inputs, "long").CastingById(id);
             Expect(compiled.IsExecutable && compiled.CoverageGaps.Count == 0, "the re-centred cast is blocked");
+            session.CancelGraphEditIntent();
             CastingGraphClickResult removed = session.ClickGraphRecipient("unit-t1", inputs);
             Expect(removed.Outcome == CastingGraphClickOutcome.Removed && session.Document.Castings.Count == 0,
                 "clicking the current centre did not remove the group casting");
@@ -168,15 +169,18 @@ namespace KingmakerBuffPlanner.Tests
             // Loaded duplicates stay as they are: nothing merges them.
             Expect(new CastingWorkspaceSession(Path.Combine(root, "graph-dm-duplicates"), "graph-campaign")
                 .Document.Castings.Count == 3, "the stored duplicates were merged");
-            Expect(session.ClickGraphRecipient("unit-t1", inputs).CastingId == first &&
-                session.ClickGraphRecipient("unit-t1", inputs).Outcome == CastingGraphClickOutcome.Removed &&
+            CastingGraphClickResult ambiguous = session.ClickGraphRecipient("unit-t1", inputs);
+            Expect(ambiguous.Outcome == CastingGraphClickOutcome.DisambiguationRequired &&
+                ambiguous.CastingId == null && session.EditingFocusCastingId == null,
+                "duplicate assignments did not request explicit disambiguation");
+            session.FocusGraphCasting(first);
+            Expect(session.RemoveFocusedCasting().Applied &&
                 session.Document.Castings.Select(value => value.CastingId).OrderBy(value => value)
                     .SequenceEqual(new[] { second, sibling }.OrderBy(value => value)),
-                "the first duplicate in routine order was not the one focused and removed");
-            Expect(session.ClickGraphRecipient("unit-t1", inputs).CastingId == second &&
-                session.ClickGraphRecipient("unit-t1", inputs).Outcome == CastingGraphClickOutcome.Removed &&
+                "duplicate assignments were not explicitly disambiguated before removal");
+            Expect(session.ClickGraphRecipient("unit-t1", inputs).Outcome == CastingGraphClickOutcome.Removed &&
                 session.Document.Castings.Single().CastingId == sibling,
-                "the second duplicate was not handled one at a time, or a sibling was touched");
+                "the now-unambiguous assignment was not toggled off, or a sibling was touched");
         }
 
         private static void TestGraphProviderChange(string root)
@@ -187,6 +191,15 @@ namespace KingmakerBuffPlanner.Tests
             Expect(session.SetFocusedRecastPolicy(ExistingEffectPolicy.Overwrite).Applied, "fixture policy");
             Expect(session.ToggleFocusedEnhancement("powerful-change-cleric", inputs).Applied, "fixture enhancement");
             PlannedCasting before = session.Document.Castings.Single();
+            // Ordinary provider gestures configure the NEXT casting even
+            // while an existing casting is being inspected.
+            CastingGraphClickResult nextCaster = session.ClickGraphCaster("unit-bard", inputs);
+            Expect(nextCaster.Outcome == CastingGraphClickOutcome.DraftConfigured &&
+                session.Document.Castings.Single().CasterUnitId == "unit-cleric" &&
+                session.EditingFocusCastingId == null,
+                "a normal caster click edited the inspected casting");
+            session.FocusGraphCasting(one);
+            Expect(session.BeginChangeProvider().Applied, "change-provider was not armed");
             // The bard has two exact sources of A: the caster header asks for
             // one of them and changes nothing.
             CastingGraphClickResult ambiguous = session.ClickGraphCaster("unit-bard", inputs);
@@ -222,6 +235,8 @@ namespace KingmakerBuffPlanner.Tests
             var narrow = new CastingWorkspaceInputs(inputs.Snapshot, options, inputs.EffectsBySource,
                 inputs.Enhancements);
             string signature = session.DocumentIntentSignature();
+            Expect(session.BeginChangeProvider().Applied,
+                "change-provider was not armed for the reach refusal");
             CastingGraphClickResult unreachable = session.ClickGraphSource(bardLevel2, narrow);
             Expect(unreachable.Outcome == CastingGraphClickOutcome.Refused &&
                 unreachable.Edit.Reason == "provider-cannot-reach-target:unit-t2" &&

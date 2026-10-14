@@ -157,7 +157,7 @@ namespace KingmakerBuffPlanner.UI
             else if (reason.StartsWith("apply-refused", StringComparison.Ordinal))
                 text = "some castings are blocked (" + (result.GateDecision == null ? 0
                     : result.GateDecision.BlockingReasons.Count) +
-                    ") - fix them or use Ready Casts Only in the planner";
+                    ") - fix them or choose Cast available in the planner";
             else if (reason.StartsWith("import-notices-pending", StringComparison.Ordinal) ||
                 reason.StartsWith("legacy-import-unresolved", StringComparison.Ordinal))
                 text = "the imported plan still needs your review in the planner";

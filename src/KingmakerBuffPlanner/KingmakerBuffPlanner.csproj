@@ -245,6 +245,7 @@
     <Compile Include="UI\CastingWorkspaceModels.cs" />
     <Compile Include="UI\CastingWorkspaceSession.cs" />
     <Compile Include="UI\CastingWorkspaceSession.Graph.cs" />
+    <Compile Include="UI\CastingWorkspaceResources.cs" />
     <Compile Include="UI\CastingWorkspaceSession.DirectManipulation.cs" />
     <Compile Include="UI\CastingWorkspaceSession.SpellbookReconciliation.cs" />
     <Compile Include="Planning\SpellbookRemovalReconciliation.cs" />

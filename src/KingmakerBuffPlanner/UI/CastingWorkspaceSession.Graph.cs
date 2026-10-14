@@ -37,6 +37,7 @@ namespace KingmakerBuffPlanner.UI
             if (!changed) return;
             Draft.Ability = null;
             Draft.SpellbookGuid = null;
+            _draftProviderKey = string.Empty;
             _resolvedDraftKey = string.Empty;
             if (previousCaster != null && _lastInputs != null &&
                 CapableCasterUnitIdsForSource(_lastInputs, SelectedSourceId).Contains(previousCaster))
@@ -58,6 +59,7 @@ namespace KingmakerBuffPlanner.UI
             ChooseDraftCaster(casterUnitId);
             Draft.Ability = null;
             Draft.SpellbookGuid = null;
+            _draftProviderKey = string.Empty;
             _resolvedDraftKey = string.Empty;
             if (_lastInputs == null || string.IsNullOrEmpty(casterUnitId)) return;
             List<ProviderPlanningOption> sources = SourceOptionsFor(_lastInputs,
@@ -66,6 +68,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 Draft.Ability = sources[0].Provider.Key.Ability;
                 Draft.SpellbookGuid = sources[0].Provider.Key.SpellbookGuid;
+                _draftProviderKey = sources[0].Provider.Key.Canonical;
                 _resolvedDraftKey = DraftResolutionKey();
             }
         }
@@ -77,7 +80,11 @@ namespace KingmakerBuffPlanner.UI
         {
             LeaveProblemNavigation();
             AuthoringEditResult result = ChooseDraftProvider(providerKey, inputs);
-            if (result.Applied) EditingFocusCastingId = null;
+            if (result.Applied)
+            {
+                EditingFocusCastingId = null;
+                CancelGraphEditIntent();
+            }
             return result;
         }
 
@@ -85,6 +92,7 @@ namespace KingmakerBuffPlanner.UI
         // routine). Only the focus changes.
         public void FocusGraphCasting(string castingId)
         {
+            CancelGraphEditIntent();
             FocusCasting(castingId);
             PlannedCasting casting = FocusedCasting();
             if (casting == null) return;
@@ -101,6 +109,7 @@ namespace KingmakerBuffPlanner.UI
         {
             LeaveProblemNavigation();
             EditingFocusCastingId = null;
+            CancelGraphEditIntent();
         }
 
         // ------------------------------------------------------------------
@@ -129,7 +138,8 @@ namespace KingmakerBuffPlanner.UI
             if (unit == null) return GraphRefusal("target-not-in-party:" + unitId);
             bool? group = IsGroupSource(_lastInputs, source);
             if (group == null) return GraphRefusal("ability-targeting-unsupported:" + source);
-            PlannedCasting existing = ExistingCastingFor(source, SelectedRoutineId, unitId, group.Value);
+            PlannedCasting existing = ExistingCastingFor(source, option.Provider.Key.Ability,
+                SelectedRoutineId, unitId, group.Value);
             if (existing != null)
             {
                 EditingFocusCastingId = existing.CastingId;
@@ -280,12 +290,9 @@ namespace KingmakerBuffPlanner.UI
             // lane's counts come from the one-pass plan's own ledger.
             ExplicitCastingPlan plan = Compile(inputs, SelectedRoutineId, false);
             CastingApplyDecision routineGate = _gate.Evaluate(
-                plan, CastingApplyMode.Ordinary, SelectedRoutineId);
+                plan, ApplyMode, SelectedRoutineId);
             RefreshProblemNavigation(routineGate);
-            CastingForecast onePass = _forecast.ForecastOnePass(
-                _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
-                inputs.EffectsBySource, inputs.Enhancements, inputs.TargetingModifiers,
-                StrictInstant);
+            CastingForecast onePass = ForecastOnePass(inputs);
             RefreshPoolLabels(inputs);
             if (EditingFocusCastingId != null && FocusedCasting() == null)
                 EditingFocusCastingId = null;
@@ -593,13 +600,14 @@ namespace KingmakerBuffPlanner.UI
             Func<string, string> nameOf)
         {
             var targets = new List<CastingGraphTargetNode>();
-            // Editing a shown casting: a portrait click moves, re-centres or
-            // removes THAT casting (ClickGraphRecipient), so legality and the
-            // hint follow its own provider, not the next casting's draft.
+            // Inspection alone never changes portrait semantics. Only the
+            // explicit one-shot Change recipient control makes the lane use
+            // the focused casting's provider and show move/re-centre hints.
             PlannedCasting focused = FocusedCasting();
             CastingGraphCasting focusedChip = focused == null ? null : chips.FirstOrDefault(value =>
                 string.Equals(value.CastingId, focused.CastingId, StringComparison.Ordinal));
-            bool editing = focusedChip != null;
+            bool editing = focusedChip != null &&
+                GraphEditIntent == CastingGraphEditIntent.ChangeRecipient;
             if (editing)
             {
                 group = focused.TargetMode != CastingTargetMode.DirectTarget;
@@ -648,6 +656,12 @@ namespace KingmakerBuffPlanner.UI
                     own == null ? null : own.OrderLabel,
                     other == null ? null : string.Join(", ", held.Where(value => own == null ||
                         value.CastingId != own.CastingId).Select(value => value.OrderLabel).ToArray()));
+                if (!editing && held.Count == 0)
+                {
+                    CastingGraphCasting covering = touching.FirstOrDefault(value => value.IsGroup);
+                    if (covering != null)
+                        hint = "Covered by " + covering.OrderLabel + " · click to inspect it";
+                }
                 targets.Add(new CastingGraphTargetNode(unit.UnitId, unit.DisplayName, legality, reason,
                     touching.Select(value => value.CastingId), coverage, hint));
             }
@@ -1143,13 +1157,15 @@ namespace KingmakerBuffPlanner.UI
             return grouping == CastGroupingKind.MassConfiguredTargets;
         }
 
-        private PlannedCasting ExistingCastingFor(string sourceId, string routineId, string unitId,
-            bool group)
+        private PlannedCasting ExistingCastingFor(string sourceId, AbilityKey ability,
+            string routineId, string unitId, bool group)
         {
-            // Routine order: duplicates an earlier version left are shown,
-            // and removed, one at a time and always in the same order.
+            // SourceId is the normalized buff while AbilityKey keeps an
+            // exact variant distinct. Legacy duplicates are surfaced by the
+            // direct-manipulation layer for explicit disambiguation.
             List<PlannedCasting> same = _authoring.Document.Castings.Where(casting => casting != null &&
                 string.Equals(casting.SourceId, sourceId, StringComparison.Ordinal) &&
+                MatchesSelectedVariant(casting, ability) &&
                 string.Equals(casting.RoutineId, routineId, StringComparison.Ordinal))
                 .OrderBy(casting => casting.Order).ThenBy(casting => casting.CastingId, StringComparer.Ordinal)
                 .ToList();
