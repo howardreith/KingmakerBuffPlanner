@@ -1,3 +1,14 @@
+> **Current October 14 rc5 blocker:** independently actionable source, focused
+> regression, package, freeze and cleanup work is complete. The selected first
+> five-target purity window **FAILED** before its first WhatIf could pass because
+> the physical display changed from the preflight's 1920x1200 to 1920x1080.
+> Nothing was deployed or launched; the post-failure audit found no transaction,
+> RunId path, allowance, Kingmaker process or save violation. Do not retry or
+> reuse `kbphf-rc5-20261014-01`. The owner must restore and hold physical
+> 1920x1200 and explicitly authorize a fresh approximately 7 h 30 m batch. Exact
+> evidence and scope are in the
+> [rc5 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
+>
 > **Current October 14 human-feedback blocker:** no independent source,
 > observer, hashing, focused-test, package or freeze work remains. Exact rc4
 > product `19e2e777261ff7887f0b8f62c8adcc75161220c5` is **NOT_RUN**. Its next

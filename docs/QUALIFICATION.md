@@ -1,3 +1,13 @@
+> **Current 0.5.1-rc5 qualification:** exact frozen product `ec3d5f8`, ZIP
+> `63c12d519dd49d514f6ddd31ea0514b9a8af5644680aa1dde82ddc77e63bfb03`,
+> passes focused planning-sequence/display checks and package validation. The
+> selected operation `kbphf-rc5-20261014-01` is a prerequisite **FAIL**, not a
+> runtime result: physical display changed from 1920x1200 preflight to 1920x1080
+> before the first explicit-size WhatIf. No game launched, transaction began,
+> allowance was created or RunId path remains. No purity/runtime/visual PASS is
+> claimed. See the
+> [rc5 decision receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
+>
 > **Current 0.5.1-rc4 qualification:** the selected rc3 campaign preserved one
 > five-target purity PASS, then stopped on actual RunId
 > `kbphf-rc3-20261014-02-ui-owner` with runtime **FAIL**. Mods and protected

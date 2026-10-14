@@ -1,3 +1,14 @@
+> **Current 0.5.1-rc5 preparation:** exact packaged source `ec3d5f8` makes the
+> full native planning sequence executable on the three-recipient/one-seed
+> fixture and adds the explicit guarded windowed-1920x1200 request with Unity,
+> native-record, PNG, game-settings and physical-display correlation. Focused
+> results are display 10/0, launcher 28/0 + 8/0, hashing 8/0, selected source
+> 43/0/build 1/0/behavior 32/0 and package 4/0. ZIP
+> `63c12d519dd49d514f6ddd31ea0514b9a8af5644680aa1dde82ddc77e63bfb03`
+> is frozen. The selected first purity prerequisite failed on a newer physical
+> 1920x1080 state before launch; no runtime or visual PASS exists. See the
+> [rc5 decision receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
+>
 > **Current 0.5.1-rc4 successor:** exact packaged source
 > `19e2e777261ff7887f0b8f62c8adcc75161220c5` adds an opaque backing beneath
 > the approved Resources PaperSlip and makes the native observer reserve two

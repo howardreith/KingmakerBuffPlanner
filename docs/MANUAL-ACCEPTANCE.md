@@ -1,3 +1,13 @@
+> **Current 0.5.1-rc5 human-feedback acceptance:** exact candidate `ec3d5f8`
+> is focused-tested, packaged and frozen but **NOT_RUN**. The first selected
+> purity prerequisite failed when the physical display changed from 1920x1200
+> to 1920x1080; no rc5 screenshot exists. The smallest owner action is to
+> restore and hold the supported physical 1920x1200 mode through the next first
+> purity/run/review checkpoint, then explicitly authorize one fresh batch. The
+> two-size Resources/planning/timing review and actual strict/permissive policy
+> cast remain unchanged and are specified in the
+> [rc5 receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
+>
 > **Current 0.5.1-rc3 human-feedback acceptance:** exact candidate `debd406`
 > is **NOT_RUN**. At owner 1920x1200 and compact 1280x720, inspect actual
 > Resources cells/scope/reopen/clipping/input, continuous assignment/hints/

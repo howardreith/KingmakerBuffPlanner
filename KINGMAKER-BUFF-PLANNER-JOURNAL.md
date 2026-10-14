@@ -3497,3 +3497,48 @@ old aggregate failure invalidates or relabels the original separate game receipt
 Receipt remains PARTIAL. Exact records and next separately budgeted guarded
 1920x1080/1280x720 batch followed by image review:
 [capture checkpoint](docs/NATIVE-UI-FINISH-0.5.0-CAPTURE-CHECKPOINT.md).
+
+## Human-feedback rc5 complete preparation and blocked live milestone — 2026-10-14
+
+- Branch `codex/kingmaker-buff-planner-human-feedback`; product/observer/
+  runtime-harness source `ec3d5f865707e540b00fccabd3f1a98f04aa3095`, version
+  0.5.1-rc5. The product commit was guarded-pushed before the live attempt.
+- Corrected the native planning sequence: two independent ordinary adds now
+  precede explicit focus, a real `CanMoveLater` check, reorder and Undo. The
+  shared regression passes the minimum three-recipient/one-seed and larger
+  four-recipient/two-seed shapes and restores the initial plan signature.
+- Added `windowed-1920x1200`, lock-time physical-display and game-settings
+  snapshots, Unity/native/PNG dimension correlation, and restore-before-Mods
+  verification. Changed user display state fails closed and is never rewritten.
+- Focused results: display 10/0; launcher direct 28/0 and file arguments 8/0;
+  relative/literal hash helper 8/0; selected development source 43/0, build
+  1/0, behavior 32/0; package source 43/0, build 1/0, validation 4/0 and
+  creation 1/0; guarded push 6/0; parsers and `git diff --check` clean.
+- Local ZIP
+  `artifacts/local-runtime/0.5.1-rc5/KingmakerBuffPlanner-0.5.1-rc5-local-runtime.zip`
+  SHA-256 `63c12d519dd49d514f6ddd31ea0514b9a8af5644680aa1dde82ddc77e63bfb03`;
+  DLL `8bbf4f1a515cdbd186f8cdd515250fd12c864d2f643a38945f84d786b61e9f92`;
+  MVID `95f36b3c-7e36-4005-9880-898841e1fd72`; exclusive qualification freeze
+  record `6db2544b9694a111359a6f9be062c7d9b05f89a26616fd73c2cacf59f2fa1ee2`.
+- Owned operation `kbphf-rc5-20261014-01` ran 12:44:54Z–13:47:50Z and
+  exited 1 in the first five-target purity phase. Its preflight measured
+  physical 1920x1200 and revalidated `advanced-inspect-20260924-01`. After the
+  expensive before-snapshot, the first 1920x1200 WhatIf measured physical
+  1920x1080 and refused before deployment: `nothing was changed`.
+- Classified as an external/environment display change during the prerequisite,
+  not a product runtime failure and not a purity PASS. No retry, game launch,
+  transaction, allowance, actual RunId, screenshot or policy cast occurred.
+  Owner-context cleanup audit: no Kingmaker process, foreign lease, unresolved
+  transaction, proposed RunId path or save violation; game registry remained
+  the pre-existing 1920x1080 fullscreen values.
+- Durable supervisor result/transcript SHA-256:
+  `5b107665e748f54bbbb03ef50f1fdfb7a364d4de81a4856d229b3f90da540c6f` /
+  `c237e0d39c156413c74598ffd80c0617be3e11d3edb82cca2b2c18defa4fa24b`.
+  Exact evidence and rejected reuse are in
+  `docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md`.
+- Rejected: changing or overwriting the newer physical display state; retrying
+  the failed purity window; treating source/package validation as purity;
+  treating the absent game run as restoration, screenshot or policy evidence.
+- Exact next action: owner restores and holds physical 1920x1200, then
+  explicitly selects one fresh approximately 7 h 30 m two-purity/four-game
+  batch with fresh RunIds. The failed 62m56s attempt is not reusable.

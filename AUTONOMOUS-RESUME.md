@@ -1,3 +1,16 @@
+> **Current October 14 human-feedback resume:** exact frozen rc5 product
+> `ec3d5f865707e540b00fccabd3f1a98f04aa3095`, version 0.5.1-rc5; ZIP
+> `63c12d519dd49d514f6ddd31ea0514b9a8af5644680aa1dde82ddc77e63bfb03`;
+> DLL `8bbf4f1a515cdbd186f8cdd515250fd12c864d2f643a38945f84d786b61e9f92`;
+> MVID `95f36b3c-7e36-4005-9880-898841e1fd72`. Planning-sequence and explicit
+> 1920x1200 corrections pass focused checks. Selected operation
+> `kbphf-rc5-20261014-01` stopped, without retry or game launch, when DATA's
+> display changed from preflight 1920x1200 to 1920x1080 during the first purity
+> inventory. No transaction, RunId path, allowance or save change exists.
+> Preserve that FAIL. Resume only after the owner restores and can hold physical
+> 1920x1200, then explicitly selects one fresh ~7 h 30 m batch described in the
+> [rc5 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
+>
 > **Current October 14 human-feedback resume:** branch
 > `codex/kingmaker-buff-planner-human-feedback`; exact frozen successor product
 > `19e2e777261ff7887f0b8f62c8adcc75161220c5`; version 0.5.1-rc4; ZIP
