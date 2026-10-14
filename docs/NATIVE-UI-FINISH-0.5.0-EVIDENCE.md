@@ -2,8 +2,8 @@
 > two one-attempt whole-history purity windows and 17 guarded game observations,
 > including exact 1920x1080 and 1280x720 UI/Advanced pictures. All transactions
 > restored and protected-save comparisons are clean. Exact identities, RunIds,
-> counts, image-review findings, the preserved runtime FAIL plus reader-only
-> reinterpretation, and per-item acceptance are in the
+> counts, image-review findings, the preserved runtime FAIL plus bounded manual
+> adjudication, and per-item acceptance are in the
 > [final evidence record](NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md). Older
 > status banners below retain chronology only.
 >

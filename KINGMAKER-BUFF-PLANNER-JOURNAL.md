@@ -1,5 +1,27 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-13 conservative reader correction and RC1 authorization
+
+The owner authorized an artifact-only `v0.5.0-rc.1` human-review prerelease,
+integration of the native UI branch into main, one annotated tag at exact tested
+product source `dfbaa5f`, and publication of the unchanged tested ZIP. This does
+not authorize stable v0.5.0, Latest status, fabricated human acceptance, a
+publisher restart, permanent installation, or protected-save changes.
+
+Review found the first post-run reader too broad: schema 1 records no inspector
+content/viewport fit fact, so an arbitrary normalized scroll value cannot replace
+the intended top-position requirement. The generic reader now keeps schema 1
+conservative. Schema 2 permits another in-range value only with an explicit
+Boolean `inspectorContentFitsViewport=true` on that observation. Temporary-file
+regressions cover schema-1 unknown fit, schema-2 missing/non-Boolean fit,
+overflow at non-top, and host-violation scope; 35/0 pass. The immutable schema-1
+record is again rejected, as expected. Its original runtime result remains FAIL
+82/1. Separately reviewed JSON and PNGs establish physical 1→2→1 navigation,
+visible problem text/controls, unchanged state, screenshots, Escape cleanup and
+lease release; inspector scroll layout remains UNVERIFIED because neither schema
+1 nor the pictures establish content/viewport geometry. No product source,
+resource, package input, DLL, ZIP, runtime dependency, game state, or save changed.
+
 ## 2026-10-13 native UI exact-candidate completion
 
 DATA/NUI feature branch; exact product and compiled observer source
@@ -16,8 +38,8 @@ The exact 1920x1080/1280x720 pictures and Advanced states were reviewed at
 original resolution. Seven UI items PASS. UI-01/UI-02/UI-03/UI-06 remain
 PARTIAL only for organic long/localized content, a custom remapped binding, and
 above-default UI scale with a long real catalogue. The problem-navigation
-runtime FAIL is preserved; a focused version-2 reader independently establishes
-PASS from immutable raw observations without changing candidate bytes. The
+runtime FAIL is preserved. The later conservative correction above narrows the
+reader and records only a partial manual adjudication without changing bytes. The
 tested ZIP is the finished local delivery. Full identities, RunIds, counts,
 visual findings, and owner checks are in
 [the final evidence record](docs/NATIVE-UI-FINISH-0.5.0-FINAL-EVIDENCE.md).

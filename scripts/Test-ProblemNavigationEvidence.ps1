@@ -24,7 +24,7 @@ function New-ProblemEvidence {
             routineId = 'long'; sourceId = 'buff'; position = $position; count = 2
             chipX = 600; chipY = 400; chipVisibleFraction = 1
             catalogueX = 100; catalogueY = 500; routineX = 500; routineY = 800
-            inspectorScroll = 0; previousEnabled = ($position -gt 1); nextEnabled = ($position -lt 2)
+            inspectorScroll = 1; previousEnabled = ($position -gt 1); nextEnabled = ($position -lt 2)
             inspectorText = "Long Problem $position of 2. Not ready: this casting is a Draft; finish its choices and mark it Ready. Previous Problem. Next Problem."
             footerText = "Showing Problem $position of 2"; documentSignature = $intent
             machineReasons = @('unresolved-saved-request')
@@ -57,9 +57,24 @@ $cases = [ordered]@{
         $ack = Read-KbpJson $ackPath
         $ack | Add-Member -NotePropertyName deliveryFailed -NotePropertyValue $false
         Write-KbpJsonAtomic $ackPath $ack }
-    'valid-scroll-top' = { param($r, $d)
-        foreach ($observation in $r.observations) { $observation.inspectorScroll = 1 } }
+    'valid-schema-two-no-overflow-non-top' = { param($r, $d)
+        $r.schemaVersion = 2
+        foreach ($observation in $r.observations) {
+            $observation['inspectorContentFitsViewport'] = $true
+            $observation.inspectorScroll = 0.37
+        } }
+    'valid-schema-two-overflow-top' = { param($r, $d)
+        $r.schemaVersion = 2
+        foreach ($observation in $r.observations) {
+            $observation['inspectorContentFitsViewport'] = $false
+            $observation.inspectorScroll = 1
+        } }
     'valid-preserved-host-scroll-verdict' = { param($r, $d)
+        $r.schemaVersion = 2
+        foreach ($observation in $r.observations) {
+            $observation['inspectorContentFitsViewport'] = $true
+            $observation.inspectorScroll = 0
+        }
         $r.violations = @(0..2 | ForEach-Object {
             'problem-inspector-or-controls-not-actionable:' + $_
         }) }
@@ -83,6 +98,27 @@ $cases = [ordered]@{
     'reason-not-visible' = { param($r, $d) $r.observations[0].inspectorText = 'generic planner' }
     'control-label-not-visible' = { param($r, $d)
         $r.observations[0].inspectorText = $r.observations[0].inspectorText.Replace('Next Problem.', '') }
+    'schema-one-unknown-fit-non-top' = { param($r, $d) $r.observations[0].inspectorScroll = 0.37 }
+    'schema-one-host-violation' = { param($r, $d)
+        $r.violations = @('problem-inspector-or-controls-not-actionable:0') }
+    'schema-two-missing-fit' = { param($r, $d) $r.schemaVersion = 2 }
+    'schema-two-nonboolean-fit' = { param($r, $d)
+        $r.schemaVersion = 2
+        foreach ($observation in $r.observations) {
+            $observation['inspectorContentFitsViewport'] = 'true'
+        } }
+    'schema-two-overflow-non-top' = { param($r, $d)
+        $r.schemaVersion = 2
+        foreach ($observation in $r.observations) {
+            $observation['inspectorContentFitsViewport'] = $false
+        }
+        $r.observations[0].inspectorScroll = 0.37 }
+    'schema-two-overflow-host-violation' = { param($r, $d)
+        $r.schemaVersion = 2
+        foreach ($observation in $r.observations) {
+            $observation['inspectorContentFitsViewport'] = $false
+        }
+        $r.violations = @('problem-inspector-or-controls-not-actionable:0') }
     'inspector-scroll-out-of-range' = { param($r, $d) $r.observations[0].inspectorScroll = -1 }
     'unexpected-host-violation' = { param($r, $d) $r.violations = @('wrong-focused-problem:0') }
     'authored-intent-changed' = { param($r, $d) $r.documentAfter = 'b' * 64 }

@@ -93,8 +93,8 @@ source, exact package/DLL/MVID, 1920x1080 display, and no RunId collision.
 | Selected selection/physical batch | 11/11 runs complete; batch exit 0 | 4073.9982068 s |
 | `Invoke-KbpLivePurityWindow` for the casting set, `-Attempts 1 -LeaseWaitSeconds 120` | PASS, exit 0; 6 WhatIf calls; all five required inventory targets | 8735.8987377 s |
 | Casting and authoring batch | Four initial runs complete; wrapper exit 1 at the preserved problem-navigation reader verdict | 1612.2090815 s |
-| Reader-only problem-navigation correction | Source 43/0, build 1/0, protocol 1/0, reader 28/0; exit 0 | 7.8 s |
-| Immutable problem-navigation re-read | PASS, exit 0 | 0.266 s |
+| Superseded problem-navigation reader relaxation | Source 43/0, build 1/0, protocol 1/0, reader 28/0; exit 0 | 7.8 s |
+| Current conservative problem-navigation reader | Temporary evidence 35/0; schema-1 immutable evidence rejected as expected because it retains host violations and no fit fact | 1.482 s plus 0.658 s reread |
 | Advanced workspace at 1280x720 | 95/0 assertions; exit 0 | 321.272677 s |
 
 The later publisher's first whole-history deployment WhatIf window also
@@ -127,29 +127,37 @@ locks, partial checks, and remote-state checks. Attempt v4 output also remains
 preserved.
 
 The original `kbpnui-dfba-physical-problems-01` runtime result remains
-unaltered at 82/1 and FAIL. Schema 1 required
-`verticalNormalizedPosition == 1` even when all inspector content fit the
-viewport and Unity validly returned 0. The version-2 reader accepts only the
-known three scroll verdicts when every raw observation proves a normalized
-position in `[0,1]`, the right text and enabled controls, physical 1→2→1
-navigation, unchanged authored state, complete screenshots, and clean cleanup.
-Every unrelated host violation remains fatal. The independent verdict is
-`PASS_REINTERPRETED`; the runtime result is never rewritten.
+unaltered at 82/1 and FAIL. Its schema-1 observations record
+`inspectorScroll=0`, but do not record inspector content height, viewport
+height, or a content-fits-viewport fact. An in-range scroll value therefore
+cannot prove the intended top position. The generic reader now keeps the
+schema-1 top-position requirement. Schema 2 can accept another normalized
+position only when that exact observation explicitly records the Boolean
+`inspectorContentFitsViewport=true`; overflow, unknown fit, non-Boolean facts,
+and unrelated host violations still fail.
+
+A separate manual adjudication is bound to the immutable schema-1 JSON and
+`problem-1.png` through `problem-3.png`. The records and pictures establish
+physical 1→2→1 navigation, the expected problem text and controls on screen,
+unchanged authored/resource/Undo state, complete screenshots, Escape cleanup,
+and lease release. The pictures do not establish the inspector's content versus
+viewport geometry, so the scroll-layout subclaim is **UNVERIFIED**. This is a
+partial adjudication, not a rewritten runtime PASS.
 
 Reader source identities are:
 
 - `scripts/RuntimeAutomation.Common.ps1` SHA-256
-  `e42aa06a0d738311092fc15f3367ca2f12bca91b8b749a78904679877bb1a4b7`.
+  `ec24fc46af81bf30515168c18c62892a68fee5aa30e6a21eee8f827c9556e9b1`.
 - `scripts/Test-ProblemNavigationEvidence.ps1` SHA-256
-  `e53ef9f11d452b75e74d3726403847ce540b82e987931eae912828adb0992a7f`.
+  `4ff19925aa481dddd589ac6f009748d45911651a7e3ffd3f4154adf28a84cdee`.
 - Immutable `physical-workspace-problems.json` SHA-256
   `8cfe48af57d5344de93d823313349eed9f4edf3bc2b21ed93fa59b203775da56`.
 
 ## Game observations
 
-All rows loaded the exact product/package/DLL/MVID above. `PASS_REINTERPRETED`
-means the original game result is preserved as FAIL and only the corrected
-reader verdict is PASS.
+All rows loaded the exact product/package/DLL/MVID above. The problem-navigation
+row retains its original FAIL while separately identifying the behavior that
+can be adjudicated from immutable records and reviewed images.
 
 | RunId | Scenario / display | Assertions | Runtime status | Seconds |
 | --- | --- | ---: | --- | ---: |
@@ -168,7 +176,7 @@ reader verdict is PASS.
 | `kbpnui-dfba-classic-cast-01` | Classic cast | 85/0 | PASS | 279.8559451 |
 | `kbpnui-dfba-advanced-finite-cast-01` | Advanced finite-resource cast | 85/0 | PASS | 288.8115206 |
 | `kbpnui-dfba-physical-authoring-01` | physical authoring / 1920x1080 | 83/0 | PASS | 299.6028302 |
-| `kbpnui-dfba-physical-problems-01` | physical problem navigation / 1920x1080 | original 82/1 | PASS_REINTERPRETED | 230.3004035 |
+| `kbpnui-dfba-physical-problems-01` | physical problem navigation / 1920x1080 | original 82/1 | FAIL; navigation/cleanup adjudicated, scroll layout UNVERIFIED | 230.3004035 |
 | `kbpnui-dfba-advanced-workspace-720-01` | Advanced workspace / 1280x720 | 95/0 | PASS | 321.2726770 |
 
 The 17 runs total 5302.2350823 seconds. Every row records Kingmaker exited,
@@ -189,8 +197,10 @@ The settled images show a coherent Kingmaker presentation, correct native
 parchment and serif treatment, readable fitted captions, a quiet sidebar, a
 well-framed HUD row, and the intended spellbook pair. The blocked-navigation
 capture sequence began while the title was still visually settling, so those
-specific PNGs support navigation/control behavior only. Settled captures from
-the same exact DLL support general planner chrome; no candidate-byte change was
+specific PNGs support navigation/control behavior only. They show the expected
+problem text and controls, but do not measure inspector content/viewport fit and
+therefore do not establish its scroll-layout subclaim. Settled captures from the
+same exact DLL support general planner chrome; no candidate-byte change was
 justified by the transient sequence.
 
 Representative reviewed images from `kbpnui-dfba-final-1080-01` are:
@@ -216,7 +226,7 @@ The listed RunIds loaded those exact bytes.
 | UI-02 peer game window and input | **PARTIAL** | Physical normal keyboard/mouse, search-focus suppression, Escape ordering, normal and deliberately paused switching, leases, and pause restoration pass. | `kbpnui-dfba-final-1080-01`, `kbpnui-dfba-final-720-01`, `kbpnui-dfba-spellbook-01`, `kbpnui-dfba-physical-select-01` | Yes, normal/paused transitions and held target states at original resolution. | No known defect; a custom remapped binding was not exercised. |
 | UI-03 native fonts/materials/colours/parchment | **PARTIAL** | Exact native TMP font/material contracts, parchment, colour treatment, and caption fit pass at 1920x1080 and 1280x720. | `kbpnui-dfba-final-1080-01`, `kbpnui-dfba-final-720-01`, `kbpnui-dfba-advanced-workspace-01`, `kbpnui-dfba-advanced-workspace-720-01` | Yes, both resolutions and populated Advanced workspaces at original resolution. | No known defect; UI scale above 100% was not exercised. |
 | UI-04 active and unavailable state clarity | **PASS** | Selected, hover, unavailable, active, skip/recast, changed-caster, and changed-recipient states are clear. | `kbpnui-dfba-cast-select-01`, `kbpnui-dfba-classic-select-01`, `kbpnui-dfba-advanced-workspace-01` | Yes, held state images at original resolution. | None. |
-| UI-05 quiet, useful sidebar | **PASS** | Concise ordering, groups, enhancement, alternate provider, resources, no-selection, unavailable, and actionable Previous/Next problem navigation pass. | `kbpnui-dfba-advanced-workspace-01`, `kbpnui-dfba-advanced-workspace-720-01`, `kbpnui-dfba-advanced-group-select-01`, `kbpnui-dfba-advanced-enhance-select-01`, `kbpnui-dfba-advanced-finite-select-01`, `kbpnui-dfba-physical-problems-01` | Yes. Problem-navigation images support controls/navigation only because their title was settling; settled exact-DLL images establish chrome. | None. |
+| UI-05 quiet, useful sidebar | **PASS** | Concise ordering, groups, enhancement, alternate provider, resources, no-selection, unavailable, and physical Previous/Next problem navigation pass. | `kbpnui-dfba-advanced-workspace-01`, `kbpnui-dfba-advanced-workspace-720-01`, `kbpnui-dfba-advanced-group-select-01`, `kbpnui-dfba-advanced-enhance-select-01`, `kbpnui-dfba-advanced-finite-select-01`, `kbpnui-dfba-physical-problems-01` | Yes. The problem images establish visible text/controls and traversal; settled exact-DLL images establish chrome. | No UI-05 defect. The auxiliary inspector scroll-layout subclaim remains unverified and is not used as the basis for this PASS. |
 | UI-06 catalogue usability | **PARTIAL** | All/Spells/Abilities/Other membership, search, selection, caption fit, and populated Advanced content pass. | `kbpnui-dfba-final-1080-01`, `kbpnui-dfba-final-720-01`, `kbpnui-dfba-physical-select-01`, `kbpnui-dfba-advanced-workspace-01`, `kbpnui-dfba-advanced-workspace-720-01` | Yes, filters/search and both populated workspace sizes at original resolution. | No known defect; a genuinely long campaign catalogue was unavailable for first/last and row-hover review. |
 | UI-07 planning footer and status | **PASS** | Planning, refusal, save failure/retry, Undo restoration, and concise state reporting pass. | `kbpnui-dfba-final-1080-01`, `kbpnui-dfba-final-720-01`, `kbpnui-dfba-physical-authoring-01`, `kbpnui-dfba-physical-problems-01` | Yes, including save/status and authoring states. | None. |
 | UI-08 normal game log | **PASS** | Refusals and run results appear in the normal game log with one concise line per run. | `kbpnui-dfba-cast-01`, `kbpnui-dfba-classic-cast-01`, `kbpnui-dfba-advanced-finite-cast-01` | Yes, game-log evidence was inspected; structured records establish exact line counts. | None. |
@@ -253,3 +263,12 @@ exists. `main`, `origin/main`, the feature branch, and its remote were all at
 `dfbaa5fbd0aba901b2e03c950dd7735f28ed226c` when the correction was received.
 The feature worktree alone contains this final reader/evidence record for a
 coherent guarded feature-branch commit; `main` remains unchanged.
+
+## Human-review prerelease decision
+
+The owner selected an artifact-only `v0.5.0-rc.1` prerelease of the unchanged
+tested ZIP for human review. The internal mod version remains 0.5.0. This scoped
+decision does not convert the interrupted stable publisher into a PASS, claim
+human acceptance, or relax the normal stable-release requirements. The annotated
+review tag must point to product source `dfbaa5f`, while its annotation and
+release notes identify the later integrated reader/evidence commit separately.

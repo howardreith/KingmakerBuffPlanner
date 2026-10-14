@@ -1003,7 +1003,8 @@ function Assert-KbpProblemNavigationOutcome {
     foreach ($key in $required) {
         if ($null -eq $record.PSObject.Properties[$key]) { throw "Physical problem evidence is missing $key." }
     }
-    if ([int]$record.schemaVersion -ne 1 -or [string]$record.runId -cne [string]$Request.runId -or
+    $schemaVersion = [int]$record.schemaVersion
+    if ($schemaVersion -notin @(1, 2) -or [string]$record.runId -cne [string]$Request.runId -or
         [string]$record.sourceCommit -cne [string]$Request.expectedCommit -or
         [string]$record.packageSha256 -cne [string]$Request.expectedPackageSha256 -or
         [string]$record.dllSha256 -cne [string]$Request.expectedDllSha256 -or
@@ -1011,13 +1012,21 @@ function Assert-KbpProblemNavigationOutcome {
         @($record.failures).Count -ne 0) {
         throw 'Physical problem evidence does not match this candidate-bound request or has failures.'
     }
-    # Schema 1's compiled judge assumed verticalNormalizedPosition=1 even when
-    # the inspector content fits its viewport. Unity may report 0 in that case.
-    # Re-evaluate only that preserved verdict from the raw observations below;
-    # every other host violation remains fatal.
-    $allowedHostViolations = @(0..2 | ForEach-Object {
-        'problem-inspector-or-controls-not-actionable:' + $_
-    })
+    $observations = @($record.observations)
+    # Schema 1 did not record content/viewport geometry or a fit verdict. Keep
+    # its original top-position requirement. Schema 2 may relax that requirement
+    # only for the exact observations that explicitly record a Boolean no-overflow
+    # fact; the reader still checks their controls and visible text below.
+    $allowedHostViolations = @()
+    if ($schemaVersion -eq 2) {
+        $allowedHostViolations = @(0..2 | Where-Object {
+            $index = $_
+            $observations.Count -gt $index -and
+                $null -ne $observations[$index].PSObject.Properties['inspectorContentFitsViewport'] -and
+                $observations[$index].inspectorContentFitsViewport -is [bool] -and
+                [bool]$observations[$index].inspectorContentFitsViewport
+        } | ForEach-Object { 'problem-inspector-or-controls-not-actionable:' + $_ })
+    }
     $unexpectedHostViolations = @($record.violations | Where-Object {
         $allowedHostViolations -cnotcontains [string]$_
     })
@@ -1076,20 +1085,32 @@ function Assert-KbpProblemNavigationOutcome {
         [bool]$record.undoBefore -ne [bool]$record.undoAfter -or $null -ne $record.acceptedDigestAfter) {
         throw 'Blocked navigation changed plan, persistence, Undo, authorization or native state.'
     }
-    $observations = @($record.observations)
     $ids = @('wp2a-blocked-late', 'wp2a-blocked-last', 'wp2a-blocked-late')
     if ($observations.Count -ne 3 -or [string]$record.firstCastingId -cne $ids[0] -or
         [string]$record.secondCastingId -cne $ids[1]) { throw 'Problem order evidence is incomplete.' }
     for ($index = 0; $index -lt 3; $index++) {
         $observation = $observations[$index]
         $position = if ($index -eq 1) { 2 } else { 1 }
+        $contentFitsViewport = $false
+        if ($schemaVersion -eq 2) {
+            $fitProperty = $observation.PSObject.Properties['inspectorContentFitsViewport']
+            if ($null -eq $fitProperty -or $fitProperty.Value -isnot [bool]) {
+                throw "Problem $position has no explicit Boolean inspector fit fact."
+            }
+            $contentFitsViewport = [bool]$fitProperty.Value
+        }
+        $inspectorScroll = [double]$observation.inspectorScroll
+        $scrollValid = -not [double]::IsNaN($inspectorScroll) -and
+            -not [double]::IsInfinity($inspectorScroll) -and
+            $(if ($contentFitsViewport) {
+                $inspectorScroll -ge -0.001 -and $inspectorScroll -le 1.001
+            } else { [Math]::Abs($inspectorScroll - 1.0) -le 0.001 })
         if ([string]$observation.castingId -cne $ids[$index] -or
             [string]$observation.routineId -cne 'long' -or [string]$observation.sourceId -cne [string]$record.sourceId -or
             [int]$observation.position -ne $position -or [int]$observation.count -ne 2 -or
             [string]$observation.documentSignature -cne [string]$record.documentBefore -or
             [double]$observation.chipVisibleFraction -lt 0.9 -or
-            [double]$observation.inspectorScroll -lt -0.001 -or
-            [double]$observation.inspectorScroll -gt 1.001 -or
+            -not $scrollValid -or
             [bool]$observation.previousEnabled -ne ($position -gt 1) -or
             [bool]$observation.nextEnabled -ne ($position -lt 2) -or
             [string]$observation.inspectorText -cnotlike "*Problem $position of 2*" -or
