@@ -1,3 +1,12 @@
+> **Current 0.5.1-rc3 qualification:** exact product `debd406`, ZIP
+> `0d30c7fa430e618be1b7d871c68bdc894b79206018771b17b90ca9b8d3037e62`,
+> is focused-tested/package-validated and **NOT_RUN**. The policy driver and
+> reader are independently actionable and now pass offline; the retained hash
+> failure is classified and corrected with harness 38/0. Actual two-size UI,
+> frame latency and strict/permissive dispatch remain one fully specified live
+> batch, costed at about 7 h 30 m including two purity windows. See the
+> [rc3 receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+>
 > **Current 0.5.1-rc2 qualification:** focused source/build/behavior and local
 > package validation pass on exact product `e06d803`; it remains **NOT_RUN**.
 > Native schema 6 requires visible useful Resources cells through first open,

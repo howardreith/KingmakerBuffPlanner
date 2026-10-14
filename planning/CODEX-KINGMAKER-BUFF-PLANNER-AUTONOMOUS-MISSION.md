@@ -1,3 +1,16 @@
+## Human-feedback rc3 preparation - October 14, 2026
+
+Packaged product source `debd40674ed2a6ed9f6e3423671f6ec2180bead0`,
+version 0.5.1-rc3, corrects the open-boundary/frame-end measurement and extends
+the established guarded qualification with strict/remembered-Cast-available
+execution evidence. Focused validation is source 43/0, build 1/0, behavior
+20/0, policy reader 7/0, runtime harness 38/0, launcher arguments 26/0 and 8/0,
+and package 4/0 plus creation 1/0. The ZIP is
+`0d30c7fa430e618be1b7d871c68bdc894b79206018771b17b90ca9b8d3037e62`.
+It is **NOT_RUN** and not installed; rc1/rc2 remain preserved. Exact identities,
+failure classification and the fully costed remaining batch are in the
+[0.5.1-rc3 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+
 ## Current human-feedback review correction - October 13, 2026
 
 Exact packaged product source `e06d803400893f4cd68d0066ae2421d0085db243`,

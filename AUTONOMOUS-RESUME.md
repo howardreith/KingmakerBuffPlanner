@@ -1,3 +1,13 @@
+> **Current October 14 human-feedback resume:** branch
+> `codex/kingmaker-buff-planner-human-feedback`; packaged product
+> `debd40674ed2a6ed9f6e3423671f6ec2180bead0`; version 0.5.1-rc3; ZIP
+> `0d30c7fa430e618be1b7d871c68bdc894b79206018771b17b90ca9b8d3037e62`;
+> DLL `6875da1340cae51b6fb12b5c2bccbc94f102a1ab096251ec35346fcedeac7f7a`;
+> MVID `407d6a8b-139f-4800-8ee8-b259578ccdfa`. Bounded source, focused checks,
+> harness correction and local package are complete; candidate is **NOT_RUN**.
+> Preserve rc1/rc2. Resume only with the single fully specified 7 h 30 m live
+> batch in the [rc3 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+>
 > **Current October 13 human-feedback correction resume:** branch
 > `codex/kingmaker-buff-planner-human-feedback`; exact packaged product
 > `e06d803400893f4cd68d0066ae2421d0085db243`; version 0.5.1-rc2; ZIP

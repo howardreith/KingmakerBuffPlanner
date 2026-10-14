@@ -1,5 +1,14 @@
 # Native Buff Coverage Matrix
 
+## 0.5.1-rc3 preparation
+
+Discovery/classification and exact-variant/group coverage remain unchanged.
+The new policy qualification selects the existing structurally discovered
+personal transmutation, Share/Powerful Change enhancement contracts and plain
+same-caster witness; it adds no spell-name/GUID discovery exception. Exact
+source `debd406` is focused-tested and **NOT_RUN**; see the
+[rc3 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+
 ## 0.5.1-rc2 review correction
 
 Discovery/classification remains unchanged. Recipient membership and hints now

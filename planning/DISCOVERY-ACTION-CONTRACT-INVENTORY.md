@@ -1,5 +1,14 @@
 # Discovery Action Contract Inventory
 
+## 0.5.1-rc3 preparation
+
+Discovery/action interpretation is unchanged. Opening now times the existing
+`_session.Refresh()` discovery separately from session/persistence binding and
+view construction. Display snapshots still cannot authorize execution; every
+qualification Apply obtains fresh production inputs. Exact source `debd406` is
+focused-tested/package-validated and **NOT_RUN**; see the
+[rc3 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+
 ## 0.5.1-rc2 review correction
 
 Discovery/action interpretation is unchanged. The correction only aligns UI

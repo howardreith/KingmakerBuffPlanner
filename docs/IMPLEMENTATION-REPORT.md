@@ -1,3 +1,11 @@
+> **Current 0.5.1-rc3 preparation:** exact packaged source `debd406` corrects
+> open-boundary/frame-end attribution, adds targeted Resources timing, and
+> extends the guarded shared/Powerful Change qualification through strict then
+> remembered Cast-available behavior. Focused results are source 43/0, build
+> 1/0, behavior 20/0, reader 7/0, harness 38/0, launcher 26/0 + 8/0 and package
+> 4/0. ZIP `0d30c7fa430e618be1b7d871c68bdc894b79206018771b17b90ca9b8d3037e62`
+> is **NOT_RUN**. See the [rc3 receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+>
 > **Current 0.5.1-rc2 review correction:** exact packaged source `e06d803`
 > fixes the Resources native layer, separates inspection focus from edit intent,
 > closes the same-caster exact-source draft leak, and makes recipient hints use

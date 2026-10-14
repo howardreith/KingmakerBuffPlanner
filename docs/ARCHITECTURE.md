@@ -1,3 +1,12 @@
+> **0.5.1-rc3 preparation architecture:** opening latency starts at the common
+> request boundary and retains discovery, session/persistence binding, input
+> lease, construction, reconciliation, display snapshot, calculation, rebuild,
+> theme and layout stages. End-of-frame is correlated with expected view state,
+> never labelled pixel correctness. The policy qualification extends the
+> existing compiler/gate/boundary/executor and shares the HUD policy resolver;
+> it adds no parallel executor. Exact product `debd406` is packaged and
+> **NOT_RUN**. See the [rc3 receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+>
 > **0.5.1-rc2 review-correction architecture:** dynamically rebuilt Resources
 > rows/cells receive the native UI layer at creation. Recipient presentation
 > and execution consume one session-level exact-variant decision; inspection

@@ -1,5 +1,53 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-14 human-feedback rc3 preparation checkpoint
+
+Continued `codex/kingmaker-buff-planner-human-feedback` from reviewed HEAD
+`90d658d2506184bc09d65989d6145ae066a6b337`, preserving correction source
+`e06d803400893f4cd68d0066ae2421d0085db243` and the rc1/rc2 packages. Product
+commit `debd40674ed2a6ed9f6e3423671f6ec2180bead0` captures open requests before
+discovery/session binding/view construction/reconciliation, records those and
+display/calculation/rebuild/theme/layout stages separately, and calls the
+correlated asynchronous measure `handlerToFrameEndMs`. Expected state and
+supersession/cancellation are explicit. Resources open/reopen/scope switches
+use the incremental path and require visible native-layer cells for correlation.
+
+The same product commit adds `policy-shared-powerful` to the established
+guarded casting qualification. It proves strict zero-dispatch/no-spend refusal,
+persists and reloads only Cast available, verifies authored intent, then uses
+the shared planner/HUD policy resolver and existing fresh session compiler,
+gate, boundary and executor for the ordered affordable subset. Omission reasons,
+per-casting native/enhancement costs, shared-pool deltas, no-op and combat
+refusal are judged. No parallel executor or blanket continuation was added.
+
+Final focused command selected
+`execution-policy,shared-recipes,policy-route,human-feedback` plus the policy
+reader: source 43/0, build 1/0, C# 20/0, reader 7/0. Direct launcher arguments
+passed 26/0 and real `-File` argument checks 8/0. The retained rc2 hash failure
+was reproduced once: inherited WhatIf simulated Get-FileHash's ProviderPath
+access, returning no hash object. This valid invocation exposed a pre-existing
+helper contract defect. Hashing an explicitly read-only stream through the
+built-in SHA256 command preserved real hashing and WhatIf mutation guards; the
+corrected harness passed 38/0.
+
+`Build-Local.ps1` on clean `debd406` passed source 43/0, build 1/0, package
+validation 4/0 and creation 1/0. Version 0.5.1-rc3 ZIP SHA-256 is
+`0d30c7fa430e618be1b7d871c68bdc894b79206018771b17b90ca9b8d3037e62`;
+DLL SHA-256 `6875da1340cae51b6fb12b5c2bccbc94f102a1ab096251ec35346fcedeac7f7a`;
+MVID `407d6a8b-139f-4800-8ee8-b259578ccdfa`. It is **NOT_RUN**, not installed
+and not released. The latest calculations-only 67-casting/77-entry sample was
+6.508 ms cold, 0.806/1.454 ms warm median/slowest, 0.673/0.921 ms buff switch,
+and 34.217/37.520 ms autosave-bound recipient toggle; no rendered-latency claim.
+
+The one remaining live batch needs two five-target purity windows (the cast
+allowance exists only after selection), owner 1920x1200 and compact 1280x720 UI
+runs, an Advanced policy selection and allowance-bound cast, four restoration/
+save receipts and visual/log review: about 7 h 30 m. The current guard accepts
+existing Advanced inspection `advanced-inspect-20260924-01` for the unchanged
+pair/profile; it must be rechecked immediately before use. Exact commands,
+fallback and limitations are in
+[the rc3 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+
 ## 2026-10-13 human-feedback review-correction checkpoint
 
 Continued `codex/kingmaker-buff-planner-human-feedback` from reviewed HEAD

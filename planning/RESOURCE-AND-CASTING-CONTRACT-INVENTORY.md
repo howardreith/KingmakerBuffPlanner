@@ -1,5 +1,16 @@
 # Resource and Casting Contract Inventory
 
+## 0.5.1-rc3 preparation
+
+Resources retain the rc2 native row/cell layers and gain incremental open/
+scope timing correlated with visible native-layer cells. The established
+qualification route now authors one partially unavailable Share + Powerful
+Change plan, proves strict no-spend refusal, persists Cast available, recompiles
+fresh, executes only the allowance-bound affordable IDs in authored order, and
+records omissions plus complete native/shared-pool costs. Exact source
+`debd406` passes focused driver/reader checks but is **NOT_RUN**; see the
+[rc3 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+
 ## 0.5.1-rc2 review correction
 
 Every rebuilt Resources `Pool.*` row/cell is assigned to the native UI layer;

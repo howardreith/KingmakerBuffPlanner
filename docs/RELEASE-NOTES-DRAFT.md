@@ -1,3 +1,11 @@
+> **Local 0.5.1-rc3 preparation candidate:** opening and Resources latency are
+> now attributed from the real request boundary through a correlated frame-end
+> state check, and the existing guarded qualification can prove strict versus
+> remembered Cast-available execution. The distinct ZIP is focused-tested and
+> package-validated but **NOT_RUN**. See the
+> [rc3 receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md). This is not a release;
+> rc1 and rc2 remain preserved.
+>
 > **Local 0.5.1-rc2 correction candidate:** Resources accounting rows now use
 > the native UI layer; continuous assignment keeps inspection separate from
 > explicit one-shot editing; exact-source draft choices reset correctly; and

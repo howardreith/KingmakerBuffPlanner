@@ -1,3 +1,12 @@
+> **Current 0.5.1-rc3 human-feedback acceptance:** exact candidate `debd406`
+> is **NOT_RUN**. At owner 1920x1200 and compact 1280x720, inspect actual
+> Resources cells/scope/reopen/clipping/input, continuous assignment/hints/
+> explicit edits/draft resets, policy and Run labels, and correlated cold-open,
+> buff-switch and Resources frame timings. The separate Advanced policy run
+> must prove strict no-spend refusal and the ordered affordable subset from raw
+> execution evidence. Exact commands and cost are in the
+> [rc3 receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+>
 > **Current 0.5.1-rc2 human-feedback acceptance:** exact local candidate
 > `e06d803` is **NOT_RUN**. At owner 1920x1200 and compact 1280x720, require
 > visible useful Resources cells on first open, selected/all/selected scope

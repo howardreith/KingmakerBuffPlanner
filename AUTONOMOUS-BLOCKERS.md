@@ -1,3 +1,13 @@
+> **Current October 14 human-feedback blocker:** no independently actionable
+> source, observer, driver, reader, focused-check or local-package work remains.
+> Exact 0.5.1-rc3 product `debd40674ed2a6ed9f6e3423671f6ec2180bead0`
+> is validated but **NOT_RUN**. The remaining UI + policy batch needs two
+> five-target purity windows because the cast allowance exists only after its
+> selection, four guarded game runs, restoration review and two-size visual/
+> timing review: about 7 h 30 m. The matching existing Advanced inspection may
+> serve if its guard still passes. Exact commands and fallback are in the
+> [rc3 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+>
 > **Current October 13 human-feedback correction blocker:** exact 0.5.1-rc2
 > product `e06d803400893f4cd68d0066ae2421d0085db243` is validated but
 > **NOT_RUN**. The selected five-target purity prerequisite is forecast at
