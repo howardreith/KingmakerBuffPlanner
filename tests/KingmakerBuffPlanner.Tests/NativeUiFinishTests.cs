@@ -836,8 +836,9 @@ namespace KingmakerBuffPlanner.Tests
             record.SaveRecoveryWorked = true;
             record.SaveFailureUndoRestored = true;
             record.PlanningSteps.AddRange(new[] { "focus:ok", "arm-retarget:ok", "retarget:ok",
-                "undo-retarget:ok", "cast-later:ok", "undo-order:ok", "done:ok", "choose-source:ok",
+                "undo-retarget:ok", "done:ok", "choose-source:ok",
                 "add-inspects-only:ok", "choose-next-source:ok", "successive-add:ok", "focus-added:ok",
+                "focus-reorder:ok", "cast-later:ok", "undo-order:ok",
                 "arm-change-caster:ok", "change-caster:ok", "undo-caster:ok", "remove-explicit:ok",
                 "undo-remove:ok", "remove-normal:ok", "remove-second-normal:ok" });
             record.PlanningRestored = true;
@@ -893,6 +894,11 @@ namespace KingmakerBuffPlanner.Tests
             schema6.ResourcesOpaqueParchment = false;
             if (schema6.Violations().Count != 0)
                 throw new InvalidOperationException("A schema-6 verdict was relabelled by opaque-dialog requirements.");
+            NativeUiRecord schema7 = QualifiedNativeUiRecord();
+            schema7.SchemaVersion = 7;
+            schema7.PlanningSteps.Remove("focus-reorder:ok");
+            if (schema7.Violations().Count != 0)
+                throw new InvalidOperationException("A schema-7 verdict was relabelled by reorder-precondition requirements.");
             legacy.SchemaVersion = 2;
             foreach (string missing in new[] { "source-tabs:missing-captions", "casting-popup:missing",
                     "catalogue-filters:missing-categories" })
@@ -937,7 +943,7 @@ namespace KingmakerBuffPlanner.Tests
                 { "spellbook-pair-height-or-baseline:Linzi", r => r.Spellbooks[0].PlannerRect = new[] { 1600f, 100f, 150f, 30f } },
                 { "spellbook-top-right-entry-present", r => r.SpellbookTopRightEntryAbsent = false },
                 { "popup-presenter:planner-scroll", r => r.PlannerPopupPresenter = "planner-scroll" },
-                { "schema:8", r => r.SchemaVersion = 8 },
+                { "schema:9", r => r.SchemaVersion = 9 },
                 { "pause:inventory:not-paused-before", r => r.Switches[4].PausedBefore = false },
                 { "pause:not-restored", r => r.OwnedPauseRestored = false },
                 { "unavailable-metamagic:no-view", r => r.Spellbooks.RemoveAt(1) },
@@ -1010,6 +1016,7 @@ namespace KingmakerBuffPlanner.Tests
                 { "run-caption:RUN LONG", r => r.RunCaption = "RUN LONG" },
                 { "planning-contract-missing:arm-retarget:ok", r => r.PlanningSteps.Remove("arm-retarget:ok") },
                 { "planning-contract-missing:successive-add:ok", r => r.PlanningSteps.Remove("successive-add:ok") },
+                { "planning-contract-missing:focus-reorder:ok", r => r.PlanningSteps.Remove("focus-reorder:ok") },
                 { "planning-not-restored", r => r.PlanningRestored = false },
                 { "escape-order", r => r.EscapeClosedFocusFirst = false },
                 { "game-log-planner-lines:2", r => r.GameLogPlannerLines.Add("Buff Planner: again") }

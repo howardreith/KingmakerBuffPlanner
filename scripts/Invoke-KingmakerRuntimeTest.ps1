@@ -80,9 +80,9 @@ param(
     # exact size through Unity's launch arguments. A size larger than this
     # session's display is refused before anything changes; the game's
     # registry key (Unity PlayerPrefs) is restored byte-exact after exit.
-    # 0.4.0 (WP7): 1600x900 and 1280x720 give a meaningfully different
-    # resolution on a 1920x1080 session, where 2560x1440 is refused.
-    [ValidateSet('owner', 'windowed-1920x1080', 'windowed-2560x1440', 'windowed-1600x900', 'windowed-1280x720')][string]$DisplayMode = 'owner',
+    # 0.5.1: the owner's 1920x1200 layout is an explicit windowed request,
+    # not an inference from the mutable owner game setting.
+    [ValidateSet('owner', 'windowed-1920x1200', 'windowed-1920x1080', 'windowed-2560x1440', 'windowed-1600x900', 'windowed-1280x720')][string]$DisplayMode = 'owner',
     # Native UI finish (live-workspace-native-ui only, required there): 'facts'
     # records the native contracts and the frames; 'qualify' also judges the
     # planner's native integration. Neither takes a casting allowance and
@@ -248,9 +248,11 @@ else {
     }
 }
 $displaySize = $null
+$admissionDisplaySnapshot = $null
 if ($DisplayMode -cne 'owner') {
     $displaySize = $DisplayMode.Substring('windowed-'.Length)
-    $sessionDisplay = Get-KbpSessionDisplaySize
+    $admissionDisplaySnapshot = Get-KbpSessionDisplaySnapshot
+    $sessionDisplay = [string]$admissionDisplaySnapshot.primarySize
     if (-not (Test-KbpDisplayModeSupported -Size $displaySize -DisplaySize $sessionDisplay)) {
         throw "DisplayMode $DisplayMode is unsupported on this session's display ($sessionDisplay); nothing was changed."
     }
@@ -435,6 +437,10 @@ $completionFailure = $null
 # key is recorded once this run holds the lock (below) and kept beside its
 # transaction.
 $displayRegistryPath = $null
+$displayPhysicalPath = $null
+$displayPhysicalBefore = $null
+$screenEvidence = $null
+$screenEvidenceFailure = $null
 $displayFailure = $null
 $restoreFailure = $null
 $runFailure = $null
@@ -460,6 +466,17 @@ try {
         }
     }
     if ($null -ne $displaySize) {
+        # Re-read only after the runtime lock is held. This is the physical
+        # state the run owns for verification; a pre-lock user change is not
+        # misattributed to the run.
+        $displayPhysicalBefore = Get-KbpSessionDisplaySnapshot
+        if (-not (Test-KbpDisplayModeSupported -Size $displaySize `
+                -DisplaySize ([string]$displayPhysicalBefore.primarySize))) {
+            throw "DisplayMode $DisplayMode no longer fits the session display $($displayPhysicalBefore.primarySize); nothing was launched."
+        }
+        $displayPhysicalPath = Join-Path $script:KbpRuntimeStateRoot "transactions\$runId\display-physical.json"
+        Save-KbpPhysicalDisplaySnapshotFile -Path $displayPhysicalPath `
+            -Snapshot $displayPhysicalBefore -RunId $runId -ExpectedWindowSize $displaySize
         $displayRegistryPath = Join-Path $script:KbpRuntimeStateRoot "transactions\$runId\display-registry.json"
         Save-KbpRegistrySnapshotFile -Path $displayRegistryPath -KeyPath $script:KbpGameRegistryKey `
             -Snapshot (Get-KbpRegistryValueSnapshot -KeyPath $script:KbpGameRegistryKey) -RunId $runId
@@ -1047,7 +1064,18 @@ public static class KbpPhysicalInput {
     $orchestration.stage = 'result-validated'
     $orchestration.completedAtUtc = [DateTime]::UtcNow.ToString('o')
     Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
-    if ($result.status -cne 'PASS') { throw "Runtime scenario returned $($result.status)." }
+    # Requested dimensions are a separate observation from the scenario's
+    # behavioural verdict. Preserve a valid size/PNG correlation even when
+    # another native-UI assertion fails, and preserve both errors when size
+    # evidence is bad too.
+    try { $screenEvidence = Assert-KbpExpectedScreenEvidence -Request $request -Result $result }
+    catch { $screenEvidenceFailure = $_.Exception.Message }
+    if ($result.status -cne 'PASS') {
+        $failure = "Runtime scenario returned $($result.status)."
+        if ($null -ne $screenEvidenceFailure) { $failure += ' Screen evidence: ' + $screenEvidenceFailure }
+        throw $failure
+    }
+    if ($null -ne $screenEvidenceFailure) { throw $screenEvidenceFailure }
     # Review C6: the launcher reads the scenario's own evidence itself.
     Assert-KbpScenarioOutcome -Request $request
     if ($Scenario -ceq 'live-ui-bootstrap') {
@@ -1090,20 +1118,36 @@ finally {
             try { [void]$process.WaitForExit(30000) }
             catch { Write-Warning "Unable to wait for launched Kingmaker exit: $($_.Exception.Message)" }
         }
-        # The display-mode registry comes back first, while this run still
-        # holds its lock (the Mods restoration below releases it); a blocked
-        # restoration keeps its snapshot for Restore-Local.ps1 -RunId.
-        if ($null -ne $displayRegistryPath -and (Test-Path -LiteralPath $displayRegistryPath)) {
+        # The game settings and physical-display verification complete while
+        # this run still holds its lock (the Mods restoration below releases
+        # it). A blocked verification keeps both durable snapshots for
+        # Restore-Local.ps1 -RunId and prevents a later runtime operation.
+        if (($null -ne $displayRegistryPath -and (Test-Path -LiteralPath $displayRegistryPath)) -or
+            ($null -ne $displayPhysicalPath -and (Test-Path -LiteralPath $displayPhysicalPath))) {
             if (@(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0) {
                 try {
-                    $displayDifferences = @(Restore-KbpRegistrySnapshotFile -Path $displayRegistryPath)
+                    $displayDifferences = if ($null -ne $displayRegistryPath -and
+                        (Test-Path -LiteralPath $displayRegistryPath)) {
+                        @(Restore-KbpRegistrySnapshotFile -Path $displayRegistryPath)
+                    } else { @() }
+                    $physicalDisplay = if ($null -ne $displayPhysicalPath -and
+                        (Test-Path -LiteralPath $displayPhysicalPath)) {
+                        Confirm-KbpPhysicalDisplaySnapshotFile -Path $displayPhysicalPath `
+                            -CurrentSnapshot (Get-KbpSessionDisplaySnapshot)
+                    } else { $null }
                     Write-KbpJsonAtomic (Join-Path $evidence 'display-mode.json') ([ordered]@{
                         schemaVersion = 1; runId = $runId; displayMode = $DisplayMode; size = $displaySize
-                        restoredValues = @($displayDifferences); restorationVerified = $true
+                        modeKind = 'windowed'; restoredValues = @($displayDifferences)
+                        gameSettingsRestorationVerified = $true
+                        physicalDisplayBefore = if ($null -eq $physicalDisplay) { $null } else { $physicalDisplay.original }
+                        physicalDisplayAfter = if ($null -eq $physicalDisplay) { $null } else { $physicalDisplay.observedAfter }
+                        physicalDisplayRestorationVerified = $null -ne $physicalDisplay -and [bool]$physicalDisplay.restored
+                        renderedContent = $screenEvidence
+                        restorationVerified = $true
                     })
                 }
-                catch { $displayFailure = 'Game registry restoration failed after the display-mode run (Restore-Local.ps1 -RunId ' + $runId + ' retries it): ' + $_.Exception.Message }
-            } else { $displayFailure = 'Kingmaker remains running; the game registry restoration is blocked (Restore-Local.ps1 -RunId ' + $runId + ' finishes it).' }
+                catch { $displayFailure = 'Display/game-settings restoration verification failed after the windowed run (Restore-Local.ps1 -RunId ' + $runId + ' retries or preserves it for review): ' + $_.Exception.Message }
+            } else { $displayFailure = 'Kingmaker remains running; display/game-settings restoration is blocked (Restore-Local.ps1 -RunId ' + $runId + ' finishes it).' }
         }
     }
     # Final review C2: the protected saves are compared before the Mods

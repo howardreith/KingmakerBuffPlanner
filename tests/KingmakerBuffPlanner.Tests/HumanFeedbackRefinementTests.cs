@@ -11,6 +11,7 @@ using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.GameAdapters;
 using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.Planning;
+using KingmakerBuffPlanner.RuntimeTesting;
 using KingmakerBuffPlanner.UI;
 using Newtonsoft.Json.Linq;
 
@@ -38,6 +39,8 @@ namespace KingmakerBuffPlanner.Tests
                 () => TestCalculationCacheInvalidation(root));
             Run("human-feedback-variant-membership-is-exact",
                 () => TestVariantMembership(root));
+            Run("human-feedback-native-ui-complete-planning-sequence",
+                () => TestNativeUiCompletePlanningSequence(root));
         }
 
         private static readonly AbilityKey SeamantleAbility = new AbilityKey(
@@ -121,6 +124,171 @@ namespace KingmakerBuffPlanner.Tests
                 name, 9, pool, 1, null, null, 18, 1800,
                 name + " description", "30 minutes", name, 0,
                 caster == "felix" ? "Wizard" : "Sorcerer");
+        }
+
+        private static CastingWorkspaceInputs NativeUiPlanningInputs(int recipientCount)
+        {
+            CastingWorkspaceInputs complete = HumanFeedbackInputs();
+            HashSet<string> unitIds = new HashSet<string>(complete.Snapshot.Units
+                .Take(recipientCount).Select(value => value.UnitId), StringComparer.Ordinal);
+            var providers = complete.Snapshot.Providers.Where(value =>
+                value.Key.Ability.Canonical == SeamantleAbility.Canonical &&
+                unitIds.Contains(value.Key.CasterUnitId)).ToList();
+            var pools = complete.Snapshot.ResourcePools.Where(value => providers.Any(provider =>
+                provider.ResourcePoolKey == value.PoolKey)).ToList();
+            var snapshot = new PartyProviderSnapshot(complete.Snapshot.Units.Where(value =>
+                unitIds.Contains(value.UnitId)), providers, pools);
+            var options = complete.ProviderOptions.Where(value => providers.Contains(value.Provider))
+                .Select(value => new ProviderPlanningOption(value.Provider, unitIds,
+                    new[] { value.Provider.Key.CasterUnitId }, 18, 1800)).ToList();
+            return new CastingWorkspaceInputs(snapshot, options, complete.EffectsBySource,
+                new CastEnhancementSnapshot[0]);
+        }
+
+        private static void TestNativeUiCompletePlanningSequence(string root)
+        {
+            RunNativeUiPlanningSequence(root, 3, 1);
+            RunNativeUiPlanningSequence(root, 4, 2);
+        }
+
+        // Mirrors the observer's complete Case C through the real session,
+        // authoring service, compiler and persistence boundary. The two
+        // fixture sizes cover both supported seed shapes: Automation's
+        // three legal recipients/one seed and the larger two-seed cap.
+        private static void RunNativeUiPlanningSequence(string root,
+            int recipientCount, int expectedSeedCount)
+        {
+            string dir = Path.Combine(root, "human-feedback-native-sequence-" + recipientCount);
+            Directory.CreateDirectory(dir);
+            CastingWorkspaceInputs inputs = NativeUiPlanningInputs(recipientCount);
+            var session = new CastingWorkspaceSession(dir, "feedback-native-" + recipientCount);
+            session.SelectGraphBuff("seamantle", inputs);
+            Expect(session.ClickGraphCaster("felix", inputs).Outcome ==
+                CastingGraphClickOutcome.DraftConfigured, "seed caster was not configured");
+            List<CastingGraphTargetNode> seedTargets = session.BuildGraph(inputs).Targets.Where(value =>
+                value.Legality == CastingGraphTargetLegality.Legal && value.CastingIds.Count == 0).ToList();
+            int seedCount = NativeUiRecord.PlanningSeedCastingCount(seedTargets.Count);
+            Expect(seedCount == expectedSeedCount, "unexpected seed count for " + recipientCount +
+                " recipients: " + seedCount);
+            foreach (CastingGraphTargetNode target in seedTargets.Take(seedCount))
+            {
+                Expect(session.ClickGraphRecipient(target.UnitId, inputs).Outcome ==
+                    CastingGraphClickOutcome.Added, "seed casting was refused");
+                session.ClearGraphFocus();
+            }
+
+            CastingGraphView graph = session.BuildGraph(inputs);
+            Expect(graph.Castings.Count == expectedSeedCount, "seeded plan count changed");
+            CastingGraphCasting first = graph.Castings[0];
+            string firstId = first.CastingId;
+            string originalTarget = first.TargetUnitId;
+            List<CastingGraphTargetNode> free = graph.Targets.Where(value =>
+                    value.CastingIds.Count == 0 && graph.Castings.All(casting =>
+                        casting.TargetUnitId != value.UnitId)).Take(2).ToList();
+            Expect(free.Count == 2, "the planning sequence did not retain two free recipients");
+            int startCount = session.Document.Castings.Count;
+            string startSignature = session.DocumentIntentSignature();
+            HashSet<string> startIds = new HashSet<string>(session.Document.Castings
+                .Select(value => value.CastingId), StringComparer.Ordinal);
+
+            session.FocusGraphCasting(firstId);
+            Expect(session.EditingFocusCastingId == firstId && session.BeginChangeRecipient().Applied,
+                "explicit retarget did not arm on the selected casting");
+            Expect(session.ClickGraphRecipient(free[0].UnitId, inputs).Outcome ==
+                CastingGraphClickOutcome.Retargeted &&
+                session.Document.Castings.Single(value => value.CastingId == firstId)
+                    .DirectTargetUnitId == free[0].UnitId,
+                "explicit retarget changed the wrong casting or was refused");
+            Expect(session.Undo() && session.Document.Castings.Single(value =>
+                    value.CastingId == firstId).DirectTargetUnitId == originalTarget,
+                "Undo did not restore the explicit retarget");
+            session.ClearGraphFocus();
+
+            Expect(session.ClickGraphCaster("leinna", inputs).Outcome ==
+                CastingGraphClickOutcome.DraftConfigured, "next caster was not selected");
+            CastingGraphClickResult firstAdd = session.ClickGraphRecipient(free[0].UnitId, inputs);
+            string added = firstAdd.CastingId;
+            Expect(firstAdd.Outcome == CastingGraphClickOutcome.Added &&
+                session.Document.Castings.Count == startCount + 1 &&
+                session.EditingFocusCastingId == added &&
+                session.GraphEditIntent == CastingGraphEditIntent.None,
+                "the first normal assignment was not an inspection-only independent add");
+            PlannedCasting firstAdded = session.Document.Castings.Single(value =>
+                value.CastingId == added);
+            Expect(firstAdded.CasterUnitId == "leinna" &&
+                firstAdded.DirectTargetUnitId == free[0].UnitId,
+                "the first add did not use the selected next source");
+
+            Expect(session.ClickGraphCaster("felix", inputs).Outcome ==
+                    CastingGraphClickOutcome.DraftConfigured &&
+                session.EditingFocusCastingId == null &&
+                session.GraphEditIntent == CastingGraphEditIntent.None,
+                "selecting the next source armed an edit or retained focus");
+            firstAdded = session.Document.Castings.Single(value => value.CastingId == added);
+            Expect(firstAdded.CasterUnitId == "leinna" &&
+                firstAdded.DirectTargetUnitId == free[0].UnitId,
+                "selecting the next source changed the earlier assignment");
+            CastingGraphClickResult secondAdd = session.ClickGraphRecipient(free[1].UnitId, inputs);
+            string addedSecond = secondAdd.CastingId;
+            Expect(secondAdd.Outcome == CastingGraphClickOutcome.Added &&
+                session.Document.Castings.Count == startCount + 2 &&
+                session.GraphEditIntent == CastingGraphEditIntent.None &&
+                addedSecond != added && !startIds.Contains(addedSecond),
+                "the second normal assignment was not independent");
+            PlannedCasting secondAdded = session.Document.Castings.Single(value =>
+                value.CastingId == addedSecond);
+            Expect(secondAdded.CasterUnitId == "felix" &&
+                secondAdded.DirectTargetUnitId == free[1].UnitId,
+                "the second normal assignment did not use the newly selected source");
+
+            string afterAdds = session.DocumentIntentSignature();
+            session.FocusGraphCasting(firstId);
+            graph = session.BuildGraph(inputs);
+            Expect(NativeUiRecord.MoveLaterPrecondition(graph, firstId) == null,
+                "the explicitly selected seeded casting was not eligible for Cast later");
+            int originalOrder = session.Document.Castings.Single(value =>
+                value.CastingId == firstId).Order;
+            Expect(session.MoveFocusedCastingWithinRoutine(1).Applied &&
+                session.Document.Castings.Single(value => value.CastingId == firstId).Order ==
+                    originalOrder + 1,
+                "the meaningful reorder did not move exactly one place");
+            List<int> orders = session.Document.Castings.Where(value => value.RoutineId == "long")
+                .Select(value => value.Order).OrderBy(value => value).ToList();
+            Expect(orders.SequenceEqual(Enumerable.Range(0, startCount + 2)),
+                "the reorder left non-contiguous authored order");
+            Expect(session.Undo() && session.DocumentIntentSignature() == afterAdds,
+                "Undo did not restore the complete pre-reorder plan");
+
+            session.FocusGraphCasting(added);
+            Expect(session.BeginChangeProvider().Applied,
+                "explicit provider edit did not arm on the selected casting");
+            Expect(session.ClickGraphCaster("felix", inputs).Outcome ==
+                    CastingGraphClickOutcome.ProviderChanged &&
+                session.Document.Castings.Single(value => value.CastingId == added)
+                    .CasterUnitId == "felix" &&
+                session.Document.Castings.Single(value => value.CastingId == addedSecond)
+                    .CasterUnitId == "felix",
+                "the explicit provider edit was refused or changed a sibling");
+            Expect(session.Undo() && session.DocumentIntentSignature() == afterAdds,
+                "Undo did not restore the explicit provider edit");
+
+            session.FocusGraphCasting(added);
+            Expect(session.RemoveFocusedCasting().Applied &&
+                session.Document.Castings.Count == startCount + 1 &&
+                session.Document.Castings.All(value => value.CastingId != added),
+                "explicit removal did not remove only the selected casting");
+            Expect(session.Undo() && session.DocumentIntentSignature() == afterAdds,
+                "Undo did not restore the explicit removal");
+            Expect(session.ClickGraphRecipient(free[0].UnitId, inputs).Outcome ==
+                    CastingGraphClickOutcome.Removed &&
+                session.Document.Castings.Count == startCount + 1 &&
+                session.Document.Castings.Any(value => value.CastingId == addedSecond),
+                "normal removal did not remove only the first added assignment");
+            Expect(session.ClickGraphRecipient(free[1].UnitId, inputs).Outcome ==
+                    CastingGraphClickOutcome.Removed &&
+                session.Document.Castings.Count == startCount &&
+                session.DocumentIntentSignature() == startSignature,
+                "the second normal removal did not restore the starting authored plan");
         }
 
         private static CastingWorkspaceSession FeedbackSession(string root, string name,

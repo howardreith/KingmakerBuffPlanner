@@ -1032,10 +1032,11 @@ if (-not $launcherLf.Contains('if ($ManualRehearseDone) { $scenarioParameters.ma
 $rehearsalRecord = New-KbpRunCompletionRecord -RunId 'r' -Scenario 'live-workspace-manual' -FixtureFamily 'Automation' `
     -ProfileId 'full-user' -ManualRehearsal $true
 if (-not [bool]$rehearsalRecord.manualRehearsal) { throw 'The completion record does not label a rehearsal.' }
-$passAt = $launcherText.IndexOf('if ($result.status -cne ''PASS'') { throw "Runtime scenario returned $($result.status)." }')
+$passAt = $launcherText.IndexOf('if ($result.status -cne ''PASS'') {')
+$screenAt = $launcherText.IndexOf('Assert-KbpExpectedScreenEvidence -Request $request -Result $result')
 $outcomeAt = $launcherText.IndexOf('Assert-KbpScenarioOutcome -Request $request')
 $hostSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimeTestHost.cs') -Raw
-if ($passAt -lt 0 -or $outcomeAt -lt $passAt -or
+if ($passAt -lt 0 -or $screenAt -lt 0 -or $screenAt -gt $passAt -or $outcomeAt -lt $passAt -or
     -not $hostSource.Contains('{ "grantConsumed", record.GrantConsumed },') -or
     -not $hostSource.Contains('{ "grantAttempts", record.GrantAttempts },')) {
     throw 'The launcher does not read the scenario evidence itself after a PASS.'
@@ -1358,7 +1359,8 @@ if (@((Test-KbpSteamSessionLogState -ConnectionLines @() -CloudLinesApp $midSess
 
 # Display modes: a window larger than the session's display is refused; the
 # Unity arguments name exactly the size; the owner's settings add none.
-if (-not (Test-KbpDisplayModeSupported -Size '1920x1080' -DisplaySize '1920x1200') -or
+if (-not (Test-KbpDisplayModeSupported -Size '1920x1200' -DisplaySize '1920x1200') -or
+    -not (Test-KbpDisplayModeSupported -Size '1920x1080' -DisplaySize '1920x1200') -or
     (Test-KbpDisplayModeSupported -Size '2560x1440' -DisplaySize '1920x1200') -or
     -not (Test-KbpDisplayModeSupported -Size '2560x1440' -DisplaySize '3840x2160') -or
     (Test-KbpDisplayModeSupported -Size '1920x1080' -DisplaySize 'unknown') -or

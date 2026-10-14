@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using KingmakerBuffPlanner.UI;
 
 namespace KingmakerBuffPlanner.RuntimeTesting
 {
@@ -142,8 +143,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // transitions, reopening, and the inspection-only focus contract.
         // Schema 7 proves the whole Resources dialog has an opaque backing and
         // reserves two legal recipients when seeding the planning probe.
+        // Schema 8 proves the reorder gesture selected a casting whose real
+        // inspector made Cast later available after the independent adds.
         // Historical records prove only what they observed.
-        public int SchemaVersion { get; set; } = 7;
+        public int SchemaVersion { get; set; } = 8;
         public string RunId { get; set; }
         public string Stage { get; set; }
         public int ScreenWidth { get; set; }
@@ -276,6 +279,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return Math.Min(2, legalRecipientCount - 2);
         }
 
+        // Shared by the live observer and its complete session regression:
+        // the reorder command is eligible only when the explicitly selected
+        // casting is the inspector's casting and is not already last.
+        public static string MoveLaterPrecondition(CastingGraphView view,
+            string castingId)
+        {
+            if (view == null) return "graph-missing";
+            if (view.Inspector == null) return "inspector-missing";
+            if (!string.Equals(view.Inspector.CastingId, castingId,
+                    StringComparison.Ordinal))
+                return "inspector=" + (view.Inspector.CastingId ?? "none");
+            return view.Inspector.CanMoveLater ? null : "cast-later-disabled";
+        }
+
         public void AddNote(string note)
         {
             if (!string.IsNullOrEmpty(note)) Notes.Add(note);
@@ -286,7 +303,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             var violations = new List<string>();
             if (SchemaVersion != 1 && SchemaVersion != 2 && SchemaVersion != 3 &&
                 SchemaVersion != 4 && SchemaVersion != 5 && SchemaVersion != 6 &&
-                SchemaVersion != 7)
+                SchemaVersion != 7 && SchemaVersion != 8)
                 violations.Add("schema:" + SchemaVersion);
             if (Stage != FactsStage && Stage != QualifyStage) violations.Add("stage:" + (Stage ?? "null"));
             violations.AddRange(Failures.Select(value => "failure:" + value));
@@ -319,6 +336,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 foreach (string violation in HumanFeedbackCorrectionViolations()) yield return violation;
             if (SchemaVersion >= 7 && !ResourcesOpaqueParchment)
                 yield return "resources:dialog-not-opaque";
+            if (SchemaVersion >= 8 && !PlanningSteps.Contains("focus-reorder:ok"))
+                yield return "planning-contract-missing:focus-reorder:ok";
             // UI-09: four cells the size of the native cells, one per native
             // column, on a third row above the native rows, inside the frame.
             if (PlannerHudButtons != 4) yield return "hud-planner-buttons:" + PlannerHudButtons;

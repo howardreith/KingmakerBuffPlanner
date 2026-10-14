@@ -1271,14 +1271,6 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 (planned(id).DirectTargetUnitId == free[0].UnitId ? null : "target=" + planned(id).DirectTargetUnitId));
             step("undo-retarget", () => click("Undo") ??
                 (planned(id).DirectTargetUnitId == originalTarget ? null : "target=" + planned(id).DirectTargetUnitId));
-            int order = 0;
-            step("cast-later", () =>
-            {
-                order = planned(id).Order;
-                return click("Casting." + id) ?? click("FocusedOrder.Later") ??
-                    (planned(id).Order == order + 1 ? null : "order=" + planned(id).Order + "<-" + order);
-            });
-            step("undo-order", () => click("Undo") ?? (planned(id).Order == order ? null : "order=" + planned(id).Order));
             step("done", () => click("DoneEditing") ??
                 (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().EditingFocusCastingId == null ? null : "still-focused"));
             step("choose-source", () => click("Caster." + other.UnitId) ?? click("Provider." + other.UnitId + ".0"));
@@ -1327,6 +1319,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     created.CasterUnitId == own.UnitId && created.DirectTargetUnitId == free[1].UnitId
                     ? null : "independent-castings-missing";
             });
+            int order = 0;
+            step("focus-reorder", () =>
+            {
+                string failure = click("Casting." + id);
+                if (failure != null) return failure;
+                CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                return NativeUiRecord.MoveLaterPrecondition(session.BuildGraph(
+                    BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime()), id);
+            });
+            step("cast-later", () =>
+            {
+                order = planned(id).Order;
+                return click("FocusedOrder.Later") ??
+                    (planned(id).Order == order + 1 ? null : "order=" + planned(id).Order + "<-" + order);
+            });
+            step("undo-order", () => click("Undo") ??
+                (planned(id).Order == order ? null : "order=" + planned(id).Order));
             step("focus-added", () => added == null ? "no-added" : click("Casting." + added) ??
                 (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().EditingFocusCastingId == added
                     ? null : "not-focused"));

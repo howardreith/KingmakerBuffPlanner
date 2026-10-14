@@ -1941,16 +1941,30 @@ function Get-KbpAllowanceFixtureBindingRefusal {
     return $null
 }
 
-# This session's primary display in physical pixels, measured in a separate
-# DPI-aware process (this process keeps its own, proven DPI context).
-function Get-KbpSessionDisplaySize {
-    $script = 'Add-Type -TypeDefinition ''using System; using System.Runtime.InteropServices; public static class KbpDisplayProbe { [DllImport("user32.dll")] public static extern bool SetProcessDPIAware(); [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index); }''; [void][KbpDisplayProbe]::SetProcessDPIAware(); [string][KbpDisplayProbe]::GetSystemMetrics(0) + ''x'' + [string][KbpDisplayProbe]::GetSystemMetrics(1)'
+# This session's physical display geometry, measured in a separate DPI-aware
+# process (this process keeps its own, proven DPI context). The virtual bounds
+# and monitor count let the transaction detect a newer topology change too.
+function Get-KbpSessionDisplaySnapshot {
+    $script = 'Add-Type -TypeDefinition ''using System; using System.Runtime.InteropServices; public static class KbpDisplayProbe { [DllImport("user32.dll")] public static extern bool SetProcessDPIAware(); [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index); }''; [void][KbpDisplayProbe]::SetProcessDPIAware(); $v=@([KbpDisplayProbe]::GetSystemMetrics(0),[KbpDisplayProbe]::GetSystemMetrics(1),[KbpDisplayProbe]::GetSystemMetrics(76),[KbpDisplayProbe]::GetSystemMetrics(77),[KbpDisplayProbe]::GetSystemMetrics(78),[KbpDisplayProbe]::GetSystemMetrics(79),[KbpDisplayProbe]::GetSystemMetrics(80)); $v -join ''|'''
     # Encoded: the embedded quotes survive the child command line intact.
     $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
     $output = @(& powershell.exe -NoProfile -NonInteractive -EncodedCommand $encoded 2>$null)
-    $size = [string]($output | Select-Object -Last 1)
-    if ($size -notmatch '^[0-9]{3,5}x[0-9]{3,5}$') { throw "The session display size could not be measured: $size" }
-    return $size
+    $line = [string]($output | Select-Object -Last 1)
+    $parts = @($line -split '\|')
+    if ($parts.Count -ne 7 -or @($parts | Where-Object { $_ -notmatch '^-?[0-9]{1,6}$' }).Count -ne 0) {
+        throw "The session display geometry could not be measured: $line"
+    }
+    return [pscustomobject][ordered]@{
+        primarySize = $parts[0] + 'x' + $parts[1]
+        primaryWidth = [int]$parts[0]; primaryHeight = [int]$parts[1]
+        virtualLeft = [int]$parts[2]; virtualTop = [int]$parts[3]
+        virtualWidth = [int]$parts[4]; virtualHeight = [int]$parts[5]
+        monitorCount = [int]$parts[6]
+    }
+}
+
+function Get-KbpSessionDisplaySize {
+    return [string](Get-KbpSessionDisplaySnapshot).primarySize
 }
 
 # Whether a <width>x<height> window fits the display.
@@ -1969,6 +1983,122 @@ function Get-KbpDisplayModeArguments {
     if ([string]::IsNullOrEmpty($Size)) { return @() }
     if ($Size -notmatch '^([0-9]+)x([0-9]+)$') { throw "Display size is invalid: $Size" }
     return @('-screen-fullscreen', '0', '-popupwindow', '-screen-width', $Matches[1], '-screen-height', $Matches[2])
+}
+
+function Get-KbpRequestExpectedScreen {
+    param([Parameter(Mandatory = $true)]$Request)
+    $parameters = $Request.parameters
+    $value = if ($parameters -is [System.Collections.IDictionary]) {
+        if ($parameters.Contains('expectedScreen')) { [string]$parameters['expectedScreen'] } else { '' }
+    }
+    elseif ($null -ne $parameters -and
+        $null -ne $parameters.PSObject.Properties['expectedScreen']) {
+        [string]$parameters.expectedScreen
+    }
+    else { '' }
+    return $value
+}
+
+# Reads the PNG signature and IHDR dimensions directly. No image library or
+# dependency is needed, and truncated/non-PNG evidence fails closed.
+function Get-KbpPngDimensions {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
+    $stream = [IO.File]::Open($resolved, [IO.FileMode]::Open,
+        [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        $bytes = New-Object byte[] 24
+        $offset = 0
+        while ($offset -lt $bytes.Length) {
+            $read = $stream.Read($bytes, $offset, $bytes.Length - $offset)
+            if ($read -le 0) { throw "PNG header is truncated: $Path" }
+            $offset += $read
+        }
+    }
+    finally { $stream.Dispose() }
+    $signature = @(137, 80, 78, 71, 13, 10, 26, 10)
+    for ($index = 0; $index -lt $signature.Count; $index++) {
+        if ([int]$bytes[$index] -ne $signature[$index]) { throw "PNG signature is invalid: $Path" }
+    }
+    if ([Text.Encoding]::ASCII.GetString($bytes, 12, 4) -cne 'IHDR') {
+        throw "PNG IHDR is missing: $Path"
+    }
+    $widthBytes = [byte[]]@($bytes[19], $bytes[18], $bytes[17], $bytes[16])
+    $heightBytes = [byte[]]@($bytes[23], $bytes[22], $bytes[21], $bytes[20])
+    $width = [BitConverter]::ToUInt32($widthBytes, 0)
+    $height = [BitConverter]::ToUInt32($heightBytes, 0)
+    if ($width -eq 0 -or $height -eq 0) { throw "PNG dimensions are invalid: $Path" }
+    return [pscustomobject]@{ width = [int]$width; height = [int]$height
+        size = [string]$width + 'x' + [string]$height }
+}
+
+# Correlates the requested window size with the game's screen assertion, the
+# native UI record and every full-screen PNG named by that record. This is a
+# content-state/size check, not a claim of pixel correctness.
+function Assert-KbpExpectedScreenEvidence {
+    param([Parameter(Mandatory = $true)]$Request,
+        [Parameter(Mandatory = $true)]$Result)
+    $expected = Get-KbpRequestExpectedScreen $Request
+    if ([string]::IsNullOrEmpty($expected)) { return $null }
+    if ($expected -notmatch '^(?<width>[0-9]{3,5})x(?<height>[0-9]{3,5})$') {
+        throw "Requested screen size is invalid: $expected"
+    }
+    $expectedWidth = [int]$Matches.width
+    $expectedHeight = [int]$Matches.height
+    $scenario = [string]$Request.scenario
+    $unityEvidence = $null
+    if ($scenario -ceq 'live-workspace-physical') {
+        $physicalPath = Join-Path ([string]$Request.evidenceDirectory) 'physical-workspace.json'
+        $physical = Read-KbpJson $physicalPath
+        if ([string]$physical.screen -cne $expected) {
+            throw "The physical workspace record has screen $($physical.screen), expected $expected."
+        }
+        $unityEvidence = [string]$physical.screen
+    }
+    else {
+        $screenAssertions = @($Result.assertions | Where-Object { [string]$_.id -ceq 'screen-size' })
+        if ($screenAssertions.Count -ne 1 -or [string]$screenAssertions[0].status -cne 'PASS' -or
+            [string]$screenAssertions[0].expected -cne $expected -or
+            -not ([string]$screenAssertions[0].observed).StartsWith($expected + ';',
+                [StringComparison]::Ordinal)) {
+            throw "The Unity screen-size assertion does not prove $expected."
+        }
+        $unityEvidence = [string]$screenAssertions[0].observed
+    }
+
+    $pngs = New-Object System.Collections.Generic.List[object]
+    $nativeScreen = $null
+    if ($scenario -ceq 'live-workspace-native-ui') {
+        $nativePath = Join-Path ([string]$Request.evidenceDirectory) 'native-ui.json'
+        $native = Read-KbpJson $nativePath
+        $nativeScreen = [string]$native.ScreenWidth + 'x' + [string]$native.ScreenHeight
+        if ([int]$native.ScreenWidth -ne $expectedWidth -or
+            [int]$native.ScreenHeight -ne $expectedHeight) {
+            throw "The native UI record has screen $nativeScreen, expected $expected."
+        }
+        foreach ($name in @($native.Captures | ForEach-Object { [string]$_ } |
+                Select-Object -Unique)) {
+            if ([string]::IsNullOrWhiteSpace($name)) { throw 'The native UI record names an empty capture.' }
+            $capturePath = Join-Path ([string]$Request.evidenceDirectory) $name
+            $dimensions = Get-KbpPngDimensions $capturePath
+            if ([int]$dimensions.width -ne $expectedWidth -or
+                [int]$dimensions.height -ne $expectedHeight) {
+                throw "Native UI PNG $name is $($dimensions.size), expected $expected."
+            }
+            $pngs.Add([ordered]@{ file = $name; width = [int]$dimensions.width
+                height = [int]$dimensions.height; sha256 = Get-KbpSha256 $capturePath })
+        }
+        if ($pngs.Count -eq 0) { throw 'The native UI record names no PNG captures.' }
+    }
+    $evidence = [ordered]@{
+        schemaVersion = 1; runId = [string]$Request.runId; scenario = $scenario
+        requested = $expected; unityObserved = $unityEvidence
+        nativeUiObserved = $nativeScreen; pngCount = $pngs.Count; pngs = $pngs.ToArray()
+        boundary = 'Unity screen assertion plus native record and PNG IHDR dimensions; no pixel-correctness claim'
+        verifiedAtUtc = [DateTime]::UtcNow.ToString('o')
+    }
+    Write-KbpJsonAtomic (Join-Path ([string]$Request.evidenceDirectory) 'screen-validation.json') $evidence
+    return [pscustomobject]$evidence
 }
 
 # The classic cast allowance (kind kbp-classic-cast, schema 2) must name this

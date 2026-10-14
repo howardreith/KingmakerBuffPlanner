@@ -243,6 +243,94 @@ function Restore-KbpRegistrySnapshotFile {
     return $restored
 }
 
+# A windowed-size run does not intentionally change the Windows display
+# mode. It nevertheless snapshots the relevant physical geometry while the
+# runtime lock is held and verifies it after Kingmaker exits. A mismatch is
+# deliberately not rewritten: it may be a newer user display change, so the
+# durable pending snapshot blocks later runs for explicit review.
+function Get-KbpPhysicalDisplaySnapshotValues {
+    param([Parameter(Mandatory = $true)]$Snapshot)
+    $required = @('primarySize', 'primaryWidth', 'primaryHeight', 'virtualLeft',
+        'virtualTop', 'virtualWidth', 'virtualHeight', 'monitorCount')
+    $values = [ordered]@{}
+    foreach ($name in $required) {
+        $property = $Snapshot.PSObject.Properties[$name]
+        if ($null -eq $property) { throw "Physical display snapshot is missing $name." }
+        $values[$name] = if ($name -ceq 'primarySize') { [string]$property.Value }
+            else { [int]$property.Value }
+    }
+    if ([string]$values.primarySize -cne
+        ([string]$values.primaryWidth + 'x' + [string]$values.primaryHeight) -or
+        [int]$values.primaryWidth -le 0 -or [int]$values.primaryHeight -le 0 -or
+        [int]$values.virtualWidth -le 0 -or [int]$values.virtualHeight -le 0 -or
+        [int]$values.monitorCount -le 0) {
+        throw 'Physical display snapshot has invalid geometry.'
+    }
+    return [pscustomobject]$values
+}
+
+function Compare-KbpPhysicalDisplaySnapshot {
+    param([Parameter(Mandatory = $true)]$Before,
+        [Parameter(Mandatory = $true)]$After)
+    $left = Get-KbpPhysicalDisplaySnapshotValues $Before
+    $right = Get-KbpPhysicalDisplaySnapshotValues $After
+    $differences = New-Object System.Collections.Generic.List[string]
+    foreach ($name in @('primarySize', 'primaryWidth', 'primaryHeight', 'virtualLeft',
+            'virtualTop', 'virtualWidth', 'virtualHeight', 'monitorCount')) {
+        if ([string]$left.$name -cne [string]$right.$name) {
+            $differences.Add($name + ':' + [string]$left.$name + '->' + [string]$right.$name)
+        }
+    }
+    return $differences.ToArray()
+}
+
+function Save-KbpPhysicalDisplaySnapshotFile {
+    param([Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)]$Snapshot,
+        [Parameter(Mandatory = $true)][string]$RunId,
+        [Parameter(Mandatory = $true)][string]$ExpectedWindowSize)
+    $values = Get-KbpPhysicalDisplaySnapshotValues $Snapshot
+    Write-KbpJsonAtomic $Path ([ordered]@{
+        schemaVersion = 1; kind = 'kbp-windowed-display-verification'; runId = $RunId
+        expectedWindowSize = $ExpectedWindowSize; restored = $false
+        savedAtUtc = [DateTime]::UtcNow.ToString('o'); original = $values
+    })
+}
+
+function Read-KbpPhysicalDisplaySnapshotFile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $file = Read-KbpJson $Path
+    if ([int]$file.schemaVersion -ne 1 -or
+        [string]$file.kind -cne 'kbp-windowed-display-verification' -or
+        [string]::IsNullOrWhiteSpace([string]$file.runId) -or
+        [string]$file.expectedWindowSize -notmatch '^[0-9]{3,5}x[0-9]{3,5}$') {
+        throw "Physical display snapshot file is invalid: $Path"
+    }
+    [void](Get-KbpPhysicalDisplaySnapshotValues $file.original)
+    return $file
+}
+
+function Confirm-KbpPhysicalDisplaySnapshotFile {
+    param([Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)]$CurrentSnapshot,
+        [switch]$Reverify)
+    $file = Read-KbpPhysicalDisplaySnapshotFile -Path $Path
+    if ([bool]$file.restored -and -not $Reverify) { return $file }
+    $current = Get-KbpPhysicalDisplaySnapshotValues $CurrentSnapshot
+    $differences = @(Compare-KbpPhysicalDisplaySnapshot -Before $file.original -After $current)
+    if ($differences.Count -ne 0) {
+        throw ("Physical display state changed during run $($file.runId): " +
+            ($differences -join ', ') + '. Refusing to overwrite a potentially newer user change; ' +
+            'the pending snapshot must be reviewed before another run.')
+    }
+    $file.restored = $true
+    $file | Add-Member -NotePropertyName verifiedAtUtc `
+        -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+    $file | Add-Member -NotePropertyName observedAfter -NotePropertyValue $current -Force
+    Write-KbpJsonAtomic $Path $file
+    return $file
+}
+
 # Waits (bounded) until no foreign runtime lease is held; throws otherwise.
 function Wait-KbpNoForeignRuntimeLease {
     param([string[]]$LeasePaths = $script:KbpForeignRuntimeLeases,
@@ -685,6 +773,13 @@ function Assert-KbpNoUnresolvedTransaction([string]$StateRoot, [string]$FixtureL
         $snapshotState = Read-KbpJson $snapshotFile.FullName
         if (-not [bool]$snapshotState.restored) {
             throw "Unrestored game registry snapshot exists: $($snapshotFile.FullName) (Restore-Local.ps1 -RunId $($snapshotState.runId) restores it)."
+        }
+    }
+    # A windowed run whose physical-display verification did not complete.
+    foreach ($snapshotFile in @(Get-ChildItem -LiteralPath $StateRoot -Filter display-physical.json -File -Recurse -ErrorAction SilentlyContinue)) {
+        $snapshotState = Read-KbpPhysicalDisplaySnapshotFile $snapshotFile.FullName
+        if (-not [bool]$snapshotState.restored) {
+            throw "Unverified physical display snapshot exists: $($snapshotFile.FullName) (Restore-Local.ps1 -RunId $($snapshotState.runId) verifies it without overwriting user settings)."
         }
     }
     # Review K6: an interrupted or unrecoverable install rollback is an
