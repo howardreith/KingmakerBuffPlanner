@@ -1,3 +1,18 @@
+## Human-feedback rc4 live finding correction - October 14, 2026
+
+The explicitly selected rc3 milestone passed its first five-target purity
+window, then stopped on owner-display RunId
+`kbphf-rc3-20261014-02-ui-owner` with a preserved FAIL and clean Mods/save
+restoration. Actual 1920x1080 screenshots demonstrated translucent Resources
+header content; an observer seed left one rather than two free recipients.
+Exact successor product `19e2e777261ff7887f0b8f62c8adcc75161220c5`, version
+0.5.1-rc4, fixes those two scoped defects, is focused-tested/package-validated,
+and remains **NOT_RUN**. ZIP SHA-256 is
+`1a38d33439392a9c1da5202c1537357213177432e8bca174b550c88ab0c68036`.
+The preserved evidence, actual timings, UX verdicts and fresh remaining batch
+are in the
+[0.5.1-rc4 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC4.md).
+
 ## Human-feedback rc3 preparation - October 14, 2026
 
 Packaged product source `debd40674ed2a6ed9f6e3423671f6ec2180bead0`,

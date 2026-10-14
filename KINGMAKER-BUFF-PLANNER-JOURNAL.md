@@ -1,5 +1,42 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-14 human-feedback rc4 runtime-finding checkpoint
+
+Continued `codex/kingmaker-buff-planner-human-feedback` from reviewed HEAD
+`685dd5c0a9c5ebadb5c527ecb1cd121910968770`. Hash-helper commit
+`d6a57d114096cb362212a586faa1a83018d8c67e` restores PowerShell literal-path
+semantics before read-only stream hashing; the matched divergent-directory,
+special-character, WhatIf, provider, missing and unreadable checks pass 8/0.
+
+The selected rc3 supervisor first retained pre-runtime Git stderr-wrapper
+failure `kbphf-rc3-20261014-01`. Corrected operation
+`kbphf-rc3-20261014-02` (product `debd406`, harness `d6a57d1`) passed one
+five-target purity window after 2 h 06 m, then actual RunId
+`kbphf-rc3-20261014-02-ui-owner` returned FAIL. Kingmaker exited, Mods restored
+and protected saves compared clean. No compact, selection, allowance, second
+purity or cast run started.
+
+The actual record was 1920x1080 rather than owner 1920x1200. Four Resources
+states had ten visible native-layer cells, correct scopes, clipping and focus,
+but original-resolution review found planner text bleeding through the
+PaperSlip header. Cold open was 463.494 ms request-to-confirmed-frame-end;
+later ordinary opens were mostly 106.783–121.409 ms with 368.654/398.747 ms
+discovery/reconciliation outliers. Resources open/all/selected/reopen were
+30.930/28.895/33.435/31.547 ms handler-to-confirmed-frame-end. The observer
+had seeded two of three recipients (`free=1`), so assignment steps were skipped
+and no buff-switch/recipient-toggle timing is claimed.
+
+Successor commit `19e2e777261ff7887f0b8f62c8adcc75161220c5` adds a full-
+dialog opaque backing beneath the approved native parchment and reserves two
+recipients in native observer schema 7. Focused checks: source 43/0, build 1/0,
+native UI 11/0, hashing 8/0, direct launcher arguments 26/0. Build-Local passed
+package 4/0 and produced frozen version 0.5.1-rc4: ZIP
+`1a38d33439392a9c1da5202c1537357213177432e8bca174b550c88ab0c68036`,
+DLL `093b08fc1f50ba334a05e75dd24eb785808885c5826d1ee6fffa63149591a287`,
+MVID `be795e3c-7c39-41a7-98e2-fdc5c177c326`. rc4 is NOT_RUN. The full evidence,
+acceptance and fresh 7 h 30 m batch are in the
+[rc4 decision receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC4.md).
+
 ## 2026-10-14 human-feedback rc3 preparation checkpoint
 
 Continued `codex/kingmaker-buff-planner-human-feedback` from reviewed HEAD

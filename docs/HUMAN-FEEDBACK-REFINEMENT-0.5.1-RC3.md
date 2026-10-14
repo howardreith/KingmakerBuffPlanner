@@ -1,5 +1,11 @@
 # Human-feedback refinement 0.5.1-rc3 preparation receipt
 
+> Historical receipt. The selected live milestone later retained one purity
+> PASS and one owner-display runtime FAIL on these exact bytes. rc3 was not
+> relabelled or rebuilt. The classified evidence and frozen rc4 successor are
+> recorded in the
+> [0.5.1-rc4 decision receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC4.md).
+
 ## Outcome
 
 The bounded preparation pass is complete. It preserves the four corrections

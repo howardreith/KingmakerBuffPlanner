@@ -1,3 +1,14 @@
+> **Current October 14 human-feedback blocker:** no independent source,
+> observer, hashing, focused-test, package or freeze work remains. Exact rc4
+> product `19e2e777261ff7887f0b8f62c8adcc75161220c5` is **NOT_RUN**. Its next
+> batch cannot reuse rc3 purity because compiled bytes changed. Before launch,
+> the owner-display guard must prove and transactionally restore 1920x1200;
+> rc3 actually rendered at 1920x1080. Then run the two five-target windows and
+> four serial game routes described in the
+> [rc4 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC4.md), approximately
+> 7 h 30 m. Do not retry the retained rc3 FAIL or claim its skipped policy and
+> assignment steps.
+>
 > **Current October 14 human-feedback blocker:** no independently actionable
 > source, observer, driver, reader, focused-check or local-package work remains.
 > Exact 0.5.1-rc3 product `debd40674ed2a6ed9f6e3423671f6ec2180bead0`

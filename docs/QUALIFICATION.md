@@ -1,3 +1,15 @@
+> **Current 0.5.1-rc4 qualification:** the selected rc3 campaign preserved one
+> five-target purity PASS, then stopped on actual RunId
+> `kbphf-rc3-20261014-02-ui-owner` with runtime **FAIL**. Mods and protected
+> saves restored cleanly. The run exposed whole-dialog Resources translucency
+> and an observer seed that left only one free recipient; it also rendered at
+> 1920x1080, not the required owner 1920x1200. Exact successor product
+> `19e2e777261ff7887f0b8f62c8adcc75161220c5`, ZIP
+> `1a38d33439392a9c1da5202c1537357213177432e8bca174b550c88ab0c68036`,
+> fixes those two demonstrated defects and passes focused checks, but rc4 is
+> **NOT_RUN**. The 1280x720 and policy routes never started. See the
+> [rc4 decision receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC4.md).
+>
 > **Current 0.5.1-rc3 qualification:** exact product `debd406`, ZIP
 > `0d30c7fa430e618be1b7d871c68bdc894b79206018771b17b90ca9b8d3037e62`,
 > is focused-tested/package-validated and **NOT_RUN**. The policy driver and

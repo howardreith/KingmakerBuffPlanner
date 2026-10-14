@@ -1,3 +1,14 @@
+> **Current 0.5.1-rc4 successor:** exact packaged source
+> `19e2e777261ff7887f0b8f62c8adcc75161220c5` adds an opaque backing beneath
+> the approved Resources PaperSlip and makes the native observer reserve two
+> recipients before its continuous-assignment probe. These are the only product/
+> observer changes arising from the retained rc3 game run. Focused results are
+> source 43/0, build 1/0, native UI 11/0, hash helper 8/0, launcher arguments
+> 26/0 and package 4/0. ZIP
+> `1a38d33439392a9c1da5202c1537357213177432e8bca174b550c88ab0c68036`
+> is frozen and **NOT_RUN**. See the
+> [rc4 decision receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC4.md).
+>
 > **Current 0.5.1-rc3 preparation:** exact packaged source `debd406` corrects
 > open-boundary/frame-end attribution, adds targeted Resources timing, and
 > extends the guarded shared/Powerful Change qualification through strict then

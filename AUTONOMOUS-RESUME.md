@@ -1,4 +1,15 @@
 > **Current October 14 human-feedback resume:** branch
+> `codex/kingmaker-buff-planner-human-feedback`; exact frozen successor product
+> `19e2e777261ff7887f0b8f62c8adcc75161220c5`; version 0.5.1-rc4; ZIP
+> `1a38d33439392a9c1da5202c1537357213177432e8bca174b550c88ab0c68036`;
+> DLL `093b08fc1f50ba334a05e75dd24eb785808885c5826d1ee6fffa63149591a287`;
+> MVID `be795e3c-7c39-41a7-98e2-fdc5c177c326`. Preserve the rc3 FAIL and its
+> clean Mods/save restoration. rc4 is **NOT_RUN**. Resume only with the fresh
+> rc4 two-purity/four-game batch, first guarding an actual transactional
+> 1920x1200 owner mode; exact scope and cost are in the
+> [rc4 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC4.md).
+>
+> **Current October 14 human-feedback resume:** branch
 > `codex/kingmaker-buff-planner-human-feedback`; packaged product
 > `debd40674ed2a6ed9f6e3423671f6ec2180bead0`; version 0.5.1-rc3; ZIP
 > `0d30c7fa430e618be1b7d871c68bdc894b79206018771b17b90ca9b8d3037e62`;
