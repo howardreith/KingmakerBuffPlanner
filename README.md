@@ -1,23 +1,14 @@
 # Kingmaker Buff Planner
 
-> **Local development candidate:** `0.5.1-rc1` adds continuous recipient
-> assignment, explicit one-shot editing of existing castings, a readable
-> scrollable Resources dialog, a remembered Require full plan / Cast available
-> policy, responsiveness caching/instrumentation and ordinary-cased Run labels.
-> Its focused checks and local installable ZIP pass, but the exact candidate is
-> **NOT_RUN** in Kingmaker pending the over-budget guarded two-size observation.
-> See the [human-feedback receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
-> The published release remains 0.5.0.
-
-**Release:** `0.5.0` — the casting-first planner: plan every cast explicitly (caster,
+**Release:** `0.5.2` — the casting-first planner: plan every cast explicitly (caster,
 exact spell source, target, enhancements) and edit castings directly in the
 graph, with autosave and one-click Long / Important / Short routines from the
 HUD that never run in combat. See the
 [release notes](docs/RELEASE-NOTES-DRAFT.md) and the
-[player guide](docs/CASTING-FIRST-PLAYER-GUIDE.md). 0.5.0 makes the planner
-one of the game's own windows: its fonts, paper and controls, the game's spell
-description window, the HUD buttons inside the game's button panel, BUFF
-PLANNER beside METAMAGIC in the spellbook, and run results in the game log.
+[player guide](docs/CASTING-FIRST-PLAYER-GUIDE.md). 0.5.2 keeps the approved
+native window and HUD while adding continuous assignment, explicit one-shot
+editing, readable Resources accounting, a remembered Require full plan / Cast
+available policy, responsiveness instrumentation and ordinary-cased Run labels.
 
 Kingmaker Buff Planner is a standalone Unity Mod Manager mod for **Pathfinder:
 Kingmaker Enhanced Plus Edition 2.1.7b**.
@@ -29,7 +20,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.5.0.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.5.2.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including

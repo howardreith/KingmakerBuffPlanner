@@ -1,34 +1,55 @@
-> **Local 0.5.1-rc3 preparation candidate:** opening and Resources latency are
-> now attributed from the real request boundary through a correlated frame-end
-> state check, and the existing guarded qualification can prove strict versus
-> remembered Cast-available execution. The distinct ZIP is focused-tested and
-> package-validated but **NOT_RUN**. See the
-> [rc3 receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md). This is not a release;
-> rc1 and rc2 remain preserved.
->
-> **Local 0.5.1-rc2 correction candidate:** Resources accounting rows now use
-> the native UI layer; continuous assignment keeps inspection separate from
-> explicit one-shot editing; exact-source draft choices reset correctly; and
-> recipient hints match the exact action. The distinct ZIP is focused-tested
-> and package-validated but **NOT_RUN**. See the
-> [rc2 correction receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md). This is not
-> a release publication and the rc1 artifact remains preserved.
->
-> **Local 0.5.1-rc1 candidate:** continuous multi-recipient assignment,
-> explicit individual-edit controls, structured Resources accounting,
-> remembered Require full plan / Cast available policy, responsiveness work
-> and ordinary-cased Run buttons are implemented, focused-tested and packaged.
-> The exact ZIP is **NOT_RUN** in Kingmaker; no new rendered screenshot or
-> runtime PASS is claimed. See the
-> [human-feedback receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md). This is not
-> a release publication and does not replace the 0.5.0 prerelease below.
->
-> **Human-review publication:** the unchanged tested 0.5.0 artifact is available
-> as [v0.5.0-rc.1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.0-rc.1).
-> RC1 is a prerelease, is not Latest, and does not claim owner acceptance or the
-> interrupted stable publisher's aggregate qualification. Download the named
-> installable ZIP asset, not GitHub's automatic source archive.
->
+# Kingmaker Buff Planner 0.5.2
+
+0.5.2 publishes the human-feedback refinement while preserving the approved
+native appearance and HUD buttons.
+
+## What changed
+
+- **Readable Resources.** Resources opens as an opaque native parchment dialog
+  with visible grouped accounting, fixed columns, bounded scrolling, selected
+  routine/all-routines scopes, reliable reopening and proper focus/close input.
+- **Continuous assignment.** A normal caster or exact source configures the next
+  assignment. Normal recipient clicks add or remove independent castings without
+  silently editing the casting being inspected. Existing castings change only
+  through the explicit one-shot recipient or caster/source edit controls.
+- **Scoped draft choices.** Share Transmutation and other draft enhancements are
+  preserved while batching recipients in an unchanged context and cleared when
+  the buff, caster, exact provider or routine changes. Saved castings are never
+  stripped merely by navigation.
+- **Strict or available casting.** Each profile remembers **Require full plan**
+  or **Cast available**. Planner and HUD resolution share the same fresh
+  validation and execution path; permissive runs preserve authored order,
+  complete casting costs, shared pools, assignments and omission reasons.
+- **Responsive, observable UI.** Revision-specific work is cached where safe,
+  full rebuild/theme/layout work is reduced, and opening, switching, recipient
+  and Resources interactions record separately attributed timings.
+- **Ordinary labels.** The controls say **Run Long**, **Run Important** and
+  **Run Short** while retaining the native skin.
+
+## Upgrading
+
+Back up the whole `Mods\KingmakerBuffPlanner` folder, including
+`UserSettings`, outside `Mods` before installing. Existing profiles remain
+strict until you explicitly choose **Cast available**. Saved assignments load
+unchanged. To roll back, restore the complete backup.
+
+## Validation boundary
+
+Focused source, behavior, display-transaction and package checks passed for the
+human-feedback candidate. The selected rc5 live milestone stopped before game
+launch when the physical display changed during its guarded purity prerequisite,
+so it produced no fresh rendered UI, input-to-frame timing or permissive-casting
+observation for these new paths. Historical 0.5.0 evidence still covers the
+unchanged native appearance and HUD. The exact retained record is in
+`docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md`.
+
+The calculation-only 67-casting probe was fast, but it does not rule out the
+reported one-to-two-second delay in a real populated campaign. This stable
+release is therefore suitable for the owner's requested full ordinary testing,
+with these limits stated rather than promoted to runtime PASS.
+
+---
+
 # Kingmaker Buff Planner 0.5.0
 
 0.5.0 makes the planner look and behave like one of the game's own windows.

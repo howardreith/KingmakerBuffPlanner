@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.1-rc1 - local human-feedback candidate
+## 0.5.2 - human-feedback refinement
 
 - Replaces the overflowing Resources overlay with a modal native parchment
   table: selected/all-routines scopes, grouped accounting, fixed columns,
@@ -15,10 +15,11 @@
   planner and HUD through the existing strict/ReadyCastsOnly gate and executor.
 - Caches revision/input-specific calculations, retains fresh execution
   validation, adds stage timings, and restores ordinary button casing to Run.
-- Focused validation and the local installable package pass. The candidate has
-  not been installed or run in Kingmaker; two-size visual/runtime acceptance is
-  deferred behind the mandatory ~101-minute purity prerequisite. See
-  `docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md`.
+- Focused source, behavior, display-transaction and package checks pass. The
+  retained rc5 live milestone stopped before launch when the physical display
+  changed during its purity prerequisite, so the new human-feedback paths do
+  not claim fresh in-game observation. See
+  `docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md`.
 
 ## 0.1.1-rc1 - testing preview
 

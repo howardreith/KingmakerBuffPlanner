@@ -1,3 +1,16 @@
+## Human-feedback rc5 preparation and selected-prerequisite failure - October 14, 2026
+
+Exact frozen product `ec3d5f865707e540b00fccabd3f1a98f04aa3095`, version
+0.5.1-rc5, fixes the complete planning-observer sequence and adds guarded,
+explicit windowed 1920x1200 validation/restoration. Focused source, behavior,
+display, launcher and package checks pass. Selected operation
+`kbphf-rc5-20261014-01` stopped without retry before any game launch: DATA's
+physical display changed from 1920x1200 at preflight to 1920x1080 at the first
+WhatIf admission. No runtime transaction, RunId path, allowance or save change
+exists, and no purity/runtime/visual PASS is claimed. Exact identities,
+evidence hashes, UX status and the fresh remaining batch are in the
+[0.5.1-rc5 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
+
 ## Human-feedback rc4 live finding correction - October 14, 2026
 
 The explicitly selected rc3 milestone passed its first five-target purity
