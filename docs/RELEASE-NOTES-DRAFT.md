@@ -1,3 +1,12 @@
+> **Local 0.5.1-rc1 candidate:** continuous multi-recipient assignment,
+> explicit individual-edit controls, structured Resources accounting,
+> remembered Require full plan / Cast available policy, responsiveness work
+> and ordinary-cased Run buttons are implemented, focused-tested and packaged.
+> The exact ZIP is **NOT_RUN** in Kingmaker; no new rendered screenshot or
+> runtime PASS is claimed. See the
+> [human-feedback receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md). This is not
+> a release publication and does not replace the 0.5.0 prerelease below.
+>
 > **Human-review publication:** the unchanged tested 0.5.0 artifact is available
 > as [v0.5.0-rc.1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.0-rc.1).
 > RC1 is a prerelease, is not Latest, and does not claim owner acceptance or the

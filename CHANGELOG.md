@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.1-rc1 - local human-feedback candidate
+
+- Replaces the overflowing Resources overlay with a modal native parchment
+  table: selected/all-routines scopes, grouped accounting, fixed columns,
+  bounded scrolling, focus/close handling and truthful save state.
+- Makes normal caster/source and recipient clicks a continuous authoring flow.
+  Existing castings are changed only through explicit one-shot Change recipient
+  or Change caster/source controls; exact variants and group origins retain
+  their distinct semantics.
+- Scopes Share and other draft choices to buff, caster, exact provider and
+  routine without changing choices already saved on castings.
+- Persists Require full plan / Cast available per profile and routes both the
+  planner and HUD through the existing strict/ReadyCastsOnly gate and executor.
+- Caches revision/input-specific calculations, retains fresh execution
+  validation, adds stage timings, and restores ordinary button casing to Run.
+- Focused validation and the local installable package pass. The candidate has
+  not been installed or run in Kingmaker; two-size visual/runtime acceptance is
+  deferred behind the mandatory ~101-minute purity prerequisite. See
+  `docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md`.
+
 ## 0.1.1-rc1 - testing preview
 
 - Testing preview of the precise casting assignments feature set described

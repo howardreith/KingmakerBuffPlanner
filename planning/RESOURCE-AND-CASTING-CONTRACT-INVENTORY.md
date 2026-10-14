@@ -1,5 +1,25 @@
 # Resource and Casting Contract Inventory
 
+## 0.5.1-rc1 availability and Resources contract
+
+Profile revision 4 stores `availabilityPolicy` as `require-full-plan` or
+`cast-available`; absent, older, malformed and unknown values resolve strictly.
+Both planner and HUD derive `CastingApplyMode` from this one session setting.
+Permissive execution reuses `ReadyCastsOnly`, canonical omission reasons,
+authored order and the existing coordinator/executor. Each selected casting is
+budgeted atomically with modifiers, rods, reservoir/material costs and shared
+pools; skipped castings do not reserve resources, and global safety refusals
+remain global. Fresh authoritative inputs are captured at execution.
+
+`WorkspaceResourceReport` projects the same policy into grouped Available now,
+Saved need, Would spend and Short columns for either the selected routine or
+all routines with no rest. Strict refusal reports zero prospective spend;
+permissive scope reports only its executable subset. The report is rendered by
+the UI but contains no Unity dependency. Exact packaged source
+`a4c4342e1296966cbae1d64eeb53b47f23265627` passed focused neighbors and is
+**NOT_RUN**; see the
+[human-feedback receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+
 ## 0.4.2 spellbook membership (removal reconciliation)
 
 The removal reconciliation depends on the Kingmaker 2.1.7b contracts below

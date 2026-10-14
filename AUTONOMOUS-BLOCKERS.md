@@ -1,3 +1,14 @@
+> **Current October 13 human-feedback blocker:** no source, focused-check,
+> observer or local-package work is blocked. Exact 0.5.1-rc1 product
+> `a4c4342e1296966cbae1d64eeb53b47f23265627` is validated but **NOT_RUN**.
+> The one remaining runtime/visual batch requires the unchanged full-history
+> purity window first; 374,395 current files and an 8.410868-second/1,038-file
+> sample estimate about 101 minutes for its two inventories, over the ordinary
+> 30-minute ceiling. After it passes, run owner 1920x1200 and compact 1280x720
+> native qualification serially and inspect Resources/assignment/policy/Run
+> PNGs. Exact commands and artifact hashes are in the
+> [human-feedback receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+>
 > **Current October 13 blockers:** no independently actionable implementation,
 > restoration, packaging, integration, or prerelease-publication blocker remains.
 > `v0.5.0-rc.1` is the exact tested human-review artifact and remains PARTIAL.

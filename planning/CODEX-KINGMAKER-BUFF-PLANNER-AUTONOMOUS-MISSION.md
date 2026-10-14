@@ -1,3 +1,17 @@
+## Current human-feedback refinement - October 13, 2026
+
+Successor branch `codex/kingmaker-buff-planner-human-feedback` preserves the
+integrated `origin/main` baseline `5e1e6d22c9cc03826f867ee9e068089fb06521b4`.
+Exact packaged product source `a4c4342e1296966cbae1d64eeb53b47f23265627`,
+version 0.5.1-rc1, implements UX-01 through UX-06 and updates the guarded
+native observer for the new gestures and Resources frames. Focused validation
+is 43/0 source, 1/0 build and 101/0 selected behavior; the local package is
+4/0 validated and 1/0 created. It is **NOT_RUN** and not installed. The
+mandatory two-size live batch remains behind an estimated 101-minute purity
+inventory prerequisite. Exact hashes, timings, rejected shortcuts, uncertainty
+and the one remaining command batch are in the
+[0.5.1-rc1 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+
 ## Current native UI completion - October 13, 2026
 
 Exact product source `dfbaa5fbd0aba901b2e03c950dd7735f28ed226c`

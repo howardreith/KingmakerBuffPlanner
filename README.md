@@ -1,5 +1,14 @@
 # Kingmaker Buff Planner
 
+> **Local development candidate:** `0.5.1-rc1` adds continuous recipient
+> assignment, explicit one-shot editing of existing castings, a readable
+> scrollable Resources dialog, a remembered Require full plan / Cast available
+> policy, responsiveness caching/instrumentation and ordinary-cased Run labels.
+> Its focused checks and local installable ZIP pass, but the exact candidate is
+> **NOT_RUN** in Kingmaker pending the over-budget guarded two-size observation.
+> See the [human-feedback receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+> The published release remains 0.5.0.
+
 **Release:** `0.5.0` — the casting-first planner: plan every cast explicitly (caster,
 exact spell source, target, enhancements) and edit castings directly in the
 graph, with autosave and one-click Long / Important / Short routines from the

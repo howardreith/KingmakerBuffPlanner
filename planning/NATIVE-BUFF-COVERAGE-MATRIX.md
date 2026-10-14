@@ -1,5 +1,15 @@
 # Native Buff Coverage Matrix
 
+## 0.5.1-rc1 human-feedback refinement
+
+No native-candidate classifier, action graph, source identity, GUID exception
+or discovery coverage changed. Continuous recipient toggles still match stable
+source plus exact ability variant and routine. Group/area coverage remains one
+casting per authored origin; clicking a covered recipient focuses that casting
+instead of manufacturing a direct-target duplicate. Exact source
+`a4c4342e1296966cbae1d64eeb53b47f23265627` is focused-tested but **NOT_RUN**;
+see the [human-feedback receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+
 ## 0.4.2 class abilities with a spell's effect
 
 | Source | Owner | Effect | Before 0.4.2 | 0.4.2 | Native cast |

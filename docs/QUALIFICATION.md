@@ -1,3 +1,12 @@
+> **Current 0.5.1-rc1 human-feedback qualification:** focused source/build/
+> behavior and strict local-package checks pass on exact product `a4c4342`, but
+> the candidate is **NOT_RUN**. UX-01/UX-02 rendered acceptance and all live
+> execution claims remain open. No new screenshot exists. The mandatory
+> full-history purity prerequisite is estimated at about 101 minutes for
+> inventories alone, so the one owner-1920x1200/compact-1280x720 guarded batch
+> was not started under the ordinary ceiling. Do not promote this to runtime
+> PASS. See the [exact receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+>
 > **Current October 13 native UI qualification:** exact source `dfbaa5f`, ZIP
 > `2e2dbe33cb4ccb65762829042e5f96076882c3030dc3bc24e1df5fff51e31501`,
 > and DLL

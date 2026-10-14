@@ -1,6 +1,8 @@
-# Buff Planner: player guide (0.5.0)
+# Buff Planner: player guide (0.5.1-rc1 local candidate)
 
-This guide describes the casting-first planner of 0.5.0. It is
+This guide describes the casting-first planner including the local 0.5.1-rc1
+human-feedback candidate. The published release remains 0.5.0, and the exact
+0.5.1-rc1 package has not yet been run in Kingmaker. It is
 the only normal planner: there is
 no Save button, no Accept Plan step and no Classic switch in the planner.
 "What has been checked in the game" at the end says exactly which parts a
@@ -55,24 +57,26 @@ expanded, merged or substituted behind your back.
    listed under Abilities beside, not inside, Mirror Image.
 2. Pick a caster in the left lane. When the caster can cast the buff in
    more than one way, pick the exact source row (spellbook and level, item
-   or ability); each row says what the whole plan leaves of that pool.
-3. Click a target on the right: one line and one casting card appear, and
-   the new casting is selected. Two allies are two castings.
-4. Work on the selected casting directly in the graph (0.4.0):
-   - click its recipient's portrait again to **remove** it;
-   - click another portrait to **move** it there (a group casting is
-     **re-centred** there instead); a portrait it cannot reach is refused
-     with the reason and nothing changes;
-   - click another caster, or another exact source row, on the left to
-     **change who casts it** - its target, routine, order, enhancements the
-     new caster has and "already there" choice stay; an enhancement only
-     the old caster had is named and dropped (Undo brings it back).
-   With nothing selected, a portrait that already has a casting of this buff
-   selects that casting instead of adding a second one, and **Done** (or
-   Escape) clears the selection.
-5. The **Casting options** panel on the right (0.5.0) shows, in order:
+   or ability); each row says what the whole plan leaves of that pool. A
+   normal caster/source click always chooses the source for the **next**
+   assignment, even while you are inspecting an existing casting.
+3. Click a legal recipient on the right to add one casting. Keep clicking
+   other recipients to add more castings with the same source and draft
+   options; no Done step is required. Clicking a recipient already assigned
+   this exact buff/variant in this routine removes that assignment, and Undo
+   restores it. Two allies are two castings. A group/area spell remains one
+   casting at its authored origin; clicking a covered member does not create
+   a duplicate group cast.
+4. Click a casting card to inspect its individual enhancements, recast policy,
+   order and Remove control. Inspection does not change what ordinary
+   caster/source or recipient clicks mean. To edit that one casting, choose
+   **Change recipient** or **Change caster/source**, then make the one intended
+   choice; the edit control turns itself off after success. **Done** or Escape
+   leaves inspection, but is not part of normal multi-recipient assignment.
+5. The **Casting options** panel on the right (0.5.1-rc1) shows, in order:
    **Done**; who casts it on whom ("Linzi » Hedwirg") and from which
-   source; its state ("Ready", "Active · Will skip", "Active · Will
+   source; explicit **Change recipient** and **Change caster/source** controls;
+   its state ("Ready", "Active · Will skip", "Active · Will
    recast", or why it is not ready); **Recast if active**; its
    **Enhancements**, each with what it does, its source and what is left
    (one that cannot be used says why); what it spends ("If cast" when the
@@ -105,8 +109,11 @@ dropped silently.
 **Share Transmutation** (Brown-Fur Transmuter, from the KingmakerGunslinger
 mod): for an eligible personal transmutation, after choosing the exact
 caster and source, choose **Share with an ally** before clicking the
-target, then click the ally. The choice appears only for a caster and
-source that can use it; a saved casting whose Share no longer applies keeps
+target, then click each ally you want. Share stays selected while the buff,
+caster, exact provider and routine remain unchanged, so one batch can add
+several recipients. It clears when any part of that draft context changes;
+choices already saved on earlier castings do not change. The choice appears
+only for a caster and source that can use it; a saved casting whose Share no longer applies keeps
 it visible with the reason so you can untick it. Without Share the spell stays self-only. The
 Arcane Reservoir cost is budgeted together with the spell's own cost; when
 either is short the casting is blocked as a whole. Turning Share off on a
@@ -172,11 +179,14 @@ earlier look for that part.
 - Every route uses the same checks: the latest saved plan, the party as it
   is at that moment, and every casting re-checked before it is cast.
   Nothing runs on a stale plan and no routine needs an acceptance step.
-- **Blocked castings.** A routine is refused as a whole if any of its
-  castings is blocked (for example no slot left, or the target is gone);
-  the refusal names the reason. **Ready Casts Only** runs the ready
-  castings and lists what it left out; it never waives a required
-  enhancement.
+- **Unavailable castings (0.5.1-rc1).** The footer policy starts at
+  **Require full plan** for old and new profiles: one blocked in-scope casting
+  refuses the whole routine and names the reason. Choose **Cast available**
+  to run the valid, affordable subset in authored order and list every
+  omission. The choice is remembered for this profile and is used by both
+  planner Run and the HUD routine buttons. It never deletes assignments,
+  waives a required enhancement or bypasses combat, save, import, identity,
+  session-lock or dispatch safeguards.
 - **Never during combat (0.4.0).** A routine pressed while the party is in
   combat is refused with "Buff routines cannot run during combat." Nothing
   is spent and no casting is singled out; press again once combat is over.
@@ -202,11 +212,14 @@ earlier look for that part.
   planner opens it on that routine with the reason. The game still logs
   each cast itself. The full per-casting record is in the Unity Mod Manager
   log (`[KBP-CF-RUN]`).
-- **The footer (0.5.0)** shows the save state, one line saying what **Run**
+- **The footer (0.5.1-rc1)** shows the save state, one line saying what **Run**
   will do now or exactly why it cannot (for example "Long cannot run: 1
-  casting is not ready (marked in red)."), and **Resources**, **Mode**,
-  **Undo** and **Run**. **Resources** opens the accounting: the selected
-  routine on its own, and the whole plan run without rest in routine order.
+  casting is not ready (marked in red)."), and **Resources**, the availability
+  policy, **Mode**, **Undo** and **Run Long** / **Run Important** / **Run Short**.
+  **Resources** opens an opaque, scrollable parchment table. Choose the selected
+  routine or all routines without rest; rows are grouped by caster/shared owner
+  and show Available now, Saved need, Would spend and Short under the current
+  policy. Close it with Close, Escape or by opening a peer window.
 
 ## Files
 
@@ -227,13 +240,24 @@ it is resolved.
 
 Install archive-first: back up the whole `Mods\KingmakerBuffPlanner` folder
 (including `UserSettings`) outside the `Mods` folder before replacing it,
-then confirm Unity Mod Manager lists version 0.5.0 (its log line
-`[KBP-BOOT] Main.Load exited;version=0.5.0;commit=<commit>` names the
-release commit). To roll back, copy the new `UserSettings` outside `Mods`,
+then confirm Unity Mod Manager lists the version you intended: 0.5.0 for the
+published release, or 0.5.1-rc1 for this explicitly selected local candidate.
+Its log line
+`[KBP-BOOT] Main.Load exited;version=<version>;commit=<commit>` names the
+source commit. To roll back, copy the new `UserSettings` outside `Mods`,
 delete the new folder and copy your backup back. The release notes give the
 exact steps and the package checksum.
 
 ## What has been checked in the game
+
+0.5.1-rc1 (`a4c4342`, local candidate): **not run in Kingmaker**. Focused
+source/build/behavior checks and the local package pass, including the exact
+Seamantle and Resinous Skin/Share sequences. The guarded observer is prepared
+to capture Resources, continuous assignment, policy and Run labels at the
+owner's 1920x1200 setting and 1280x720, but the mandatory purity prerequisite
+is estimated at about 101 minutes for filesystem inventories alone and was not
+started under the ordinary budget. See the
+[exact receipt and remaining batch](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
 
 0.5.0 (guarded runs `kbpnui-*` on 2026-10-10/11 on the disposable automation
 campaign only, at the session display (1920x1200, later 1920x1080) and at

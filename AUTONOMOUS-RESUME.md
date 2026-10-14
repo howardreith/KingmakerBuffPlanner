@@ -1,3 +1,14 @@
+> **Current October 13 human-feedback resume:** branch
+> `codex/kingmaker-buff-planner-human-feedback`; exact packaged product
+> `a4c4342e1296966cbae1d64eeb53b47f23265627`; version 0.5.1-rc1; ZIP
+> `2e4e1a9fe3fd56eaf11eac39f09132be18c3358ebc9aee45f3b6fad8e8d2ffbc`;
+> DLL `bdc1aa3c512ba884a6c8b4476f4c92ea9362dec794b7fb1addf95f07288af10e`;
+> MVID `e21f2f39-0305-4bb3-aa02-067f4ac78252`. Source/focused/package work is
+> complete and **NOT_RUN**. Do not install, relabel 0.5.0 evidence or launch an
+> unbudgeted campaign. Resume with the single frozen-product purity plus owner
+> 1920x1200/compact 1280x720 batch in the
+> [human-feedback receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+>
 > **Current October 13 resume:** exact product `dfbaa5f`, internal version
 > 0.5.0, is published as artifact-only human-review prerelease `v0.5.0-rc.1`.
 > The annotated tag targets the product commit; later reader/evidence records do

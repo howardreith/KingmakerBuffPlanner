@@ -1,3 +1,14 @@
+> **Current 0.5.1-rc1 human-feedback acceptance:** exact local candidate
+> `a4c4342` is **NOT_RUN**. After its full-history purity prerequisite passes,
+> the selected guarded batch must render owner 1920x1200 and compact 1280x720.
+> Inspect selected/all Resources tables for opaque paper, bounded clipping and
+> no overlap; capture normal multi-recipient/add/remove and explicit-edit state;
+> confirm Require full plan / Cast available plus Run Long casing; compare
+> `[KBP-WORKSPACE-PERF]` calculation completion with the first correct frame;
+> then verify exact restoration and every protected save. The procedure,
+> expected PNGs and hashes are in the
+> [human-feedback receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+>
 > **Current October 13 owner-only remainder:** the exact `dfbaa5f` candidate has
 > completed the independently actionable game and visual work. The smallest
 > remaining list is: (1) an organic long/localized spell popup in a real

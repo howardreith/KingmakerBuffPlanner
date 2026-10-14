@@ -1,5 +1,16 @@
 # Discovery Action Contract Inventory
 
+## 0.5.1-rc1 human-feedback refinement
+
+Discovery and structural action interpretation are unchanged. The performance
+work caches only normalized calculations for an exact immutable input snapshot,
+authoring revision and execution mode; opening/running still captures fresh
+game/spellbook inputs and invalidates on a new snapshot. No spell-name/GUID
+list, reflection expansion or compatibility dependency was added. Exact source
+`a4c4342e1296966cbae1d64eeb53b47f23265627` is **NOT_RUN**; evidence and the
+remaining guarded batch are in the
+[human-feedback receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+
 ## 0.4.2 catalogue source identity
 
 Discovery and its action-graph interpretation are unchanged. The catalogue

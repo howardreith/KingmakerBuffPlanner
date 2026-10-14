@@ -1,5 +1,51 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-13 human-feedback refinement checkpoint
+
+On DATA, successor branch `codex/kingmaker-buff-planner-human-feedback` began
+from `origin/main` `5e1e6d22c9cc03826f867ee9e068089fb06521b4` with no project changes.
+The exact handoff ZIP SHA-256 is
+`60fd5af6b1ac9b25551a9c4d8daff4724158614cd74e8086e8f3363291562c56`;
+its nine entries had one root and zero unsafe, symlink-like or duplicate paths.
+Built-in manifest verification passed 8/0 after isolated extraction. All four
+owner 1920x1200 references were inspected.
+
+Implementation commit `5688cc5762ba6aead3f23a60d14180de329c841f`
+delivers UX-01 through UX-06. Review found the old guarded observer still
+assumed add-to-focus and implicit retarget; runtime-evidence commit
+`a4c4342e1296966cbae1d64eeb53b47f23265627` corrects it and adds two Resources
+captures plus schema-5 bounds/focus/clipping/unchanged-plan judgements. The
+final affected command recorded in the receipt passed source 43/0, build 1/0
+and selected protocol 101/0 in 8.5 seconds. `scripts/Build-Local.ps1` then
+passed source 43/0, build 1/0, package validation 4/0 and creation 1/0.
+The first observer-focused attempt was 49/1 because one planner-copy assertion
+still expected the intentionally retired “click to select it” gesture; after
+updating that meaningful expectation, the rerun passed 50/0. A direct runner
+call that omitted the repository selector's game-path/dependency environment
+was rejected as an invalid invocation rather than a product failure.
+
+The resulting 0.5.1-rc1 ZIP SHA-256 is
+`2e4e1a9fe3fd56eaf11eac39f09132be18c3358ebc9aee45f3b6fad8e8d2ffbc`;
+DLL SHA-256 `bdc1aa3c512ba884a6c8b4476f4c92ea9362dec794b7fb1addf95f07288af10e`;
+MVID `e21f2f39-0305-4bb3-aa02-067f4ac78252`. It is local, validated,
+**NOT_RUN**, never installed and not published.
+
+Representative 67-casting/77-entry calculation medians changed from
+66.131/1.458/1.528/35.034 ms (cold/warm/buff/toggle) to
+65.211/0.771/0.689/36.559 ms; after slowest observations were
+67.248/1.752/1.270/51.593 ms. Toggle remains synchronous autosave-bound.
+Weakening autosave, trusting stale snapshots, adding a parallel executor,
+duplicating group casts and reusing older runtime pictures were rejected.
+
+No game or live-purity route was launched. Current full-history inputs contain
+374,395 files and the measured sample estimates about 101 minutes for mandatory
+before/after inventories alone, exceeding the 30-minute ceiling. Remaining
+uncertainty is actual Resources/render/input behavior and first-frame latency
+at owner 1920x1200 and compact 1280x720, plus live planner/HUD dispatch. Next:
+run the one frozen-`a4c4342` guarded batch and inspect its actual images. Full
+commands, exact performance table, limitations and evidence paths:
+[0.5.1-rc1 human-feedback receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+
 ## 2026-10-13 RC1 human-review prerelease publication
 
 The bounded reader/evidence correction is commit

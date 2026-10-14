@@ -1,3 +1,12 @@
+> **Current 0.5.1-rc1 human-feedback implementation:** exact packaged source
+> `a4c4342e1296966cbae1d64eeb53b47f23265627` implements UX-01 through UX-06;
+> final affected checks are source 43/0, build 1/0, protocol 101/0 and package
+> validation 4/0. ZIP
+> `2e4e1a9fe3fd56eaf11eac39f09132be18c3358ebc9aee45f3b6fad8e8d2ffbc`
+> is **NOT_RUN**, never installed and not published. Before/after timings,
+> architecture, per-UX evidence, limitations and the exact deferred live batch
+> are in the [human-feedback receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+>
 > **Current October 13 native UI result:** exact source `dfbaa5f`, ZIP
 > `2e2dbe33cb4ccb65762829042e5f96076882c3030dc3bc24e1df5fff51e31501`,
 > and DLL
