@@ -6,6 +6,26 @@ using KingmakerBuffPlanner.Planning;
 
 namespace KingmakerBuffPlanner.UI
 {
+    // One policy resolver shared by the HUD entry and guarded qualification.
+    // It chooses only the requested/remembered gate mode; compilation,
+    // validation, projection and dispatch remain owned by the session.
+    internal static class CastingRunPolicy
+    {
+        internal static CastingApplyMode Resolve(CastingWorkspaceSession session,
+            CastingApplyMode? requestedMode)
+        {
+            if (session == null) throw new ArgumentNullException("session");
+            return requestedMode ?? session.ApplyMode;
+        }
+
+        internal static WorkspaceApplyResult Apply(CastingWorkspaceSession session,
+            CastingApplyMode? requestedMode, string routineId,
+            CastingWorkspaceInputs inputs)
+        {
+            return session.Apply(Resolve(session, requestedMode), routineId, inputs);
+        }
+    }
+
     // Player-facing text for casting-first runs and refusals. Effects and
     // resource spending are stated separately; nothing claims more than
     // the run reported, and nothing is described as rolled back.

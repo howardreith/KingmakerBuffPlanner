@@ -271,6 +271,11 @@ namespace KingmakerBuffPlanner.Execution
         // the shared reservoir's COMBINED demand and lands the enhanced
         // result on the ally.
         public const string SharedPowerful = "shared-powerful";
+        // The human-feedback policy route keeps the established shared +
+        // Powerful Change qualification, then authors a partially available
+        // plan: strict refusal followed by the remembered Cast available
+        // policy through the same planner/HUD policy service.
+        public const string PolicySharedPowerful = "policy-shared-powerful";
         // The willing-target touch qualification (0.4.0 WP6): one touch buff
         // delivered to an ally through the sticky-touch route (instant: the
         // touch transaction; animated: the game's two-stage command) from a
@@ -295,7 +300,13 @@ namespace KingmakerBuffPlanner.Execution
 
         public static bool IsSharedRecipe(string recipe)
         {
-            return recipe == SharedPersonal || recipe == SharedPowerful;
+            return recipe == SharedPersonal || recipe == SharedPowerful ||
+                recipe == PolicySharedPowerful;
+        }
+
+        public static bool IsPolicyRecipe(string recipe)
+        {
+            return recipe == PolicySharedPowerful;
         }
 
         // The recipes that cast one buff plain and then again with a
@@ -343,6 +354,7 @@ namespace KingmakerBuffPlanner.Execution
         public static int ForecastSteps(string recipe)
         {
             if (IsSingleUseRecipe(recipe)) return 1;
+            if (IsPolicyRecipe(recipe)) return 3;
             if (IsTwoPhase(recipe)) return 2;
             return HasDisableStep(recipe) ? 5 : 3;
         }
@@ -360,6 +372,8 @@ namespace KingmakerBuffPlanner.Execution
             if (recipe == SharedPersonal) return SelectSharedPersonal(inputs, campaignId);
             if (recipe == SharedPowerful) return SelectSharedPersonal(inputs, campaignId,
                 combined: true);
+            if (recipe == PolicySharedPowerful) return SelectSharedPersonal(inputs, campaignId,
+                combined: true, resultRecipe: PolicySharedPowerful);
             return new CastingQualificationSelection("unknown-recipe:" + recipe, null, null,
                 null, 0, null, recipe);
         }
@@ -376,7 +390,8 @@ namespace KingmakerBuffPlanner.Execution
         // document (graph-assigned identities), so the projections bound
         // by the allowance are the production ones.
         public static CastingQualificationSelection SelectSharedPersonal(
-            CastingWorkspaceInputs inputs, string campaignId, bool combined = false)
+            CastingWorkspaceInputs inputs, string campaignId, bool combined = false,
+            string resultRecipe = null)
         {
             if (inputs == null) throw new ArgumentNullException("inputs");
             var rejections = new List<string>();
@@ -531,9 +546,9 @@ namespace KingmakerBuffPlanner.Execution
                     return new CastingQualificationSelection(null, sourceId,
                         provider.Key.Ability, new[] { shared, plainCasting }, considered,
                         rejections,
-                        recipe: combined
+                        recipe: resultRecipe ?? (combined
                             ? CastingQualificationRecipe.SharedPowerful
-                            : CastingQualificationRecipe.SharedPersonal,
+                            : CastingQualificationRecipe.SharedPersonal),
                         coverage: new[] { "share:" + share.EnhancementId,
                             "reservoir:" + share.UsagePoolId,
                             "units:" + share.UsageUnitsPerCast,
@@ -546,7 +561,9 @@ namespace KingmakerBuffPlanner.Execution
                     reject(share.EnhancementId + "|no-whitelisted-personal-option");
             }
             return new CastingQualificationSelection("no-eligible-shared-recipe", null, null,
-                null, considered, rejections, CastingQualificationRecipe.SharedPersonal);
+                null, considered, rejections, resultRecipe ?? (combined
+                    ? CastingQualificationRecipe.SharedPowerful
+                    : CastingQualificationRecipe.SharedPersonal));
         }
 
         // The isolation witness's candidates (v1.2 E20): plain spellbook
@@ -1783,6 +1800,7 @@ namespace KingmakerBuffPlanner.Execution
         // source can fund is refused WHOLE - no submission, no native spend,
         // no Share/Powerful Change state touched.
         public const string Shortage = "shortage";
+        public const string Available = "cast-available";
 
         public static IReadOnlyList<CastingQualificationStepForecast> Forecast(
             CastingQualificationSelection selection, CastingWorkspaceInputs inputs,
@@ -1794,6 +1812,8 @@ namespace KingmakerBuffPlanner.Execution
                 return ForecastTwoPhase(selection, inputs, campaignId, Prime, Mixed);
             if (CastingQualificationRecipe.IsEnhancedRecipe(selection.Recipe))
                 return ForecastTwoPhase(selection, inputs, campaignId, Plain, Enhanced);
+            if (CastingQualificationRecipe.IsPolicyRecipe(selection.Recipe))
+                return ForecastSharedPolicy(selection, inputs, campaignId);
             if (CastingQualificationRecipe.IsSharedRecipe(selection.Recipe))
                 return ForecastTwoPhase(selection, inputs, campaignId, Shared, Witness);
             // The single-use recipes (ability-pool-direct, sticky-touch-direct):
@@ -1897,6 +1917,119 @@ namespace KingmakerBuffPlanner.Execution
             return new ReadOnlyCollection<CastingQualificationStepForecast>(steps);
         }
 
+        // The policy recipe forecasts the same shared and witness projections
+        // as the established route, then advances both native reservations
+        // and enhancement-pool usage before compiling the authored shortage
+        // under ReadyCastsOnly.  The strict attempt has no projection and is
+        // deliberately runtime evidence; only the affordable subset receives
+        // a run-bound allowance.
+        private static IReadOnlyList<CastingQualificationStepForecast> ForecastSharedPolicy(
+            CastingQualificationSelection selection, CastingWorkspaceInputs inputs,
+            string campaignId)
+        {
+            PlannedCasting shared = selection.Castings[0];
+            PlannedCasting witness = selection.Castings[1];
+            EffectExpression sharedEffect = inputs.EffectsBySource[shared.SourceId];
+            EffectExpression witnessEffect = inputs.EffectsBySource[witness.SourceId];
+            ProviderSnapshot sharedProvider = inputs.Snapshot.Providers.First(value =>
+                value.Key.CasterUnitId == shared.CasterUnitId &&
+                value.Key.Ability.Canonical == shared.Ability.Canonical);
+            ProviderSnapshot witnessProvider = inputs.Snapshot.Providers.First(value =>
+                value.Key.CasterUnitId == witness.CasterUnitId &&
+                value.Key.Ability.Canonical == witness.Ability.Canonical);
+
+            var steps = new List<CastingQualificationStepForecast>();
+            CastingQualificationStepForecast sharedStep = Project(Shared,
+                BuildDocument(campaignId, new[] { shared }), inputs, inputs.LiveEffects);
+            steps.Add(sharedStep);
+            if (sharedStep.Projection == null)
+                return new ReadOnlyCollection<CastingQualificationStepForecast>(steps);
+
+            CastingWorkspaceInputs afterShared = WithSpentSteps(inputs,
+                sharedStep.Projection.Plan.Steps);
+            afterShared = WithLiveEffects(afterShared, WithGranted(afterShared,
+                sharedEffect, new[]
+                {
+                    new EffectGrant(shared.DirectTargetUnitId,
+                        sharedProvider.EffectiveCasterLevel, shared.Ability.MetamagicMask)
+                }));
+            CastingPlanDocument witnessDocument = BuildDocument(campaignId,
+                new[] { shared.WithState(CastingAuthoringState.Disabled), witness });
+            CastingQualificationStepForecast witnessStep = Project(Witness,
+                witnessDocument, afterShared, afterShared.LiveEffects);
+            steps.Add(witnessStep);
+            if (witnessStep.Projection == null)
+                return new ReadOnlyCollection<CastingQualificationStepForecast>(steps);
+
+            CastingWorkspaceInputs afterWitness = WithSpentSteps(afterShared,
+                witnessStep.Projection.Plan.Steps);
+            afterWitness = WithLiveEffects(afterWitness, WithGranted(afterWitness,
+                witnessEffect, new[]
+                {
+                    new EffectGrant(witness.DirectTargetUnitId,
+                        witnessProvider.EffectiveCasterLevel, witness.Ability.MetamagicMask)
+                }));
+            ProviderPlanningOption option = afterWitness.ProviderOptions.First(value =>
+                value.Provider.Key.CasterUnitId == shared.CasterUnitId &&
+                value.Provider.Key.Ability.Canonical == shared.Ability.Canonical &&
+                string.Equals(value.Provider.Key.SpellbookGuid ?? string.Empty,
+                    shared.SpellbookGuid ?? string.Empty, StringComparison.Ordinal));
+            ResourcePoolSnapshot nativePool = afterWitness.Snapshot.ResourcePools.FirstOrDefault(value =>
+                string.Equals(value.PoolKey, option.Provider.ResourcePoolKey, StringComparison.Ordinal));
+            int needed;
+            if (nativePool != null && nativePool.Kind != ResourcePoolKind.Unlimited)
+                needed = CastingQualificationRecipe.CastsAvailable(afterWitness,
+                    option.Provider, CastingQualificationDriver.MaximumShortageCastings) + 1;
+            else
+            {
+                var selected = new HashSet<string>(shared.Enhancements
+                    .Select(value => value.EnhancementId), StringComparer.Ordinal);
+                List<IGrouping<string, CastEnhancementSnapshot>> pools = afterWitness.Enhancements
+                    .Where(value => selected.Contains(value.EnhancementId))
+                    .GroupBy(value => value.UsagePoolId, StringComparer.Ordinal).ToList();
+                int available = int.MaxValue;
+                foreach (IGrouping<string, CastEnhancementSnapshot> pool in pools)
+                {
+                    int demand = pool.Sum(value => value.UsageUnitsPerCast);
+                    int? remaining = pool.Where(value => value.RemainingUses.HasValue)
+                        .Select(value => value.RemainingUses).Min();
+                    if (demand > 0 && remaining.HasValue)
+                        available = Math.Min(available, remaining.Value / demand);
+                }
+                needed = available == int.MaxValue ? int.MaxValue : available + 1;
+            }
+            if (needed > CastingQualificationDriver.MaximumShortageCastings)
+            {
+                steps.Add(new CastingQualificationStepForecast(Available,
+                    "shortage-unconstructible:" + needed, null, null));
+                return new ReadOnlyCollection<CastingQualificationStepForecast>(steps);
+            }
+            List<PlannedCasting> shortage = BuildShortageCastings(shared, needed);
+            CastingPlanDocument availableDocument = BuildDocument(campaignId,
+                new[] { shared.WithState(CastingAuthoringState.Disabled), witness }
+                    .Concat(shortage));
+            steps.Add(Project(Available, availableDocument, afterWitness,
+                afterWitness.LiveEffects, CastingApplyMode.ReadyCastsOnly));
+            return new ReadOnlyCollection<CastingQualificationStepForecast>(steps);
+        }
+
+        internal static List<PlannedCasting> BuildShortageCastings(
+            PlannedCasting shared, int count)
+        {
+            var result = new List<PlannedCasting>();
+            for (int index = 1; index <= count; index++)
+                result.Add(new PlannedCasting(
+                    CastingQualificationRecord.ShortageCastingPrefix + index,
+                    CastingQualificationRecipe.RoutineId, 10 + index,
+                    shared.SourceId, shared.Ability, shared.CasterUnitId,
+                    shared.SpellbookGuid, CastingTargetMode.DirectTarget,
+                    shared.DirectTargetUnitId, null, null,
+                    shared.TargetingModifiers, shared.Enhancements,
+                    ExistingEffectPolicy.Overwrite, null,
+                    CastingAuthoringState.Ready, null));
+            return result;
+        }
+
         internal sealed class EffectGrant
         {
             internal EffectGrant(string unitId, int casterLevel, int metamagicMask)
@@ -1950,7 +2083,54 @@ namespace KingmakerBuffPlanner.Execution
             return new CastingWorkspaceInputs(new PartyProviderSnapshot(inputs.Snapshot.Units,
                     inputs.Snapshot.Providers, pools), inputs.ProviderOptions,
                 inputs.EffectsBySource, inputs.Enhancements, inputs.TargetingModifiers,
-                inputs.LiveEffects);
+                inputs.LiveEffects, inputs.CombatActive, inputs.SpellbookMembership,
+                inputs.RunActive);
+        }
+
+        // Advances the complete atomic cost of projected steps: their native
+        // reservations and every enhancement usage unit sharing a pool.
+        internal static CastingWorkspaceInputs WithSpentSteps(CastingWorkspaceInputs inputs,
+            IEnumerable<CastStep> steps)
+        {
+            List<CastStep> values = (steps ?? new CastStep[0]).ToList();
+            CastingWorkspaceInputs native = WithSpent(inputs,
+                values.Select(value => value.Reservation));
+            var usage = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, int> pair in values.SelectMany(value =>
+                value.EnhancementUsageByPool))
+            {
+                int prior;
+                usage.TryGetValue(pair.Key, out prior);
+                usage[pair.Key] = prior + pair.Value;
+            }
+            List<CastEnhancementSnapshot> enhancements = native.Enhancements.Select(value =>
+            {
+                int spent;
+                int? remaining = value.RemainingUses;
+                if (remaining.HasValue && usage.TryGetValue(value.UsagePoolId, out spent))
+                    remaining = Math.Max(0, remaining.Value - spent);
+                return new CastEnhancementSnapshot(value.EnhancementId,
+                    value.CasterUnitId, value.SourceBlueprintGuid, value.DisplayName,
+                    value.Description, value.Category, value.MetamagicMask,
+                    value.MaximumSpellLevel, remaining, value.AbilityWhiteList,
+                    value.EffectDisplayName, value.SpellbookWhiteList,
+                    value.UsagePoolId, value.RequiresNativeCommand,
+                    value.ExclusiveGroupId, value.UsageUnitsPerCast,
+                    value.AffectsTargeting, value.NativeActivationGroupId,
+                    value.UsagePoolDisplayName, value.DirectCastProviderId);
+            }).ToList();
+            return new CastingWorkspaceInputs(native.Snapshot, native.ProviderOptions,
+                native.EffectsBySource, enhancements, native.TargetingModifiers,
+                native.LiveEffects, native.CombatActive, native.SpellbookMembership,
+                native.RunActive);
+        }
+
+        internal static CastingWorkspaceInputs WithLiveEffects(
+            CastingWorkspaceInputs inputs, ActiveEffectSnapshot live)
+        {
+            return new CastingWorkspaceInputs(inputs.Snapshot, inputs.ProviderOptions,
+                inputs.EffectsBySource, inputs.Enhancements, inputs.TargetingModifiers,
+                live, inputs.CombatActive, inputs.SpellbookMembership, inputs.RunActive);
         }
 
         // The document exactly as a fresh session holds it after the recipe
@@ -1995,11 +2175,18 @@ namespace KingmakerBuffPlanner.Execution
         internal static CastingQualificationStepForecast Project(string name,
             CastingPlanDocument document, CastingWorkspaceInputs inputs, ActiveEffectSnapshot live)
         {
+            return Project(name, document, inputs, live, CastingApplyMode.Ordinary);
+        }
+
+        internal static CastingQualificationStepForecast Project(string name,
+            CastingPlanDocument document, CastingWorkspaceInputs inputs, ActiveEffectSnapshot live,
+            CastingApplyMode mode)
+        {
             ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(document,
                 inputs.Snapshot, inputs.ProviderOptions, inputs.EffectsBySource, inputs.Enhancements,
                 CastingQualificationRecipe.RoutineId, inputs.TargetingModifiers, false, live);
             CastingApplyDecision decision = new CastingExecutionGate().Evaluate(plan,
-                CastingApplyMode.Ordinary, CastingQualificationRecipe.RoutineId);
+                mode, CastingQualificationRecipe.RoutineId);
             if (!decision.Allowed)
                 return new CastingQualificationStepForecast(name,
                     "gate-refused:" + string.Join(",", decision.BlockingReasons.ToArray()), null, null);

@@ -66,7 +66,14 @@ namespace KingmakerBuffPlanner.UI
         private double? _nextCommandAndPersistenceMilliseconds;
         private long? _nextInteractionStartedAt;
         private int _refreshSequence;
-        private FirstCorrectFrameProbe _firstCorrectFrameProbe;
+        private ExpectedStateFrameProbe _frameEndProbe;
+        private long? _openRequestStartedAt;
+        private double? _requestToRefreshMilliseconds;
+        private double? _openDiscoveryMilliseconds;
+        private double? _sessionBindingAndPersistenceMilliseconds;
+        private double? _inputLeaseMilliseconds;
+        private double? _viewConstructionMilliseconds;
+        private double? _openReconciliationMilliseconds;
         private GraphLayoutResult _lastLayout;
         private GraphLayoutMetrics _lastMetrics;
 
@@ -140,29 +147,65 @@ namespace KingmakerBuffPlanner.UI
         private bool _descriptionShownLastFrame;
         private readonly Action<string> _log;
 
-        // Canvas layout completion is not the player's first rendered frame.
-        // Sample EndOfFrame after the synchronously rebuilt view so the live
-        // evidence can retain the separate stage timings and also measure
-        // input-to-first-correct-rendered-frame latency.
-        private sealed class FirstCorrectFrameProbe : MonoBehaviour
+        // EndOfFrame is a render-stage boundary, not proof of pixels. Each
+        // sample is correlated with a lightweight expected-state observation
+        // and named handler-to-frame-end. A newer interaction explicitly
+        // supersedes the older sample instead of inheriting its start time.
+        private sealed class ExpectedStateFrameProbe : MonoBehaviour
         {
+            private bool _pending;
+            private int _sequence;
+            private string _cause;
+            private Action<string> _log;
+
             internal void Arm(long startedAt, int sequence, string cause,
-                Action<string> log)
+                Func<string> observeExpectedState, Action<string> log)
             {
+                if (_pending)
+                    _log("[KBP-WORKSPACE-PERF] sequence=" + _sequence + ";cause=" + _cause +
+                        ";outcome=superseded;supersededBySequence=" + sequence + ".");
                 StopAllCoroutines();
-                StartCoroutine(Observe(startedAt, sequence, cause, log));
+                _pending = true;
+                _sequence = sequence;
+                _cause = cause;
+                _log = log;
+                StartCoroutine(Observe(startedAt, sequence, cause, observeExpectedState));
             }
 
-            private static IEnumerator Observe(long startedAt, int sequence,
-                string cause, Action<string> log)
+            internal void Cancel(string reason)
+            {
+                if (!_pending) return;
+                StopAllCoroutines();
+                _log("[KBP-WORKSPACE-PERF] sequence=" + _sequence + ";cause=" + _cause +
+                    ";outcome=cancelled;reason=" + reason + ".");
+                _pending = false;
+            }
+
+            private IEnumerator Observe(long startedAt, int sequence,
+                string cause, Func<string> observeExpectedState)
             {
                 yield return new WaitForEndOfFrame();
+                if (!_pending || sequence != _sequence) yield break;
                 double milliseconds = (System.Diagnostics.Stopwatch.GetTimestamp() - startedAt) *
                     1000.0 / System.Diagnostics.Stopwatch.Frequency;
-                log("[KBP-WORKSPACE-PERF] sequence=" + sequence + ";cause=" + cause +
-                    ";inputToFirstCorrectRenderedFrameMs=" + milliseconds.ToString("F3") +
-                    ";renderedFrame=" + Time.frameCount + ".");
+                string expectedState;
+                try { expectedState = observeExpectedState == null ? "unobserved" : observeExpectedState(); }
+                catch (Exception exception) { expectedState = "observation-error:" + exception.GetType().Name; }
+                _log("[KBP-WORKSPACE-PERF] sequence=" + sequence + ";cause=" + cause +
+                    ";handlerToFrameEndMs=" + milliseconds.ToString("F3") +
+                    ";frame=" + Time.frameCount + ";expectedState=" + expectedState +
+                    ";outcome=" + (expectedState.StartsWith("confirmed:", StringComparison.Ordinal)
+                        ? "expected-state-observed" : "state-not-confirmed") + ".");
+                _pending = false;
             }
+        }
+
+        private struct ResourceRebuildTiming
+        {
+            internal double InputMilliseconds;
+            internal double CalculationMilliseconds;
+            internal double RegionMilliseconds;
+            internal double LayoutMilliseconds;
         }
 
         internal CastingWorkspaceScreenView(
@@ -190,6 +233,22 @@ namespace KingmakerBuffPlanner.UI
         internal GameObject RootObject
         {
             get { return _root == null ? null : _root.gameObject; }
+        }
+
+        internal void BeginOpenMeasurement(long requestStartedAt,
+            double requestToRefreshMilliseconds, double discoveryMilliseconds,
+            double sessionBindingAndPersistenceMilliseconds,
+            double inputLeaseMilliseconds, double constructionMilliseconds,
+            double reconciliationMilliseconds)
+        {
+            _openRequestStartedAt = requestStartedAt;
+            _requestToRefreshMilliseconds = requestToRefreshMilliseconds;
+            _openDiscoveryMilliseconds = discoveryMilliseconds;
+            _sessionBindingAndPersistenceMilliseconds =
+                sessionBindingAndPersistenceMilliseconds;
+            _inputLeaseMilliseconds = inputLeaseMilliseconds;
+            _viewConstructionMilliseconds = constructionMilliseconds;
+            _openReconciliationMilliseconds = reconciliationMilliseconds;
         }
 
         // Everyday-use v1.2's one continuous scroll (the two-page book art
@@ -369,6 +428,8 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed) return;
             _disposed = true;
+            if (_frameEndProbe != null)
+                _frameEndProbe.Cancel("workspace-disposed-before-frame-end");
             if (_description != null) _description.Dispose();
             _description = null;
             if (_root != null) UnityEngine.Object.Destroy(_root.gameObject);
@@ -511,7 +572,8 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed) return;
             long totalStarted = System.Diagnostics.Stopwatch.GetTimestamp();
-            long interactionStarted = _nextInteractionStartedAt ?? totalStarted;
+            long interactionStarted = _openRequestStartedAt ?? _nextInteractionStartedAt ?? totalStarted;
+            _openRequestStartedAt = null;
             _nextInteractionStartedAt = null;
             int sequence = ++_refreshSequence;
             string cause = _lastView == null ? "cold-open"
@@ -527,7 +589,7 @@ namespace KingmakerBuffPlanner.UI
                 : _inspectorScroll.verticalNormalizedPosition;
             long stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             CastingWorkspaceInputs inputs = _inputs();
-            double inputMilliseconds = ElapsedMilliseconds(stageStarted);
+            double displaySnapshotMilliseconds = ElapsedMilliseconds(stageStarted);
             stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             CastingGraphView view = _session.BuildGraph(inputs);
             double calculationMilliseconds = ElapsedMilliseconds(stageStarted);
@@ -565,17 +627,43 @@ namespace KingmakerBuffPlanner.UI
             RevealPendingProblem();
             double layoutMilliseconds = ElapsedMilliseconds(stageStarted);
             _log("[KBP-WORKSPACE-PERF] sequence=" + sequence + ";cause=" + cause +
+                ";requestToRefreshMs=" + (_requestToRefreshMilliseconds ?? 0d).ToString("F3") +
+                ";discoveryMs=" + (_openDiscoveryMilliseconds ?? 0d).ToString("F3") +
+                ";sessionBindingAndPersistenceMs=" +
+                    (_sessionBindingAndPersistenceMilliseconds ?? 0d).ToString("F3") +
+                ";inputLeaseMs=" + (_inputLeaseMilliseconds ?? 0d).ToString("F3") +
+                ";viewConstructionMs=" + (_viewConstructionMilliseconds ?? 0d).ToString("F3") +
+                ";openReconciliationMs=" + (_openReconciliationMilliseconds ?? 0d).ToString("F3") +
                 ";commandAndPersistenceMs=" +
                     commandAndPersistenceMilliseconds.ToString("F3") +
-                ";inputMs=" + inputMilliseconds.ToString("F3") +
+                ";displaySnapshotMs=" + displaySnapshotMilliseconds.ToString("F3") +
                 ";calculationMs=" + calculationMilliseconds.ToString("F3") +
                 ";reviewMs=" + reviewMilliseconds.ToString("F3") +
                 ";regionsMs=" + regionMilliseconds.ToString("F3") +
                 ";themeMs=" + themeMilliseconds.ToString("F3") +
                 ";layoutMs=" + layoutMilliseconds.ToString("F3") +
                 ";presentedRefreshMs=" + ElapsedMilliseconds(totalStarted).ToString("F3"));
-            if (_firstCorrectFrameProbe != null)
-                _firstCorrectFrameProbe.Arm(interactionStarted, sequence, cause, _log);
+            _requestToRefreshMilliseconds = null;
+            _openDiscoveryMilliseconds = null;
+            _sessionBindingAndPersistenceMilliseconds = null;
+            _inputLeaseMilliseconds = null;
+            _viewConstructionMilliseconds = null;
+            _openReconciliationMilliseconds = null;
+            if (_frameEndProbe != null)
+                _frameEndProbe.Arm(interactionStarted, sequence, cause,
+                    () => ObserveGraphExpectedState(view), _log);
+        }
+
+        private string ObserveGraphExpectedState(CastingGraphView expected)
+        {
+            if (_disposed || _root == null || !_root.gameObject.activeInHierarchy)
+                return "missing:workspace";
+            if (!ReferenceEquals(_lastView, expected)) return "superseded:graph-model";
+            if (_bannerTitle == null || !string.Equals(_bannerTitle.text,
+                    expected.SelectedSourceCaption, StringComparison.Ordinal))
+                return "mismatch:banner";
+            return "confirmed:graph:routine=" + expected.SelectedRoutineId +
+                ",source=" + expected.SelectedSourceId;
         }
 
         private static double ElapsedMilliseconds(long startedAt)
@@ -953,7 +1041,7 @@ namespace KingmakerBuffPlanner.UI
             canvas.overrideSorting = true;
             canvas.sortingOrder = 32000;
             _root.gameObject.AddComponent<GraphicRaycaster>();
-            _firstCorrectFrameProbe = _root.gameObject.AddComponent<FirstCorrectFrameProbe>();
+            _frameEndProbe = _root.gameObject.AddComponent<ExpectedStateFrameProbe>();
             _description = new NativeDescriptionPresenter(canvas, _root, _log);
             CanvasGroup group = _root.gameObject.AddComponent<CanvasGroup>();
             group.alpha = 1f;
@@ -1586,12 +1674,16 @@ namespace KingmakerBuffPlanner.UI
                 CloseResources();
                 return;
             }
+            long startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
             NativeDescriptionPresenter.CloseIfOpen();
-            try { RebuildResources(); }
+            ResourceRebuildTiming timing;
+            try { timing = RebuildResources(); }
             catch (Exception exception)
             {
                 Feedback("Resources could not be prepared: " + exception.Message, true);
                 _log("[KBP-WORKSPACE] Resources refused: " + exception);
+                _log("[KBP-WORKSPACE-PERF] cause=resources-open;outcome=refused;handlerMs=" +
+                    ElapsedMilliseconds(startedAt).ToString("F3") + ".");
                 return;
             }
             _resources.gameObject.SetActive(true);
@@ -1599,11 +1691,14 @@ namespace KingmakerBuffPlanner.UI
             if (_resourcesButton != null) _kit.SetSelected(_resourcesButton, true);
             if (EventSystem.current != null && _resourcesCloseButton != null)
                 EventSystem.current.SetSelectedGameObject(_resourcesCloseButton.gameObject);
+            ArmResourcesFrameProbe(startedAt, "resources-open", timing);
         }
 
         private void CloseResources()
         {
             if (_resources == null || !_resources.gameObject.activeSelf) return;
+            if (_frameEndProbe != null)
+                _frameEndProbe.Cancel("resources-closed-before-frame-end");
             _resources.gameObject.SetActive(false);
             if (_resourcesButton != null) _kit.SetSelected(_resourcesButton, false);
             if (EventSystem.current != null && _resourcesButton != null)
@@ -1613,21 +1708,35 @@ namespace KingmakerBuffPlanner.UI
         private void SetResourceScope(WorkspaceResourceScope scope)
         {
             if (_resourceScope == scope) return;
+            long startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
             WorkspaceResourceScope prior = _resourceScope;
             _resourceScope = scope;
-            try { RebuildResources(); }
+            try
+            {
+                ResourceRebuildTiming timing = RebuildResources();
+                ArmResourcesFrameProbe(startedAt, "resources-scope-" + scope, timing);
+            }
             catch (Exception exception)
             {
                 _resourceScope = prior;
                 Feedback("Resources could not change scope: " + exception.Message, true);
                 _log("[KBP-WORKSPACE] Resources scope refused: " + exception);
+                _log("[KBP-WORKSPACE-PERF] cause=resources-scope-" + scope +
+                    ";outcome=refused;handlerMs=" + ElapsedMilliseconds(startedAt).ToString("F3") + ".");
             }
         }
 
-        private void RebuildResources()
+        private ResourceRebuildTiming RebuildResources()
         {
-            if (_resourcesContent == null) return;
-            WorkspaceResourceReport report = _session.BuildResourceReport(_inputs(), _resourceScope);
+            var timing = new ResourceRebuildTiming();
+            if (_resourcesContent == null) return timing;
+            long stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+            CastingWorkspaceInputs inputs = _inputs();
+            timing.InputMilliseconds = ElapsedMilliseconds(stageStarted);
+            stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+            WorkspaceResourceReport report = _session.BuildResourceReport(inputs, _resourceScope);
+            timing.CalculationMilliseconds = ElapsedMilliseconds(stageStarted);
+            stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             _resourcesSummary.text = report.ScopeLabel + " · " + report.Summary;
             string saveState = _session.FooterSaveState;
             string saveProblem = WorkspaceFooterText.SaveProblem(saveState);
@@ -1665,9 +1774,39 @@ namespace KingmakerBuffPlanner.UI
                         row.WouldSpendText, row.ShortText, PlannerTextRole.Body,
                         row.ShortBy != 0);
             }
+            timing.RegionMilliseconds = ElapsedMilliseconds(stageStarted);
+            stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             Canvas.ForceUpdateCanvases();
             if (_resourcesScroll != null)
                 _resourcesScroll.verticalNormalizedPosition = position;
+            timing.LayoutMilliseconds = ElapsedMilliseconds(stageStarted);
+            return timing;
+        }
+
+        private void ArmResourcesFrameProbe(long startedAt, string cause,
+            ResourceRebuildTiming timing)
+        {
+            int sequence = ++_refreshSequence;
+            _log("[KBP-WORKSPACE-PERF] sequence=" + sequence + ";cause=" + cause +
+                ";displaySnapshotMs=" + timing.InputMilliseconds.ToString("F3") +
+                ";calculationMs=" + timing.CalculationMilliseconds.ToString("F3") +
+                ";regionsMs=" + timing.RegionMilliseconds.ToString("F3") +
+                ";themeMs=0.000;layoutMs=" + timing.LayoutMilliseconds.ToString("F3") +
+                ";handlerSynchronousMs=" + ElapsedMilliseconds(startedAt).ToString("F3"));
+            WorkspaceResourceScope expectedScope = _resourceScope;
+            if (_frameEndProbe != null)
+                _frameEndProbe.Arm(startedAt, sequence, cause,
+                    () => ObserveResourcesExpectedState(expectedScope), _log);
+        }
+
+        private string ObserveResourcesExpectedState(WorkspaceResourceScope expectedScope)
+        {
+            if (!ResourcesOpenForRuntime) return "missing:resources";
+            if (_resourceScope != expectedScope) return "superseded:resource-scope";
+            if (!ResourcesAccountingUsesNativeLayerForRuntime) return "mismatch:resource-layer";
+            int cells = ResourcesVisibleAccountingCellsForRuntime.Length;
+            return cells == 0 ? "mismatch:no-visible-accounting-cells"
+                : "confirmed:resources:scope=" + expectedScope + ",visibleCells=" + cells;
         }
 
         private void ResourceTableRow(string name, string resource, string available,

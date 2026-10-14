@@ -272,7 +272,7 @@ if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-Qua
 }
 # Every recipe the host knows can be approved (the group recipe included).
 foreach ($knownRecipe in @('finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct',
-        'shared-personal', 'shared-powerful', 'sticky-touch-direct')) {
+        'shared-personal', 'shared-powerful', 'policy-shared-powerful', 'sticky-touch-direct')) {
     if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-QualificationFixtureJson @{ recipe = $knownRecipe }) `
             -RunId 'qual-bind-test' -BuildManifest $manifestFixture -Recipe $knownRecipe)) {
         throw "A $knownRecipe qualification allowance was refused by the build binding."

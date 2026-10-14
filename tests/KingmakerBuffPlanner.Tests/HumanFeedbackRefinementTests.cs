@@ -368,7 +368,8 @@ namespace KingmakerBuffPlanner.Tests
             string rootSource = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src",
                 "KingmakerBuffPlanner", "UI", "BuffPlannerUiRoot.cs"));
             Expect(rootSource.Contains("StartCastingFirstRoutine(routineId, completed, null)") &&
-                rootSource.Contains("requestedMode ?? session.ApplyMode"),
+                rootSource.Contains("CastingRunPolicy.Resolve(session, requestedMode)") &&
+                rootSource.Contains("CastingRunPolicy.Apply(session, requestedMode, routineId, inputs)"),
                 "the ordinary HUD route does not resolve the remembered policy through the session");
         }
 
@@ -466,11 +467,16 @@ namespace KingmakerBuffPlanner.Tests
                 "_resourcesCloseButton", "CloseResources();", "SetResourceScope",
                 "row.gameObject.layer = _uiLayer", "text.gameObject.layer = _uiLayer",
                 "ResourcesVisibleAccountingCellsForRuntime", "ResourcesAccountingUsesNativeLayerForRuntime",
-                "inputToFirstCorrectRenderedFrameMs", "commandAndPersistenceMs", "calculationMs",
-                "regionsMs", "themeMs", "layoutMs",
+                "handlerToFrameEndMs", "expectedState=", "outcome=superseded",
+                "requestToRefreshMs", "discoveryMs", "sessionBindingAndPersistenceMs",
+                "inputLeaseMs", "viewConstructionMs", "openReconciliationMs", "displaySnapshotMs",
+                "cause=resources-open", "resources-scope-", "handlerSynchronousMs",
+                "commandAndPersistenceMs", "calculationMs", "regionsMs", "themeMs", "layoutMs",
                 "GraphEditIntent.ChangeRecipient", "GraphEditIntent.ChangeProvider"
             })
                 Expect(source.Contains(required), "native refinement control is missing: " + required);
+            Expect(!source.Contains("inputToFirstCorrectRenderedFrameMs"),
+                "EndOfFrame is still mislabeled as a proven correct rendered frame");
             Expect(!source.Contains("PlannerTextRole.Action") &&
                 source.Contains("WorkspaceFooterText.RunCaption"),
                 "the Run control still forces uppercase or lost its native caption");

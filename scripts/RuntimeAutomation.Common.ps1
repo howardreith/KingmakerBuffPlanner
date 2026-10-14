@@ -895,7 +895,7 @@ function Get-KbpQualificationAllowanceBuildRefusal {
     if ([string]$allowance.dllSha256 -cne [string]$BuildManifest.dllSha256) { return 'dll' }
     if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
     if (@('zero-cost-mixed', 'finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct',
-            'shared-personal', 'shared-powerful', 'sticky-touch-direct') -cnotcontains [string]$allowance.recipe) { return 'recipe' }
+            'shared-personal', 'shared-powerful', 'policy-shared-powerful', 'sticky-touch-direct') -cnotcontains [string]$allowance.recipe) { return 'recipe' }
     if (-not [string]::IsNullOrEmpty($Recipe) -and [string]$allowance.recipe -cne $Recipe) { return 'recipe-differs' }
     if (@('instant', 'animated') -cnotcontains [string]$allowance.executionMode) { return 'execution-mode' }
     if (-not [string]::IsNullOrEmpty($ExecutionMode) -and [string]$allowance.executionMode -cne $ExecutionMode) {
@@ -1425,7 +1425,8 @@ function Assert-KbpScenarioOutcome {
         # The shared recipes (v1.2 E16-E20): the launcher re-reads the typed
         # Share evidence itself rather than trusting the host's verdict
         # alone.
-        $sharedRecipe = @('shared-personal', 'shared-powerful') -ccontains [string]$outcome.selection.recipe
+        $policyRecipe = [string]$outcome.selection.recipe -ceq 'policy-shared-powerful'
+        $sharedRecipe = @('shared-personal', 'shared-powerful', 'policy-shared-powerful') -ccontains [string]$outcome.selection.recipe
         if ($sharedRecipe -and -not $cast -and ($null -eq $outcome.share -or -not [bool]$outcome.share.persisted)) {
             throw "Share qualification evidence does not show the per-casting Share intent persisted: $path"
         }
@@ -1460,8 +1461,56 @@ function Assert-KbpScenarioOutcome {
                 [int]$share.reservoirBeforeShortage -ne [int]$share.reservoirAfterShortage -or
                 -not [bool]$share.persisted -or -not [bool]$share.draftDisarmKeptCasting -or
                 -not [string]::IsNullOrEmpty([string]$share.baselineArmed) -or [int]$share.shortageCastings -lt 1 -or
-                (@($outcome.steps | ForEach-Object { [string]$_.name }) -join ',') -cne 'shared,witness,shortage') {
+                (@($outcome.steps | ForEach-Object { [string]$_.name }) -join ',') -cne $(if ($policyRecipe) {
+                    'shared,witness,shortage,cast-available' } else { 'shared,witness,shortage' })) {
                 throw "Share qualification evidence does not show the exact, once-charged, isolated Share contract: $path"
+            }
+            if ($policyRecipe) {
+                if ([int]$outcome.schemaVersion -ne 2 -or $null -eq $outcome.policy) {
+                    throw "Policy qualification evidence is missing its schema-2 policy record: $path"
+                }
+                $policy = $outcome.policy
+                $executable = @($policy.executableCastingIds | ForEach-Object { [string]$_ })
+                $costIds = @($policy.projectedCosts | ForEach-Object { ([string]$_).Split('|')[0] })
+                $strictOmissions = @($policy.strictOmissions | ForEach-Object { [string]$_ })
+                $availableOmissions = @($policy.availableOmissions | ForEach-Object { [string]$_ })
+                $available = @($outcome.steps | Where-Object { [string]$_.name -ceq 'cast-available' })
+                $strict = @($outcome.steps | Where-Object { [string]$_.name -ceq 'shortage' })
+                $confirmed = @($available.entries | Where-Object { [string]$_ -match '=EffectConfirmed;' } |
+                    ForEach-Object { ([string]$_).Split('=')[0] })
+                $strictAvailabilityChanged = @($strict.availability | Where-Object {
+                    $match = [regex]::Match([string]$_, '^[^:]+:(-?\d+)>(-?\d+)$')
+                    -not $match.Success -or $match.Groups[1].Value -cne $match.Groups[2].Value
+                }).Count -ne 0
+                if ([string]$policy.before -cne 'require-full-plan' -or
+                    [string]$policy.after -cne 'cast-available' -or
+                    [string]$policy.reloaded -cne 'cast-available' -or
+                    [string]$policy.strictMode -cne 'Ordinary' -or
+                    [string]$policy.plannerMode -cne 'ReadyCastsOnly' -or
+                    [string]$policy.hudMode -cne 'ReadyCastsOnly' -or
+                    -not [bool]$policy.authoredIntentPreserved -or
+                    $executable.Count -lt 1 -or ($executable -join ',') -cne ($costIds -join ',') -or
+                    @($policy.projectedCosts | Where-Object {
+                        [string]$_ -notlike '*|native=*:*|enhancements=*:*' -or
+                        [string]$_ -like '*|native=none*' }).Count -ne 0 -or
+                    @($strictOmissions | Where-Object { $_ -like 'qual-short-*|*pool-exhausted:*' }).Count -lt 1 -or
+                    @($availableOmissions | Where-Object { $_ -like 'qual-short-*|*pool-exhausted:*' }).Count -lt 1 -or
+                    $strict.Count -ne 1 -or [bool]$strict[0].applyAllowed -or $null -ne $strict[0].terminal -or
+                    @($strict[0].entries).Count -ne 0 -or $strictAvailabilityChanged -or
+                    (@($strict[0].omissions | ForEach-Object { [string]$_ }) -join ',') -cne
+                        ($strictOmissions -join ',') -or
+                    $available.Count -ne 1 -or -not [bool]$available[0].applyAllowed -or
+                    [string]$available[0].terminal -cne 'completed' -or
+                    ($confirmed -join ',') -cne ($executable -join ',') -or
+                    (@($available[0].omissions | ForEach-Object { [string]$_ }) -join ',') -cne
+                        ($availableOmissions -join ',') -or
+                    [string]$available[0].projectionId -cne [string](@($outcome.forecast |
+                        Where-Object { [string]$_.name -ceq 'cast-available' })[0].projectionId) -or
+                    -not ([string]$policy.noOpReason).StartsWith('nothing-to-cast:', [StringComparison]::Ordinal) -or
+                    [string]$policy.globalRefusalReason -cne 'combat-active' -or
+                    -not [bool]$policy.postchecksSpentNothing) {
+                    throw "Policy qualification evidence does not prove strict refusal and remembered affordable execution: $path"
+                }
             }
         }
         return

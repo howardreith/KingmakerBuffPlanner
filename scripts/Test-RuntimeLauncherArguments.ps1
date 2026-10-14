@@ -36,7 +36,9 @@ try {
         @{ Name = 'native-advanced-qualify-uppercase'; Args = @{ Scenario = 'LIVE-WORKSPACE-NATIVE-UI'; NativeUiStage = 'QUALIFY'; FixtureFamily = 'ADVANCED'; TimeoutSeconds = 900 }; ErrorId = 'KBP_NATIVE_UI_FIXTURE' },
         @{ Name = 'native-advanced-profile-with-automation'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'qualify'; CompatibilityProfileId = 'advanced-gunslinger-0136'; TimeoutSeconds = 900 }; ErrorId = 'KBP_NATIVE_UI_FIXTURE' },
         @{ Name = 'native-facts-short-timeout'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'facts'; TimeoutSeconds = 599 }; ErrorId = 'KBP_NATIVE_UI_TIMEOUT' },
-        @{ Name = 'native-qualify-default-timeout'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'qualify' }; ErrorId = 'KBP_NATIVE_UI_TIMEOUT' }
+        @{ Name = 'native-qualify-default-timeout'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'qualify' }; ErrorId = 'KBP_NATIVE_UI_TIMEOUT' },
+        @{ Name = 'policy-qualification-recipe'; Args = @{ Scenario = 'live-cast-qual-select'; QualificationRecipe = 'policy-shared-powerful'; TimeoutSeconds = 900 }; ErrorId = $null },
+        @{ Name = 'unknown-qualification-recipe'; Args = @{ Scenario = 'live-cast-qual-select'; QualificationRecipe = 'policy-unknown'; TimeoutSeconds = 900 }; ErrorId = 'ParameterArgumentValidationError' }
     )) {
         $observed = $null
         $caseArgs = $case.Args

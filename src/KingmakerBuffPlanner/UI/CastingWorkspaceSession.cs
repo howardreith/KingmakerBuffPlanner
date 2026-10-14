@@ -2470,6 +2470,23 @@ namespace KingmakerBuffPlanner.UI
                 _authoring.Document, _uiSettings, _executionSettings));
         }
 
+        // Canonical authored-plan content without UI or execution settings.
+        // Qualification uses this to distinguish the one expected policy
+        // setting write from any unintended assignment/variant/modifier/
+        // enhancement or authored-order change.
+        public string AuthoredPlanIntentSignature()
+        {
+            CastingPlanProfile profile = CastingPlanProfile.FromDocument(_authoring.Document);
+            return Newtonsoft.Json.JsonConvert.SerializeObject(new
+            {
+                campaignId = profile.CampaignId,
+                routines = profile.Routines,
+                castings = profile.Castings,
+                importNotices = profile.ImportNotices,
+                acknowledgedImportNotices = profile.AcknowledgedImportNotices
+            }, Newtonsoft.Json.Formatting.None);
+        }
+
         // What a fresh session would read for this campaign, as the same
         // intent signature (a plain read: no import, no session), so the
         // in-game reload compares disk with what was saved, not the retained
