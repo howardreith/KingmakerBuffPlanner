@@ -3542,3 +3542,26 @@ Receipt remains PARTIAL. Exact records and next separately budgeted guarded
 - Exact next action: owner restores and holds physical 1920x1200, then
   explicitly selects one fresh approximately 7 h 30 m two-purity/four-game
   batch with fresh RunIds. The failed 62m56s attempt is not reusable.
+
+## Stable 0.5.2 publication - 2026-10-14
+
+- Owner authorized default-branch merge and full release, selected stable
+  0.5.2 or higher, and explicitly requested minimal testing rather than the
+  multi-hour aggregate.
+- Feature `2194d0f0f597ebe8b8423f91f8e1fb6b1f65fdb7` merged without conflict
+  into actual remote-main lineage at `a94e0e586685f8577d32357f289090bc28f1148b`.
+  Project guard WhatIf and guarded pushes passed for feature and `main`.
+- Minimal exact-merge checks: publisher contract 3/0; source validation 43/0;
+  deterministic release build twice with source 43/0, build 1/0, package 4/0
+  each; final release build 3/0 and package 4/0.
+- Published public stable Latest `v0.5.2` at 19:47:53Z. ZIP
+  `84dd4b6cfabb84664029d53af0be0740b982dda6f1d800a230ac81d185290d70`;
+  DLL `8c6f6a4198de826a886111f64d33b17683173e8bb979164bf63be12d21f19e82`;
+  MVID `4a2c100a-2b5d-400e-8251-3560f7a3e616`.
+- Independent download hashes and GitHub asset digests agree. Strict package
+  validation passed 4/0 after the first outside-artifacts invocation correctly
+  refused and the same bytes were placed under the required evidence root.
+- Broad `Test-SourceOnly`, purity inventories and game runs were not performed;
+  no runtime PASS was inferred. No install, launch, Mods transaction or save
+  access occurred. Exact evidence and next ordinary owner test are in
+  `docs/evidence/release-0.5.2-receipt.md`.

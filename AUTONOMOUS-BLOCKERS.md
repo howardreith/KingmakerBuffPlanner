@@ -1,3 +1,12 @@
+> **Current October 14 release status:** no release-engineering blocker remains.
+> Stable `v0.5.2` is merged, public, non-prerelease, Latest, checksummed and
+> independently downloaded/validated. At the owner's explicit request the
+> multi-hour aggregate and game campaign were not rerun. Ordinary owner testing
+> therefore remains the evidence path for the new Resources, assignment,
+> permissive-policy execution and populated-plan latency behavior; it is a
+> disclosed qualification limit, not a publication blocker. See the
+> [0.5.2 release receipt](docs/evidence/release-0.5.2-receipt.md).
+>
 > **Current October 14 rc5 blocker:** independently actionable source, focused
 > regression, package, freeze and cleanup work is complete. The selected first
 > five-target purity window **FAILED** before its first WhatIf could pass because

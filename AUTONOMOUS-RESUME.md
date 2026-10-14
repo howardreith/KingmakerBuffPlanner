@@ -1,3 +1,16 @@
+> **Current October 14 stable release:** the owner accepted the
+> human-feedback candidate for full ordinary testing, selected minimal release
+> checks, and authorized default-branch integration and a full release. Stable
+> `v0.5.2` is public, non-prerelease and GitHub Latest at release commit
+> `a94e0e586685f8577d32357f289090bc28f1148b`. ZIP SHA-256
+> `84dd4b6cfabb84664029d53af0be0740b982dda6f1d800a230ac81d185290d70`;
+> DLL `8c6f6a4198de826a886111f64d33b17683173e8bb979164bf63be12d21f19e82`;
+> MVID `4a2c100a-2b5d-400e-8251-3560f7a3e616`. Deterministic release builds and
+> independent download/package verification pass. The broad source-only/purity/
+> game campaign was deliberately not rerun; the retained rc5 pre-launch display
+> failure and runtime limits remain. Exact record:
+> [0.5.2 release receipt](docs/evidence/release-0.5.2-receipt.md).
+>
 > **Current October 14 human-feedback resume:** exact frozen rc5 product
 > `ec3d5f865707e540b00fccabd3f1a98f04aa3095`, version 0.5.1-rc5; ZIP
 > `63c12d519dd49d514f6ddd31ea0514b9a8af5644680aa1dde82ddc77e63bfb03`;
