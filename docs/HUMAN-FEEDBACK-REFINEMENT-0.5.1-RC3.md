@@ -354,3 +354,14 @@ If the reusable Advanced inspection no longer matches, add one guarded
 restoration and review; do not bypass it. This is the single remaining live
 batch. It is a cost estimate, not authorization in this preparation pass and
 not a runtime PASS.
+
+## Delivery provenance
+
+`scripts/Test-GuardedPush.ps1` passed 6/0 without mutation. The project-owned
+helper then fast-forward pushed and remotely verified the product commit plus
+first complete receipt checkpoint at
+`d89dd46189d6fdebf000aa0c224ba7486e2e6dec` on
+`codex/kingmaker-buff-planner-human-feedback`. This delivery addendum is
+documentation-only and does not rebuild or relabel packaged product source
+`debd40674ed2a6ed9f6e3423671f6ec2180bead0`, its DLL or ZIP. No main merge,
+tag or release was made.
