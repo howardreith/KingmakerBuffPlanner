@@ -8,7 +8,9 @@
 > display changed from preflight 1920x1200 to 1920x1080 during the first purity
 > inventory. No transaction, RunId path, allowance or save change exists.
 > Preserve that FAIL. Resume only after the owner restores and can hold physical
-> 1920x1200, then explicitly selects one fresh ~7 h 30 m batch described in the
+> 1920x1200, then explicitly selects one fresh ~7 h 30 m batch from a clean
+> runtime checkout at the path-bound product/harness commit `ec3d5f8`, as
+> described in the
 > [rc5 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
 >
 > **Current October 14 human-feedback resume:** branch

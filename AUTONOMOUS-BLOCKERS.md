@@ -6,7 +6,7 @@
 > RunId path, allowance, Kingmaker process or save violation. Do not retry or
 > reuse `kbphf-rc5-20261014-01`. The owner must restore and hold physical
 > 1920x1200 and explicitly authorize a fresh approximately 7 h 30 m batch. Exact
-> evidence and scope are in the
+> evidence, path-bound product-checkout requirement and scope are in the
 > [rc5 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
 >
 > **Current October 14 human-feedback blocker:** no independent source,

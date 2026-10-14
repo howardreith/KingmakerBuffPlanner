@@ -55,7 +55,11 @@ and receipt to a new exclusive directory, independently extracted the packaged
 DLL, and rechecked its SHA-256 and MVID. rc1 through rc4 and the retained rc3
 failure remain unchanged. The product commit was guarded-pushed before the live
 attempt; the final documentation commit is deliberately separate from the
-frozen product identity.
+frozen product identity. Any future runtime attempt must use a clean checkout
+whose `HEAD` is exactly `ec3d5f865707e540b00fccabd3f1a98f04aa3095`, because
+the original build receipt is path-bound and the launcher requires its commit
+to equal checkout `HEAD`. The later documentation-only branch HEAD is not a
+runtime input and does not require a rebuild.
 
 ## Corrected preparation behavior
 
@@ -231,9 +235,11 @@ must re-read that state; it must not change the physical display itself.
 
 With fresh RunIds and an absent operation root:
 
-1. revalidate the exact rc5 freeze, clean product checkout, Steam/offline and
+1. enter a clean, owned runtime checkout at exact product/harness commit
+   `ec3d5f865707e540b00fccabd3f1a98f04aa3095`, revalidate the original
+   path-bound rc5 receipt and freeze, then revalidate Steam/offline,
    transaction/save guards, 1920x1200 physical state, and the existing Advanced
-   inspection binding;
+   inspection binding; restore the feature branch after the owned operation;
 2. run one five-target purity window with `-Attempts 1` and
    `-LeaseWaitSeconds 120` around exactly these three WhatIf calls:
    `live-workspace-native-ui` at `windowed-1920x1200`, the same scenario at
