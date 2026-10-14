@@ -1,3 +1,11 @@
+> **Current 0.5.1-rc2 qualification:** focused source/build/behavior and local
+> package validation pass on exact product `e06d803`; it remains **NOT_RUN**.
+> Native schema 6 requires visible useful Resources cells through first open,
+> both scope transitions and reopen, and records end-of-rendered-frame latency.
+> No screenshot, runtime execution or visual PASS exists. The selected purity
+> command, complete cost, two-size checklist and distinct policy-execution gap
+> are in the [rc2 correction receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+>
 > **Current 0.5.1-rc1 human-feedback qualification:** focused source/build/
 > behavior and strict local-package checks pass on exact product `a4c4342`, but
 > the candidate is **NOT_RUN**. UX-01/UX-02 rendered acceptance and all live

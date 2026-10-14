@@ -1,8 +1,8 @@
-# Buff Planner: player guide (0.5.1-rc1 local candidate)
+# Buff Planner: player guide (0.5.1-rc2 local candidate)
 
-This guide describes the casting-first planner including the local 0.5.1-rc1
+This guide describes the casting-first planner including the local 0.5.1-rc2
 human-feedback candidate. The published release remains 0.5.0, and the exact
-0.5.1-rc1 package has not yet been run in Kingmaker. It is
+0.5.1-rc2 package has not yet been run in Kingmaker. It is
 the only normal planner: there is
 no Save button, no Accept Plan step and no Classic switch in the planner.
 "What has been checked in the game" at the end says exactly which parts a
@@ -73,7 +73,7 @@ expanded, merged or substituted behind your back.
    **Change recipient** or **Change caster/source**, then make the one intended
    choice; the edit control turns itself off after success. **Done** or Escape
    leaves inspection, but is not part of normal multi-recipient assignment.
-5. The **Casting options** panel on the right (0.5.1-rc1) shows, in order:
+5. The **Casting options** panel on the right (0.5.1-rc2) shows, in order:
    **Done**; who casts it on whom ("Linzi » Hedwirg") and from which
    source; explicit **Change recipient** and **Change caster/source** controls;
    its state ("Ready", "Active · Will skip", "Active · Will
@@ -179,7 +179,7 @@ earlier look for that part.
 - Every route uses the same checks: the latest saved plan, the party as it
   is at that moment, and every casting re-checked before it is cast.
   Nothing runs on a stale plan and no routine needs an acceptance step.
-- **Unavailable castings (0.5.1-rc1).** The footer policy starts at
+- **Unavailable castings (0.5.1-rc2).** The footer policy starts at
   **Require full plan** for old and new profiles: one blocked in-scope casting
   refuses the whole routine and names the reason. Choose **Cast available**
   to run the valid, affordable subset in authored order and list every
@@ -212,7 +212,7 @@ earlier look for that part.
   planner opens it on that routine with the reason. The game still logs
   each cast itself. The full per-casting record is in the Unity Mod Manager
   log (`[KBP-CF-RUN]`).
-- **The footer (0.5.1-rc1)** shows the save state, one line saying what **Run**
+- **The footer (0.5.1-rc2)** shows the save state, one line saying what **Run**
   will do now or exactly why it cannot (for example "Long cannot run: 1
   casting is not ready (marked in red)."), and **Resources**, the availability
   policy, **Mode**, **Undo** and **Run Long** / **Run Important** / **Run Short**.
@@ -241,7 +241,7 @@ it is resolved.
 Install archive-first: back up the whole `Mods\KingmakerBuffPlanner` folder
 (including `UserSettings`) outside the `Mods` folder before replacing it,
 then confirm Unity Mod Manager lists the version you intended: 0.5.0 for the
-published release, or 0.5.1-rc1 for this explicitly selected local candidate.
+published release, or 0.5.1-rc2 for this explicitly selected local candidate.
 Its log line
 `[KBP-BOOT] Main.Load exited;version=<version>;commit=<commit>` names the
 source commit. To roll back, copy the new `UserSettings` outside `Mods`,
@@ -250,14 +250,15 @@ exact steps and the package checksum.
 
 ## What has been checked in the game
 
-0.5.1-rc1 (`a4c4342`, local candidate): **not run in Kingmaker**. Focused
+0.5.1-rc2 (`e06d803`, local candidate): **not run in Kingmaker**. Focused
 source/build/behavior checks and the local package pass, including the exact
 Seamantle and Resinous Skin/Share sequences. The guarded observer is prepared
-to capture Resources, continuous assignment, policy and Run labels at the
+to capture visible Resources cells through scope/reopen, continuous assignment,
+policy, Run labels and end-of-frame latency at the
 owner's 1920x1200 setting and 1280x720, but the mandatory purity prerequisite
 is estimated at about 101 minutes for filesystem inventories alone and was not
 started under the ordinary budget. See the
-[exact receipt and remaining batch](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+[exact receipt and remaining batch](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
 
 0.5.0 (guarded runs `kbpnui-*` on 2026-10-10/11 on the disposable automation
 campaign only, at the session display (1920x1200, later 1920x1080) and at

@@ -1,3 +1,11 @@
+> **Local 0.5.1-rc2 correction candidate:** Resources accounting rows now use
+> the native UI layer; continuous assignment keeps inspection separate from
+> explicit one-shot editing; exact-source draft choices reset correctly; and
+> recipient hints match the exact action. The distinct ZIP is focused-tested
+> and package-validated but **NOT_RUN**. See the
+> [rc2 correction receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md). This is not
+> a release publication and the rc1 artifact remains preserved.
+>
 > **Local 0.5.1-rc1 candidate:** continuous multi-recipient assignment,
 > explicit individual-edit controls, structured Resources accounting,
 > remembered Require full plan / Cast available policy, responsiveness work

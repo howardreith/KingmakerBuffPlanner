@@ -1,3 +1,15 @@
+## Current human-feedback review correction - October 13, 2026
+
+Exact packaged product source `e06d803400893f4cd68d0066ae2421d0085db243`,
+version 0.5.1-rc2, corrects the four review findings on successor branch
+`codex/kingmaker-buff-planner-human-feedback`. Focused validation is 43/0
+source, 1/0 build and 47/0 selected behavior; the distinct local package is
+4/0 validated and 1/0 created. It is **NOT_RUN** and not installed. The rc1
+artifact/evidence are preserved. Exact hashes, behavior contract, timing data,
+two-size selected-purity command and the policy-execution evidence limitation
+are in the
+[0.5.1-rc2 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+
 ## Current human-feedback refinement - October 13, 2026
 
 Successor branch `codex/kingmaker-buff-planner-human-feedback` preserves the

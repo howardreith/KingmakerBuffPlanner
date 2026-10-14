@@ -1,3 +1,13 @@
+> **Current 0.5.1-rc2 human-feedback acceptance:** exact local candidate
+> `e06d803` is **NOT_RUN**. At owner 1920x1200 and compact 1280x720, require
+> visible useful Resources cells on first open, selected/all/selected scope
+> changes and reopen; correct assignment actions/hints and draft resets; policy
+> and Run captions; input ownership/clipping; and input-to-first-correct-frame
+> timing separated from calculation/persistence/layout stages. Policy execution
+> additionally needs an allowance-bound guarded cast proving strict refusal and
+> the permissive authored-order subset; a caption is not execution evidence.
+> See the [rc2 correction receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+>
 > **Current 0.5.1-rc1 human-feedback acceptance:** exact local candidate
 > `a4c4342` is **NOT_RUN**. After its full-history purity prerequisite passes,
 > the selected guarded batch must render owner 1920x1200 and compact 1280x720.

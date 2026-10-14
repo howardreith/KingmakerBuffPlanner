@@ -1,3 +1,15 @@
+> **Current October 13 human-feedback correction blocker:** exact 0.5.1-rc2
+> product `e06d803400893f4cd68d0066ae2421d0085db243` is validated but
+> **NOT_RUN**. The selected five-target purity prerequisite is forecast at
+> roughly 2 hours 35 minutes from comparable completed windows (101 minutes is
+> the two-inventory estimate alone), above the ordinary ceiling. It must use
+> `-Attempts 1 -LeaseWaitSeconds 120`, then owner 1920x1200 and compact
+> 1280x720 runs proceed serially with fresh RunIds/restoration. Separately, the
+> existing strict-only casting qualification record needs a bounded policy-aware
+> step before it can prove actual `Cast available` subset execution. Exact
+> acceptance and commands are in the
+> [rc2 correction receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+>
 > **Current October 13 human-feedback blocker:** no source, focused-check,
 > observer or local-package work is blocked. Exact 0.5.1-rc1 product
 > `a4c4342e1296966cbae1d64eeb53b47f23265627` is validated but **NOT_RUN**.

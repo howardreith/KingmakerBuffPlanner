@@ -1,5 +1,14 @@
 # Discovery Action Contract Inventory
 
+## 0.5.1-rc2 review correction
+
+Discovery/action interpretation is unchanged. The correction only aligns UI
+layer construction, authoring-session decisions, draft invalidation and
+runtime observation. Fresh execution discovery/validation is still required;
+the display cache cannot authorize a cast. Exact source `e06d803` is
+focused-tested/package-validated and **NOT_RUN**; see the
+[rc2 correction receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+
 ## 0.5.1-rc1 human-feedback refinement
 
 Discovery and structural action interpretation are unchanged. The performance

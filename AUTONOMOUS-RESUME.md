@@ -1,3 +1,14 @@
+> **Current October 13 human-feedback correction resume:** branch
+> `codex/kingmaker-buff-planner-human-feedback`; exact packaged product
+> `e06d803400893f4cd68d0066ae2421d0085db243`; version 0.5.1-rc2; ZIP
+> `6e6a5822c771514981b4bd788398864c56f98df7fabf96e4479ad84cccbcaa27`;
+> DLL `695f65d02e8253da81a96238312e32d64489793788ad35dbb5e0c41417354548`;
+> MVID `bfd140ba-1d58-40fb-a71c-4255371b42f2`. Four source-review findings,
+> focused checks and local packaging are complete; candidate is **NOT_RUN**.
+> Preserve rc1 and do not install, merge, release or relabel older evidence.
+> Remaining live scope and its exact selected-purity parameters/cost are in the
+> [rc2 correction receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+>
 > **Current October 13 human-feedback resume:** branch
 > `codex/kingmaker-buff-planner-human-feedback`; exact packaged product
 > `a4c4342e1296966cbae1d64eeb53b47f23265627`; version 0.5.1-rc1; ZIP

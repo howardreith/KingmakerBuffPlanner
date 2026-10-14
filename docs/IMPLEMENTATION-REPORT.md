@@ -1,3 +1,12 @@
+> **Current 0.5.1-rc2 review correction:** exact packaged source `e06d803`
+> fixes the Resources native layer, separates inspection focus from edit intent,
+> closes the same-caster exact-source draft leak, and makes recipient hints use
+> the action's exact session decision. Focused results are source 43/0, build
+> 1/0 and behavior 47/0; strict package validation is 4/0. ZIP
+> `6e6a5822c771514981b4bd788398864c56f98df7fabf96e4479ad84cccbcaa27`
+> is **NOT_RUN**, never installed and not published. See the
+> [rc2 correction receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+>
 > **Current 0.5.1-rc1 human-feedback implementation:** exact packaged source
 > `a4c4342e1296966cbae1d64eeb53b47f23265627` implements UX-01 through UX-06;
 > final affected checks are source 43/0, build 1/0, protocol 101/0 and package

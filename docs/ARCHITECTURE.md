@@ -1,3 +1,12 @@
+> **0.5.1-rc2 review-correction architecture:** dynamically rebuilt Resources
+> rows/cells receive the native UI layer at creation. Recipient presentation
+> and execution consume one session-level exact-variant decision; inspection
+> focus is separate from one-shot edit intent. Exact-provider transitions own
+> draft-choice invalidation. The view adds an end-of-frame latency observer
+> without moving business rules or live reads into Unity handlers. Exact source
+> `e06d803` is focused-tested/package-validated and **NOT_RUN**. See the
+> [rc2 correction receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+>
 > **0.5.1-rc1 human-feedback architecture:** the normalized calculation cache
 > lives in the session and is keyed by authoring revision, exact immutable input
 > snapshot and execution mode; the Unity view owns only its display snapshot and

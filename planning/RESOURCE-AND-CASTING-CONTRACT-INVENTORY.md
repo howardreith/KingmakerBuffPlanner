@@ -1,5 +1,17 @@
 # Resource and Casting Contract Inventory
 
+## 0.5.1-rc2 review correction
+
+Every rebuilt Resources `Pool.*` row/cell is assigned to the native UI layer;
+schema 6 requires visible useful accounting cells through first open, both
+scope transitions and reopen. Normal recipient action/presentation now share
+one exact session decision, so provider reach cannot hide a legal removal and
+variant/group semantics stay intact. Exact product `e06d803` passes focused
+neighbors and package validation but is **NOT_RUN**. The existing guarded
+qualification shortage step remains strict-only; it cannot be cited as live
+`Cast available` execution. See the
+[rc2 correction receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+
 ## 0.5.1-rc1 availability and Resources contract
 
 Profile revision 4 stores `availabilityPolicy` as `require-full-plan` or

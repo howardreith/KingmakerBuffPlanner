@@ -1,5 +1,51 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-13 human-feedback review-correction checkpoint
+
+Continued `codex/kingmaker-buff-planner-human-feedback` from reviewed HEAD
+`754cf637457bee58744ba47765d52f97639a8da4`, preserving packaged rc1 source
+`a4c4342e1296966cbae1d64eeb53b47f23265627` and its ZIP SHA-256
+`2e4e1a9fe3fd56eaf11eac39f09132be18c3358ebc9aee45f3b6fad8e8d2ffbc`.
+Correction commit `e06d803400893f4cd68d0066ae2421d0085db243` assigns dynamic
+Resources rows/cells to the native layer; defines add focus as inspection with
+no implicit edit intent; clears backing draft choices across the same-caster
+exact-source-to-unresolved transition; and gives recipient presentation/clicks
+one exact-variant session decision. Native record schema 6 requires useful
+visible accounting cells on first open, both scope transitions and reopen.
+
+The exact focused command selected `human-feedback,direct-manipulation,native-ui,graph-`
+and passed source 43/0, production build 1/0 and behavior 47/0 in 8.8 seconds.
+Both changed PowerShell files parsed and the diff check had no patch errors.
+`Build-Local.ps1` passed source 43/0, build 1/0, strict package validation 4/0
+and creation 1/0. Version 0.5.1-rc2 ZIP SHA-256 is
+`6e6a5822c771514981b4bd788398864c56f98df7fabf96e4479ad84cccbcaa27`;
+DLL SHA-256 `695f65d02e8253da81a96238312e32d64489793788ad35dbb5e0c41417354548`;
+MVID `bfd140ba-1d58-40fb-a71c-4255371b42f2`. It is local, **NOT_RUN**,
+never installed and not published.
+
+Five fresh-process representative runs (67 castings/77 entries) produced
+corrected medians 70.274/0.805/0.729/37.495 ms for cold/warm/buff-switch/
+recipient-toggle, with slowest 71.448/2.260/2.197/52.347 ms. The original
+baseline was 66.131/1.458/1.528/35.034 ms. Warm and buff calculation improve;
+cold and autosave-bound toggle do not. A warmed aggregate-process cold value
+was rejected as non-comparable. The runtime view now records a separate
+input-to-first-correct-rendered-frame value; no such live value exists yet.
+
+The broad file-launcher wrapper passed cheap argument cases 24/0 and real
+`-File` cases 8/0 before it entered the unchanged multi-hour purity inventory
+and was stopped. The focused harness meta-test failed closed in fixture
+bootstrap `-WhatIf` because a mock hash result had no `Hash` property. Neither
+is recorded as a product/runtime PASS; no safeguard was relaxed.
+
+The next selected five-target purity call must use `-Attempts 1` and
+`-LeaseWaitSeconds 120`. Its two inventories estimate about 101 minutes; prior
+comparable complete windows took 145.6–153.9 minutes, so reserve about 2 hours
+35 minutes before the two serial UI runs. The existing casting qualification's
+shared shortage step is strict-only and cannot prove permissive execution; a
+bounded policy-aware step is required before the targeted cast route can supply
+that evidence. Exact scope, commands, limitations and artifact identities:
+[0.5.1-rc2 correction receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+
 ## 2026-10-13 human-feedback refinement checkpoint
 
 On DATA, successor branch `codex/kingmaker-buff-planner-human-feedback` began

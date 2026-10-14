@@ -1,5 +1,14 @@
 # Native Buff Coverage Matrix
 
+## 0.5.1-rc2 review correction
+
+Discovery/classification remains unchanged. Recipient membership and hints now
+share one decision filtered by stable source, exact ability variant, routine
+and authored target/origin. Covered group recipients inspect the one origin;
+they do not become duplicate direct/group casts. Exact source `e06d803` is
+focused-tested and **NOT_RUN**; see the
+[rc2 correction receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+
 ## 0.5.1-rc1 human-feedback refinement
 
 No native-candidate classifier, action graph, source identity, GUID exception
