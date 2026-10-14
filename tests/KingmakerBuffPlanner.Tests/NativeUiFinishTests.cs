@@ -396,17 +396,26 @@ namespace KingmakerBuffPlanner.Tests
                     new[] { "existing-insufficient:unit-1" }), "Active \u00b7 Will recast" },
                 { CastingGraphText.CardStatus(ResolvedCastingReadiness.Ready, false, new string[0]), "Ready" },
                 { CastingGraphText.CardStatus(ResolvedCastingReadiness.Blocked, false, null), "Not ready" },
-                { CastingGraphText.RecipientHint(true, true, false, null, false, "#2", null), "Click again to remove #2" },
-                { CastingGraphText.RecipientHint(true, true, false, null, false, null, "#1"), "Has casting #1" },
-                { CastingGraphText.RecipientHint(true, false, false, "Out of this caster's reach.", false, null, null),
-                    "Out of this caster's reach." },
-                { CastingGraphText.RecipientHint(true, true, false, null, false, null, null), "Click to move it here" },
-                { CastingGraphText.RecipientHint(true, true, false, null, true, null, null), "Click to centre it here" },
-                { CastingGraphText.RecipientHint(false, true, false, null, false, null, "#3"),
+                { CastingGraphText.RecipientHint(CastingGraphRecipientAction.Remove, false, "#2", null),
+                    "Has casting #2 \u00b7 click to remove it" },
+                { CastingGraphText.RecipientHint(CastingGraphRecipientAction.InspectGroupCoverage, true, "#1", null),
+                    "Covered by #1 \u00b7 click to inspect it" },
+                { CastingGraphText.RecipientHint(CastingGraphRecipientAction.Refuse, false, null,
+                    "Out of this caster's reach."), "Out of this caster's reach." },
+                { CastingGraphText.RecipientHint(CastingGraphRecipientAction.Retarget, false, null, null),
+                    "Click to move it here" },
+                { CastingGraphText.RecipientHint(CastingGraphRecipientAction.Recentre, true, null, null),
+                    "Click to centre it here" },
+                { CastingGraphText.RecipientHint(CastingGraphRecipientAction.Remove, false, "#3", null),
                     "Has casting #3 \u00b7 click to remove it" },
-                { CastingGraphText.RecipientHint(false, false, true, null, false, null, null), "Choose a caster first" },
-                { CastingGraphText.RecipientHint(false, true, false, null, false, null, null), "Click to add a casting" },
-                { CastingGraphText.RecipientHint(false, true, false, null, true, null, null), "Click to centre a casting here" },
+                { CastingGraphText.RecipientHint(CastingGraphRecipientAction.Refuse, false, null,
+                    "Choose a caster and exact source first."), "Choose a caster and exact source first." },
+                { CastingGraphText.RecipientHint(CastingGraphRecipientAction.Add, false, null, null),
+                    "Click to add a casting" },
+                { CastingGraphText.RecipientHint(CastingGraphRecipientAction.Add, true, null, null),
+                    "Click to centre a casting here" },
+                { CastingGraphText.RecipientHint(CastingGraphRecipientAction.Disambiguate, false, "#1, #2", null),
+                    "Multiple matching castings (#1, #2) \u00b7 inspect one to remove it" },
                 { CastingGraphText.NextStep(false, false, false, false), "Choose a buff" },
                 { CastingGraphText.NextStep(true, true, false, false), "Choose a caster and source" },
                 { CastingGraphText.NextStep(true, true, true, false), "Choose a recipient" },
@@ -751,6 +760,23 @@ namespace KingmakerBuffPlanner.Tests
             record.ResourcesPanelSize = new[] { 1536f, 1008f };
             record.ResourcesSelectedSummary = "Long · 3 ready · 1 unavailable";
             record.ResourcesAllSummary = "All routines - no rest · 8 ready · 2 unavailable";
+            record.ResourcesSelectedAgainSummary = "Long · 3 ready · 1 unavailable";
+            record.ResourcesReopenedSummary = "Long · 3 ready · 1 unavailable";
+            record.ResourcesSelectedScope = "SelectedRoutine";
+            record.ResourcesAllScope = "AllRoutinesNoRest";
+            record.ResourcesSelectedAgainScope = "SelectedRoutine";
+            record.ResourcesReopenedScope = "SelectedRoutine";
+            record.ResourcesSelectedCells.Add("Pool.SpellSlots.bard-l2/Resource=Bard level 2 spell slots");
+            record.ResourcesAllCells.Add("Pool.SpellSlots.bard-l2/Needed=8");
+            record.ResourcesSelectedAgainCells.Add("Pool.SpellSlots.bard-l2/Spend=3");
+            record.ResourcesReopenedCells.Add("Pool.SpellSlots.bard-l2/Short=1");
+            record.ResourcesSelectedCellsUseNativeLayer = true;
+            record.ResourcesAllCellsUseNativeLayer = true;
+            record.ResourcesSelectedAgainCellsUseNativeLayer = true;
+            record.ResourcesReopenedCellsUseNativeLayer = true;
+            record.ResourcesClosedBetweenOpens = true;
+            record.ResourcesReopened = true;
+            record.ResourcesReopenedCloseFocused = true;
             record.ResourcesSaveStatus = "Saved";
             record.ResourcesClosedByEscape = true;
             record.ResourcesDocumentBefore = "doc";
@@ -798,8 +824,9 @@ namespace KingmakerBuffPlanner.Tests
             record.SaveFailureUndoRestored = true;
             record.PlanningSteps.AddRange(new[] { "focus:ok", "arm-retarget:ok", "retarget:ok",
                 "undo-retarget:ok", "cast-later:ok", "undo-order:ok", "done:ok", "choose-source:ok",
-                "add-without-focus:ok", "focus-added:ok", "arm-change-caster:ok", "change-caster:ok",
-                "undo-caster:ok", "remove-explicit:ok", "undo-remove:ok", "remove-normal:ok" });
+                "add-inspects-only:ok", "choose-next-source:ok", "successive-add:ok", "focus-added:ok",
+                "arm-change-caster:ok", "change-caster:ok", "undo-caster:ok", "remove-explicit:ok",
+                "undo-remove:ok", "remove-normal:ok", "remove-second-normal:ok" });
             record.PlanningRestored = true;
             record.EscapeClosedFocusFirst = true;
             record.EscapeClosedPlannerLast = true;
@@ -840,6 +867,14 @@ namespace KingmakerBuffPlanner.Tests
             schema4.PlanningSteps.Remove("arm-retarget:ok");
             if (schema4.Violations().Count != 0)
                 throw new InvalidOperationException("A schema-4 verdict was relabelled by human-feedback requirements.");
+            NativeUiRecord schema5 = QualifiedNativeUiRecord();
+            schema5.SchemaVersion = 5;
+            schema5.PlanningSteps.Remove("add-inspects-only:ok");
+            schema5.PlanningSteps.Add("add-without-focus:ok");
+            schema5.ResourcesSelectedCells.Clear();
+            schema5.ResourcesReopened = false;
+            if (schema5.Violations().Count != 0)
+                throw new InvalidOperationException("A schema-5 verdict was relabelled by correction requirements.");
             legacy.SchemaVersion = 2;
             foreach (string missing in new[] { "source-tabs:missing-captions", "casting-popup:missing",
                     "catalogue-filters:missing-categories" })
@@ -884,7 +919,7 @@ namespace KingmakerBuffPlanner.Tests
                 { "spellbook-pair-height-or-baseline:Linzi", r => r.Spellbooks[0].PlannerRect = new[] { 1600f, 100f, 150f, 30f } },
                 { "spellbook-top-right-entry-present", r => r.SpellbookTopRightEntryAbsent = false },
                 { "popup-presenter:planner-scroll", r => r.PlannerPopupPresenter = "planner-scroll" },
-                { "schema:6", r => r.SchemaVersion = 6 },
+                { "schema:7", r => r.SchemaVersion = 7 },
                 { "pause:inventory:not-paused-before", r => r.Switches[4].PausedBefore = false },
                 { "pause:not-restored", r => r.OwnedPauseRestored = false },
                 { "unavailable-metamagic:no-view", r => r.Spellbooks.RemoveAt(1) },
@@ -948,9 +983,14 @@ namespace KingmakerBuffPlanner.Tests
                 { "planning:retarget:target=unit-1", r => r.PlanningSteps[2] = "retarget:target=unit-1" },
                 { "resources:not-opened", r => r.ResourcesOpened = false },
                 { "resources:changed-plan", r => r.ResourcesDocumentAfter = "changed" },
+                { "resources:selected-visible-pool-cells-missing", r => r.ResourcesSelectedCells.Clear() },
+                { "resources:accounting-cells-wrong-layer", r => r.ResourcesReopenedCellsUseNativeLayer = false },
+                { "resources:scope-transition", r => r.ResourcesSelectedAgainScope = "AllRoutinesNoRest" },
+                { "resources:reopen", r => r.ResourcesReopened = false },
                 { "availability-policy-caption:none", r => r.AvailabilityPolicyCaption = null },
                 { "run-caption:RUN LONG", r => r.RunCaption = "RUN LONG" },
                 { "planning-contract-missing:arm-retarget:ok", r => r.PlanningSteps.Remove("arm-retarget:ok") },
+                { "planning-contract-missing:successive-add:ok", r => r.PlanningSteps.Remove("successive-add:ok") },
                 { "planning-not-restored", r => r.PlanningRestored = false },
                 { "escape-order", r => r.EscapeClosedFocusFirst = false },
                 { "game-log-planner-lines:2", r => r.GameLogPlannerLines.Add("Buff Planner: again") }

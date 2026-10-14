@@ -150,6 +150,15 @@ namespace KingmakerBuffPlanner.Tests
             ResolvedCasting compiled = session.CompileForRuntime(inputs, "long").CastingById(id);
             Expect(compiled.IsExecutable && compiled.CoverageGaps.Count == 0, "the re-centred cast is blocked");
             session.CancelGraphEditIntent();
+            CastingGraphTargetNode coveredNode = session.BuildGraph(inputs).TargetById("unit-t3");
+            Expect(coveredNode.Action == CastingGraphRecipientAction.InspectGroupCoverage &&
+                coveredNode.Legality == CastingGraphTargetLegality.Legal &&
+                coveredNode.Hint.StartsWith("Covered by ", System.StringComparison.Ordinal),
+                "a covered group recipient advertised the selected provider's illegal-centre warning");
+            CastingGraphClickResult inspected = session.ClickGraphRecipient("unit-t3", inputs);
+            Expect(inspected.Outcome == CastingGraphClickOutcome.Focused &&
+                inspected.CastingId == id && session.Document.Castings.Count == 1,
+                "a covered recipient did not inspect the existing group cast");
             CastingGraphClickResult removed = session.ClickGraphRecipient("unit-t1", inputs);
             Expect(removed.Outcome == CastingGraphClickOutcome.Removed && session.Document.Castings.Count == 0,
                 "clicking the current centre did not remove the group casting");
@@ -169,6 +178,10 @@ namespace KingmakerBuffPlanner.Tests
             // Loaded duplicates stay as they are: nothing merges them.
             Expect(new CastingWorkspaceSession(Path.Combine(root, "graph-dm-duplicates"), "graph-campaign")
                 .Document.Castings.Count == 3, "the stored duplicates were merged");
+            CastingGraphTargetNode duplicateNode = session.BuildGraph(inputs).TargetById("unit-t1");
+            Expect(duplicateNode.Action == CastingGraphRecipientAction.Disambiguate &&
+                duplicateNode.Hint.StartsWith("Multiple matching castings", System.StringComparison.Ordinal),
+                "duplicate intent did not present the same disambiguation the click requires");
             CastingGraphClickResult ambiguous = session.ClickGraphRecipient("unit-t1", inputs);
             Expect(ambiguous.Outcome == CastingGraphClickOutcome.DisambiguationRequired &&
                 ambiguous.CastingId == null && session.EditingFocusCastingId == null,

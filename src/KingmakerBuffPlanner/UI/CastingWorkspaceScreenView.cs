@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Kingmaker.Blueprints;
@@ -63,6 +64,9 @@ namespace KingmakerBuffPlanner.UI
         private CastingGraphView _lastView;
         private string _nextRefreshCause;
         private double? _nextCommandAndPersistenceMilliseconds;
+        private long? _nextInteractionStartedAt;
+        private int _refreshSequence;
+        private FirstCorrectFrameProbe _firstCorrectFrameProbe;
         private GraphLayoutResult _lastLayout;
         private GraphLayoutMetrics _lastMetrics;
 
@@ -135,6 +139,31 @@ namespace KingmakerBuffPlanner.UI
         private NativeDescriptionPresenter _description;
         private bool _descriptionShownLastFrame;
         private readonly Action<string> _log;
+
+        // Canvas layout completion is not the player's first rendered frame.
+        // Sample EndOfFrame after the synchronously rebuilt view so the live
+        // evidence can retain the separate stage timings and also measure
+        // input-to-first-correct-rendered-frame latency.
+        private sealed class FirstCorrectFrameProbe : MonoBehaviour
+        {
+            internal void Arm(long startedAt, int sequence, string cause,
+                Action<string> log)
+            {
+                StopAllCoroutines();
+                StartCoroutine(Observe(startedAt, sequence, cause, log));
+            }
+
+            private static IEnumerator Observe(long startedAt, int sequence,
+                string cause, Action<string> log)
+            {
+                yield return new WaitForEndOfFrame();
+                double milliseconds = (System.Diagnostics.Stopwatch.GetTimestamp() - startedAt) *
+                    1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                log("[KBP-WORKSPACE-PERF] sequence=" + sequence + ";cause=" + cause +
+                    ";inputToFirstCorrectRenderedFrameMs=" + milliseconds.ToString("F3") +
+                    ";renderedFrame=" + Time.frameCount + ".");
+            }
+        }
 
         internal CastingWorkspaceScreenView(
             StaticCanvas nativeCanvas,
@@ -265,6 +294,59 @@ namespace KingmakerBuffPlanner.UI
         internal string ResourcesSaveStatusForRuntime
         {
             get { return _resourcesSaveStatus == null ? null : _resourcesSaveStatus.text; }
+        }
+
+        internal string ResourcesScopeForRuntime
+        {
+            get { return _resourceScope.ToString(); }
+        }
+
+        // Actual accounting cells which intersect the masked viewport after
+        // layout. Row identity is retained so runtime evidence can prove a
+        // useful pool row, not merely the static column headings or summary.
+        internal string[] ResourcesVisibleAccountingCellsForRuntime
+        {
+            get
+            {
+                if (!ResourcesOpenForRuntime || _resourcesContent == null ||
+                    _resourcesScroll == null || _resourcesScroll.viewport == null)
+                    return new string[0];
+                Canvas.ForceUpdateCanvases();
+                Rect viewport = _resourcesScroll.viewport.rect;
+                return _resourcesContent.GetComponentsInChildren<TMP_Text>(false)
+                    .Where(text => IsAccountingCell(text) && text.isActiveAndEnabled &&
+                        text.canvasRenderer != null && !text.canvasRenderer.cull &&
+                        BoundsOverlap(RectTransformUtility.CalculateRelativeRectTransformBounds(
+                            _resourcesScroll.viewport, text.rectTransform), viewport) &&
+                        !string.IsNullOrWhiteSpace(text.text))
+                    .Select(text => text.transform.parent.name + "/" + text.name + "=" + text.text)
+                    .ToArray();
+            }
+        }
+
+        internal bool ResourcesAccountingUsesNativeLayerForRuntime
+        {
+            get
+            {
+                if (!ResourcesOpenForRuntime || _resourcesContent == null) return false;
+                TMP_Text[] cells = _resourcesContent.GetComponentsInChildren<TMP_Text>(false)
+                    .Where(IsAccountingCell).ToArray();
+                return cells.Length != 0 && cells.All(text => text.gameObject.layer == _uiLayer &&
+                    text.transform.parent != null && text.transform.parent.gameObject.layer == _uiLayer);
+            }
+        }
+
+        private static bool IsAccountingCell(TMP_Text text)
+        {
+            if (text == null || text.transform.parent == null) return false;
+            string row = text.transform.parent.name ?? string.Empty;
+            return row == "Columns" || row.StartsWith("Pool.", StringComparison.Ordinal);
+        }
+
+        private static bool BoundsOverlap(Bounds bounds, Rect rect)
+        {
+            return bounds.max.x > rect.xMin && bounds.min.x < rect.xMax &&
+                bounds.max.y > rect.yMin && bounds.min.y < rect.yMax;
         }
 
         internal string AvailabilityPolicyCaptionForRuntime
@@ -429,6 +511,9 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed) return;
             long totalStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+            long interactionStarted = _nextInteractionStartedAt ?? totalStarted;
+            _nextInteractionStartedAt = null;
+            int sequence = ++_refreshSequence;
             string cause = _lastView == null ? "cold-open"
                 : (_nextRefreshCause ?? "warm-refresh");
             _nextRefreshCause = null;
@@ -479,7 +564,7 @@ namespace KingmakerBuffPlanner.UI
             if (_inspectorScroll != null) _inspectorScroll.verticalNormalizedPosition = inspectorPosition;
             RevealPendingProblem();
             double layoutMilliseconds = ElapsedMilliseconds(stageStarted);
-            _log("[KBP-WORKSPACE-PERF] cause=" + cause +
+            _log("[KBP-WORKSPACE-PERF] sequence=" + sequence + ";cause=" + cause +
                 ";commandAndPersistenceMs=" +
                     commandAndPersistenceMilliseconds.ToString("F3") +
                 ";inputMs=" + inputMilliseconds.ToString("F3") +
@@ -489,6 +574,8 @@ namespace KingmakerBuffPlanner.UI
                 ";themeMs=" + themeMilliseconds.ToString("F3") +
                 ";layoutMs=" + layoutMilliseconds.ToString("F3") +
                 ";presentedRefreshMs=" + ElapsedMilliseconds(totalStarted).ToString("F3"));
+            if (_firstCorrectFrameProbe != null)
+                _firstCorrectFrameProbe.Arm(interactionStarted, sequence, cause, _log);
         }
 
         private static double ElapsedMilliseconds(long startedAt)
@@ -866,6 +953,7 @@ namespace KingmakerBuffPlanner.UI
             canvas.overrideSorting = true;
             canvas.sortingOrder = 32000;
             _root.gameObject.AddComponent<GraphicRaycaster>();
+            _firstCorrectFrameProbe = _root.gameObject.AddComponent<FirstCorrectFrameProbe>();
             _description = new NativeDescriptionPresenter(canvas, _root, _log);
             CanvasGroup group = _root.gameObject.AddComponent<CanvasGroup>();
             group.alpha = 1f;
@@ -1586,6 +1674,11 @@ namespace KingmakerBuffPlanner.UI
             string needed, string spend, string shortBy, PlannerTextRole role, bool problem)
         {
             RectTransform row = KingmakerUiFactory.CreateRect(name, _resourcesContent);
+            // CreateRect starts on Unity's default layer. These rows are
+            // rebuilt after the one construction-time layer propagation, so
+            // put each row on the native UI camera's layer before its cells
+            // inherit the layer and render.
+            row.gameObject.layer = _uiLayer;
             KingmakerUiFactory.AddLayout(row, 36f);
             ResourceCell(row, "Resource", resource, 0f, 0.46f, role, problem);
             ResourceCell(row, "AvailableNow", available, 0.46f, 0.60f, role, false);
@@ -1599,6 +1692,7 @@ namespace KingmakerBuffPlanner.UI
         {
             TextMeshProUGUI text = _kit.Text(row, name, value, role, 14f,
                 from == 0f ? TextAlignmentOptions.MidlineLeft : TextAlignmentOptions.MidlineRight);
+            text.gameObject.layer = _uiLayer;
             text.enableAutoSizing = true;
             text.fontSizeMin = 10f;
             text.fontSizeMax = 14f;
@@ -2605,6 +2699,7 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed) return;
             long commandStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+            _nextInteractionStartedAt = commandStarted;
             // A command's feedback lasts until the next command; without one
             // the footer shows Run's status again.
             _feedbackShown = false;

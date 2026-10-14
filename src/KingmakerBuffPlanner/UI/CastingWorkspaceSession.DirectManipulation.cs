@@ -96,74 +96,68 @@ namespace KingmakerBuffPlanner.UI
             if (inputs != null) _lastInputs = inputs;
             if (string.IsNullOrEmpty(unitId))
                 return Refused(AuthoringEditResult.Refuse("target-not-in-party:"));
-            PlannedCasting focused = FocusedCasting();
-            if (GraphEditIntent == CastingGraphEditIntent.ChangeRecipient)
-            {
-                if (focused == null)
-                {
-                    CancelGraphEditIntent();
-                    return Refused(AuthoringEditResult.Refuse("no-editing-focus"));
-                }
-                bool editingGroup = focused.TargetMode != CastingTargetMode.DirectTarget;
-                string editingRefusal = RecipientRefusal(focused, unitId, editingGroup);
-                if (editingRefusal != null)
-                    return Refused(AuthoringEditResult.Refuse(editingRefusal), focused.CastingId);
-                AuthoringEditResult edit = RetargetFocusedCasting(unitId);
-                if (!edit.Applied) return Refused(edit, focused.CastingId);
+
+            // A recipient is not a provider choice. Leaving an explicit
+            // provider edit by clicking here makes this a normal assignment
+            // gesture and, critically, does not carry that edit intent onto
+            // the casting which AddGraphCasting may focus for inspection.
+            if (GraphEditIntent == CastingGraphEditIntent.ChangeProvider)
                 CancelGraphEditIntent();
-                return new CastingGraphClickResult(editingGroup
-                    ? CastingGraphClickOutcome.Recentred
-                    : CastingGraphClickOutcome.Retargeted, edit, focused.CastingId);
+
+            bool? group;
+            string draftRefusal;
+            ProviderPlanningOption option = ResolveRecipientDraftOption(_lastInputs,
+                out group, out draftRefusal);
+            GraphRecipientDecision decision = DecideGraphRecipient(unitId, _lastInputs,
+                option, group, draftRefusal, null);
+            switch (decision.Action)
+            {
+                case CastingGraphRecipientAction.Retarget:
+                case CastingGraphRecipientAction.Recentre:
+                {
+                    PlannedCasting focused = FocusedCasting();
+                    if (focused == null)
+                    {
+                        CancelGraphEditIntent();
+                        return Refused(AuthoringEditResult.Refuse("no-editing-focus"));
+                    }
+                    AuthoringEditResult edit = RetargetFocusedCasting(unitId);
+                    if (!edit.Applied) return Refused(edit, focused.CastingId);
+                    CancelGraphEditIntent();
+                    return new CastingGraphClickResult(
+                        decision.Action == CastingGraphRecipientAction.Recentre
+                            ? CastingGraphClickOutcome.Recentred
+                            : CastingGraphClickOutcome.Retargeted,
+                        edit, focused.CastingId);
+                }
+                case CastingGraphRecipientAction.Remove:
+                {
+                    AuthoringEditResult removal = _authoring.RemoveCasting(decision.CastingId);
+                    if (string.Equals(EditingFocusCastingId, decision.CastingId,
+                            StringComparison.Ordinal))
+                        EditingFocusCastingId = null;
+                    return removal.Applied
+                        ? new CastingGraphClickResult(CastingGraphClickOutcome.Removed,
+                            removal, decision.CastingId)
+                        : Refused(removal);
+                }
+                case CastingGraphRecipientAction.InspectGroupCoverage:
+                {
+                    FocusGraphCasting(decision.CastingId);
+                    return new CastingGraphClickResult(CastingGraphClickOutcome.Focused, null,
+                        decision.CastingId);
+                }
+                case CastingGraphRecipientAction.Disambiguate:
+                    return new CastingGraphClickResult(
+                        CastingGraphClickOutcome.DisambiguationRequired, null, null);
+                case CastingGraphRecipientAction.Refuse:
+                    if (GraphEditIntent == CastingGraphEditIntent.ChangeRecipient &&
+                        FocusedCasting() == null)
+                        CancelGraphEditIntent();
+                    return Refused(AuthoringEditResult.Refuse(decision.RefusalCode),
+                        decision.CastingId);
             }
 
-            bool? group = IsGroupSource(_lastInputs, SelectedSourceId);
-            if (group == null)
-                return Refused(AuthoringEditResult.Refuse(
-                    "ability-targeting-unsupported:" + (SelectedSourceId ?? string.Empty)));
-            List<PlannedCasting> same = _authoring.Document.Castings.Where(casting =>
-                    casting != null &&
-                    string.Equals(casting.SourceId, SelectedSourceId, StringComparison.Ordinal) &&
-                    string.Equals(casting.RoutineId, SelectedRoutineId, StringComparison.Ordinal) &&
-                    MatchesSelectedVariant(casting, Draft.Ability) &&
-                    (casting.TargetMode != CastingTargetMode.DirectTarget) == group.Value)
-                .OrderBy(casting => casting.Order)
-                .ThenBy(casting => casting.CastingId, StringComparer.Ordinal).ToList();
-            List<PlannedCasting> centred = same.Where(casting =>
-                string.Equals(RecipientOf(casting), unitId, StringComparison.Ordinal)).ToList();
-            if (centred.Count > 1)
-            {
-                // Never choose one legacy duplicate arbitrarily. Both cards
-                // remain visible in the graph so the player can explicitly
-                // inspect one and use its Remove casting control.
-                return new CastingGraphClickResult(
-                    CastingGraphClickOutcome.DisambiguationRequired, null, null);
-            }
-            if (centred.Count == 1)
-            {
-                string removed = centred[0].CastingId;
-                AuthoringEditResult removal = _authoring.RemoveCasting(removed);
-                if (string.Equals(EditingFocusCastingId, removed, StringComparison.Ordinal))
-                    EditingFocusCastingId = null;
-                return removal.Applied
-                    ? new CastingGraphClickResult(CastingGraphClickOutcome.Removed, removal, removed)
-                    : Refused(removal);
-            }
-            if (group.Value && same.Count != 0 && _lastInputs != null)
-            {
-                ExplicitCastingPlan plan = Compile(_lastInputs, SelectedRoutineId, false);
-                PlannedCasting covering = same.FirstOrDefault(casting =>
-                {
-                    ResolvedCasting resolved = plan.CastingById(casting.CastingId);
-                    return resolved != null &&
-                        resolved.PredictedBeneficiaryUnitIds.Contains(unitId);
-                });
-                if (covering != null)
-                {
-                    FocusGraphCasting(covering.CastingId);
-                    return new CastingGraphClickResult(CastingGraphClickOutcome.Focused, null,
-                        covering.CastingId);
-                }
-            }
             CastingGraphEditResult added = AddGraphCasting(unitId);
             if (added.ShowedExisting)
                 return new CastingGraphClickResult(CastingGraphClickOutcome.Focused, null,
@@ -201,11 +195,7 @@ namespace KingmakerBuffPlanner.UI
                 // caster's exact source rows (the graph draws rows for the
                 // chosen caster only) so the next click on one changes the
                 // provider. The focused casting is kept and unchanged.
-                ChooseDraftCaster(casterUnitId);
-                Draft.Ability = null;
-                Draft.SpellbookGuid = null;
-                _draftProviderKey = string.Empty;
-                _resolvedDraftKey = string.Empty;
+                ConfigureGraphDraftCaster(casterUnitId);
                 return Refused(AuthoringEditResult.Refuse("exact-source-ambiguous:" + sources.Count),
                     focused.CastingId);
             }
@@ -282,6 +272,170 @@ namespace KingmakerBuffPlanner.UI
                 return focused.TargetMode == CastingTargetMode.CasterCenteredOrigin
                     ? "origin-caster-illegal:" + centre : "origin-anchor-illegal:" + centre;
             return null;
+        }
+
+        private sealed class GraphRecipientDecision
+        {
+            internal GraphRecipientDecision(CastingGraphRecipientAction action, bool group,
+                string castingId, IEnumerable<string> castingIds, string refusalCode,
+                string reason, bool unknown)
+            {
+                Action = action;
+                Group = group;
+                CastingId = castingId;
+                CastingIds = (castingIds ?? new string[0]).ToList();
+                RefusalCode = refusalCode;
+                Reason = reason ?? string.Empty;
+                Unknown = unknown;
+            }
+
+            internal CastingGraphRecipientAction Action { get; private set; }
+            internal bool Group { get; private set; }
+            internal string CastingId { get; private set; }
+            internal IReadOnlyList<string> CastingIds { get; private set; }
+            internal string RefusalCode { get; private set; }
+            internal string Reason { get; private set; }
+            internal bool Unknown { get; private set; }
+        }
+
+        // Resolves the exact provider and targeting modifiers used by both
+        // AddGraphCasting and the recipient read model. Saved assignment
+        // decisions are evaluated before this option, so a current provider
+        // that cannot add never prevents provider-independent removal.
+        private ProviderPlanningOption ResolveRecipientDraftOption(CastingWorkspaceInputs inputs,
+            out bool? group, out string refusal)
+        {
+            group = IsGroupSource(inputs, SelectedSourceId);
+            refusal = group == null
+                ? "ability-targeting-unsupported:" + (SelectedSourceId ?? string.Empty)
+                : null;
+            if (inputs == null || group == null) return null;
+            ProviderPlanningOption option = ResolveDraftOption(out refusal);
+            if (option == null) return null;
+            if (Draft.TargetingModifiers.Count == 0) return option;
+            PlannedCasting prospective = ProspectiveDraftCasting(option);
+            return ApplyGraphTargetingModifiers(Draft.TargetingModifiers, inputs,
+                prospective, option, out refusal);
+        }
+
+        // One authoritative decision for both presentation and execution.
+        // It deliberately filters saved intent by the selected exact ability
+        // variant before deciding Remove/Inspect/Disambiguate.
+        private GraphRecipientDecision DecideGraphRecipient(string unitId,
+            CastingWorkspaceInputs inputs, ProviderPlanningOption option, bool? selectedGroup,
+            string draftRefusal, ExplicitCastingPlan compiled)
+        {
+            UnitSnapshot unit = inputs == null ? null : inputs.Snapshot.Units.FirstOrDefault(value =>
+                string.Equals(value.UnitId, unitId, StringComparison.Ordinal));
+            if (unit == null)
+                return RefusedRecipient(false, "target-not-in-party:" + (unitId ?? string.Empty),
+                    "Not in the current party.", false, null);
+
+            PlannedCasting focused = FocusedCasting();
+            if (GraphEditIntent == CastingGraphEditIntent.ChangeRecipient)
+            {
+                if (focused == null)
+                    return RefusedRecipient(false, "no-editing-focus",
+                        "Choose a casting before changing its recipient.", true, null);
+                bool editingGroup = focused.TargetMode != CastingTargetMode.DirectTarget;
+                if (string.Equals(RecipientOf(focused), unitId, StringComparison.Ordinal))
+                    return RefusedRecipient(editingGroup, "target-unchanged",
+                        editingGroup ? "This is already the casting's centre."
+                            : "This is already the casting's recipient.", false,
+                        focused.CastingId);
+                string editingRefusal = RecipientRefusal(focused, unitId, editingGroup);
+                if (editingRefusal != null)
+                    return RefusedRecipient(editingGroup, editingRefusal,
+                        RecipientDecisionReason(editingRefusal), false, focused.CastingId);
+                return new GraphRecipientDecision(editingGroup
+                        ? CastingGraphRecipientAction.Recentre
+                        : CastingGraphRecipientAction.Retarget,
+                    editingGroup, focused.CastingId, new[] { focused.CastingId }, null,
+                    string.Empty, false);
+            }
+
+            if (selectedGroup == null)
+                return RefusedRecipient(false,
+                    "ability-targeting-unsupported:" + (SelectedSourceId ?? string.Empty),
+                    "This buff's targeting is not understood.", true, null);
+            bool group = selectedGroup.Value;
+            List<PlannedCasting> same = _authoring.Document.Castings.Where(casting =>
+                    casting != null &&
+                    string.Equals(casting.SourceId, SelectedSourceId, StringComparison.Ordinal) &&
+                    string.Equals(casting.RoutineId, SelectedRoutineId, StringComparison.Ordinal) &&
+                    MatchesSelectedVariant(casting, Draft.Ability) &&
+                    (casting.TargetMode != CastingTargetMode.DirectTarget) == group)
+                .OrderBy(casting => casting.Order)
+                .ThenBy(casting => casting.CastingId, StringComparer.Ordinal).ToList();
+            List<PlannedCasting> centred = same.Where(casting =>
+                string.Equals(RecipientOf(casting), unitId, StringComparison.Ordinal)).ToList();
+            if (centred.Count > 1)
+                return new GraphRecipientDecision(CastingGraphRecipientAction.Disambiguate,
+                    group, null, centred.Select(value => value.CastingId), null,
+                    string.Empty, true);
+            if (centred.Count == 1)
+                return new GraphRecipientDecision(CastingGraphRecipientAction.Remove,
+                    group, centred[0].CastingId, new[] { centred[0].CastingId }, null,
+                    string.Empty, false);
+
+            if (group && same.Count != 0)
+            {
+                ExplicitCastingPlan plan = compiled ?? Compile(inputs, SelectedRoutineId, false);
+                PlannedCasting covering = same.FirstOrDefault(casting =>
+                {
+                    ResolvedCasting resolved = plan.CastingById(casting.CastingId);
+                    return resolved != null &&
+                        resolved.PredictedBeneficiaryUnitIds.Contains(unitId);
+                });
+                if (covering != null)
+                    return new GraphRecipientDecision(
+                        CastingGraphRecipientAction.InspectGroupCoverage, true,
+                        covering.CastingId, new[] { covering.CastingId }, null,
+                        string.Empty, false);
+            }
+
+            if (option == null)
+                return RefusedRecipient(group,
+                    string.IsNullOrEmpty(draftRefusal) ? "draft-ability-unresolved" : draftRefusal,
+                    RecipientDecisionReason(draftRefusal), true, null);
+            bool reachable = group ? option.LegalAnchorIds.Contains(unitId)
+                : option.ReachableTargetIds.Contains(unitId);
+            if (!reachable)
+                return RefusedRecipient(group,
+                    group ? "origin-anchor-illegal:" + unitId : "target-unreachable:" + unitId,
+                    group ? "The group spell cannot be centred here."
+                        : "Out of this caster's reach.", false, null);
+            if (!group)
+            {
+                string invalid = InvalidTargetReason(unit);
+                if (invalid != null)
+                    return RefusedRecipient(false, invalid + ":" + unitId,
+                        WorkspaceReasonText.Describe(invalid), false, null);
+            }
+            return new GraphRecipientDecision(CastingGraphRecipientAction.Add, group,
+                null, new string[0], null, string.Empty, false);
+        }
+
+        private static GraphRecipientDecision RefusedRecipient(bool group, string code,
+            string reason, bool unknown, string castingId)
+        {
+            return new GraphRecipientDecision(CastingGraphRecipientAction.Refuse, group,
+                castingId, castingId == null ? null : new[] { castingId },
+                code ?? "recipient-refused", reason, unknown);
+        }
+
+        private static string RecipientDecisionReason(string refusal)
+        {
+            if (string.IsNullOrEmpty(refusal) ||
+                refusal.StartsWith("draft-ability-unresolved", StringComparison.Ordinal))
+                return "Choose a caster and exact source first.";
+            if (refusal.StartsWith("target-unreachable", StringComparison.Ordinal))
+                return "Out of this caster's reach.";
+            if (refusal.StartsWith("origin-", StringComparison.Ordinal))
+                return "The group spell cannot be centred here.";
+            if (refusal.StartsWith("recipient-already-has-casting", StringComparison.Ordinal))
+                return "This recipient already has another matching casting.";
+            return WorkspaceRefusalText.Describe(refusal);
         }
 
         // The recipient a portrait click compares with: the direct target, or

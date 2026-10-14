@@ -140,11 +140,16 @@ namespace KingmakerBuffPlanner.Tests
             Expect(session.ClickGraphCaster("felix", inputs).Outcome ==
                 CastingGraphClickOutcome.DraftConfigured, "Felix was not chosen for the next casting");
             CastingGraphClickResult felix = session.ClickGraphRecipient("felix", inputs);
-            Expect(felix.Outcome == CastingGraphClickOutcome.Added, "Felix did not receive Seamantle");
+            Expect(felix.Outcome == CastingGraphClickOutcome.Added &&
+                session.EditingFocusCastingId == felix.CastingId &&
+                session.GraphEditIntent == CastingGraphEditIntent.None,
+                "Felix did not receive an inspection-only Seamantle focus");
             string afterFelix = session.DocumentIntentSignature();
             Expect(session.ClickGraphCaster("leinna", inputs).Outcome ==
                     CastingGraphClickOutcome.DraftConfigured &&
-                session.DocumentIntentSignature() == afterFelix,
+                session.DocumentIntentSignature() == afterFelix &&
+                session.EditingFocusCastingId == null &&
+                session.GraphEditIntent == CastingGraphEditIntent.None,
                 "choosing Leinna retargeted Felix's saved casting");
             CastingGraphClickResult leinna = session.ClickGraphRecipient("leinna", inputs);
             Expect(leinna.Outcome == CastingGraphClickOutcome.Added,
@@ -261,14 +266,41 @@ namespace KingmakerBuffPlanner.Tests
             session.SelectGraphBuff(GraphSourceA, graph);
             session.SelectGraphCaster("unit-bard", graph);
             Expect(session.SelectGraphSource(bardLevel2, graph).Applied, "fixture provider was refused");
+            session.Draft.Enhancements.Add(new AuthoredEnhancementSelection(
+                "reservoir-extend", true, null));
+            CastingGraphClickResult providerSaved = session.ClickGraphRecipient("unit-t1", graph);
+            Expect(providerSaved.Outcome == CastingGraphClickOutcome.Added &&
+                session.Document.Castings.Single().Enhancements.Any(value =>
+                    value.EnhancementId == "reservoir-extend"),
+                "the exact-provider fixture did not save its applicable enhancement");
+
+            // Re-clicking a multi-source caster header leaves the exact
+            // provider context. That transition must clear the backing
+            // choices before source B is picked, even though the caster is
+            // unchanged, and must not rewrite the saved casting.
+            session.SelectGraphCaster("unit-bard", graph);
+            Expect(session.Draft.Enhancements.Count == 0 &&
+                session.BuildGraph(graph).SelectedProviderKey == null,
+                "same-caster header reselection retained source A's choices");
+            Expect(session.SelectGraphSource(bardLevel1, graph).Applied &&
+                session.Draft.Enhancements.Count == 0 &&
+                session.Document.Castings.Single().Enhancements.Any(value =>
+                    value.EnhancementId == "reservoir-extend"),
+                "source B inherited source A's choice or the saved casting was stripped");
+
+            Expect(session.SelectGraphSource(bardLevel2, graph).Applied,
+                "fixture provider could not be restored");
             session.Draft.TargetingModifiers.Add(new TargetingModifierSelection("draft-only", true, null));
-            session.Draft.Enhancements.Add(new AuthoredEnhancementSelection("draft-only", true, null));
+            session.Draft.Enhancements.Add(new AuthoredEnhancementSelection("reservoir-extend", true, null));
             Expect(session.SelectGraphSource(bardLevel2, graph).Applied &&
                 session.Draft.TargetingModifiers.Count == 1 && session.Draft.Enhancements.Count == 1,
                 "reselecting the same exact provider cleared transient choices");
             Expect(session.SelectGraphSource(bardLevel1, graph).Applied &&
                 session.Draft.TargetingModifiers.Count == 0 && session.Draft.Enhancements.Count == 0,
                 "changing only the exact provider did not clear transient choices");
+            Expect(session.Document.Castings.Single().Enhancements.Any(value =>
+                    value.EnhancementId == "reservoir-extend"),
+                "direct provider switching stripped a previously saved casting");
         }
 
         private static void TestAvailabilityPolicy(string root)
@@ -432,6 +464,10 @@ namespace KingmakerBuffPlanner.Tests
                 "CreateScrollView(\"Accounting\"", "WorkspaceResourceReport",
                 "\"Available now\"", "\"Saved need\"", "\"Would spend\"", "\"Short\"",
                 "_resourcesCloseButton", "CloseResources();", "SetResourceScope",
+                "row.gameObject.layer = _uiLayer", "text.gameObject.layer = _uiLayer",
+                "ResourcesVisibleAccountingCellsForRuntime", "ResourcesAccountingUsesNativeLayerForRuntime",
+                "inputToFirstCorrectRenderedFrameMs", "commandAndPersistenceMs", "calculationMs",
+                "regionsMs", "themeMs", "layoutMs",
                 "GraphEditIntent.ChangeRecipient", "GraphEditIntent.ChangeProvider"
             })
                 Expect(source.Contains(required), "native refinement control is missing: " + required);
@@ -491,7 +527,23 @@ namespace KingmakerBuffPlanner.Tests
                 Path.Combine(root, "human-feedback-exhausted-removal"), "graph-campaign");
             GraphAdd(removal, exhausted, GraphSourceA, "unit-bard",
                 GraphProviderKey("unit-bard", "book-bard", GraphAbilityA, "level-2"), "unit-t1");
-            Expect(removal.ClickGraphRecipient("unit-t1", exhausted).Outcome ==
+            string selectedProvider = GraphProviderKey("unit-bard", "book-bard",
+                GraphAbilityA, "level-2");
+            var narrowedOptions = exhausted.ProviderOptions.Select(option =>
+                option.Provider.Key.Canonical == selectedProvider
+                    ? new ProviderPlanningOption(option.Provider, new[] { "unit-bard" },
+                        option.LegalAnchorIds, 5, 100)
+                    : option).ToList();
+            var narrowed = new CastingWorkspaceInputs(exhausted.Snapshot, narrowedOptions,
+                exhausted.EffectsBySource, exhausted.Enhancements,
+                exhausted.TargetingModifiers, exhausted.LiveEffects,
+                exhausted.CombatActive, exhausted.SpellbookMembership, exhausted.RunActive);
+            CastingGraphTargetNode removalNode = removal.BuildGraph(narrowed).TargetById("unit-t1");
+            Expect(removalNode.Action == CastingGraphRecipientAction.Remove &&
+                removalNode.Legality == CastingGraphTargetLegality.Legal &&
+                removalNode.Hint.Contains("remove") && removalNode.IllegalReason.Length == 0,
+                "an unreachable current provider made a removable assignment look disabled");
+            Expect(removal.ClickGraphRecipient("unit-t1", narrowed).Outcome ==
                     CastingGraphClickOutcome.Removed && removal.Document.Castings.Count == 0,
                 "an exhausted provider prevented removal of its saved assignment");
         }
@@ -527,6 +579,11 @@ namespace KingmakerBuffPlanner.Tests
             session.SelectGraphCaster("unit-bard", inputs);
             Expect(session.SelectGraphSource(variant.Key.Canonical, inputs).Applied,
                 "variant fixture exact source was refused");
+            CastingGraphTargetNode variantTarget = session.BuildGraph(inputs).TargetById("unit-t1");
+            Expect(variantTarget.Action == CastingGraphRecipientAction.Add &&
+                variantTarget.Legality == CastingGraphTargetLegality.Legal &&
+                variantTarget.Hint == "Click to add a casting",
+                "a different exact variant advertised removal of the base-form assignment");
             Expect(session.ClickGraphRecipient("unit-t1", inputs).Outcome ==
                     CastingGraphClickOutcome.Added && session.Document.Castings.Count == 2,
                 "a different exact variant was mistaken for the saved assignment");

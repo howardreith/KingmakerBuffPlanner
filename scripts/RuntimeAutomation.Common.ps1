@@ -1560,6 +1560,9 @@ function Assert-KbpScenarioOutcome {
         if ([int]$record.SchemaVersion -ge 5) {
             $requiredCaptures += @('nui-resources.png', 'nui-resources-all.png')
         }
+        if ([int]$record.SchemaVersion -ge 6) {
+            $requiredCaptures += @('nui-resources-selected-again.png', 'nui-resources-reopened.png')
+        }
         foreach ($capture in $requiredCaptures) {
             if (@($record.Captures) -cnotcontains $capture -or
                 -not (Test-Path -LiteralPath (Join-Path $directory $capture) -PathType Leaf)) {

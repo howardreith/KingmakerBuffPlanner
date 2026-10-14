@@ -137,9 +137,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // key-route preconditions. Schema 4 adds deliberately paused switching and
         // the planner action with unavailable Metamagic. Schema 5 adds the
         // human-feedback Resources modal, execution-policy/Run captions and
-        // the explicit-edit/continuous-assignment gesture contract.
+        // the explicit-edit/continuous-assignment gesture contract. Schema 6
+        // adds visible accounting-cell/layer observations, both scope
+        // transitions, reopening, and the inspection-only focus contract.
         // Historical records prove only what they observed.
-        public int SchemaVersion { get; set; } = 5;
+        public int SchemaVersion { get; set; } = 6;
         public string RunId { get; set; }
         public string Stage { get; set; }
         public int ScreenWidth { get; set; }
@@ -213,6 +215,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public float[] ResourcesPanelSize { get; set; }
         public string ResourcesSelectedSummary { get; set; }
         public string ResourcesAllSummary { get; set; }
+        public string ResourcesSelectedAgainSummary { get; set; }
+        public string ResourcesReopenedSummary { get; set; }
+        public string ResourcesSelectedScope { get; set; }
+        public string ResourcesAllScope { get; set; }
+        public string ResourcesSelectedAgainScope { get; set; }
+        public string ResourcesReopenedScope { get; set; }
+        public List<string> ResourcesSelectedCells { get; } = new List<string>();
+        public List<string> ResourcesAllCells { get; } = new List<string>();
+        public List<string> ResourcesSelectedAgainCells { get; } = new List<string>();
+        public List<string> ResourcesReopenedCells { get; } = new List<string>();
+        public bool ResourcesSelectedCellsUseNativeLayer { get; set; }
+        public bool ResourcesAllCellsUseNativeLayer { get; set; }
+        public bool ResourcesSelectedAgainCellsUseNativeLayer { get; set; }
+        public bool ResourcesReopenedCellsUseNativeLayer { get; set; }
+        public bool ResourcesClosedBetweenOpens { get; set; }
+        public bool ResourcesReopened { get; set; }
+        public bool ResourcesReopenedCloseFocused { get; set; }
         public string ResourcesSaveStatus { get; set; }
         public bool ResourcesClosedByEscape { get; set; }
         public string ResourcesDocumentBefore { get; set; }
@@ -257,7 +276,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         {
             var violations = new List<string>();
             if (SchemaVersion != 1 && SchemaVersion != 2 && SchemaVersion != 3 &&
-                SchemaVersion != 4 && SchemaVersion != 5) violations.Add("schema:" + SchemaVersion);
+                SchemaVersion != 4 && SchemaVersion != 5 && SchemaVersion != 6)
+                violations.Add("schema:" + SchemaVersion);
             if (Stage != FactsStage && Stage != QualifyStage) violations.Add("stage:" + (Stage ?? "null"));
             violations.AddRange(Failures.Select(value => "failure:" + value));
             violations.AddRange(MissingCaptures.Select(value => "capture-missing:" + value));
@@ -285,6 +305,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 foreach (string violation in PausedAndUnavailableViolations()) yield return violation;
             if (SchemaVersion >= 5)
                 foreach (string violation in HumanFeedbackViolations()) yield return violation;
+            if (SchemaVersion >= 6)
+                foreach (string violation in HumanFeedbackCorrectionViolations()) yield return violation;
             // UI-09: four cells the size of the native cells, one per native
             // column, on a third row above the native rows, inside the frame.
             if (PlannerHudButtons != 4) yield return "hud-planner-buttons:" + PlannerHudButtons;
@@ -415,9 +437,49 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 yield return "run-caption:" + (RunCaption ?? "none");
             foreach (string required in new[]
             {
-                "arm-retarget:ok", "add-without-focus:ok", "arm-change-caster:ok", "remove-normal:ok"
+                "arm-retarget:ok", "arm-change-caster:ok", "remove-normal:ok"
             })
                 if (!PlanningSteps.Contains(required)) yield return "planning-contract-missing:" + required;
+            if (SchemaVersion == 5 && !PlanningSteps.Contains("add-without-focus:ok"))
+                yield return "planning-contract-missing:add-without-focus:ok";
+        }
+
+        private IEnumerable<string> HumanFeedbackCorrectionViolations()
+        {
+            foreach (KeyValuePair<string, List<string>> observation in new Dictionary<string, List<string>>
+            {
+                { "selected", ResourcesSelectedCells },
+                { "all", ResourcesAllCells },
+                { "selected-again", ResourcesSelectedAgainCells },
+                { "reopened", ResourcesReopenedCells }
+            })
+            {
+                if (observation.Value == null || !observation.Value.Any(value =>
+                        value != null && value.StartsWith("Pool.", StringComparison.Ordinal) &&
+                        value.IndexOf('=') > 5))
+                    yield return "resources:" + observation.Key + "-visible-pool-cells-missing";
+            }
+            if (!ResourcesSelectedCellsUseNativeLayer || !ResourcesAllCellsUseNativeLayer ||
+                !ResourcesSelectedAgainCellsUseNativeLayer || !ResourcesReopenedCellsUseNativeLayer)
+                yield return "resources:accounting-cells-wrong-layer";
+            if (ResourcesSelectedScope != "SelectedRoutine" ||
+                ResourcesAllScope != "AllRoutinesNoRest" ||
+                ResourcesSelectedAgainScope != "SelectedRoutine" ||
+                ResourcesReopenedScope != "SelectedRoutine")
+                yield return "resources:scope-transition";
+            if (string.IsNullOrWhiteSpace(ResourcesSelectedAgainSummary) ||
+                ResourcesSelectedAgainSummary.StartsWith("All routines", StringComparison.Ordinal))
+                yield return "resources:selected-again-summary-missing";
+            if (!ResourcesClosedBetweenOpens || !ResourcesReopened ||
+                !ResourcesReopenedCloseFocused || string.IsNullOrWhiteSpace(ResourcesReopenedSummary))
+                yield return "resources:reopen";
+            foreach (string required in new[]
+            {
+                "add-inspects-only:ok", "choose-next-source:ok", "successive-add:ok",
+                "remove-second-normal:ok"
+            })
+                if (!PlanningSteps.Contains(required))
+                    yield return "planning-contract-missing:" + required;
         }
 
         // These observations support bounded integration judgements, not a

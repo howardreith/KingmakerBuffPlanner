@@ -808,12 +808,13 @@ try {
         $directory = Join-Path $outcomeRoot $Name
         New-Item -ItemType Directory -Path $directory | Out-Null
         $captures = @('nui-hud.png', 'nui-native-popup.png', 'nui-planner-casting.png', 'nui-planner-popup.png',
-            'nui-gamelog.png', 'nui-resources.png', 'nui-resources-all.png')
+            'nui-gamelog.png', 'nui-resources.png', 'nui-resources-all.png',
+            'nui-resources-selected-again.png', 'nui-resources-reopened.png')
         foreach ($capture in $captures) { [IO.File]::WriteAllBytes((Join-Path $directory $capture), [byte[]](1, 2, 3)) }
         $switch = [ordered]@{ Route = 'inventory'; PlannerOpenBefore = $true; PlannerOpenAfter = $false
             NativeShownAfter = $true; PlannerReopened = $true; SelectedSourceBefore = 'src-1'
             SelectedSourceAfterReopen = 'src-1' }
-        $record = [ordered]@{ SchemaVersion = 5; RunId = 'native-ui-run'; Stage = $Stage
+        $record = [ordered]@{ SchemaVersion = 6; RunId = 'native-ui-run'; Stage = $Stage
             Captures = $captures; MissingCaptures = @(); Failures = @(); RunsStarted = 0
             LeaseReleasedAtEnd = $true; FullScreenModeAtEnd = $false; NativePopupOpened = $true
             PlannerOpened = $true; Switches = @($switch, $switch, $switch)
