@@ -39,7 +39,16 @@ function Get-KbpSha256([string]$Path) {
     # is simulated and the command returns no hash object. Hash an explicitly
     # read-only stream instead: WhatIf remains armed for every mutating
     # operation while real bytes still pass through the built-in SHA256 tool.
-    $stream = [IO.File]::OpenRead([IO.Path]::GetFullPath($Path))
+    # Resolve-Path applies PowerShell's current-location and provider semantics;
+    # IO.Path.GetFullPath instead uses the process current directory, which can
+    # legitimately differ after Set-Location or Push-Location. The literal form
+    # also keeps wildcard metacharacters in filenames literal.
+    $resolved = @(Resolve-Path -LiteralPath $Path -ErrorAction Stop)
+    if ($resolved.Count -ne 1 -or $null -eq $resolved[0].Provider -or
+        [string]$resolved[0].Provider.Name -cne 'FileSystem') {
+        throw "SHA256 hashing supports exactly one FileSystem path: $Path"
+    }
+    $stream = [IO.File]::OpenRead([string]$resolved[0].Path)
     try {
         $result = @(Get-FileHash -InputStream $stream -Algorithm SHA256)
     }
