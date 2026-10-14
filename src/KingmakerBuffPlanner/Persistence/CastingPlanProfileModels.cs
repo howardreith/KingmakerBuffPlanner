@@ -24,12 +24,13 @@ namespace KingmakerBuffPlanner.Persistence
         //   2 = + importNotices, legacyRecipientKey, reviewItems (K-series)
         //   3 = + acknowledgedImportNotices, resolvedReviewItems,
         //       formatRevision (L1)
+        //   4 = + execution.availabilityPolicy (human-feedback UX-05)
         // The built assembly declares the newest revision it reads through
         // an AssemblyMetadata attribute ("KingmakerBuffPlanner.
         // CandidateProfileFormat" = "<schema>.<revision>"), which install
         // rollback reads from the restored binary itself.
-        internal const int CurrentFormatRevision = 3;
-        internal const string CandidateFormatToken = "6.3";
+        internal const int CurrentFormatRevision = 4;
+        internal const string CandidateFormatToken = "6.4";
         internal const string CandidateFormatAttributeKey =
             "KingmakerBuffPlanner.CandidateProfileFormat";
 

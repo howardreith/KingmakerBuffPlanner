@@ -176,11 +176,25 @@ namespace KingmakerBuffPlanner.UI
         Illegal
     }
 
+    // The session's authoritative interpretation of a recipient click. The
+    // view renders this decision; the click handler executes the same one.
+    public enum CastingGraphRecipientAction
+    {
+        Add,
+        Remove,
+        InspectGroupCoverage,
+        Disambiguate,
+        Retarget,
+        Recentre,
+        Refuse
+    }
+
     public sealed class CastingGraphTargetNode
     {
         internal CastingGraphTargetNode(string unitId, string displayName,
             CastingGraphTargetLegality legality, string illegalReason,
-            IEnumerable<string> castingIds, WorkspaceRecipientCoverage coverage, string hint)
+            IEnumerable<string> castingIds, WorkspaceRecipientCoverage coverage, string hint,
+            CastingGraphRecipientAction action = CastingGraphRecipientAction.Refuse)
         {
             UnitId = unitId ?? string.Empty;
             DisplayName = string.IsNullOrWhiteSpace(displayName) ? UnitId : displayName;
@@ -189,6 +203,7 @@ namespace KingmakerBuffPlanner.UI
             CastingIds = new ReadOnlyCollection<string>((castingIds ?? new string[0]).ToList());
             Coverage = coverage;
             Hint = hint ?? string.Empty;
+            Action = action;
         }
 
         public string UnitId { get; private set; }
@@ -201,6 +216,7 @@ namespace KingmakerBuffPlanner.UI
         public WorkspaceRecipientCoverage Coverage { get; private set; }
         // What a click does now ("Adds a casting", "Shows casting #2", ...).
         public string Hint { get; private set; }
+        public CastingGraphRecipientAction Action { get; private set; }
     }
 
     public sealed class CastingGraphCasting
@@ -633,25 +649,30 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
-        // What a recipient portrait click does now. Adding (no casting
-        // selected): add one casting, or select the one it already has.
-        // Editing a selected casting: its own recipient removes it, another
-        // legal recipient moves it there, a recipient holding another casting
-        // of this buff refuses (it would double), an unreachable one refuses.
-        public static string RecipientHint(bool editing, bool legal, bool unknown, string reason,
-            bool group, string ownCastingLabel, string otherCastingLabel)
+        // What the authoritative recipient decision does now. Focus alone
+        // never changes this action; Retarget/Recentre are available only
+        // while the corresponding explicit one-shot edit is armed.
+        public static string RecipientHint(CastingGraphRecipientAction action,
+            bool group, string castingLabel, string reason)
         {
-            if (editing)
+            switch (action)
             {
-                if (ownCastingLabel != null) return "Click again to remove " + ownCastingLabel;
-                if (otherCastingLabel != null) return "Has casting " + otherCastingLabel;
-                if (!legal) return string.IsNullOrEmpty(reason) ? "Cannot receive it" : reason;
-                return group ? "Click to centre it here" : "Click to move it here";
+                case CastingGraphRecipientAction.Add:
+                    return group ? "Click to centre a casting here" : "Click to add a casting";
+                case CastingGraphRecipientAction.Remove:
+                    return "Has casting " + castingLabel + " · click to remove it";
+                case CastingGraphRecipientAction.InspectGroupCoverage:
+                    return "Covered by " + castingLabel + " · click to inspect it";
+                case CastingGraphRecipientAction.Disambiguate:
+                    return "Multiple matching castings (" + castingLabel +
+                        ") · inspect one to remove it";
+                case CastingGraphRecipientAction.Retarget:
+                    return "Click to move it here";
+                case CastingGraphRecipientAction.Recentre:
+                    return "Click to centre it here";
+                default:
+                    return string.IsNullOrEmpty(reason) ? "Cannot receive it" : reason;
             }
-            if (otherCastingLabel != null) return "Has casting " + otherCastingLabel + " · click to select it";
-            if (unknown) return "Choose a caster first";
-            if (!legal) return reason ?? string.Empty;
-            return group ? "Click to centre a casting here" : "Click to add a casting";
         }
 
         // The sidebar's single instruction while adding a casting.

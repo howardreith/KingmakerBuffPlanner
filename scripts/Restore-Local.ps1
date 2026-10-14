@@ -43,6 +43,14 @@ if (Test-Path -LiteralPath $registryPath -PathType Leaf) {
     $registryRestored = @(Restore-KbpRegistrySnapshotFile -Path $registryPath)
     Write-Host "Game registry restoration: verified=True run=$RunId values=$($registryRestored.Count)"
 }
+$physicalDisplayPath = Join-Path (Split-Path -Parent $statePath) 'display-physical.json'
+if (Test-Path -LiteralPath $physicalDisplayPath -PathType Leaf) {
+    $displayTransactionActive = [string](Read-KbpJson $statePath).status -cne 'Restored'
+    $physicalDisplay = Confirm-KbpPhysicalDisplaySnapshotFile -Path $physicalDisplayPath `
+        -CurrentSnapshot (Get-KbpSessionDisplaySnapshot) -Reverify:$displayTransactionActive
+    Write-Host ("Physical display restoration: verified=" + [bool]$physicalDisplay.restored +
+        " run=$RunId size=" + [string]$physicalDisplay.original.primarySize)
+}
 # Final review C2: a protected-save comparison the launcher could not make
 # is finished here, before the Mods restoration releases this run's lock
 # (the other lab checks that lock, so it cannot have run in between). A

@@ -1,3 +1,61 @@
+> **Current October 14 human-feedback resume:** exact frozen rc5 product
+> `ec3d5f865707e540b00fccabd3f1a98f04aa3095`, version 0.5.1-rc5; ZIP
+> `63c12d519dd49d514f6ddd31ea0514b9a8af5644680aa1dde82ddc77e63bfb03`;
+> DLL `8bbf4f1a515cdbd186f8cdd515250fd12c864d2f643a38945f84d786b61e9f92`;
+> MVID `95f36b3c-7e36-4005-9880-898841e1fd72`. Planning-sequence and explicit
+> 1920x1200 corrections pass focused checks. Selected operation
+> `kbphf-rc5-20261014-01` stopped, without retry or game launch, when DATA's
+> display changed from preflight 1920x1200 to 1920x1080 during the first purity
+> inventory. No transaction, RunId path, allowance or save change exists.
+> Preserve that FAIL. Resume only after the owner restores and can hold physical
+> 1920x1200, then explicitly selects one fresh ~7 h 30 m batch from a clean
+> runtime checkout at the path-bound product/harness commit `ec3d5f8`, as
+> described in the
+> [rc5 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
+>
+> **Current October 14 human-feedback resume:** branch
+> `codex/kingmaker-buff-planner-human-feedback`; exact frozen successor product
+> `19e2e777261ff7887f0b8f62c8adcc75161220c5`; version 0.5.1-rc4; ZIP
+> `1a38d33439392a9c1da5202c1537357213177432e8bca174b550c88ab0c68036`;
+> DLL `093b08fc1f50ba334a05e75dd24eb785808885c5826d1ee6fffa63149591a287`;
+> MVID `be795e3c-7c39-41a7-98e2-fdc5c177c326`. Preserve the rc3 FAIL and its
+> clean Mods/save restoration. rc4 is **NOT_RUN**. Resume only with the fresh
+> rc4 two-purity/four-game batch, first guarding an actual transactional
+> 1920x1200 owner mode; exact scope and cost are in the
+> [rc4 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC4.md).
+>
+> **Current October 14 human-feedback resume:** branch
+> `codex/kingmaker-buff-planner-human-feedback`; packaged product
+> `debd40674ed2a6ed9f6e3423671f6ec2180bead0`; version 0.5.1-rc3; ZIP
+> `0d30c7fa430e618be1b7d871c68bdc894b79206018771b17b90ca9b8d3037e62`;
+> DLL `6875da1340cae51b6fb12b5c2bccbc94f102a1ab096251ec35346fcedeac7f7a`;
+> MVID `407d6a8b-139f-4800-8ee8-b259578ccdfa`. Bounded source, focused checks,
+> harness correction and local package are complete; candidate is **NOT_RUN**.
+> Preserve rc1/rc2. Resume only with the single fully specified 7 h 30 m live
+> batch in the [rc3 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+>
+> **Current October 13 human-feedback correction resume:** branch
+> `codex/kingmaker-buff-planner-human-feedback`; exact packaged product
+> `e06d803400893f4cd68d0066ae2421d0085db243`; version 0.5.1-rc2; ZIP
+> `6e6a5822c771514981b4bd788398864c56f98df7fabf96e4479ad84cccbcaa27`;
+> DLL `695f65d02e8253da81a96238312e32d64489793788ad35dbb5e0c41417354548`;
+> MVID `bfd140ba-1d58-40fb-a71c-4255371b42f2`. Four source-review findings,
+> focused checks and local packaging are complete; candidate is **NOT_RUN**.
+> Preserve rc1 and do not install, merge, release or relabel older evidence.
+> Remaining live scope and its exact selected-purity parameters/cost are in the
+> [rc2 correction receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+>
+> **Current October 13 human-feedback resume:** branch
+> `codex/kingmaker-buff-planner-human-feedback`; exact packaged product
+> `a4c4342e1296966cbae1d64eeb53b47f23265627`; version 0.5.1-rc1; ZIP
+> `2e4e1a9fe3fd56eaf11eac39f09132be18c3358ebc9aee45f3b6fad8e8d2ffbc`;
+> DLL `bdc1aa3c512ba884a6c8b4476f4c92ea9362dec794b7fb1addf95f07288af10e`;
+> MVID `e21f2f39-0305-4bb3-aa02-067f4ac78252`. Source/focused/package work is
+> complete and **NOT_RUN**. Do not install, relabel 0.5.0 evidence or launch an
+> unbudgeted campaign. Resume with the single frozen-product purity plus owner
+> 1920x1200/compact 1280x720 batch in the
+> [human-feedback receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+>
 > **Current October 13 resume:** exact product `dfbaa5f`, internal version
 > 0.5.0, is published as artifact-only human-review prerelease `v0.5.0-rc.1`.
 > The annotated tag targets the product commit; later reader/evidence records do

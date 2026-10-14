@@ -1,3 +1,51 @@
+> **Current 0.5.1-rc5 qualification:** exact frozen product `ec3d5f8`, ZIP
+> `63c12d519dd49d514f6ddd31ea0514b9a8af5644680aa1dde82ddc77e63bfb03`,
+> passes focused planning-sequence/display checks and package validation. The
+> selected operation `kbphf-rc5-20261014-01` is a prerequisite **FAIL**, not a
+> runtime result: physical display changed from 1920x1200 preflight to 1920x1080
+> before the first explicit-size WhatIf. No game launched, transaction began,
+> allowance was created or RunId path remains. No purity/runtime/visual PASS is
+> claimed. See the
+> [rc5 decision receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
+>
+> **Current 0.5.1-rc4 qualification:** the selected rc3 campaign preserved one
+> five-target purity PASS, then stopped on actual RunId
+> `kbphf-rc3-20261014-02-ui-owner` with runtime **FAIL**. Mods and protected
+> saves restored cleanly. The run exposed whole-dialog Resources translucency
+> and an observer seed that left only one free recipient; it also rendered at
+> 1920x1080, not the required owner 1920x1200. Exact successor product
+> `19e2e777261ff7887f0b8f62c8adcc75161220c5`, ZIP
+> `1a38d33439392a9c1da5202c1537357213177432e8bca174b550c88ab0c68036`,
+> fixes those two demonstrated defects and passes focused checks, but rc4 is
+> **NOT_RUN**. The 1280x720 and policy routes never started. See the
+> [rc4 decision receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC4.md).
+>
+> **Current 0.5.1-rc3 qualification:** exact product `debd406`, ZIP
+> `0d30c7fa430e618be1b7d871c68bdc894b79206018771b17b90ca9b8d3037e62`,
+> is focused-tested/package-validated and **NOT_RUN**. The policy driver and
+> reader are independently actionable and now pass offline; the retained hash
+> failure is classified and corrected with harness 38/0. Actual two-size UI,
+> frame latency and strict/permissive dispatch remain one fully specified live
+> batch, costed at about 7 h 30 m including two purity windows. See the
+> [rc3 receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+>
+> **Current 0.5.1-rc2 qualification:** focused source/build/behavior and local
+> package validation pass on exact product `e06d803`; it remains **NOT_RUN**.
+> Native schema 6 requires visible useful Resources cells through first open,
+> both scope transitions and reopen, and records end-of-rendered-frame latency.
+> No screenshot, runtime execution or visual PASS exists. The selected purity
+> command, complete cost, two-size checklist and distinct policy-execution gap
+> are in the [rc2 correction receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+>
+> **Current 0.5.1-rc1 human-feedback qualification:** focused source/build/
+> behavior and strict local-package checks pass on exact product `a4c4342`, but
+> the candidate is **NOT_RUN**. UX-01/UX-02 rendered acceptance and all live
+> execution claims remain open. No new screenshot exists. The mandatory
+> full-history purity prerequisite is estimated at about 101 minutes for
+> inventories alone, so the one owner-1920x1200/compact-1280x720 guarded batch
+> was not started under the ordinary ceiling. Do not promote this to runtime
+> PASS. See the [exact receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+>
 > **Current October 13 native UI qualification:** exact source `dfbaa5f`, ZIP
 > `2e2dbe33cb4ccb65762829042e5f96076882c3030dc3bc24e1df5fff51e31501`,
 > and DLL

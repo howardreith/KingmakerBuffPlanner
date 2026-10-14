@@ -2817,8 +2817,9 @@ namespace KingmakerBuffPlanner.Tests
             string main = source("Main.cs");
             var required = new[]
             {
-                "if (CastingFirstActive)\r\n                return StartCastingFirstRoutine(routineId, completed, CastingApplyMode.Ordinary);",
+                "if (CastingFirstActive)\r\n                return StartCastingFirstRoutine(routineId, completed, null);",
                 "if (CastingFirstActive)\r\n                return StartCastingFirstRoutine(routineId, completed,\r\n                    CastingApplyMode.ReadyCastsOnly);",
+                "CastingApplyMode mode = requestedMode ?? session.ApplyMode;",
                 "if (CastingFirstActive)\r\n                return OpenCastingWorkspace();",
                 "try { _castingHost.Pump(); }",
                 "_instance._castingHost.Shutdown(\"mod-disabled\");",

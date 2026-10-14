@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory = $true)][string[]]$Only,
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
-    [ValidateSet('RuntimeHarness', 'ProblemNavigationEvidence', 'SpellbookEntryEvidence', 'FixtureInventoryEvidence', 'PhysicalSearchEvidence')]
+    [ValidateSet('RuntimeHarness', 'ProblemNavigationEvidence', 'SpellbookEntryEvidence', 'FixtureInventoryEvidence', 'PhysicalSearchEvidence', 'PolicyQualificationEvidence', 'DisplayTransaction')]
     [string[]]$Check = @()
 )
 

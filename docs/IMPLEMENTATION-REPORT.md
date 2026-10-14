@@ -1,3 +1,51 @@
+> **Current 0.5.1-rc5 preparation:** exact packaged source `ec3d5f8` makes the
+> full native planning sequence executable on the three-recipient/one-seed
+> fixture and adds the explicit guarded windowed-1920x1200 request with Unity,
+> native-record, PNG, game-settings and physical-display correlation. Focused
+> results are display 10/0, launcher 28/0 + 8/0, hashing 8/0, selected source
+> 43/0/build 1/0/behavior 32/0 and package 4/0. ZIP
+> `63c12d519dd49d514f6ddd31ea0514b9a8af5644680aa1dde82ddc77e63bfb03`
+> is frozen. The selected first purity prerequisite failed on a newer physical
+> 1920x1080 state before launch; no runtime or visual PASS exists. See the
+> [rc5 decision receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
+>
+> **Current 0.5.1-rc4 successor:** exact packaged source
+> `19e2e777261ff7887f0b8f62c8adcc75161220c5` adds an opaque backing beneath
+> the approved Resources PaperSlip and makes the native observer reserve two
+> recipients before its continuous-assignment probe. These are the only product/
+> observer changes arising from the retained rc3 game run. Focused results are
+> source 43/0, build 1/0, native UI 11/0, hash helper 8/0, launcher arguments
+> 26/0 and package 4/0. ZIP
+> `1a38d33439392a9c1da5202c1537357213177432e8bca174b550c88ab0c68036`
+> is frozen and **NOT_RUN**. See the
+> [rc4 decision receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC4.md).
+>
+> **Current 0.5.1-rc3 preparation:** exact packaged source `debd406` corrects
+> open-boundary/frame-end attribution, adds targeted Resources timing, and
+> extends the guarded shared/Powerful Change qualification through strict then
+> remembered Cast-available behavior. Focused results are source 43/0, build
+> 1/0, behavior 20/0, reader 7/0, harness 38/0, launcher 26/0 + 8/0 and package
+> 4/0. ZIP `0d30c7fa430e618be1b7d871c68bdc894b79206018771b17b90ca9b8d3037e62`
+> is **NOT_RUN**. See the [rc3 receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+>
+> **Current 0.5.1-rc2 review correction:** exact packaged source `e06d803`
+> fixes the Resources native layer, separates inspection focus from edit intent,
+> closes the same-caster exact-source draft leak, and makes recipient hints use
+> the action's exact session decision. Focused results are source 43/0, build
+> 1/0 and behavior 47/0; strict package validation is 4/0. ZIP
+> `6e6a5822c771514981b4bd788398864c56f98df7fabf96e4479ad84cccbcaa27`
+> is **NOT_RUN**, never installed and not published. See the
+> [rc2 correction receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+>
+> **Current 0.5.1-rc1 human-feedback implementation:** exact packaged source
+> `a4c4342e1296966cbae1d64eeb53b47f23265627` implements UX-01 through UX-06;
+> final affected checks are source 43/0, build 1/0, protocol 101/0 and package
+> validation 4/0. ZIP
+> `2e4e1a9fe3fd56eaf11eac39f09132be18c3358ebc9aee45f3b6fad8e8d2ffbc`
+> is **NOT_RUN**, never installed and not published. Before/after timings,
+> architecture, per-UX evidence, limitations and the exact deferred live batch
+> are in the [human-feedback receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+>
 > **Current October 13 native UI result:** exact source `dfbaa5f`, ZIP
 > `2e2dbe33cb4ccb65762829042e5f96076882c3030dc3bc24e1df5fff51e31501`,
 > and DLL

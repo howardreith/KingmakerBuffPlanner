@@ -163,9 +163,10 @@ namespace KingmakerBuffPlanner.Tests
             session.ProblemNavigation.CompleteReveal("original");
             string originalIntent = session.DocumentIntentSignature();
             string files = ProblemFiles(dir);
-            // WP3: the authoring gesture on a focused problem is a portrait
-            // click (Duplicate is retired); here it moves the problem
-            // casting to another recipient.
+            // Human-feedback refinement: inspection alone never retargets.
+            // The explicit one-shot action moves this problem casting.
+            Expect(session.BeginChangeRecipient().Applied,
+                "the explicit problem repair was not armed");
             CastingGraphClickResult moved = session.ClickGraphRecipient("unit-t2", inputs);
             Expect(moved.Outcome == CastingGraphClickOutcome.Retargeted && moved.CastingId == "original",
                 "the real retarget authoring operation failed: " + moved.Outcome + " " +

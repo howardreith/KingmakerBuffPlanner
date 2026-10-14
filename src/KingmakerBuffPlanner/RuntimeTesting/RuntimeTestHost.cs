@@ -5451,6 +5451,29 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             };
         }
 
+        private static JObject PolicyEvidence(CastingQualificationRecord record)
+        {
+            return new JObject
+            {
+                { "before", record.PolicyBefore },
+                { "after", record.PolicyAfter },
+                { "reloaded", record.PolicyReloaded },
+                { "strictMode", record.PolicyStrictMode },
+                { "plannerMode", record.PolicyPlannerMode },
+                { "hudMode", record.PolicyHudMode },
+                { "authoredIntentPreserved", record.PolicyAuthoredIntentPreserved.HasValue
+                    ? (JToken)record.PolicyAuthoredIntentPreserved.Value : JValue.CreateNull() },
+                { "strictOmissions", new JArray(record.PolicyStrictOmissions.Cast<object>().ToArray()) },
+                { "availableOmissions", new JArray(record.PolicyAvailableOmissions.Cast<object>().ToArray()) },
+                { "executableCastingIds", new JArray(record.PolicyExecutableCastingIds.Cast<object>().ToArray()) },
+                { "projectedCosts", new JArray(record.PolicyProjectedCosts.Cast<object>().ToArray()) },
+                { "noOpReason", record.PolicyNoOpReason },
+                { "globalRefusalReason", record.PolicyGlobalRefusalReason },
+                { "postchecksSpentNothing", record.PolicyPostchecksSpentNothing.HasValue
+                    ? (JToken)record.PolicyPostchecksSpentNothing.Value : JValue.CreateNull() }
+            };
+        }
+
         private void PublishQualificationRecord()
         {
             _qualificationPublished = true;
@@ -5501,14 +5524,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         StringComparer.Ordinal).Select(key => (object)(key + ":" + (step.RemainingSecondsAfter[key] == null
                             ? "unread" : step.RemainingSecondsAfter[key].Value.ToString("0.0",
                                 System.Globalization.CultureInfo.InvariantCulture)))).ToArray()) },
-                    { "observations", new JArray(step.Observations.Cast<object>().ToArray()) }
+                    { "observations", new JArray(step.Observations.Cast<object>().ToArray()) },
+                    { "omissions", new JArray(step.Omissions.Cast<object>().ToArray()) }
                 });
             }
             CastingQualificationSelection selection = record.Selection;
             AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "qual-outcome.json"),
                 new JObject
                 {
-                    { "schemaVersion", 1 },
+                    { "schemaVersion", 2 },
                     { "runId", _request.RunId },
                     { "scenario", _request.Scenario },
                     { "castingScenario", record.CastingScenario },
@@ -5525,6 +5549,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     // launcher's independent re-check.
                     { "share", selection == null ||
                         !CastingQualificationRecipe.IsSharedRecipe(selection.Recipe) ? null : ShareEvidence(record) },
+                    { "policy", selection == null ||
+                        !CastingQualificationRecipe.IsPolicyRecipe(selection.Recipe) ? null : PolicyEvidence(record) },
                     { "selection", selection == null ? null : new JObject
                         {
                             { "selected", selection.Selected },

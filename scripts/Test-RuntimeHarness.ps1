@@ -1701,21 +1701,25 @@ try {
         $launcherText -notmatch "restoration-failure\.txt") {
         throw 'The launcher can skip the save comparison or the completion record on a restoration failure, or drops the failure.'
     }
-    # A display-mode run restores the game's registry key inside the finally,
-    # before the save comparison and the completion record, and folds a
-    # failure into the restoration failure. Final review C2: the saves are
-    # compared before the Mods restoration releases the run's lock.
+    # A display-mode run restores the game's registry key and verifies the
+    # unchanged physical display inside the finally, before the save
+    # comparison and completion record, and folds either failure into the
+    # restoration failure. Final review C2: saves are compared before the
+    # Mods restoration releases the run's lock.
     $finallyText = $launcherText.Substring($launcherText.IndexOf("`nfinally {"))
     $registryAt = $finallyText.IndexOf('Restore-KbpRegistrySnapshotFile -Path $displayRegistryPath')
+    $physicalAt = $finallyText.IndexOf('Confirm-KbpPhysicalDisplaySnapshotFile -Path $displayPhysicalPath')
     $modsAt = $finallyText.IndexOf("Restore-Local.ps1') -RunId `$runId")
     $savesAt = $finallyText.IndexOf('Complete-KbpProtectedSaveComparison -BaselinePath')
     $recordAt = $finallyText.IndexOf('New-KbpRunCompletionRecord')
     $enteredAt = $launcherText.IndexOf('$transactionEntered = $true')
     $snapshotAt = $launcherText.IndexOf('Save-KbpRegistrySnapshotFile -Path $displayRegistryPath')
-    if ($registryAt -lt 0 -or $savesAt -lt $registryAt -or $modsAt -lt $savesAt -or $recordAt -lt $modsAt -or
-        $enteredAt -lt 0 -or $snapshotAt -lt $enteredAt -or
+    $physicalSnapshotAt = $launcherText.IndexOf('Save-KbpPhysicalDisplaySnapshotFile -Path $displayPhysicalPath')
+    if ($registryAt -lt 0 -or $physicalAt -lt $registryAt -or $savesAt -lt $physicalAt -or
+        $modsAt -lt $savesAt -or $recordAt -lt $modsAt -or
+        $enteredAt -lt 0 -or $snapshotAt -lt $enteredAt -or $physicalSnapshotAt -lt $enteredAt -or
         $finallyText -notmatch '\$restoreFailure = if \(\$null -eq \$restoreFailure\) \{ \$displayFailure \}') {
-        throw 'The display-mode registry restoration is not inside the finally before the record, or drops its failure.'
+        throw 'Display/game-settings restoration is not inside the finally before the record, or drops its failure.'
     }
     if ($launcherText -notmatch 'New-KbpRunCompletionRecord' -or $launcherText -notmatch 'Invoke-KbpProtectedSaveComparison' -or
         $automationText -notmatch '(?s)function Invoke-KbpProtectedSaveComparison \{.*?Get-KbpProtectedSavePolicy' -or

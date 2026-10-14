@@ -48,9 +48,21 @@ namespace KingmakerBuffPlanner.Planning
         public static CastingPlanSignature For(ExplicitCastingPlan plan,
             string scopeRoutineId)
         {
+            return For(plan, scopeRoutineId, null);
+        }
+
+        // Availability policy changes which casting identities reach the
+        // approved projection, so permissive previews carry an explicit
+        // token. Strict uses the historical signature byte-for-byte, which
+        // keeps existing strict-profile acknowledgements compatible.
+        public static CastingPlanSignature For(ExplicitCastingPlan plan,
+            string scopeRoutineId, string availabilityPolicyToken)
+        {
             if (plan == null) throw new ArgumentNullException("plan");
             var builder = new StringBuilder();
             builder.Append("scope:").Append(scopeRoutineId ?? "*").Append(';');
+            if (!string.IsNullOrEmpty(availabilityPolicyToken))
+                builder.Append("availability:").Append(availabilityPolicyToken).Append(';');
             foreach (ResolvedCasting casting in plan.Castings)
             {
                 if (scopeRoutineId != null &&

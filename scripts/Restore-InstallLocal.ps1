@@ -210,6 +210,7 @@ $candidateMembersRev1 = @('schemaVersion', 'campaignId', 'routines', 'castings',
     'scale', 'hotkey', 'mode', 'allowAnimatedFallback', 'outOfCombatOnly', 'recastExisting')
 $candidateMembersRev2 = @('importNotices', 'legacyRecipientKey', 'reviewItems')
 $candidateMembersRev3 = @('acknowledgedImportNotices', 'resolvedReviewItems', 'formatRevision')
+$candidateMembersRev4 = @('availabilityPolicy', 'formatRevision')
 
 function Get-KbpJsonMemberNames($Node) {
     $names = New-Object System.Collections.Generic.List[string]
@@ -247,6 +248,7 @@ function Get-KbpCandidateRequirement([string]$Path) {
         if ($candidateMembersRev1 -ccontains $name) { continue }
         if ($candidateMembersRev2 -ccontains $name) { if ($required -lt 2) { $required = 2 }; continue }
         if ($candidateMembersRev3 -ccontains $name) { if ($required -lt 3) { $required = 3 }; continue }
+        if ($candidateMembersRev4 -ccontains $name) { if ($required -lt 4) { $required = 4 }; continue }
         return $null
     }
     $revisionProperty = $json.PSObject.Properties['formatRevision']

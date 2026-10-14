@@ -1,5 +1,48 @@
 # Resource and Casting Contract Inventory
 
+## 0.5.1-rc3 preparation
+
+Resources retain the rc2 native row/cell layers and gain incremental open/
+scope timing correlated with visible native-layer cells. The established
+qualification route now authors one partially unavailable Share + Powerful
+Change plan, proves strict no-spend refusal, persists Cast available, recompiles
+fresh, executes only the allowance-bound affordable IDs in authored order, and
+records omissions plus complete native/shared-pool costs. Exact source
+`debd406` passes focused driver/reader checks but is **NOT_RUN**; see the
+[rc3 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+
+## 0.5.1-rc2 review correction
+
+Every rebuilt Resources `Pool.*` row/cell is assigned to the native UI layer;
+schema 6 requires visible useful accounting cells through first open, both
+scope transitions and reopen. Normal recipient action/presentation now share
+one exact session decision, so provider reach cannot hide a legal removal and
+variant/group semantics stay intact. Exact product `e06d803` passes focused
+neighbors and package validation but is **NOT_RUN**. The existing guarded
+qualification shortage step remains strict-only; it cannot be cited as live
+`Cast available` execution. See the
+[rc2 correction receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+
+## 0.5.1-rc1 availability and Resources contract
+
+Profile revision 4 stores `availabilityPolicy` as `require-full-plan` or
+`cast-available`; absent, older, malformed and unknown values resolve strictly.
+Both planner and HUD derive `CastingApplyMode` from this one session setting.
+Permissive execution reuses `ReadyCastsOnly`, canonical omission reasons,
+authored order and the existing coordinator/executor. Each selected casting is
+budgeted atomically with modifiers, rods, reservoir/material costs and shared
+pools; skipped castings do not reserve resources, and global safety refusals
+remain global. Fresh authoritative inputs are captured at execution.
+
+`WorkspaceResourceReport` projects the same policy into grouped Available now,
+Saved need, Would spend and Short columns for either the selected routine or
+all routines with no rest. Strict refusal reports zero prospective spend;
+permissive scope reports only its executable subset. The report is rendered by
+the UI but contains no Unity dependency. Exact packaged source
+`a4c4342e1296966cbae1d64eeb53b47f23265627` passed focused neighbors and is
+**NOT_RUN**; see the
+[human-feedback receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+
 ## 0.4.2 spellbook membership (removal reconciliation)
 
 The removal reconciliation depends on the Kingmaker 2.1.7b contracts below

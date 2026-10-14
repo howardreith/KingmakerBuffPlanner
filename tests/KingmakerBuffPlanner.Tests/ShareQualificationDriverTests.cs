@@ -31,6 +31,10 @@ namespace KingmakerBuffPlanner.Tests
         {
             Run("shared-recipes-select-cast-and-isolate-end-to-end", () => TestSharedRecipesEndToEnd(root));
             Run("shared-recipes-fail-closed-on-leaks-and-mischarges", () => TestSharedRecipesFailClosed(root));
+            Run("policy-route-refuses-strict-then-casts-affordable-authored-subset",
+                () => TestPolicyRouteEndToEnd(root));
+            Run("policy-route-driver-and-judge-fail-closed",
+                () => TestPolicyRouteFailClosed(root));
         }
 
         private sealed class SharedBuffWorld : IInstantCastRuntimeAdapter, ICastRuntimeAdapter,
@@ -231,7 +235,8 @@ namespace KingmakerBuffPlanner.Tests
         // allowance writer does) one casting run in a FRESH plan directory,
         // as every live run gets a freshly staged mod folder.
         private static CastingQualificationRecord[] RunShared(string root, string name, SharedBuffWorld world,
-            string recipe, string mode)
+            string recipe, string mode,
+            Func<IReadOnlyList<CastingQualificationStepForecast>, IEnumerable<string>> approved = null)
         {
             long now = 0;
             Func<long> clock = () => now;
@@ -251,8 +256,11 @@ namespace KingmakerBuffPlanner.Tests
                     o["fixtureGameId"] = "fixture-campaign";
                     o["executionMode"] = mode;
                     o["recipe"] = recipe;
-                    o["approvedProjectionIds"] = new JArray(select.Forecast
-                        .Select(step => (object)step.ProjectionId).ToArray());
+                    IEnumerable<string> projectionIds = approved == null
+                        ? select.Forecast.Select(step => step.ProjectionId)
+                        : approved(select.Forecast);
+                    o["approvedProjectionIds"] = new JArray(projectionIds
+                        .Select(value => (object)value).ToArray());
                     o["maximumNativeSubmissions"] = select.Forecast.Sum(step => step.CastingIds.Count);
                 }), "qual-run-1", out refusal);
             if (allowance == null) throw new InvalidOperationException("Shared allowance refused: " + refusal);
@@ -343,6 +351,104 @@ namespace KingmakerBuffPlanner.Tests
                         StringComparison.Ordinal) < 0)
                     throw new InvalidOperationException("Share failure shape '" + item.Key + "' was not caught: " + all);
             }
+        }
+
+        // One guarded route proves both halves of the player policy against
+        // the exact same authored plan.  The strict attempt spends nothing;
+        // after the policy survives a session reopen, ReadyCastsOnly executes
+        // the first two affordable shortage castings in authored order and
+        // reports the third with its concrete pool shortage.
+        private static void TestPolicyRouteEndToEnd(string root)
+        {
+            var world = new SharedBuffWorld();
+            CastingQualificationRecord[] runs = RunShared(root, "policy-shared-powerful", world,
+                CastingQualificationRecipe.PolicySharedPowerful, "instant");
+            CastingQualificationRecord select = runs[0];
+            CastingQualificationRecord cast = runs[1];
+            if (!CastingQualificationRecipe.IsKnown(CastingQualificationRecipe.PolicySharedPowerful) ||
+                CastingQualificationRecipe.ForecastSteps(CastingQualificationRecipe.PolicySharedPowerful) != 3 ||
+                select.TerminalReason != "completed" || select.Violations().Count != 0 ||
+                select.Forecast.Count != 3)
+                throw new InvalidOperationException("Policy selection did not produce its bounded forecast: " +
+                    Why(select));
+            if (cast == null || cast.TerminalReason != "completed" || cast.Violations().Count != 0)
+                throw new InvalidOperationException("Policy casting route was not clean: " + Why(cast));
+
+            CastingQualificationStepResult strict = cast.Step(CastingQualificationForecast.Shortage);
+            CastingQualificationStepResult available = cast.Step(CastingQualificationForecast.Available);
+            string[] expected = { "qual-short-1", "qual-short-2" };
+            if (strict == null || strict.ApplyAllowed || strict.Report != null ||
+                strict.Omissions.Count == 0 || available == null || !available.ApplyAllowed ||
+                available.Report == null || available.Report.Mode != CastingApplyMode.ReadyCastsOnly ||
+                !cast.PolicyExecutableCastingIds.SequenceEqual(expected, StringComparer.Ordinal) ||
+                !available.Report.Entries.Where(value => value.State == CastingOutcomeState.EffectConfirmed)
+                    .Select(value => value.CastingId).SequenceEqual(expected, StringComparer.Ordinal) ||
+                !cast.PolicyAvailableOmissions.Any(value => value.StartsWith("qual-short-3|",
+                    StringComparison.Ordinal)) ||
+                cast.PolicyBefore != KingmakerBuffPlanner.Persistence.ExecutionProfile.RequireFullPlan ||
+                cast.PolicyAfter != KingmakerBuffPlanner.Persistence.ExecutionProfile.CastAvailable ||
+                cast.PolicyReloaded != KingmakerBuffPlanner.Persistence.ExecutionProfile.CastAvailable ||
+                cast.PolicyStrictMode != CastingApplyMode.Ordinary.ToString() ||
+                cast.PolicyPlannerMode != CastingApplyMode.ReadyCastsOnly.ToString() ||
+                cast.PolicyHudMode != CastingApplyMode.ReadyCastsOnly.ToString() ||
+                cast.PolicyAuthoredIntentPreserved != true || cast.PolicyPostchecksSpentNothing != true ||
+                cast.PolicyGlobalRefusalReason != CastingExecutionPolicy.CombatActive ||
+                string.IsNullOrEmpty(cast.PolicyNoOpReason) ||
+                !cast.PolicyNoOpReason.StartsWith("nothing-to-cast:", StringComparison.Ordinal) ||
+                world.ShapeSlots != 0 || world.WitnessSlots != 2 || world.ReservoirPoints != 0 ||
+                world.Fires != 4)
+                throw new InvalidOperationException("Policy evidence was incomplete or charged wrongly: " +
+                    Why(cast) + " ids=" + string.Join(",", cast.PolicyExecutableCastingIds.ToArray()) +
+                    " omissions=" + string.Join(",", cast.PolicyAvailableOmissions.ToArray()) +
+                    " resources=" + world.ShapeSlots + "/" + world.WitnessSlots + "/" +
+                    world.ReservoirPoints + " fires=" + world.Fires);
+        }
+
+        private static void TestPolicyRouteFailClosed(string root)
+        {
+            var world = new SharedBuffWorld();
+            CastingQualificationRecord[] runs = RunShared(root, "policy-judge", world,
+                CastingQualificationRecipe.PolicySharedPowerful, "instant");
+            CastingQualificationRecord cast = runs[1];
+            if (cast == null || cast.Violations().Count != 0)
+                throw new InvalidOperationException("Policy baseline was not clean: " + Why(cast));
+
+            IReadOnlyList<string> savedOmissions = cast.PolicyAvailableOmissions;
+            cast.PolicyAvailableOmissions = new[] { "qual-short-3|unexplained" };
+            if (!cast.Violations().Contains("policy-omission-reasons-missing"))
+                throw new InvalidOperationException("The policy judge accepted an omission without a reason.");
+            cast.PolicyAvailableOmissions = savedOmissions;
+
+            string savedPolicy = cast.PolicyReloaded;
+            cast.PolicyReloaded = KingmakerBuffPlanner.Persistence.ExecutionProfile.RequireFullPlan;
+            if (!cast.Violations().Any(value => value.StartsWith("policy-not-persisted:",
+                    StringComparison.Ordinal)))
+                throw new InvalidOperationException("The policy judge accepted a setting that did not persist.");
+            cast.PolicyReloaded = savedPolicy;
+
+            bool? savedPostchecks = cast.PolicyPostchecksSpentNothing;
+            cast.PolicyPostchecksSpentNothing = false;
+            if (!cast.Violations().Contains("policy-postchecks-spent-resources"))
+                throw new InvalidOperationException("The policy judge accepted a spending postcheck.");
+            cast.PolicyPostchecksSpentNothing = savedPostchecks;
+            if (cast.Violations().Count != 0)
+                throw new InvalidOperationException("Restoring the policy evidence did not restore PASS: " +
+                    Why(cast));
+
+            var refusedWorld = new SharedBuffWorld();
+            CastingQualificationRecord[] refused = RunShared(root, "policy-allowance-missing-projection",
+                refusedWorld, CastingQualificationRecipe.PolicySharedPowerful, "instant",
+                forecast => forecast.Take(forecast.Count - 1).Select(value => value.ProjectionId));
+            CastingQualificationRecord refusedCast = refused[1];
+            if (refusedCast == null || !refusedCast.TerminalReason.StartsWith("failed:",
+                    StringComparison.Ordinal) ||
+                refusedCast.AllowanceStatus != "projections-differ-from-forecast" ||
+                !refusedCast.Failures.Any(value => value.EndsWith(
+                    "allowance-projections-differ-from-forecast", StringComparison.Ordinal)) ||
+                refusedWorld.Fires != 0 || refusedWorld.ShapeSlots != 3 ||
+                refusedWorld.WitnessSlots != 3 || refusedWorld.ReservoirPoints != 6)
+                throw new InvalidOperationException("A policy allowance missing the affordable projection was not " +
+                    "refused before spend: " + Why(refusedCast));
         }
     }
 }

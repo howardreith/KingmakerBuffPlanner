@@ -1,3 +1,70 @@
+## Human-feedback rc5 preparation and selected-prerequisite failure - October 14, 2026
+
+Exact frozen product `ec3d5f865707e540b00fccabd3f1a98f04aa3095`, version
+0.5.1-rc5, fixes the complete planning-observer sequence and adds guarded,
+explicit windowed 1920x1200 validation/restoration. Focused source, behavior,
+display, launcher and package checks pass. Selected operation
+`kbphf-rc5-20261014-01` stopped without retry before any game launch: DATA's
+physical display changed from 1920x1200 at preflight to 1920x1080 at the first
+WhatIf admission. No runtime transaction, RunId path, allowance or save change
+exists, and no purity/runtime/visual PASS is claimed. Exact identities,
+evidence hashes, UX status and the fresh remaining batch are in the
+[0.5.1-rc5 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
+
+## Human-feedback rc4 live finding correction - October 14, 2026
+
+The explicitly selected rc3 milestone passed its first five-target purity
+window, then stopped on owner-display RunId
+`kbphf-rc3-20261014-02-ui-owner` with a preserved FAIL and clean Mods/save
+restoration. Actual 1920x1080 screenshots demonstrated translucent Resources
+header content; an observer seed left one rather than two free recipients.
+Exact successor product `19e2e777261ff7887f0b8f62c8adcc75161220c5`, version
+0.5.1-rc4, fixes those two scoped defects, is focused-tested/package-validated,
+and remains **NOT_RUN**. ZIP SHA-256 is
+`1a38d33439392a9c1da5202c1537357213177432e8bca174b550c88ab0c68036`.
+The preserved evidence, actual timings, UX verdicts and fresh remaining batch
+are in the
+[0.5.1-rc4 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC4.md).
+
+## Human-feedback rc3 preparation - October 14, 2026
+
+Packaged product source `debd40674ed2a6ed9f6e3423671f6ec2180bead0`,
+version 0.5.1-rc3, corrects the open-boundary/frame-end measurement and extends
+the established guarded qualification with strict/remembered-Cast-available
+execution evidence. Focused validation is source 43/0, build 1/0, behavior
+20/0, policy reader 7/0, runtime harness 38/0, launcher arguments 26/0 and 8/0,
+and package 4/0 plus creation 1/0. The ZIP is
+`0d30c7fa430e618be1b7d871c68bdc894b79206018771b17b90ca9b8d3037e62`.
+It is **NOT_RUN** and not installed; rc1/rc2 remain preserved. Exact identities,
+failure classification and the fully costed remaining batch are in the
+[0.5.1-rc3 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+
+## Current human-feedback review correction - October 13, 2026
+
+Exact packaged product source `e06d803400893f4cd68d0066ae2421d0085db243`,
+version 0.5.1-rc2, corrects the four review findings on successor branch
+`codex/kingmaker-buff-planner-human-feedback`. Focused validation is 43/0
+source, 1/0 build and 47/0 selected behavior; the distinct local package is
+4/0 validated and 1/0 created. It is **NOT_RUN** and not installed. The rc1
+artifact/evidence are preserved. Exact hashes, behavior contract, timing data,
+two-size selected-purity command and the policy-execution evidence limitation
+are in the
+[0.5.1-rc2 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+
+## Current human-feedback refinement - October 13, 2026
+
+Successor branch `codex/kingmaker-buff-planner-human-feedback` preserves the
+integrated `origin/main` baseline `5e1e6d22c9cc03826f867ee9e068089fb06521b4`.
+Exact packaged product source `a4c4342e1296966cbae1d64eeb53b47f23265627`,
+version 0.5.1-rc1, implements UX-01 through UX-06 and updates the guarded
+native observer for the new gestures and Resources frames. Focused validation
+is 43/0 source, 1/0 build and 101/0 selected behavior; the local package is
+4/0 validated and 1/0 created. It is **NOT_RUN** and not installed. The
+mandatory two-size live batch remains behind an estimated 101-minute purity
+inventory prerequisite. Exact hashes, timings, rejected shortcuts, uncertainty
+and the one remaining command batch are in the
+[0.5.1-rc1 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+
 ## Current native UI completion - October 13, 2026
 
 Exact product source `dfbaa5fbd0aba901b2e03c950dd7735f28ed226c`

@@ -1325,7 +1325,7 @@ namespace KingmakerBuffPlanner.UI
         public bool TryStart(string routineId, Action<QuickExecutionResult> completed)
         {
             if (CastingFirstActive)
-                return StartCastingFirstRoutine(routineId, completed, CastingApplyMode.Ordinary);
+                return StartCastingFirstRoutine(routineId, completed, null);
             if (!_enabled || _session == null || _session.IsExecuting || _quickStartPending ||
                 (_castingHost != null && _castingHost.IsRunning))
                 return false;
@@ -1354,7 +1354,7 @@ namespace KingmakerBuffPlanner.UI
         // production dispatch boundary. Pressing a routine while a run is
         // active is the deliberate stop of that run.
         private bool StartCastingFirstRoutine(string routineId,
-            Action<QuickExecutionResult> completed, CastingApplyMode mode)
+            Action<QuickExecutionResult> completed, CastingApplyMode? requestedMode)
         {
             if (!_enabled || _session == null) return false;
             if (_session.IsExecuting || _quickStartPending) return false;
@@ -1402,8 +1402,9 @@ namespace KingmakerBuffPlanner.UI
                 return true;
             }
             name = session.RoutineDisplayName(routineId);
+            CastingApplyMode mode = CastingRunPolicy.Resolve(session, requestedMode);
             WorkspaceApplyResult result;
-            try { result = session.Apply(mode, routineId, inputs); }
+            try { result = CastingRunPolicy.Apply(session, requestedMode, routineId, inputs); }
             catch (Exception exception)
             {
                 _log.Error("[KBP-CF-RUN] apply failed before submission;routine=" +
@@ -1695,6 +1696,7 @@ namespace KingmakerBuffPlanner.UI
         // automated test session; see NativeCastingSessionPolicy).
         private bool OpenCastingWorkspace()
         {
+            long openRequestStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             if (!_workspaceOpenSound.BeginOpen(_castingWorkspace != null)) return false;
             BuffPlannerInputLease lease = null;
             try
@@ -1711,7 +1713,10 @@ namespace KingmakerBuffPlanner.UI
                 // funnels through the catch, which releases the local lease
                 // exactly once (review H3).
                 CastingWorkspaceSession workspaceSession;
-                string unresolved = EnsureCastingSession(out workspaceSession);
+                double discoveryMilliseconds;
+                double sessionBindingAndPersistenceMilliseconds;
+                string unresolved = EnsureCastingSession(out workspaceSession,
+                    out discoveryMilliseconds, out sessionBindingAndPersistenceMilliseconds);
                 string campaignId = workspaceSession == null ? null : workspaceSession.CampaignId;
                 if (workspaceSession == null)
                 {
@@ -1728,7 +1733,13 @@ namespace KingmakerBuffPlanner.UI
                 // construction; a failed acquire self-restores, and the
                 // catch below releases this local reference on any
                 // subsequent failure (reviews R2, H3).
+                long leaseStarted = System.Diagnostics.Stopwatch.GetTimestamp();
                 lease = BuffPlannerInputLease.Acquire(new KingmakerPlannerInputBoundary());
+                double inputLeaseMilliseconds = ElapsedMilliseconds(leaseStarted);
+                // A view lifetime owns one immutable display snapshot. Never
+                // carry party/resources/effects from a previous open or scene.
+                _workspaceInputs = null;
+                long constructionStarted = System.Diagnostics.Stopwatch.GetTimestamp();
                 _castingWorkspace = new CastingWorkspaceScreenView(
                     StaticCanvas.Instance, workspaceSession,
                     BuildCastingWorkspaceInputs, BuildFreshCastingWorkspaceInputs,
@@ -1738,10 +1749,17 @@ namespace KingmakerBuffPlanner.UI
                     CastingWorkspaceDevSelection.Enabled ? (Action)null
                         : () => SwitchPlannerFromScreen(PlannerMode.Classic),
                     value => _log.Info(value));
+                double constructionMilliseconds = ElapsedMilliseconds(constructionStarted);
                 _workspaceInputLease = lease;
                 lease = null;
+                long reconciliationStarted = System.Diagnostics.Stopwatch.GetTimestamp();
                 SpellbookReconciliationOutcome reconciliation =
                     ReconcileSpellbookOnOpen(workspaceSession);
+                double reconciliationMilliseconds = ElapsedMilliseconds(reconciliationStarted);
+                _castingWorkspace.BeginOpenMeasurement(openRequestStarted,
+                    ElapsedMilliseconds(openRequestStarted), discoveryMilliseconds,
+                    sessionBindingAndPersistenceMilliseconds, inputLeaseMilliseconds,
+                    constructionMilliseconds, reconciliationMilliseconds);
                 _castingWorkspace.RefreshView();
                 if (reconciliation != null && reconciliation.Applied)
                     _castingWorkspace.ShowNotice(reconciliation.Notice);
@@ -1784,6 +1802,7 @@ namespace KingmakerBuffPlanner.UI
                 CastingSession.ClearGraphFocus();
             _castingWorkspace.Dispose();
             _castingWorkspace = null;
+            _workspaceInputs = null;
             // Unsaved intent is PRESERVED across an ordinary close/reopen
             // (review F6): the session (document + undo history + dirty
             // state) survives; only the view is disposed. Full teardown
@@ -1791,45 +1810,48 @@ namespace KingmakerBuffPlanner.UI
         }
 
         private bool _closeScreenForClassicRun;
-        private DateTime _lastWorkspaceInputsRefreshUtc = DateTime.MinValue;
-        private static readonly TimeSpan WorkspaceInputsRefreshMinimum =
-            TimeSpan.FromSeconds(2);
+        private CastingWorkspaceInputs _workspaceInputs;
 
         private CastingWorkspaceInputs BuildCastingWorkspaceInputs()
         {
             if (_session.Model == null)
                 throw new InvalidOperationException(
                     "Discovery has not produced a party model yet.");
-            // Bounded freshness at the production input boundary (review
-            // C2): Apply/present/rebuild preflights re-run discovery at most
-            // once per two seconds — never per frame — and a failed refresh
-            // falls back to the existing model rather than failing the call.
-            if (DateTime.UtcNow - _lastWorkspaceInputsRefreshUtc >=
-                WorkspaceInputsRefreshMinimum)
+            // One immutable snapshot serves the open workspace. Selection,
+            // focus and layout refreshes do not rediscover the party. Open
+            // and every execution preflight replace it with a fresh snapshot.
+            if (_workspaceInputs == null)
             {
-                _lastWorkspaceInputsRefreshUtc = DateTime.UtcNow;
-                try { _session.Refresh(); }
-                catch (Exception exception)
-                {
-                    _log.Error("[KBP-WORKSPACE] bounded input refresh failed;" +
-                        " using prior discovery state.", exception);
-                }
+                long started = System.Diagnostics.Stopwatch.GetTimestamp();
+                _workspaceInputs = CurrentCastingInputs();
+                _log.Info("[KBP-WORKSPACE-PERF] displaySnapshotMs=" +
+                    ElapsedMilliseconds(started).ToString("F3") + ".");
             }
-            return CurrentCastingInputs();
+            return _workspaceInputs;
         }
 
         // Apply and quick-run preflight: discovery is re-read NOW and a
         // failed refresh refuses the run instead of falling back to earlier
-        // state (the bounded provider above is for rendering only).
+        // state (the lifetime snapshot above is for rendering only).
         private CastingWorkspaceInputs BuildFreshCastingWorkspaceInputs()
         {
-            _lastWorkspaceInputsRefreshUtc = DateTime.UtcNow;
+            long started = System.Diagnostics.Stopwatch.GetTimestamp();
             _session.Refresh();
             if (_session.Model == null)
                 throw new InvalidOperationException(_session.Status ?? "discovery failed");
             // 0.4.2 (B): the native spellbook contents are read with the same
             // fresh pass (runs and opens only, never a render refresh).
-            return CurrentCastingInputs(new KingmakerSpellbookMembershipAdapter().Capture());
+            _workspaceInputs = CurrentCastingInputs(
+                new KingmakerSpellbookMembershipAdapter().Capture());
+            _log.Info("[KBP-WORKSPACE-PERF] freshDiscoveryAndSnapshotMs=" +
+                ElapsedMilliseconds(started).ToString("F3") + ".");
+            return _workspaceInputs;
+        }
+
+        private static double ElapsedMilliseconds(long startedAt)
+        {
+            return (System.Diagnostics.Stopwatch.GetTimestamp() - startedAt) * 1000.0 /
+                System.Diagnostics.Stopwatch.Frequency;
         }
 
         private CastingWorkspaceInputs CurrentCastingInputs(
@@ -1939,11 +1961,26 @@ namespace KingmakerBuffPlanner.UI
         private string EnsureCastingSession(out CastingWorkspaceSession session,
             bool refresh = true)
         {
+            double discoveryMilliseconds;
+            double sessionBindingAndPersistenceMilliseconds;
+            return EnsureCastingSession(out session, out discoveryMilliseconds,
+                out sessionBindingAndPersistenceMilliseconds, refresh);
+        }
+
+        private string EnsureCastingSession(out CastingWorkspaceSession session,
+            out double discoveryMilliseconds,
+            out double sessionBindingAndPersistenceMilliseconds,
+            bool refresh = true)
+        {
             session = null;
+            discoveryMilliseconds = 0d;
+            sessionBindingAndPersistenceMilliseconds = 0d;
             if (refresh)
             {
-                _lastWorkspaceInputsRefreshUtc = DateTime.UtcNow;
+                long discoveryStarted = System.Diagnostics.Stopwatch.GetTimestamp();
                 _session.Refresh();
+                discoveryMilliseconds = ElapsedMilliseconds(discoveryStarted);
+                _workspaceInputs = null;
             }
             string campaignId = _session.Model == null || _session.Model.Profile == null
                 ? null : _session.Model.Profile.CampaignId;
@@ -1954,7 +1991,10 @@ namespace KingmakerBuffPlanner.UI
             // a failure an explicit reachable recovery owner, before the
             // binding changes. Its file is its own campaign's, never the
             // new one's.
-            return _castingSessions.Ensure(campaignId, out session);
+            long sessionStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+            string refusal = _castingSessions.Ensure(campaignId, out session);
+            sessionBindingAndPersistenceMilliseconds = ElapsedMilliseconds(sessionStarted);
+            return refusal;
         }
 
         private CastingWorkspaceSession CreateCastingSession(string campaignId)
@@ -2040,7 +2080,7 @@ namespace KingmakerBuffPlanner.UI
         private void OnCastingRunCompleted(CastingRunReport report)
         {
             // The next inputs re-read discovery (spent slots, new effects).
-            _lastWorkspaceInputsRefreshUtc = DateTime.MinValue;
+            _workspaceInputs = null;
             CastingWorkspaceSession session = CastingSession;
             string routineId = string.IsNullOrEmpty(report.ScopeRoutineId)
                 ? "long" : report.ScopeRoutineId;

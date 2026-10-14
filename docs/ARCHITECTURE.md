@@ -1,3 +1,32 @@
+> **0.5.1-rc3 preparation architecture:** opening latency starts at the common
+> request boundary and retains discovery, session/persistence binding, input
+> lease, construction, reconciliation, display snapshot, calculation, rebuild,
+> theme and layout stages. End-of-frame is correlated with expected view state,
+> never labelled pixel correctness. The policy qualification extends the
+> existing compiler/gate/boundary/executor and shares the HUD policy resolver;
+> it adds no parallel executor. Exact product `debd406` is packaged and
+> **NOT_RUN**. See the [rc3 receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+>
+> **0.5.1-rc2 review-correction architecture:** dynamically rebuilt Resources
+> rows/cells receive the native UI layer at creation. Recipient presentation
+> and execution consume one session-level exact-variant decision; inspection
+> focus is separate from one-shot edit intent. Exact-provider transitions own
+> draft-choice invalidation. The view adds an end-of-frame latency observer
+> without moving business rules or live reads into Unity handlers. Exact source
+> `e06d803` is focused-tested/package-validated and **NOT_RUN**. See the
+> [rc2 correction receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+>
+> **0.5.1-rc1 human-feedback architecture:** the normalized calculation cache
+> lives in the session and is keyed by authoring revision, exact immutable input
+> snapshot and execution mode; the Unity view owns only its display snapshot and
+> invalidation. Structured Resources accounting is a Unity-free read model.
+> Continuous gestures delegate to authoring services; explicit edit intent is a
+> separate one-shot state. Availability policy persists with the profile and
+> selects the existing gate mode for both planner and HUD; execution still uses
+> the canonical coordinator and fresh input validation. Exact source `a4c4342`
+> is focused-tested/package-validated and **NOT_RUN**. See the
+> [human-feedback receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+>
 > Unreleased WP2A candidate: ordinary blocked runs focus the first blocking casting; HUD refusals open directly to it. Previous/Next navigate current blockers without editing or saving. Repairs recompute through the compiler/gate. Global refusals stay global; Ready Casts Only remains an explicit fallback. Duplicate and Reload leave problem inspection; group summaries identify known origins. Review corrections are implemented and regressed. Qualification belongs to the exact manifest, complete source gate and fresh guarded runtime completion; see the dated checkpoint and required records in [WP2A evidence](../docs/WP2A-NOT-READY-NAVIGATION.md). Historical 0.3.0 evidence below is unchanged.
 
 # Architecture

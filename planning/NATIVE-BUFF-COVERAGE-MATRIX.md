@@ -1,5 +1,33 @@
 # Native Buff Coverage Matrix
 
+## 0.5.1-rc3 preparation
+
+Discovery/classification and exact-variant/group coverage remain unchanged.
+The new policy qualification selects the existing structurally discovered
+personal transmutation, Share/Powerful Change enhancement contracts and plain
+same-caster witness; it adds no spell-name/GUID discovery exception. Exact
+source `debd406` is focused-tested and **NOT_RUN**; see the
+[rc3 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+
+## 0.5.1-rc2 review correction
+
+Discovery/classification remains unchanged. Recipient membership and hints now
+share one decision filtered by stable source, exact ability variant, routine
+and authored target/origin. Covered group recipients inspect the one origin;
+they do not become duplicate direct/group casts. Exact source `e06d803` is
+focused-tested and **NOT_RUN**; see the
+[rc2 correction receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+
+## 0.5.1-rc1 human-feedback refinement
+
+No native-candidate classifier, action graph, source identity, GUID exception
+or discovery coverage changed. Continuous recipient toggles still match stable
+source plus exact ability variant and routine. Group/area coverage remains one
+casting per authored origin; clicking a covered recipient focuses that casting
+instead of manufacturing a direct-target duplicate. Exact source
+`a4c4342e1296966cbae1d64eeb53b47f23265627` is focused-tested but **NOT_RUN**;
+see the [human-feedback receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+
 ## 0.4.2 class abilities with a spell's effect
 
 | Source | Owner | Effect | Before 0.4.2 | 0.4.2 | Native cast |

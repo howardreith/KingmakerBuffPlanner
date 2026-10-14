@@ -544,9 +544,160 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                                     float.PositiveInfinity, float.PositiveInfinity).x,
                                 AvailableWidth = caption.rectTransform.rect.width
                             });
+                        _nativeUi.AvailabilityPolicyCaption = view.AvailabilityPolicyCaptionForRuntime;
+                        _nativeUi.RunCaption = view.RunCaptionForRuntime;
                     }
                     _nativeUi.PlannerDocumentBeforePopup = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
                     NativeUiCapture("nui-planner-casting.png");
+                    NativeUiNext(39);
+                    return false;
+                }
+                case 39:
+                {
+                    _nativeUi.ResourcesDocumentBefore =
+                        BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                    string result = BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("Resources");
+                    if (result != "invoked") _nativeUi.Failures.Add("resources-open:" + result);
+                    NativeUiNext(40);
+                    return false;
+                }
+                case 40:
+                {
+                    if (!NativeUiWaited(1200)) return false;
+                    Canvas.ForceUpdateCanvases();
+                    Vector2? size = view == null ? null : view.ResourcesPanelScreenSizeForRuntime;
+                    _nativeUi.ResourcesOpened = view != null && view.ResourcesOpenForRuntime;
+                    _nativeUi.ResourcesTopmost = view != null && view.ResourcesTopmostForRuntime;
+                    _nativeUi.ResourcesCloseFocused = view != null && view.ResourcesCloseFocusedForRuntime;
+                    _nativeUi.ResourcesOpaqueParchment = view != null &&
+                        view.ResourcesOpaqueParchmentForRuntime;
+                    _nativeUi.ResourcesScrollClips = view != null && view.ResourcesScrollClipsForRuntime;
+                    _nativeUi.ResourcesScrollOverflow = view == null
+                        ? -1f : view.ResourcesScrollOverflowForRuntime;
+                    _nativeUi.ResourcesPanelSize = size == null
+                        ? null : new[] { size.Value.x, size.Value.y };
+                    _nativeUi.ResourcesSelectedSummary = view == null
+                        ? null : view.ResourcesSummaryForRuntime;
+                    _nativeUi.ResourcesSelectedScope = view == null
+                        ? null : view.ResourcesScopeForRuntime;
+                    if (view != null)
+                    {
+                        _nativeUi.ResourcesSelectedCells.AddRange(
+                            view.ResourcesVisibleAccountingCellsForRuntime);
+                        _nativeUi.ResourcesSelectedCellsUseNativeLayer =
+                            view.ResourcesAccountingUsesNativeLayerForRuntime;
+                    }
+                    _nativeUi.ResourcesSaveStatus = view == null
+                        ? null : view.ResourcesSaveStatusForRuntime;
+                    NativeUiCapture("nui-resources.png");
+                    NativeUiNext(41);
+                    return false;
+                }
+                case 41:
+                {
+                    string result = BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("AllRoutinesScope");
+                    if (result != "invoked") _nativeUi.Failures.Add("resources-all-scope:" + result);
+                    NativeUiNext(42);
+                    return false;
+                }
+                case 42:
+                {
+                    if (!NativeUiWaited(700)) return false;
+                    Canvas.ForceUpdateCanvases();
+                    _nativeUi.ResourcesAllSummary = view == null
+                        ? null : view.ResourcesSummaryForRuntime;
+                    _nativeUi.ResourcesAllScope = view == null
+                        ? null : view.ResourcesScopeForRuntime;
+                    if (view != null)
+                    {
+                        _nativeUi.ResourcesAllCells.AddRange(
+                            view.ResourcesVisibleAccountingCellsForRuntime);
+                        _nativeUi.ResourcesAllCellsUseNativeLayer =
+                            view.ResourcesAccountingUsesNativeLayerForRuntime;
+                    }
+                    NativeUiCapture("nui-resources-all.png");
+                    NativeUiNext(45);
+                    return false;
+                }
+                case 45:
+                {
+                    string result = BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime(
+                        "SelectedRoutineScope");
+                    if (result != "invoked")
+                        _nativeUi.Failures.Add("resources-selected-scope:" + result);
+                    NativeUiNext(46);
+                    return false;
+                }
+                case 46:
+                {
+                    if (!NativeUiWaited(700)) return false;
+                    Canvas.ForceUpdateCanvases();
+                    _nativeUi.ResourcesSelectedAgainSummary = view == null
+                        ? null : view.ResourcesSummaryForRuntime;
+                    _nativeUi.ResourcesSelectedAgainScope = view == null
+                        ? null : view.ResourcesScopeForRuntime;
+                    if (view != null)
+                    {
+                        _nativeUi.ResourcesSelectedAgainCells.AddRange(
+                            view.ResourcesVisibleAccountingCellsForRuntime);
+                        _nativeUi.ResourcesSelectedAgainCellsUseNativeLayer =
+                            view.ResourcesAccountingUsesNativeLayerForRuntime;
+                    }
+                    NativeUiCapture("nui-resources-selected-again.png");
+                    NativeUiNext(47);
+                    return false;
+                }
+                case 47:
+                {
+                    BuffPlannerUiRoot.HandleEscapeForRuntime();
+                    NativeUiNext(48);
+                    return false;
+                }
+                case 48:
+                {
+                    if (!NativeUiWaited(500)) return false;
+                    _nativeUi.ResourcesClosedBetweenOpens = view != null &&
+                        !view.ResourcesOpenForRuntime && BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                    string result = BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("Resources");
+                    if (result != "invoked") _nativeUi.Failures.Add("resources-reopen:" + result);
+                    NativeUiNext(49);
+                    return false;
+                }
+                case 49:
+                {
+                    if (!NativeUiWaited(700)) return false;
+                    Canvas.ForceUpdateCanvases();
+                    _nativeUi.ResourcesReopened = view != null && view.ResourcesOpenForRuntime;
+                    _nativeUi.ResourcesReopenedCloseFocused = view != null &&
+                        view.ResourcesCloseFocusedForRuntime;
+                    _nativeUi.ResourcesReopenedSummary = view == null
+                        ? null : view.ResourcesSummaryForRuntime;
+                    _nativeUi.ResourcesReopenedScope = view == null
+                        ? null : view.ResourcesScopeForRuntime;
+                    if (view != null)
+                    {
+                        _nativeUi.ResourcesReopenedCells.AddRange(
+                            view.ResourcesVisibleAccountingCellsForRuntime);
+                        _nativeUi.ResourcesReopenedCellsUseNativeLayer =
+                            view.ResourcesAccountingUsesNativeLayerForRuntime;
+                    }
+                    NativeUiCapture("nui-resources-reopened.png");
+                    NativeUiNext(43);
+                    return false;
+                }
+                case 43:
+                {
+                    BuffPlannerUiRoot.HandleEscapeForRuntime();
+                    NativeUiNext(44);
+                    return false;
+                }
+                case 44:
+                {
+                    if (!NativeUiWaited(500)) return false;
+                    _nativeUi.ResourcesClosedByEscape = view != null && !view.ResourcesOpenForRuntime &&
+                        BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                    _nativeUi.ResourcesDocumentAfter =
+                        BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
                     NativeUiNext(34);
                     return false;
                 }
@@ -812,7 +963,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         try { failure = _nativeUiPlanning[_nativeUiPlanningIndex](); }
                         catch (Exception exception) { failure = "threw:" + exception.GetType().Name + ":" + exception.Message; }
                         _nativeUi.PlanningSteps.Add(name + ":" + (failure ?? "ok"));
-                        if (name == "add") NativeUiCapture("nui-planning-added.png");
+                        if (name == "successive-add") NativeUiCapture("nui-planning-added.png");
                         if (name == "done") NativeUiCapture("nui-planning-no-selection.png");
                         if (name == "change-caster") NativeUiCapture("nui-planning-changed-caster.png");
                         _nativeUiPlanningIndex++;
@@ -1082,19 +1233,23 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
             CastingGraphCasting first = graph.Castings[0];
             string originalTarget = first.TargetUnitId;
-            CastingGraphTargetNode free = graph.Targets.FirstOrDefault(value => value.CastingIds.Count == 0 &&
-                graph.Castings.All(casting => casting.TargetUnitId != value.UnitId));
+            List<CastingGraphTargetNode> free = graph.Targets.Where(value => value.CastingIds.Count == 0 &&
+                    graph.Castings.All(casting => casting.TargetUnitId != value.UnitId))
+                .Take(2).ToList();
             CastingGraphCasterNode other = graph.Casters.FirstOrDefault(value => !value.IsUnresolved &&
                 value.UnitId != first.CasterUnitId && value.Sources.Count != 0);
             CastingGraphCasterNode own = graph.Casters.FirstOrDefault(value => value.UnitId == first.CasterUnitId);
-            if (free == null || other == null || own == null)
+            if (free.Count < 2 || other == null || own == null)
             {
-                _nativeUi.AddNote("planning:fixture-shape;free=" + (free != null) + ";other=" + (other != null));
+                _nativeUi.AddNote("planning:fixture-shape;free=" + free.Count + ";other=" + (other != null));
                 return;
             }
             int startCount = live.Document.Castings.Count;
+            var startIds = new HashSet<string>(live.Document.Castings.Select(value => value.CastingId),
+                StringComparer.Ordinal);
             string id = first.CastingId;
             string added = null;
+            string addedSecond = null;
             Func<string, PlannedCasting> planned = value => BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime()
                 .Document.Castings.FirstOrDefault(item => item.CastingId == value);
             Func<string, string> click = name =>
@@ -1109,42 +1264,98 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             };
             step("focus", () => click("Casting." + id) ??
                 (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().EditingFocusCastingId == id ? null : "not-focused"));
-            step("retarget", () => click("Target." + free.UnitId) ??
-                (planned(id).DirectTargetUnitId == free.UnitId ? null : "target=" + planned(id).DirectTargetUnitId));
+            step("arm-retarget", () => click("ChangeRecipient") ??
+                (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().GraphEditIntent ==
+                    CastingGraphEditIntent.ChangeRecipient ? null : "not-armed"));
+            step("retarget", () => click("Target." + free[0].UnitId) ??
+                (planned(id).DirectTargetUnitId == free[0].UnitId ? null : "target=" + planned(id).DirectTargetUnitId));
             step("undo-retarget", () => click("Undo") ??
                 (planned(id).DirectTargetUnitId == originalTarget ? null : "target=" + planned(id).DirectTargetUnitId));
-            int order = 0;
-            step("cast-later", () =>
-            {
-                order = planned(id).Order;
-                return click("Casting." + id) ?? click("FocusedOrder.Later") ??
-                    (planned(id).Order == order + 1 ? null : "order=" + planned(id).Order + "<-" + order);
-            });
-            step("undo-order", () => click("Undo") ?? (planned(id).Order == order ? null : "order=" + planned(id).Order));
             step("done", () => click("DoneEditing") ??
                 (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().EditingFocusCastingId == null ? null : "still-focused"));
             step("choose-source", () => click("Caster." + other.UnitId) ?? click("Provider." + other.UnitId + ".0"));
-            step("add", () =>
+            step("add-inspects-only", () =>
             {
-                string failure = click("Target." + free.UnitId);
+                string failure = click("Target." + free[0].UnitId);
                 if (failure != null) return failure;
                 CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
                 if (session.Document.Castings.Count != startCount + 1) return "count=" + session.Document.Castings.Count;
-                added = session.EditingFocusCastingId;
-                PlannedCasting created = added == null ? null : planned(added);
-                return created != null && created.CasterUnitId == other.UnitId && created.DirectTargetUnitId == free.UnitId
+                PlannedCasting created = session.Document.Castings.FirstOrDefault(value =>
+                    !startIds.Contains(value.CastingId));
+                added = created == null ? null : created.CastingId;
+                if (session.GraphEditIntent != CastingGraphEditIntent.None)
+                    return "implicit-edit=" + session.GraphEditIntent;
+                if (created != null && session.EditingFocusCastingId != created.CastingId)
+                    return "inspection-focus=" + (session.EditingFocusCastingId ?? "none");
+                return created != null && created.CasterUnitId == other.UnitId &&
+                    created.DirectTargetUnitId == free[0].UnitId
                     ? null : "added=" + (created == null ? "none" : created.CasterUnitId + ">" + created.DirectTargetUnitId);
             });
+            step("choose-next-source", () =>
+            {
+                string failure = click("Caster." + own.UnitId) ?? click("Provider." + own.UnitId + ".0");
+                CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                if (failure != null) return failure;
+                if (session.GraphEditIntent != CastingGraphEditIntent.None) return "implicit-edit=" + session.GraphEditIntent;
+                PlannedCasting firstAdded = added == null ? null : planned(added);
+                return firstAdded != null && firstAdded.CasterUnitId == other.UnitId &&
+                    firstAdded.DirectTargetUnitId == free[0].UnitId
+                    ? null : "first-was-retargeted";
+            });
+            step("successive-add", () =>
+            {
+                string failure = click("Target." + free[1].UnitId);
+                if (failure != null) return failure;
+                CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                if (session.Document.Castings.Count != startCount + 2) return "count=" + session.Document.Castings.Count;
+                PlannedCasting created = session.Document.Castings.FirstOrDefault(value =>
+                    !startIds.Contains(value.CastingId) && value.CastingId != added);
+                addedSecond = created == null ? null : created.CastingId;
+                if (session.GraphEditIntent != CastingGraphEditIntent.None)
+                    return "implicit-edit=" + session.GraphEditIntent;
+                PlannedCasting firstAdded = added == null ? null : planned(added);
+                return firstAdded != null && firstAdded.CasterUnitId == other.UnitId &&
+                    firstAdded.DirectTargetUnitId == free[0].UnitId && created != null &&
+                    created.CasterUnitId == own.UnitId && created.DirectTargetUnitId == free[1].UnitId
+                    ? null : "independent-castings-missing";
+            });
+            int order = 0;
+            step("focus-reorder", () =>
+            {
+                string failure = click("Casting." + id);
+                if (failure != null) return failure;
+                CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                return NativeUiRecord.MoveLaterPrecondition(session.BuildGraph(
+                    BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime()), id);
+            });
+            step("cast-later", () =>
+            {
+                order = planned(id).Order;
+                return click("FocusedOrder.Later") ??
+                    (planned(id).Order == order + 1 ? null : "order=" + planned(id).Order + "<-" + order);
+            });
+            step("undo-order", () => click("Undo") ??
+                (planned(id).Order == order ? null : "order=" + planned(id).Order));
+            step("focus-added", () => added == null ? "no-added" : click("Casting." + added) ??
+                (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().EditingFocusCastingId == added
+                    ? null : "not-focused"));
+            step("arm-change-caster", () => click("ChangeProvider") ??
+                (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().GraphEditIntent ==
+                    CastingGraphEditIntent.ChangeProvider ? null : "not-armed"));
             step("change-caster", () => click("Provider." + own.UnitId + ".0") ??
                 (added != null && planned(added).CasterUnitId == own.UnitId ? null : "caster=" +
                     (added == null ? "none" : planned(added).CasterUnitId)));
             step("undo-caster", () => click("Undo") ??
                 (added != null && planned(added).CasterUnitId == other.UnitId ? null : "caster-not-restored"));
-            step("remove", () => (added == null ? "no-added" : click("Casting." + added)) ?? click("Target." + free.UnitId) ??
+            step("remove-explicit", () => (added == null ? "no-added" : click("Remove")) ??
                 (added != null && planned(added) == null ? null : "not-removed"));
             step("undo-remove", () => click("Undo") ?? (added != null && planned(added) != null ? null : "not-restored"));
-            step("undo-add", () => click("Undo") ??
-                (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().Document.Castings.Count == startCount
+            step("remove-normal", () => click("Target." + free[0].UnitId) ??
+                (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().Document.Castings.Count == startCount + 1
+                    ? null : "count=" + BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().Document.Castings.Count));
+            step("remove-second-normal", () => click("Target." + free[1].UnitId) ??
+                (addedSecond != null && planned(addedSecond) == null &&
+                    BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().Document.Castings.Count == startCount
                     ? null : "count=" + BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().Document.Castings.Count));
         }
 
@@ -2183,7 +2394,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         // A representative casting state through session commands: one
         // single-target buff both fixture casters know, one caster and
-        // source, two recipients, the first casting focused.
+        // source, up to two recipients while reserving two legal recipients
+        // for the continuous-assignment script, the first casting focused.
         private string AuthorNativeUiCastings(CastingWorkspaceSession session)
         {
             CastingWorkspaceInputs inputs = BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime();
@@ -2205,9 +2417,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             CastingGraphSourceRow row = selected == null ? null : selected.Sources.FirstOrDefault(value => value.Usable);
             if (row != null && !row.Selected) session.ClickGraphSource(row.ProviderKey, inputs);
             view = session.BuildGraph(inputs);
+            List<CastingGraphTargetNode> availableTargets = view.Targets.Where(value =>
+                value.Legality == CastingGraphTargetLegality.Legal && value.CastingIds.Count == 0).ToList();
+            int seedCount = NativeUiRecord.PlanningSeedCastingCount(availableTargets.Count);
+            if (seedCount == 0)
+                return "author:planning-fixture-needs-three-legal-targets:" + availableTargets.Count;
             int added = 0;
-            foreach (CastingGraphTargetNode target in view.Targets.Where(value =>
-                    value.Legality == CastingGraphTargetLegality.Legal && value.CastingIds.Count == 0).Take(2))
+            foreach (CastingGraphTargetNode target in availableTargets.Take(seedCount))
             {
                 CastingGraphClickResult result = session.ClickGraphRecipient(target.UnitId, inputs);
                 if (result != null && result.Outcome == CastingGraphClickOutcome.Added) added++;

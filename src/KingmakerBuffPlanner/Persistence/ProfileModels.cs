@@ -237,6 +237,21 @@ namespace KingmakerBuffPlanner.Persistence
         [JsonProperty("allowAnimatedFallback", Required = Required.Always, Order = 2)] public bool AllowAnimatedFallback { get; set; }
         [JsonProperty("outOfCombatOnly", Required = Required.Always, Order = 3)] public bool OutOfCombatOnly { get; set; }
         [JsonProperty("recastExisting", Required = Required.Always, Order = 4)] public bool RecastExisting { get; set; }
+        // Optional in candidate format revisions 1-3. Missing or malformed
+        // values normalize to strict, so an existing profile never begins
+        // omitting unavailable castings without an explicit player choice.
+        [JsonProperty("availabilityPolicy", Order = 5,
+            NullValueHandling = NullValueHandling.Ignore)]
+        public string AvailabilityPolicy { get; set; }
+
+        public const string RequireFullPlan = "require-full-plan";
+        public const string CastAvailable = "cast-available";
+
+        internal static string NormalizeAvailabilityPolicy(string value)
+        {
+            return string.Equals(value, CastAvailable, StringComparison.Ordinal)
+                ? CastAvailable : RequireFullPlan;
+        }
 
         internal static ExecutionProfile Default()
         {
@@ -250,7 +265,8 @@ namespace KingmakerBuffPlanner.Persistence
                 Mode = "instant",
                 AllowAnimatedFallback = CastingExecutionPolicy.AllowAnimatedFallback,
                 OutOfCombatOnly = CastingExecutionPolicy.OutOfCombatOnly,
-                RecastExisting = false
+                RecastExisting = false,
+                AvailabilityPolicy = RequireFullPlan
             };
         }
 
@@ -267,7 +283,8 @@ namespace KingmakerBuffPlanner.Persistence
                 Mode = Mode,
                 AllowAnimatedFallback = CastingExecutionPolicy.AllowAnimatedFallback,
                 OutOfCombatOnly = CastingExecutionPolicy.OutOfCombatOnly,
-                RecastExisting = RecastExisting
+                RecastExisting = RecastExisting,
+                AvailabilityPolicy = NormalizeAvailabilityPolicy(AvailabilityPolicy)
             };
         }
 

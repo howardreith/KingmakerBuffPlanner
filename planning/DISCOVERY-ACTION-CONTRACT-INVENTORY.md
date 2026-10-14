@@ -1,5 +1,34 @@
 # Discovery Action Contract Inventory
 
+## 0.5.1-rc3 preparation
+
+Discovery/action interpretation is unchanged. Opening now times the existing
+`_session.Refresh()` discovery separately from session/persistence binding and
+view construction. Display snapshots still cannot authorize execution; every
+qualification Apply obtains fresh production inputs. Exact source `debd406` is
+focused-tested/package-validated and **NOT_RUN**; see the
+[rc3 receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+
+## 0.5.1-rc2 review correction
+
+Discovery/action interpretation is unchanged. The correction only aligns UI
+layer construction, authoring-session decisions, draft invalidation and
+runtime observation. Fresh execution discovery/validation is still required;
+the display cache cannot authorize a cast. Exact source `e06d803` is
+focused-tested/package-validated and **NOT_RUN**; see the
+[rc2 correction receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+
+## 0.5.1-rc1 human-feedback refinement
+
+Discovery and structural action interpretation are unchanged. The performance
+work caches only normalized calculations for an exact immutable input snapshot,
+authoring revision and execution mode; opening/running still captures fresh
+game/spellbook inputs and invalidates on a new snapshot. No spell-name/GUID
+list, reflection expansion or compatibility dependency was added. Exact source
+`a4c4342e1296966cbae1d64eeb53b47f23265627` is **NOT_RUN**; evidence and the
+remaining guarded batch are in the
+[human-feedback receipt](../docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+
 ## 0.4.2 catalogue source identity
 
 Discovery and its action-graph interpretation are unchanged. The catalogue

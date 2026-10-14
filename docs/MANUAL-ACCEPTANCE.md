@@ -1,3 +1,43 @@
+> **Current 0.5.1-rc5 human-feedback acceptance:** exact candidate `ec3d5f8`
+> is focused-tested, packaged and frozen but **NOT_RUN**. The first selected
+> purity prerequisite failed when the physical display changed from 1920x1200
+> to 1920x1080; no rc5 screenshot exists. The smallest owner action is to
+> restore and hold the supported physical 1920x1200 mode through the next first
+> purity/run/review checkpoint, then explicitly authorize one fresh batch. The
+> two-size Resources/planning/timing review and actual strict/permissive policy
+> cast remain unchanged and are specified in the
+> [rc5 receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
+>
+> **Current 0.5.1-rc3 human-feedback acceptance:** exact candidate `debd406`
+> is **NOT_RUN**. At owner 1920x1200 and compact 1280x720, inspect actual
+> Resources cells/scope/reopen/clipping/input, continuous assignment/hints/
+> explicit edits/draft resets, policy and Run labels, and correlated cold-open,
+> buff-switch and Resources frame timings. The separate Advanced policy run
+> must prove strict no-spend refusal and the ordered affordable subset from raw
+> execution evidence. Exact commands and cost are in the
+> [rc3 receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+>
+> **Current 0.5.1-rc2 human-feedback acceptance:** exact local candidate
+> `e06d803` is **NOT_RUN**. At owner 1920x1200 and compact 1280x720, require
+> visible useful Resources cells on first open, selected/all/selected scope
+> changes and reopen; correct assignment actions/hints and draft resets; policy
+> and Run captions; input ownership/clipping; and input-to-first-correct-frame
+> timing separated from calculation/persistence/layout stages. Policy execution
+> additionally needs an allowance-bound guarded cast proving strict refusal and
+> the permissive authored-order subset; a caption is not execution evidence.
+> See the [rc2 correction receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+>
+> **Current 0.5.1-rc1 human-feedback acceptance:** exact local candidate
+> `a4c4342` is **NOT_RUN**. After its full-history purity prerequisite passes,
+> the selected guarded batch must render owner 1920x1200 and compact 1280x720.
+> Inspect selected/all Resources tables for opaque paper, bounded clipping and
+> no overlap; capture normal multi-recipient/add/remove and explicit-edit state;
+> confirm Require full plan / Cast available plus Run Long casing; compare
+> `[KBP-WORKSPACE-PERF]` calculation completion with the first correct frame;
+> then verify exact restoration and every protected save. The procedure,
+> expected PNGs and hashes are in the
+> [human-feedback receipt](HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+>
 > **Current October 13 owner-only remainder:** the exact `dfbaa5f` candidate has
 > completed the independently actionable game and visual work. The smallest
 > remaining list is: (1) an organic long/localized spell popup in a real

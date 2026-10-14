@@ -23,6 +23,7 @@ try {
         @{ Name = 'native-facts-owner'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'facts'; TimeoutSeconds = 600 }; ErrorId = $null },
         @{ Name = 'native-qualify-owner'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'qualify'; TimeoutSeconds = 900 }; ErrorId = $null },
         @{ Name = 'native-facts-windowed'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'facts'; DisplayMode = 'windowed-1280x720'; TimeoutSeconds = 600 }; ErrorId = $null },
+        @{ Name = 'native-owner-layout-explicit-windowed'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'qualify'; DisplayMode = 'windowed-1920x1200'; TimeoutSeconds = 900 }; ErrorId = $null },
         @{ Name = 'native-qualify-windowed'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'qualify'; DisplayMode = 'windowed-1920x1080'; TimeoutSeconds = 900 }; ErrorId = $null },
         @{ Name = 'native-mixed-case'; Args = @{ Scenario = 'LiVe-WoRkSpAcE-NaTiVe-Ui'; NativeUiStage = 'QuAlIfY'; DisplayMode = 'WINDOWED-1280X720'; FixtureFamily = 'aUtOmAtIoN'; CompatibilityProfileId = 'FULL-USER'; TimeoutSeconds = 600 }; ErrorId = $null },
         @{ Name = 'native-stage-required-owner'; Args = @{ Scenario = 'live-workspace-native-ui' }; ErrorId = 'KBP_NATIVE_UI_STAGE_REQUIRED' },
@@ -32,11 +33,14 @@ try {
         @{ Name = 'native-stage-other-windowed'; Args = @{ Scenario = 'live-workspace-qual'; NativeUiStage = 'qualify'; DisplayMode = 'windowed-1280x720' }; ErrorId = 'KBP_NATIVE_UI_STAGE_SCENARIO' },
         @{ Name = 'native-stage-other-uppercase'; Args = @{ Scenario = 'LIVE-WORKSPACE-PHYSICAL'; NativeUiStage = 'FACTS'; DisplayMode = 'OWNER' }; ErrorId = 'KBP_NATIVE_UI_STAGE_SCENARIO' },
         @{ Name = 'native-invalid-stage'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'unknown' }; ErrorId = 'ParameterArgumentValidationError' },
+        @{ Name = 'native-unapproved-explicit-size'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'qualify'; DisplayMode = 'windowed-1920x1199'; TimeoutSeconds = 900 }; ErrorId = 'ParameterArgumentValidationError' },
         @{ Name = 'native-advanced-facts'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'facts'; FixtureFamily = 'Advanced'; CompatibilityProfileId = 'advanced-gunslinger-0136'; TimeoutSeconds = 600 }; ErrorId = 'KBP_NATIVE_UI_FIXTURE' },
         @{ Name = 'native-advanced-qualify-uppercase'; Args = @{ Scenario = 'LIVE-WORKSPACE-NATIVE-UI'; NativeUiStage = 'QUALIFY'; FixtureFamily = 'ADVANCED'; TimeoutSeconds = 900 }; ErrorId = 'KBP_NATIVE_UI_FIXTURE' },
         @{ Name = 'native-advanced-profile-with-automation'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'qualify'; CompatibilityProfileId = 'advanced-gunslinger-0136'; TimeoutSeconds = 900 }; ErrorId = 'KBP_NATIVE_UI_FIXTURE' },
         @{ Name = 'native-facts-short-timeout'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'facts'; TimeoutSeconds = 599 }; ErrorId = 'KBP_NATIVE_UI_TIMEOUT' },
-        @{ Name = 'native-qualify-default-timeout'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'qualify' }; ErrorId = 'KBP_NATIVE_UI_TIMEOUT' }
+        @{ Name = 'native-qualify-default-timeout'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'qualify' }; ErrorId = 'KBP_NATIVE_UI_TIMEOUT' },
+        @{ Name = 'policy-qualification-recipe'; Args = @{ Scenario = 'live-cast-qual-select'; QualificationRecipe = 'policy-shared-powerful'; TimeoutSeconds = 900 }; ErrorId = $null },
+        @{ Name = 'unknown-qualification-recipe'; Args = @{ Scenario = 'live-cast-qual-select'; QualificationRecipe = 'policy-unknown'; TimeoutSeconds = 900 }; ErrorId = 'ParameterArgumentValidationError' }
     )) {
         $observed = $null
         $caseArgs = $case.Args

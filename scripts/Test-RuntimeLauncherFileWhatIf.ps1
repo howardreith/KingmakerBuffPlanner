@@ -272,7 +272,7 @@ if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-Qua
 }
 # Every recipe the host knows can be approved (the group recipe included).
 foreach ($knownRecipe in @('finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct',
-        'shared-personal', 'shared-powerful', 'sticky-touch-direct')) {
+        'shared-personal', 'shared-powerful', 'policy-shared-powerful', 'sticky-touch-direct')) {
     if ($null -ne (Get-KbpQualificationAllowanceBuildRefusal -AllowanceJson (New-QualificationFixtureJson @{ recipe = $knownRecipe }) `
             -RunId 'qual-bind-test' -BuildManifest $manifestFixture -Recipe $knownRecipe)) {
         throw "A $knownRecipe qualification allowance was refused by the build binding."
@@ -808,12 +808,13 @@ try {
         $directory = Join-Path $outcomeRoot $Name
         New-Item -ItemType Directory -Path $directory | Out-Null
         $captures = @('nui-hud.png', 'nui-native-popup.png', 'nui-planner-casting.png', 'nui-planner-popup.png',
-            'nui-gamelog.png')
+            'nui-gamelog.png', 'nui-resources.png', 'nui-resources-all.png',
+            'nui-resources-selected-again.png', 'nui-resources-reopened.png')
         foreach ($capture in $captures) { [IO.File]::WriteAllBytes((Join-Path $directory $capture), [byte[]](1, 2, 3)) }
         $switch = [ordered]@{ Route = 'inventory'; PlannerOpenBefore = $true; PlannerOpenAfter = $false
             NativeShownAfter = $true; PlannerReopened = $true; SelectedSourceBefore = 'src-1'
             SelectedSourceAfterReopen = 'src-1' }
-        $record = [ordered]@{ SchemaVersion = 1; RunId = 'native-ui-run'; Stage = $Stage
+        $record = [ordered]@{ SchemaVersion = 6; RunId = 'native-ui-run'; Stage = $Stage
             Captures = $captures; MissingCaptures = @(); Failures = @(); RunsStarted = 0
             LeaseReleasedAtEnd = $true; FullScreenModeAtEnd = $false; NativePopupOpened = $true
             PlannerOpened = $true; Switches = @($switch, $switch, $switch)
@@ -838,6 +839,7 @@ try {
         'native-ui-left-open' = @('facts', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
             $r.LeaseReleasedAtEnd = $false; Write-KbpJsonAtomic (Join-Path $d 'native-ui.json') $r })
         'native-ui-frame-missing' = @('facts', { param($d) Remove-Item -LiteralPath (Join-Path $d 'nui-planner-popup.png') })
+        'native-ui-resources-frame-missing' = @('qualify', { param($d) Remove-Item -LiteralPath (Join-Path $d 'nui-resources.png') })
         'native-ui-planner-stayed' = @('qualify', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
             $r.Switches[1].PlannerOpenAfter = $true; Write-KbpJsonAtomic (Join-Path $d 'native-ui.json') $r })
         'native-ui-selection-lost' = @('qualify', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
@@ -1030,10 +1032,11 @@ if (-not $launcherLf.Contains('if ($ManualRehearseDone) { $scenarioParameters.ma
 $rehearsalRecord = New-KbpRunCompletionRecord -RunId 'r' -Scenario 'live-workspace-manual' -FixtureFamily 'Automation' `
     -ProfileId 'full-user' -ManualRehearsal $true
 if (-not [bool]$rehearsalRecord.manualRehearsal) { throw 'The completion record does not label a rehearsal.' }
-$passAt = $launcherText.IndexOf('if ($result.status -cne ''PASS'') { throw "Runtime scenario returned $($result.status)." }')
+$passAt = $launcherText.IndexOf('if ($result.status -cne ''PASS'') {')
+$screenAt = $launcherText.IndexOf('Assert-KbpExpectedScreenEvidence -Request $request -Result $result')
 $outcomeAt = $launcherText.IndexOf('Assert-KbpScenarioOutcome -Request $request')
 $hostSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\src\KingmakerBuffPlanner\RuntimeTesting\RuntimeTestHost.cs') -Raw
-if ($passAt -lt 0 -or $outcomeAt -lt $passAt -or
+if ($passAt -lt 0 -or $screenAt -lt 0 -or $screenAt -gt $passAt -or $outcomeAt -lt $passAt -or
     -not $hostSource.Contains('{ "grantConsumed", record.GrantConsumed },') -or
     -not $hostSource.Contains('{ "grantAttempts", record.GrantAttempts },')) {
     throw 'The launcher does not read the scenario evidence itself after a PASS.'
@@ -1356,7 +1359,8 @@ if (@((Test-KbpSteamSessionLogState -ConnectionLines @() -CloudLinesApp $midSess
 
 # Display modes: a window larger than the session's display is refused; the
 # Unity arguments name exactly the size; the owner's settings add none.
-if (-not (Test-KbpDisplayModeSupported -Size '1920x1080' -DisplaySize '1920x1200') -or
+if (-not (Test-KbpDisplayModeSupported -Size '1920x1200' -DisplaySize '1920x1200') -or
+    -not (Test-KbpDisplayModeSupported -Size '1920x1080' -DisplaySize '1920x1200') -or
     (Test-KbpDisplayModeSupported -Size '2560x1440' -DisplaySize '1920x1200') -or
     -not (Test-KbpDisplayModeSupported -Size '2560x1440' -DisplaySize '3840x2160') -or
     (Test-KbpDisplayModeSupported -Size '1920x1080' -DisplaySize 'unknown') -or

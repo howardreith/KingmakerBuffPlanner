@@ -249,6 +249,7 @@ namespace KingmakerBuffPlanner.UI
         private CastingWorkspaceInputs _lastInputs;
         private string _savedIntentSignature = string.Empty;
         private string _resolvedDraftKey = string.Empty;
+        private string _draftProviderKey = string.Empty;
         private string _rememberedDirectRecipient = string.Empty;
         private readonly CastingForecastService _forecast =
             new CastingForecastService();
@@ -258,6 +259,15 @@ namespace KingmakerBuffPlanner.UI
         private readonly ExplicitCastingCompiler _compiler =
             new ExplicitCastingCompiler();
         private CastingAuthoringService _authoring;
+        private CastingAuthoringService _calculationCacheAuthoring;
+        private CastingWorkspaceInputs _calculationCacheInputs;
+        private int _calculationCacheRevision = -1;
+        private bool _calculationCacheStrictInstant;
+        private readonly Dictionary<string, ExplicitCastingPlan> _compiledPlans =
+            new Dictionary<string, ExplicitCastingPlan>(StringComparer.Ordinal);
+        private CastingForecast _cachedOnePassForecast;
+        internal int CompilationCountForRuntime { get; private set; }
+        internal int ForecastCountForRuntime { get; private set; }
         private bool _submissionInFlight;
         // Player settings stored beside the document in the candidate
         // profile; loaded with it and written back by Save (never reset).
@@ -648,7 +658,9 @@ namespace KingmakerBuffPlanner.UI
                 Mode = value.Mode,
                 AllowAnimatedFallback = value.AllowAnimatedFallback,
                 OutOfCombatOnly = value.OutOfCombatOnly,
-                RecastExisting = value.RecastExisting
+                RecastExisting = value.RecastExisting,
+                AvailabilityPolicy = ExecutionProfile.NormalizeAvailabilityPolicy(
+                    value.AvailabilityPolicy)
             };
         }
 
@@ -664,6 +676,25 @@ namespace KingmakerBuffPlanner.UI
             get { return _executionSettings.Mode; }
         }
 
+        public string AvailabilityPolicy
+        {
+            get
+            {
+                return ExecutionProfile.NormalizeAvailabilityPolicy(
+                    _executionSettings.AvailabilityPolicy);
+            }
+        }
+
+        public CastingApplyMode ApplyMode
+        {
+            get
+            {
+                return AvailabilityPolicy == ExecutionProfile.CastAvailable
+                    ? CastingApplyMode.ReadyCastsOnly
+                    : CastingApplyMode.Ordinary;
+            }
+        }
+
         // "animated" (native casting animations, the default) or "instant".
         public void SetExecutionMode(string mode)
         {
@@ -671,6 +702,19 @@ namespace KingmakerBuffPlanner.UI
                 throw new ArgumentException("Unknown execution mode.", "mode");
             ExecutionProfile next = CopyOf(_executionSettings);
             next.Mode = mode;
+            _executionSettings = next;
+            _executionSettingsChosen = true;
+            AutosaveSettingsNow();
+        }
+
+        public void SetAvailabilityPolicy(string policy)
+        {
+            if (policy != ExecutionProfile.RequireFullPlan &&
+                policy != ExecutionProfile.CastAvailable)
+                throw new ArgumentException("Unknown availability policy.", "policy");
+            if (AvailabilityPolicy == policy) return;
+            ExecutionProfile next = CopyOf(_executionSettings);
+            next.AvailabilityPolicy = policy;
             _executionSettings = next;
             _executionSettingsChosen = true;
             AutosaveSettingsNow();
@@ -768,9 +812,14 @@ namespace KingmakerBuffPlanner.UI
                 ? string.Empty : sourceId;
             if (!string.Equals(resolved, SelectedSourceId,
                     StringComparison.Ordinal))
+            {
                 // A stale ability under a different displayed source must
                 // never survive selection (review F1).
                 Draft.Ability = null;
+                _draftProviderKey = string.Empty;
+                ClearDraftTransientChoices();
+                CancelGraphEditIntent();
+            }
             SelectedSourceId = resolved;
         }
 
@@ -780,6 +829,11 @@ namespace KingmakerBuffPlanner.UI
             if (_authoring.Document.Routines.All(
                     value => value.RoutineId != routineId))
                 throw new ArgumentException("Unknown routine.", "routineId");
+            if (!string.Equals(SelectedRoutineId, routineId, StringComparison.Ordinal))
+            {
+                ClearDraftTransientChoices();
+                CancelGraphEditIntent();
+            }
             SelectedRoutineId = routineId;
         }
 
@@ -792,7 +846,11 @@ namespace KingmakerBuffPlanner.UI
                 ? null : casterUnitId;
             if (!string.Equals(resolved, SelectedCasterUnitId,
                     StringComparison.Ordinal))
+            {
                 Draft.Ability = null;
+                _draftProviderKey = string.Empty;
+                ClearDraftTransientChoices();
+            }
             SelectedCasterUnitId = resolved;
         }
 
@@ -800,18 +858,17 @@ namespace KingmakerBuffPlanner.UI
         // casting (draft) and focus it. Never edits an existing casting.
         public void ChooseDraftCaster(string casterUnitId)
         {
-            string previous = Draft.CasterUnitId;
             SelectCaster(casterUnitId);
             Draft.CasterUnitId = SelectedCasterUnitId;
-            // Re-review: enhancements belong to their caster (a rod in someone's
-            // pack); another caster keeps only the ones it has (judged once the
-            // party has been read).
-            if (_lastInputs != null && !string.Equals(previous, Draft.CasterUnitId, StringComparison.Ordinal))
-            {
-                HashSet<string> owned = EnhancementIdsOf(Draft.CasterUnitId);
-                Draft.Enhancements.RemoveAll(selection => selection == null ||
-                    !owned.Contains(selection.EnhancementId));
-            }
+        }
+
+        // Targeting and enhancement choices describe one exact NEXT-casting
+        // context. Clear the backing draft collections when that context
+        // changes; merely focusing another saved casting never touches it.
+        private void ClearDraftTransientChoices()
+        {
+            Draft.TargetingModifiers.Clear();
+            Draft.Enhancements.Clear();
         }
 
         private HashSet<string> EnhancementIdsOf(string casterUnitId)
@@ -1020,13 +1077,10 @@ namespace KingmakerBuffPlanner.UI
                 .Select(line => new WorkspaceBudgetRow(line, BudgetLabel(line))).ToList();
             WorkspaceBudgetRow.DisambiguateLabels(budget);
             CastingApplyDecision selectedGate = _gate.Evaluate(
-                plan, CastingApplyMode.Ordinary, SelectedRoutineId);
-            CastingForecast onePass = _forecast.ForecastOnePass(
-                _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
-                inputs.EffectsBySource, inputs.Enhancements,
-                inputs.TargetingModifiers, StrictInstant);
+                plan, ApplyMode, SelectedRoutineId);
+            CastingForecast onePass = ForecastOnePass(inputs);
             CastingApplyDecision onePassGate = _gate.Evaluate(
-                onePass.Plan, CastingApplyMode.Ordinary);
+                onePass.Plan, ApplyMode);
             WorkspaceEditingScope scope = EditingFocusCastingId == null
                 ? WorkspaceEditingScope.ConfigureNextCasting
                 : WorkspaceEditingScope.EditingSingleCasting;
@@ -1556,7 +1610,7 @@ namespace KingmakerBuffPlanner.UI
         public CastingPlanSignature PresentForReview(CastingWorkspaceInputs inputs)
         {
             ExplicitCastingPlan plan = Compile(inputs, SelectedRoutineId, false);
-            CastingPlanSignature signature = CastingPlanSignature.For(plan, SelectedRoutineId);
+            CastingPlanSignature signature = ReviewSignature(plan, SelectedRoutineId);
             // Presentation never revokes a stored acceptance (it authorizes
             // only its exact digest); only Accept writes review state.
             _review.Present(SelectedRoutineId, signature);
@@ -1605,7 +1659,7 @@ namespace KingmakerBuffPlanner.UI
         {
             ExplicitCastingPlan plan = Compile(inputs, SelectedRoutineId, false);
             bool accepted = _review.Accept(SelectedRoutineId,
-                CastingPlanSignature.For(plan, SelectedRoutineId)).Allowed;
+                ReviewSignature(plan, SelectedRoutineId)).Allowed;
             if (accepted) PersistReviewState();
             return accepted;
         }
@@ -1704,7 +1758,7 @@ namespace KingmakerBuffPlanner.UI
                         "persistence-failed:" + (_autosaveStatus ?? before ?? "unknown"),
                         decision, null);
             }
-            CastingPlanSignature signature = CastingPlanSignature.For(plan, scope);
+            CastingPlanSignature signature = ReviewSignature(plan, scope);
             // v1.2 §5: the deliberate Run request authorizes THIS exact
             // revision; no editor acceptance prerequisite remains. All
             // other refusals above (unresolved imports, blocked gate,
@@ -1741,6 +1795,15 @@ namespace KingmakerBuffPlanner.UI
             {
                 _submissionInFlight = false;
             }
+        }
+
+        private CastingPlanSignature ReviewSignature(
+            ExplicitCastingPlan plan, string scopeRoutineId)
+        {
+            return AvailabilityPolicy == ExecutionProfile.CastAvailable
+                ? CastingPlanSignature.For(plan, scopeRoutineId,
+                    ExecutionProfile.CastAvailable)
+                : CastingPlanSignature.For(plan, scopeRoutineId);
         }
 
         // The last production run started from this session (any route),
@@ -2046,6 +2109,7 @@ namespace KingmakerBuffPlanner.UI
                     candidates;
             Draft.Ability = option.Provider.Key.Ability;
             Draft.SpellbookGuid = option.Provider.Key.SpellbookGuid;
+            _draftProviderKey = option.Provider.Key.Canonical;
             _resolvedDraftKey = DraftResolutionKey();
             return null;
         }
@@ -2205,9 +2269,14 @@ namespace KingmakerBuffPlanner.UI
                 return AuthoringEditResult.Refuse("provider-unavailable:" + providerKey);
             if (TwinCount(_lastInputs, option.Provider.Key) > 1)
                 return AuthoringEditResult.Refuse("provider-not-pinnable:" + providerKey);
+            if (!string.IsNullOrEmpty(_draftProviderKey) &&
+                !string.Equals(_draftProviderKey, option.Provider.Key.Canonical,
+                    StringComparison.Ordinal))
+                ClearDraftTransientChoices();
             ChooseDraftCaster(option.Provider.Key.CasterUnitId);
             Draft.Ability = option.Provider.Key.Ability;
             Draft.SpellbookGuid = option.Provider.Key.SpellbookGuid;
+            _draftProviderKey = option.Provider.Key.Canonical;
             _resolvedDraftKey = DraftResolutionKey();
             return AuthoringEditResult.Accept("draft-provider", new string[0]);
         }
@@ -2401,6 +2470,23 @@ namespace KingmakerBuffPlanner.UI
                 _authoring.Document, _uiSettings, _executionSettings));
         }
 
+        // Canonical authored-plan content without UI or execution settings.
+        // Qualification uses this to distinguish the one expected policy
+        // setting write from any unintended assignment/variant/modifier/
+        // enhancement or authored-order change.
+        public string AuthoredPlanIntentSignature()
+        {
+            CastingPlanProfile profile = CastingPlanProfile.FromDocument(_authoring.Document);
+            return Newtonsoft.Json.JsonConvert.SerializeObject(new
+            {
+                campaignId = profile.CampaignId,
+                routines = profile.Routines,
+                castings = profile.Castings,
+                importNotices = profile.ImportNotices,
+                acknowledgedImportNotices = profile.AcknowledgedImportNotices
+            }, Newtonsoft.Json.Formatting.None);
+        }
+
         // What a fresh session would read for this campaign, as the same
         // intent signature (a plain read: no import, no session), so the
         // in-game reload compares disk with what was saved, not the retained
@@ -2548,11 +2634,50 @@ namespace KingmakerBuffPlanner.UI
         {
             if (inputs == null) throw new ArgumentNullException("inputs");
             _lastInputs = inputs;
-            return _compiler.Compile(
+            EnsureCalculationCache(inputs);
+            string key = (routineScope ?? "\0") +
+                (projectEffects ? "\u0001project" : "\u0001plain");
+            ExplicitCastingPlan cached;
+            if (_compiledPlans.TryGetValue(key, out cached)) return cached;
+            ExplicitCastingPlan plan = _compiler.Compile(
                 _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
                 inputs.EffectsBySource, inputs.Enhancements,
                 routineScope, inputs.TargetingModifiers, projectEffects,
                 inputs.LiveEffects, StrictInstant);
+            _compiledPlans[key] = plan;
+            CompilationCountForRuntime++;
+            return plan;
+        }
+
+        private CastingForecast ForecastOnePass(CastingWorkspaceInputs inputs)
+        {
+            if (inputs == null) throw new ArgumentNullException("inputs");
+            _lastInputs = inputs;
+            EnsureCalculationCache(inputs);
+            if (_cachedOnePassForecast != null) return _cachedOnePassForecast;
+            _cachedOnePassForecast = _forecast.ForecastOnePass(
+                _authoring.Document, inputs.Snapshot, inputs.ProviderOptions,
+                inputs.EffectsBySource, inputs.Enhancements,
+                inputs.TargetingModifiers, StrictInstant);
+            ForecastCountForRuntime++;
+            return _cachedOnePassForecast;
+        }
+
+        private void EnsureCalculationCache(CastingWorkspaceInputs inputs)
+        {
+            int revision = _authoring.CurrentRevision;
+            bool strict = StrictInstant;
+            if (ReferenceEquals(_calculationCacheAuthoring, _authoring) &&
+                ReferenceEquals(_calculationCacheInputs, inputs) &&
+                _calculationCacheRevision == revision &&
+                _calculationCacheStrictInstant == strict)
+                return;
+            _calculationCacheAuthoring = _authoring;
+            _calculationCacheInputs = inputs;
+            _calculationCacheRevision = revision;
+            _calculationCacheStrictInstant = strict;
+            _compiledPlans.Clear();
+            _cachedOnePassForecast = null;
         }
 
         // WP4: Instant mode is strict. A casting with no qualified instant

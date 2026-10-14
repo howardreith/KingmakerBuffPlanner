@@ -6,6 +6,26 @@ using KingmakerBuffPlanner.Planning;
 
 namespace KingmakerBuffPlanner.UI
 {
+    // One policy resolver shared by the HUD entry and guarded qualification.
+    // It chooses only the requested/remembered gate mode; compilation,
+    // validation, projection and dispatch remain owned by the session.
+    internal static class CastingRunPolicy
+    {
+        internal static CastingApplyMode Resolve(CastingWorkspaceSession session,
+            CastingApplyMode? requestedMode)
+        {
+            if (session == null) throw new ArgumentNullException("session");
+            return requestedMode ?? session.ApplyMode;
+        }
+
+        internal static WorkspaceApplyResult Apply(CastingWorkspaceSession session,
+            CastingApplyMode? requestedMode, string routineId,
+            CastingWorkspaceInputs inputs)
+        {
+            return session.Apply(Resolve(session, requestedMode), routineId, inputs);
+        }
+    }
+
     // Player-facing text for casting-first runs and refusals. Effects and
     // resource spending are stated separately; nothing claims more than
     // the run reported, and nothing is described as rolled back.
@@ -157,7 +177,7 @@ namespace KingmakerBuffPlanner.UI
             else if (reason.StartsWith("apply-refused", StringComparison.Ordinal))
                 text = "some castings are blocked (" + (result.GateDecision == null ? 0
                     : result.GateDecision.BlockingReasons.Count) +
-                    ") - fix them or use Ready Casts Only in the planner";
+                    ") - fix them or choose Cast available in the planner";
             else if (reason.StartsWith("import-notices-pending", StringComparison.Ordinal) ||
                 reason.StartsWith("legacy-import-unresolved", StringComparison.Ordinal))
                 text = "the imported plan still needs your review in the planner";

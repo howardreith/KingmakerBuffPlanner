@@ -1,3 +1,58 @@
+> **Current October 14 rc5 blocker:** independently actionable source, focused
+> regression, package, freeze and cleanup work is complete. The selected first
+> five-target purity window **FAILED** before its first WhatIf could pass because
+> the physical display changed from the preflight's 1920x1200 to 1920x1080.
+> Nothing was deployed or launched; the post-failure audit found no transaction,
+> RunId path, allowance, Kingmaker process or save violation. Do not retry or
+> reuse `kbphf-rc5-20261014-01`. The owner must restore and hold physical
+> 1920x1200 and explicitly authorize a fresh approximately 7 h 30 m batch. Exact
+> evidence, path-bound product-checkout requirement and scope are in the
+> [rc5 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md).
+>
+> **Current October 14 human-feedback blocker:** no independent source,
+> observer, hashing, focused-test, package or freeze work remains. Exact rc4
+> product `19e2e777261ff7887f0b8f62c8adcc75161220c5` is **NOT_RUN**. Its next
+> batch cannot reuse rc3 purity because compiled bytes changed. Before launch,
+> the owner-display guard must prove and transactionally restore 1920x1200;
+> rc3 actually rendered at 1920x1080. Then run the two five-target windows and
+> four serial game routes described in the
+> [rc4 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC4.md), approximately
+> 7 h 30 m. Do not retry the retained rc3 FAIL or claim its skipped policy and
+> assignment steps.
+>
+> **Current October 14 human-feedback blocker:** no independently actionable
+> source, observer, driver, reader, focused-check or local-package work remains.
+> Exact 0.5.1-rc3 product `debd40674ed2a6ed9f6e3423671f6ec2180bead0`
+> is validated but **NOT_RUN**. The remaining UI + policy batch needs two
+> five-target purity windows because the cast allowance exists only after its
+> selection, four guarded game runs, restoration review and two-size visual/
+> timing review: about 7 h 30 m. The matching existing Advanced inspection may
+> serve if its guard still passes. Exact commands and fallback are in the
+> [rc3 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+>
+> **Current October 13 human-feedback correction blocker:** exact 0.5.1-rc2
+> product `e06d803400893f4cd68d0066ae2421d0085db243` is validated but
+> **NOT_RUN**. The selected five-target purity prerequisite is forecast at
+> roughly 2 hours 35 minutes from comparable completed windows (101 minutes is
+> the two-inventory estimate alone), above the ordinary ceiling. It must use
+> `-Attempts 1 -LeaseWaitSeconds 120`, then owner 1920x1200 and compact
+> 1280x720 runs proceed serially with fresh RunIds/restoration. Separately, the
+> existing strict-only casting qualification record needs a bounded policy-aware
+> step before it can prove actual `Cast available` subset execution. Exact
+> acceptance and commands are in the
+> [rc2 correction receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+>
+> **Current October 13 human-feedback blocker:** no source, focused-check,
+> observer or local-package work is blocked. Exact 0.5.1-rc1 product
+> `a4c4342e1296966cbae1d64eeb53b47f23265627` is validated but **NOT_RUN**.
+> The one remaining runtime/visual batch requires the unchanged full-history
+> purity window first; 374,395 current files and an 8.410868-second/1,038-file
+> sample estimate about 101 minutes for its two inventories, over the ordinary
+> 30-minute ceiling. After it passes, run owner 1920x1200 and compact 1280x720
+> native qualification serially and inspect Resources/assignment/policy/Run
+> PNGs. Exact commands and artifact hashes are in the
+> [human-feedback receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+>
 > **Current October 13 blockers:** no independently actionable implementation,
 > restoration, packaging, integration, or prerelease-publication blocker remains.
 > `v0.5.0-rc.1` is the exact tested human-review artifact and remains PARTIAL.

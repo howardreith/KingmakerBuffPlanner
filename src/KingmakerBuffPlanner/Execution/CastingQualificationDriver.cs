@@ -67,6 +67,9 @@ namespace KingmakerBuffPlanner.Execution
             new List<CastingQualificationTokenReading>();
         public List<string> UnreadTokenCastings { get; } = new List<string>();
         public List<string> Observations { get; } = new List<string>();
+        // Exact gate omissions and reasons for this attempt, in authored
+        // order ("castingId|reason,...").
+        public List<string> Omissions { get; } = new List<string>();
         // The enhanced recipe: the caster reads (the enhancement's own
         // resource and every activatable ability of the caster) before and
         // after the step, and per casting the stat modifiers its effect gives
@@ -186,6 +189,26 @@ namespace KingmakerBuffPlanner.Execution
         // shared spell's native source could fund).
         public int ShareShortageCastings { get; set; }
         public const string ShortageCastingPrefix = "qual-short-";
+        // Human-feedback availability-policy evidence. The strict attempt
+        // and the remembered permissive attempt use the same authored plan;
+        // only the execution setting is expected to change.
+        public string PolicyBefore { get; set; }
+        public string PolicyAfter { get; set; }
+        public string PolicyReloaded { get; set; }
+        public string PolicyStrictMode { get; set; }
+        public string PolicyPlannerMode { get; set; }
+        public string PolicyHudMode { get; set; }
+        public bool? PolicyAuthoredIntentPreserved { get; set; }
+        public IReadOnlyList<string> PolicyStrictOmissions { get; set; } = new string[0];
+        public IReadOnlyList<string> PolicyAvailableOmissions { get; set; } = new string[0];
+        public IReadOnlyList<string> PolicyExecutableCastingIds { get; set; } = new string[0];
+        public IReadOnlyList<string> PolicyProjectedCosts { get; set; } = new string[0];
+        public string PolicyNoOpReason { get; set; }
+        public string PolicyGlobalRefusalReason { get; set; }
+        public bool? PolicyPostchecksSpentNothing { get; set; }
+        internal IReadOnlyList<PlannedCasting> PolicyCastings { get; set; } =
+            new PlannedCasting[0];
+        internal string PolicyAuthoredSignature { get; set; }
 
         private bool HasDisableStep
         {
@@ -221,6 +244,12 @@ namespace KingmakerBuffPlanner.Execution
             }
         }
 
+        private bool IsPolicy
+        {
+            get { return Selection != null &&
+                CastingQualificationRecipe.IsPolicyRecipe(Selection.Recipe); }
+        }
+
         // The judged steps of this record's recipe, in order.
         public IEnumerable<string> JudgedSteps
         {
@@ -229,6 +258,7 @@ namespace KingmakerBuffPlanner.Execution
                 if (IsGroup) return GroupStepNames;
                 if (IsEnhanced) return EnhancedStepNames;
                 if (IsSingleUse) return SingleUseStepNames;
+                if (IsPolicy) return PolicyStepNames;
                 if (IsShared) return SharedStepNames;
                 return HasDisableStep
                     ? StepNames.Concat(new[] { CastingQualificationForecast.Disable, CastingQualificationForecast.Recover })
@@ -280,6 +310,7 @@ namespace KingmakerBuffPlanner.Execution
                 if (failure != null) violations.Add(name + ":" + failure);
             }
             if (IsShared) violations.AddRange(SharedRunFailures());
+            if (IsPolicy) violations.AddRange(PolicyRunFailures());
             // The stop is the player's own: pressed once and taken by the
             // host as the player stop. An animated cast spans many frames,
             // so there the press must land while the first cast is in
@@ -328,6 +359,42 @@ namespace KingmakerBuffPlanner.Execution
         // The single-use recipes (ability-pool-direct, sticky-touch-direct).
         public static readonly string[] SingleUseStepNames = { "use", "repeat", "exhausted" };
         public static readonly string[] SharedStepNames = { "shared", "witness", "shortage" };
+        public static readonly string[] PolicyStepNames =
+            { "shared", "witness", "shortage", "cast-available" };
+
+        private IEnumerable<string> PolicyRunFailures()
+        {
+            if (PolicyBefore != KingmakerBuffPlanner.Persistence.ExecutionProfile.RequireFullPlan)
+                yield return "policy-before:" + (PolicyBefore ?? "unread");
+            if (PolicyAfter != KingmakerBuffPlanner.Persistence.ExecutionProfile.CastAvailable ||
+                PolicyReloaded != KingmakerBuffPlanner.Persistence.ExecutionProfile.CastAvailable)
+                yield return "policy-not-persisted:" + (PolicyAfter ?? "unread") + ">" +
+                    (PolicyReloaded ?? "unread");
+            if (PolicyStrictMode != CastingApplyMode.Ordinary.ToString() ||
+                PolicyPlannerMode != CastingApplyMode.ReadyCastsOnly.ToString() ||
+                PolicyHudMode != CastingApplyMode.ReadyCastsOnly.ToString())
+                yield return "policy-entry-modes:" + (PolicyStrictMode ?? "unread") + ">" +
+                    (PolicyPlannerMode ?? "unread") + ">" + (PolicyHudMode ?? "unread");
+            if (PolicyAuthoredIntentPreserved != true)
+                yield return "policy-changed-authored-intent";
+            if (PolicyExecutableCastingIds.Count == 0 ||
+                !PolicyExecutableCastingIds.SequenceEqual(PolicyProjectedCosts.Select(value =>
+                    value.Split('|')[0]), StringComparer.Ordinal))
+                yield return "policy-costs-or-order:" +
+                    string.Join(",", PolicyExecutableCastingIds.ToArray());
+            if (!PolicyAvailableOmissions.Any(value =>
+                    value.StartsWith(ShortageCastingPrefix, StringComparison.Ordinal) &&
+                    (value.IndexOf("resource-pool-exhausted:", StringComparison.Ordinal) >= 0 ||
+                     value.IndexOf("enhancement-pool-exhausted:", StringComparison.Ordinal) >= 0)))
+                yield return "policy-omission-reasons-missing";
+            if (string.IsNullOrEmpty(PolicyNoOpReason) ||
+                !PolicyNoOpReason.StartsWith("nothing-to-cast:", StringComparison.Ordinal))
+                yield return "policy-no-op:" + (PolicyNoOpReason ?? "unread");
+            if (PolicyGlobalRefusalReason != CastingExecutionPolicy.CombatActive)
+                yield return "policy-global-refusal:" + (PolicyGlobalRefusalReason ?? "unread");
+            if (PolicyPostchecksSpentNothing != true)
+                yield return "policy-postchecks-spent-resources";
+        }
 
         // The shared casting run's own isolation and cost rules (v1.2
         // E16-E20), beyond each step's: the projection charges the
@@ -427,6 +494,8 @@ namespace KingmakerBuffPlanner.Execution
                 return ExhaustedFailure(step, first);
             if (name == CastingQualificationForecast.Shortage)
                 return ShortageFailure(step, castings);
+            if (name == CastingQualificationForecast.Available)
+                return PolicyAvailableFailure(step);
             if (step.Report == null) return "report:none";
             if (step.Report.CleanupFailures.Count != 0)
                 return "cleanup:" + string.Join("|", step.Report.CleanupFailures.ToArray());
@@ -948,6 +1017,41 @@ namespace KingmakerBuffPlanner.Execution
             return CasterFailure(step, 0);
         }
 
+        private string PolicyAvailableFailure(CastingQualificationStepResult step)
+        {
+            CastingQualificationStepForecast forecast = Forecast == null ? null :
+                Forecast.FirstOrDefault(value => value.Name == CastingQualificationForecast.Available);
+            if (forecast == null || forecast.Projection == null) return "forecast:missing";
+            if (!step.ApplyAllowed || step.Report == null)
+                return "not-submitted:" + (step.ApplyReason ?? "none");
+            if (step.Report.Mode != CastingApplyMode.ReadyCastsOnly ||
+                step.Report.TerminalReason != "completed")
+                return "report:" + step.Report.Mode + ":" + step.Report.TerminalReason;
+            if (!string.Equals(step.ProjectionId, forecast.ProjectionId, StringComparison.Ordinal) ||
+                !PolicyExecutableCastingIds.SequenceEqual(forecast.CastingIds, StringComparer.Ordinal))
+                return "projection-or-order:" + (step.ProjectionId ?? "none") + ":" +
+                    string.Join(",", PolicyExecutableCastingIds.ToArray());
+            if (step.Report.Submitted != PolicyExecutableCastingIds.Count ||
+                PolicyExecutableCastingIds.Any(id =>
+                    step.StateOf(id) != CastingOutcomeState.EffectConfirmed))
+                return "states:" + States(step);
+            List<string> omitted = PolicyCastings.Select(value => value.CastingId)
+                .Where(id => !PolicyExecutableCastingIds.Contains(id, StringComparer.Ordinal)).ToList();
+            if (omitted.Any(id => step.StateOf(id) !=
+                    (id == CastingQualificationRecipe.CastingIds[1]
+                        ? CastingOutcomeState.Skipped : CastingOutcomeState.Omitted)))
+                return "omissions:" + States(step);
+            if (PolicyExecutableCastingIds.Any(id =>
+            {
+                string transition = step.TransitionOf(id);
+                return transition != "new-instance" && transition != "refreshed";
+            }))
+                return "effects:" + string.Join(",", step.Transitions.ToArray());
+            string caster = CasterFailure(step,
+                (ShareIndependentDemand ?? -1) * PolicyExecutableCastingIds.Count);
+            return caster ?? ResourceFailure(step, PolicyCastings);
+        }
+
         private static IReadOnlyList<string> ModifiersOf(IDictionary<string, IReadOnlyList<string>> modifiers,
             string castingId)
         {
@@ -1314,6 +1418,10 @@ namespace KingmakerBuffPlanner.Execution
                 case "witness-wait": Wait(false, "shortage-author"); return;
                 case "shortage-author": ShortageAuthor(); return;
                 case "shortage": Shortage(); return;
+                case "policy-author": PolicyAuthor(); return;
+                case "cast-available": BeginPolicyAvailable(); return;
+                case "cast-available-wait": Wait(false, "policy-postchecks"); return;
+                case "policy-postchecks": PolicyPostchecks(); return;
                 default: Finish("completed"); return;
             }
         }
@@ -1496,6 +1604,9 @@ namespace KingmakerBuffPlanner.Execution
                 return;
             }
             _session.SetExecutionMode(_allowance.ExecutionMode);
+            if (CastingQualificationRecipe.IsPolicyRecipe(Recipe))
+                _session.SetAvailabilityPolicy(
+                    KingmakerBuffPlanner.Persistence.ExecutionProfile.RequireFullPlan);
             _session.Save();
             inputs = _freshInputs();
             _session.PresentForReview(inputs);
@@ -1583,18 +1694,15 @@ namespace KingmakerBuffPlanner.Execution
                     ? reservoir.Resource.Value / perCast + 1 : int.MaxValue;
             }
             if (needed > MaximumShortageCastings) { Fail("shortage-unconstructible:" + needed); return; }
-            for (int index = 1; index <= needed; index++)
+            List<PlannedCasting> shortage =
+                CastingQualificationForecast.BuildShortageCastings(shared, needed);
+            foreach (PlannedCasting casting in shortage)
             {
-                var casting = new PlannedCasting(
-                    CastingQualificationRecord.ShortageCastingPrefix + index, CastingQualificationRecipe.RoutineId,
-                    10 + index, shared.SourceId, shared.Ability, shared.CasterUnitId, shared.SpellbookGuid,
-                    CastingTargetMode.DirectTarget, shared.DirectTargetUnitId, null, null,
-                    shared.TargetingModifiers, shared.Enhancements, ExistingEffectPolicy.Overwrite, null,
-                    CastingAuthoringState.Ready, null);
                 AuthoringEditResult added = _session.AddCastingForRuntime(casting);
                 if (!added.Applied) { Fail("shortage-author-refused:" + casting.CastingId + ":" + added.Reason); return; }
             }
             Record.ShareShortageCastings = needed;
+            Record.PolicyCastings = _session.Document.Castings.ToList();
             _session.Save();
             inputs = _freshInputs();
             // Recorded like any edit; the blocked plan is refused either way.
@@ -1613,7 +1721,9 @@ namespace KingmakerBuffPlanner.Execution
             _observeSteps = StepsToObserve(CastingQualificationForecast.Shortage);
             _before = ObserveAll(step, "shortage-before");
             step.CasterBefore = ObserveShareCaster(step, "shortage-before");
-            WorkspaceApplyResult result = _session.Apply(CastingApplyMode.Ordinary,
+            WorkspaceApplyResult result = _session.Apply(
+                CastingQualificationRecipe.IsPolicyRecipe(Recipe)
+                    ? _session.ApplyMode : CastingApplyMode.Ordinary,
                 CastingQualificationRecipe.RoutineId, _freshInputs());
             step.ApplyAllowed = result.Allowed;
             step.ApplyReason = result.Allowed && result.Dispatch != null
@@ -1625,9 +1735,122 @@ namespace KingmakerBuffPlanner.Execution
                 return;
             }
             ObserveTransitions(step, "shortage-after");
+            Record.PolicyStrictOmissions = DescribeOmissions(result.GateDecision);
+            step.Omissions.AddRange(Record.PolicyStrictOmissions);
+            Record.PolicyBefore = _session.AvailabilityPolicy;
+            Record.PolicyStrictMode = _session.ApplyMode.ToString();
+            if (CastingQualificationRecipe.IsPolicyRecipe(Recipe))
+                Record.PolicyAuthoredSignature = _session.AuthoredPlanIntentSignature();
             string failure = Record.StepFailure(CastingQualificationForecast.Shortage);
             if (failure != null) { Fail("step:" + failure); return; }
+            _phase = CastingQualificationRecipe.IsPolicyRecipe(Recipe)
+                ? "policy-author" : "done";
+        }
+
+        private void PolicyAuthor()
+        {
+            string authored = Record.PolicyAuthoredSignature;
+            _session.SetAvailabilityPolicy(
+                KingmakerBuffPlanner.Persistence.ExecutionProfile.CastAvailable);
+            Record.PolicyAfter = _session.AvailabilityPolicy;
+            bool preserved = string.Equals(authored,
+                _session.AuthoredPlanIntentSignature(), StringComparison.Ordinal);
+
+            // A new session proves the choice was remembered on disk. The
+            // allowance-bound dispatch boundary is unchanged, and the same
+            // canonical authored-plan signature must survive the reload.
+            _session = _openSession(_boundary);
+            Record.PolicyReloaded = _session.AvailabilityPolicy;
+            preserved = preserved && string.Equals(authored,
+                _session.AuthoredPlanIntentSignature(), StringComparison.Ordinal);
+            Record.PolicyAuthoredIntentPreserved = preserved;
+            Record.PolicyPlannerMode = _session.ApplyMode.ToString();
+            Record.PolicyHudMode = CastingRunPolicy.Resolve(_session, null).ToString();
+
+            CastingQualificationStepForecast forecast = Record.Forecast.FirstOrDefault(value =>
+                value.Name == CastingQualificationForecast.Available);
+            if (forecast == null || forecast.Projection == null)
+            { Fail("policy-forecast-missing"); return; }
+            Record.PolicyExecutableCastingIds = forecast.CastingIds.ToList();
+            Record.PolicyProjectedCosts = forecast.Projection.Plan.Steps.Select((step, index) =>
+                forecast.CastingIds[index] + "|native=" +
+                (step.Reservation == null ? "none" : step.Reservation.PoolKey + ":" +
+                    step.Reservation.Units) + "|enhancements=" +
+                string.Join(",", step.EnhancementUsageByPool.OrderBy(pair => pair.Key,
+                    StringComparer.Ordinal).Select(pair => pair.Key + ":" + pair.Value).ToArray()))
+                .ToList();
+            CastingWorkspaceInputs inputs = _freshInputs();
+            _session.PresentForReview(inputs);
+            _session.AcceptPresentedPlan(inputs);
+            _phase = "cast-available";
+        }
+
+        private void BeginPolicyAvailable()
+        {
+            if (WorldHeld()) return;
+            var step = new CastingQualificationStepResult(CastingQualificationForecast.Available);
+            Record.Steps.Add(step);
+            _observeSteps = StepsToObserve(CastingQualificationForecast.Available);
+            _before = ObserveAll(step, "cast-available-before");
+            string beforeFailure = BeforeReadFailure(_observeSteps, _before);
+            step.CasterBefore = ObserveShareCaster(step, "cast-available-before");
+            if (beforeFailure == null && !step.CasterBefore.Succeeded)
+                beforeFailure = "caster:" + step.CasterBefore.Failure;
+            if (beforeFailure != null) { Fail("before-read:" + beforeFailure); return; }
+
+            // This is the same remembered-policy resolver used by the HUD;
+            // the session still owns fresh compilation, validation,
+            // projection and guarded dispatch.
+            WorkspaceApplyResult result = CastingRunPolicy.Apply(_session, null,
+                CastingQualificationRecipe.RoutineId, _freshInputs());
+            step.ApplyAllowed = result.Allowed;
+            step.ApplyReason = result.Allowed && result.Dispatch != null
+                ? result.Dispatch.Reason : result.ReviewReason;
+            step.ProjectionId = result.Projection == null ? null : result.Projection.ProjectionId;
+            Record.PolicyAvailableOmissions = DescribeOmissions(result.GateDecision);
+            step.Omissions.AddRange(Record.PolicyAvailableOmissions);
+            if (!result.Allowed || result.Dispatch == null || !result.Dispatch.Submitted)
+            { Fail("policy-apply-refused:" + step.ApplyReason); return; }
+            _running = step;
+            _phase = "cast-available-wait";
+        }
+
+        private void PolicyPostchecks()
+        {
+            if (WorldHeld()) return;
+            int submissions = _boundary == null ? 0 : _boundary.PlannedSubmissions;
+            CasterEnhancementObservation before = ObserveShareCaster(null, "policy-postchecks-before");
+            string authored = _session.AuthoredPlanIntentSignature();
+
+            WorkspaceApplyResult noOp = CastingRunPolicy.Apply(_session, null,
+                CastingQualificationRecipe.RoutineId, _freshInputs());
+            Record.PolicyNoOpReason = noOp.ReviewReason;
+
+            CastingWorkspaceInputs fresh = _freshInputs();
+            var combat = new CastingWorkspaceInputs(fresh.Snapshot, fresh.ProviderOptions,
+                fresh.EffectsBySource, fresh.Enhancements, fresh.TargetingModifiers,
+                fresh.LiveEffects, true, fresh.SpellbookMembership, fresh.RunActive);
+            WorkspaceApplyResult global = CastingRunPolicy.Apply(_session, null,
+                CastingQualificationRecipe.RoutineId, combat);
+            Record.PolicyGlobalRefusalReason = global.ReviewReason;
+            CasterEnhancementObservation after = ObserveShareCaster(null, "policy-postchecks-after");
+            bool finalIntent = string.Equals(Record.PolicyAuthoredSignature,
+                _session.AuthoredPlanIntentSignature(), StringComparison.Ordinal);
+            Record.PolicyAuthoredIntentPreserved =
+                Record.PolicyAuthoredIntentPreserved == true && finalIntent;
+            Record.PolicyPostchecksSpentNothing =
+                (_boundary == null ? 0 : _boundary.PlannedSubmissions) == submissions &&
+                CastingQualificationRecord.CasterDifference("policy-postchecks", before, after, 0) == null &&
+                string.Equals(authored, _session.AuthoredPlanIntentSignature(),
+                    StringComparison.Ordinal);
             _phase = "done";
+        }
+
+        private static IReadOnlyList<string> DescribeOmissions(CastingApplyDecision decision)
+        {
+            return decision == null ? (IReadOnlyList<string>)new string[0] :
+                decision.Omissions.Select(value => value.CastingId + "|" +
+                    string.Join(",", value.Reasons.ToArray())).ToList();
         }
 
         // The demand the shared step must charge, derived independently of

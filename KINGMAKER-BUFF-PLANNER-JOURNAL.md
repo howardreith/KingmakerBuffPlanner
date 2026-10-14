@@ -1,5 +1,190 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-14 human-feedback rc4 runtime-finding checkpoint
+
+Continued `codex/kingmaker-buff-planner-human-feedback` from reviewed HEAD
+`685dd5c0a9c5ebadb5c527ecb1cd121910968770`. Hash-helper commit
+`d6a57d114096cb362212a586faa1a83018d8c67e` restores PowerShell literal-path
+semantics before read-only stream hashing; the matched divergent-directory,
+special-character, WhatIf, provider, missing and unreadable checks pass 8/0.
+
+The selected rc3 supervisor first retained pre-runtime Git stderr-wrapper
+failure `kbphf-rc3-20261014-01`. Corrected operation
+`kbphf-rc3-20261014-02` (product `debd406`, harness `d6a57d1`) passed one
+five-target purity window after 2 h 06 m, then actual RunId
+`kbphf-rc3-20261014-02-ui-owner` returned FAIL. Kingmaker exited, Mods restored
+and protected saves compared clean. No compact, selection, allowance, second
+purity or cast run started.
+
+The actual record was 1920x1080 rather than owner 1920x1200. Four Resources
+states had ten visible native-layer cells, correct scopes, clipping and focus,
+but original-resolution review found planner text bleeding through the
+PaperSlip header. Cold open was 463.494 ms request-to-confirmed-frame-end;
+later ordinary opens were mostly 106.783–121.409 ms with 368.654/398.747 ms
+discovery/reconciliation outliers. Resources open/all/selected/reopen were
+30.930/28.895/33.435/31.547 ms handler-to-confirmed-frame-end. The observer
+had seeded two of three recipients (`free=1`), so assignment steps were skipped
+and no buff-switch/recipient-toggle timing is claimed.
+
+Successor commit `19e2e777261ff7887f0b8f62c8adcc75161220c5` adds a full-
+dialog opaque backing beneath the approved native parchment and reserves two
+recipients in native observer schema 7. Focused checks: source 43/0, build 1/0,
+native UI 11/0, hashing 8/0, direct launcher arguments 26/0. Build-Local passed
+package 4/0 and produced frozen version 0.5.1-rc4: ZIP
+`1a38d33439392a9c1da5202c1537357213177432e8bca174b550c88ab0c68036`,
+DLL `093b08fc1f50ba334a05e75dd24eb785808885c5826d1ee6fffa63149591a287`,
+MVID `be795e3c-7c39-41a7-98e2-fdc5c177c326`. rc4 is NOT_RUN. The full evidence,
+acceptance and fresh 7 h 30 m batch are in the
+[rc4 decision receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC4.md).
+
+## 2026-10-14 human-feedback rc3 preparation checkpoint
+
+Continued `codex/kingmaker-buff-planner-human-feedback` from reviewed HEAD
+`90d658d2506184bc09d65989d6145ae066a6b337`, preserving correction source
+`e06d803400893f4cd68d0066ae2421d0085db243` and the rc1/rc2 packages. Product
+commit `debd40674ed2a6ed9f6e3423671f6ec2180bead0` captures open requests before
+discovery/session binding/view construction/reconciliation, records those and
+display/calculation/rebuild/theme/layout stages separately, and calls the
+correlated asynchronous measure `handlerToFrameEndMs`. Expected state and
+supersession/cancellation are explicit. Resources open/reopen/scope switches
+use the incremental path and require visible native-layer cells for correlation.
+
+The same product commit adds `policy-shared-powerful` to the established
+guarded casting qualification. It proves strict zero-dispatch/no-spend refusal,
+persists and reloads only Cast available, verifies authored intent, then uses
+the shared planner/HUD policy resolver and existing fresh session compiler,
+gate, boundary and executor for the ordered affordable subset. Omission reasons,
+per-casting native/enhancement costs, shared-pool deltas, no-op and combat
+refusal are judged. No parallel executor or blanket continuation was added.
+
+Final focused command selected
+`execution-policy,shared-recipes,policy-route,human-feedback` plus the policy
+reader: source 43/0, build 1/0, C# 20/0, reader 7/0. Direct launcher arguments
+passed 26/0 and real `-File` argument checks 8/0. The retained rc2 hash failure
+was reproduced once: inherited WhatIf simulated Get-FileHash's ProviderPath
+access, returning no hash object. This valid invocation exposed a pre-existing
+helper contract defect. Hashing an explicitly read-only stream through the
+built-in SHA256 command preserved real hashing and WhatIf mutation guards; the
+corrected harness passed 38/0.
+
+`Build-Local.ps1` on clean `debd406` passed source 43/0, build 1/0, package
+validation 4/0 and creation 1/0. Version 0.5.1-rc3 ZIP SHA-256 is
+`0d30c7fa430e618be1b7d871c68bdc894b79206018771b17b90ca9b8d3037e62`;
+DLL SHA-256 `6875da1340cae51b6fb12b5c2bccbc94f102a1ab096251ec35346fcedeac7f7a`;
+MVID `407d6a8b-139f-4800-8ee8-b259578ccdfa`. It is **NOT_RUN**, not installed
+and not released. The latest calculations-only 67-casting/77-entry sample was
+6.508 ms cold, 0.806/1.454 ms warm median/slowest, 0.673/0.921 ms buff switch,
+and 34.217/37.520 ms autosave-bound recipient toggle; no rendered-latency claim.
+
+The one remaining live batch needs two five-target purity windows (the cast
+allowance exists only after selection), owner 1920x1200 and compact 1280x720 UI
+runs, an Advanced policy selection and allowance-bound cast, four restoration/
+save receipts and visual/log review: about 7 h 30 m. The current guard accepts
+existing Advanced inspection `advanced-inspect-20260924-01` for the unchanged
+pair/profile; it must be rechecked immediately before use. Exact commands,
+fallback and limitations are in
+[the rc3 receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC3.md).
+
+Guarded-push dry run passed 6/0. The owned helper fast-forward pushed and
+remotely verified the product plus first receipt checkpoint at
+`d89dd46189d6fdebf000aa0c224ba7486e2e6dec`; no main merge, tag or release.
+
+## 2026-10-13 human-feedback review-correction checkpoint
+
+Continued `codex/kingmaker-buff-planner-human-feedback` from reviewed HEAD
+`754cf637457bee58744ba47765d52f97639a8da4`, preserving packaged rc1 source
+`a4c4342e1296966cbae1d64eeb53b47f23265627` and its ZIP SHA-256
+`2e4e1a9fe3fd56eaf11eac39f09132be18c3358ebc9aee45f3b6fad8e8d2ffbc`.
+Correction commit `e06d803400893f4cd68d0066ae2421d0085db243` assigns dynamic
+Resources rows/cells to the native layer; defines add focus as inspection with
+no implicit edit intent; clears backing draft choices across the same-caster
+exact-source-to-unresolved transition; and gives recipient presentation/clicks
+one exact-variant session decision. Native record schema 6 requires useful
+visible accounting cells on first open, both scope transitions and reopen.
+
+The exact focused command selected `human-feedback,direct-manipulation,native-ui,graph-`
+and passed source 43/0, production build 1/0 and behavior 47/0 in 8.8 seconds.
+Both changed PowerShell files parsed and the diff check had no patch errors.
+`Build-Local.ps1` passed source 43/0, build 1/0, strict package validation 4/0
+and creation 1/0. Version 0.5.1-rc2 ZIP SHA-256 is
+`6e6a5822c771514981b4bd788398864c56f98df7fabf96e4479ad84cccbcaa27`;
+DLL SHA-256 `695f65d02e8253da81a96238312e32d64489793788ad35dbb5e0c41417354548`;
+MVID `bfd140ba-1d58-40fb-a71c-4255371b42f2`. It is local, **NOT_RUN**,
+never installed and not published.
+
+Five fresh-process representative runs (67 castings/77 entries) produced
+corrected medians 70.274/0.805/0.729/37.495 ms for cold/warm/buff-switch/
+recipient-toggle, with slowest 71.448/2.260/2.197/52.347 ms. The original
+baseline was 66.131/1.458/1.528/35.034 ms. Warm and buff calculation improve;
+cold and autosave-bound toggle do not. A warmed aggregate-process cold value
+was rejected as non-comparable. The runtime view now records a separate
+input-to-first-correct-rendered-frame value; no such live value exists yet.
+
+The broad file-launcher wrapper passed cheap argument cases 24/0 and real
+`-File` cases 8/0 before it entered the unchanged multi-hour purity inventory
+and was stopped. The focused harness meta-test failed closed in fixture
+bootstrap `-WhatIf` because a mock hash result had no `Hash` property. Neither
+is recorded as a product/runtime PASS; no safeguard was relaxed.
+
+The next selected five-target purity call must use `-Attempts 1` and
+`-LeaseWaitSeconds 120`. Its two inventories estimate about 101 minutes; prior
+comparable complete windows took 145.6–153.9 minutes, so reserve about 2 hours
+35 minutes before the two serial UI runs. The existing casting qualification's
+shared shortage step is strict-only and cannot prove permissive execution; a
+bounded policy-aware step is required before the targeted cast route can supply
+that evidence. Exact scope, commands, limitations and artifact identities:
+[0.5.1-rc2 correction receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC2.md).
+The guarded-push WhatIf passed 6/0; the owned helper fast-forward pushed and
+remotely verified the first complete correction/receipt checkpoint
+`d69e9a3d6b05e26fb82f5fa8d61ffdaf5ff48494`. The following delivery note is
+records-only and leaves the product/package identities above unchanged.
+
+## 2026-10-13 human-feedback refinement checkpoint
+
+On DATA, successor branch `codex/kingmaker-buff-planner-human-feedback` began
+from `origin/main` `5e1e6d22c9cc03826f867ee9e068089fb06521b4` with no project changes.
+The exact handoff ZIP SHA-256 is
+`60fd5af6b1ac9b25551a9c4d8daff4724158614cd74e8086e8f3363291562c56`;
+its nine entries had one root and zero unsafe, symlink-like or duplicate paths.
+Built-in manifest verification passed 8/0 after isolated extraction. All four
+owner 1920x1200 references were inspected.
+
+Implementation commit `5688cc5762ba6aead3f23a60d14180de329c841f`
+delivers UX-01 through UX-06. Review found the old guarded observer still
+assumed add-to-focus and implicit retarget; runtime-evidence commit
+`a4c4342e1296966cbae1d64eeb53b47f23265627` corrects it and adds two Resources
+captures plus schema-5 bounds/focus/clipping/unchanged-plan judgements. The
+final affected command recorded in the receipt passed source 43/0, build 1/0
+and selected protocol 101/0 in 8.5 seconds. `scripts/Build-Local.ps1` then
+passed source 43/0, build 1/0, package validation 4/0 and creation 1/0.
+The first observer-focused attempt was 49/1 because one planner-copy assertion
+still expected the intentionally retired “click to select it” gesture; after
+updating that meaningful expectation, the rerun passed 50/0. A direct runner
+call that omitted the repository selector's game-path/dependency environment
+was rejected as an invalid invocation rather than a product failure.
+
+The resulting 0.5.1-rc1 ZIP SHA-256 is
+`2e4e1a9fe3fd56eaf11eac39f09132be18c3358ebc9aee45f3b6fad8e8d2ffbc`;
+DLL SHA-256 `bdc1aa3c512ba884a6c8b4476f4c92ea9362dec794b7fb1addf95f07288af10e`;
+MVID `e21f2f39-0305-4bb3-aa02-067f4ac78252`. It is local, validated,
+**NOT_RUN**, never installed and not published.
+
+Representative 67-casting/77-entry calculation medians changed from
+66.131/1.458/1.528/35.034 ms (cold/warm/buff/toggle) to
+65.211/0.771/0.689/36.559 ms; after slowest observations were
+67.248/1.752/1.270/51.593 ms. Toggle remains synchronous autosave-bound.
+Weakening autosave, trusting stale snapshots, adding a parallel executor,
+duplicating group casts and reusing older runtime pictures were rejected.
+
+No game or live-purity route was launched. Current full-history inputs contain
+374,395 files and the measured sample estimates about 101 minutes for mandatory
+before/after inventories alone, exceeding the 30-minute ceiling. Remaining
+uncertainty is actual Resources/render/input behavior and first-frame latency
+at owner 1920x1200 and compact 1280x720, plus live planner/HUD dispatch. Next:
+run the one frozen-`a4c4342` guarded batch and inspect its actual images. Full
+commands, exact performance table, limitations and evidence paths:
+[0.5.1-rc1 human-feedback receipt](docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC1.md).
+
 ## 2026-10-13 RC1 human-review prerelease publication
 
 The bounded reader/evidence correction is commit
@@ -3312,3 +3497,48 @@ old aggregate failure invalidates or relabels the original separate game receipt
 Receipt remains PARTIAL. Exact records and next separately budgeted guarded
 1920x1080/1280x720 batch followed by image review:
 [capture checkpoint](docs/NATIVE-UI-FINISH-0.5.0-CAPTURE-CHECKPOINT.md).
+
+## Human-feedback rc5 complete preparation and blocked live milestone — 2026-10-14
+
+- Branch `codex/kingmaker-buff-planner-human-feedback`; product/observer/
+  runtime-harness source `ec3d5f865707e540b00fccabd3f1a98f04aa3095`, version
+  0.5.1-rc5. The product commit was guarded-pushed before the live attempt.
+- Corrected the native planning sequence: two independent ordinary adds now
+  precede explicit focus, a real `CanMoveLater` check, reorder and Undo. The
+  shared regression passes the minimum three-recipient/one-seed and larger
+  four-recipient/two-seed shapes and restores the initial plan signature.
+- Added `windowed-1920x1200`, lock-time physical-display and game-settings
+  snapshots, Unity/native/PNG dimension correlation, and restore-before-Mods
+  verification. Changed user display state fails closed and is never rewritten.
+- Focused results: display 10/0; launcher direct 28/0 and file arguments 8/0;
+  relative/literal hash helper 8/0; selected development source 43/0, build
+  1/0, behavior 32/0; package source 43/0, build 1/0, validation 4/0 and
+  creation 1/0; guarded push 6/0; parsers and `git diff --check` clean.
+- Local ZIP
+  `artifacts/local-runtime/0.5.1-rc5/KingmakerBuffPlanner-0.5.1-rc5-local-runtime.zip`
+  SHA-256 `63c12d519dd49d514f6ddd31ea0514b9a8af5644680aa1dde82ddc77e63bfb03`;
+  DLL `8bbf4f1a515cdbd186f8cdd515250fd12c864d2f643a38945f84d786b61e9f92`;
+  MVID `95f36b3c-7e36-4005-9880-898841e1fd72`; exclusive qualification freeze
+  record `6db2544b9694a111359a6f9be062c7d9b05f89a26616fd73c2cacf59f2fa1ee2`.
+- Owned operation `kbphf-rc5-20261014-01` ran 12:44:54Z–13:47:50Z and
+  exited 1 in the first five-target purity phase. Its preflight measured
+  physical 1920x1200 and revalidated `advanced-inspect-20260924-01`. After the
+  expensive before-snapshot, the first 1920x1200 WhatIf measured physical
+  1920x1080 and refused before deployment: `nothing was changed`.
+- Classified as an external/environment display change during the prerequisite,
+  not a product runtime failure and not a purity PASS. No retry, game launch,
+  transaction, allowance, actual RunId, screenshot or policy cast occurred.
+  Owner-context cleanup audit: no Kingmaker process, foreign lease, unresolved
+  transaction, proposed RunId path or save violation; game registry remained
+  the pre-existing 1920x1080 fullscreen values.
+- Durable supervisor result/transcript SHA-256:
+  `5b107665e748f54bbbb03ef50f1fdfb7a364d4de81a4856d229b3f90da540c6f` /
+  `c237e0d39c156413c74598ffd80c0617be3e11d3edb82cca2b2c18defa4fa24b`.
+  Exact evidence and rejected reuse are in
+  `docs/HUMAN-FEEDBACK-REFINEMENT-0.5.1-RC5.md`.
+- Rejected: changing or overwriting the newer physical display state; retrying
+  the failed purity window; treating source/package validation as purity;
+  treating the absent game run as restoration, screenshot or policy evidence.
+- Exact next action: owner restores and holds physical 1920x1200, then
+  explicitly selects one fresh approximately 7 h 30 m two-purity/four-game
+  batch with fresh RunIds. The failed 62m56s attempt is not reusable.
