@@ -544,9 +544,74 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                                     float.PositiveInfinity, float.PositiveInfinity).x,
                                 AvailableWidth = caption.rectTransform.rect.width
                             });
+                        _nativeUi.AvailabilityPolicyCaption = view.AvailabilityPolicyCaptionForRuntime;
+                        _nativeUi.RunCaption = view.RunCaptionForRuntime;
                     }
                     _nativeUi.PlannerDocumentBeforePopup = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
                     NativeUiCapture("nui-planner-casting.png");
+                    NativeUiNext(39);
+                    return false;
+                }
+                case 39:
+                {
+                    _nativeUi.ResourcesDocumentBefore =
+                        BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                    string result = BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("Resources");
+                    if (result != "invoked") _nativeUi.Failures.Add("resources-open:" + result);
+                    NativeUiNext(40);
+                    return false;
+                }
+                case 40:
+                {
+                    if (!NativeUiWaited(1200)) return false;
+                    Canvas.ForceUpdateCanvases();
+                    Vector2? size = view == null ? null : view.ResourcesPanelScreenSizeForRuntime;
+                    _nativeUi.ResourcesOpened = view != null && view.ResourcesOpenForRuntime;
+                    _nativeUi.ResourcesTopmost = view != null && view.ResourcesTopmostForRuntime;
+                    _nativeUi.ResourcesCloseFocused = view != null && view.ResourcesCloseFocusedForRuntime;
+                    _nativeUi.ResourcesScrollClips = view != null && view.ResourcesScrollClipsForRuntime;
+                    _nativeUi.ResourcesScrollOverflow = view == null
+                        ? -1f : view.ResourcesScrollOverflowForRuntime;
+                    _nativeUi.ResourcesPanelSize = size == null
+                        ? null : new[] { size.Value.x, size.Value.y };
+                    _nativeUi.ResourcesSelectedSummary = view == null
+                        ? null : view.ResourcesSummaryForRuntime;
+                    _nativeUi.ResourcesSaveStatus = view == null
+                        ? null : view.ResourcesSaveStatusForRuntime;
+                    NativeUiCapture("nui-resources.png");
+                    NativeUiNext(41);
+                    return false;
+                }
+                case 41:
+                {
+                    string result = BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("AllRoutinesScope");
+                    if (result != "invoked") _nativeUi.Failures.Add("resources-all-scope:" + result);
+                    NativeUiNext(42);
+                    return false;
+                }
+                case 42:
+                {
+                    if (!NativeUiWaited(700)) return false;
+                    Canvas.ForceUpdateCanvases();
+                    _nativeUi.ResourcesAllSummary = view == null
+                        ? null : view.ResourcesSummaryForRuntime;
+                    NativeUiCapture("nui-resources-all.png");
+                    NativeUiNext(43);
+                    return false;
+                }
+                case 43:
+                {
+                    BuffPlannerUiRoot.HandleEscapeForRuntime();
+                    NativeUiNext(44);
+                    return false;
+                }
+                case 44:
+                {
+                    if (!NativeUiWaited(500)) return false;
+                    _nativeUi.ResourcesClosedByEscape = view != null && !view.ResourcesOpenForRuntime &&
+                        BuffPlannerUiRoot.IsCastingWorkspaceOpen;
+                    _nativeUi.ResourcesDocumentAfter =
+                        BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
                     NativeUiNext(34);
                     return false;
                 }
@@ -812,7 +877,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         try { failure = _nativeUiPlanning[_nativeUiPlanningIndex](); }
                         catch (Exception exception) { failure = "threw:" + exception.GetType().Name + ":" + exception.Message; }
                         _nativeUi.PlanningSteps.Add(name + ":" + (failure ?? "ok"));
-                        if (name == "add") NativeUiCapture("nui-planning-added.png");
+                        if (name == "add-without-focus") NativeUiCapture("nui-planning-added.png");
                         if (name == "done") NativeUiCapture("nui-planning-no-selection.png");
                         if (name == "change-caster") NativeUiCapture("nui-planning-changed-caster.png");
                         _nativeUiPlanningIndex++;
@@ -1093,6 +1158,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 return;
             }
             int startCount = live.Document.Castings.Count;
+            var startIds = new HashSet<string>(live.Document.Castings.Select(value => value.CastingId),
+                StringComparer.Ordinal);
             string id = first.CastingId;
             string added = null;
             Func<string, PlannedCasting> planned = value => BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime()
@@ -1109,6 +1176,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             };
             step("focus", () => click("Casting." + id) ??
                 (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().EditingFocusCastingId == id ? null : "not-focused"));
+            step("arm-retarget", () => click("ChangeRecipient") ??
+                (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().GraphEditIntent ==
+                    CastingGraphEditIntent.ChangeRecipient ? null : "not-armed"));
             step("retarget", () => click("Target." + free.UnitId) ??
                 (planned(id).DirectTargetUnitId == free.UnitId ? null : "target=" + planned(id).DirectTargetUnitId));
             step("undo-retarget", () => click("Undo") ??
@@ -1124,26 +1194,35 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             step("done", () => click("DoneEditing") ??
                 (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().EditingFocusCastingId == null ? null : "still-focused"));
             step("choose-source", () => click("Caster." + other.UnitId) ?? click("Provider." + other.UnitId + ".0"));
-            step("add", () =>
+            step("add-without-focus", () =>
             {
                 string failure = click("Target." + free.UnitId);
                 if (failure != null) return failure;
                 CastingWorkspaceSession session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
                 if (session.Document.Castings.Count != startCount + 1) return "count=" + session.Document.Castings.Count;
-                added = session.EditingFocusCastingId;
-                PlannedCasting created = added == null ? null : planned(added);
+                PlannedCasting created = session.Document.Castings.FirstOrDefault(value =>
+                    !startIds.Contains(value.CastingId));
+                added = created == null ? null : created.CastingId;
+                if (session.EditingFocusCastingId != null)
+                    return "silently-focused=" + session.EditingFocusCastingId;
                 return created != null && created.CasterUnitId == other.UnitId && created.DirectTargetUnitId == free.UnitId
                     ? null : "added=" + (created == null ? "none" : created.CasterUnitId + ">" + created.DirectTargetUnitId);
             });
+            step("focus-added", () => added == null ? "no-added" : click("Casting." + added) ??
+                (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().EditingFocusCastingId == added
+                    ? null : "not-focused"));
+            step("arm-change-caster", () => click("ChangeProvider") ??
+                (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().GraphEditIntent ==
+                    CastingGraphEditIntent.ChangeProvider ? null : "not-armed"));
             step("change-caster", () => click("Provider." + own.UnitId + ".0") ??
                 (added != null && planned(added).CasterUnitId == own.UnitId ? null : "caster=" +
                     (added == null ? "none" : planned(added).CasterUnitId)));
             step("undo-caster", () => click("Undo") ??
                 (added != null && planned(added).CasterUnitId == other.UnitId ? null : "caster-not-restored"));
-            step("remove", () => (added == null ? "no-added" : click("Casting." + added)) ?? click("Target." + free.UnitId) ??
+            step("remove-explicit", () => (added == null ? "no-added" : click("Remove")) ??
                 (added != null && planned(added) == null ? null : "not-removed"));
             step("undo-remove", () => click("Undo") ?? (added != null && planned(added) != null ? null : "not-restored"));
-            step("undo-add", () => click("Undo") ??
+            step("remove-normal", () => click("Target." + free.UnitId) ??
                 (BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().Document.Castings.Count == startCount
                     ? null : "count=" + BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime().Document.Castings.Count));
         }

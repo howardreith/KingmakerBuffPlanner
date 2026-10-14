@@ -116,6 +116,7 @@ namespace KingmakerBuffPlanner.UI
         private bool _feedbackShown;
         private Button _resourcesButton;
         private RectTransform _resources;
+        private RectTransform _resourcesDialog;
         private RectTransform _resourcesContent;
         private ScrollRect _resourcesScroll;
         private TMP_Text _resourcesSummary;
@@ -186,6 +187,101 @@ namespace KingmakerBuffPlanner.UI
         internal CastingGraphView LastGraphForRuntime { get { return _lastView; } }
         internal GraphLayoutResult LastLayoutForRuntime { get { return _lastLayout; } }
         internal GraphLayoutMetrics LastMetricsForRuntime { get { return _lastMetrics; } }
+
+        // Human-feedback refinement runtime evidence. These reads expose the
+        // rendered modal's observable state without rebuilding it or changing
+        // the plan; screenshots remain the authority for appearance.
+        internal bool ResourcesOpenForRuntime
+        {
+            get { return _resources != null && _resources.gameObject.activeInHierarchy; }
+        }
+
+        internal bool ResourcesTopmostForRuntime
+        {
+            get
+            {
+                return ResourcesOpenForRuntime && _resources.parent != null &&
+                    _resources.GetSiblingIndex() == _resources.parent.childCount - 1;
+            }
+        }
+
+        internal bool ResourcesCloseFocusedForRuntime
+        {
+            get
+            {
+                return ResourcesOpenForRuntime && EventSystem.current != null &&
+                    _resourcesCloseButton != null &&
+                    EventSystem.current.currentSelectedGameObject == _resourcesCloseButton.gameObject;
+            }
+        }
+
+        internal bool ResourcesScrollClipsForRuntime
+        {
+            get
+            {
+                if (!ResourcesOpenForRuntime || _resourcesScroll == null ||
+                    _resourcesScroll.viewport == null || _resourcesScroll.content == null) return false;
+                RectTransform viewport = _resourcesScroll.viewport;
+                RectMask2D rectMask = viewport.GetComponent<RectMask2D>();
+                Mask mask = viewport.GetComponent<Mask>();
+                return (rectMask != null && rectMask.enabled) || (mask != null && mask.enabled);
+            }
+        }
+
+        internal float ResourcesScrollOverflowForRuntime
+        {
+            get
+            {
+                if (_resourcesScroll == null || _resourcesScroll.viewport == null ||
+                    _resourcesScroll.content == null) return -1f;
+                return Mathf.Max(0f, _resourcesScroll.content.rect.height -
+                    _resourcesScroll.viewport.rect.height);
+            }
+        }
+
+        internal Vector2? ResourcesPanelScreenSizeForRuntime
+        {
+            get
+            {
+                if (!ResourcesOpenForRuntime || _resourcesDialog == null) return null;
+                Canvas canvas = _resourcesDialog.GetComponentInParent<Canvas>();
+                Camera camera = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay
+                    ? null : canvas.worldCamera;
+                var corners = new Vector3[4];
+                _resourcesDialog.GetWorldCorners(corners);
+                Vector2 lower = RectTransformUtility.WorldToScreenPoint(camera, corners[0]);
+                Vector2 upper = RectTransformUtility.WorldToScreenPoint(camera, corners[2]);
+                if (lower.x < 0f || lower.y < 0f || upper.x > Screen.width || upper.y > Screen.height)
+                    return null;
+                return new Vector2(upper.x - lower.x, upper.y - lower.y);
+            }
+        }
+
+        internal string ResourcesSummaryForRuntime
+        {
+            get { return _resourcesSummary == null ? null : _resourcesSummary.text; }
+        }
+
+        internal string ResourcesSaveStatusForRuntime
+        {
+            get { return _resourcesSaveStatus == null ? null : _resourcesSaveStatus.text; }
+        }
+
+        internal string AvailabilityPolicyCaptionForRuntime
+        {
+            get { return ButtonCaption(_policyButton); }
+        }
+
+        internal string RunCaptionForRuntime
+        {
+            get { return ButtonCaption(_runButton); }
+        }
+
+        private static string ButtonCaption(Button button)
+        {
+            TMP_Text caption = button == null ? null : button.GetComponentInChildren<TMP_Text>(true);
+            return caption == null ? null : caption.text;
+        }
 
         public void Dispose()
         {
@@ -1329,6 +1425,7 @@ namespace KingmakerBuffPlanner.UI
             dismiss.onClick.AddListener(CloseResources);
 
             RectTransform dialog = KingmakerUiFactory.CreateRect("Dialog", _resources);
+            _resourcesDialog = dialog;
             KingmakerUiFactory.SetAnchors(dialog, 0.10f, 0.08f, 0.90f, 0.92f);
             Image paper = _kit.Paint(dialog, PlannerNativeKit.PaperSlip, Color.white, true);
             if (paper == null)

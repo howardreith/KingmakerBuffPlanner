@@ -1555,8 +1555,12 @@ function Assert-KbpScenarioOutcome {
             -not [bool]$record.NativePopupOpened -or -not [bool]$record.PlannerOpened) {
             throw "The native UI scenario run is inconsistent with a PASS: $path"
         }
-        foreach ($capture in @('nui-hud.png', 'nui-native-popup.png', 'nui-planner-casting.png',
-                'nui-planner-popup.png', 'nui-gamelog.png')) {
+        $requiredCaptures = @('nui-hud.png', 'nui-native-popup.png', 'nui-planner-casting.png',
+            'nui-planner-popup.png', 'nui-gamelog.png')
+        if ([int]$record.SchemaVersion -ge 5) {
+            $requiredCaptures += @('nui-resources.png', 'nui-resources-all.png')
+        }
+        foreach ($capture in $requiredCaptures) {
             if (@($record.Captures) -cnotcontains $capture -or
                 -not (Test-Path -LiteralPath (Join-Path $directory $capture) -PathType Leaf)) {
                 throw "The native UI scenario frame $capture is missing: $path"

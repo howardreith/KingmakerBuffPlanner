@@ -135,9 +135,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // Earlier schemas retain their original judgements. Schema 2 adds
         // popup/caption/filter observations; schema 3 adds native action and
         // key-route preconditions. Schema 4 adds deliberately paused switching and
-        // the planner action with unavailable Metamagic. Historical records
-        // prove only what they observed.
-        public int SchemaVersion { get; set; } = 4;
+        // the planner action with unavailable Metamagic. Schema 5 adds the
+        // human-feedback Resources modal, execution-policy/Run captions and
+        // the explicit-edit/continuous-assignment gesture contract.
+        // Historical records prove only what they observed.
+        public int SchemaVersion { get; set; } = 5;
         public string RunId { get; set; }
         public string Stage { get; set; }
         public int ScreenWidth { get; set; }
@@ -203,6 +205,20 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public List<NativeUiCaptionFit> SourceTabs { get; } = new List<NativeUiCaptionFit>();
         public NativeUiCastingPopup CastingPopup { get; set; }
         public List<NativeUiCatalogueFilter> CatalogueFilters { get; } = new List<NativeUiCatalogueFilter>();
+        public bool ResourcesOpened { get; set; }
+        public bool ResourcesTopmost { get; set; }
+        public bool ResourcesCloseFocused { get; set; }
+        public bool ResourcesScrollClips { get; set; }
+        public float ResourcesScrollOverflow { get; set; }
+        public float[] ResourcesPanelSize { get; set; }
+        public string ResourcesSelectedSummary { get; set; }
+        public string ResourcesAllSummary { get; set; }
+        public string ResourcesSaveStatus { get; set; }
+        public bool ResourcesClosedByEscape { get; set; }
+        public string ResourcesDocumentBefore { get; set; }
+        public string ResourcesDocumentAfter { get; set; }
+        public string AvailabilityPolicyCaption { get; set; }
+        public string RunCaption { get; set; }
 
         // Window switching and nested Escape.
         public List<NativeUiWindowSwitch> Switches { get; } = new List<NativeUiWindowSwitch>();
@@ -225,9 +241,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool SaveFailureShown { get; set; }
         public bool SaveRecoveryWorked { get; set; }
         public bool SaveFailureUndoRestored { get; set; }
-        // Case C: the redesigned controls drive the plan as clicks do -
-        // retarget, reorder, add, change caster, remove - each undone, and
-        // the plan ends exactly where it started.
+        // Case C: normal source/recipient clicks continuously author while
+        // explicit one-shot controls retarget an inspected casting. Every
+        // edit is reversed and the plan ends exactly where it started.
         public List<string> PlanningSteps { get; set; } = new List<string>();
         public bool PlanningRestored { get; set; }
         public int RunsStarted { get; set; }
@@ -240,7 +256,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public IList<string> Violations()
         {
             var violations = new List<string>();
-            if (SchemaVersion != 1 && SchemaVersion != 2 && SchemaVersion != 3 && SchemaVersion != 4) violations.Add("schema:" + SchemaVersion);
+            if (SchemaVersion != 1 && SchemaVersion != 2 && SchemaVersion != 3 &&
+                SchemaVersion != 4 && SchemaVersion != 5) violations.Add("schema:" + SchemaVersion);
             if (Stage != FactsStage && Stage != QualifyStage) violations.Add("stage:" + (Stage ?? "null"));
             violations.AddRange(Failures.Select(value => "failure:" + value));
             violations.AddRange(MissingCaptures.Select(value => "capture-missing:" + value));
@@ -266,6 +283,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 foreach (string violation in NativeActionViolations()) yield return violation;
             if (SchemaVersion >= 4)
                 foreach (string violation in PausedAndUnavailableViolations()) yield return violation;
+            if (SchemaVersion >= 5)
+                foreach (string violation in HumanFeedbackViolations()) yield return violation;
             // UI-09: four cells the size of the native cells, one per native
             // column, on a third row above the native rows, inside the frame.
             if (PlannerHudButtons != 4) yield return "hud-planner-buttons:" + PlannerHudButtons;
@@ -364,6 +383,41 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!RoutinePressRefused) yield return "routine-press-not-refused";
             if (GameLogPlannerLines.Count != 1)
                 yield return "game-log-planner-lines:" + GameLogPlannerLines.Count;
+        }
+
+        private IEnumerable<string> HumanFeedbackViolations()
+        {
+            if (!ResourcesOpened) yield return "resources:not-opened";
+            if (!ResourcesTopmost) yield return "resources:not-topmost";
+            if (!ResourcesCloseFocused) yield return "resources:close-not-focused";
+            if (!ResourcesScrollClips) yield return "resources:scroll-not-clipped";
+            if (ResourcesScrollOverflow < 0f || float.IsNaN(ResourcesScrollOverflow) ||
+                float.IsInfinity(ResourcesScrollOverflow)) yield return "resources:invalid-overflow";
+            if (ResourcesPanelSize == null || ResourcesPanelSize.Length != 2 ||
+                ResourcesPanelSize.Any(value => value <= 0f || float.IsNaN(value) || float.IsInfinity(value)) ||
+                (ScreenWidth > 0 && ResourcesPanelSize[0] > ScreenWidth + 1f) ||
+                (ScreenHeight > 0 && ResourcesPanelSize[1] > ScreenHeight + 1f))
+                yield return "resources:panel-out-of-bounds";
+            if (string.IsNullOrWhiteSpace(ResourcesSelectedSummary))
+                yield return "resources:selected-summary-missing";
+            if (string.IsNullOrWhiteSpace(ResourcesAllSummary) ||
+                !ResourcesAllSummary.StartsWith("All routines", StringComparison.Ordinal))
+                yield return "resources:all-summary-missing";
+            if (string.IsNullOrWhiteSpace(ResourcesSaveStatus)) yield return "resources:save-status-missing";
+            if (!ResourcesClosedByEscape) yield return "resources:escape-did-not-close";
+            if (string.IsNullOrEmpty(ResourcesDocumentBefore) ||
+                ResourcesDocumentBefore != ResourcesDocumentAfter) yield return "resources:changed-plan";
+            if (AvailabilityPolicyCaption != "Require full plan" &&
+                AvailabilityPolicyCaption != "Cast available")
+                yield return "availability-policy-caption:" + (AvailabilityPolicyCaption ?? "none");
+            if (string.IsNullOrEmpty(RunCaption) ||
+                !RunCaption.StartsWith("Run ", StringComparison.Ordinal))
+                yield return "run-caption:" + (RunCaption ?? "none");
+            foreach (string required in new[]
+            {
+                "arm-retarget:ok", "add-without-focus:ok", "arm-change-caster:ok", "remove-normal:ok"
+            })
+                if (!PlanningSteps.Contains(required)) yield return "planning-contract-missing:" + required;
         }
 
         // These observations support bounded integration judgements, not a

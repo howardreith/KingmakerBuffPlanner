@@ -808,12 +808,12 @@ try {
         $directory = Join-Path $outcomeRoot $Name
         New-Item -ItemType Directory -Path $directory | Out-Null
         $captures = @('nui-hud.png', 'nui-native-popup.png', 'nui-planner-casting.png', 'nui-planner-popup.png',
-            'nui-gamelog.png')
+            'nui-gamelog.png', 'nui-resources.png', 'nui-resources-all.png')
         foreach ($capture in $captures) { [IO.File]::WriteAllBytes((Join-Path $directory $capture), [byte[]](1, 2, 3)) }
         $switch = [ordered]@{ Route = 'inventory'; PlannerOpenBefore = $true; PlannerOpenAfter = $false
             NativeShownAfter = $true; PlannerReopened = $true; SelectedSourceBefore = 'src-1'
             SelectedSourceAfterReopen = 'src-1' }
-        $record = [ordered]@{ SchemaVersion = 1; RunId = 'native-ui-run'; Stage = $Stage
+        $record = [ordered]@{ SchemaVersion = 5; RunId = 'native-ui-run'; Stage = $Stage
             Captures = $captures; MissingCaptures = @(); Failures = @(); RunsStarted = 0
             LeaseReleasedAtEnd = $true; FullScreenModeAtEnd = $false; NativePopupOpened = $true
             PlannerOpened = $true; Switches = @($switch, $switch, $switch)
@@ -838,6 +838,7 @@ try {
         'native-ui-left-open' = @('facts', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
             $r.LeaseReleasedAtEnd = $false; Write-KbpJsonAtomic (Join-Path $d 'native-ui.json') $r })
         'native-ui-frame-missing' = @('facts', { param($d) Remove-Item -LiteralPath (Join-Path $d 'nui-planner-popup.png') })
+        'native-ui-resources-frame-missing' = @('qualify', { param($d) Remove-Item -LiteralPath (Join-Path $d 'nui-resources.png') })
         'native-ui-planner-stayed' = @('qualify', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
             $r.Switches[1].PlannerOpenAfter = $true; Write-KbpJsonAtomic (Join-Path $d 'native-ui.json') $r })
         'native-ui-selection-lost' = @('qualify', { param($d) $r = Read-KbpJson (Join-Path $d 'native-ui.json')
