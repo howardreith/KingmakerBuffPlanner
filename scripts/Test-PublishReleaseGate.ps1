@@ -112,6 +112,14 @@ foreach ($step in $focused) {
         throw "Owner-authorized validation step is missing: $step"
     }
 }
+# Regression (0.5.3 fresh-clone publish): the offline suite inspects the built
+# production assembly, so it must compile HEAD with Build.ps1 before the runner.
+$suiteBody = ${function:Invoke-KbpOfflineCSharpSuite}.ToString()
+$buildAt = $suiteBody.IndexOf("'scripts\Build.ps1'", [StringComparison]::Ordinal)
+$runAt = $suiteBody.IndexOf('& $testExe', [StringComparison]::Ordinal)
+if ($buildAt -lt 0 -or $runAt -lt 0 -or $buildAt -gt $runAt) {
+    throw 'The offline C# suite does not build the production assembly before running the tests.'
+}
 Assert-Throws { Get-KbpReleaseValidationPlan -Disposition 'Unknown' } 'Unknown release disposition' 'Unknown disposition'
 $passed++
 
