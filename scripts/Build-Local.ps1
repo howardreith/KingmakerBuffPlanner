@@ -20,6 +20,7 @@ Copy-Item -LiteralPath $dllOutput -Destination (Join-Path $staging 'KingmakerBuf
 Copy-Item -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Info.json') -Destination (Join-Path $staging 'Info.json')
 Copy-Item -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\NativeEffectOverrides.json') -Destination (Join-Path $staging 'NativeEffectOverrides.json')
 Copy-Item -LiteralPath (Join-Path $root 'THIRD-PARTY-NOTICES.md') -Destination (Join-Path $staging 'THIRD-PARTY-NOTICES.md')
+Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination (Join-Path $staging 'LICENSE')
 
 $package = Join-Path $artifactRoot "KingmakerBuffPlanner-$version-local-runtime.zip"
 Add-Type -AssemblyName System.IO.Compression
