@@ -1,3 +1,40 @@
+# Mr. Bard's Kingmaker Buff Planner 0.5.3
+
+Publication status: local draft - not a public release. Update this status,
+and the validation boundary below, only when 0.5.3 is authorized for release.
+
+0.5.3 renames the mod. It was published as **Kingmaker Buff Planner** through
+0.5.2; Unity Mod Manager now lists it as **Mr. Bard's Kingmaker Buff Planner**
+by **Mr. Bard**. The planner itself is the 0.5.2 planner.
+
+## What changed
+
+- **Name and author only.** The UMM display name and author, the DLL's
+  title/product, and the bootstrap diagnostics label on the mod's UMM page.
+  The planner window, HUD buttons, spellbook button and game-log lines keep
+  their "Buff Planner" labels.
+- **Same mod underneath.** The UMM ID `KingmakerBuffPlanner`,
+  `KingmakerBuffPlanner.dll`, its entry method, the
+  `Mods\KingmakerBuffPlanner` folder, the `UserSettings` profile files and
+  the package layout are unchanged.
+
+## Upgrading
+
+Back up the whole `Mods\KingmakerBuffPlanner` folder, including
+`UserSettings`, outside `Mods` before installing. 0.5.3 installs over 0.5.2
+or an earlier version as the same Unity Mod Manager entry, now shown under
+the new name. 0.5.2 plans load unchanged: the plan format is the same. To roll
+back, restore the complete backup.
+
+## Validation boundary
+
+Source validation, the release build and strict package validation of the
+branded candidate are recorded in the journal. The candidate has not been run
+in the game. 0.5.2's validation boundary below applies unchanged to the same
+planner code.
+
+---
+
 # Kingmaker Buff Planner 0.5.2
 
 0.5.2 publishes the human-feedback refinement while preserving the approved

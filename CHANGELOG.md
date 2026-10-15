@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.3 - Mr. Bard branding (unreleased)
+
+- Not yet published. Branding-only candidate prepared on
+  `codex/kingmaker-buff-planner-mr-bard-branding`.
+- Unity Mod Manager now shows the mod as **Mr. Bard's Kingmaker Buff Planner**
+  by **Mr. Bard**. The UMM ID, `KingmakerBuffPlanner.dll`, entry method,
+  namespaces, Harmony IDs, `Mods\KingmakerBuffPlanner` folder, `UserSettings`
+  profile files and package layout are unchanged, so it installs over 0.5.2
+  as the same entry and keeps existing plans.
+- The assembly title/product and the UMM page's bootstrap diagnostics label
+  carry the new name. Planner, HUD, spellbook and game-log labels
+  ("Buff Planner") are unchanged.
+- Source and package validation additionally require the exact branded
+  DisplayName/Author and the unchanged entry method.
+- No gameplay, planning, execution, persistence or UI behavior change. The
+  candidate has not been run in the game; 0.5.2's records apply to 0.5.2's
+  bytes only.
+
 ## 0.5.2 - human-feedback refinement
 
 - Replaces the overflowing Resources overlay with a modal native parchment

@@ -1,19 +1,21 @@
 # Installation and Use
 
+Mr. Bard's Kingmaker Buff Planner was published as Kingmaker Buff Planner through 0.5.2. Its UMM ID, DLL, `Mods\KingmakerBuffPlanner` folder and `UserSettings` profiles are unchanged by the rename.
+
 ## Requirements
 
 - Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b.
 - Unity Mod Manager 0.28.2 installed for Kingmaker.
-- The release ZIP for Kingmaker Buff Planner. Call of the Wild is optional and is not bundled.
+- The release ZIP for Mr. Bard's Kingmaker Buff Planner. Call of the Wild is optional and is not bundled.
 
 ## Install
 
 1. Exit Kingmaker and back up the whole `Mods\KingmakerBuffPlanner` folder (including `UserSettings`) outside `Mods`.
 2. Extract the release ZIP into Kingmaker's `Mods` directory. The resulting path must be `Mods\KingmakerBuffPlanner\Info.json`.
-3. Start Kingmaker through Steam in the normal way and confirm Unity Mod Manager lists `KingmakerBuffPlanner` once, with the version of the ZIP you installed (0.5.0).
+3. Start Kingmaker through Steam in the normal way and confirm Unity Mod Manager lists the planner once, with the version of the ZIP you installed. 0.5.2 and earlier are listed as Kingmaker Buff Planner; from 0.5.3 the same entry is listed as Mr. Bard's Kingmaker Buff Planner.
 4. Load a campaign. Open the planner with the HUD's gear button, the spellbook's BUFF PLANNER button or Ctrl+Shift+B.
 
-Do not copy game DLLs, Harmony, Unity Mod Manager, Call of the Wild, or another mod into the Kingmaker Buff Planner folder.
+Do not copy game DLLs, Harmony, Unity Mod Manager, Call of the Wild, or another mod into the `Mods\KingmakerBuffPlanner` folder.
 
 ## Plan and run
 

@@ -1,4 +1,14 @@
-# Kingmaker Buff Planner
+# Mr. Bard's Kingmaker Buff Planner
+
+Formerly published as **Kingmaker Buff Planner** (through 0.5.2). Only the
+public name and author changed: the UMM ID `KingmakerBuffPlanner`, the
+`KingmakerBuffPlanner.dll` assembly, the `Mods\KingmakerBuffPlanner` folder and
+its `UserSettings` profiles are unchanged, so the renamed mod installs over an
+earlier version as the same Unity Mod Manager entry.
+
+**Next:** `0.5.3` is an unreleased, branding-only candidate: the new display
+name and author with no gameplay, persistence or package-layout change. It is
+not published and has not been run in the game.
 
 **Release:** `0.5.2` — the casting-first planner: plan every cast explicitly (caster,
 exact spell source, target, enhancements) and edit castings directly in the
@@ -10,8 +20,8 @@ native window and HUD while adding continuous assignment, explicit one-shot
 editing, readable Resources accounting, a remembered Require full plan / Cast
 available policy, responsiveness instrumentation and ordinary-cased Run labels.
 
-Kingmaker Buff Planner is a standalone Unity Mod Manager mod for **Pathfinder:
-Kingmaker Enhanced Plus Edition 2.1.7b**.
+Mr. Bard's Kingmaker Buff Planner is a standalone Unity Mod Manager mod for
+**Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b**.
 
 It plans and applies party buffs while preserving Kingmaker targeting,
 spell-slot, resource, duration, material-component, and metamagic semantics. It
@@ -32,6 +42,9 @@ Kingmaker's `Mods` directory so the final layout includes:
 Mods\KingmakerBuffPlanner\Info.json
 Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll
 ```
+
+Unity Mod Manager lists 0.5.2 and earlier as **Kingmaker Buff Planner**; from
+0.5.3 the same entry is listed as **Mr. Bard's Kingmaker Buff Planner**.
 
 Load a campaign, then open the planner with the HUD's gear button, the
 spellbook's **BUFF PLANNER** button or Ctrl+Shift+B. Pick a buff, a caster
