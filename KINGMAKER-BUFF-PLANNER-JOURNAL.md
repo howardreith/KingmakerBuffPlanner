@@ -3650,3 +3650,21 @@ Receipt remains PARTIAL. Exact records and next separately budgeted guarded
 - Next: from a fresh clone of GitHub `main` with the branch imported (no local
   tags), merge, guarded-push `main`, then
   `Publish-Release.ps1 -Publish -ConfirmOwnerAuthorizedPreRuntimeRelease`.
+
+## Stable 0.5.3 publication - 2026-10-15
+
+- Owner-authorized stable release published 2026-10-15T22:22:12Z:
+  https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.3
+  (latest, non-draft, non-prerelease). Release commit `3ec93b4` (merge of
+  `ff6cac4` and `0b46bb5`); annotated tag `v0.5.3` peels to it.
+- First attempt on `ff6cac4` failed closed before tagging (offline C# 543/1:
+  a fresh clone lacked the built production DLL that one test inspects).
+  `0b46bb5` builds HEAD with `Build.ps1` before the suite and pins the order in
+  the gate tests (8/0).
+- Publisher (owner-authorized path) on `3ec93b4`: source 47/0, production
+  build, offline C# 544/0, gate 8/0, two deterministic release builds, package
+  6/0. ZIP `951311dd97f62b662a5895067ce27c39ef9ade5763d21b33753cb5a4a1988ef3`,
+  five entries including the MIT `LICENSE`; download verified identical.
+- Not run: Test-SourceOnly, purity windows, runtime harness, game launch,
+  install, Mods or save access; no in-game run of 0.5.3. Receipt:
+  `docs/evidence/release-0.5.3-receipt.md`. Nexus upload not performed.
