@@ -238,7 +238,9 @@ it is resolved.
 
 Install archive-first: back up the whole `Mods\KingmakerBuffPlanner` folder
 (including `UserSettings`) outside the `Mods` folder before replacing it,
-then confirm Unity Mod Manager lists version 0.5.2.
+then confirm Unity Mod Manager lists the version you installed. 0.5.2 is
+listed as Kingmaker Buff Planner; from 0.5.3 the same entry is named
+Mr. Bard's Kingmaker Buff Planner and keeps the same folder and profiles.
 Its log line
 `[KBP-BOOT] Main.Load exited;version=<version>;commit=<commit>` names the
 source commit. To roll back, copy the new `UserSettings` outside `Mods`,

@@ -1,3 +1,48 @@
+# Mr. Bard's Kingmaker Buff Planner 0.5.3
+
+Owner-authorized stable release, 2026-10-15.
+
+0.5.3 renames the mod and adds an explicit license. It was published as
+**Kingmaker Buff Planner** through 0.5.2; Unity Mod Manager now lists it as
+**Mr. Bard's Kingmaker Buff Planner** by **Mr. Bard**. The planner itself is
+the 0.5.2 planner.
+
+## What changed
+
+- **Name and author.** The UMM display name and author, the DLL's
+  title/product/company, and the bootstrap diagnostics label on the mod's UMM
+  page. The planner window, HUD buttons, spellbook button and game-log lines
+  keep their "Buff Planner" labels.
+- **MIT license.** The mod is released under the MIT License
+  (`Copyright (c) 2026 Mr. Bard`). The ZIP now includes `LICENSE` next to
+  `THIRD-PARTY-NOTICES.md`, which keeps its design-reference credits.
+- **Same mod underneath.** The UMM ID `KingmakerBuffPlanner`,
+  `KingmakerBuffPlanner.dll`, its entry method, the
+  `Mods\KingmakerBuffPlanner` folder and the `UserSettings` profile files are
+  unchanged. The only new package entry is `LICENSE`.
+
+## Upgrading
+
+Back up the whole `Mods\KingmakerBuffPlanner` folder, including
+`UserSettings`, outside `Mods` before installing. 0.5.3 installs over 0.5.2
+or an earlier version as the same Unity Mod Manager entry, now shown under
+the new name. 0.5.3 reads the same plan format as 0.5.2, so 0.5.2 plans are
+expected to load unchanged; this follows from the unchanged persistence code
+and was not exercised in a live upgrade. To roll back, restore the complete
+backup.
+
+## Validation boundary
+
+The owner authorized this release without a further human playtest. Source
+validation, the complete offline C# behavior suite, the publisher gate tests,
+two deterministic release builds and strict package validation ran for this
+release. 0.5.3 has not been run in the game, and the broad source-only
+aggregate (runtime-harness, launcher, deployment, restore and filesystem-purity
+checks) was not run. Its planner code is unchanged from 0.5.2, whose
+validation boundary below applies unchanged.
+
+---
+
 # Kingmaker Buff Planner 0.5.2
 
 0.5.2 publishes the human-feedback refinement while preserving the approved

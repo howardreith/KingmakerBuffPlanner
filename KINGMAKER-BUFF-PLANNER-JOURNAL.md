@@ -3565,3 +3565,88 @@ Receipt remains PARTIAL. Exact records and next separately budgeted guarded
   no runtime PASS was inferred. No install, launch, Mods transaction or save
   access occurred. Exact evidence and next ordinary owner test are in
   `docs/evidence/release-0.5.2-receipt.md`.
+
+## Mr. Bard branding candidate 0.5.3 (local only) - 2026-10-15
+
+- Branch `codex/kingmaker-buff-planner-mr-bard-branding` from `origin/main`
+  `d46a7f6` (v0.5.2 + its record), in isolated worktree
+  `KingmakerBuffPlanner-BRAND`. Owner mission: public branding only, no
+  publication.
+- `299cfda`: UMM DisplayName `Mr. Bard's Kingmaker Buff Planner`, Author
+  `Mr. Bard`, version 0.5.3 on every authoritative surface, assembly
+  title/product and the UMM page's bootstrap diagnostics label renamed;
+  Validate-Source and validate-package also require the exact branded
+  DisplayName/Author and the unchanged EntryMethod. `537a528`: README,
+  installation/player-guide install text, CHANGELOG, a local-only 0.5.3
+  release-notes draft and `docs/NEXUS-RELEASE-COPY.md`.
+- Unchanged: UMM Id, AssemblyName, EntryMethod, namespaces, Harmony IDs,
+  `Mods\KingmakerBuffPlanner`, `UserSettings` files, plan schema 6 and
+  candidate format 6.4, package allowlist. Persistence never stamps product
+  version or display name, so 0.5.2 plans load unchanged.
+- Checks: `Test-Development.ps1` (persistence, import, migration,
+  planner-mode, settings-page, rollback-format prefixes) source 44/0, build
+  1/0, tests 24/0 in 7.1 s; `Test-PublishReleaseGate.ps1` 3/0;
+  `Build-Release.ps1` at `537a528`: two deterministic builds, package 5/0,
+  release 3/0. Negative manifest cases (old name, old author, changed entry
+  method, changed Id) are refused by validate-package; old name/author by
+  Validate-Source.
+- Local ZIP `artifacts\release\0.5.3\KingmakerBuffPlanner-0.5.3.zip`
+  `cfe6fb21af957edd3fdc02df933b956d5620aca2d49ee13fc3a29c8eba063293`;
+  DLL `b45832fb9a3f6ffc0853f9fbf36bd5ef7d357aba0ac8fad5cf4477448dba9fd3`;
+  MVID `254b6c3b-c85f-4a3c-af96-f62c9b57e4d0`; embedded commit `537a528`.
+  Same four entries and top-level folder as the downloaded v0.5.2 asset
+  (`84dd4b6c...`); `NativeEffectOverrides.json` and `THIRD-PARTY-NOTICES.md`
+  byte-identical; only Info.json and the DLL differ.
+- Not run: `Test-SourceOnly`, purity windows, any game launch, install, Mods
+  transaction or save access. No push, tag or release. This entry is
+  documentation after the build; the artifact keeps commit `537a528`.
+- Next: owner review; before release, merge to `main`, rebuild there, change
+  the release-notes draft's local-only status, run the guarded publisher.
+
+## Owner-authorized 0.5.3 release candidate (MIT, publisher disposition) - 2026-10-15
+
+- Owner mission of 2026-10-15 authorizes merging, tagging and publishing
+  stable 0.5.3 without a further playtest, adding MIT, and branding
+  AssemblyCompany. Branch `codex/kingmaker-buff-planner-mr-bard-branding`
+  in worktree `KingmakerBuffPlanner-BRAND`, candidate HEAD `874624a`.
+- `9aabc3e`: root `LICENSE` (standard MIT, `Copyright (c) 2026 Mr. Bard`)
+  staged by Build-Local; the package allowlist expects
+  `KingmakerBuffPlanner/LICENSE` (five entries) and validate-package requires
+  it byte-identical to the repository file (6/0); Validate-Source requires
+  LICENSE and THIRD-PARTY-NOTICES.md and checks the MIT text and holder
+  (47/0). `50919c3`: AssemblyCompany `Mr. Bard`; AssemblyCopyright unchanged.
+- `070843c`: guarded publisher gains `-ConfirmOwnerAuthorizedPreRuntimeRelease`,
+  mutually exclusive with `-ConfirmHumanAcceptance` and valid only with
+  `-Publish`. It runs `Validate-Source.ps1`, the complete offline C# suite and
+  `Test-PublishReleaseGate.ps1` instead of `Test-SourceOnly.ps1`, requires the
+  current release-notes section to state the owner authorization and the
+  not-run-in-game state, and writes verification text naming those checks.
+  All branch, clean-tree, origin, tag, no-replace, build and package gates are
+  unchanged; draft and human-acceptance paths still run Test-SourceOnly. Logic
+  in `scripts\PublishRelease.Common.ps1`; gate tests 8/0 (was 3/0); mutations
+  (publisher calling the aggregate directly, a live step in the owner plan)
+  are refused.
+- `4f38b18`: release notes, CHANGELOG, README, installation guide and Nexus
+  copy finalized for the owner-authorized release; Nexus permissions are MIT.
+- `874624a`: the complete offline C# suite failed 542/2 here and identically
+  on released `d46a7f6` (one matched reproduction in a temporary detached
+  worktree, since removed). Classified as obsolete source-text fixtures from
+  `5688cc5`/`debd406`, not product defects; updated to the current
+  `RunStatus(..., view.OnePassShortCount, ...)` and
+  `CastingRunPolicy.Resolve(session, requestedMode)` wiring, with the Resolve
+  body pinned (a mutation dropping the remembered-mode default fails).
+- Checks on `874624a`: owner-authorized focused validation (exact publisher
+  plan) source 47/0, C# 544/0, publisher gate 8/0 in 26 s; `Build-Release.ps1`
+  two deterministic builds, package 6/0, release 3/0 in 7 s.
+- Branch ZIP `artifacts\release\0.5.3\KingmakerBuffPlanner-0.5.3.zip`
+  `30f210df6b5185f37373768cefa86d5a1e197c8c1c3d776a11f9119324266be3`; DLL
+  `52a20d7b4fd10e7a30638ef3a8eb5dbd8c5bb2e1a59fbdfe1356abdde13a79f4`; MVID
+  `ec3c3ba9-d13f-43d8-832f-2445cde4ad86`; embedded commit `874624a`. Entries:
+  Info.json, KingmakerBuffPlanner.dll, LICENSE, NativeEffectOverrides.json,
+  THIRD-PARTY-NOTICES.md. This is a branch check only; the publisher rebuilds
+  on the merge commit.
+- Not run: Test-SourceOnly, purity windows, runtime harness, any game launch,
+  install, Mods transaction or save access. No push, tag or release yet.
+- Next: from a fresh clone of GitHub `main` with the branch imported (no local
+  tags), merge, guarded-push `main`, then
+  `Publish-Release.ps1 -Publish -ConfirmOwnerAuthorizedPreRuntimeRelease`.

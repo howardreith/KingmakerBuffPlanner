@@ -11,7 +11,8 @@ $required = @(
     'src\KingmakerBuffPlanner\KingmakerBuffPlanner.csproj',
     'src\KingmakerBuffPlanner\Info.json',
     'planning\KINGMAKER-BUFF-PLANNER-MISSION.md',
-    'AUTONOMOUS-RESUME.md', 'AUTONOMOUS-BLOCKERS.md')
+    'AUTONOMOUS-RESUME.md', 'AUTONOMOUS-BLOCKERS.md',
+    'LICENSE', 'THIRD-PARTY-NOTICES.md')
 $assertions = 0
 foreach ($relative in $required) {
     if (-not (Test-Path -LiteralPath (Join-Path $root $relative) -PathType Leaf)) {
@@ -74,6 +75,21 @@ if ($info.Id -cne 'KingmakerBuffPlanner' -or
     $info.Version -cne $version -or
     $info.ManagerVersion -cne '0.28.2') {
     throw 'Info.json standalone identity or version is invalid.'
+}
+$assertions++
+# Public branding is DisplayName/Author only; Id, AssemblyName and EntryMethod
+# above stay the stable identity that existing installs and profiles use.
+if ($info.DisplayName -cne "Mr. Bard's Kingmaker Buff Planner" -or
+    $info.Author -cne 'Mr. Bard') {
+    throw 'Info.json public DisplayName or Author is invalid.'
+}
+$assertions++
+# The product is MIT-licensed; the packaged LICENSE is this file verbatim.
+$license = (Get-Content -LiteralPath (Join-Path $root 'LICENSE') -Raw) -replace "`r`n", "`n"
+if (-not $license.StartsWith("MIT License`n`nCopyright (c) 2026 Mr. Bard`n`nPermission is hereby granted, free of charge,", [StringComparison]::Ordinal) -or
+    -not $license.Contains('The above copyright notice and this permission notice shall be included in all') -or
+    -not $license.Contains('THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND')) {
+    throw 'LICENSE is not the MIT license for the product.'
 }
 $assertions++
 

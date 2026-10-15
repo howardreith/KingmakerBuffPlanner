@@ -26,6 +26,10 @@ committed or uploaded as source.
 under `artifacts\release\<version>`, builds twice, rejects non-deterministic
 package or DLL output, and runs the strict package validator.
 
+The ZIP contains exactly one `KingmakerBuffPlanner/` folder with `Info.json`,
+`KingmakerBuffPlanner.dll`, `NativeEffectOverrides.json`, the MIT `LICENSE`
+(byte-identical to the repository root file) and `THIRD-PARTY-NOTICES.md`.
+
 ## GitHub release publisher
 
 Create a draft GitHub release for review:
@@ -38,7 +42,8 @@ The publisher:
 
 1. requires a clean checkout of the fully pushed default branch;
 2. verifies the local origin matches the GitHub repository;
-3. runs the complete source-only suite;
+3. runs the complete source-only suite (or, for an owner-authorized
+   pre-runtime release, the focused offline validation described below);
 4. performs two deterministic clean release builds;
 5. validates the final UMM ZIP;
 6. writes `SHA256SUMS.txt`;
@@ -70,6 +75,39 @@ Before running that command:
 - ensure the version tag and GitHub release do not already exist.
 
 Use `-ReleaseNotesPath <path>` to select another notes file.
+
+### Owner-authorized pre-runtime release
+
+`-ConfirmHumanAcceptance` asserts that the candidate's human acceptance gates
+are complete. When the owner authorizes a public release without that
+acceptance, use the separate disposition instead:
+
+```powershell
+.\scripts\Publish-Release.ps1 `
+  -Publish `
+  -ConfirmOwnerAuthorizedPreRuntimeRelease
+```
+
+The two switches are mutually exclusive, and the owner switch is valid only
+with `-Publish`. This path:
+
+- keeps every default-branch, clean-tree, pushed-HEAD, origin, existing-release,
+  tag, deterministic-build and strict package gate;
+- replaces `Test-SourceOnly.ps1` with focused offline validation:
+  `Validate-Source.ps1`, the complete offline C# behavior suite (read-only
+  reflection over the installed game assemblies) and
+  `Test-PublishReleaseGate.ps1`. It runs no launcher, runtime harness,
+  deployment, restore or filesystem-purity step;
+- requires the current section of the release notes (above the first `---`)
+  to state the owner authorization and that the release has not been run in
+  the game; and
+- writes generated release notes that name the checks actually run and state
+  that the source-only aggregate, in-game runs and human acceptance were not
+  performed.
+
+The plan, notes requirement and generated text live in
+`scripts\PublishRelease.Common.ps1` and are covered by
+`Test-PublishReleaseGate.ps1`.
 
 This repository may be private. A release in a private repository is available
 only to authorized GitHub users. The publisher blocks `-Publish` on a private
