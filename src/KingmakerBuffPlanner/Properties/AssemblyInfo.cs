@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 [assembly: AssemblyTitle("Mr. Bard's Kingmaker Buff Planner")]
 [assembly: AssemblyDescription("Standalone buff discovery, planning, and execution for Pathfinder: Kingmaker")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("Mr. Bard")]
 [assembly: AssemblyProduct("Mr. Bard's Kingmaker Buff Planner")]
 [assembly: AssemblyCopyright("Copyright © 2026 Howie Reith")]
 [assembly: ComVisible(false)]
