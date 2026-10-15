@@ -91,6 +91,10 @@ function Get-KbpReleaseVerificationStatement {
 
 function Invoke-KbpOfflineCSharpSuite {
     $root = Get-KbpRepositoryRoot
+    # Some behavior tests inspect the built production assembly, so compile the
+    # exact HEAD first, as Test-Development.ps1 does; a fresh release clone has
+    # no earlier build output to fall back on.
+    & (Join-Path $root 'scripts\Build.ps1') -Configuration Release | Out-Host
     $msbuild = Get-KbpMsBuild
     & $msbuild (Join-Path $root 'tests\KingmakerBuffPlanner.Tests\KingmakerBuffPlanner.Tests.csproj') /t:Rebuild /p:Configuration=Release /m /nologo /v:minimal | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Offline C# test build failed.' }
