@@ -6,6 +6,14 @@ param(
 
     [switch] $ConfirmHumanAcceptance,
 
+    # Owner authorized this public release without completed human/runtime
+    # acceptance. Mutually exclusive with -ConfirmHumanAcceptance and valid
+    # only with -Publish. Runs the focused offline validation defined in
+    # PublishRelease.Common.ps1 instead of Test-SourceOnly.ps1 and says so in
+    # the generated release notes; every branch, tag, build and package gate
+    # still applies.
+    [switch] $ConfirmOwnerAuthorizedPreRuntimeRelease,
+
     [switch] $AllowPrivateRepositoryRelease,
 
     # Preview releases only: permit publishing a prerelease (version with a
@@ -18,6 +26,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Common.ps1')
+. (Join-Path $PSScriptRoot 'PublishRelease.Common.ps1')
 
 function Assert-CommandAvailable {
     param([Parameter(Mandatory = $true)][string] $Name)
@@ -69,6 +78,11 @@ function Test-NativeCommand {
         $ErrorActionPreference = $priorErrorActionPreference
     }
 }
+
+$disposition = Resolve-KbpReleaseDisposition `
+    -Publish:$Publish `
+    -ConfirmHumanAcceptance:$ConfirmHumanAcceptance `
+    -ConfirmOwnerAuthorizedPreRuntimeRelease:$ConfirmOwnerAuthorizedPreRuntimeRelease
 
 $root = Get-KbpRepositoryRoot
 Assert-CommandAvailable -Name 'git'
@@ -144,10 +158,6 @@ try {
         throw 'The repository is private. Use -AllowPrivateRepositoryRelease only when a private release is intentional.'
     }
 
-    if ($Publish -and -not $ConfirmHumanAcceptance) {
-        throw 'Public publication requires -ConfirmHumanAcceptance.'
-    }
-
     $notesSourcePath = if ([string]::IsNullOrWhiteSpace($ReleaseNotesPath)) {
         Join-Path $root 'docs\RELEASE-NOTES-DRAFT.md'
     }
@@ -171,6 +181,7 @@ try {
         $customNotes -match '(?i)not a public release|publication status:.*(?:local|draft)|acceptance (?:remains|is) (?:required|pending)|local-only') {
         throw 'Release notes still identify the candidate as local-only or awaiting acceptance.'
     }
+    Assert-KbpReleaseNotesDisposition -Notes $customNotes -Disposition $disposition
 
     $tag = "v$version"
     $title = "Mr. Bard's Kingmaker Buff Planner $tag"
@@ -193,7 +204,7 @@ try {
         }
     }
 
-    & (Join-Path $PSScriptRoot 'Test-SourceOnly.ps1')
+    Invoke-KbpReleaseValidation -Disposition $disposition -ScriptsRoot $PSScriptRoot
     $packagePath = & (Join-Path $PSScriptRoot 'Build-Release.ps1') |
         Select-Object -Last 1
     if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
@@ -255,7 +266,7 @@ try {
         '',
         "Release commit: $head",
         '',
-        'The asset passed the repository source-only suite, two deterministic clean release builds, and strict package validation.'
+        (Get-KbpReleaseVerificationStatement -Disposition $disposition)
     )
     $notes = $customNotes + [Environment]::NewLine +
         [Environment]::NewLine +
@@ -330,6 +341,7 @@ try {
 
     Write-Host "Release: $releaseUrl"
     Write-Host "State: $(if ($Publish) { 'published' } else { 'draft' })"
+    Write-Host "Disposition: $disposition"
     Write-Host "Asset: $packagePath"
     Write-Host "SHA-256: $packageHash"
 }
