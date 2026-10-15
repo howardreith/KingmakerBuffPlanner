@@ -76,6 +76,13 @@ if ($info.Id -cne 'KingmakerBuffPlanner' -or
     throw 'Info.json standalone identity or version is invalid.'
 }
 $assertions++
+# Public branding is DisplayName/Author only; Id, AssemblyName and EntryMethod
+# above stay the stable identity that existing installs and profiles use.
+if ($info.DisplayName -cne "Mr. Bard's Kingmaker Buff Planner" -or
+    $info.Author -cne 'Mr. Bard') {
+    throw 'Info.json public DisplayName or Author is invalid.'
+}
+$assertions++
 
 [xml]$project = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\KingmakerBuffPlanner.csproj') -Raw
 $namespace = @{ msb = 'http://schemas.microsoft.com/developer/msbuild/2003' }

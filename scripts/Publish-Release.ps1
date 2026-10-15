@@ -173,7 +173,7 @@ try {
     }
 
     $tag = "v$version"
-    $title = "Kingmaker Buff Planner $tag"
+    $title = "Mr. Bard's Kingmaker Buff Planner $tag"
     $existingRelease = $null
 
     if (Test-NativeCommand -FilePath 'gh' -Arguments @(
@@ -245,7 +245,7 @@ try {
         '',
         "1. Download **$assetName** from **Assets** below.",
         '2. In Unity Mod Manager, select Pathfinder: Kingmaker and drag the ZIP into the **Mods** tab.',
-        '3. Launch the game and enable Kingmaker Buff Planner.',
+        "3. Launch the game and enable Mr. Bard's Kingmaker Buff Planner.",
         '',
         "Do not download GitHub's automatically generated **Source code** archives; they are not the installable Unity Mod Manager package.",
         '',
