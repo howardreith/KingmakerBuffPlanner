@@ -1,16 +1,16 @@
 # Mr. Bard's Kingmaker Buff Planner
 
-Formerly published as **Kingmaker Buff Planner** (through 0.5.2). Only the
-public name and author changed: the UMM ID `KingmakerBuffPlanner`, the
-`KingmakerBuffPlanner.dll` assembly, the `Mods\KingmakerBuffPlanner` folder and
-its `UserSettings` profiles are unchanged, so the renamed mod installs over an
-earlier version as the same Unity Mod Manager entry.
+**Release:** `0.5.3` (2026-10-15) — the mod's public name and author are now
+**Mr. Bard's Kingmaker Buff Planner** by **Mr. Bard**, and it is released under
+the [MIT License](LICENSE). It was published as **Kingmaker Buff Planner**
+through 0.5.2. The planner code is the 0.5.2 planner: the UMM ID
+`KingmakerBuffPlanner`, the `KingmakerBuffPlanner.dll` assembly, the
+`Mods\KingmakerBuffPlanner` folder and its `UserSettings` profiles are
+unchanged, so 0.5.3 installs over an earlier version as the same Unity Mod
+Manager entry. The owner authorized 0.5.3 without a further playtest; it has
+not been run in the game.
 
-**Next:** `0.5.3` is an unreleased, branding-only candidate: the new display
-name and author with no gameplay, persistence or package-layout change. It is
-not published and has not been run in the game.
-
-**Release:** `0.5.2` — the casting-first planner: plan every cast explicitly (caster,
+**Planner (since 0.5.2):** casting-first: plan every cast explicitly (caster,
 exact spell source, target, enhancements) and edit castings directly in the
 graph, with autosave and one-click Long / Important / Short routines from the
 HUD that never run in combat. See the
@@ -30,7 +30,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.5.2.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.5.3.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including
@@ -93,6 +93,14 @@ Profiles live under the mod's UserSettings directory and are not written into
 Kingmaker saves. Removing the standalone mod does not create a missing-content
 save dependency.
 
+## License
+
+Mr. Bard's Kingmaker Buff Planner is released under the [MIT License](LICENSE),
+which ships in the release ZIP. [Third-party notices](THIRD-PARTY-NOTICES.md)
+credit the MIT-licensed projects studied as design references; no third-party
+code, binary or game asset is included. Pathfinder: Kingmaker and its assets
+belong to their respective owners.
+
 ## Build, package, and release
 
 The project targets .NET Framework 4.7 and C# 7.3 against exact locally
@@ -114,7 +122,10 @@ uploads release assets:
   -AllowPrivateRepositoryRelease
 ```
 
-The final switch is required only while the repository is private. This
+An owner-authorized release without completed human acceptance uses
+`-ConfirmOwnerAuthorizedPreRuntimeRelease` instead of `-ConfirmHumanAcceptance`;
+see [Build and release](docs/BUILD-AND-RELEASE.md). The final switch is
+required only while the repository is private. This
 repository is currently PUBLIC, so a published release is downloadable by
 anyone; only a DRAFT release (never published) stays visible to the
 repository's collaborators alone, which is how private previews are shared.

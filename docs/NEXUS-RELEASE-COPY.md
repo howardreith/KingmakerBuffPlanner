@@ -1,9 +1,9 @@
 # Nexus Mods release copy
 
-Prepared for the branded 0.5.3 candidate. Nothing here has been uploaded.
-Before publishing, replace the bracketed owner decisions, attach the exact
-validated `KingmakerBuffPlanner-0.5.3.zip`, and update the testing statement if
-the candidate is run in the game first.
+Nexus Mods page copy for the owner-authorized 0.5.3 release (GitHub release
+`v0.5.3`). Upload the exact GitHub release asset `KingmakerBuffPlanner-0.5.3.zip`
+without repackaging it; its SHA-256 is listed in the release's
+`SHA256SUMS.txt`.
 
 ## Title
 
@@ -17,9 +17,10 @@ combat. Plans live outside your saves.
 
 ## Description
 
-Mr. Bard's Kingmaker Buff Planner is a standalone Unity Mod Manager mod for
-Pathfinder: Kingmaker Enhanced Plus Edition. It was published on GitHub as
-**Kingmaker Buff Planner** through version 0.5.2.
+Mr. Bard's Kingmaker Buff Planner, by Mr. Bard, is a standalone Unity Mod
+Manager mod for Pathfinder: Kingmaker Enhanced Plus Edition. It was published
+on GitHub as **Kingmaker Buff Planner** through version 0.5.2. It is free
+software under the MIT License.
 
 - **Casting-first planning.** Each casting is one cast with its own caster,
   exact spell source, target or group origin, and enhancements, shown as a
@@ -73,8 +74,9 @@ replaces your existing entry instead of appearing twice.
 2. Back up the whole `Mods\KingmakerBuffPlanner` folder, including
    `UserSettings`, somewhere outside `Mods`.
 3. Install the new ZIP as above, over the existing folder.
-4. Your plans in `UserSettings` load unchanged. 0.5.3 uses the same plan
-   format as 0.5.2.
+4. Your plans in `UserSettings` should load unchanged: 0.5.3 reads the same
+   plan format as 0.5.2. This follows from the unchanged persistence code; an
+   in-place upgrade was not exercised in a running game for 0.5.3.
 
 Upgrading from an older version applies that version's usual one-time
 conversions. For example, a classic plan from an earlier version is imported
@@ -104,10 +106,13 @@ Remove `Mods\KingmakerBuffPlanner`. Plans are stored as JSON in the mod's
 
 ## Known limitations and testing
 
-- **0.5.3 has not been run in the game.** It is a renaming release: the
-  planner code is 0.5.2's, and only the display name, author, DLL title and
-  one Unity Mod Manager settings-page label changed. Source validation, a
-  release build and strict package checks cover the branded files.
+- **0.5.3 has not been run in the game.** It is a renaming and licensing
+  release: the planner code is 0.5.2's. Only the display name, author, DLL
+  title/product/company, one Unity Mod Manager settings-page label and the
+  added `LICENSE` file changed. Offline source validation, the complete
+  offline C# behavior suite, two deterministic release builds and strict
+  package validation ran for this release; the broad runtime/purity suite and
+  human playtesting did not.
 - **0.5.2's own boundary still applies.** Its newest paths (the Resources
   dialog, continuous assignment, Require full plan / Cast available) passed
   source, build and behavior checks, but were not observed in a fresh
@@ -129,9 +134,15 @@ Remove `Mods\KingmakerBuffPlanner`. Plans are stored as JSON in the mod's
 - Pathfinder: Kingmaker is by Owlcat Games. The planner borrows the running
   game's own sprites, fonts and sounds at runtime. No game asset is
   distributed.
-- Permissions: **[OWNER DECISION REQUIRED: the repository has no LICENSE
-  file, so no reuse terms are stated. Choose the Nexus permission settings
-  or add a license before publishing.]**
+- License: **MIT** (`LICENSE` in the download, `Copyright (c) 2026 Mr. Bard`).
+  You may use, copy, modify, merge, publish, distribute, sublicense and sell
+  copies of the mod, provided the copyright and permission notice is kept.
+- Nexus permission settings, matching the MIT terms: upload to other sites
+  allowed; modification allowed; conversion allowed; asset use allowed;
+  commercial use allowed. In every case keep the MIT copyright and permission
+  notice and credit Mr. Bard. These permissions cover this mod only, not
+  Pathfinder: Kingmaker or its assets, which belong to their owners and are
+  not included.
 
 ## Bug reports
 
