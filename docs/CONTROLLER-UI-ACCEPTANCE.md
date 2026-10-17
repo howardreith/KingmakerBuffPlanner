@@ -1,5 +1,9 @@
 # Controller execution acceptance
 
+Review follow-up: [entry cleanup, persistence and latest-outcome corrections](CONTROLLER-UI-REVIEW-FIXES.md).
+No live status is promoted by these source regressions. The next native test is
+the entry/exit handoff only, before any casting.
+
 October 17, 2026. Scope is the
 [execution-first revision 2](../planning/KBP-CONTROLLER-UI-MISSION.md).
 Support level: **implemented with named qualification gaps**. Cold-controller

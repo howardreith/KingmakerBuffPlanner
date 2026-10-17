@@ -25,10 +25,15 @@ namespace KingmakerBuffPlanner.UI
         private static MethodInfo _dispatch;
         private static MethodInfo _deselect;
         private static FieldInfo _binds;
+        private static FieldInfo _actionsUsed;
         private static ModLog _log;
         private static bool _enabled;
         private static readonly Dictionary<BaseGameMenuView, GameObject> Hints =
             new Dictionary<BaseGameMenuView, GameObject>();
+        private static readonly Dictionary<BaseGameMenuView, InputLayer> EntryLayers =
+            new Dictionary<BaseGameMenuView, InputLayer>();
+        private static readonly ControllerEntryRegistry<InputLayer, BindDescription> Entries =
+            new ControllerEntryRegistry<InputLayer, BindDescription>(DetachEntry);
 
         internal static ControllerRoutineMenu ActiveMenu { get; set; }
 
@@ -41,8 +46,10 @@ namespace KingmakerBuffPlanner.UI
             _dispatch = typeof(BindDescription).GetMethod("Handler", InstanceMembers, null,
                 new[] { typeof(InputActionEventData) }, null);
             _binds = typeof(InputLayer).GetField("m_Binds", InstanceMembers);
+            _actionsUsed = typeof(InputLayer).GetField("m_ActionsUsed", InstanceMembers);
             if (_getLayer == null || _getLayer.ReturnType != typeof(InputLayer) || _deselect == null ||
-                _dispatch == null || _binds == null || _binds.FieldType != typeof(List<BindDescription>))
+                _dispatch == null || _binds == null || _binds.FieldType != typeof(List<BindDescription>) ||
+                _actionsUsed == null || _actionsUsed.FieldType != typeof(Dictionary<int, BindDescription>))
                 throw new InvalidOperationException("The native controller routine contracts do not match this installation.");
             _harmony = HarmonyInstance.Create(HarmonyId);
             try
@@ -72,36 +79,84 @@ namespace KingmakerBuffPlanner.UI
             GameObject hint = null;
             try
             {
-                foreach (BaseGameMenuView stale in Hints.Keys.Where(candidate => candidate == null).ToArray()) Hints.Remove(stale);
+                foreach (BaseGameMenuView stale in EntryLayers.Keys.Where(candidate => candidate == null).ToArray())
+                    RemoveEntry(stale);
+                InputLayer previousLayer;
+                if (EntryLayers.TryGetValue(__instance, out previousLayer) && !ReferenceEquals(previousLayer, __result))
+                    RemoveEntry(__instance);
                 GameObject previous;
                 if (Hints.TryGetValue(__instance, out previous) && previous != null) UnityEngine.Object.Destroy(previous);
                 Hints.Remove(__instance);
-                // Respect another native/optional adapter's use of this action.
-                var binds = (List<BindDescription>)_binds.GetValue(__result);
-                if (binds.Any(bind => bind.ActionId == RewiredConsts.Action.Func01))
-                {
-                    _log.Info("[KBP-CONTROLLER] entry unavailable;native-menu-action-conflict=Func01.");
-                    return;
-                }
                 TMP_Text donor = __instance.GetComponentsInChildren<TMP_Text>(true)
                     .FirstOrDefault(label => label != null && label.font != null);
                 if (donor == null) throw new InvalidOperationException("Native controller menu text is unavailable.");
                 hint = ControllerRoutineView.EntryHint(__instance.transform, donor);
                 BaseGameMenuView view = __instance;
                 InputLayer entryLayer = __result;
-                __result.AddButton(_ =>
+                bool installed = Entries.Ensure(entryLayer, (List<BindDescription>)_binds.GetValue(entryLayer),
+                    bind => bind.ActionId == RewiredConsts.Action.Func01, alive =>
                 {
-                    if (!_enabled || !Application.isFocused || view == null || !view.gameObject.activeInHierarchy ||
-                        !GamePad.HasInstance || GamePad.Instance.CurrentInputLayer != entryLayer ||
-                        GamePad.Instance.Player.controllers.joystickCount == 0) return;
-                    BuffPlannerUiRoot.OpenControllerRoutines(view, donor);
-                }, RewiredConsts.Action.Func01, InputActionEventType.ButtonJustPressed, false, false);
+                    InputBindStruct registration = entryLayer.AddButton(_ =>
+                    {
+                        if (!alive() || !_enabled || !Application.isFocused || view == null || !view.gameObject.activeInHierarchy ||
+                            !GamePad.HasInstance || GamePad.Instance.CurrentInputLayer != entryLayer ||
+                            GamePad.Instance.Player.controllers.joystickCount == 0) return;
+                        BuffPlannerUiRoot.OpenControllerRoutines(view, donor);
+                    }, RewiredConsts.Action.Func01, InputActionEventType.ButtonJustPressed, false, false);
+                    return registration.Binds.ToArray();
+                });
+                if (!installed)
+                {
+                    UnityEngine.Object.Destroy(hint);
+                    _log.Info("[KBP-CONTROLLER] entry unavailable;native-menu-action-conflict=Func01.");
+                    return;
+                }
+                EntryLayers[view] = entryLayer;
                 Hints.Add(view, hint);
             }
             catch (Exception exception)
             {
                 if (hint != null) UnityEngine.Object.Destroy(hint);
+                try { RemoveEntry(__instance); }
+                catch (Exception cleanup) { _log.Error("[KBP-CONTROLLER] entry cleanup failed.", cleanup); }
                 _log.Error("[KBP-CONTROLLER] native entry unavailable;mouse routes remain available.", exception);
+            }
+        }
+
+        private static void RemoveEntry(BaseGameMenuView view)
+        {
+            InputLayer layer;
+            if (EntryLayers.TryGetValue(view, out layer)) Entries.Remove(layer);
+            EntryLayers.Remove(view);
+            GameObject hint;
+            if (Hints.TryGetValue(view, out hint) && hint != null) UnityEngine.Object.Destroy(hint);
+            Hints.Remove(view);
+        }
+
+        private static void DetachEntry(InputLayer layer, BindDescription binding)
+        {
+            // AddButton has no disposable/remove API in 2.1.7b. Mirror its
+            // verified Rewired unbind, but never unbind/rebind the whole layer
+            // or clear an action slot a newer foreign binding now owns.
+            binding.ActionHandler = _ => { };
+            try
+            {
+                if (binding.Bound && GamePad.HasInstance)
+                {
+                    var handler = (Action<InputActionEventData>)Delegate.CreateDelegate(
+                        typeof(Action<InputActionEventData>), binding, _dispatch);
+                    GamePad.Instance.Player.RemoveInputEventDelegate(handler, UpdateLoopType.Update,
+                        binding.EventType, binding.ActionId);
+                }
+                binding.Bound = false;
+            }
+            finally
+            {
+                ((List<BindDescription>)_binds.GetValue(layer)).RemoveAll(candidate => ReferenceEquals(candidate, binding));
+                var actions = (Dictionary<int, BindDescription>)_actionsUsed.GetValue(layer);
+                BindDescription current;
+                if (actions.TryGetValue(binding.ActionId, out current) && ReferenceEquals(current, binding))
+                    actions.Remove(binding.ActionId);
             }
         }
 
@@ -127,15 +182,23 @@ namespace KingmakerBuffPlanner.UI
 
         internal static void Uninstall()
         {
-            SetEnabled(false);
-            foreach (GameObject hint in Hints.Values) if (hint != null) UnityEngine.Object.Destroy(hint);
-            Hints.Clear();
-            if (_harmony != null)
+            try
             {
-                if (_getLayer != null) _harmony.Unpatch(_getLayer, HarmonyPatchType.Postfix, HarmonyId);
-                if (_dispatch != null) _harmony.Unpatch(_dispatch, HarmonyPatchType.Prefix, HarmonyId);
+                try { SetEnabled(false); }
+                finally { Entries.Clear(); }
             }
-            _harmony = null;
+            finally
+            {
+                foreach (GameObject hint in Hints.Values) if (hint != null) UnityEngine.Object.Destroy(hint);
+                Hints.Clear();
+                EntryLayers.Clear();
+                if (_harmony != null)
+                {
+                    if (_getLayer != null) _harmony.Unpatch(_getLayer, HarmonyPatchType.Postfix, HarmonyId);
+                    if (_dispatch != null) _harmony.Unpatch(_dispatch, HarmonyPatchType.Prefix, HarmonyId);
+                }
+                _harmony = null;
+            }
         }
     }
 }

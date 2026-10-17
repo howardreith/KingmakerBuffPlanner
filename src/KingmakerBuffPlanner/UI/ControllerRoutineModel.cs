@@ -80,6 +80,16 @@ namespace KingmakerBuffPlanner.UI
             if (session != null && session.PersistenceBlocked)
                 Message = "The saved plan could not be loaded: " + session.LoadWarning +
                     ". Use the mouse/keyboard editor's recovery controls, then return here.";
+            if (session != null)
+            {
+                string saveProblem = WorkspaceFooterText.SaveProblem(session.FooterSaveState);
+                if (saveProblem != null)
+                    Message = saveProblem + "\n" + (session.PersistenceBlocked ? Message :
+                        session.LoadWarning + "\nUse the mouse/keyboard editor's recovery controls, then return here.") +
+                        (session.LegacyImportBlocked ? "\n" + session.LegacyImportBlockReason : string.Empty);
+                string latest = ControllerRoutineDetails.LatestOutcome(session);
+                if (latest != null) Message = latest;
+            }
             if (Running) Focus = 3;
         }
 
@@ -96,7 +106,8 @@ namespace KingmakerBuffPlanner.UI
                 if (_session == null) return _unavailable ?? "No saved plan is available.";
                 return (_session.ExecutionMode == "instant" ? "Instant" : "Animated") + " | " +
                     (_session.AvailabilityPolicy == ExecutionProfile.CastAvailable
-                        ? "Cast available" : "Require full plan") + " | " + _session.AutosaveStatus;
+                        ? "Cast available" : "Require full plan") + " | " +
+                    WorkspaceFooterText.SaveStatus(_session.FooterSaveState);
             }
         }
 
@@ -148,6 +159,18 @@ namespace KingmakerBuffPlanner.UI
 
     internal static class ControllerRoutineDetails
     {
+        private const string RepairNote = "\nPlan repair uses the mouse/keyboard editor. Back returns to the game. " +
+            "Use the editor's Retry save/Reload controls when needed.";
+
+        internal static string LatestOutcome(CastingWorkspaceSession session)
+        {
+            // The session keeps a newer refused attempt alongside the prior
+            // completed report, and clears that message on later completion.
+            if (!string.IsNullOrEmpty(session.LastAttemptMessage))
+                return session.LastAttemptMessage + RepairNote;
+            return session.LastRunReport == null ? null : Report(session.LastRunReport, session);
+        }
+
         internal static string Report(CastingRunReport report, CastingWorkspaceSession session)
         {
             Func<string, string> label = session == null ? (Func<string, string>)(id => id) : session.CastingLabel;
@@ -162,8 +185,7 @@ namespace KingmakerBuffPlanner.UI
             return summary + "\n\n" + string.Join("\n", result.BlockingCastings.Select(blocker =>
                 session.CastingLabel(blocker.CastingId) + ": " +
                 string.Join("; ", blocker.Reasons.Select(WorkspaceReasonText.Describe).ToArray())).ToArray()) +
-                "\nPlan repair uses the mouse/keyboard editor. Back returns to the game. " +
-                "Use the editor's Retry save/Reload controls when needed.";
+                RepairNote;
         }
     }
 }

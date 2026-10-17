@@ -19,6 +19,8 @@ namespace KingmakerBuffPlanner.Tests
         {
             Run("controller-input-neutral-edges-and-transition-frames", TestControllerActivationLatch);
             Run("controller-input-owned-bindings-and-native-takeover", TestControllerLayerOwnership);
+            Run("controller-entry-retained-layer-unload-reinstall", TestControllerEntryLifecycle);
+            Run("controller-entry-native-detach-keeps-foreign-bindings", TestControllerNativeDetach);
             Run("controller-native-assembly-entry-and-stack-contracts", TestControllerNativeContracts);
             Run("controller-cold-saved-session-selects-each-routine", () => TestControllerColdSession(root));
             Run("controller-browsing-is-read-only", () => TestControllerBrowsing(root));
@@ -29,6 +31,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("controller-results-include-omissions-and-refusal-details", () => TestControllerDetails(root));
             Run("controller-unavailable-session-is-explained", TestControllerUnavailable);
             Run("controller-unreadable-profile-refuses-without-overwrite", () => TestControllerCorruptPlan(root));
+            Run("controller-persistence-presentation-before-run", () => TestControllerPersistencePresentation(root));
+            Run("controller-latest-refusal-survives-reconstruction", () => TestControllerLatestOutcome(root));
             Run("controller-production-entry-does-not-construct-editor", TestControllerProductionWiring);
         }
 
@@ -110,6 +114,108 @@ namespace KingmakerBuffPlanner.Tests
                 position += size;
             }
             return calls.ToArray();
+        }
+
+        private sealed class ControllerEntryBinding
+        {
+            internal int Action;
+            internal Action Callback;
+        }
+
+        private static void TestControllerEntryLifecycle()
+        {
+            var layer = new object();
+            var native = new ControllerEntryBinding { Action = 1, Callback = () => { } };
+            var thirdParty = new ControllerEntryBinding { Action = 2, Callback = () => { } };
+            var bindings = new List<ControllerEntryBinding> { native, thirdParty };
+            var device = new List<ControllerEntryBinding>(bindings);
+            int opens = 0, registrations = 0, removals = 0;
+            var registry = new ControllerEntryRegistry<object, ControllerEntryBinding>((ownedLayer, binding) =>
+            {
+                Assert(ReferenceEquals(ownedLayer, layer));
+                removals++;
+                bindings.Remove(binding);
+                device.Remove(binding);
+            });
+            Func<Func<bool>, ControllerEntryBinding[]> register = alive =>
+            {
+                registrations++;
+                var binding = new ControllerEntryBinding { Action = 7, Callback = () => { if (alive()) opens++; } };
+                bindings.Add(binding);
+                device.Add(binding);
+                return new[] { binding };
+            };
+            Func<bool> install = () => registry.Ensure(layer, bindings, b => b.Action == 7, register);
+            Assert(install() && install() && registrations == 1);
+            ControllerEntryBinding old = bindings.Last();
+            old.Callback();
+            Assert(opens == 1);
+            registry.Clear();
+            registry.Clear();
+            old.Callback(); // a captured/in-flight callback also cannot reopen
+            Assert(opens == 1 && removals == 1 && bindings.SequenceEqual(new[] { native, thirdParty }) &&
+                device.SequenceEqual(bindings));
+            Assert(install() && install() && registrations == 2);
+            device.Last().Callback();
+            Assert(opens == 2 && !device.Contains(old));
+            // A later third-party binding on the same action must survive
+            // unload, and must be recognized as an external conflict after it.
+            var conflicting = new ControllerEntryBinding { Action = 7, Callback = () => { } };
+            bindings.Add(conflicting);
+            device.Add(conflicting);
+            Assert(!install());
+            registry.Clear();
+            Assert(bindings.SequenceEqual(new[] { native, thirdParty, conflicting }) && device.SequenceEqual(bindings));
+            Assert(!install() && registrations == 2 && removals == 2);
+        }
+
+        private sealed class ControllerNativeCallback
+        {
+            internal int Calls;
+            public void Receive<T>(T data) { Calls++; }
+        }
+
+        private static void TestControllerNativeDetach()
+        {
+            // Execute the production collection/callback cleanup on actual
+            // installed native layer/binding types. The layer is unbound:
+            // detached inspection cannot provide a live Rewired Player.
+            string game = Environment.GetEnvironmentVariable("KBP_TEST_GAME_PATH");
+            Assembly.LoadFrom(Path.Combine(game, "Kingmaker_Data", "Managed", "UnityModManager", "0Harmony12.dll"));
+            Assembly native = Assembly.LoadFrom(Path.Combine(game, "Kingmaker_Data", "Managed", "Assembly-CSharp.dll"));
+            Assembly product = Assembly.LoadFrom(Path.Combine(FindRepositoryRoot(), "artifacts", "build", "Release", "KingmakerBuffPlanner.dll"));
+            Type adapter = product.GetType("KingmakerBuffPlanner.UI.ControllerRoutineIntegration", true);
+            Type layerType = native.GetType("Kingmaker.Assets.Console.GamepadInput.InputLayer", true);
+            Type bindingType = native.GetType("Kingmaker.Assets.Console.GamepadInput.BindDescription", true);
+            const BindingFlags instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            const BindingFlags statics = BindingFlags.Static | BindingFlags.NonPublic;
+            FieldInfo bindsField = layerType.GetField("m_Binds", instance);
+            FieldInfo actionsField = layerType.GetField("m_ActionsUsed", instance);
+            adapter.GetField("_binds", statics).SetValue(null, bindsField);
+            adapter.GetField("_actionsUsed", statics).SetValue(null, actionsField);
+            object layer = Activator.CreateInstance(layerType);
+            var bindings = (System.Collections.IList)bindsField.GetValue(layer);
+            var actions = (System.Collections.IDictionary)actionsField.GetValue(layer);
+            object owned = Activator.CreateInstance(bindingType), foreign = Activator.CreateInstance(bindingType);
+            bindings.Add(owned);
+            bindings.Add(foreign);
+            bindingType.GetField("ActionId").SetValue(owned, 7);
+            actions.Add(7, foreign); // newer owner, same action: do not clear it
+            FieldInfo callbackField = bindingType.GetField("ActionHandler");
+            Type dataType = callbackField.FieldType.GetGenericArguments().Single();
+            var callback = new ControllerNativeCallback();
+            Delegate handler = Delegate.CreateDelegate(callbackField.FieldType, callback,
+                typeof(ControllerNativeCallback).GetMethod("Receive").MakeGenericMethod(dataType));
+            callbackField.SetValue(owned, handler);
+            object data = dataType.IsValueType ? Activator.CreateInstance(dataType) : null;
+            handler.DynamicInvoke(data);
+            Assert(callback.Calls == 1);
+            MethodInfo detach = adapter.GetMethod("DetachEntry", statics);
+            detach.Invoke(null, new[] { layer, owned });
+            detach.Invoke(null, new[] { layer, owned });
+            Assert(bindings.Count == 1 && ReferenceEquals(bindings[0], foreign) && ReferenceEquals(actions[7], foreign));
+            ((Delegate)callbackField.GetValue(owned)).DynamicInvoke(data);
+            Assert(callback.Calls == 1);
         }
 
         private static void TestControllerNativeContracts()
@@ -208,8 +314,11 @@ namespace KingmakerBuffPlanner.Tests
                 FreshReads++;
                 LastApply = CastingRunPolicy.Apply(Session, null, routine, Inputs);
                 if (!LastApply.Allowed)
-                    Menu.ShowResult(ControllerRoutineDetails.Refusal(CastingRunPresentation.DescribeRefusal(
-                        Session.RoutineDisplayName(routine), LastApply, Session), LastApply, Session));
+                {
+                    string refusal = CastingRunPresentation.DescribeRefusal(Session.RoutineDisplayName(routine), LastApply, Session);
+                    Session.RecordAttempt(refusal);
+                    Menu.ShowResult(ControllerRoutineDetails.Refusal(refusal, LastApply, Session));
+                }
                 return true;
             }
 
@@ -412,6 +521,77 @@ namespace KingmakerBuffPlanner.Tests
             menu.Confirm();
             Assert(!result.Allowed && boundary.RecordedSubmissions.Count == 0 && File.ReadAllText(path) == bytes);
             Assert(menu.Message.Contains("mouse/keyboard editor"));
+        }
+
+        private static ControllerRoutineModel ReopenController(ControllerFixture fixture)
+        {
+            return new ControllerRoutineModel(fixture.Session, null, _ => false, () => { },
+                () => fixture.Host.IsRunning, () => fixture.Host.ActiveScopeRoutineId);
+        }
+
+        private static void TestControllerLatestOutcome(string root)
+        {
+            var fixture = new ControllerFixture(root, "latest-outcome");
+            fixture.Menu.Confirm();
+            fixture.Pump();
+            CastingRunReport first = fixture.Session.LastRunReport;
+            string success = ControllerRoutineDetails.Report(first, fixture.Session);
+            // Model reconstruction is the real presentation used on reopen,
+            // not a test-only call to ShowResult.
+            Assert(ReopenController(fixture).Message == success);
+            fixture.Menu.Move(1); // completed Run left focus on Stop; select Long again
+            fixture.Inputs = PolicyInputs(fixture.Inputs, true);
+            fixture.Menu.Confirm();
+            Assert(!fixture.LastApply.Allowed);
+            string refusal = CastingRunPresentation.DescribeRefusal("Long", fixture.LastApply, fixture.Session);
+            Assert(fixture.Session.LastAttemptMessage == refusal);
+            var reopened = ReopenController(fixture);
+            Assert(ReferenceEquals(fixture.Session.LastRunReport, first));
+            Assert(reopened.Message.Contains(refusal) && reopened.Message != success &&
+                reopened.Message.Contains("mouse/keyboard editor"));
+            fixture.Inputs = PolicyInputs(fixture.Inputs, false);
+            fixture.Menu.Confirm();
+            fixture.Pump();
+            Assert(fixture.Session.LastAttemptMessage == null && !ReferenceEquals(first, fixture.Session.LastRunReport));
+            Assert(ReopenController(fixture).Message ==
+                ControllerRoutineDetails.Report(fixture.Session.LastRunReport, fixture.Session));
+        }
+
+        private static void TestControllerPersistencePresentation(string root)
+        {
+            foreach (string state in new[] { "corrupt", "unsupported", "legacy-unresolved", "backup" })
+            {
+                string dir = Path.Combine(root, "controller-persistence-" + state);
+                var repository = new CastingPlanRepository(dir);
+                const string campaign = "controller-persistence";
+                string path = state == "legacy-unresolved"
+                    ? new ProfileRepository(dir).GetProfilePath(campaign) : repository.GetProfilePath(campaign);
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                if (state == "backup")
+                {
+                    repository.Save(CastingPlanProfile.FromDocument(new CastingPlanDocument(campaign,
+                        new[] { new RoutineDefinition("long", "Long") }, new PlannedCasting[0])));
+                    File.Copy(path, path + ".bak1");
+                }
+                File.WriteAllText(path, state == "unsupported" ? "{\"schemaVersion\":999}" : "{ unreadable owned fixture");
+                var session = new CastingWorkspaceSession(dir, campaign, new DisabledCastingDispatchBoundary());
+                Assert(session.SavesRefused);
+                if (state == "legacy-unresolved") Assert(session.LegacyImportBlocked);
+                if (state == "backup") Assert(session.LoadStatus == CastingPlanLoadStatus.RecoveredFromBackup);
+                string[] files = Directory.GetFiles(dir, "*", SearchOption.AllDirectories).OrderBy(p => p).ToArray();
+                string[] contents = files.Select(File.ReadAllText).ToArray();
+                DateTime[] writes = files.Select(File.GetLastWriteTimeUtc).ToArray();
+                var menu = new ControllerRoutineModel(session, null, _ => { throw new Exception("Unexpected Run"); },
+                    () => { throw new Exception("Unexpected Stop"); }, () => false, () => null);
+                for (int i = 0; i < 12; i++)
+                {
+                    menu.Move(1);
+                    Assert(menu.Settings.EndsWith(" | Not saved", StringComparison.Ordinal));
+                    Assert(menu.Message.Contains(WorkspaceFooterText.SaveProblem(session.FooterSaveState)));
+                }
+                Assert(files.SequenceEqual(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).OrderBy(p => p)));
+                Assert(contents.SequenceEqual(files.Select(File.ReadAllText)) && writes.SequenceEqual(files.Select(File.GetLastWriteTimeUtc)));
+            }
         }
     }
 }

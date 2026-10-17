@@ -1,5 +1,23 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17 PR review corrections
+
+Intake `0539c081db0a6c75d57e5df95805900686e6e2fb`, clean
+`codex/kingmaker-buff-planner-controller-ui`, version 0.5.2-controller.1.
+Fixed all three reported P2s: owned entry detach/idempotence; authoritative
+persistence header/explanations; latest refusal over historical success.
+17 controller + 26 neighbors passed 43/0 via the exact Test-Development command
+in [review receipt](docs/CONTROLLER-UI-REVIEW-FIXES.md), source43/build1/test
+compile passed; 6.3 s reported / 6.5082444 s child wall. Failed reproductions
+and intermediate correction logs remain, not relabeled. Detached actual-native
+cleanup is exercised; live input subscription/handoff remains unproved.
+Original frozen product `d04c1a7` and its package are untouched, historical and
+not the next live candidate. Next: commit corrections, non-destructively merge
+current main `dcf718f` preserving 0.5.3 branding/license/publisher changes,
+validate affected integration and identify a distinct candidate. Then inspect
+the guarded entry/exit-only route and its budget before any live action.
+PR remains draft; full editor deferred; no game or installation interaction.
+
 ## 2026-10-17 owner-requested draft PR preparation
 
 The owner explicitly requested a PR after local candidate delivery. This permits

@@ -1734,8 +1734,6 @@ namespace KingmakerBuffPlanner.UI
                 // Own the usable controller surface before closing the native
                 // menu. PopLayer removes that older middle layer by identity.
                 ControllerRoutineIntegration.CloseNativeMenu(nativeMenu);
-                if (session != null && session.LastRunReport != null)
-                    root._controllerRoutines.ShowResult(ControllerRoutineDetails.Report(session.LastRunReport, session));
             }
             catch (Exception exception)
             {

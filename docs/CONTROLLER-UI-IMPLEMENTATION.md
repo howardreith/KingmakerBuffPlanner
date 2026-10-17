@@ -1,5 +1,8 @@
 # Controller execution implementation
 
+PR review follow-up: [three corrected defects and their regressions](CONTROLLER-UI-REVIEW-FIXES.md).
+The original candidate identities below are historical, not builds of the fixes.
+
 October 17, 2026; execution-first revision 2 of the
 [owner mission](../planning/KBP-CONTROLLER-UI-MISSION.md). Controller execution
 is implemented with qualification gaps. Full controller editing is deferred.

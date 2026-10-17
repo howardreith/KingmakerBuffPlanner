@@ -312,6 +312,7 @@
     <Compile Include="UI\PlannerNativeTheme.cs" />
     <Compile Include="UI\ControllerRoutineModel.cs" />
     <Compile Include="UI\ControllerLayerOwnership.cs" />
+    <Compile Include="UI\ControllerEntryRegistry.cs" />
     <Compile Include="UI\ControllerRoutineView.cs" />
     <Compile Include="UI\ControllerRoutineMenu.cs" />
     <Compile Include="UI\ControllerRoutineIntegration.cs" />
