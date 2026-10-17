@@ -1451,7 +1451,11 @@ namespace KingmakerBuffPlanner.Tests
                 "_session.SetFocusedTargeting(CastingTargetMode.CasterCenteredOrigin, null, null, null)",
                 "ActionButton(\"FocusedSingle.\" + unit, \"Single target: \" + target.DisplayName",
                 "_session.SetFocusedTargeting(CastingTargetMode.DirectTarget, unit, null, null)",
-                "WorkspaceFooterText.WholePlan(view.OnePassShortCount);"
+                // Human-feedback 0.5.1 moved the one-pass shortfall from the
+                // retired Resources body into the footer run status (the
+                // Resources dialog shows it under "All routines - no rest").
+                "return WorkspaceFooterText.RunStatus(_session.DispatchDisposition, view.SelectedRoutineName, " +
+                    "view.RoutineCastingCount, allowed, executable, notReady, otherBlock, view.OnePassShortCount,"
             })
                 if (!view.Contains(CollapsedWhitespace(wiring)))
                     throw new InvalidOperationException("The focused editor has no control for: " + wiring);
@@ -2819,7 +2823,9 @@ namespace KingmakerBuffPlanner.Tests
             {
                 "if (CastingFirstActive)\r\n                return StartCastingFirstRoutine(routineId, completed, null);",
                 "if (CastingFirstActive)\r\n                return StartCastingFirstRoutine(routineId, completed,\r\n                    CastingApplyMode.ReadyCastsOnly);",
-                "CastingApplyMode mode = requestedMode ?? session.ApplyMode;",
+                // Human-feedback rc3 routes the remembered policy through
+                // CastingRunPolicy.Resolve (its body is pinned below).
+                "CastingApplyMode mode = CastingRunPolicy.Resolve(session, requestedMode);",
                 "if (CastingFirstActive)\r\n                return OpenCastingWorkspace();",
                 "try { _castingHost.Pump(); }",
                 "_instance._castingHost.Shutdown(\"mod-disabled\");",
@@ -2840,6 +2846,9 @@ namespace KingmakerBuffPlanner.Tests
                 if (rootUi.Replace("\r\n", "\n").IndexOf(fragment.Replace("\r\n", "\n"),
                         StringComparison.Ordinal) < 0)
                     throw new InvalidOperationException("UI root wiring missing: " + fragment);
+            if (source(Path.Combine("UI", "CastingRunPresentation.cs")).IndexOf(
+                    "return requestedMode ?? session.ApplyMode;", StringComparison.Ordinal) < 0)
+                throw new InvalidOperationException("The run policy no longer defaults to the remembered apply mode.");
             if (rootUi.Contains("UIUtility.SendWarning") || rootUi.Contains("ExecuteLegacyRoutine"))
                 throw new InvalidOperationException("A floating result or legacy route came back.");
             // The classic routine execution refuses under the session lock

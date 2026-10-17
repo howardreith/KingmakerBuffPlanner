@@ -1,8 +1,8 @@
 {
   "Id": "KingmakerBuffPlanner",
-  "DisplayName": "Kingmaker Buff Planner",
-  "Author": "Howie Reith",
-  "Version": "0.5.2-controller.1",
+  "DisplayName": "Mr. Bard's Kingmaker Buff Planner",
+  "Author": "Mr. Bard",
+  "Version": "0.5.4-controller.1",
   "ManagerVersion": "0.28.2",
   "GameVersion": "2.1.7",
   "AssemblyName": "KingmakerBuffPlanner.dll",

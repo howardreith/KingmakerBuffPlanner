@@ -1,3 +1,14 @@
+## Stable 0.5.2 publication - October 14, 2026
+
+On explicit owner authorization, the human-feedback branch was merged into
+remote `main` at `a94e0e586685f8577d32357f289090bc28f1148b` and published as
+public, non-prerelease, Latest `v0.5.2`. The owner selected minimal release
+testing, so deterministic build/package and independent download validation
+were run while the broad source-only/purity/game campaign was not. Runtime
+limits remain exactly disclosed in the
+[release receipt](../docs/evidence/release-0.5.2-receipt.md). No game, install,
+Mods or save mutation occurred.
+
 ## Human-feedback rc5 preparation and selected-prerequisite failure - October 14, 2026
 
 Exact frozen product `ec3d5f865707e540b00fccabd3f1a98f04aa3095`, version

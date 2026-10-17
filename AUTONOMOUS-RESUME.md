@@ -7,9 +7,11 @@
 > native/physical qualification is pending. Full controller editor is DEFERRED,
 > not an execution acceptance gate. Do not resume older runtime/push/publication
 > campaigns below. The owner's subsequent October 17 request authorizes pushing
-> this feature branch and opening a draft PR only; merge, release and permanent
-> installation remain unauthorized. Preserve the frozen candidate while reviewing
-> integration with main's later 0.5.3 branding/licensing changes. Preserved source milestone
+> this feature branch and opening a draft PR. The subsequent review requested
+> the three corrections and main integration; default-branch merge, release and
+> permanent installation remain unauthorized. Review fixes are recorded in the
+> [correction receipt](docs/CONTROLLER-UI-REVIEW-FIXES.md). The integrated local
+> candidate is 0.5.4-controller.1, not a relabeling of the preserved source milestone
 > `afa108f1fd2cc76f49f466c62bd1572f31663d15`; frozen product
 > `d04c1a781770194966fa55df15000d627e14662d`, 0.5.2-controller.1, focused
 > 38/0 and two-build deterministic package PASS. Exact artifacts/hashes/MVID:
@@ -17,6 +19,19 @@
 > Next is owner source/candidate review, then scoped guarded controller protocol
 > preparation and an exclusive budgeted live session; do not deploy an old mouse
 > scenario or rebuild later documentation HEAD over the frozen artifact.
+>
+> **Current October 14 stable release:** the owner accepted the
+> human-feedback candidate for full ordinary testing, selected minimal release
+> checks, and authorized default-branch integration and a full release. Stable
+> `v0.5.2` is public, non-prerelease and GitHub Latest at release commit
+> `a94e0e586685f8577d32357f289090bc28f1148b`. ZIP SHA-256
+> `84dd4b6cfabb84664029d53af0be0740b982dda6f1d800a230ac81d185290d70`;
+> DLL `8c6f6a4198de826a886111f64d33b17683173e8bb979164bf63be12d21f19e82`;
+> MVID `4a2c100a-2b5d-400e-8251-3560f7a3e616`. Deterministic release builds and
+> independent download/package verification pass. The broad source-only/purity/
+> game campaign was deliberately not rerun; the retained rc5 pre-launch display
+> failure and runtime limits remain. Exact record:
+> [0.5.2 release receipt](docs/evidence/release-0.5.2-receipt.md).
 >
 > **Current October 14 human-feedback resume:** exact frozen rc5 product
 > `ec3d5f865707e540b00fccabd3f1a98f04aa3095`, version 0.5.1-rc5; ZIP

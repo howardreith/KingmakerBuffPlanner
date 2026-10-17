@@ -197,7 +197,7 @@ namespace KingmakerBuffPlanner
             try
             {
                 _lastSnapshot = BuffPlannerUiRoot.GetSnapshot();
-                GUILayout.Label("Kingmaker Buff Planner bootstrap diagnostics");
+                GUILayout.Label("Mr. Bard's Kingmaker Buff Planner bootstrap diagnostics");
                 GUILayout.TextArea(_lastSnapshot, GUILayout.MinHeight(100f));
                 if (GUILayout.Button("Log bootstrap snapshot"))
                     _log.Info("[KBP-BOOT] snapshot;" + _lastSnapshot);

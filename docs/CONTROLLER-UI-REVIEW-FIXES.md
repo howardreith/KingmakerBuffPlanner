@@ -61,6 +61,16 @@ reviewed defects and is not the next live candidate. These fixes need their own
 post-integration product/artifact identity; no build is relabeled as the old ZIP.
 Resolve the fix checkpoint through this document's introducing commit.
 
+Current main `dcf718fd7b70cf453dd25aa693fefc6aa503d826` is integrated without
+rewriting either history. Its branding, MIT license, publisher/build-order fixes,
+release receipts and corrected wiring fixtures are preserved. Local candidate
+metadata is now **0.5.4-controller.1 / CLR 0.5.4.0**, distinct from both stable
+0.5.3 and the old candidate. The integration selection adds
+`focused-casting-routine-order-and-recast,production-execution-wiring-and-session-lock`
+to the command above: **45/0**, source47/build1, successful test build; 6.4 s
+reported / 6.680194 s child wall, `review-main-integration.log`. This is still
+source evidence, not a frozen-package or native run receipt.
+
 First native observation must be entry/exit only: fresh controller startup,
 native campaign menu -> planner, older native menu closes while planner stays
 visible/current, navigate without running, Back and neutral, normal gameplay

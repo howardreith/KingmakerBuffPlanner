@@ -11,6 +11,18 @@
 > `d04c1a781770194966fa55df15000d627e14662d`, version 0.5.2-controller.1,
 > focused 38/0 with deterministic validated ZIP; packaging is not blocked.
 > [Identity/commands](docs/CONTROLLER-UI-CANDIDATE-0.5.2-CONTROLLER.1.md).
+> The reviewed defects have source fixes and regressions; the original ZIP is
+> historical, not the next live candidate. Main integration uses distinct local
+> candidate 0.5.4-controller.1. Native entry/exit handoff must pass before casts.
+>
+> **Current October 14 release status:** no release-engineering blocker remains.
+> Stable `v0.5.2` is merged, public, non-prerelease, Latest, checksummed and
+> independently downloaded/validated. At the owner's explicit request the
+> multi-hour aggregate and game campaign were not rerun. Ordinary owner testing
+> therefore remains the evidence path for the new Resources, assignment,
+> permissive-policy execution and populated-plan latency behavior; it is a
+> disclosed qualification limit, not a publication blocker. See the
+> [0.5.2 release receipt](docs/evidence/release-0.5.2-receipt.md).
 >
 > **Current October 14 rc5 blocker:** independently actionable source, focused
 > regression, package, freeze and cleanup work is complete. The selected first

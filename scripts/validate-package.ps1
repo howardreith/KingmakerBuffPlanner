@@ -16,6 +16,7 @@ try {
     $expected = @(
         'KingmakerBuffPlanner/Info.json',
         'KingmakerBuffPlanner/KingmakerBuffPlanner.dll',
+        'KingmakerBuffPlanner/LICENSE',
         'KingmakerBuffPlanner/NativeEffectOverrides.json',
         'KingmakerBuffPlanner/THIRD-PARTY-NOTICES.md') | Sort-Object
     if (($actual -join "`n") -cne ($expected -join "`n")) {
@@ -43,8 +44,19 @@ try {
         $info.Version -cne (Get-KbpVersion)) {
         throw 'Package identity/version validation failed.'
     }
+    # Installing over an earlier release depends on the unchanged loader
+    # identity; the public UMM listing shows the branded name and author.
+    if ($info.EntryMethod -cne 'KingmakerBuffPlanner.Main.Load' -or
+        $info.DisplayName -cne "Mr. Bard's Kingmaker Buff Planner" -or
+        $info.Author -cne 'Mr. Bard') {
+        throw 'Package entry point or public UMM metadata validation failed.'
+    }
+    # The installable package carries the repository's MIT license verbatim.
+    if ((Get-KbpSha256 (Join-Path $mod 'LICENSE')) -cne (Get-KbpSha256 (Join-Path $root 'LICENSE'))) {
+        throw 'Packaged LICENSE does not match the repository LICENSE.'
+    }
 }
 finally {
     if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Recurse -Force }
 }
-Write-Host "Package validation: PASS=4 FAIL=0 sha256=$(Get-KbpSha256 $package)"
+Write-Host "Package validation: PASS=6 FAIL=0 sha256=$(Get-KbpSha256 $package)"
