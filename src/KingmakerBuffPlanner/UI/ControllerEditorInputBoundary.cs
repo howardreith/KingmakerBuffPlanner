@@ -22,6 +22,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Action _back;
         private readonly ControllerActivationLatch _latch = new ControllerActivationLatch();
         private InputLayer _layer;
+        private GamePad _pad;
         private ControllerLayerOwnership _ownership;
         private EventSystem _events;
         private RewiredStandaloneInputModule _module;
@@ -39,7 +40,7 @@ namespace KingmakerBuffPlanner.UI
         private object _area;
         private object _ui;
         private List<Action> _modeQueue;
-        private Action _pendingStart;
+        private ControllerQueuedModeAction _pendingStart;
         private int _modeWaitFrames;
         private static readonly FieldInfo ModeQueue = typeof(Game).GetField("m_BeforeTickActions",
             BindingFlags.Instance | BindingFlags.NonPublic);
@@ -55,6 +56,7 @@ namespace KingmakerBuffPlanner.UI
                 !GamePad.HasInstance || EventSystem.current == null)
                 throw new InvalidOperationException("Controller campaign input is not ready.");
             _events = EventSystem.current;
+            _pad = GamePad.Instance;
             _module = _events.currentInputModule as RewiredStandaloneInputModule;
             if (_module == null) throw new InvalidOperationException("The native Rewired mouse input module is unavailable.");
             _campaign = game.Player.GameId;
@@ -80,9 +82,9 @@ namespace KingmakerBuffPlanner.UI
                 {
                     if (Valid && _latch.Take(Time.frameCount)) _backPending = true;
                 }, RewiredConsts.Action.Decline, InputActionEventType.ButtonJustPressed, false, false);
-                _ownership = new ControllerLayerOwnership(_layer, () => GamePad.Instance.CurrentInputLayer, back.Binds);
+                _ownership = new ControllerLayerOwnership(_layer, () => _pad.CurrentInputLayer, back.Binds);
                 Active = this;
-                _ownership.Acquired(GamePad.Instance.PushLayer(_layer));
+                _ownership.Acquired(_pad.PushLayer(_layer));
                 _module.allowMouseInput = false;
                 _module.PlayerMice = new List<PlayerMouse>();
                 _ownedMice = _module.PlayerMice; // native setter copies the list
@@ -92,7 +94,8 @@ namespace KingmakerBuffPlanner.UI
                 Cursor.visible = true;
                 var before = new HashSet<Action>(_modeQueue);
                 Game.Instance.StartMode(GameModeType.FullScreenUi);
-                _pendingStart = _modeQueue.FirstOrDefault(action => !before.Contains(action) && action.Method.Name.Contains("<StartMode>"));
+                Action queuedStart = _modeQueue.FirstOrDefault(action => !before.Contains(action) && action.Method.Name.Contains("<StartMode>"));
+                if (queuedStart != null) _pendingStart = new ControllerQueuedModeAction(_modeQueue, queuedStart);
                 _modeOwned = true;
                 if (_pendingStart == null && Game.Instance.CurrentMode != GameModeType.FullScreenUi)
                     throw new InvalidOperationException("The native fullscreen mode request was refused.");
@@ -111,8 +114,8 @@ namespace KingmakerBuffPlanner.UI
                     ReferenceEquals(game.RootUiContext.InGameUiContext, _ui) &&
                     (game.CurrentMode == GameModeType.FullScreenUi ||
                         (game.CurrentMode == GameModeType.Default && _pendingStart != null &&
-                         _modeQueue.Contains(_pendingStart) && _modeWaitFrames < 120)) &&
-                    _ownership != null && _ownership.IsCurrent &&
+                         _pendingStart.Pending && _modeWaitFrames < 120)) &&
+                    _ownership != null && GamePad.HasInstance && ReferenceEquals(GamePad.Instance, _pad) && _ownership.IsCurrent &&
                     EventSystem.current == _events && _module != null && _module.isActiveAndEnabled &&
                     GamePad.Instance.Player.controllers.joystickCount > 0;
             }
@@ -146,25 +149,51 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_restored) return;
             _restored = true;
-            bool current = _ownership != null && _ownership.IsCurrent;
+            bool current = _ownership != null && GamePad.HasInstance && ReferenceEquals(GamePad.Instance, _pad) && _ownership.IsCurrent;
             if (Active == this) Active = null;
             try
             {
+                try
+                {
                 if (_module != null && _ownedMice != null && ReferenceEquals(_module.PlayerMice, _ownedMice) && _ownedMice.Count == 0)
                 {
                     _module.PlayerMice = _previousMice;
                     if (_module.allowMouseInput == _armed) _module.allowMouseInput = _mouseAllowed;
                 }
                 if (_events != null && !_events.sendNavigationEvents) _events.sendNavigationEvents = _navigation;
+                }
+                finally
+                {
+                    try
+                    {
                 if (current)
                 {
                     if (Cursor.lockState == CursorLockMode.None) Cursor.lockState = _cursorLock;
                     if (Cursor.visible) Cursor.visible = _cursorVisible;
                 }
+                    }
+                    finally { ReleaseOwnedMode(current); }
+                }
+            }
+            finally
+            {
+                _modeOwned = false;
+                try { if (_ownership != null) _ownership.Dispose(); }
+                finally
+                {
+                    try { if (_layer != null && _pad != null && _pad.Layers.Contains(_layer)) _pad.PopLayer(_layer); }
+                    finally { _ownership = null; _layer = null; _ownedMice = null; }
+                }
+            }
+        }
+
+        private void ReleaseOwnedMode(bool current)
+        {
                 // Cancel only our exact queued Start delegate if the native
                 // game has not executed it yet. Never clear a global queue.
-                if (_pendingStart != null) lock (_modeQueue) _modeQueue.Remove(_pendingStart);
-                if (current && _modeOwned && Game.Instance != null && Game.Instance.CurrentMode == GameModeType.FullScreenUi)
+                if (_pendingStart != null) _pendingStart.Cancel();
+                if (current && _modeOwned && Game.Instance != null && Game.Instance.RootUiContext != null &&
+                    ReferenceEquals(Game.Instance.RootUiContext.InGameUiContext, _ui) && Game.Instance.CurrentMode == GameModeType.FullScreenUi)
                 {
                     var pad = GamePad.Instance;
                     int index = pad.Layers.IndexOf(_layer);
@@ -175,29 +204,15 @@ namespace KingmakerBuffPlanner.UI
                     Action queued = _modeQueue.FirstOrDefault(action => !before.Contains(action) && action.Method.Name.Contains("<StopMode>"));
                     if (queued != null)
                     {
-                        int slot = _modeQueue.IndexOf(queued);
                         // The game may defer Stop. Do not end a newer native
                         // window's mode if it acquires input before execution.
-                        _modeQueue[slot] = () =>
-                        {
-                            if (Game.Instance == game && game.Player != null && game.Player.GameId == _campaign &&
+                        new ControllerQueuedModeAction(_modeQueue, queued).Guard(() =>
+                            Game.Instance == game && game.Player != null && game.Player.GameId == _campaign &&
                                 ReferenceEquals(game.CurrentlyLoadedArea, _area) && game.RootUiContext != null &&
                                 ReferenceEquals(game.RootUiContext.InGameUiContext, _ui) &&
-                                GamePad.HasInstance && ReferenceEquals(GamePad.Instance.CurrentInputLayer, below)) queued();
-                        };
+                                GamePad.HasInstance && ReferenceEquals(GamePad.Instance.CurrentInputLayer, below));
                     }
                 }
-            }
-            finally
-            {
-                _modeOwned = false;
-                if (_ownership != null) _ownership.Dispose();
-                if (_layer != null && GamePad.HasInstance && GamePad.Instance.Layers.Contains(_layer))
-                    GamePad.Instance.PopLayer(_layer);
-                _ownership = null;
-                _layer = null;
-                _ownedMice = null;
-            }
         }
     }
 }

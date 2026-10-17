@@ -2,6 +2,15 @@
 
 ## 2026-10-17 controller access correction — implementation checkpoint
 
+Implementation preserved at b64e86c. Subsequent review hardens optional geometry
+logging (cannot break construction), actual results-settled sampling, deferred
+mode cancellation/Stop ownership, and input-dispatch failure cleanup. Added an
+identity-only queued-mode action regression; controller-opened editor Run now
+instructs returning to the selector instead of submitting while fullscreen.
+Pre-freeze selected neighbors: 59/0 in 6.5 s, source47/build1 PASS, log
+artifacts/controller-access/development-final.log; distinct local version .2.
+Candidate source and final frozen evidence are recorded separately after build.
+
 Owner superseded run-only acceptance with actual same-session authoring access
 and observed clipping repair. Continued clean legitimate PR #10 branch from
 2a04579a460064d53f4f87d34defb22a96dbc227; preserved every frozen package and

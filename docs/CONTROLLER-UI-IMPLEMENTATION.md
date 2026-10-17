@@ -1,5 +1,64 @@
 # Controller execution implementation
 
+## Current owner correction: actual editor access and layout repair
+
+The [access mission](../planning/KBP-CONTROLLER-ACCESS-REPAIR-MISSION.md)
+supersedes the old run-only acceptance boundary below. Local candidate
+0.5.4-controller.2 adds a focusable **Configure plans** action (first displayed
+row, default for empty/blocked plans), using the SAME CastingWorkspaceSession
+and actual CastingWorkspaceScreenView. No profile copy, hidden editor startup,
+global input-mode switch or gameplay-mod dependency is introduced.
+
+Installed TMP Awake calls LoadDefaultSettings, which can replace sizeDelta.
+Controller labels now disable owned auto-container/font sizing, set margins and
+final geometry AFTER activation, and borrow the font's base material rather
+than a donor label's stencil material. Bounded optional diagnostics report
+component/activation/final/settled geometry, bounds, masks/material clip and
+1920x1200 or actual screen identity. These are not yet native-rendered evidence.
+Configure, three authored counts, Stop, contextual Confirm and the essential
+status need no explanation pager. Explicit View results opens a full-width
+masked ScrollRect with scrollbar; navigation there does not move action focus.
+
+Controller authoring resolves the native origin Canvas as a Component host;
+mouse authoring still uses StaticCanvas and its existing boundary. The actual
+workspace is constructed with an exit before acquiring ControllerEditorInputBoundary.
+That adapter reuses the existing Rewired EventSystem/module, temporarily selects
+the installed Unity physical-mouse fallback through PlayerMice, suppresses Unity
+navigation submit, shows the OS pointer, and owns a native Back-only layer plus
+FullScreenUi mode. Mouse input arms only after neutral. Text-edit Back deselects
+the input field first, then existing Resources/description/casting focus handling
+applies. Native base/gameplay dispatch is isolated only during owned lifetimes.
+The controller-opened editor's Run explains returning to quick access instead
+of submitting under fullscreen ownership; ordinary mouse Run is unchanged.
+
+Configure and Close are queued semantic requests outside view/input callbacks.
+Native Game.StartMode/StopMode can queue: cancel only this adapter's exact pending
+Start delegate, and guard an owned deferred Stop against newer native ownership.
+Return waits for actual Default mode and expected layer; timeout never authorizes
+opening. Session edits, failed-save intent, import recovery and authoritative
+FooterSaveState remain canonical. Empty runs do not submit. Nonempty/corrupt/
+unresolved state is not inferred from a screenshot or overwritten.
+
+The console SpellBookView CreateInputs/Hide and SpellBookVM.Back contracts are
+separate from the mouse entry. Y/Func02 is reserved for native book switching.
+An owned footer chooses RightStickButton, otherwise FuncAdditional, ONLY if
+free in the book and always-bound base layer; older pushed gameplay layers are
+unbound. It uses the matching native glyph, omits entry on conflict, and is
+hidden/inert during Metamagic, context/modal takeover or lost ownership.
+Exact owned registrations are detached on Hide/disable/unload. The source-aware
+ControllerSurfaceHandoff uses VM.Back then observes real book/layer/mode release,
+with campaign/area/UI guards and neutral gating, before opening the ACTUAL editor.
+It is party-wide, not selected-spell authoring. Deliberate editor Close returns
+to quick access; original book/selection reconstruction is not implemented.
+
+Native card: DEFERRED until the required repaired authoring route is verified;
+native collection/VM contracts were inspected, but no live donor/listener clone
+audit or card/navigation acceptance occurred. No reference-project code or
+assets were copied. Full controller graph editing remains DEFERRED. None of
+these source changes establishes mixed-input or rendering usability in-game.
+
+Historical execution candidate identities and evidence follow unchanged.
+
 PR review follow-up: [three corrected defects and their regressions](CONTROLLER-UI-REVIEW-FIXES.md).
 The original candidate identities below are historical, not builds of the fixes.
 Current integrated frozen product is `9aec44e374b26b3561fa4402912c77a23a4e08ac`,

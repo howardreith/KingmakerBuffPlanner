@@ -1,4 +1,19 @@
-# Local review candidate 0.5.4-controller.1 — controller execution
+# Local review candidate 0.5.4-controller.2 — controller editor access/layout repair
+
+Not published, installed or native-qualified. Adds Configure plans into the
+ACTUAL editor in a controller-started campaign, with mouse/keyboard authoring,
+canonical autosave and a neutral-gated return to quick access in the same session.
+Fixes text creation order against installed TMP default-container initialization;
+essential messages/controls are unpaged and longer results get a scrollable view.
+Adds a context-scoped console-book footer into that editor, preserving native Y
+book switching/Metamagic and retaining the accepted campaign-menu shortcut.
+Full controller graph editing, native fan card and original-book reconstruction
+remain deferred. Native rendering (1920x1200/compact), pointer/text interaction,
+physical input and full author/save/return/run qualification are NOT_RUN.
+No gameplay-mod changes/dependencies, release/tag/push, merge or permanent install.
+The 0.5.4-controller.1 published frozen alpha below remains unchanged.
+
+## Historical local candidate 0.5.4-controller.1 — controller execution
 
 Not published or permanently installed. Integrates the controller mission with
 0.5.3 branding/licensing and publisher changes, plus the three PR review fixes.

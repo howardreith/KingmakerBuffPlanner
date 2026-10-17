@@ -1,5 +1,36 @@
 # Buff Planner: player guide (0.5.2)
 
+## Local access-repair candidate (0.5.4-controller.2)
+
+Not yet qualified in-game or publicly released. The intended new same-session
+workflow is: controller campaign menu -> displayed Buff Planner shortcut ->
+**Configure plans** -> edit the actual planner with mouse and keyboard ->
+**Close** -> controller routine selector. Edits use existing autosave; no restart
+or global input-mode switch. A failed save remains Not saved and blocks execution.
+Create/edit plans with mouse and keyboard; run saved routines and request Stop
+with a controller in native controller mode. This is NOT full gamepad graph editing.
+
+Configure is the first row and default for an empty plan. Empty Run actions are
+unavailable. Use D-pad Up/Down and the displayed native Confirm/Back icons;
+Confirm says Open planner, Run Long, Stop, etc. Explicit View results opens a
+scrollable view; D-pad scrolls and Back returns to routines. Basic instructions
+and the latest outcome no longer require explanation pages. Stop remains separate.
+
+In the editor, use the physical mouse for selection/scrolling and keyboard for
+search/text. Back first leaves active text editing, then dismisses the top
+description/Resources/casting focus, then returns to routines. Close also returns
+to routines after release. Run inside this controller-opened editor explains
+returning to the selector, avoiding a run held behind the editor. Stop a running
+routine before opening Configure. Ordinary mouse-mode authoring/Run is unchanged.
+
+The controller spellbook additionally has a Buff Planner footer when a mapped
+action is free (normally the right-stick click candidate; follow its actual
+glyph). Y remains native book switching. The entry opens the actual editor,
+not a spell-specific plan; it is inactive in Metamagic/context/modals. Editor
+Close returns to routines, not a reconstructed book selection. A native fan
+card and original-book return are deferred. Rendering, pointer use and native
+controls still require the [new acceptance checks](CONTROLLER-UI-ACCEPTANCE.md).
+
 ## Local controller execution preview (0.5.4-controller.1)
 
 Create/edit plans with mouse and keyboard; run saved routines and request Stop

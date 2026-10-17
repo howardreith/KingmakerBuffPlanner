@@ -172,16 +172,24 @@ namespace KingmakerBuffPlanner.UI
 
         private static bool DispatchPrefix(BindDescription __instance)
         {
-            if (!ControllerSpellbookIntegration.AllowsDispatch(__instance)) return false;
-            ControllerEditorInputBoundary editor = ControllerEditorInputBoundary.Active;
-            if (editor != null) return editor.Allows(__instance);
-            ControllerRoutineMenu menu = ActiveMenu;
-            if (menu == null) return true;
-            try { return menu.AllowsNativeDispatch(__instance); }
+            try
+            {
+                if (!ControllerSpellbookIntegration.AllowsDispatch(__instance)) return false;
+                ControllerEditorInputBoundary editor = ControllerEditorInputBoundary.Active;
+                if (editor != null) return editor.Allows(__instance);
+                ControllerRoutineMenu menu = ActiveMenu;
+                return menu == null || menu.AllowsNativeDispatch(__instance);
+            }
             catch (Exception exception)
             {
                 _log.Error("[KBP-CONTROLLER] input ownership failed;releasing owned layer.", exception);
-                menu.Dispose();
+                try
+                {
+                    if (ActiveMenu != null) ActiveMenu.Dispose();
+                    if (ControllerEditorInputBoundary.Active != null) ControllerEditorInputBoundary.Active.RestoreState(null);
+                    ControllerSpellbookIntegration.SetEnabled(false);
+                }
+                catch (Exception cleanup) { _log.Error("[KBP-CONTROLLER] input cleanup failed;native state uncertain.", cleanup); }
                 return true;
             }
         }

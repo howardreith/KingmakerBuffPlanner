@@ -187,6 +187,13 @@ namespace KingmakerBuffPlanner.UI
             get { return _instance != null && _instance._plannerMode == PlannerMode.CastingFirst; }
         }
 
+        internal static bool ControllerAuthoringAvailable
+        {
+            get { return _instance != null && _instance._enabled && _instance._castingHost != null &&
+                !_instance._castingHost.IsRunning && _instance._castingWorkspace == null &&
+                _instance._controllerRoutines == null && _instance._controllerBookHandoff == null; }
+        }
+
         // The stored mode, or null before the root is constructed (the
         // settings page can draw before the first update).
         internal static PlannerMode? SelectedPlannerMode
@@ -1722,6 +1729,7 @@ namespace KingmakerBuffPlanner.UI
                 root._controllerUi = Game.Instance.RootUiContext.InGameUiContext;
                 root._controllerCampaign = Game.Instance.Player.GameId;
                 root.OpenControllerQuick();
+                if (root._controllerRoutines == null) throw new InvalidOperationException("Controller destination is unavailable;native menu retained.");
                 ControllerRoutineIntegration.CloseNativeMenu(nativeMenu);
             }
             catch (Exception exception)
@@ -1943,7 +1951,7 @@ namespace KingmakerBuffPlanner.UI
                     // cannot switch planners (SetPlannerMode refuses there).
                     CastingWorkspaceDevSelection.Enabled || _controllerEditor != null ? (Action)null
                         : () => SwitchPlannerFromScreen(PlannerMode.Classic),
-                    value => _log.Info(value));
+                    value => _log.Info(value), _controllerEditor != null);
                 // For the controller route, construct the real presentation
                 // and Close control before acquiring its input ownership.
                 if (_controllerEditor != null) lease = BuffPlannerInputLease.Acquire(boundary);
@@ -1959,6 +1967,8 @@ namespace KingmakerBuffPlanner.UI
                     sessionBindingAndPersistenceMilliseconds, inputLeaseMilliseconds,
                     constructionMilliseconds, reconciliationMilliseconds);
                 _castingWorkspace.RefreshView();
+                if (_controllerEditor != null)
+                    _castingWorkspace.ShowNotice("Edit with mouse and keyboard; changes autosave. Close returns to controller routines. Back dismisses the top layer first.");
                 if (reconciliation != null && reconciliation.Applied)
                     _castingWorkspace.ShowNotice(reconciliation.Notice);
                 _castingWorkspaceOpens++;

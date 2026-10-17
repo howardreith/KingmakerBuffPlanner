@@ -51,6 +51,7 @@
     <Compile Include="HumanFeedbackRefinementTests.cs" />
     <Compile Include="ControllerRoutineTests.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ControllerSurfaceHandoff.cs"><Link>UI\ControllerSurfaceHandoff.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ControllerQueuedModeAction.cs"><Link>UI\ControllerQueuedModeAction.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ControllerRoutineModel.cs"><Link>UI\ControllerRoutineModel.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ControllerLayerOwnership.cs"><Link>UI\ControllerLayerOwnership.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ControllerEntryRegistry.cs"><Link>UI\ControllerEntryRegistry.cs</Link></Compile>

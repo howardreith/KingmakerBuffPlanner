@@ -48,7 +48,7 @@ namespace KingmakerBuffPlanner.UI
 
         private static bool Ready(Entry entry)
         {
-            return _enabled && Application.isFocused && Game.Instance != null && Game.Instance.IsControllerGamepad &&
+            return _enabled && BuffPlannerUiRoot.ControllerAuthoringAvailable && Application.isFocused && Game.Instance != null && Game.Instance.IsControllerGamepad &&
                 GamePad.HasInstance && GamePad.Instance.Player.controllers.joystickCount > 0 &&
                 Game.Instance.CurrentMode == Kingmaker.GameModes.GameModeType.FullScreenUi &&
                 entry.View != null && Showing(entry.View) && entry.View.gameObject.activeInHierarchy &&

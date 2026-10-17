@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Kingmaker.Blueprints.Console;
 using TMPro;
 using UnityEngine;
@@ -24,6 +25,8 @@ namespace KingmakerBuffPlanner.UI
         private readonly Action<string> _log;
         private int _settleFrame;
         private bool _measured;
+        private int _detailsSettleFrame;
+        private bool _detailsMeasured;
 
         internal ControllerRoutineView(TMP_Text donor, Action<string> log = null)
         {
@@ -91,6 +94,8 @@ namespace KingmakerBuffPlanner.UI
                 _details.rectTransform.sizeDelta = size;
                 _scroll.verticalNormalizedPosition = 1;
             }
+            if (model.ResultsOpen && !_detailsPanel.gameObject.activeSelf)
+            { _detailsSettleFrame = Time.frameCount + 2; _detailsMeasured = false; }
             _detailsPanel.gameObject.SetActive(model.ResultsOpen);
         }
 
@@ -132,6 +137,12 @@ namespace KingmakerBuffPlanner.UI
 
         internal void ObserveSettledGeometry()
         {
+            if (!_detailsMeasured && _detailsPanel.gameObject.activeInHierarchy && Time.frameCount >= _detailsSettleFrame)
+            {
+                _detailsMeasured = true;
+                _details.ForceMeshUpdate();
+                Measure(_details, "settled-results", 784, _log);
+            }
             if (_measured || Time.frameCount < _settleFrame) return;
             _measured = true;
             Canvas.ForceUpdateCanvases();
@@ -229,6 +240,8 @@ namespace KingmakerBuffPlanner.UI
         private static void Measure(TMP_Text label, string phase, float intendedWidth, Action<string> log)
         {
             if (log == null) return;
+            try
+            {
             RectTransform rect = label.rectTransform;
             log("[KBP-CONTROLLER-LAYOUT] label=" + label.name + ";phase=" + phase +
                 ";intendedWidth=" + intendedWidth + ";actual=" + rect.rect.size +
@@ -238,9 +251,15 @@ namespace KingmakerBuffPlanner.UI
                 ";preferred=" + label.preferredWidth + "/" + label.preferredHeight +
                 ";bounds=" + label.textBounds.size + ";overflow=" + label.overflowMode +
                 ";pages=" + (label.textInfo == null ? 0 : label.textInfo.pageCount) +
-                ";layoutControllers=" + rect.GetComponents<Component>().Length +
+                ";layoutControllers=" + rect.GetComponents<Component>().OfType<ILayoutController>().Count() +
                 ";mask=" + (rect.GetComponentInParent<Mask>() != null) +
-                ";material=" + (label.fontSharedMaterial == null ? "none" : label.fontSharedMaterial.name));
+                ";rectMask=" + (rect.GetComponentInParent<RectMask2D>() != null) +
+                ";material=" + (label.fontSharedMaterial == null ? "none" : label.fontSharedMaterial.name) +
+                ";materialClip=" + (label.fontSharedMaterial != null && label.fontSharedMaterial.HasProperty("_ClipRect")
+                    ? label.fontSharedMaterial.GetVector("_ClipRect").ToString() : "none"));
+            }
+            catch (Exception exception)
+            { log("[KBP-CONTROLLER-LAYOUT] phase=" + phase + ";diagnosticUnavailable=" + exception.GetType().Name); }
         }
 
         private static RectTransform Rect(Transform parent, string name, Vector2 min, Vector2 max)

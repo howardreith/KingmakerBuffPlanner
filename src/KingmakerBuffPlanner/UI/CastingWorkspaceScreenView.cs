@@ -48,6 +48,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Func<CastingWorkspaceInputs> _freshInputs;
         private readonly Action _close;
         private readonly Action _switchToClassic;
+        private readonly bool _controllerAuthoring;
         private PlannerUiTheme _theme;
         private PlannerNativeThemeSurface _nativeTheme;
         private RectTransform _root;
@@ -216,8 +217,9 @@ namespace KingmakerBuffPlanner.UI
             Func<CastingWorkspaceInputs> freshInputsProvider,
             Action close,
             Action switchToClassic = null,
-            Action<string> log = null)
+            Action<string> log = null, bool controllerAuthoring = false)
         {
+            _controllerAuthoring = controllerAuthoring;
             _log = log ?? (value => { });
             if (nativeCanvas == null)
                 throw new ArgumentNullException("nativeCanvas");
@@ -3054,6 +3056,11 @@ namespace KingmakerBuffPlanner.UI
 
         private void RunApply()
         {
+            if (_controllerAuthoring)
+            {
+                Feedback("Use Close to return to saved routines, then choose Run with the controller.", true);
+                return;
+            }
             CastingApplyMode mode = _session.ApplyMode;
             string name = _session.RoutineDisplayName(_session.SelectedRoutineId);
             CastingWorkspaceInputs inputs;

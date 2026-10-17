@@ -1,5 +1,39 @@
 # Controller execution acceptance
 
+## Access/layout correction — current gate, not run-only completion
+
+Owner observed the alpha's entry opening but unusable clipping and no editor
+route. The new [mission](../planning/KBP-CONTROLLER-ACCESS-REPAIR-MISSION.md)
+requires actual authoring in the controller-started session. Version
+0.5.4-controller.2 is a LOCAL, source-tested candidate, not a public alpha or
+qualified controller release. Keep E/C history below under its original IDs.
+
+| New observation | Native status | Offline evidence / next check |
+| --- | --- | --- |
+| A01 cold-controller empty/missing/blocked plan | NOT_RUN | Real campaign/file presentation tests; empty default Configure; protected data unchanged. |
+| A02 controller Configure -> real editor, mouse clicks/scroll/search/typing/Back | NOT_RUN | Native host/module/TMP contracts inspected; production compiles; needs guarded real interaction. |
+| A03 autosave -> return -> correct counts/current save state | NOT_RUN | Real same-session author/save/reconstructed selector test; failed-save/recovery neighbors retained. |
+| A04 three focused finite-resource runs/refusal/Stop | NOT_RUN | Canonical host/resource tests; separate live allowance only AFTER no-cast workflow passes. |
+| A05 existing nonempty/corrupt/import/failed-save safety | NOT_RUN | Real files/session/persistence/admission tests, no browse writes. |
+| A06 rendered 1920x1200 then compact, including long result scroll | NOT_RUN | Installed TMP reset path established; bounded post-activation/settled diagnostics implemented, no screenshots or pixel PASS. |
+| A07 neutral input, failed handoff, stale context, lifecycle and restoration | NOT_RUN | Native boundary contracts plus owned-binding/latch/handoff/timeout tests; actual stack/event ordering remains unobserved. |
+| A08 console-book footer/native controls and mouse regression | NOT_RUN | Real contract/reflection and existing mouse-entry neighbors; live Metamagic/context/book/unit/level controls still need checking. |
+
+DATA at 2026-10-17T23:50Z: foreign Kingmaker PID 22596 and active KMG lease;
+neither touched. Installed lab planner is 0.1.1.0, not the owner's controller
+alpha (SHA-256 78407dd4c7240ce25c7654715854e83061da744a18d8eb4a2198fdffec5e3080;
+MVID c0cc9cbc-8075-4d98-a32e-29972aafa7fa). No mission-owned runtime transaction,
+game launch or profile/settings/save/install mutation; restoration NOT_RUN.
+The existing guarded controller observer route is still absent, so older mouse
+manual/physical scenarios cannot be relabeled as this acceptance. First extend
+the entry-only protected request/observer route, with submission lock retained,
+and select an exclusive session after the foreign lease is released. Capture
+geometry AND pixels AND actual input; no callback injection as device proof.
+
+Native card and book-origin context reconstruction: DEFERRED. Full controller
+graph editing: DEFERRED. The owner's working KMG/CotW stack is preserved, not
+retested or required by this standalone mod. No push/merge/release/install made.
+
 Review follow-up: [entry cleanup, persistence and latest-outcome corrections](CONTROLLER-UI-REVIEW-FIXES.md).
 No live status is promoted by these source regressions. The next native test is
 the entry/exit handoff only, before any casting.

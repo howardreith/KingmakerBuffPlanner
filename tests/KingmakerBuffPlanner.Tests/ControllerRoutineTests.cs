@@ -40,6 +40,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("controller-spellbook-handoff-waits-for-release", TestControllerBookHandoff);
             Run("controller-spellbook-handoff-cancel-timeout-no-open", TestControllerBookHandoffCancel);
             Run("controller-spellbook-native-close-and-conflict-selection", TestControllerBookContracts);
+            Run("controller-queued-mode-actions-own-exact-request", TestControllerModeQueue);
         }
 
         private static void TestControllerActivationLatch()
@@ -680,6 +681,29 @@ namespace KingmakerBuffPlanner.Tests
             released = true;
             Assert(request.Tick(true, 30) && request.Tick(true, 31));
             Assert(closes == 1 && opens == 1);
+        }
+
+        private static void TestControllerModeQueue()
+        {
+            int own = 0, foreign = 0;
+            Action owned = () => own++, other = () => foreign++;
+            var queue = new List<Action> { other, owned, other };
+            var pending = new ControllerQueuedModeAction(queue, owned);
+            Assert(pending.Pending);
+            pending.Cancel(); pending.Cancel();
+            Assert(!pending.Pending && queue.Count == 2 && queue.All(action => ReferenceEquals(action, other)));
+            queue.ForEach(action => action());
+            Assert(own == 0 && foreign == 2);
+            queue.Insert(1, owned);
+            bool stillOwns = true;
+            Assert(pending.Guard(() => stillOwns));
+            stillOwns = false; // native window takes over AFTER Stop was queued
+            queue.ForEach(action => action());
+            Assert(own == 0 && foreign == 4);
+            stillOwns = true;
+            queue.ForEach(action => action());
+            Assert(own == 1 && foreign == 6);
+            Assert(!pending.Guard(() => true)); // no longer the exact pending identity
         }
 
         private static void TestControllerBookHandoffCancel()

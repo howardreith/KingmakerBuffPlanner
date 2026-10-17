@@ -317,6 +317,7 @@
     <Compile Include="UI\ControllerEditorInputBoundary.cs" />
     <Compile Include="UI\ControllerSpellbookIntegration.cs" />
     <Compile Include="UI\ControllerSurfaceHandoff.cs" />
+    <Compile Include="UI\ControllerQueuedModeAction.cs" />
     <Compile Include="UI\ControllerRoutineMenu.cs" />
     <Compile Include="UI\ControllerRoutineIntegration.cs" />
     <Compile Include="UI\PlannerNativeThemeSurface.cs" />

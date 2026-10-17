@@ -1,5 +1,14 @@
 # Mr. Bard's Kingmaker Buff Planner
 
+Local access/layout repair **0.5.4-controller.2** adds Configure plans into the
+actual editor from a controller-started session, with mouse/keyboard authoring,
+same-session return and a console-book entry. Essential quick-menu text is no
+longer paged. This is source-tested, **not yet native-qualified or published**;
+the existing public alpha below is unchanged. See
+[implementation](docs/CONTROLLER-UI-IMPLEMENTATION.md) and
+[new acceptance gate](docs/CONTROLLER-UI-ACCEPTANCE.md). Native card and full
+gamepad graph editing remain deferred.
+
 **Controller Alpha 1:** [download the experimental prerelease](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.1).
 It reuses the unchanged candidate below for owner testing; native controller
 behavior is not yet qualified. Back up the mod folder/UserSettings and saves,
