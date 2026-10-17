@@ -50,6 +50,16 @@ namespace KingmakerBuffPlanner.UI
         }
         private CastingWorkspaceScreenView _castingWorkspace;
         private ControllerRoutineMenu _controllerRoutines;
+        private Component _controllerHost;
+        private TMPro.TMP_Text _controllerDonor;
+        private ControllerEditorInputBoundary _controllerEditor;
+        private object _controllerArea;
+        private object _controllerUi;
+        private string _controllerCampaign;
+        private bool _editorReturnRequested;
+        private readonly ControllerActivationLatch _authoringExitLatch = new ControllerActivationLatch();
+        private ControllerSurfaceHandoff _controllerBookHandoff;
+        private ControllerSurfaceHandoff _controllerQuickReturn;
         // Successful workspace opens (runtime evidence: one per handoff).
         private int _castingWorkspaceOpens;
         // 0.4.2: one native paper-opening sound per successful open.
@@ -603,7 +613,7 @@ namespace KingmakerBuffPlanner.UI
                 taken = true;
                 if (!_castingWorkspace.HandleEscape())
                 {
-                    CloseCastingWorkspace();
+                    RequestWorkspaceClose();
                     _log.Info("[KBP-BOOT] casting workspace close requested;source=" + source + ".");
                 }
             }
@@ -1706,6 +1716,78 @@ namespace KingmakerBuffPlanner.UI
                 root._castingWorkspace != null || root._screen.IsOpen) return;
             try
             {
+                root._controllerHost = nativeMenu.GetComponentInParent<Canvas>();
+                root._controllerDonor = donor;
+                root._controllerArea = Game.Instance.CurrentlyLoadedArea;
+                root._controllerUi = Game.Instance.RootUiContext.InGameUiContext;
+                root._controllerCampaign = Game.Instance.Player.GameId;
+                root.OpenControllerQuick();
+                ControllerRoutineIntegration.CloseNativeMenu(nativeMenu);
+            }
+            catch (Exception exception)
+            {
+                root.CloseControllerRoutines();
+                root._log.Error("[KBP-CONTROLLER] open failed;owned input released.", exception);
+            }
+        }
+
+        private bool ControllerContextValid()
+        {
+            Game game = Game.Instance;
+            return _enabled && Application.isFocused && game != null && game.IsControllerGamepad &&
+                game.Player != null && game.Player.GameId == _controllerCampaign &&
+                ReferenceEquals(game.CurrentlyLoadedArea, _controllerArea) && game.RootUiContext != null &&
+                ReferenceEquals(game.RootUiContext.InGameUiContext, _controllerUi) && _controllerHost != null &&
+                Kingmaker.Assets.Console.GamepadInput.GamePad.HasInstance &&
+                Kingmaker.Assets.Console.GamepadInput.GamePad.Instance.Player.controllers.joystickCount > 0;
+        }
+
+        internal static void RequestControllerEditorFromBook(
+            Kingmaker.UI._ConsoleUI.SpellBook.SpellBookView book,
+            Kingmaker.Assets.Console.GamepadInput.InputLayer sourceLayer, TMPro.TMP_Text donor)
+        {
+            BuffPlannerUiRoot root = _instance;
+            if (root == null || !root._enabled || root._controllerBookHandoff != null ||
+                root._castingWorkspace != null || root._controllerRoutines != null || root._castingHost.IsRunning ||
+                book == null || ControllerSpellbookIntegration.Model(book) == null || donor == null || donor.font == null) return;
+            var pad = Kingmaker.Assets.Console.GamepadInput.GamePad.Instance;
+            int index = pad.Layers.IndexOf(sourceLayer);
+            if (index < 0 || pad.CurrentInputLayer != sourceLayer) return;
+            var below = index == 0 ? pad.BaseLayer : pad.Layers[index - 1];
+            root._controllerHost = book.GetComponentInParent<Canvas>();
+            root._controllerDonor = donor;
+            root._controllerCampaign = Game.Instance.Player.GameId;
+            root._controllerArea = Game.Instance.CurrentlyLoadedArea;
+            root._controllerUi = Game.Instance.RootUiContext.InGameUiContext;
+            var vm = ControllerSpellbookIntegration.Model(book);
+            root._controllerBookHandoff = new ControllerSurfaceHandoff(
+                () => root.ControllerContextValid() && !root._castingHost.IsRunning &&
+                    (ReferenceEquals(pad.CurrentInputLayer, sourceLayer) || ReferenceEquals(pad.CurrentInputLayer, below)),
+                () => book != null && ControllerSpellbookIntegration.Showing(book) && ControllerSpellbookIntegration.Model(book) == vm && !vm.MetamagicBuilderMode.Value &&
+                    ReferenceEquals(pad.CurrentInputLayer, sourceLayer),
+                () => vm.Back(),
+                () => Game.Instance.CurrentMode == GameModeType.Default && !ControllerSpellbookIntegration.Showing(book) &&
+                    ReferenceEquals(pad.CurrentInputLayer, below),
+                () => root.BeginControllerAuthoring());
+        }
+
+        private void BeginControllerAuthoring()
+        {
+            if (!ControllerContextValid() || _castingHost.IsRunning) return;
+            CloseControllerRoutines();
+            if (!CastingFirstActive)
+                OpenControllerQuick("Classic is retained. Select casting-first in mod settings using mouse/keyboard; it has not been switched.");
+            else if (!OpenCastingWorkspace() && ControllerContextValid())
+                OpenControllerQuick("The editor could not open. Input was released. See the log for the unavailable host/input contract.");
+        }
+
+        private void OpenControllerQuick(string notice = null)
+        {
+                BuffPlannerUiRoot root = this;
+                if (!ControllerContextValid() || Game.Instance.CurrentMode != GameModeType.Default) return;
+                if (_controllerDonor == null)
+                    _controllerDonor = _controllerHost.GetComponentsInChildren<TMPro.TMP_Text>(true)
+                        .FirstOrDefault(text => text != null && text.font != null);
                 CastingWorkspaceSession session = null;
                 string unavailable = null;
                 string campaign = Game.Instance.Player == null ? null : Game.Instance.Player.GameId;
@@ -1730,15 +1812,50 @@ namespace KingmakerBuffPlanner.UI
                     () => root._castingHost.RequestStop(CastingExecutionHost.PlayerStopReason),
                     () => root._castingHost.IsRunning,
                     () => root._castingHost.ActiveScopeRoutineId);
-                root._controllerRoutines = new ControllerRoutineMenu(donor, model, root._log.Info);
-                // Own the usable controller surface before closing the native
-                // menu. PopLayer removes that older middle layer by identity.
-                ControllerRoutineIntegration.CloseNativeMenu(nativeMenu);
-            }
-            catch (Exception exception)
+                root._controllerRoutines = new ControllerRoutineMenu(_controllerDonor, model, root._log.Info);
+                if (notice != null) root._controllerRoutines.ShowResult(notice);
+        }
+
+        private void RequestWorkspaceClose()
+        {
+            if (_controllerEditor == null) CloseCastingWorkspace();
+            else if (!_editorReturnRequested)
             {
-                root.CloseControllerRoutines();
-                root._log.Error("[KBP-CONTROLLER] open failed;owned input released.", exception);
+                _editorReturnRequested = true; // semantic request, outside UI callback/Tick
+                _authoringExitLatch.Reset();
+            }
+        }
+
+        private void TickControllerAuthoring()
+        {
+            ControllerSpellbookIntegration.Tick();
+            if (_controllerQuickReturn != null && _controllerQuickReturn.Tick(ControllerRoutineMenu.ControlsAreNeutral(), Time.frameCount))
+                _controllerQuickReturn = null;
+            if (_controllerBookHandoff != null && _controllerBookHandoff.Tick(ControllerRoutineMenu.ControlsAreNeutral(), Time.frameCount))
+                _controllerBookHandoff = null;
+            if (_controllerEditor != null)
+            {
+                if (!_controllerEditor.Valid) { CloseCastingWorkspace(); return; }
+                _controllerEditor.Tick();
+                if (!_editorReturnRequested || !_authoringExitLatch.CanRelease(ControllerRoutineMenu.ControlsAreNeutral() &&
+                    !Input.GetMouseButton(0) && !Input.GetMouseButton(1), Time.frameCount)) return;
+                CloseCastingWorkspace();
+                if (ControllerContextValid())
+                {
+                    var pad = Kingmaker.Assets.Console.GamepadInput.GamePad.Instance;
+                    var expected = pad.CurrentInputLayer;
+                    _controllerQuickReturn = new ControllerSurfaceHandoff(
+                        () => ControllerContextValid() && ReferenceEquals(pad.CurrentInputLayer, expected),
+                        () => true, () => { }, () => Game.Instance.CurrentMode == GameModeType.Default,
+                        () => OpenControllerQuick());
+                }
+            }
+            else if (_controllerRoutines != null && _controllerRoutines.ConfigureReady)
+            {
+                if (!ControllerContextValid()) { CloseControllerRoutines(); return; }
+                if (_castingHost.IsRunning)
+                { _controllerRoutines.ShowResult("Select Stop before opening the editor."); return; }
+                BeginControllerAuthoring();
             }
         }
 
@@ -1769,7 +1886,9 @@ namespace KingmakerBuffPlanner.UI
             BuffPlannerInputLease lease = null;
             try
             {
-                if (StaticCanvas.Instance == null)
+                Component workspaceHost = Game.Instance != null && Game.Instance.IsControllerGamepad
+                    ? _controllerHost : (Component)StaticCanvas.Instance;
+                if (workspaceHost == null)
                 {
                     _workspaceOpenSound.Cancel();
                     LogUiUnavailable("casting-workspace: campaign UI unavailable");
@@ -1802,21 +1921,32 @@ namespace KingmakerBuffPlanner.UI
                 // catch below releases this local reference on any
                 // subsequent failure (reviews R2, H3).
                 long leaseStarted = System.Diagnostics.Stopwatch.GetTimestamp();
-                lease = BuffPlannerInputLease.Acquire(new KingmakerPlannerInputBoundary());
+                IPlannerInputBoundary boundary;
+                if (Game.Instance.IsControllerGamepad)
+                {
+                    if (_castingHost.IsRunning) throw new InvalidOperationException("Stop the active routine before editing.");
+                    _controllerEditor = new ControllerEditorInputBoundary(() => TakeEscape("controller-Back"));
+                    boundary = _controllerEditor;
+                }
+                else boundary = new KingmakerPlannerInputBoundary();
+                if (_controllerEditor == null) lease = BuffPlannerInputLease.Acquire(boundary);
                 double inputLeaseMilliseconds = ElapsedMilliseconds(leaseStarted);
                 // A view lifetime owns one immutable display snapshot. Never
                 // carry party/resources/effects from a previous open or scene.
                 _workspaceInputs = null;
                 long constructionStarted = System.Diagnostics.Stopwatch.GetTimestamp();
                 _castingWorkspace = new CastingWorkspaceScreenView(
-                    StaticCanvas.Instance, workspaceSession,
+                    workspaceHost, workspaceSession,
                     BuildCastingWorkspaceInputs, BuildFreshCastingWorkspaceInputs,
-                    CloseCastingWorkspace,
+                    RequestWorkspaceClose,
                     // A runtime-test session selects the workspace itself and
                     // cannot switch planners (SetPlannerMode refuses there).
-                    CastingWorkspaceDevSelection.Enabled ? (Action)null
+                    CastingWorkspaceDevSelection.Enabled || _controllerEditor != null ? (Action)null
                         : () => SwitchPlannerFromScreen(PlannerMode.Classic),
                     value => _log.Info(value));
+                // For the controller route, construct the real presentation
+                // and Close control before acquiring its input ownership.
+                if (_controllerEditor != null) lease = BuffPlannerInputLease.Acquire(boundary);
                 double constructionMilliseconds = ElapsedMilliseconds(constructionStarted);
                 _workspaceInputLease = lease;
                 lease = null;
@@ -1856,11 +1986,13 @@ namespace KingmakerBuffPlanner.UI
 
         private void CloseCastingWorkspace()
         {
+            _editorReturnRequested = false;
             if (_workspaceInputLease != null)
             {
                 _workspaceInputLease.Dispose();
                 _workspaceInputLease = null;
             }
+            _controllerEditor = null;
             if (_castingWorkspace == null) return;
             // Deliberate unsaved-state policy: closing discards in-memory
             // authoring edits; the next open reloads the last explicitly
@@ -2315,6 +2447,13 @@ namespace KingmakerBuffPlanner.UI
                 _controllerRoutines.Tick();
                 if (!_controllerRoutines.IsOpen) _controllerRoutines = null;
             }
+            try { TickControllerAuthoring(); }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-CONTROLLER] authoring transition failed;releasing owned surfaces.", exception);
+                CloseCastingWorkspace();
+                CloseControllerRoutines();
+            }
             // One step of the active casting run per frame (executors yield
             // per frame), only while the world runs and no planner window
             // holds the game; a held run waits, and its deadline counts only
@@ -2629,6 +2768,10 @@ namespace KingmakerBuffPlanner.UI
 
         private void ReleasePlayerUi()
         {
+            if (_controllerQuickReturn != null) _controllerQuickReturn.Cancel();
+            _controllerQuickReturn = null;
+            if (_controllerBookHandoff != null) _controllerBookHandoff.Cancel();
+            _controllerBookHandoff = null;
             CloseControllerRoutines();
             _closeScreenForClassicRun = false;
             CloseCastingWorkspace();
@@ -2640,6 +2783,10 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed) return;
             _disposed = true;
+            if (_controllerQuickReturn != null) _controllerQuickReturn.Cancel();
+            _controllerQuickReturn = null;
+            if (_controllerBookHandoff != null) _controllerBookHandoff.Cancel();
+            _controllerBookHandoff = null;
             CloseControllerRoutines();
             // End any casting run first, through its owned terminal, while
             // the result can still be logged and presented.

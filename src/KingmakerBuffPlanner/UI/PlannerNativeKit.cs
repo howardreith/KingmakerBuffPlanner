@@ -88,7 +88,7 @@ namespace KingmakerBuffPlanner.UI
         {
         }
 
-        internal static PlannerNativeKit Resolve(StaticCanvas canvas)
+        internal static PlannerNativeKit Resolve(Component canvas)
         {
             int id = canvas == null ? 0 : canvas.GetInstanceID();
             if (_cached != null && _cachedCanvas == id && _cached.BodyFont != null) return _cached;
@@ -99,7 +99,7 @@ namespace KingmakerBuffPlanner.UI
             return kit;
         }
 
-        private void Load(StaticCanvas canvas)
+        private void Load(Component canvas)
         {
             foreach (TMP_FontAsset font in Resources.FindObjectsOfTypeAll<TMP_FontAsset>())
             {

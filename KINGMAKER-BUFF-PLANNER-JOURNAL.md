@@ -1,5 +1,38 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17 controller access correction — implementation checkpoint
+
+Owner superseded run-only acceptance with actual same-session authoring access
+and observed clipping repair. Continued clean legitimate PR #10 branch from
+2a04579a460064d53f4f87d34defb22a96dbc227; preserved every frozen package and
+unrelated mod. Installed TMP Awake calls LoadDefaultSettings, which can write
+default UI sizeDelta. Controller labels now establish final rects after Awake,
+disable owned auto-container resizing, use the font base material and emit
+bounded creation/activation/settled geometry samples. No native pixels claimed.
+Configure/default-empty focus, unavailable empty runs, contextual Confirm and
+separate scrollable results replace basic explanation paging. The existing
+workspace accepts a native Component host; mouse StaticCanvas behavior remains.
+Controller editor reuses the active Rewired EventSystem with scoped physical
+mouse fallback and native layer/Back/fullscreen ownership, including exact
+pending mode-request cancellation. No input-mode property switch.
+
+Console book CreateInputs/Hide/VM.Back contracts inspected. Y/Func02 is reserved
+for book switching even when its hint is hidden. New owned footer binding uses
+an available RightStickButton or FuncAdditional, checks book/base conflicts,
+guards captured gameplay callbacks and closes the book through its own VM.
+Source-aware handoff waits for actual Default/native-owner release; timeout
+never opens. Basic workflow returns to quick access, not an unverified recreated
+book context. Native card awaits verification of the repaired authoring flow.
+
+Focused selector integration: 42 PASS / 0 FAIL in 6.1 s, source47/build1 PASS;
+logs artifacts/controller-access/development-review.log and prior failing/passing
+iterations retained. Real-session author/save/return/run, result isolation,
+handoff neutral/cancel/timeout and exact native contract cases added. Intermediate
+compile failures and four obsolete focus/wiring expectations corrected, not
+reclassified baseline defects. Native construction/click/text/layout remains
+NOT_RUN; no game launch, staging, saves/settings/install change or restoration
+transaction. DATA foreign PID 22596 and KMG lease active at 23:50Z left alone.
+
 ## 2026-10-17 owner-selected controller alpha publication
 
 Owner requested an alpha for another computer, explicitly without a full release

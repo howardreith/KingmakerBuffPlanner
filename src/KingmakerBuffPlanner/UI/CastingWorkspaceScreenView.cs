@@ -210,7 +210,7 @@ namespace KingmakerBuffPlanner.UI
         }
 
         internal CastingWorkspaceScreenView(
-            StaticCanvas nativeCanvas,
+            Component nativeCanvas,
             CastingWorkspaceSession session,
             Func<CastingWorkspaceInputs> inputsProvider,
             Func<CastingWorkspaceInputs> freshInputsProvider,
@@ -1040,7 +1040,7 @@ namespace KingmakerBuffPlanner.UI
         // Construction
         // ------------------------------------------------------------------
 
-        private void Build(StaticCanvas nativeCanvas)
+        private void Build(Component nativeCanvas)
         {
             // Top-level canvas in the game's own service-window pattern
             // (ScreenSpaceCamera bound to the native UI camera): a canvas
@@ -1049,6 +1049,8 @@ namespace KingmakerBuffPlanner.UI
             Canvas nativeRootCanvas = nativeCanvas.GetComponent<Canvas>();
             Canvas canvas = _root.gameObject.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            if (Kingmaker.Game.Instance != null && Kingmaker.Game.Instance.IsControllerGamepad)
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.worldCamera = nativeRootCanvas == null ? null : nativeRootCanvas.worldCamera;
             canvas.planeDistance = nativeRootCanvas == null ? 100f : nativeRootCanvas.planeDistance;
             canvas.overrideSorting = true;

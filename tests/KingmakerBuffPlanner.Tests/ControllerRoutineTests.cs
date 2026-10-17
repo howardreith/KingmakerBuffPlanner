@@ -34,6 +34,12 @@ namespace KingmakerBuffPlanner.Tests
             Run("controller-persistence-presentation-before-run", () => TestControllerPersistencePresentation(root));
             Run("controller-latest-refusal-survives-reconstruction", () => TestControllerLatestOutcome(root));
             Run("controller-production-entry-does-not-construct-editor", TestControllerProductionWiring);
+            Run("controller-configure-author-save-return-same-session", () => TestControllerConfigure(root));
+            Run("controller-results-isolate-focus-and-confirm", () => TestControllerResultsNavigation(root));
+            Run("controller-native-tmp-initialization-and-mouse-fallback", TestControllerAuthoringContracts);
+            Run("controller-spellbook-handoff-waits-for-release", TestControllerBookHandoff);
+            Run("controller-spellbook-handoff-cancel-timeout-no-open", TestControllerBookHandoffCancel);
+            Run("controller-spellbook-native-close-and-conflict-selection", TestControllerBookContracts);
         }
 
         private static void TestControllerActivationLatch()
@@ -416,8 +422,12 @@ namespace KingmakerBuffPlanner.Tests
                 Assert(combat.Host.StartedRuns == 0 && combat.Instant.Fired.Count == 0 && combat.Animated.Started.Count == 0);
             }
             var empty = new ControllerFixture(root, "empty", count: 0);
+            Assert(empty.Menu.Focus == 4 && empty.Menu.ConfirmHint == "Open planner");
             empty.Menu.Confirm();
-            Assert(!empty.LastApply.Allowed && empty.Host.StartedRuns == 0 && empty.Menu.Message.Contains("nothing to cast"));
+            Assert(empty.Menu.ConfigureRequested && empty.LastApply == null && empty.Host.StartedRuns == 0);
+            FocusController(empty.Menu, 0);
+            empty.Menu.Confirm();
+            Assert(empty.LastApply == null && empty.Menu.Message.Contains("no configured castings"));
         }
 
         private static void TestControllerStop(string root)
@@ -429,10 +439,10 @@ namespace KingmakerBuffPlanner.Tests
             Assert(fixture.Host.ActiveCastingInFlight);
             // A Run row while active is a refusal, not a second spend or an
             // implicit Stop. Stop is a separate deliberate action.
-            fixture.Menu.Move(1);
+            FocusController(fixture.Menu, 0);
             fixture.Menu.Confirm();
             Assert(fixture.Host.StartedRuns == 1 && fixture.Host.ActiveStopRequested == null);
-            fixture.Menu.Move(-1);
+            FocusController(fixture.Menu, 3);
             fixture.Menu.Confirm();
             Assert(fixture.Host.IsRunning && fixture.Host.ActiveStopRequested == CastingExecutionHost.PlayerStopReason);
             fixture.Pump();
@@ -483,7 +493,7 @@ namespace KingmakerBuffPlanner.Tests
         private static void TestControllerProductionWiring()
         {
             string root = WithoutComments(ProductionSource("UI", "BuffPlannerUiRoot.cs"));
-            string open = MemberBody(root, "internal static void OpenControllerRoutines(");
+            string open = MemberBody(root, "private void OpenControllerQuick(");
             Assert(open.Contains("EnsureCastingSession(out session, refresh)") &&
                 open.Contains("StartCastingFirstRoutine(routine, root.PresentQuickResult, null, false)") &&
                 !open.Contains("OpenSetup(") && !open.Contains("new CastingWorkspaceScreenView"));
@@ -518,6 +528,7 @@ namespace KingmakerBuffPlanner.Tests
                 return true;
             }, () => { throw new InvalidOperationException("Unexpected Stop."); }, () => false, () => null);
             Assert(session.PersistenceBlocked && menu.Message.Contains("could not be loaded"));
+            FocusController(menu, 0); // explicitly choose Run Long; default is recovery access
             menu.Confirm();
             Assert(!result.Allowed && boundary.RecordedSubmissions.Count == 0 && File.ReadAllText(path) == bytes);
             Assert(menu.Message.Contains("mouse/keyboard editor"));
@@ -539,7 +550,7 @@ namespace KingmakerBuffPlanner.Tests
             // Model reconstruction is the real presentation used on reopen,
             // not a test-only call to ShowResult.
             Assert(ReopenController(fixture).Message == success);
-            fixture.Menu.Move(1); // completed Run left focus on Stop; select Long again
+            FocusController(fixture.Menu, 0);
             fixture.Inputs = PolicyInputs(fixture.Inputs, true);
             fixture.Menu.Confirm();
             Assert(!fixture.LastApply.Allowed);
@@ -592,6 +603,118 @@ namespace KingmakerBuffPlanner.Tests
                 Assert(files.SequenceEqual(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).OrderBy(p => p)));
                 Assert(contents.SequenceEqual(files.Select(File.ReadAllText)) && writes.SequenceEqual(files.Select(File.GetLastWriteTimeUtc)));
             }
+        }
+
+        private static void TestControllerConfigure(string root)
+        {
+            var fixture = new ControllerFixture(root, "configure", count: 0);
+            Assert(fixture.Menu.Focus == 4 && fixture.Menu.Summary.Contains("Configure plans"));
+            fixture.Menu.Confirm();
+            Assert(fixture.Menu.ConfigureRequested && fixture.Host.StartedRuns == 0 && fixture.FreshReads == 0);
+            // The authoring surface uses THIS existing session; no parallel
+            // storage or disk reload. Exercise real authoring and autosave.
+            Assert(AddDraftCasting(fixture.Session, fixture.Inputs, "unit-wizard", "unit-t1").Applied);
+            var returned = new ControllerRoutineModel(fixture.Session, null, id =>
+            {
+                fixture.LastApply = CastingRunPolicy.Apply(fixture.Session, null, id, fixture.Inputs);
+                return true;
+            }, () => { }, () => fixture.Host.IsRunning, () => fixture.Host.ActiveScopeRoutineId);
+            Assert(returned.Row(0).Contains("1 castings") && returned.Settings.EndsWith("Saved"));
+            Assert(!returned.Available(1) && !returned.Available(2));
+            returned.Confirm(); fixture.Pump();
+            Assert(fixture.LastApply.Allowed && fixture.Host.LastReport.Confirmed == 1 && fixture.Host.LastReport.ResourcesSpent == 1);
+            var loaded = new CastingWorkspaceSession(fixture.Path, fixture.Session.CampaignId);
+            Assert(loaded.Document.Castings.Count == 1 && loaded.Document.Castings[0].CasterUnitId == "unit-wizard");
+        }
+
+        private static void TestControllerResultsNavigation(string root)
+        {
+            var fixture = new ControllerFixture(root, "results-navigation");
+            FocusController(fixture.Menu, 5);
+            Assert(fixture.Menu.Focus == 5 && fixture.Menu.ConfirmHint == "View results");
+            fixture.Menu.Confirm();
+            for (int i = 0; i < 20; i++) { fixture.Menu.Move(1); fixture.Menu.Confirm(); }
+            Assert(fixture.Menu.Focus == 5 && fixture.Host.StartedRuns == 0 && fixture.FreshReads == 0);
+            Assert(fixture.Menu.CloseResults() && !fixture.Menu.CloseResults());
+            FocusController(fixture.Menu, 4); fixture.Menu.Confirm();
+            Assert(fixture.Menu.ConfigureRequested);
+            var running = new ControllerFixture(root, "configure-running", "animated");
+            running.Menu.Confirm(); FocusController(running.Menu, 4); running.Menu.Confirm();
+            Assert(running.Host.IsRunning && !running.Menu.ConfigureRequested && running.Menu.Message.Contains("Stop"));
+        }
+
+        private static void TestControllerAuthoringContracts()
+        {
+            string managed = Path.Combine(Environment.GetEnvironmentVariable("KBP_TEST_GAME_PATH"), "Kingmaker_Data", "Managed");
+            Assembly tmp = Assembly.LoadFrom(Path.Combine(managed, "Assembly-CSharp-firstpass.dll"));
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            Type text = tmp.GetType("TMPro.TMP_Text", true);
+            Type ui = tmp.GetType("TMPro.TextMeshProUGUI", true);
+            Assert(ControllerIlCalls(ui.GetMethod("Awake", flags)).Any(m => m.Name == "LoadDefaultSettings"));
+            Assert(ControllerIlCalls(text.GetMethod("LoadDefaultSettings", flags)).Any(m => m.Name == "set_sizeDelta"));
+            Assembly game = Assembly.LoadFrom(Path.Combine(managed, "Assembly-CSharp.dll"));
+            Type pointer = game.GetType("Rewired.Integration.UnityUI.RewiredPointerInputModule", true);
+            Assert(ControllerIlCalls(pointer.GetMethod("GetMouseInputSource", flags)).Any(m => m.Name == "get_defaultMouseInputSource"));
+            Type module = game.GetType("Rewired.Integration.UnityUI.RewiredStandaloneInputModule", true);
+            Assert(ControllerIlCalls(module.GetProperty("PlayerMice").GetSetMethod()).Any(m => m.Name == "SetupRewiredVars"));
+        }
+
+        private static void FocusController(ControllerRoutineModel menu, int focus)
+        {
+            for (int moves = 0; menu.Focus != focus && moves < 6; moves++) menu.Move(1);
+            Assert(menu.Focus == focus);
+        }
+
+        private static void TestControllerBookHandoff()
+        {
+            int closes = 0, opens = 0;
+            bool source = true, released = false;
+            var request = new ControllerSurfaceHandoff(() => true, () => source,
+                () => { closes++; source = false; }, () => released, () => opens++);
+            for (int frame = 0; frame < 10; frame++) Assert(!request.Tick(false, frame));
+            Assert(closes == 0 && opens == 0);
+            Assert(!request.Tick(true, 10) && !request.Tick(true, 11));
+            Assert(closes == 1 && opens == 0);
+            for (int frame = 12; frame < 30; frame++) Assert(!request.Tick(true, frame));
+            Assert(opens == 0); // neither elapsed time nor source removal grants ownership
+            released = true;
+            Assert(request.Tick(true, 30) && request.Tick(true, 31));
+            Assert(closes == 1 && opens == 1);
+        }
+
+        private static void TestControllerBookHandoffCancel()
+        {
+            foreach (string failure in new[] { "context", "source", "timeout", "cancel" })
+            {
+                int opens = 0;
+                bool valid = true;
+                var request = new ControllerSurfaceHandoff(() => valid, () => failure != "source",
+                    () => { }, () => false, () => opens++);
+                request.Tick(true, 0);
+                if (failure == "context") valid = false;
+                if (failure == "cancel") request.Cancel();
+                bool complete = false;
+                for (int frame = 1; frame < 200; frame++) complete |= request.Tick(true, frame);
+                Assert(complete && opens == 0);
+            }
+        }
+
+        private static void TestControllerBookContracts()
+        {
+            string gamePath = Environment.GetEnvironmentVariable("KBP_TEST_GAME_PATH");
+            Assembly game = Assembly.LoadFrom(Path.Combine(gamePath, "Kingmaker_Data", "Managed", "Assembly-CSharp.dll"));
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            Type view = game.GetType("Kingmaker.UI._ConsoleUI.SpellBook.SpellBookView", true);
+            Assert(view.GetField("IsShowed", flags).FieldType == typeof(bool));
+            Assert(ControllerIlCalls(view.GetMethod("Hide", flags)).Any(call => call.Name == "PopLayer"));
+            Type vm = game.GetType("Kingmaker.UI._ConsoleUI.SpellBook.SpellBookVM", true);
+            Assert(ControllerIlCalls(vm.GetMethod("Back", flags)).Any(call => call.Name == "Dispose"));
+            Type production = Assembly.LoadFrom(Path.Combine(FindRepositoryRoot(), "artifacts", "build", "Release", "KingmakerBuffPlanner.dll"))
+                .GetType("KingmakerBuffPlanner.UI.ControllerSpellbookIntegration", true);
+            MethodInfo select = production.GetMethod("ChooseAction", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert((int)select.Invoke(null, new object[] { new[] { 11 } }) == 19);
+            Assert((int)select.Invoke(null, new object[] { new[] { 11, 19 } }) == 17);
+            Assert(select.Invoke(null, new object[] { new[] { 19, 17 } }) == null);
         }
     }
 }

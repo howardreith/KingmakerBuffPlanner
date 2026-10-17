@@ -1,4 +1,18 @@
-> **Current October 17 owner alpha:** [Controller Alpha 1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.1)
+> **Current controller ACCESS repair (owner correction):**
+> [mission](planning/KBP-CONTROLLER-ACCESS-REPAIR-MISSION.md) supersedes the old
+> run-only gate. Real Configure -> existing editor -> same-session return is
+> mandatory, mouse/keyboard authoring allowed. Source now includes that route,
+> final-after-Awake TMP geometry, unpaged basic status, scrollable results and a
+> context-scoped console-book editor entry. Focused 42/0 at the integration
+> checkpoint; native rendering/input/authoring NOT_RUN. DATA read-only intake
+> at 2026-10-17T23:50Z found foreign Kingmaker PID 22596 and the KMG lease active;
+> neither touched. The installed lab KBP is 0.1.1.0, SHA-256 78407dd4c7240ce25c7654715854e83061da744a18d8eb4a2198fdffec5e3080,
+> MVID c0cc9cbc-8075-4d98-a32e-29972aafa7fa, NOT the owner's alpha.
+> Keep old artifacts and working KMG/CotW fixes. Native card follows verified
+> authoring workflow; full controller graph editing deferred. No push, release,
+> merge, install or native campaign authorized/selected by this repair.
+>
+> **Historical October 17 owner alpha:** [Controller Alpha 1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.1)
 > is published as a non-Latest prerelease of the unchanged 9aec44e candidate.
 > The owner explicitly requested artifact-only publication without new tests or
 > rebuilds for testing on another PC. [Release receipt](docs/evidence/controller-alpha-0.5.4-controller.1.md).

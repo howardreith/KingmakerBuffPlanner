@@ -314,6 +314,9 @@
     <Compile Include="UI\ControllerLayerOwnership.cs" />
     <Compile Include="UI\ControllerEntryRegistry.cs" />
     <Compile Include="UI\ControllerRoutineView.cs" />
+    <Compile Include="UI\ControllerEditorInputBoundary.cs" />
+    <Compile Include="UI\ControllerSpellbookIntegration.cs" />
+    <Compile Include="UI\ControllerSurfaceHandoff.cs" />
     <Compile Include="UI\ControllerRoutineMenu.cs" />
     <Compile Include="UI\ControllerRoutineIntegration.cs" />
     <Compile Include="UI\PlannerNativeThemeSurface.cs" />

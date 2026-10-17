@@ -1,4 +1,15 @@
-> **Current October 17 alpha:** owner-authorized artifact-only
+> **Current access/layout repair:** source implementation proceeds under the
+> [corrected mission](planning/KBP-CONTROLLER-ACCESS-REPAIR-MISSION.md); do not
+> revert to execution-only acceptance. Native qualification is NOT_RUN: foreign
+> Kingmaker PID 22596 / KMG compatibility lease observed 2026-10-17T23:50Z and
+> left untouched. Existing guarded scenarios do not establish this cold-controller
+> mixed-input authoring route; no substitute mouse scenario was launched.
+> Need exclusive guarded entry/editor/return, rendered 1920x1200 then compact,
+> real text/click/scroll and input-restoration observations, before finite-resource
+> casts. Native card and safe book-context reconstruction remain deferred; full
+> controller graph editing is not implemented. Published alpha 1 is unchanged.
+>
+> **Historical October 17 alpha:** owner-authorized artifact-only
 > [Controller Alpha 1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.1)
 > is published for testing on another PC. No tests/rebuilds or local runtime
 > actions were selected. [Receipt](docs/evidence/controller-alpha-0.5.4-controller.1.md).

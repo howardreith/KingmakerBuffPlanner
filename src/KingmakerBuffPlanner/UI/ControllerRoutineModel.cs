@@ -64,6 +64,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Func<bool> _running;
         private readonly Func<string> _activeRoutine;
         private readonly string _unavailable;
+        private bool _configureRequested;
 
         internal ControllerRoutineModel(CastingWorkspaceSession session, string unavailable,
             Func<string, bool> run, Action stop, Func<bool> running, Func<string> activeRoutine)
@@ -76,7 +77,9 @@ namespace KingmakerBuffPlanner.UI
             _activeRoutine = activeRoutine;
             Message = unavailable ?? "Select a saved routine, then confirm Run. Nothing runs while browsing.";
             if (session != null && session.Document.Castings.Count == 0)
-                Message = "This campaign has no configured castings. Create/edit plans with mouse and keyboard, then return here.";
+                Message = (session.LoadStatus == CastingPlanLoadStatus.Absent
+                    ? "No saved casting plan was found for this campaign. " : "No buffs are configured in this campaign plan. ") +
+                    "Choose Configure plans to open the planner here; use mouse and keyboard to edit. Changes autosave.";
             if (session != null && session.PersistenceBlocked)
                 Message = "The saved plan could not be loaded: " + session.LoadWarning +
                     ". Use the mouse/keyboard editor's recovery controls, then return here.";
@@ -91,10 +94,15 @@ namespace KingmakerBuffPlanner.UI
                 if (latest != null) Message = latest;
             }
             if (Running) Focus = 3;
+            else if (session != null && session.Document.Castings.Count == 0) Focus = 4;
         }
 
         internal int Focus { get; private set; }
         internal string Message { get; private set; }
+        internal bool ResultsOpen { get; private set; }
+        internal bool ConfigureRequested { get { return _configureRequested; } }
+        internal string Summary { get { return Message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Ready."; } }
+        internal string ConfirmHint { get { return Focus == 4 ? "Open planner" : Focus == 5 ? "View results" : Focus == 3 ? "Stop" : "Run " + Row(Focus).Substring(4).Split('(')[0].Trim(); } }
         internal bool Running { get { return _running(); } }
         internal string ActiveRoutine { get { return _activeRoutine(); } }
         internal string CampaignId { get { return _session == null ? null : _session.CampaignId; } }
@@ -113,6 +121,8 @@ namespace KingmakerBuffPlanner.UI
 
         internal string Row(int index)
         {
+            if (index == 4) return "Configure plans (mouse + keyboard)";
+            if (index == 5) return "View results / explanations";
             if (index == 3) return Running ? "Stop " + (ActiveRoutine ?? "running routine") : "Stop (no active run)";
             string id = RoutineIds[index];
             string name = _session == null ? char.ToUpperInvariant(id[0]) + id.Substring(1)
@@ -124,11 +134,37 @@ namespace KingmakerBuffPlanner.UI
 
         internal void Move(int direction)
         {
-            Focus = (Focus + (direction < 0 ? 3 : 1)) % 4;
+            if (ResultsOpen) return;
+            int[] order = { 4, 0, 1, 2, 3, 5 };
+            Focus = order[(Array.IndexOf(order, Focus) + (direction < 0 ? 5 : 1)) % order.Length];
+        }
+
+        internal bool Available(int index)
+        {
+            if (index == 4) return !Running;
+            if (index == 5) return true;
+            if (index == 3) return Running;
+            return !Running && _session != null && _session.Document.Castings.Any(c => c.RoutineId == RoutineIds[index]);
+        }
+
+        internal bool CloseResults()
+        {
+            if (!ResultsOpen) return false;
+            ResultsOpen = false;
+            return true;
         }
 
         internal void Confirm()
         {
+            if (ResultsOpen) return;
+            if (Focus == 5) { ResultsOpen = true; return; }
+            if (Focus == 4)
+            {
+                if (Running) Message = "Stop the active routine before opening the editor. Select Stop; completed buffs are kept.";
+                else if (_session == null) Message = _unavailable ?? "The campaign session is unavailable. Return after loading finishes.";
+                else _configureRequested = true;
+                return;
+            }
             if (Focus == 3)
             {
                 if (!Running) { Message = "There is no active routine to stop."; return; }
@@ -144,6 +180,12 @@ namespace KingmakerBuffPlanner.UI
             if (_session == null)
             {
                 Message = _unavailable ?? "Configure and save a plan with mouse and keyboard first.";
+                return;
+            }
+            if (!_session.PersistenceBlocked && !_session.LegacyImportBlocked &&
+                !_session.Document.Castings.Any(c => c.RoutineId == RoutineIds[Focus]))
+            {
+                Message = "This routine has no configured castings. Choose Configure plans to add buffs in the editor.";
                 return;
             }
             if (!_run(RoutineIds[Focus]))

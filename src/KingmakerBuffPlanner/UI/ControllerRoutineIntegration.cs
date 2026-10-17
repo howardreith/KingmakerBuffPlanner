@@ -58,6 +58,8 @@ namespace KingmakerBuffPlanner.UI
                     .GetMethod("MenuLayerPostfix", BindingFlags.Static | BindingFlags.NonPublic)), null);
                 _harmony.Patch(_dispatch, new HarmonyMethod(typeof(ControllerRoutineIntegration)
                     .GetMethod("DispatchPrefix", BindingFlags.Static | BindingFlags.NonPublic)), null, null);
+                try { ControllerSpellbookIntegration.Install(_harmony, log); }
+                catch (Exception exception) { log.Error("[KBP-CONTROLLER-BOOK] optional footer contracts unavailable;quick access retained.", exception); }
             }
             catch { Uninstall(); throw; }
             _log.Info("[KBP-CONTROLLER] native menu entry and scoped binding ownership installed;action=Func01;event=ButtonJustPressed.");
@@ -66,6 +68,7 @@ namespace KingmakerBuffPlanner.UI
         internal static void SetEnabled(bool enabled)
         {
             _enabled = enabled;
+            ControllerSpellbookIntegration.SetEnabled(enabled);
             if (!enabled && ActiveMenu != null) ActiveMenu.Dispose();
             foreach (GameObject hint in Hints.Values)
                 if (hint != null) hint.SetActive(enabled);
@@ -133,7 +136,7 @@ namespace KingmakerBuffPlanner.UI
             Hints.Remove(view);
         }
 
-        private static void DetachEntry(InputLayer layer, BindDescription binding)
+        internal static void DetachEntry(InputLayer layer, BindDescription binding)
         {
             // AddButton has no disposable/remove API in 2.1.7b. Mirror its
             // verified Rewired unbind, but never unbind/rebind the whole layer
@@ -169,6 +172,9 @@ namespace KingmakerBuffPlanner.UI
 
         private static bool DispatchPrefix(BindDescription __instance)
         {
+            if (!ControllerSpellbookIntegration.AllowsDispatch(__instance)) return false;
+            ControllerEditorInputBoundary editor = ControllerEditorInputBoundary.Active;
+            if (editor != null) return editor.Allows(__instance);
             ControllerRoutineMenu menu = ActiveMenu;
             if (menu == null) return true;
             try { return menu.AllowsNativeDispatch(__instance); }
@@ -196,6 +202,8 @@ namespace KingmakerBuffPlanner.UI
                 {
                     if (_getLayer != null) _harmony.Unpatch(_getLayer, HarmonyPatchType.Postfix, HarmonyId);
                     if (_dispatch != null) _harmony.Unpatch(_dispatch, HarmonyPatchType.Prefix, HarmonyId);
+                    foreach (string method in new[] { "CreateInputs", "Hide" })
+                        _harmony.Unpatch(typeof(Kingmaker.UI._ConsoleUI.SpellBook.SpellBookView).GetMethod(method, InstanceMembers), HarmonyPatchType.Postfix, HarmonyId);
                 }
                 _harmony = null;
             }

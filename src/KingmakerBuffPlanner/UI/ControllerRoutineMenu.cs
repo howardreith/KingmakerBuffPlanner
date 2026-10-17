@@ -49,7 +49,7 @@ namespace KingmakerBuffPlanner.UI
             try
             {
                 // Construction and a usable exit route precede ownership.
-                _view = new ControllerRoutineView(donor);
+                _view = new ControllerRoutineView(donor, log);
                 Refresh();
                 ControllerRoutineIntegration.ActiveMenu = this;
                 _ownership.Acquired(_pad.PushLayer(_layer));
@@ -66,6 +66,7 @@ namespace KingmakerBuffPlanner.UI
         }
 
         internal bool IsOpen { get { return !_disposed; } }
+        internal bool ConfigureReady { get; private set; }
 
         private void Add(List<object> bindings, int action, ControllerRoutineCommand command)
         {
@@ -98,6 +99,12 @@ namespace KingmakerBuffPlanner.UI
                 { Dispose(); return; }
                 int frame = Time.frameCount;
                 bool neutral = ControlsNeutral();
+                _view.ObserveSettledGeometry();
+                if (_model.ConfigureRequested)
+                {
+                    ConfigureReady = _latch.CanRelease(neutral, frame);
+                    return;
+                }
                 if (_closing)
                 {
                     if (_latch.CanRelease(neutral, frame)) Dispose();
@@ -110,12 +117,12 @@ namespace KingmakerBuffPlanner.UI
                 {
                     switch (command.Value)
                     {
-                        case ControllerRoutineCommand.Up: _model.Move(-1); break;
-                        case ControllerRoutineCommand.Down: _model.Move(1); break;
-                        case ControllerRoutineCommand.PreviousPage: _view.TurnPage(-1); break;
-                        case ControllerRoutineCommand.NextPage: _view.TurnPage(1); break;
+                        case ControllerRoutineCommand.Up: if (_model.ResultsOpen) _view.TurnPage(-1); else _model.Move(-1); break;
+                        case ControllerRoutineCommand.Down: if (_model.ResultsOpen) _view.TurnPage(1); else _model.Move(1); break;
+                        case ControllerRoutineCommand.PreviousPage: if (_model.ResultsOpen) _view.TurnPage(-1); break;
+                        case ControllerRoutineCommand.NextPage: if (_model.ResultsOpen) _view.TurnPage(1); break;
                         case ControllerRoutineCommand.Confirm: _model.Confirm(); break;
-                        case ControllerRoutineCommand.Back: _closing = true; _latch.Reset(); break;
+                        case ControllerRoutineCommand.Back: if (!_model.CloseResults()) _closing = true; _latch.Reset(); break;
                     }
                     Refresh();
                 }
@@ -162,15 +169,21 @@ namespace KingmakerBuffPlanner.UI
 
         private bool ControlsNeutral()
         {
+            return ControlsAreNeutral();
+        }
+
+        internal static bool ControlsAreNeutral()
+        {
+            if (!GamePad.HasInstance) return false;
             // These are the verified mapped action constants, not device
             // indices. Include both Confirm/Decline mappings and every native
             // action so closing cannot pass a held input into gameplay.
             for (int action = RewiredConsts.Action.DPadLeft; action <= RewiredConsts.Action.RightStickButton; action++)
-                if (_pad.Player.GetButton(action)) return false;
-            return Mathf.Abs(_pad.Player.GetAxis(RewiredConsts.Action.LeftStickX)) < .2f &&
-                Mathf.Abs(_pad.Player.GetAxis(RewiredConsts.Action.LeftStickY)) < .2f &&
-                Mathf.Abs(_pad.Player.GetAxis(RewiredConsts.Action.RightStickX)) < .2f &&
-                Mathf.Abs(_pad.Player.GetAxis(RewiredConsts.Action.RightStickY)) < .2f;
+                if (GamePad.Instance.Player.GetButton(action)) return false;
+            return Mathf.Abs(GamePad.Instance.Player.GetAxis(RewiredConsts.Action.LeftStickX)) < .2f &&
+                Mathf.Abs(GamePad.Instance.Player.GetAxis(RewiredConsts.Action.LeftStickY)) < .2f &&
+                Mathf.Abs(GamePad.Instance.Player.GetAxis(RewiredConsts.Action.RightStickX)) < .2f &&
+                Mathf.Abs(GamePad.Instance.Player.GetAxis(RewiredConsts.Action.RightStickY)) < .2f;
         }
 
         public void Dispose()

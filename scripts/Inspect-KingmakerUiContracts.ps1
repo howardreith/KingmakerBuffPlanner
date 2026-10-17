@@ -4,7 +4,8 @@ param(
     [string]$MethodPattern = '.*',
     [switch]$ListMembers,
     # Explicit additional local contracts; no type enumeration is needed.
-    [string[]]$TypeName = @()
+    [string[]]$TypeName = @(),
+    [string]$AssemblyPath
 )
 
 Set-StrictMode -Version Latest
@@ -13,7 +14,7 @@ $ErrorActionPreference = 'Stop'
 
 $game = Get-KbpGamePath
 $managed = Join-Path $game 'Kingmaker_Data\Managed'
-$assemblyPath = Join-Path $managed 'Assembly-CSharp.dll'
+if (-not $AssemblyPath) { $AssemblyPath = Join-Path $managed 'Assembly-CSharp.dll' }
 $resolver = [ResolveEventHandler]{
     param($sender, $eventArgs)
     $name = ([Reflection.AssemblyName]$eventArgs.Name).Name + '.dll'
@@ -139,10 +140,10 @@ foreach ($name in $TypeName) { $contracts[$name] = @() }
 
 [AppDomain]::CurrentDomain.add_ReflectionOnlyAssemblyResolve($resolver)
 try {
-    $assembly = [Reflection.Assembly]::ReflectionOnlyLoadFrom($assemblyPath)
+    $assembly = [Reflection.Assembly]::ReflectionOnlyLoadFrom($AssemblyPath)
     $flags = [Reflection.BindingFlags]'Public,NonPublic,Instance,Static,DeclaredOnly'
-    Write-Output ('Assembly-CSharp SHA-256: ' + (Get-KbpSha256 $assemblyPath))
-    Write-Output ('Assembly-CSharp MVID: ' + $assembly.ManifestModule.ModuleVersionId)
+    Write-Output ('Assembly SHA-256: ' + (Get-KbpSha256 $AssemblyPath))
+    Write-Output ('Assembly MVID: ' + $assembly.ManifestModule.ModuleVersionId)
     foreach ($entry in $contracts.GetEnumerator()) {
         if ([string]$entry.Key -notmatch $TypePattern) { continue }
         $type = $assembly.GetType([string]$entry.Key, $true)
