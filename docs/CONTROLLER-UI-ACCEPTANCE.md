@@ -18,12 +18,14 @@ Public release/permanent installation: **not authorized or performed**.
 Working base: `2194d0f0f597ebe8b8423f91f8e1fb6b1f65fdb7`, existing 0.5.2
 human-feedback branch, continued on `codex/kingmaker-buff-planner-controller-ui`.
 Entry/source milestone: `afa108f1fd2cc76f49f466c62bd1572f31663d15`.
-Candidate: `0.5.2-controller.1` (CLR 0.5.2.0). Frozen product
-`d04c1a781770194966fa55df15000d627e14662d` passed focused 38/0 and
-deterministic local packaging. The
-[candidate receipt](CONTROLLER-UI-CANDIDATE-0.5.2-CONTROLLER.1.md) records exact
-paths, ZIP/DLL SHA-256 and MVID. These bytes are NOT_RUN; no historical binary's
-runtime verdict applies.
+Current candidate: **0.5.4-controller.1** (CLR 0.5.4.0), frozen integrated
+product `9aec44e374b26b3561fa4402912c77a23a4e08ac`, focused 45/0 and
+deterministic package PASS. Its [receipt](CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.1.md)
+records exact paths/hashes/MVID. Main's 0.5.3 branding/licensing/publisher changes
+and the three PR corrections are included. The original `d04c1a7` /
+[0.5.2-controller.1 receipt](CONTROLLER-UI-CANDIDATE-0.5.2-CONTROLLER.1.md)
+and ZIP remain historical and unchanged, not selected for the next live run.
+Both candidates are NOT_RUN; no historical runtime verdict applies.
 
 DATA, Windows PowerShell 5.1, configured Kingmaker 2.1.7b references, legacy
 Harmony12, C# 7.3/.NET Framework 4.7. Assembly-CSharp MVID
@@ -34,6 +36,10 @@ No virtual controller was used. No game resolution was changed or qualified.
 The 16:48:33Z read-only audit found foreign Kingmaker PID 29980/lease active,
 all 562 project transactions Restored and no unresolved project transaction;
 `artifacts/controller-ui/runtime-intake.json`. No foreign state was changed.
+Follow-up read-only audit at 19:51:18Z found no game or foreign lease, 562
+transactions with no unresolved transaction and no pending protected-save review;
+`artifacts/controller-ui/review-runtime-intake.json`. This is not a Steam/session
+preflight or live restoration PASS.
 
 ## Primary matrix
 
@@ -49,10 +55,10 @@ product observation. No runtime PASS is claimed.
 | E03 | PARTIAL | Each saved routine reaches canonical projection/host with exact caster/book/ability/target in tests. Need real buffs and finite before/after resources for each. |
 | E04 | PARTIAL | Real gate/executors preserve strict/subset, both modes, combat and save refusal. Need representative native execution/refusal/omission observations and zero spend on refusals. |
 | E05 | PARTIAL | Real animated host finishes its in-flight cast then stops later casts; immediate Stop preserves terminal report. Need physical Stop while a suitable native run remains active; no artificial delay. |
-| E06 | PARTIAL | Canonical report entries/omissions/blockers feed paged controller text; refusal suppresses editor construction. Need rendered readable pages and physical dismissal. |
+| E06 | PARTIAL | Canonical report entries/omissions/blockers feed paged controller text; refusal suppresses editor construction. Reconstructed latest-refusal precedence and authoritative persistence status pass regressions. Need rendered readable pages and physical dismissal. |
 | E07 | PARTIAL | Neutral-edge/transition and owned-binding/base-layer/native-takeover tests pass. Need correlated input plus world/camera/radial observations, including held Back/Run and reopen. |
 | E08 | PARTIAL | Browsing preserves exact file bytes/timestamps, document and authoring selection; current/failed edits use canonical durability. Need mouse authoring -> supported controller switch/restart -> unchanged real execution, plus cold process. |
-| E09 | PARTIAL | Context checks and ownership cleanup implemented; stack-boundary takeover/release tests pass. Need actual reopen/area/save/window/focus/device/toggle cycles and stale-campaign checks. |
+| E09 | PARTIAL | Context/ownership cleanup, retained-layer unload/reinstall and actual-native unbound entry detach pass offline regressions. Need live subscription removal and actual reopen/area/save/window/focus/device/toggle cycles and stale-campaign checks. |
 | E10 | PARTIAL | Shared exact-source projection and policy/admission neighbors pass. Need native available/unavailable enhancement/resource cases. Optional-provider/device-family coverage unrun. |
 | E11 | PARTIAL | Existing HUD/hotkey/escape/lease/Classic/session neighbors pass; mouse navigation/highlight code unchanged. Need fresh no-controller mouse startup and ordinary editor/hover observations on candidate. |
 | E12 | BLOCKED | Owned selector/result layout implemented. Need screenshots and human review at owner resolution and supported compact/windowed configuration. No pixel/clipping claim from source. |
@@ -96,13 +102,14 @@ larger validation budget still need to be selected at the actual boundary.
    drivers or loader configuration. Cold-controller proof needs a separate fresh
    process if the switch sequence did not establish it. Record Main.Load,
    callbacks, native mode, campaign, session and zero editor opens before entry.
-6. Physically open the native campaign card menu, follow the displayed Buff
-   Planner button icon, release controls, navigate Long/Important/Short without
-   executing, and deliberately confirm one. Repeat the appropriate authorized
-   routine/resource fixtures for all three. Correlate native mapped input,
-   visible focus/results and actual buff/resource outcomes; no callback counters
-   as substitute. Read all omission/refusal pages with Left/Right.
-7. Include strict/subset and both engines, combat/unresolved/failed-save refusal,
+6. First run is [entry/exit only](CONTROLLER-ENTRY-EXIT-PLAN.md), no casting:
+   fresh native-controller startup -> native campaign menu -> Buff Planner ->
+   older menu closes while planner stays visible/current -> navigate -> Back ->
+   neutral -> normal gameplay input. Correlate physical mapped input, frames,
+   current layer, OnUnbind ordering and zero host starts. Stop here if it fails.
+7. Only after that passes, separately select the authorized finite-resource cases
+   for all three routines. Observe actual buffs/spend, not dispatch counters.
+   Include strict/subset and both engines, combat/unresolved/failed-save refusal,
    a valid/unavailable enhancement, existing-effect skip and a suitable active
    animated Stop. Hold and repeat controls, Back and reopen. While the selector
    owns input, movement/camera/radial/pause must not react. A paused run waits;

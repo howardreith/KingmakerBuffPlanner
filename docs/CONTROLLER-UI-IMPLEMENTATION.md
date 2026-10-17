@@ -2,19 +2,24 @@
 
 PR review follow-up: [three corrected defects and their regressions](CONTROLLER-UI-REVIEW-FIXES.md).
 The original candidate identities below are historical, not builds of the fixes.
+Current integrated frozen product is `9aec44e374b26b3561fa4402912c77a23a4e08ac`,
+**0.5.4-controller.1**, focused 45/0 and deterministic local package PASS:
+[current receipt](CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.1.md).
 
 October 17, 2026; execution-first revision 2 of the
 [owner mission](../planning/KBP-CONTROLLER-UI-MISSION.md). Controller execution
 is implemented with qualification gaps. Full controller editing is deferred.
 This is a local review candidate, with no installation or publication performed.
 
-## Baseline and checkpoint identities
+## Original baseline and checkpoint identities (historical)
 
 Branch: `codex/kingmaker-buff-planner-controller-ui`, preserving the clean
 existing mission base `2194d0f0f597ebe8b8423f91f8e1fb6b1f65fdb7` (0.5.2).
 Read-only `git ls-remote origin refs/heads/main` returned
 `dcf718fd7b70cf453dd25aa693fefc6aa503d826`, matching the supplied 0.5.3
-branding/licensing reference. No reset, merge, push or changes to those releases.
+branding/licensing reference. Initial intake did not replace that legitimate
+mission ancestry. Later feature-branch integration preserves both histories;
+stable releases/archives are untouched and PR #10 remains draft.
 Entry/source checkpoint: `afa108f1fd2cc76f49f466c62bd1572f31663d15`.
 The candidate is `0.5.2-controller.1` using the existing prerelease/numeric
 assembly-version mechanism (CLR 0.5.2.0). No new gameplay logic follows that
@@ -33,6 +38,11 @@ on the native campaign menu (the menu containing Inventory/Character/Spellbook
 cards). It does not depend on the mouse HUD, Formation button or UMM overlay.
 If another adapter already uses that action, this entry is omitted with a bounded
 diagnostic. Missing contracts/font/icon fail softly. No native object is cloned.
+Owned entry registrations are retained by native layer/binding identity and
+detached individually on stale-view cleanup or uninstall. Repeated augmentation
+is idempotent; a later foreign binding is preserved and blocks replacement.
+See the correction receipt for actual-native unbound cleanup coverage and the
+remaining live-subscription boundary.
 
 The entry constructs the complete usable selector, including Back, before
 `GamePad.PushLayer` acquires input. The native menu is closed through its exact
@@ -96,6 +106,8 @@ mode, strict/subset policy and save state. Empty/corrupt/missing sessions explai
 setup/recovery. A retained Classic selection stays Classic: controller execution
 of Classic is not implemented. Its message directs the player to mouse/keyboard
 mod settings and import review; it never silently changes mode.
+Save labels and explanations use the authoritative session `FooterSaveState`
+through `WorkspaceFooterText`, including blocked imports and backup recovery.
 
 ## Refusals, results, Stop and ownership
 
@@ -105,6 +117,9 @@ use the same refusal text, blocker identities/reason formatter and per-casting
 outcome formatter, with paged text and a mouse repair explanation. No automatic
 Reload, Retry, discard, repair or policy change is added. Completed reports list
 each casting, including skips/omissions, without hover.
+Reconstruction gives the session's `LastAttemptMessage` precedence over its
+historical `LastRunReport`; a later completed report clears that refusal through
+the existing session contract. No parallel outcome store is used.
 
 Stop is a separate fourth action, focused when the selector sees a running host.
 A Run row pressed during a run explains Stop rather than reentering execution.

@@ -1,4 +1,15 @@
-> **Current October 17 controller qualification gap:** the execution candidate
+> **Current October 17 PR review handoff:** three P2 fixes committed at
+> `8e4677ba2bb92969a30037875d3bf041f380ab9c`; main integrated at frozen product
+> `9aec44e374b26b3561fa4402912c77a23a4e08ac`, 0.5.4-controller.1. Focused 45/0,
+> deterministic local package PASS; [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.1.md).
+> Live qualification is BLOCKED on the controller-specific guarded observer
+> route and separately selected safety/purity budget/exclusive window. No game
+> or foreign lease at the 19:51:18Z audit; no unresolved transaction/save review.
+> That transient observation is not permission to take over the desktop. First
+> observation is entry/exit only, no casting; [precise preparation](docs/CONTROLLER-ENTRY-EXIT-PLAN.md).
+> PR stays draft; full editor deferred; release/permanent install unauthorized.
+>
+> **Initial October 17 controller qualification gap:** the execution candidate
 > is source-tested; cold-controller startup, actual mapped input, rendered layout,
 > native effects/resources and lifecycle/restoration remain unqualified. Windows
 > sees the owner's USB Xbox 360 controller. A foreign game/lease was observed and

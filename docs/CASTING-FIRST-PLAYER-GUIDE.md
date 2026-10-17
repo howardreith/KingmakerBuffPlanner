@@ -1,6 +1,6 @@
 # Buff Planner: player guide (0.5.2)
 
-## Local controller execution preview (0.5.2-controller.1)
+## Local controller execution preview (0.5.4-controller.1)
 
 Create/edit plans with mouse and keyboard; run saved routines and request Stop
 with a controller in native controller mode.
@@ -16,6 +16,9 @@ cards), then press the button shown beside **Buff Planner — saved routines**.
 Release the opening button. D-pad Up/Down focuses Long, Important, Short or
 Stop; the displayed Confirm button runs that action. Focusing a routine does
 not run it. Mode, availability policy and save status are shown above the rows.
+Unreadable/unresolved data says **Not saved** immediately. Reopening keeps the
+latest refused attempt visible instead of replacing it with an older completed
+run; a later completed run supersedes that refusal.
 
 While casting, Stop uses the existing rule: the cast in progress may finish,
 then later casts stop. The selector itself does not pause the game. If the game

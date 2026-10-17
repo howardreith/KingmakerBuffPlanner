@@ -16,9 +16,14 @@
 > `d04c1a781770194966fa55df15000d627e14662d`, 0.5.2-controller.1, focused
 > 38/0 and two-build deterministic package PASS. Exact artifacts/hashes/MVID:
 > [candidate receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.2-CONTROLLER.1.md).
-> Next is owner source/candidate review, then scoped guarded controller protocol
-> preparation and an exclusive budgeted live session; do not deploy an old mouse
-> scenario or rebuild later documentation HEAD over the frozen artifact.
+> Current integrated product: `9aec44e374b26b3561fa4402912c77a23a4e08ac`,
+> [0.5.4-controller.1 receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.1.md),
+> focused 45/0 and deterministic package PASS. Three P2 fixes and main integration
+> are complete; the older artifact above is historical. Next is the narrow
+> [entry/exit protocol](docs/CONTROLLER-ENTRY-EXIT-PLAN.md), positive/negative
+> guards, then an exclusive separately budgeted entry-only session. No runnable
+> controller scenario exists yet. Do not deploy an old mouse scenario or rebuild
+> later documentation HEAD over either frozen artifact.
 >
 > **Current October 14 stable release:** the owner accepted the
 > human-feedback candidate for full ordinary testing, selected minimal release

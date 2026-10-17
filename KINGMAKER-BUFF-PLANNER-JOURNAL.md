@@ -1,5 +1,30 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17 corrected integrated candidate and native boundary
+
+Frozen product `9aec44e374b26b3561fa4402912c77a23a4e08ac`, 0.5.4-controller.1,
+CLR0.5.4.0; correction commit `8e4677ba2bb92969a30037875d3bf041f380ab9c`.
+Clean-product focused selection 45/0, source47/build1/test compile PASS, 6.2 s
+reported / 6.4519714 s child wall. Two deterministic builds identical; final
+package6/0, release assertions3/0; 8.0408864 s stopwatch / 8.1444404 s child wall.
+Exact commands/logs/hashes/MVID: [new receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.1.md).
+Old ZIP hash rechecked unchanged. Stable 0.5.3/main release history not modified.
+
+Read-only 19:51:18Z audit: 562 transactions, no unresolved state/protected-save
+review, no running game/foreign lease. No runtime write/transaction/launch.
+Restoration NOT_RUN. The launcher has no controller entry-only scenario; manual
+hold occurs after mouse workspace capture, physical allowances are scenario-bound.
+Actual live route audit is not complete. Prepared explicit
+[no-cast entry/exit protocol plan](docs/CONTROLLER-ENTRY-EXIT-PLAN.md) instead of
+relabeling a mouse run or bypassing guards. Required historical full-history
+purity cost exceeds ordinary 30-minute policy; no broad wrapper launched.
+Next: guard/observer extension with positive/negative tests, new observer identity,
+separately selected safety/purity budget and exclusive DATA window, entry/exit
+first, then only justified finite-resource cases. Keep PR draft and editor deferred.
+Final handoff checks: local links/conflict markers 74/0, frozen old/new artifact
+identities 4/0, whitespace clean. No source/script/test/version delta follows
+the frozen merge product; this handoff is documentation only.
+
 ## 2026-10-17 release integration candidate
 
 Merged main `dcf718fd7b70cf453dd25aa693fefc6aa503d826` into the controller
