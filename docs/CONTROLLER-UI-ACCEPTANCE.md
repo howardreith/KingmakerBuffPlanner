@@ -13,8 +13,10 @@ Public release/permanent installation: **not authorized or performed**.
 
 Working base: `2194d0f0f597ebe8b8423f91f8e1fb6b1f65fdb7`, existing 0.5.2
 human-feedback branch, continued on `codex/kingmaker-buff-planner-controller-ui`.
-The execution milestone, final candidate and artifact identities are recorded in
-the delivery receipt added below. No historical binary's runtime verdict applies.
+Entry/source milestone: `afa108f1fd2cc76f49f466c62bd1572f31663d15`.
+Candidate: `0.5.2-controller.1` (CLR 0.5.2.0). Final product/artifact identities
+will be recorded after deterministic packaging. No historical binary's runtime
+verdict applies.
 
 DATA, Windows PowerShell 5.1, configured Kingmaker 2.1.7b references, legacy
 Harmony12, C# 7.3/.NET Framework 4.7. Assembly-CSharp MVID
@@ -22,6 +24,9 @@ Harmony12, C# 7.3/.NET Framework 4.7. Assembly-CSharp MVID
 Windows reports `Xbox 360 Controller for Windows` and the HID game controller
 as OK. Game recognition/mapped input on this candidate remains unobserved.
 No virtual controller was used. No game resolution was changed or qualified.
+The 16:48:33Z read-only audit found foreign Kingmaker PID 29980/lease active,
+all 562 project transactions Restored and no unresolved project transaction;
+`artifacts/controller-ui/runtime-intake.json`. No foreign state was changed.
 
 ## Primary matrix
 

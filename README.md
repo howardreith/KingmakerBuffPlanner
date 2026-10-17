@@ -1,5 +1,12 @@
 # Kingmaker Buff Planner
 
+Local development candidate `0.5.2-controller.1` adds controller execution of
+mouse-authored saved routines. It is source-tested with pending native/physical
+qualification, not full controller editing. See the
+[controller implementation](docs/CONTROLLER-UI-IMPLEMENTATION.md) and
+[acceptance matrix](docs/CONTROLLER-UI-ACCEPTANCE.md). It has not been published
+or permanently installed; the stable release information below is preserved.
+
 **Release:** `0.5.2` — the casting-first planner: plan every cast explicitly (caster,
 exact spell source, target, enhancements) and edit castings directly in the
 graph, with autosave and one-click Long / Important / Short routines from the

@@ -1,4 +1,31 @@
-# Kingmaker Buff Planner 0.5.2
+# Local review candidate 0.5.2-controller.1 — controller execution
+
+Not published or permanently installed. Based on the preserved 0.5.2 mission
+branch; the version suffix identifies a local candidate, not a new stable release.
+
+Create/edit plans with mouse and keyboard; run saved routines and request Stop
+with a controller in native controller mode.
+
+- Adds a Buff Planner entry with a native mapped-button hint to the campaign
+  controller menu, plus Long / Important / Short and explicit Stop.
+- Uses the same campaign session, latest-edit durability barrier, strict/subset
+  policy, exact casting projection and Instant/Animated host as the mouse routes.
+- Adds visible focus, current mode/policy/save state and paged per-casting results
+  and refusal reasons; controller refusals do not open the mouse editor.
+- Uses the native input stack and scoped binding ownership, with neutral latching
+  and lifecycle cleanup. Retained Classic choices direct the player to mouse
+  setup; controller Classic execution and full controller editing are deferred.
+
+Source-tested with named qualification gaps: cold-controller startup, physical
+mapping/isolation, game rendering, actual effects/resources and live restoration
+are pending. Windows device detection is not gameplay qualification. See
+[implementation](CONTROLLER-UI-IMPLEMENTATION.md) and
+[E01–E13 acceptance](CONTROLLER-UI-ACCEPTANCE.md). No controller-support claim for
+Steam Deck, Linux, consoles, other device families or remappings.
+
+---
+
+# Kingmaker Buff Planner 0.5.2 (preserved release notes)
 
 0.5.2 publishes the human-feedback refinement while preserving the approved
 native appearance and HUD buttons.

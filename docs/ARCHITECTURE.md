@@ -1,3 +1,9 @@
+> **October 17 controller execution architecture:** the native campaign menu
+> adds a bounded saved-routine selector and owns its native input layer; session
+> binding and execution remain the canonical services, independently of editor
+> construction. No fullscreen/pause lease or controller plan copy. Details and
+> source/runtime boundaries: [controller implementation](CONTROLLER-UI-IMPLEMENTATION.md).
+>
 > **0.5.1-rc3 preparation architecture:** opening latency starts at the common
 > request boundary and retains discovery, session/persistence binding, input
 > lease, construction, reconciliation, display snapshot, calculation, rebuild,

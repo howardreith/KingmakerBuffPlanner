@@ -1,3 +1,9 @@
+> **Current October 17 controller qualification:** source-tested local execution
+> candidate with native/physical gaps, including cold-controller startup. The
+> [E01–E13 matrix](CONTROLLER-UI-ACCEPTANCE.md) records each status independently.
+> No old runtime PASS transfers; no controller editor, publication or permanent
+> installation is claimed.
+>
 > **Current 0.5.1-rc5 qualification:** exact frozen product `ec3d5f8`, ZIP
 > `63c12d519dd49d514f6ddd31ea0514b9a8af5644680aa1dde82ddc77e63bfb03`,
 > passes focused planning-sequence/display checks and package validation. The

@@ -12,8 +12,11 @@ existing mission base `2194d0f0f597ebe8b8423f91f8e1fb6b1f65fdb7` (0.5.2).
 Read-only `git ls-remote origin refs/heads/main` returned
 `dcf718fd7b70cf453dd25aa693fefc6aa503d826`, matching the supplied 0.5.3
 branding/licensing reference. No reset, merge, push or changes to those releases.
-The final candidate receipt below will distinguish the entry checkpoint, frozen
-product commit and documentation HEAD.
+Entry/source checkpoint: `afa108f1fd2cc76f49f466c62bd1572f31663d15`.
+The candidate is `0.5.2-controller.1` using the existing prerelease/numeric
+assembly-version mechanism (CLR 0.5.2.0). No new gameplay logic follows that
+entry checkpoint. The final receipt distinguishes frozen product/package and
+documentation identities.
 
 ## Native integration
 
@@ -160,8 +163,11 @@ physical input isolation, resolution and human usability remain unqualified.
 
 On DATA the owner connected USB hardware; a read-only Windows PnP query found
 `Xbox 360 Controller for Windows` and `HID-compliant game controller`, both OK.
-A foreign game/lease was observed and left untouched; later read-only checks
-found both released. No project runtime launch/staging was attempted. Existing
+A foreign game/lease was observed and left untouched; a brief released window
+was followed by another active run. At 16:48:33Z the read-only audit recorded
+game PID 29980 and the foreign lease, with all 562 Buff Planner transactions
+Restored and no unresolved project transaction. No project runtime
+launch/staging was attempted. Existing
 manual/physical harness scenarios open/drive mouse surfaces and cannot be
 relabeled controller evidence. Controller-specific guarded observation and
 allowance selection are remaining qualification work; see the

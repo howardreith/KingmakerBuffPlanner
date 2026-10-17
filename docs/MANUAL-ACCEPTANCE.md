@@ -1,3 +1,8 @@
+> **Current October 17 controller acceptance:** review the execution candidate
+> against [E01–E13](CONTROLLER-UI-ACCEPTANCE.md), including physical input and
+> restoration. Mouse-based authoring is permitted. Full controller editing is
+> deferred and is not an execution gate; old C-series evidence remains separate.
+>
 > **Current 0.5.1-rc5 human-feedback acceptance:** exact candidate `ec3d5f8`
 > is focused-tested, packaged and frozen but **NOT_RUN**. The first selected
 > purity prerequisite failed when the physical display changed from 1920x1200

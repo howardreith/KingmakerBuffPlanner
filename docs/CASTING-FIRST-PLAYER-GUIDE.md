@@ -1,5 +1,43 @@
 # Buff Planner: player guide (0.5.2)
 
+## Local controller execution preview (0.5.2-controller.1)
+
+Create/edit plans with mouse and keyboard; run saved routines and request Stop
+with a controller in native controller mode.
+
+This sentence describes the implemented preview workflow. Physical controller,
+cold startup, rendering and real buff/resource qualification remain pending;
+see [controller acceptance](CONTROLLER-UI-ACCEPTANCE.md). This is not full
+controller editor support or a public release recommendation.
+
+After authoring and saving your plan, use the game's supported controller-mode
+workflow. Open its normal campaign menu (the Inventory/Character/Spellbook
+cards), then press the button shown beside **Buff Planner — saved routines**.
+Release the opening button. D-pad Up/Down focuses Long, Important, Short or
+Stop; the displayed Confirm button runs that action. Focusing a routine does
+not run it. Mode, availability policy and save status are shown above the rows.
+
+While casting, Stop uses the existing rule: the cast in progress may finish,
+then later casts stop. The selector itself does not pause the game. If the game
+was already paused, casting waits; Back returns you to native pause controls.
+Results and refusal details are paged with D-pad Left/Right. Back closes after
+you release the controls, then you can continue playing.
+
+Empty plans explain mouse/keyboard setup. Failed saves, unavailable castings
+and other canonical refusals remain refusals: use the mouse editor for repair,
+Retry save or Reload. A retained Classic choice requires mouse/keyboard setup
+of the casting-first planner and import review; it is never switched silently.
+There is no controller Setup button leading into a mouse-only editor.
+
+Windows on DATA recognizes the owner's USB Xbox 360 controller. This alone
+does not establish that the game recognized or executed its mapped inputs on
+this candidate. Follow the game's displayed icons; no device/remapping claim
+extends beyond the eventual observed test. Other controller families, Linux,
+Steam Deck and consoles are unqualified. The mouse guide below retains the
+established 0.5.2 authoring workflow.
+
+## Mouse and keyboard authoring
+
 This guide describes the casting-first planner in 0.5.2. It is the only normal
 planner: there is
 no Save button, no Accept Plan step and no Classic switch in the planner.

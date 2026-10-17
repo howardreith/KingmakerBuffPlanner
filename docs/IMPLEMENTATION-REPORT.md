@@ -1,3 +1,9 @@
+> **Current October 17 controller execution:** bounded native entry, shared cold
+> session binding, canonical Run/Stop, scoped ownership and readable results are
+> implemented with qualification gaps. Full editor DEFERRED. See the
+> [controller report](CONTROLLER-UI-IMPLEMENTATION.md); historical records below
+> keep their original artifacts and do not qualify this candidate.
+>
 > **Current 0.5.1-rc5 preparation:** exact packaged source `ec3d5f8` makes the
 > full native planning sequence executable on the three-recipient/one-seed
 > fixture and adds the explicit guarded windowed-1920x1200 request with Unity,

@@ -1,5 +1,23 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17 execution candidate freeze preparation
+
+Entry/source milestone `afa108f1fd2cc76f49f466c62bd1572f31663d15` is preserved
+on `codex/kingmaker-buff-planner-controller-ui`. Its final entry selection passed
+13/0 in 7.2 s (source 43/0, production build 1/0). The existing prerelease
+mechanism identifies the local candidate as `0.5.2-controller.1`, CLR 0.5.2.0;
+only version metadata/player and architecture documentation follow that source
+milestone. Stable releases/archives are untouched. No optional editor work.
+
+The read-only 16:48:33Z audit found 562 project transactions Restored and no
+unresolved project transaction; foreign Kingmaker PID 29980/lease were active.
+No interaction or mutation was attempted. Relevant new documentation links 3/0
+and `git diff --check` passed. Next commands on the clean candidate product HEAD:
+the implementation's exact 38-test Test-Development selection, then
+`scripts/Build-Release.ps1` (its two deterministic Build-Local passes and strict
+package validation). These are pending at this preparation checkpoint; a separate
+receipt will bind their results/hashes/MVID to the frozen product, not later docs.
+
 ## 2026-10-17 controller execution-first source checkpoint
 
 Branch `codex/kingmaker-buff-planner-controller-ui`, preserved exact intake HEAD
