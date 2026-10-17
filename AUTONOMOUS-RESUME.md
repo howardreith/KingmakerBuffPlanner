@@ -1,3 +1,14 @@
+> **Current October 17 controller execution-first mission:** follow
+> [revision 2](planning/KBP-CONTROLLER-UI-MISSION.md) and the
+> [implementation](docs/CONTROLLER-UI-IMPLEMENTATION.md) /
+> [acceptance](docs/CONTROLLER-UI-ACCEPTANCE.md) records. Continue
+> `codex/kingmaker-buff-planner-controller-ui` from preserved base
+> `2194d0f0f597ebe8b8423f91f8e1fb6b1f65fdb7`. Source execution is implemented;
+> native/physical qualification is pending. Full controller editor is DEFERRED,
+> not an execution acceptance gate. Do not resume older runtime/push/publication
+> campaigns below. Next: freeze/review the local execution candidate and record
+> its exact product/package identity before any optional expansion.
+>
 > **Current October 14 human-feedback resume:** exact frozen rc5 product
 > `ec3d5f865707e540b00fccabd3f1a98f04aa3095`, version 0.5.1-rc5; ZIP
 > `63c12d519dd49d514f6ddd31ea0514b9a8af5644680aa1dde82ddc77e63bfb03`;

@@ -1,0 +1,141 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using Harmony12;
+using Kingmaker;
+using Kingmaker.Assets.Console.GamepadInput;
+using Kingmaker.GameModes;
+using Kingmaker.UI._ConsoleUI.InGameMenu;
+using KingmakerBuffPlanner.Infrastructure;
+using Rewired;
+using TMPro;
+using UnityEngine;
+
+namespace KingmakerBuffPlanner.UI
+{
+    // Optional, exact 2.1.7b controller adapter. Failure leaves the existing
+    // mouse routes intact; nothing changes the game's input-mode setting.
+    internal static class ControllerRoutineIntegration
+    {
+        private const string HarmonyId = "KingmakerBuffPlanner.ControllerRoutines";
+        private const BindingFlags InstanceMembers = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        private static HarmonyInstance _harmony;
+        private static MethodInfo _getLayer;
+        private static MethodInfo _dispatch;
+        private static MethodInfo _deselect;
+        private static FieldInfo _binds;
+        private static ModLog _log;
+        private static bool _enabled;
+        private static readonly Dictionary<BaseGameMenuView, GameObject> Hints =
+            new Dictionary<BaseGameMenuView, GameObject>();
+
+        internal static ControllerRoutineMenu ActiveMenu { get; set; }
+
+        internal static void Install(ModLog log)
+        {
+            if (_harmony != null) return;
+            _log = log;
+            _getLayer = typeof(BaseGameMenuView).GetMethod("GetInputLayer", InstanceMembers, null, Type.EmptyTypes, null);
+            _deselect = typeof(BaseGameMenuView).GetMethod("Deselect", InstanceMembers, null, Type.EmptyTypes, null);
+            _dispatch = typeof(BindDescription).GetMethod("Handler", InstanceMembers, null,
+                new[] { typeof(InputActionEventData) }, null);
+            _binds = typeof(InputLayer).GetField("m_Binds", InstanceMembers);
+            if (_getLayer == null || _getLayer.ReturnType != typeof(InputLayer) || _deselect == null ||
+                _dispatch == null || _binds == null || _binds.FieldType != typeof(List<BindDescription>))
+                throw new InvalidOperationException("The native controller routine contracts do not match this installation.");
+            _harmony = HarmonyInstance.Create(HarmonyId);
+            try
+            {
+                _harmony.Patch(_getLayer, null, new HarmonyMethod(typeof(ControllerRoutineIntegration)
+                    .GetMethod("MenuLayerPostfix", BindingFlags.Static | BindingFlags.NonPublic)), null);
+                _harmony.Patch(_dispatch, new HarmonyMethod(typeof(ControllerRoutineIntegration)
+                    .GetMethod("DispatchPrefix", BindingFlags.Static | BindingFlags.NonPublic)), null, null);
+            }
+            catch { Uninstall(); throw; }
+            _log.Info("[KBP-CONTROLLER] native menu entry and scoped binding ownership installed;action=Func01;event=ButtonJustPressed.");
+        }
+
+        internal static void SetEnabled(bool enabled)
+        {
+            _enabled = enabled;
+            if (!enabled && ActiveMenu != null) ActiveMenu.Dispose();
+            foreach (GameObject hint in Hints.Values)
+                if (hint != null) hint.SetActive(enabled);
+        }
+
+        private static void MenuLayerPostfix(BaseGameMenuView __instance, InputLayer __result)
+        {
+            if (!_enabled || __instance == null || __result == null || Game.Instance == null ||
+                !Game.Instance.IsControllerGamepad || Game.Instance.CurrentMode != GameModeType.Default ||
+                Game.Instance.RootUiContext == null || Game.Instance.RootUiContext.InGameUiContext == null) return;
+            GameObject hint = null;
+            try
+            {
+                foreach (BaseGameMenuView stale in Hints.Keys.Where(candidate => candidate == null).ToArray()) Hints.Remove(stale);
+                GameObject previous;
+                if (Hints.TryGetValue(__instance, out previous) && previous != null) UnityEngine.Object.Destroy(previous);
+                Hints.Remove(__instance);
+                // Respect another native/optional adapter's use of this action.
+                var binds = (List<BindDescription>)_binds.GetValue(__result);
+                if (binds.Any(bind => bind.ActionId == RewiredConsts.Action.Func01))
+                {
+                    _log.Info("[KBP-CONTROLLER] entry unavailable;native-menu-action-conflict=Func01.");
+                    return;
+                }
+                TMP_Text donor = __instance.GetComponentsInChildren<TMP_Text>(true)
+                    .FirstOrDefault(label => label != null && label.font != null);
+                if (donor == null) throw new InvalidOperationException("Native controller menu text is unavailable.");
+                hint = ControllerRoutineView.EntryHint(__instance.transform, donor);
+                BaseGameMenuView view = __instance;
+                InputLayer entryLayer = __result;
+                __result.AddButton(_ =>
+                {
+                    if (!_enabled || !Application.isFocused || view == null || !view.gameObject.activeInHierarchy ||
+                        !GamePad.HasInstance || GamePad.Instance.CurrentInputLayer != entryLayer ||
+                        GamePad.Instance.Player.controllers.joystickCount == 0) return;
+                    BuffPlannerUiRoot.OpenControllerRoutines(view, donor);
+                }, RewiredConsts.Action.Func01, InputActionEventType.ButtonJustPressed, false, false);
+                Hints.Add(view, hint);
+            }
+            catch (Exception exception)
+            {
+                if (hint != null) UnityEngine.Object.Destroy(hint);
+                _log.Error("[KBP-CONTROLLER] native entry unavailable;mouse routes remain available.", exception);
+            }
+        }
+
+        // Deselect clears the menu's authored native selection before Confirm
+        // closes it, preventing an Inventory/Rest/etc. action from also firing.
+        internal static void CloseNativeMenu(BaseGameMenuView view)
+        {
+            _deselect.Invoke(view, null);
+        }
+
+        private static bool DispatchPrefix(BindDescription __instance)
+        {
+            ControllerRoutineMenu menu = ActiveMenu;
+            if (menu == null) return true;
+            try { return menu.AllowsNativeDispatch(__instance); }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-CONTROLLER] input ownership failed;releasing owned layer.", exception);
+                menu.Dispose();
+                return true;
+            }
+        }
+
+        internal static void Uninstall()
+        {
+            SetEnabled(false);
+            foreach (GameObject hint in Hints.Values) if (hint != null) UnityEngine.Object.Destroy(hint);
+            Hints.Clear();
+            if (_harmony != null)
+            {
+                if (_getLayer != null) _harmony.Unpatch(_getLayer, HarmonyPatchType.Postfix, HarmonyId);
+                if (_dispatch != null) _harmony.Unpatch(_dispatch, HarmonyPatchType.Prefix, HarmonyId);
+            }
+            _harmony = null;
+        }
+    }
+}

@@ -2,7 +2,9 @@
 param(
     [string]$TypePattern = '.*',
     [string]$MethodPattern = '.*',
-    [switch]$ListMembers
+    [switch]$ListMembers,
+    # Explicit additional local contracts; no type enumeration is needed.
+    [string[]]$TypeName = @()
 )
 
 Set-StrictMode -Version Latest
@@ -133,6 +135,7 @@ $contracts = [ordered]@{
     'Kingmaker.UI.Tooltip.TooltipTrigger' = @(
         'SetNameAndDescription', 'ShowTooltipManual', 'OnPointerEnter', 'OnPointerExit')
 }
+foreach ($name in $TypeName) { $contracts[$name] = @() }
 
 [AppDomain]::CurrentDomain.add_ReflectionOnlyAssemblyResolve($resolver)
 try {
@@ -148,12 +151,27 @@ try {
             Write-Output ('=== ' + $entry.Key + ' declared members ===')
             foreach ($field in @($type.GetFields($flags) | Sort-Object Name)) {
                 Write-Output ('field ' + $field.FieldType.FullName + ' ' + $field.Name)
+                if ($field.IsLiteral) { Write-Output ('  constant=' + $field.GetRawConstantValue()) }
             }
             foreach ($property in @($type.GetProperties($flags) | Sort-Object Name)) {
                 Write-Output ('property ' + $property.PropertyType.FullName + ' ' + $property.Name)
             }
         }
-        foreach ($methodName in @($entry.Value)) {
+        $methodNames = @($entry.Value)
+        if ($TypeName -contains [string]$entry.Key) {
+            $methodNames = @($type.GetMethods($flags) | Select-Object -ExpandProperty Name -Unique)
+            if ($ListMembers) {
+                foreach ($method in $type.GetMethods($flags)) { Write-Output ($method.ToString()) }
+                foreach ($constructor in $type.GetConstructors($flags)) { Write-Output ($constructor.ToString()) }
+            }
+        }
+        if ($TypeName -contains [string]$entry.Key -and '.ctor' -match $MethodPattern) {
+            foreach ($constructor in $type.GetConstructors($flags)) {
+                Write-Output ('=== ' + $entry.Key + '::' + $constructor.ToString() + ' ===')
+                Read-MethodIl $constructor
+            }
+        }
+        foreach ($methodName in $methodNames) {
             if ($methodName -notmatch $MethodPattern) { continue }
             $methods = @($type.GetMethods($flags) | Where-Object Name -ceq $methodName)
             if ($methods.Count -eq 0) { throw "Method not found: $($entry.Key)::$methodName" }

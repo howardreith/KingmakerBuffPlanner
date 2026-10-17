@@ -1,5 +1,43 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17 controller execution-first source checkpoint
+
+Branch `codex/kingmaker-buff-planner-controller-ui`, preserved exact intake HEAD
+`2194d0f0f597ebe8b8423f91f8e1fb6b1f65fdb7`, version 0.5.2. Clean intake;
+existing worktrees retained. Read-only origin/main is the supplied
+`dcf718fd7b70cf453dd25aa693fefc6aa503d826`. No history replacement/fetch merge.
+Revision 2 explicitly replaces full-editor-first scope; mission saved in
+`planning/KBP-CONTROLLER-UI-MISSION.md`.
+
+Native menu entry/semantic focus, mapped edges/neutral latch, explicit Stop,
+owned native input layer/base dispatch suppression, cold shared-session binding,
+canonical Run and controller-readable refusal/result details implemented.
+Classic remains unchanged with a mouse setup explanation. No mouse navigation
+or hover rewrite, second planner/profile/executor or new packaged dependency.
+
+Commands/evidence: explicit Test-Development selection in controller implementation;
+initial focused behavior 21/0 in 6.2 s; reviewed behavior 38/0 in 6.5 s,
+source 43/0, production build 1/0, test build successful. Intermediate new-code
+compiler errors were corrected; no known baseline failure converted to PASS.
+`artifacts/controller-ui/development-*.log`, `prefix-selection.json` and private
+assembly IL evidence retain their original inputs. Assembly-CSharp SHA-256
+`3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`,
+MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`.
+
+Owner plugged USB controller into DATA; Windows reports Xbox 360/HID controller
+OK. Foreign Kingmaker/lease observed, untouched, subsequently released. No game
+interaction, staging, runtime transaction, settings/profile/save modification,
+push/PR/tag/release/permanent install. Restoration NOT_RUN. Offline script-backed
+effect/spend outcomes do not establish native buffs or physical input.
+
+Rejected: hidden editor initialization, global navigation, hotkey emulation,
+fullscreen Stop, PushLayer-only isolation, device detection as gameplay proof,
+old C-series evidence reuse. Physical/startup/layout/native outcomes remain
+pending; full editor DEFERRED. Next: freeze execution source, stamp a distinct
+local candidate, run the focused selection on frozen identity, package through
+the existing deterministic route and record exact hashes/MVID separately from
+documentation HEAD. Guarded controller protocol/observations follow owner review.
+
 ## 2026-10-14 human-feedback rc4 runtime-finding checkpoint
 
 Continued `codex/kingmaker-buff-planner-human-feedback` from reviewed HEAD

@@ -1,3 +1,13 @@
+> **Current October 17 controller qualification gap:** the execution candidate
+> is source-tested; cold-controller startup, actual mapped input, rendered layout,
+> native effects/resources and lifecycle/restoration remain unqualified. Windows
+> sees the owner's USB Xbox 360 controller. A foreign game/lease was observed and
+> left untouched, then cleared; it is not a permanent hardware blocker. Existing
+> mouse-oriented live scenarios cannot qualify this path without a scoped guarded
+> controller observer/allowance extension. See the exact remaining procedure in
+> [controller acceptance](docs/CONTROLLER-UI-ACCEPTANCE.md). Do not restart old
+> full-source/live campaigns, change loader settings or permanently install.
+>
 > **Current October 14 rc5 blocker:** independently actionable source, focused
 > regression, package, freeze and cleanup work is complete. The selected first
 > five-target purity window **FAILED** before its first WhatIf could pass because

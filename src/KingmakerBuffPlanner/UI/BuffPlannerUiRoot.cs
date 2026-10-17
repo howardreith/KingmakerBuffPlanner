@@ -49,6 +49,7 @@ namespace KingmakerBuffPlanner.UI
             get { return _castingSessions == null ? null : _castingSessions.Current; }
         }
         private CastingWorkspaceScreenView _castingWorkspace;
+        private ControllerRoutineMenu _controllerRoutines;
         // Successful workspace opens (runtime evidence: one per handoff).
         private int _castingWorkspaceOpens;
         // 0.4.2: one native paper-opening sound per successful open.
@@ -145,6 +146,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal static void SetEnabled(bool enabled)
         {
+            ControllerRoutineIntegration.SetEnabled(enabled);
             if (_instance == null) return;
             _instance._enabled = enabled;
             if (enabled)
@@ -539,6 +541,7 @@ namespace KingmakerBuffPlanner.UI
         // instead of ending it underneath (StaticCanvas keeps one flag).
         public void HandleFullScreenUiChanged(bool state, Kingmaker.UI.FullScreenUITypes.FullScreenUIType type)
         {
+            if (state && !KingmakerPlannerInputBoundary.RaisingOwnNotification) CloseControllerRoutines();
             if (!PlannerWindowTransition.YieldsTo(_castingWorkspace != null,
                     KingmakerPlannerInputBoundary.RaisingOwnNotification, state)) return;
             try
@@ -1354,7 +1357,8 @@ namespace KingmakerBuffPlanner.UI
         // production dispatch boundary. Pressing a routine while a run is
         // active is the deliberate stop of that run.
         private bool StartCastingFirstRoutine(string routineId,
-            Action<QuickExecutionResult> completed, CastingApplyMode? requestedMode)
+            Action<QuickExecutionResult> completed, CastingApplyMode? requestedMode,
+            bool openEditorOnRefusal = true)
         {
             if (!_enabled || _session == null) return false;
             if (_session.IsExecuting || _quickStartPending) return false;
@@ -1438,12 +1442,14 @@ namespace KingmakerBuffPlanner.UI
                     QuickExecutionDisposition.Refused, refusal,
                     result.GateDecision == null ? 0 : result.GateDecision.ExecutableCastingIds.Count,
                     0, 0));
+                if (!openEditorOnRefusal && _controllerRoutines != null)
+                    _controllerRoutines.ShowResult(ControllerRoutineDetails.Refusal(refusal, result, session));
                 // No floating result (the accepted HUD boundary): a refusal
                 // the player resolves in the planner opens it on that
                 // routine, with the reason in the footer; any other refusal
                 // of a press with no planner open reaches the game log.
-                if (!CastingRunPresentation.OpensPlanner(result)) ReportClosedPlannerRefusal(refusal);
-                if (CastingRunPresentation.OpensPlanner(result) &&
+                if (!openEditorOnRefusal || !CastingRunPresentation.OpensPlanner(result)) ReportClosedPlannerRefusal(refusal);
+                if (openEditorOnRefusal && CastingRunPresentation.OpensPlanner(result) &&
                     _castingWorkspace == null)
                 {
                     try
@@ -1681,9 +1687,73 @@ namespace KingmakerBuffPlanner.UI
 
         private bool OpenSetup()
         {
+            CloseControllerRoutines();
             if (CastingFirstActive)
                 return OpenCastingWorkspace();
             return _screen != null && _screen.Open();
+        }
+
+        // Called only by the verified native menu's mapped Func01 binding.
+        // Binding initializes the ordinary campaign session, with no mouse
+        // editor construction and no discovery on focus/idle/repeated opens.
+        internal static void OpenControllerRoutines(
+            Kingmaker.UI._ConsoleUI.InGameMenu.BaseGameMenuView nativeMenu, TMPro.TMP_Text donor)
+        {
+            BuffPlannerUiRoot root = _instance;
+            if (root == null || !root._enabled || root._controllerRoutines != null ||
+                Game.Instance == null || !Game.Instance.IsControllerGamepad ||
+                Game.Instance.CurrentMode != GameModeType.Default ||
+                root._castingWorkspace != null || root._screen.IsOpen) return;
+            try
+            {
+                CastingWorkspaceSession session = null;
+                string unavailable = null;
+                string campaign = Game.Instance.Player == null ? null : Game.Instance.Player.GameId;
+                if (!root.CastingFirstActive)
+                    unavailable = "Classic is selected. Use mouse and keyboard to select the casting-first planner " +
+                        "in mod settings and review/save its imported plan. Classic has not been switched.";
+                else if (string.IsNullOrWhiteSpace(campaign))
+                    unavailable = "No campaign profile is available. Return after the campaign has loaded.";
+                else
+                {
+                    bool refresh = root._session.Model == null || root._session.Model.Profile == null ||
+                        root._session.Model.Profile.CampaignId != campaign;
+                    unavailable = root.EnsureCastingSession(out session, refresh);
+                    if (session != null && session.CampaignId != campaign)
+                    {
+                        session = null;
+                        unavailable = "The loaded campaign could not be bound. Close this menu and try again after loading.";
+                    }
+                }
+                var model = new ControllerRoutineModel(session, unavailable,
+                    routine => root.StartCastingFirstRoutine(routine, root.PresentQuickResult, null, false),
+                    () => root._castingHost.RequestStop(CastingExecutionHost.PlayerStopReason),
+                    () => root._castingHost.IsRunning,
+                    () => root._castingHost.ActiveScopeRoutineId);
+                root._controllerRoutines = new ControllerRoutineMenu(donor, model, root._log.Info);
+                // Own the usable controller surface before closing the native
+                // menu. PopLayer removes that older middle layer by identity.
+                ControllerRoutineIntegration.CloseNativeMenu(nativeMenu);
+                if (session != null && session.LastRunReport != null)
+                    root._controllerRoutines.ShowResult(ControllerRoutineDetails.Report(session.LastRunReport, session));
+            }
+            catch (Exception exception)
+            {
+                root.CloseControllerRoutines();
+                root._log.Error("[KBP-CONTROLLER] open failed;owned input released.", exception);
+            }
+        }
+
+        private void CloseControllerRoutines()
+        {
+            ControllerRoutineMenu menu = _controllerRoutines;
+            _controllerRoutines = null;
+            if (menu == null) return;
+            try { menu.Dispose(); }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-CONTROLLER] owned menu cleanup failed;native restoration is uncertain.", exception);
+            }
         }
 
         // The casting-first planner (selected in the mod settings, or by a
@@ -2103,6 +2173,8 @@ namespace KingmakerBuffPlanner.UI
             {
                 _log.Error("[KBP-CF-RUN] result presentation failed.", exception);
             }
+            if (_controllerRoutines != null)
+                _controllerRoutines.ShowResult(ControllerRoutineDetails.Report(report, session));
             // Native UI finish (UI-08): one summary line in the game's own log
             // (the game already logs each cast); the full description is its
             // hover text, and stays in the UMM log and on the session for the
@@ -2240,6 +2312,11 @@ namespace KingmakerBuffPlanner.UI
             if (!_enabled) return;
             long rootStartedAt = RuntimePerformanceDiagnostics.BeginOperation();
             _tickCount++;
+            if (_controllerRoutines != null)
+            {
+                _controllerRoutines.Tick();
+                if (!_controllerRoutines.IsOpen) _controllerRoutines = null;
+            }
             // One step of the active casting run per frame (executors yield
             // per frame), only while the world runs and no planner window
             // holds the game; a held run waits, and its deadline counts only
@@ -2515,6 +2592,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void PresentQuickResult(QuickExecutionResult result)
         {
+            if (_controllerRoutines != null) _controllerRoutines.ShowResult(result.Message);
             _lastQuickResult = result;
             if (result.RoutineId == "long" && _runtimeFirstLongResult == null)
                 _runtimeFirstLongResult = result;
@@ -2535,6 +2613,11 @@ namespace KingmakerBuffPlanner.UI
             ReleasePlayerUi();
         }
 
+        private void OnApplicationFocus(bool focused)
+        {
+            if (!focused) CloseControllerRoutines();
+        }
+
         private void OnEnable()
         {
             if (_castingHost != null && _enabled && !_disposed) _castingHost.Resume();
@@ -2548,6 +2631,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void ReleasePlayerUi()
         {
+            CloseControllerRoutines();
             _closeScreenForClassicRun = false;
             CloseCastingWorkspace();
             if (_screen != null) _screen.Close();
@@ -2558,6 +2642,7 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed) return;
             _disposed = true;
+            CloseControllerRoutines();
             // End any casting run first, through its owned terminal, while
             // the result can still be logged and presented.
             if (_castingHost != null) _castingHost.Shutdown("root-teardown");

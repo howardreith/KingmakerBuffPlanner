@@ -453,6 +453,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunSpellbookRemovalTests(root);
                 RunNativeUiFinishTests(root);
                 RunHumanFeedbackRefinementTests(root);
+                RunControllerRoutineTests(root);
             }
             finally
             {

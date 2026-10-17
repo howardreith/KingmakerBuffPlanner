@@ -49,6 +49,9 @@
     <Compile Include="SpellbookRemovalTests.cs" />
     <Compile Include="NativeUiFinishTests.cs" />
     <Compile Include="HumanFeedbackRefinementTests.cs" />
+    <Compile Include="ControllerRoutineTests.cs" />
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ControllerRoutineModel.cs"><Link>UI\ControllerRoutineModel.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ControllerLayerOwnership.cs"><Link>UI\ControllerLayerOwnership.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\NativeTextMaterialSelection.cs"><Link>UI\NativeTextMaterialSelection.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\ShareCastingModifierAdapter.cs"><Link>GameAdapters\ShareCastingModifierAdapter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\EnhancementLeaseCleanup.cs"><Link>GameAdapters\EnhancementLeaseCleanup.cs</Link></Compile>
