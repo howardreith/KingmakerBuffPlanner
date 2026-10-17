@@ -1,5 +1,30 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17 owner-requested draft PR preparation
+
+The owner explicitly requested a PR after local candidate delivery. This permits
+the guarded feature-branch push and draft PR, not merge, tag, release, runtime
+interaction or permanent installation. Intake HEAD
+`acd56f9909e2ae9ee7a9e16121d25910ace213f4` on
+`codex/kingmaker-buff-planner-controller-ui` was clean; candidate version remains
+0.5.2-controller.1 and frozen product remains `d04c1a7` (full receipt below).
+
+`scripts/Test-GuardedPush.ps1` passed 6/0 in 4.485 s child wall time.
+Read-only `git ls-remote` and an exact-commit fetch established current main
+`dcf718fd7b70cf453dd25aa693fefc6aa503d826`; merge-base is preserved mission
+base `2194d0f0f597ebe8b8423f91f8e1fb6b1f65fdb7`. The PR three-dot diff contains
+only this mission's three commits, not main's later branding/licensing work.
+No existing PR for this branch was found. No main merge, source rewrite or
+artifact rebuild is selected for this publication-only request. Draft review
+must reconcile later main changes before any eventual merge and retain native/
+physical qualification gaps. Historical no-PR statements describe the earlier
+candidate checkpoint, not a continuing prohibition after this new request.
+
+PR documentation/link/boundary checks passed 9/0; `git diff --check` passed.
+Next: documentation-only commit, repeat guarded-push test on its clean HEAD,
+guarded push, create and verify a draft PR against main.
+No runtime transaction was started; restoration remains NOT_RUN.
+
 ## 2026-10-17 preserved execution candidate delivery
 
 Branch `codex/kingmaker-buff-planner-controller-ui`; source milestone

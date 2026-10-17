@@ -6,7 +6,10 @@
 > `2194d0f0f597ebe8b8423f91f8e1fb6b1f65fdb7`. Source execution is implemented;
 > native/physical qualification is pending. Full controller editor is DEFERRED,
 > not an execution acceptance gate. Do not resume older runtime/push/publication
-> campaigns below. Preserved source milestone
+> campaigns below. The owner's subsequent October 17 request authorizes pushing
+> this feature branch and opening a draft PR only; merge, release and permanent
+> installation remain unauthorized. Preserve the frozen candidate while reviewing
+> integration with main's later 0.5.3 branding/licensing changes. Preserved source milestone
 > `afa108f1fd2cc76f49f466c62bd1572f31663d15`; frozen product
 > `d04c1a781770194966fa55df15000d627e14662d`, 0.5.2-controller.1, focused
 > 38/0 and two-build deterministic package PASS. Exact artifacts/hashes/MVID:
