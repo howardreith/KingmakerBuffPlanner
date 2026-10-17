@@ -1,4 +1,11 @@
-> **Current October 17 PR review handoff:** three P2 fixes committed at
+> **Current October 17 alpha:** owner-authorized artifact-only
+> [Controller Alpha 1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.1)
+> is published for testing on another PC. No tests/rebuilds or local runtime
+> actions were selected. [Receipt](docs/evidence/controller-alpha-0.5.4-controller.1.md).
+> Native qualification remains unproved; await entry/exit-first owner feedback.
+> PR stays draft; no stable release, main merge or permanent installation.
+>
+> **Previous October 17 PR review handoff:** three P2 fixes committed at
 > `8e4677ba2bb92969a30037875d3bf041f380ab9c`; main integrated at frozen product
 > `9aec44e374b26b3561fa4402912c77a23a4e08ac`, 0.5.4-controller.1. Focused 45/0,
 > deterministic local package PASS; [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.1.md).

@@ -1,11 +1,17 @@
 # Mr. Bard's Kingmaker Buff Planner
 
+**Controller Alpha 1:** [download the experimental prerelease](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.1).
+It reuses the unchanged candidate below for owner testing; native controller
+behavior is not yet qualified. Back up the mod folder/UserSettings and saves,
+and test entry/Back before casting. Stable 0.5.3 remains Latest.
+
 Local development candidate `0.5.4-controller.1` adds controller execution of
 mouse-authored saved routines. It is source-tested with pending native/physical
 qualification, not full controller editing. See the
 [controller implementation](docs/CONTROLLER-UI-IMPLEMENTATION.md) and
-[acceptance matrix](docs/CONTROLLER-UI-ACCEPTANCE.md). It has not been published
-or permanently installed; the stable release information below is preserved.
+[acceptance matrix](docs/CONTROLLER-UI-ACCEPTANCE.md). It is now published only
+as the owner-authorized alpha above, without local installation; stable release
+information below is preserved.
 
 **Release:** `0.5.3` (2026-10-15) — the mod's public name and author are now
 **Mr. Bard's Kingmaker Buff Planner** by **Mr. Bard**, and it is released under

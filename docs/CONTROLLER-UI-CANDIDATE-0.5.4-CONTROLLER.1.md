@@ -1,5 +1,10 @@
 # Integrated local controller candidate: 0.5.4-controller.1
 
+Subsequent owner authorization published these exact bytes as
+[Controller Alpha 1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.1),
+without a rebuild/new tests. [Publication receipt](evidence/controller-alpha-0.5.4-controller.1.md).
+The original freeze snapshot below retains its identities and qualification gaps.
+
 October 17, 2026. **Implemented with named qualification gaps.** PR review
 corrections and current main integration are complete in this candidate. Native
 startup, handoff, physical input, effects/resources and lifecycle remain NOT_RUN.

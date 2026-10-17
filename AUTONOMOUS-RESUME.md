@@ -1,4 +1,11 @@
-> **Current October 17 controller execution-first mission:** follow
+> **Current October 17 owner alpha:** [Controller Alpha 1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.1)
+> is published as a non-Latest prerelease of the unchanged 9aec44e candidate.
+> The owner explicitly requested artifact-only publication without new tests or
+> rebuilds for testing on another PC. [Release receipt](docs/evidence/controller-alpha-0.5.4-controller.1.md).
+> Await owner entry/exit-first feedback. PR #10 remains draft; stable 0.5.3/main,
+> DATA installation and all saves are untouched. Do not resume a broad campaign.
+>
+> **Previous October 17 controller execution-first mission:** follow
 > [revision 2](planning/KBP-CONTROLLER-UI-MISSION.md) and the
 > [implementation](docs/CONTROLLER-UI-IMPLEMENTATION.md) /
 > [acceptance](docs/CONTROLLER-UI-ACCEPTANCE.md) records. Continue

@@ -11,7 +11,10 @@ startup and physical-controller execution have **not been demonstrated**.
 Additional usability is limited to paged per-casting results, blocker reasons,
 setup/recovery notes and visible semantic focus in the new selector (source-tested;
 rendering unqualified). Full controller editor: **DEFERRED**.
-Public release/permanent installation: **not authorized or performed**.
+Owner-authorized [alpha publication](evidence/controller-alpha-0.5.4-controller.1.md)
+reuses the existing candidate without new tests. Stable controller release and
+permanent installation are **not authorized or performed**; live statuses below
+are unchanged pending owner testing on another PC.
 
 ## Identity and environment
 

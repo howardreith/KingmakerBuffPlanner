@@ -1,5 +1,23 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17 owner-selected controller alpha publication
+
+Owner requested an alpha for another computer, explicitly without a full release
+workflow/new tests. Published unchanged existing product
+`9aec44e374b26b3561fa4402912c77a23a4e08ac`, version 0.5.4-controller.1,
+as non-Latest prerelease at 20:06:32Z. Documentation HEAD at publication was
+`b0d92ce0bffd5a01da7a37414c66bf517fc34b02`; tag targets the compiled product.
+No rebuild/test campaign or permanent installation. ZIP/hash/source and package
+integrity verified; uploaded ZIP/checksum downloaded and matched before publish;
+post-publication flags/digests/tag verified. Strict package integrity 6/0,
+0.54 s child wall. Prior 45/0 tests remain prior evidence, not rerun.
+Exact assets/hashes/MVID/commands/authorization:
+[alpha receipt](docs/evidence/controller-alpha-0.5.4-controller.1.md).
+Stable 0.5.3 remains Latest, main unchanged, PR #10 draft/unmerged, native/physical
+qualification pending. No DATA runtime/saves/settings/Mods mutation; restoration
+NOT_RUN. Next: owner tests entry/exit first on the available other PC and reports
+controller/startup/handoff/Back/input-isolation behavior before casting.
+
 ## 2026-10-17 corrected integrated candidate and native boundary
 
 Frozen product `9aec44e374b26b3561fa4402912c77a23a4e08ac`, 0.5.4-controller.1,
