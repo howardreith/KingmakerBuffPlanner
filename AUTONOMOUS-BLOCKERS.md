@@ -7,6 +7,10 @@
 > controller observer/allowance extension. See the exact remaining procedure in
 > [controller acceptance](docs/CONTROLLER-UI-ACCEPTANCE.md). Do not restart old
 > full-source/live campaigns, change loader settings or permanently install.
+> Local candidate is preserved at product
+> `d04c1a781770194966fa55df15000d627e14662d`, version 0.5.2-controller.1,
+> focused 38/0 with deterministic validated ZIP; packaging is not blocked.
+> [Identity/commands](docs/CONTROLLER-UI-CANDIDATE-0.5.2-CONTROLLER.1.md).
 >
 > **Current October 14 rc5 blocker:** independently actionable source, focused
 > regression, package, freeze and cleanup work is complete. The selected first

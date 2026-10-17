@@ -6,8 +6,14 @@
 > `2194d0f0f597ebe8b8423f91f8e1fb6b1f65fdb7`. Source execution is implemented;
 > native/physical qualification is pending. Full controller editor is DEFERRED,
 > not an execution acceptance gate. Do not resume older runtime/push/publication
-> campaigns below. Next: freeze/review the local execution candidate and record
-> its exact product/package identity before any optional expansion.
+> campaigns below. Preserved source milestone
+> `afa108f1fd2cc76f49f466c62bd1572f31663d15`; frozen product
+> `d04c1a781770194966fa55df15000d627e14662d`, 0.5.2-controller.1, focused
+> 38/0 and two-build deterministic package PASS. Exact artifacts/hashes/MVID:
+> [candidate receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.2-CONTROLLER.1.md).
+> Next is owner source/candidate review, then scoped guarded controller protocol
+> preparation and an exclusive budgeted live session; do not deploy an old mouse
+> scenario or rebuild later documentation HEAD over the frozen artifact.
 >
 > **Current October 14 human-feedback resume:** exact frozen rc5 product
 > `ec3d5f865707e540b00fccabd3f1a98f04aa3095`, version 0.5.1-rc5; ZIP

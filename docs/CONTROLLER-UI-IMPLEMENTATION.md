@@ -15,8 +15,11 @@ branding/licensing reference. No reset, merge, push or changes to those releases
 Entry/source checkpoint: `afa108f1fd2cc76f49f466c62bd1572f31663d15`.
 The candidate is `0.5.2-controller.1` using the existing prerelease/numeric
 assembly-version mechanism (CLR 0.5.2.0). No new gameplay logic follows that
-entry checkpoint. The final receipt distinguishes frozen product/package and
-documentation identities.
+entry checkpoint. The [candidate receipt](CONTROLLER-UI-CANDIDATE-0.5.2-CONTROLLER.1.md)
+identifies frozen product `d04c1a781770194966fa55df15000d627e14662d`, its
+deterministic ZIP/DLL/MVID and separate documentation provenance. Frozen
+validation: 38/0 in 6.2 s; deterministic packaging 8.294 s. These bytes remain
+NOT_RUN in Kingmaker.
 
 ## Native integration
 

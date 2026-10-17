@@ -1,5 +1,42 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17 preserved execution candidate delivery
+
+Branch `codex/kingmaker-buff-planner-controller-ui`; source milestone
+`afa108f1fd2cc76f49f466c62bd1572f31663d15`, frozen product/harness HEAD
+`d04c1a781770194966fa55df15000d627e14662d`, version 0.5.2-controller.1,
+CLR 0.5.2.0. Later changes are documentation only; full controller editor remains
+DEFERRED and no optional source follow-on obscures this execution candidate.
+
+Frozen Test-Development exact selection in the candidate receipt: source 43/0,
+production build 1/0, successful test compilation, behavior 38/0, 6.2 s reported
+(6.4462946 s child wall). Build-Release: two identical source43/build1/package4/
+creation1 passes, final package validation 4/0, release assertions 3/0,
+8.294 s stopwatch (8.4338511 s child wall). Links before freeze 15/0,
+inspector parser 1/0, diff whitespace clean. No broad runtime/purity campaign.
+Final documentation checks: relevant links 19/0, receipt/artifact identity 6/0;
+`artifacts/controller-ui/documentation-final.log`. Product bytes were not rebuilt
+for this later documentation checkpoint.
+
+ZIP `artifacts/release/0.5.2-controller.1/KingmakerBuffPlanner-0.5.2-controller.1.zip`;
+SHA-256 `50c85871a64039702786fca12586cd49a643b0ad3908f565ef4f03278b882bd5`;
+DLL `4b5d2b0c5fbbdfd2d898e359b4d6da780c859a62358cbf6306e967c9c217e19f`;
+MVID `72d854ad-48ce-4d2d-8140-7769f2ba7ec5`. Exact paths/manifests/test
+identity and retained logs: [candidate receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.2-CONTROLLER.1.md).
+
+DATA Windows PnP sees the owner's USB Xbox 360 controller; game recognition is
+unobserved. Foreign game/lease active at 16:48:33Z, PID29980; 562 project
+transactions Restored/no unresolved project transaction. No foreign interruption,
+runtime staging/launch, live save/profile/settings mutation or allowance.
+Restoration NOT_RUN. No push/PR/merge/tag/publication/permanent installation.
+All E01–E13 live gaps remain explicit; no C-series PASS is reused.
+
+Rejected theories and boundaries are retained in implementation/acceptance.
+Exact next action: owner reviews the preserved candidate; prepare narrowly tested
+guarded controller observer/allowance support, then select an exclusive DATA
+qualification window and budget preserving all existing safety/purity/restoration.
+Existing mouse manual/physical scenarios cannot be relabeled as controller proof.
+
 ## 2026-10-17 execution candidate freeze preparation
 
 Entry/source milestone `afa108f1fd2cc76f49f466c62bd1572f31663d15` is preserved

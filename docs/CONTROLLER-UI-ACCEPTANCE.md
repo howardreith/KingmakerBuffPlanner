@@ -14,9 +14,12 @@ Public release/permanent installation: **not authorized or performed**.
 Working base: `2194d0f0f597ebe8b8423f91f8e1fb6b1f65fdb7`, existing 0.5.2
 human-feedback branch, continued on `codex/kingmaker-buff-planner-controller-ui`.
 Entry/source milestone: `afa108f1fd2cc76f49f466c62bd1572f31663d15`.
-Candidate: `0.5.2-controller.1` (CLR 0.5.2.0). Final product/artifact identities
-will be recorded after deterministic packaging. No historical binary's runtime
-verdict applies.
+Candidate: `0.5.2-controller.1` (CLR 0.5.2.0). Frozen product
+`d04c1a781770194966fa55df15000d627e14662d` passed focused 38/0 and
+deterministic local packaging. The
+[candidate receipt](CONTROLLER-UI-CANDIDATE-0.5.2-CONTROLLER.1.md) records exact
+paths, ZIP/DLL SHA-256 and MVID. These bytes are NOT_RUN; no historical binary's
+runtime verdict applies.
 
 DATA, Windows PowerShell 5.1, configured Kingmaker 2.1.7b references, legacy
 Harmony12, C# 7.3/.NET Framework 4.7. Assembly-CSharp MVID
