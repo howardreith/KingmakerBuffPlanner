@@ -1,5 +1,10 @@
 ## 0.6.0 publication authority and native boundary
 
+Publication is DONE: PR10 merged; product c98b434, v0.6.0 Latest02:52:33Z,
+downloaded assets verified. Offline579/0, source47/0, publisher8/0 and two
+deterministic builds/package checks PASS. Native F01-F10 remain NOT_RUN, not
+a failed publication. [Final receipt](docs/RELEASE-0.6.0-RECORD.md).
+
 Owner explicitly authorizes merge/push/full release with a new version. Existing
 OwnerAuthorizedPreRuntime route is selected; human/native acceptance is not
 asserted. Native gaps below are qualification gaps, not a claim publication is

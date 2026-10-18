@@ -1,5 +1,18 @@
 # Kingmaker Buff Planner Journal
 
+## Full release0.6.0 published and verified
+
+PR10 merged02:51:49Z; guarded main integration product c98b43446c13534a2d165b6ca18a264602957758.
+Unchanged established OwnerAuthorizedPreRuntime publisher: offline579/0, source47/0,
+publisher8/0, deterministic2/build3/package6 PASS. Published02:52:33Z, full/non-draft/
+non-prerelease, Latest verified. Annotated tag peeled to exact product; downloaded
+ZIP/checksum match remote digests. ZIP54a7b985...921dfa; DLL240aeaa8...125da2,
+MVIDa6339ffd-16b2-4126-a7e3-43eda0fd32d4. Full identities/commands/times in
+docs/RELEASE-0.6.0-RECORD.md. Existing main worktree/old alphas left untouched;
+no game/install/save/settings/profile/unrelated-mod mutation, native restoration
+NOT_RUN. F01-F10 still NOT_RUN; publication permission is not human acceptance.
+Separate Alpha4 safety scan remains running; its results do not qualify0.6.0.
+
 ## Owner-authorized full release0.6.0 preparation
 
 Owner explicitly requests default-branch merge, push and full release/new version.

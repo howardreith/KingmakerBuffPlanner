@@ -1,4 +1,17 @@
-## Current owner-authorized 0.6.0 full release preparation
+## Current owner-authorized 0.6.0 full release — DONE
+
+PR10 MERGED; main product c98b43446c13534a2d165b6ca18a264602957758. Full GitHub
+release v0.6.0 published02:52:33Z, non-draft/non-prerelease and Latest; annotated
+tag peels to exact product. Complete offline579/0, source47/0, publisher8/0,
+two deterministic release builds/package checks passed via unchanged established
+OwnerAuthorizedPreRuntime route. Downloaded ZIP/checksum verified. No native
+acceptance asserted; F01-F10 remain NOT_RUN. Old artifacts/occupied main worktree
+and separate Alpha4 safety process preserved. [Exact receipt](docs/RELEASE-0.6.0-RECORD.md).
+This documentation HEAD is separate from compiled/tagged c98b434; do not rebuild
+or relabel the existing release. Await controller usability evidence/next owner
+direction; no unsolicited new release, gameplay-mod repair or permanent install.
+
+## 0.6.0 preparation checkpoint (historical)
 
 Owner now explicitly requests merge to default branch, push and a full release
 with a new version. Use existing OwnerAuthorizedPreRuntime publisher disposition,
