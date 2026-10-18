@@ -2,6 +2,11 @@
 
 ## Access/layout correction — current gate, not run-only completion
 
+Frozen product 32f6385206694b7cdb102d1b938f7b2b1acb2d1b / 0.5.4-controller.2:
+[exact package, evidence and limits](CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.2.md).
+60/0 focused source tests and deterministic local packaging pass; native statuses
+below are NOT_RUN, not replaced by those counts.
+
 Owner observed the alpha's entry opening but unusable clipping and no editor
 route. The new [mission](../planning/KBP-CONTROLLER-ACCESS-REPAIR-MISSION.md)
 requires actual authoring in the controller-started session. Version
@@ -19,6 +24,13 @@ qualified controller release. Keep E/C history below under its original IDs.
 | A07 neutral input, failed handoff, stale context, lifecycle and restoration | NOT_RUN | Native boundary contracts plus owned-binding/latch/handoff/timeout tests; actual stack/event ordering remains unobserved. |
 | A08 console-book footer/native controls and mouse regression | NOT_RUN | Real contract/reflection and existing mouse-entry neighbors; live Metamagic/context/book/unit/level controls still need checking. |
 
+Owner baseline screenshots: all three privately supplied ChatGPT photos were
+visually inspected at original 1920x1200. The quick-menu image confirms severe
+left-strip clipping and basic explanation paging; the others show the original
+book controls and existing menu/X hint. They contain no new-candidate identity
+or repaired render, and do not promote A06 or any input/execution observation.
+Exact filenames/hashes are in the candidate receipt; images remain private.
+
 DATA at 2026-10-17T23:50Z: foreign Kingmaker PID 22596 and active KMG lease;
 neither touched. Installed lab planner is 0.1.1.0, not the owner's controller
 alpha (SHA-256 78407dd4c7240ce25c7654715854e83061da744a18d8eb4a2198fdffec5e3080;
@@ -33,6 +45,8 @@ geometry AND pixels AND actual input; no callback injection as device proof.
 Native card and book-origin context reconstruction: DEFERRED. Full controller
 graph editing: DEFERRED. The owner's working KMG/CotW stack is preserved, not
 retested or required by this standalone mod. No push/merge/release/install made.
+
+## Historical execution-only acceptance (original evidence IDs)
 
 Review follow-up: [entry cleanup, persistence and latest-outcome corrections](CONTROLLER-UI-REVIEW-FIXES.md).
 No live status is promoted by these source regressions. The next native test is

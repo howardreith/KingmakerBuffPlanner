@@ -1,4 +1,10 @@
-> **Current access/layout repair:** source implementation proceeds under the
+> **Current access/layout repair:**
+> Frozen candidate .2 is available: product 32f6385, focused 60/0 and deterministic
+> package PASS. See [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.2.md).
+> No source/build blocker; actual authoring/pointer/layout and new native book
+> path are unqualified. This is not a controller-support-complete handoff.
+>
+> Source implementation follows the
 > [corrected mission](planning/KBP-CONTROLLER-ACCESS-REPAIR-MISSION.md); do not
 > revert to execution-only acceptance. Native qualification is NOT_RUN: foreign
 > Kingmaker PID 22596 / KMG compatibility lease observed 2026-10-17T23:50Z and
@@ -8,6 +14,8 @@
 > real text/click/scroll and input-restoration observations, before finite-resource
 > casts. Native card and safe book-context reconstruction remain deferred; full
 > controller graph editing is not implemented. Published alpha 1 is unchanged.
+> All three owner photos were inspected; the clipped old quick panel is confirmed,
+> not a native rendering PASS for this candidate. See receipt for image hashes.
 >
 > **Historical October 17 alpha:** owner-authorized artifact-only
 > [Controller Alpha 1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.1)

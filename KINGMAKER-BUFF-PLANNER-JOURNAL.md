@@ -1,5 +1,36 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17 frozen controller access candidate .2 / local handoff
+
+Product 32f6385206694b7cdb102d1b938f7b2b1acb2d1b preserved in clean detached
+private/worktrees/KBP-CONTROLLER-ACCESS02-VERIFIED. Focused frozen selector 60/0 (7.0 s),
+source47/build1, package6 and deterministic two-build/release3 PASS; combined
+15.873 s. Exact ZIP 0a79c3b10dd2f1adfe8ba85888c9099b1885002f5b7c77d10a429f7c743930ef;
+DLL fd37060969c1cc4d0fb092b14f410bc6f585feb269a2dd45a38353e9e8bfb15f;
+MVID 9eae87dc-ce34-4e79-af0d-da49a3747dcb. Local-only installable .2 ZIP and
+receipt delivered to handoff; parent checkout records documentation separately.
+Exact commands/logs, controls, source-only limits and native A01–A08 remaining
+checks: [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.2.md).
+Read-only GitHub check: PR #10 open/draft, remote HEAD2a04579; no concurrent
+remote correction to merge. No push/PR update, release/tag, merge or install.
+Foreign live game/lease left untouched; no runtime transaction/restoration debt.
+No rendered geometry, physical controller or mouse authoring native PASS claimed.
+
+Pre-delivery c75b030 .2 snapshot (59/0) remains frozen, not selected/delivered.
+Mixed Escape/native Back review found a double-handling risk: 63b9082 introduced
+one neutral-edge latch preserving original text-only intent. Its 59/1 was an
+obsolete source-wiring expectation, not the new behavior test. Corrected the
+assertion at 32f6385; narrow 2/0 (6.7 s), then selected frozen 60/0 above.
+All intermediate logs/artifacts retained. All three private owner ChatGPT photos
+were inspected at original 1920x1200: severe narrow text clipping, native book
+controls/no footer, and native menu/X hint/no card. Receipt records hashes and
+limits. They establish old observed failures, not repaired rendered acceptance.
+Documentation-only handoff checks: 10 relevant document slices, 18 local links,
+zero broken links/conflict markers; git diff --check clean. All 23 explicit
+selector prefixes have registered tests (separate from the frozen 60/0 run).
+Selected ZIP/manifest/source and handoff copies hash-matched; original public
+alpha ZIP hash rechecked unchanged. No source rebuild for these prose updates.
+
 ## 2026-10-17 controller access correction — implementation checkpoint
 
 Implementation preserved at b64e86c. Subsequent review hardens optional geometry

@@ -1,4 +1,11 @@
 > **Current controller ACCESS repair (owner correction):**
+> Frozen local 0.5.4-controller.2 product 32f6385206694b7cdb102d1b938f7b2b1acb2d1b,
+> 60/0 focused tests, deterministic two-build package PASS; exact ZIP/DLL/MVID
+> and native gaps: [candidate receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.2.md).
+> Clean detached product worktree: private/worktrees/KBP-CONTROLLER-ACCESS02-VERIFIED.
+> Parent checkout is documentation/review; do not rebuild its later HEAD over
+> the frozen package. PR #10 remains remote 2a04579, draft; no push selected.
+>
 > [mission](planning/KBP-CONTROLLER-ACCESS-REPAIR-MISSION.md) supersedes the old
 > run-only gate. Real Configure -> existing editor -> same-session return is
 > mandatory, mouse/keyboard authoring allowed. Source now includes that route,
@@ -10,7 +17,9 @@
 > MVID c0cc9cbc-8075-4d98-a32e-29972aafa7fa, NOT the owner's alpha.
 > Keep old artifacts and working KMG/CotW fixes. Native card follows verified
 > authoring workflow; full controller graph editing deferred. No push, release,
-> merge, install or native campaign authorized/selected by this repair.
+> merge or install selected. Native tests were not run: foreign ownership and
+> the guarded controller observer gap remain. All three owner photos inspected;
+> they corroborate the old clipping/entry state, not a new-candidate PASS.
 >
 > **Historical October 17 owner alpha:** [Controller Alpha 1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.1)
 > is published as a non-Latest prerelease of the unchanged 9aec44e candidate.

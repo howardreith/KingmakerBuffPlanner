@@ -2,6 +2,9 @@
 
 ## Current owner correction: actual editor access and layout repair
 
+Frozen .2 product 32f6385, focused 60/0, deterministic package and exact identities:
+[current receipt](CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.2.md).
+
 The [access mission](../planning/KBP-CONTROLLER-ACCESS-REPAIR-MISSION.md)
 supersedes the old run-only acceptance boundary below. Local candidate
 0.5.4-controller.2 adds a focusable **Configure plans** action (first displayed
@@ -27,7 +30,9 @@ the installed Unity physical-mouse fallback through PlayerMice, suppresses Unity
 navigation submit, shows the OS pointer, and owns a native Back-only layer plus
 FullScreenUi mode. Mouse input arms only after neutral. Text-edit Back deselects
 the input field first, then existing Resources/description/casting focus handling
-applies. Native base/gameplay dispatch is isolated only during owned lifetimes.
+applies. Physical Escape/native Back share one neutral-edge latch and preserve
+the original text-only intent even if TMP handles Escape before release.
+Native base/gameplay dispatch is isolated only during owned lifetimes.
 The controller-opened editor's Run explains returning to quick access instead
 of submitting under fullscreen ownership; ordinary mouse Run is unchanged.
 
@@ -56,6 +61,13 @@ native collection/VM contracts were inspected, but no live donor/listener clone
 audit or card/navigation acceptance occurred. No reference-project code or
 assets were copied. Full controller graph editing remains DEFERRED. None of
 these source changes establishes mixed-input or rendering usability in-game.
+
+All three owner photos were inspected at 1920x1200: narrow clipped quick-panel
+text despite unused panel width, native spellbook without planner entry, and
+native menu with the existing X hint but no card. Their hashes/limits are in
+the receipt. They are baseline evidence, not new-byte rendered acceptance.
+
+## Historical execution-only candidate records
 
 Historical execution candidate identities and evidence follow unchanged.
 
