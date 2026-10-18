@@ -1,4 +1,18 @@
-# Local source candidate 0.5.4-controller.4 — full controller planner (unqualified)
+# Mr. Bard's Kingmaker Buff Planner 0.6.0
+
+Owner-authorized full release of the controller planner implementation. The exact
+release has not been run in the game; native F01-F10 remain NOT_RUN. New native
+card, semantic authoring/search, workspace text repair and shared entry/run
+handoffs do not inherit Alpha4's qualification. The established pre-runtime
+publisher retains complete offline C# tests, publisher checks, reproducible
+builds and strict package validation. No unrelated mod, saves, settings or
+permanent installation is changed. See the
+[0.6.0 release notes](RELEASE-NOTES-0.6.0.md) and
+[release record](RELEASE-0.6.0-RECORD.md).
+
+---
+
+# Historical local source candidate 0.5.4-controller.4 — full controller planner (unqualified)
 
 Implements semantic controller focus over the existing workspace's authoring
 controls, controller search/text modal, exact source/recipient/options/order/Undo/

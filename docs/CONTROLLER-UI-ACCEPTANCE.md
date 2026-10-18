@@ -1,5 +1,9 @@
 # Controller execution acceptance
 
+Owner now authorizes merge/push/full release0.6.0 using the established
+OwnerAuthorizedPreRuntime disposition. This changes publication authority,
+not any F01-F10 native verdict. [Release record](RELEASE-0.6.0-RECORD.md).
+
 ## ACTIVE full-controller mission — F01-F10 required
 
 Mouse-required authoring and deferred native-card/full-authoring statements below

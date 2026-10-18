@@ -1,5 +1,16 @@
 # Kingmaker Buff Planner Journal
 
+## Owner-authorized full release0.6.0 preparation
+
+Owner explicitly requests default-branch merge, push and full release/new version.
+Base5276b21, clean feature branch, remote main dcf718f, PR10 draft/mergeable;
+version0.6.0 unused at intake. Select unchanged established pre-runtime publisher:
+complete offline C# suite, publisher gates, two deterministic builds/package checks,
+not human/native acceptance. Existing Alpha4 scan26124/83416 remains running;
+do not duplicate/kill it or inherit its results. Prepare version surfaces and
+honest current docs, preserve old histories, integrate in isolated main clone.
+Actual product/commands/counts/hashes follow in docs/RELEASE-0.6.0-RECORD.md.
+
 ## Alpha4 extended checks: preserved intermittent fixture failure, remaining stages running
 
 ef63e54 v2: arguments28/0, source47/0, package6/0, corrected C#579/0; scratch

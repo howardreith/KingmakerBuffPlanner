@@ -1,5 +1,20 @@
 # Mr. Bard's Kingmaker Buff Planner
 
+**Release: [0.6.0](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.0).**
+Adds the native controller-menu card, semantic controller authoring/search,
+spellbook access and workspace text repair over the shared planner. The owner
+authorized this full release before native qualification; this exact version
+has not been run in the game. Offline checks/build reproducibility do not prove
+controller input, rendered layout or gameplay outcomes. See
+[release notes](docs/RELEASE-NOTES-0.6.0.md),
+[controls/capabilities](docs/CONTROLLER-AUTHORING-CAPABILITIES.md) and
+[native acceptance](docs/CONTROLLER-UI-ACCEPTANCE.md).
+
+## Historical releases and controller previews
+
+The version-specific statements below record earlier releases, not current
+0.6.0 scope or evidence. Prior alphas and their receipts remain unchanged.
+
 [Controller test Alpha4 **0.5.4-controller.4**](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.4)
 targets full controller authoring, its
 own native menu card and actual workspace rendering repair. No mouse prerequisite
@@ -69,7 +84,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.5.3.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.6.0.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including
@@ -85,7 +100,13 @@ Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll
 Unity Mod Manager lists 0.5.2 and earlier as **Kingmaker Buff Planner**; from
 0.5.3 the same entry is listed as **Mr. Bard's Kingmaker Buff Planner**.
 
-Load a campaign, then open the planner with the HUD's gear button, the
+In native controller mode, load a campaign and select the Buff Planner card in
+the RT/R2 campaign menu. Follow the displayed mapped controls for focus,
+routine selection, search, authoring and Back. The controller spellbook footer
+opens the same planner; the displayed quick shortcut remains available. Native
+controller acceptance is NOT_RUN; start with no-cast editing on a disposable plan.
+
+In mouse mode, load a campaign, then open the planner with the HUD's gear button, the
 spellbook's **BUFF PLANNER** button or Ctrl+Shift+B. Pick a buff, a caster
 and its exact source, then click the
 recipient: each line is one cast, and every edit saves itself. The HUD's

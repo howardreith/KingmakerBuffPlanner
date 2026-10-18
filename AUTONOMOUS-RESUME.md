@@ -1,4 +1,14 @@
-## Current full-controller implementation checkpoint
+## Current owner-authorized 0.6.0 full release preparation
+
+Owner now explicitly requests merge to default branch, push and a full release
+with a new version. Use existing OwnerAuthorizedPreRuntime publisher disposition,
+not ConfirmHumanAcceptance; F01-F10 remain NOT_RUN. Selected0.6.0/CLR0.6.0.0.
+Base5276b21. Preserve occupied main worktree and old alpha artifacts/process26124.
+Prepare/test feature version commit, guarded push; isolated clone main merge,
+guarded -AllowDefaultBranch push; unchanged guarded publisher. No permanent
+install, game/save work or unrelated mod changes. [Release record](docs/RELEASE-0.6.0-RECORD.md).
+
+## Historical full-controller implementation checkpoint
 
 **Alpha4 published** 2026-10-18T02:18:48Z; product69a48a4, non-Latest prerelease,
 downloaded hashes verified. [Publication/check record](docs/CONTROLLER-ALPHA4-PUBLICATION.md).

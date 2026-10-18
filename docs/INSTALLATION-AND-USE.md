@@ -15,6 +15,14 @@ Mr. Bard's Kingmaker Buff Planner was published as Kingmaker Buff Planner throug
 3. Start Kingmaker through Steam in the normal way and confirm Unity Mod Manager lists the planner once, with the version of the ZIP you installed. 0.5.2 and earlier are listed as Kingmaker Buff Planner; from 0.5.3 the same entry is listed as Mr. Bard's Kingmaker Buff Planner.
 4. Load a campaign. Open the planner with the HUD's gear button, the spellbook's BUFF PLANNER button or Ctrl+Shift+B.
 
+In native controller mode, use the selectable Buff Planner card in the RT/R2
+campaign menu or the controller spellbook footer. Follow its displayed mapped
+controls for semantic focus, search/text entry, exact casting authoring and Back.
+The quick shortcut remains available for saved routines/Stop. Version0.6.0 is
+owner-authorized before native qualification: this exact release has not been
+run in the game. Test no-cast authoring/return in a disposable plan first;
+[controls and evidence limits](CONTROLLER-AUTHORING-CAPABILITIES.md).
+
 Do not copy game DLLs, Harmony, Unity Mod Manager, Call of the Wild, or another mod into the `Mods\KingmakerBuffPlanner` folder.
 
 ## Plan and run
@@ -28,5 +36,13 @@ Profiles are external JSON under `Mods\KingmakerBuffPlanner\UserSettings`. They 
 Exit the game before replacing the mod folder. To preserve settings across a manual reinstall, copy `UserSettings` first and restore it only to the same standalone mod folder. To uninstall, remove `Mods\KingmakerBuffPlanner`; Kingmaker saves do not depend on the mod or its external profiles.
 
 ## Qualification boundary
+
+0.6.0 uses the established owner-authorized pre-runtime publication route:
+source validation, the complete offline C# suite, publisher gates, deterministic
+builds and strict package checks, not a native acceptance assertion. The
+controller F01-F10 matrix remains NOT_RUN. No accompanying Gunslinger/CotW
+change is required. See [current release notes](RELEASE-NOTES-0.6.0.md) and
+[release record](RELEASE-0.6.0-RECORD.md). The following version-specific results
+are historical and do not transfer to new bytes.
 
 0.5.3 is an owner-authorized rename and licensing release of the 0.5.2 planner: offline source validation, the complete offline C# behavior suite, deterministic release builds and strict package validation ran for it, but it has not been run in the game. 0.5.2's boundary is in its release notes. 0.5.0 is the native UI finish: the planner, HUD row, spellbook button and spell description drawn and behaving as the game's own (see the release notes); its guarded in-game runs and what they did not cover are in `docs/QUALIFICATION.md`. 0.4.3 is the owner-accepted 0.4.2 build (`7a0842f`) with only the version number and documentation advanced; its source gate, guarded in-game runs and what they did not cover are in `docs/OWNER-FEEDBACK-0.4.2-HANDOFF.md`. 0.4.1 is the owner-accepted 0.4.0 candidate (rc4 `009b6dd`) with only the version number and documentation advanced; its qualification (the full source-only gate and guarded in-game runs on disposable test campaigns, with what each run did and did not cover) is recorded with exact run ids in `docs/REMAINING-WORK-0.4.0-HANDOFF.md`; earlier qualification is in `docs/E01-E27-ACCEPTANCE-MATRIX.md` and `docs/QUALIFICATION.md`. Routines never run during combat, and Instant mode never falls back to an animated cast.

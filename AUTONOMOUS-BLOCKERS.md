@@ -1,4 +1,12 @@
-## Current full-controller native boundary
+## 0.6.0 publication authority and native boundary
+
+Owner explicitly authorizes merge/push/full release with a new version. Existing
+OwnerAuthorizedPreRuntime route is selected; human/native acceptance is not
+asserted. Native gaps below are qualification gaps, not a claim publication is
+unauthorized. Keep old artifacts, occupied worktrees and active Alpha4 purity
+process untouched. [Current release record](docs/RELEASE-0.6.0-RECORD.md).
+
+## Historical full-controller native boundary
 
 Alpha4 published for manual testing. Subsequent broad check stopped577/1 on
 baseline brittle Classic source adjacency before purity. Matched Alpha3 fails

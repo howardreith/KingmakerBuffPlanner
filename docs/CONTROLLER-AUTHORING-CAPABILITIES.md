@@ -1,10 +1,12 @@
-# Full controller planner — local source checkpoint, not native acceptance
+# Full controller planner — implementation and native evidence boundary
 
 Active [owner mission](../planning/KBP-FULL-CONTROLLER-MISSION.md) requires ALL
 three: readable workspace, real native card, controller-only authoring. Previous
 mixed-input/card/editor deferrals are historical and no longer completion criteria.
-Local candidate 0.5.4-controller.4 is not published or native-qualified. This
-checkpoint is not completion of the assignment; F01-F10 require new native evidence.
+Alpha4 was published for manual testing. The owner now authorizes merging and
+full release0.6.0 through the existing pre-runtime publisher route. Neither
+publication establishes native qualification or completion of the assignment;
+F01-F10 require new native evidence. [0.6.0 notes](RELEASE-NOTES-0.6.0.md).
 Frozen product69a48a4 and deterministic package/64-test frozen evidence:
 [candidate receipt](CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.4.md).
 

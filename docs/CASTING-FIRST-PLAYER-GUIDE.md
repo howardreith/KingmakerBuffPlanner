@@ -1,6 +1,6 @@
-# Buff Planner: player guide (0.5.2)
+# Buff Planner: player guide (0.6.0)
 
-## Local full-controller candidate 0.5.4-controller.4 (unqualified)
+## Controller planner in 0.6.0 (native qualification NOT_RUN)
 
 The new requirement is controller-only authoring, not mandatory mouse use. Source
 now adds a real native campaign-menu card opening the planner, semantic region
@@ -14,11 +14,14 @@ The spellbook entry opens the same planner; the existing shortcut remains quick
 access. A retained Classic choice requires explicit controller-readable switch
 consent, never a silent mode change. Autosave/recovery and all exact casting
 semantics in the mouse guide remain shared. Full input/rendering/native card
-acceptance is NOT_RUN; this is not a controller-support-complete claim or public
-release. See [capabilities and gaps](CONTROLLER-AUTHORING-CAPABILITIES.md).
+acceptance is NOT_RUN. The owner authorized a full release without those native
+observations; this exact release has not been run in the game. It is not a
+controller-support-complete claim. See
+[capabilities and gaps](CONTROLLER-AUTHORING-CAPABILITIES.md) and
+[release notes](RELEASE-NOTES-0.6.0.md).
 The mixed-input alpha limitations below are historical, not the active goal.
 
-## Controller test alpha 0.5.4-controller.3
+## Historical controller test alpha 0.5.4-controller.3
 
 Includes the same-session workflow below. Escape/Back while typing should leave
 text editing only, even if TMP cancels first; a second deliberate press dismisses
