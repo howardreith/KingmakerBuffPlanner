@@ -47,15 +47,18 @@ namespace KingmakerBuffPlanner.Tests
                 !owns.Contains("BuffPlannerUiRoot.IsCastingWorkspaceOpen") ||
                 !owns.Contains("BuffPlannerUiRoot.IsScreenOpen"))
                 throw new InvalidOperationException("The native Escape is not suppressed while the planner owns it.");
-            // Native UI finish: every Escape key press reaches the one
-            // TakeEscape route (the runtime seam calls the same method),
-            // which marks the Escape taken before the workspace handles it.
+            // Mouse Escape keeps TakeEscape; mixed-input authoring queues
+            // the same Back intent as the native binding to avoid two layers.
+            // Its text-only/edge behavior is exercised in ControllerRoutineTests.
             string rootSource = ProductionSource("UI", "BuffPlannerUiRoot.cs");
             string root = WithoutComments(rootSource);
             string take = WithoutComments(MemberBody(rootSource, "private bool TakeEscape("));
             int marked = take.IndexOf("PlannerHotkey.MarkEscapeTaken();", StringComparison.Ordinal);
             int handled = take.IndexOf("_castingWorkspace.HandleEscape()", StringComparison.Ordinal);
-            if (!root.Contains("if (Input.GetKeyDown(KeyCode.Escape)) TakeEscape(\"Escape\");") ||
+            if (!root.Contains("if (Input.GetKeyDown(KeyCode.Escape))") ||
+                !root.Contains("if (_controllerEditor != null) _controllerEditor.RequestBack();") ||
+                !root.Contains("else TakeEscape(\"Escape\");") ||
+                !root.Contains("new ControllerEditorInputBoundary(() => TakeEscape(\"controller-Back\"))") ||
                 !root.Contains("_instance.TakeEscape(\"runtime-escape\")") ||
                 marked < 0 || handled < 0 || marked > handled)
                 throw new InvalidOperationException("The workspace's Escape is not marked as taken before it is handled.");
