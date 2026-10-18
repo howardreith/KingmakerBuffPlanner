@@ -2,6 +2,11 @@
 
 ## 2026-10-17 alpha .3 review corrections / product freeze
 
+Frozen product 7a7faec9a0824ff192271d12d1a9cde4199452cf in
+private/worktrees/KBP-CONTROLLER-ALPHA03. Final frozen selection 62/0 (6.9 s),
+two deterministic builds/package6/release3 PASS; combined14.924 s. Exact hashes,
+MVID, commands and native limits in [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.3.md).
+
 Continued clean PR #10 branch at 2144f2c470fc34084c016c79f9558811c6abce69;
 remote matches, PR OPEN/DRAFT. Owner explicitly requested two reviewed fixes,
 PR update and a new alpha. Version .3 is new; .1 published and .2 local frozen

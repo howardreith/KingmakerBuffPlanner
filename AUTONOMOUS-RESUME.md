@@ -1,4 +1,7 @@
 > **Current controller ACCESS repair (owner correction):**
+> Frozen .3 product 7a7faec9a0824ff192271d12d1a9cde4199452cf, focused 62/0
+> and deterministic packaging PASS; [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.3.md).
+> Native gates unchanged. Reuse private/worktrees/KBP-CONTROLLER-ALPHA03 bytes.
 > Owner's new review requests two fixes, draft PR update and a new alpha.
 > .3 implements pre-request owned TMP cancellation tracking and overlapping
 > viewport result scrolling; focused development 38/0. Native authoring/layout

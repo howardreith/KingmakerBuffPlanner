@@ -2,6 +2,9 @@
 
 ## Alpha .3 review correction
 
+Frozen product `7a7faec9a0824ff192271d12d1a9cde4199452cf`, focused 62/0,
+deterministic package: [exact receipt](CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.3.md).
+
 The .2 claim that Back preserved text intent even when TMP canceled before the
 request was not fully supported. Its test recorded focused intent first. The
 review identified the missing ordering, now addressed in .3: a Harmony12 prefix

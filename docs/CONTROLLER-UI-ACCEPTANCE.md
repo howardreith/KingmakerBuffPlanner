@@ -2,6 +2,9 @@
 
 ## Alpha .3 focused review correction (native gates unchanged)
 
+Selected source-tested product `7a7faec`, frozen 62/0 and deterministic package;
+[artifact identity and limits](CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.3.md).
+
 Version 0.5.4-controller.3 corrects .2's untested pre-request text cancellation
 ordering and report-length-dependent scroll jumps. Offline regressions exercise
 the production field-context request path with cancellation before/after it,
