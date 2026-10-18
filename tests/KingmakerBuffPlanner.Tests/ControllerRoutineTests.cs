@@ -41,6 +41,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("controller-spellbook-handoff-cancel-timeout-no-open", TestControllerBookHandoffCancel);
             Run("controller-spellbook-native-close-and-conflict-selection", TestControllerBookContracts);
             Run("controller-queued-mode-actions-own-exact-request", TestControllerModeQueue);
+            Run("controller-editor-back-keeps-text-intent-and-single-edge", TestControllerTextBack);
         }
 
         private static void TestControllerActivationLatch()
@@ -704,6 +705,27 @@ namespace KingmakerBuffPlanner.Tests
             queue.ForEach(action => action());
             Assert(own == 1 && foreign == 6);
             Assert(!pending.Guard(() => true)); // no longer the exact pending identity
+        }
+
+        private static void TestControllerTextBack()
+        {
+            var latch = new ControllerActivationLatch();
+            var back = new ControllerBackIntent();
+            int texts = 0, windows = 0;
+            latch.Observe(true, 1);
+            Assert(back.Request(latch, 2, true));
+            // Native binding and keyboard polling cannot independently accept
+            // this frame. Later field cancellation must not change its intent.
+            Assert(!back.Request(latch, 2, false) && !back.Request(latch, 3, false));
+            for (int frame = 3; frame < 8; frame++) back.Complete(latch, false, frame, () => texts++, () => windows++);
+            back.Complete(latch, true, 8, () => texts++, () => windows++);
+            back.Complete(latch, true, 9, () => texts++, () => windows++);
+            back.Complete(latch, true, 10, () => texts++, () => windows++);
+            Assert(texts == 1 && windows == 0);
+            Assert(back.Request(latch, 11, false));
+            back.Complete(latch, true, 12, () => texts++, () => windows++);
+            back.Complete(latch, true, 13, () => texts++, () => windows++);
+            Assert(texts == 1 && windows == 1);
         }
 
         private static void TestControllerBookHandoffCancel()

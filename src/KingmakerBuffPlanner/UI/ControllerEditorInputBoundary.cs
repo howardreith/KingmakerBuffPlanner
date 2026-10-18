@@ -33,7 +33,8 @@ namespace KingmakerBuffPlanner.UI
         private bool _cursorVisible;
         private CursorLockMode _cursorLock;
         private bool _modeOwned;
-        private bool _backPending;
+        private readonly ControllerBackIntent _backIntent = new ControllerBackIntent();
+        private TMPro.TMP_InputField _backText;
         private bool _armed;
         private bool _restored;
         private string _campaign;
@@ -80,7 +81,7 @@ namespace KingmakerBuffPlanner.UI
                 _layer = new InputLayer { ContextName = "KingmakerBuffPlanner.MixedInputEditor", CursorEnabled = false };
                 InputBindStruct back = _layer.AddButton(_ =>
                 {
-                    if (Valid && _latch.Take(Time.frameCount)) _backPending = true;
+                    RequestBack();
                 }, RewiredConsts.Action.Decline, InputActionEventType.ButtonJustPressed, false, false);
                 _ownership = new ControllerLayerOwnership(_layer, () => _pad.CurrentInputLayer, back.Binds);
                 Active = this;
@@ -123,24 +124,37 @@ namespace KingmakerBuffPlanner.UI
 
         internal bool Allows(BindDescription binding) { return _ownership == null || _ownership.Allows(binding); }
 
+        internal void RequestBack()
+        {
+            if (!Valid) return;
+            var field = _events.currentSelectedGameObject == null ? null :
+                _events.currentSelectedGameObject.GetComponent<TMPro.TMP_InputField>();
+            if (_backIntent.Request(_latch, Time.frameCount, field != null && field.isFocused)) _backText = field;
+        }
+
         internal void Tick()
         {
             if (!Valid) return;
             if (Game.Instance.CurrentMode != GameModeType.FullScreenUi) { _modeWaitFrames++; return; }
             bool neutral = ControllerRoutineMenu.ControlsAreNeutral() &&
-                !Input.GetMouseButton(0) && !Input.GetMouseButton(1) && !Input.GetMouseButton(2);
+                !Input.GetMouseButton(0) && !Input.GetMouseButton(1) && !Input.GetMouseButton(2) && !Input.GetKey(KeyCode.Escape);
             _latch.Observe(neutral, Time.frameCount);
             if (!_armed && _latch.Ready(Time.frameCount))
             {
                 _armed = true;
                 _module.allowMouseInput = true;
             }
-            if (!_backPending || !_latch.CanRelease(neutral, Time.frameCount)) return;
-            _backPending = false;
-            var field = _events.currentSelectedGameObject == null ? null :
-                _events.currentSelectedGameObject.GetComponent<TMPro.TMP_InputField>();
-            if (field != null && field.isFocused) { field.DeactivateInputField(); _events.SetSelectedGameObject(null); }
-            else _back();
+            _backIntent.Complete(_latch, neutral, Time.frameCount, () =>
+            {
+                // TMP may already have handled keyboard Escape. Keep the
+                // ORIGINAL text-only intent rather than closing another layer.
+                if (_backText != null)
+                {
+                    if (_backText.isFocused) _backText.DeactivateInputField();
+                    if (_events.currentSelectedGameObject == _backText.gameObject) _events.SetSelectedGameObject(null);
+                }
+                _backText = null;
+            }, _back);
         }
 
         public void YieldFullScreenOwnership() { _modeOwned = false; }

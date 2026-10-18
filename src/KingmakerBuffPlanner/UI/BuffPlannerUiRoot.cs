@@ -2487,7 +2487,11 @@ namespace KingmakerBuffPlanner.UI
                 if (_spellbookEntry != null) _spellbookEntry.Tick();
                 TickWindowHandoff();
                 if (_castingWorkspace != null) _castingWorkspace.TickGeometry();
-                if (Input.GetKeyDown(KeyCode.Escape)) TakeEscape("Escape");
+                if (Input.GetKeyDown(KeyCode.Escape))
+                {
+                    if (_controllerEditor != null) _controllerEditor.RequestBack();
+                    else TakeEscape("Escape");
+                }
                 if (_castingWorkspace != null) _castingWorkspace.NoteFrameEnd();
                 // The close an accepted Classic run asked for, one frame after
                 // the press (never inside the button's own callback).

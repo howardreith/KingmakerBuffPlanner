@@ -52,7 +52,26 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
-    // Focus and result paging belong to the selector, never to authoring.
+    internal sealed class ControllerBackIntent
+    {
+        private bool _pending;
+        private bool _textOnly;
+        internal bool Request(ControllerActivationLatch latch, int frame, bool textEditing)
+        {
+            if (_pending || !latch.Take(frame)) return false;
+            _pending = true;
+            _textOnly = textEditing;
+            return true;
+        }
+        internal void Complete(ControllerActivationLatch latch, bool neutral, int frame, Action leaveText, Action back)
+        {
+            if (!_pending || !latch.CanRelease(neutral, frame)) return;
+            _pending = false;
+            if (_textOnly) leaveText(); else back();
+        }
+    }
+
+    // Focus and read-only results belong to the selector, never to authoring.
     // Commands delegate to the existing routine entry and host. In particular,
     // this class cannot compile, save, reconcile, accept or spend anything.
     internal sealed class ControllerRoutineModel
