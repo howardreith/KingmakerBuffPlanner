@@ -1,5 +1,26 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17 owner-requested Alpha 3 publication / PR update
+
+Published v0.5.4-controller.3 at 2026-10-18T00:39:48Z, product/tag
+7a7faec9a0824ff192271d12d1a9cde4199452cf, documentation HEAD at publication
+eb125de9d43ee56db43dd3c82cf88c62f38377cb. Existing draft PR #10 body updated
+with both review corrections and exact 62/0 frozen evidence; no merge/ready flip.
+Guarded-push WhatIf6/0, fast-forward remote verification PASS. Owner-selected
+artifact-only alpha route reused the unchanged deterministic .3 ZIP; draft
+upload/download ZIP and checksum matched before publication. Remote asset
+digests, prerelease=true/draft=false/latest=false, product tag and unchanged
+main/stableLatest v0.5.3 verified. ZIP 909204 bytes, SHA256SUMS SHA-256
+c644071d35c7a1bca0e31852cd92db6e1c2bb63f244aaa7ff199a8604ee95079;
+full DLL/ZIP/MVID, commands/paths: [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.3.md).
+A shell-quoting invocation failed before any upload; remote state checked and
+corrected plain-quote invocation succeeded. No partial public/duplicate release
+or overwritten assets. 31 relevant links/whitespace checked; no source rebuild
+for later documentation. No native desktop/game/staging/Mods/settings/profile/save
+change, runtime/restoration NOT_RUN. Next owner action: no-cast authoring workflow
+plus text Escape, full report scroll, initial/settled 1920x1200 and compact
+screens before finite-resource runs. Full gamepad graph editing/card deferred.
+
 ## 2026-10-17 alpha .3 review corrections / product freeze
 
 Frozen product 7a7faec9a0824ff192271d12d1a9cde4199452cf in

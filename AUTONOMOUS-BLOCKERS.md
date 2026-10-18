@@ -1,4 +1,8 @@
 > **Current access/layout repair:**
+> .3 fixes are published as owner-requested non-Latest test alpha; draft PR #10
+> updated. Frozen product 7a7faec, 62/0 and deterministic package PASS. See
+> [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.3.md). Actual no-cast
+> Configure/author/save/return/render/input qualification remains NOT_RUN.
 > .3 review fixes have no source/build blocker (focused 38/0); owner now requests
 > alpha publication and PR update. Existing native authoring/rendering gaps
 > remain explicit and must not be promoted by the test release.

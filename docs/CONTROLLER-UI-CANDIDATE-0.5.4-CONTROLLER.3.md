@@ -70,11 +70,32 @@ transaction: restoration **NOT_RUN**, not PASS. Working KMG/CotW repairs untouch
 
 ## Alpha publication and next check
 
+Published [Controller Alpha 3](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.3)
+at **2026-10-18T00:39:48Z** (October 17 local). Draft=false, prerelease=true,
+latest=false; stable v0.5.3 remains Latest and main remains
+dcf718fd7b70cf453dd25aa693fefc6aa503d826. Tag v0.5.4-controller.3 resolves to
+the exact frozen product above. ZIP asset 909204 bytes. SHA256SUMS.txt SHA-256
+`c644071d35c7a1bca0e31852cd92db6e1c2bb63f244aaa7ff199a8604ee95079`.
+Publication documentation HEAD was eb125de9d43ee56db43dd3c82cf88c62f38377cb,
+not the compiled source. Draft PR #10 includes both review fixes.
+
 Selected route is the established artifact-only alpha workflow: guarded
 fast-forward branch push, draft prerelease upload of these unchanged bytes and
 checksum, download/hash verification, then publish with prerelease=true and
 latest=false. No historical full publisher/rebuild campaign and no weakened
-validator. Exact publication result is recorded after remote verification.
+validator. Upload stayed draft until both downloaded ZIP/checksum matched local
+hashes. After publication, GitHub asset digests, flags, exact remote tag/main and
+stable Latest were rechecked. Private notes/checksum/download evidence lives in
+the normal checkout's `artifacts/controller-alpha3/`. Guarded-push WhatIf 6/0;
+31 relevant documentation links checked, whitespace clean. No tests were rerun
+or product rebuilt for publication documentation.
+
+Commands: `gh release create ... --target 7a7faec... --draft --prerelease
+--latest=false`; `gh release download`; `gh release edit ... --draft=false
+--prerelease --latest=false`; release/API/tag verification. A first upload
+invocation failed at shell quoting before execution and created no release;
+the corrected invocation and final remote verification succeeded. No existing
+release/tag/asset was overwritten.
 
 First owner check is **no casting**: cold controller -> menu/shortcut -> readable
 initial/settled quick menu -> Configure -> real pointer/click/scroll/text -> one

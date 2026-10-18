@@ -1,4 +1,8 @@
 > **Current controller ACCESS repair (owner correction):**
+> Owner-requested [Alpha 3](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.3)
+> published 2026-10-18T00:39:48Z as non-Latest prerelease; exact product/tag,
+> download-verified hashes and pending native checks are in the .3 receipt.
+> PR #10 remains draft. Stable/main/old alphas/installation/saves unchanged.
 > Frozen .3 product 7a7faec9a0824ff192271d12d1a9cde4199452cf, focused 62/0
 > and deterministic packaging PASS; [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.3.md).
 > Native gates unchanged. Reuse private/worktrees/KBP-CONTROLLER-ALPHA03 bytes.
