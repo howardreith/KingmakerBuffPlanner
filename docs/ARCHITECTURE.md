@@ -1,3 +1,11 @@
+> **Active full-controller architecture:** native card/book/fast entry adapters
+> share context-bound handoffs. Workspace focus/search delegates to the existing
+> control callbacks/session; stable semantic IDs, scoped focus and owned input
+> do not introduce another plan. Editor ownership releases before explicit quick
+> Run confirmation; that overlay still has no fullscreen/pause lease. Controller
+> text materials have independent lifetime; mouse navigation remains pointer-owned.
+> [Exact paths/evidence boundaries](CONTROLLER-AUTHORING-CAPABILITIES.md).
+>
 > **0.5.1-rc3 preparation architecture:** opening latency starts at the common
 > request boundary and retains discovery, session/persistence binding, input
 > lease, construction, reconciliation, display snapshot, calculation, rebuild,

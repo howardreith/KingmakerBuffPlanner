@@ -2,7 +2,10 @@
 param(
     [string]$TypePattern = '.*',
     [string]$MethodPattern = '.*',
-    [switch]$ListMembers
+    [switch]$ListMembers,
+    # Explicit additional local contracts; no type enumeration is needed.
+    [string[]]$TypeName = @(),
+    [string]$AssemblyPath
 )
 
 Set-StrictMode -Version Latest
@@ -11,7 +14,7 @@ $ErrorActionPreference = 'Stop'
 
 $game = Get-KbpGamePath
 $managed = Join-Path $game 'Kingmaker_Data\Managed'
-$assemblyPath = Join-Path $managed 'Assembly-CSharp.dll'
+if (-not $AssemblyPath) { $AssemblyPath = Join-Path $managed 'Assembly-CSharp.dll' }
 $resolver = [ResolveEventHandler]{
     param($sender, $eventArgs)
     $name = ([Reflection.AssemblyName]$eventArgs.Name).Name + '.dll'
@@ -133,13 +136,14 @@ $contracts = [ordered]@{
     'Kingmaker.UI.Tooltip.TooltipTrigger' = @(
         'SetNameAndDescription', 'ShowTooltipManual', 'OnPointerEnter', 'OnPointerExit')
 }
+foreach ($name in $TypeName) { $contracts[$name] = @() }
 
 [AppDomain]::CurrentDomain.add_ReflectionOnlyAssemblyResolve($resolver)
 try {
-    $assembly = [Reflection.Assembly]::ReflectionOnlyLoadFrom($assemblyPath)
+    $assembly = [Reflection.Assembly]::ReflectionOnlyLoadFrom($AssemblyPath)
     $flags = [Reflection.BindingFlags]'Public,NonPublic,Instance,Static,DeclaredOnly'
-    Write-Output ('Assembly-CSharp SHA-256: ' + (Get-KbpSha256 $assemblyPath))
-    Write-Output ('Assembly-CSharp MVID: ' + $assembly.ManifestModule.ModuleVersionId)
+    Write-Output ('Assembly SHA-256: ' + (Get-KbpSha256 $AssemblyPath))
+    Write-Output ('Assembly MVID: ' + $assembly.ManifestModule.ModuleVersionId)
     foreach ($entry in $contracts.GetEnumerator()) {
         if ([string]$entry.Key -notmatch $TypePattern) { continue }
         $type = $assembly.GetType([string]$entry.Key, $true)
@@ -148,12 +152,27 @@ try {
             Write-Output ('=== ' + $entry.Key + ' declared members ===')
             foreach ($field in @($type.GetFields($flags) | Sort-Object Name)) {
                 Write-Output ('field ' + $field.FieldType.FullName + ' ' + $field.Name)
+                if ($field.IsLiteral) { Write-Output ('  constant=' + $field.GetRawConstantValue()) }
             }
             foreach ($property in @($type.GetProperties($flags) | Sort-Object Name)) {
                 Write-Output ('property ' + $property.PropertyType.FullName + ' ' + $property.Name)
             }
         }
-        foreach ($methodName in @($entry.Value)) {
+        $methodNames = @($entry.Value)
+        if ($TypeName -contains [string]$entry.Key) {
+            $methodNames = @($type.GetMethods($flags) | Select-Object -ExpandProperty Name -Unique)
+            if ($ListMembers) {
+                foreach ($method in $type.GetMethods($flags)) { Write-Output ($method.ToString()) }
+                foreach ($constructor in $type.GetConstructors($flags)) { Write-Output ($constructor.ToString()) }
+            }
+        }
+        if ($TypeName -contains [string]$entry.Key -and '.ctor' -match $MethodPattern) {
+            foreach ($constructor in $type.GetConstructors($flags)) {
+                Write-Output ('=== ' + $entry.Key + '::' + $constructor.ToString() + ' ===')
+                Read-MethodIl $constructor
+            }
+        }
+        foreach ($methodName in $methodNames) {
             if ($methodName -notmatch $MethodPattern) { continue }
             $methods = @($type.GetMethods($flags) | Where-Object Name -ceq $methodName)
             if ($methods.Count -eq 0) { throw "Method not found: $($entry.Key)::$methodName" }

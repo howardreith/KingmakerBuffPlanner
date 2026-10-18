@@ -1,4 +1,106 @@
-# Buff Planner: player guide (0.5.2)
+# Buff Planner: player guide (0.6.0)
+
+## Controller planner in 0.6.0 (native qualification NOT_RUN)
+
+The new requirement is controller-only authoring, not mandatory mouse use. Source
+now adds a real native campaign-menu card opening the planner, semantic region
+focus, a controller search keyboard and shared authoring actions. D-pad/left
+stick navigates; Left/Right changes regions; displayed bumper actions change
+routine; Confirm selects only the focused control. Context inspects; right stick
+scrolls; Back dismisses one layer. Run releases editing ownership and opens the
+selected routine's confirmation/status surface before a separate Run press.
+
+The spellbook entry opens the same planner; the existing shortcut remains quick
+access. A retained Classic choice requires explicit controller-readable switch
+consent, never a silent mode change. Autosave/recovery and all exact casting
+semantics in the mouse guide remain shared. Full input/rendering/native card
+acceptance is NOT_RUN. The owner authorized a full release without those native
+observations; this exact release has not been run in the game. It is not a
+controller-support-complete claim. See
+[capabilities and gaps](CONTROLLER-AUTHORING-CAPABILITIES.md) and
+[release notes](RELEASE-NOTES-0.6.0.md).
+The mixed-input alpha limitations below are historical, not the active goal.
+
+## Historical controller test alpha 0.5.4-controller.3
+
+Includes the same-session workflow below. Escape/Back while typing should leave
+text editing only, even if TMP cancels first; a second deliberate press dismisses
+the next layer. Long results scroll by overlapping viewport-sized steps, not a
+percentage of the whole report. Native usability is still unqualified; first
+test Configure -> mouse click/scroll/text -> autosave -> Close -> count/status ->
+Back without casting. [Alpha notes](CONTROLLER-ALPHA-0.5.4-CONTROLLER.3-NOTES.md).
+
+## Local access-repair candidate (0.5.4-controller.2)
+
+Not yet qualified in-game or publicly released. The intended new same-session
+workflow is: controller campaign menu -> displayed Buff Planner shortcut ->
+**Configure plans** -> edit the actual planner with mouse and keyboard ->
+**Close** -> controller routine selector. Edits use existing autosave; no restart
+or global input-mode switch. A failed save remains Not saved and blocks execution.
+Create/edit plans with mouse and keyboard; run saved routines and request Stop
+with a controller in native controller mode. This is NOT full gamepad graph editing.
+
+Configure is the first row and default for an empty plan. Empty Run actions are
+unavailable. Use D-pad Up/Down and the displayed native Confirm/Back icons;
+Confirm says Open planner, Run Long, Stop, etc. Explicit View results opens a
+scrollable view; D-pad scrolls and Back returns to routines. Basic instructions
+and the latest outcome no longer require explanation pages. Stop remains separate.
+
+In the editor, use the physical mouse for selection/scrolling and keyboard for
+search/text. Back first leaves active text editing, then dismisses the top
+description/Resources/casting focus, then returns to routines. Close also returns
+to routines after release. Run inside this controller-opened editor explains
+returning to the selector, avoiding a run held behind the editor. Stop a running
+routine before opening Configure. Ordinary mouse-mode authoring/Run is unchanged.
+
+The controller spellbook additionally has a Buff Planner footer when a mapped
+action is free (normally the right-stick click candidate; follow its actual
+glyph). Y remains native book switching. The entry opens the actual editor,
+not a spell-specific plan; it is inactive in Metamagic/context/modals. Editor
+Close returns to routines, not a reconstructed book selection. A native fan
+card and original-book return are deferred. Rendering, pointer use and native
+controls still require the [new acceptance checks](CONTROLLER-UI-ACCEPTANCE.md).
+
+## Local controller execution preview (0.5.4-controller.1)
+
+Create/edit plans with mouse and keyboard; run saved routines and request Stop
+with a controller in native controller mode.
+
+This sentence describes the implemented preview workflow. Physical controller,
+cold startup, rendering and real buff/resource qualification remain pending;
+see [controller acceptance](CONTROLLER-UI-ACCEPTANCE.md). This is not full
+controller editor support or a public release recommendation.
+
+After authoring and saving your plan, use the game's supported controller-mode
+workflow. Open its normal campaign menu (the Inventory/Character/Spellbook
+cards), then press the button shown beside **Buff Planner — saved routines**.
+Release the opening button. D-pad Up/Down focuses Long, Important, Short or
+Stop; the displayed Confirm button runs that action. Focusing a routine does
+not run it. Mode, availability policy and save status are shown above the rows.
+Unreadable/unresolved data says **Not saved** immediately. Reopening keeps the
+latest refused attempt visible instead of replacing it with an older completed
+run; a later completed run supersedes that refusal.
+
+While casting, Stop uses the existing rule: the cast in progress may finish,
+then later casts stop. The selector itself does not pause the game. If the game
+was already paused, casting waits; Back returns you to native pause controls.
+Results and refusal details are paged with D-pad Left/Right. Back closes after
+you release the controls, then you can continue playing.
+
+Empty plans explain mouse/keyboard setup. Failed saves, unavailable castings
+and other canonical refusals remain refusals: use the mouse editor for repair,
+Retry save or Reload. A retained Classic choice requires mouse/keyboard setup
+of the casting-first planner and import review; it is never switched silently.
+There is no controller Setup button leading into a mouse-only editor.
+
+Windows on DATA recognizes the owner's USB Xbox 360 controller. This alone
+does not establish that the game recognized or executed its mapped inputs on
+this candidate. Follow the game's displayed icons; no device/remapping claim
+extends beyond the eventual observed test. Other controller families, Linux,
+Steam Deck and consoles are unqualified. The mouse guide below retains the
+established 0.5.2 authoring workflow.
+
+## Mouse and keyboard authoring
 
 This guide describes the casting-first planner in 0.5.2. It is the only normal
 planner: there is

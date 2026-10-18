@@ -1,3 +1,16 @@
+> **0.6.0 release boundary:** owner authorizes default-branch merge and full
+> publication through the established pre-runtime route, not a human-acceptance
+> assertion. This exact release has not been run in the game; F01-F10 remain
+> NOT_RUN. [Release record](RELEASE-0.6.0-RECORD.md) separates final mechanical
+> results/artifact identities from historical alpha evidence below.
+>
+> **Historical full-controller checkpoint:** local .4/product69a48a4 passes64
+> focused tests and deterministic package checks, not native acceptance. All
+> [F01-F10 gates](CONTROLLER-UI-ACCEPTANCE.md) are NOT_RUN. Actual rendering/card/
+> controller authoring/book/execution/mouse behavior and restoration remain
+> unqualified. No old PASS transfers; no publication/install occurred. Source
+> checkpoint is IN_PROGRESS, not completion. [Receipt](CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.4.md).
+>
 > **Current 0.5.1-rc5 qualification:** exact frozen product `ec3d5f8`, ZIP
 > `63c12d519dd49d514f6ddd31ea0514b9a8af5644680aa1dde82ddc77e63bfb03`,
 > passes focused planning-sequence/display checks and package validation. The

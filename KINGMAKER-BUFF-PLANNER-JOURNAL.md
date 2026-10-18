@@ -1,5 +1,472 @@
 # Kingmaker Buff Planner Journal
 
+## Owner-authorized full release0.6.0 preparation
+
+Owner explicitly requests default-branch merge, push and full release/new version.
+Base5276b21, clean feature branch, remote main dcf718f, PR10 draft/mergeable;
+version0.6.0 unused at intake. Select unchanged established pre-runtime publisher:
+complete offline C# suite, publisher gates, two deterministic builds/package checks,
+not human/native acceptance. Existing Alpha4 scan26124/83416 remains running;
+do not duplicate/kill it or inherit its results. Prepare version surfaces and
+honest current docs, preserve old histories, integrate in isolated main clone.
+Actual product/commands/counts/hashes follow in docs/RELEASE-0.6.0-RECORD.md.
+
+## Alpha4 extended checks: preserved intermittent fixture failure, remaining stages running
+
+ef63e54 v2: arguments28/0, source47/0, package6/0, corrected C#579/0; scratch
+Info.json cleanup FAIL, original exception obscured. Synthetic transaction records
+Restored/verified, no lock; leftover synthetic files retained. One isolated unchanged
+filesystem suite38/0 including retry cases; combined FAIL not erased. Resumed
+remaining original safety children02:31:31Z, WindowsPS5.1 PID26124, exec83416,
+buffered remaining-safety-stages.log. No native launch/staging or new product.
+Original source gate still FAIL, no runtime bypass/qualification receipt inferred.
+Additional read-only exact-assembly inspection identifies console main-menu load
+service as MainMenuUiCanvasPartContext, distinct from in-campaign CommonUiLoadService;
+private controller-native-load-services evidence retains actual IL. No observer
+implementation/native load evidence inferred from that inspection.
+
+## Alpha4 corrected-reader wrapper retry scoping
+
+a643b8a harness: launcher28/0, source47/0, package6/0, C#579/0; then FAIL in
+synthetic foreign-once retry. Wrapper globally limited attempts to1, including
+the fixture's deliberate retry scenario. Scoped the limit to actual deployment/
+launcher full-history stages, restored defaults after each; fixture unchanged.
+No product/game/installation/save changes. Preserve first log; corrected v2 run
+must prove fixture retry behavior before any real purity comparison.
+
+## 2026-10-17/18 Alpha4 publication and corrected-reader safety selection
+
+Published02:18:48Z, product/tag69a48a4, notes/pushed brancha78b6ab. Draft ZIP and
+checksum downloaded/matched; flags/tag/unchanged main/stableLatest0.5.3 verified.
+Guarded push WhatIf6/0; PR stays draft. [Publication/evidence record](docs/CONTROLLER-ALPHA4-PUBLICATION.md).
+Owner authorized extended checks after publication. Broad28/0arguments47/0source
+577/1C# stopped before purity; matched Alpha3 reproduces failure once (0/1).
+Classic behavior passes; first-statement source assertion rejected controller
+cleanup preceding the reset. Reader now checks compiled reset-before-both-close,
+with missing/late/wrong-value negatives; focused39/0,5.7s. Production untouched.
+Narrow exact-product corrected-reader sequence retains all remaining source/safety
+children/full-history inventories (attempts1/leasewait120). Not old-wrapper PASS,
+native qualification, new product or retag authority. No game/live transaction.
+
+## 2026-10-17/18 owner requests Alpha4 before extended checks
+
+Owner explicitly requests alpha publication for manual testing first, then
+continuation of the discussed extended guarded checks. Select unchanged frozen
+product69a48a4/.4; focused64/0 and deterministic ZIP already verified. Prepare
+manual no-cast/full-controller notes, guarded feature-branch push, draft
+prerelease upload, download/hash validation then publish non-Latest. No new
+native acceptance inferred, no main merge or normal-install replacement. Public
+tag must point to product, not later docs. Prior alpha artifacts preserved.
+
+## 2026-10-17 DATA availability and read-only native preflight
+
+Owner confirms DATA free for guarded disposable-fixture work; no longer blocked
+on availability. Clean intake99d6d9c; product69a48a4/.4 preserved, no new build.
+Four existing read-only prerequisite groups PASS: foreign lease; unresolved
+transaction/fixture/protected-review; Steam exact offline/cloud/app safety;
+authorized Automation pair. No game process/lease/transaction created. Exact
+console main-menu/load contracts inspected privately; old manual scenario is
+mouse-specific, not cold-controller evidence. Controller route remains unfinished.
+20s bounded count reaches317699 historical files before finishing backups;
+128-file existing hash helper sample3.224s extrapolates16016s for just one
+two-inventory subset. Full mandatory purity/aggregate longer, over ordinary
+30-minute ceiling; not launched or bypassed. Read-only probe/process invocation
+corrections are disclosed in [preflight](docs/CONTROLLER-NATIVE-PREFLIGHT-2026-10-17.md).
+No live input/desktop/Mods/settings/profile/save change; restoration and F01-F10
+NOT_RUN. No source or behavior retest claimed for these documentation changes.
+Next requires safe controller-specific route implementation plus a separately
+selected extended safety-validation budget, not another availability request.
+
+## 2026-10-17/18 full-controller scope and local implementation
+
+Frozen product69a48a4d4c6484abf84549ab8bb062195cedb380, local .4, after
+integration baf221b and authoritative mission-mirror alignment. Clean frozen
+focused64/0,7.3s; deterministic DLL/ZIP/build/package PASS. Exact hashes/MVID,
+commands/logs/environment and remaining native work:
+[.4 receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.4.md).
+No source rebuild for subsequent documentation, no remote writes. Scope remains
+IN_PROGRESS; F01-F10 NOT_RUN. Guarded controller observer route is still required.
+Distinct .4 ZIP and local test note copied into the handoff folder; ZIP hash
+matched. No prior artifact overwritten. Compiled BuildInfo/MVID re-inspected,
+frozen tree clean. Current-scope23 local links and whitespace checks passed;
+initial link-check command's root-path handling was corrected before the strict
+successful pass. No new DLL build or native qualification for documentation.
+
+Owner supersedes mouse-required authoring and deferred card/full-authoring scope.
+Intake clean branch codex/kingmaker-buff-planner-controller-ui at e08031ba;
+read-only PR #10 OPEN/DRAFT matches. Preserve all frozen .1/.2/.3 artifacts,
+Alpha 3 cancellation/viewport-scroll fixes and working KMG/CotW startup. No other
+mod touched. Foundation e4dcbfc: current mission, safe inactive-parent text
+initialization, controller-owned materials/root host, semantic focus/grid/repeat.
+Card checkpoint 117b7f1: actual native view/VM/cart/navigation adapter, passive art
+only, code-drawn icon, MIT attribution; integration is subsequent source work.
+Current working .4 integrates controller commands into existing control callbacks,
+exact source/recipient/edit/options/recovery/services, source-aware card/book/run
+handoffs, owned transition input, Classic consent and no physical typing requirement.
+Owner reports spellbook origin rendered worse: compare canvas/material/lifetime
+for both sources; no build-matched pixels prove cause or correction yet.
+
+Selected Test-Development prefixes controller-,planner-escape-,native-text-material-,
+native-source-tabs-,input-lease-,native-window-takes-,casting-workspace-campaign-bound-,
+spellbook-entry-,graph-,native-theme-: **64/0**, 6.5 s; source47/build1/test compile
+PASS; artifacts/controller-access/full-controller-final-development.log. Earlier
+45/0, 37/0 and rendering4/0 logs retained separately. Two compile iterations
+corrected nonexistent routine Order and Component/Canvas signature; not baseline
+failures. Private installed IL evidence under artifacts/controller-access is not
+distributed. Installed DATA DLL 0.1.1-rc3, SHA256
+78407dd4c7240ce25c7654715854e83061da744a18d8eb4a2198fdffec5e3080,
+MVID c0cc9cbc-8075-4d98-a32e-29972aafa7fa; not screenshot identity. No game or
+foreign lease at intake, but current exclusive session confirmation remains
+pending. No runtime/staging/settings/profile/save mutations; restoration NOT_RUN.
+F01-F10 NOT_RUN; assignment IN_PROGRESS, not controller-support-complete.
+Next: freeze distinct .4, focused frozen validation/deterministic local package;
+then complete guarded no-cast controller observer route and, after authority and
+prerequisites, record real card -> author/search/save/return, initial/settled
+1920x1200 and compact frames from both origins. Finite-resource execution later.
+No remote writes/release/tag/merge/permanent installation authorized or performed.
+
+## 2026-10-17 owner-requested Alpha 3 publication / PR update
+
+Published v0.5.4-controller.3 at 2026-10-18T00:39:48Z, product/tag
+7a7faec9a0824ff192271d12d1a9cde4199452cf, documentation HEAD at publication
+eb125de9d43ee56db43dd3c82cf88c62f38377cb. Existing draft PR #10 body updated
+with both review corrections and exact 62/0 frozen evidence; no merge/ready flip.
+Guarded-push WhatIf6/0, fast-forward remote verification PASS. Owner-selected
+artifact-only alpha route reused the unchanged deterministic .3 ZIP; draft
+upload/download ZIP and checksum matched before publication. Remote asset
+digests, prerelease=true/draft=false/latest=false, product tag and unchanged
+main/stableLatest v0.5.3 verified. ZIP 909204 bytes, SHA256SUMS SHA-256
+c644071d35c7a1bca0e31852cd92db6e1c2bb63f244aaa7ff199a8604ee95079;
+full DLL/ZIP/MVID, commands/paths: [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.3.md).
+A shell-quoting invocation failed before any upload; remote state checked and
+corrected plain-quote invocation succeeded. No partial public/duplicate release
+or overwritten assets. 31 relevant links/whitespace checked; no source rebuild
+for later documentation. No native desktop/game/staging/Mods/settings/profile/save
+change, runtime/restoration NOT_RUN. Next owner action: no-cast authoring workflow
+plus text Escape, full report scroll, initial/settled 1920x1200 and compact
+screens before finite-resource runs. Full gamepad graph editing/card deferred.
+
+## 2026-10-17 alpha .3 review corrections / product freeze
+
+Frozen product 7a7faec9a0824ff192271d12d1a9cde4199452cf in
+private/worktrees/KBP-CONTROLLER-ALPHA03. Final frozen selection 62/0 (6.9 s),
+two deterministic builds/package6/release3 PASS; combined14.924 s. Exact hashes,
+MVID, commands and native limits in [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.3.md).
+
+Continued clean PR #10 branch at 2144f2c470fc34084c016c79f9558811c6abce69;
+remote matches, PR OPEN/DRAFT. Owner explicitly requested two reviewed fixes,
+PR update and a new alpha. Version .3 is new; .1 published and .2 local frozen
+artifacts untouched. No other mod/game/save/settings edits or runtime selected.
+Installed TMP KeyPressed sets m_WasCanceled for Escape, then OnUpdateSelected
+calls DeactivateInputField, which clears m_AllowInput before end-edit. Private
+assembly evidence: artifacts/controller-access/review-tmp-cancel.private.txt.
+Added owned-root cancellation observation before deactivation, retained through
+the shared production Back request path regardless of selected/focused state
+at poll time. Only the current edge is retained, not a stale wasCanceled flag.
+This corrects the .2 receipt's too-strong pre-request ordering claim. Results
+now move 75% of viewport height and stop inertia, preserving readable overlap.
+
+Explicit development command: powershell.exe -NoProfile -ExecutionPolicy Bypass
+-File scripts/Test-Development.ps1 -Only
+'controller-,planner-escape-,native-text-material-,native-source-tabs-,input-lease-,native-window-takes-,casting-workspace-campaign-bound-,spellbook-entry-'.
+PASS=38 FAIL=0, 6.0 s reported / 6.196 s child wall; source47/build1/test compile
+PASS. Log artifacts/controller-access/review-fixes-development.log. Includes new
+before/after-cancel, no-nested-layer/second-press and complete report-line scroll
+coverage to 100,000 units. No native usability/pixel/input PASS. Freeze source,
+run focused neighbors/package in clean isolated output, guarded push and publish
+a non-Latest alpha with exact hash/MVID receipt; keep PR draft. No stable merge,
+installation, KMG/CotW work or broad compatibility/runtime campaign is selected.
+
+## 2026-10-17 owner-requested PR access/layout update
+
+Owner requested opening a PR after the local candidate handoff. Read-only GitHub
+check found existing #10 OPEN/DRAFT, feature branch head
+2a04579a460064d53f4f87d34defb22a96dbc227, base main. Reuse/update that PR rather
+than create a duplicate. Local reviewed documentation HEAD before this receipt
+was 4aa49bd3345c271381d14d0e1da8bcebfd1bb593; frozen product stays
+32f6385206694b7cdb102d1b938f7b2b1acb2d1b, version 0.5.4-controller.2.
+No source rebuild or test rerun selected: existing frozen 60/0 (7.0 s) and
+deterministic candidate identity remain unchanged. Explicit additional check:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GuardedPush.ps1,
+PASS=6 FAIL=0, 2.504 s child wall. Its clean-tree, approved-origin/branch,
+credential/generated-file and fast-forward checks are preserved. Publish only
+through the owned lab Push-KingmakerBuffPlanner.ps1 helper; require returned
+remote HEAD/PR head to match this receipt commit before reporting success.
+Update PR title/body for actual editor access/layout repair, retain draft and
+historical identities, expose all NOT_RUN native gates and deferred card/full
+gamepad editing. No release assets, tags, default-branch merge, installation,
+game interaction or save changes are authorized/performed by this PR request.
+
+## 2026-10-17 frozen controller access candidate .2 / local handoff
+
+Product 32f6385206694b7cdb102d1b938f7b2b1acb2d1b preserved in clean detached
+private/worktrees/KBP-CONTROLLER-ACCESS02-VERIFIED. Focused frozen selector 60/0 (7.0 s),
+source47/build1, package6 and deterministic two-build/release3 PASS; combined
+15.873 s. Exact ZIP 0a79c3b10dd2f1adfe8ba85888c9099b1885002f5b7c77d10a429f7c743930ef;
+DLL fd37060969c1cc4d0fb092b14f410bc6f585feb269a2dd45a38353e9e8bfb15f;
+MVID 9eae87dc-ce34-4e79-af0d-da49a3747dcb. Local-only installable .2 ZIP and
+receipt delivered to handoff; parent checkout records documentation separately.
+Exact commands/logs, controls, source-only limits and native A01–A08 remaining
+checks: [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.2.md).
+Read-only GitHub check: PR #10 open/draft, remote HEAD2a04579; no concurrent
+remote correction to merge. No push/PR update, release/tag, merge or install.
+Foreign live game/lease left untouched; no runtime transaction/restoration debt.
+No rendered geometry, physical controller or mouse authoring native PASS claimed.
+
+Pre-delivery c75b030 .2 snapshot (59/0) remains frozen, not selected/delivered.
+Mixed Escape/native Back review found a double-handling risk: 63b9082 introduced
+one neutral-edge latch preserving original text-only intent. Its 59/1 was an
+obsolete source-wiring expectation, not the new behavior test. Corrected the
+assertion at 32f6385; narrow 2/0 (6.7 s), then selected frozen 60/0 above.
+All intermediate logs/artifacts retained. All three private owner ChatGPT photos
+were inspected at original 1920x1200: severe narrow text clipping, native book
+controls/no footer, and native menu/X hint/no card. Receipt records hashes and
+limits. They establish old observed failures, not repaired rendered acceptance.
+Documentation-only handoff checks: 10 relevant document slices, 18 local links,
+zero broken links/conflict markers; git diff --check clean. All 23 explicit
+selector prefixes have registered tests (separate from the frozen 60/0 run).
+Selected ZIP/manifest/source and handoff copies hash-matched; original public
+alpha ZIP hash rechecked unchanged. No source rebuild for these prose updates.
+
+## 2026-10-17 controller access correction — implementation checkpoint
+
+Implementation preserved at b64e86c. Subsequent review hardens optional geometry
+logging (cannot break construction), actual results-settled sampling, deferred
+mode cancellation/Stop ownership, and input-dispatch failure cleanup. Added an
+identity-only queued-mode action regression; controller-opened editor Run now
+instructs returning to the selector instead of submitting while fullscreen.
+Pre-freeze selected neighbors: 59/0 in 6.5 s, source47/build1 PASS, log
+artifacts/controller-access/development-final.log; distinct local version .2.
+Candidate source and final frozen evidence are recorded separately after build.
+
+Owner superseded run-only acceptance with actual same-session authoring access
+and observed clipping repair. Continued clean legitimate PR #10 branch from
+2a04579a460064d53f4f87d34defb22a96dbc227; preserved every frozen package and
+unrelated mod. Installed TMP Awake calls LoadDefaultSettings, which can write
+default UI sizeDelta. Controller labels now establish final rects after Awake,
+disable owned auto-container resizing, use the font base material and emit
+bounded creation/activation/settled geometry samples. No native pixels claimed.
+Configure/default-empty focus, unavailable empty runs, contextual Confirm and
+separate scrollable results replace basic explanation paging. The existing
+workspace accepts a native Component host; mouse StaticCanvas behavior remains.
+Controller editor reuses the active Rewired EventSystem with scoped physical
+mouse fallback and native layer/Back/fullscreen ownership, including exact
+pending mode-request cancellation. No input-mode property switch.
+
+Console book CreateInputs/Hide/VM.Back contracts inspected. Y/Func02 is reserved
+for book switching even when its hint is hidden. New owned footer binding uses
+an available RightStickButton or FuncAdditional, checks book/base conflicts,
+guards captured gameplay callbacks and closes the book through its own VM.
+Source-aware handoff waits for actual Default/native-owner release; timeout
+never opens. Basic workflow returns to quick access, not an unverified recreated
+book context. Native card awaits verification of the repaired authoring flow.
+
+Focused selector integration: 42 PASS / 0 FAIL in 6.1 s, source47/build1 PASS;
+logs artifacts/controller-access/development-review.log and prior failing/passing
+iterations retained. Real-session author/save/return/run, result isolation,
+handoff neutral/cancel/timeout and exact native contract cases added. Intermediate
+compile failures and four obsolete focus/wiring expectations corrected, not
+reclassified baseline defects. Native construction/click/text/layout remains
+NOT_RUN; no game launch, staging, saves/settings/install change or restoration
+transaction. DATA foreign PID 22596 and KMG lease active at 23:50Z left alone.
+
+## 2026-10-17 owner-selected controller alpha publication
+
+Owner requested an alpha for another computer, explicitly without a full release
+workflow/new tests. Published unchanged existing product
+`9aec44e374b26b3561fa4402912c77a23a4e08ac`, version 0.5.4-controller.1,
+as non-Latest prerelease at 20:06:32Z. Documentation HEAD at publication was
+`b0d92ce0bffd5a01da7a37414c66bf517fc34b02`; tag targets the compiled product.
+No rebuild/test campaign or permanent installation. ZIP/hash/source and package
+integrity verified; uploaded ZIP/checksum downloaded and matched before publish;
+post-publication flags/digests/tag verified. Strict package integrity 6/0,
+0.54 s child wall. Prior 45/0 tests remain prior evidence, not rerun.
+Exact assets/hashes/MVID/commands/authorization:
+[alpha receipt](docs/evidence/controller-alpha-0.5.4-controller.1.md).
+Stable 0.5.3 remains Latest, main unchanged, PR #10 draft/unmerged, native/physical
+qualification pending. No DATA runtime/saves/settings/Mods mutation; restoration
+NOT_RUN. Next: owner tests entry/exit first on the available other PC and reports
+controller/startup/handoff/Back/input-isolation behavior before casting.
+
+## 2026-10-17 corrected integrated candidate and native boundary
+
+Frozen product `9aec44e374b26b3561fa4402912c77a23a4e08ac`, 0.5.4-controller.1,
+CLR0.5.4.0; correction commit `8e4677ba2bb92969a30037875d3bf041f380ab9c`.
+Clean-product focused selection 45/0, source47/build1/test compile PASS, 6.2 s
+reported / 6.4519714 s child wall. Two deterministic builds identical; final
+package6/0, release assertions3/0; 8.0408864 s stopwatch / 8.1444404 s child wall.
+Exact commands/logs/hashes/MVID: [new receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.1.md).
+Old ZIP hash rechecked unchanged. Stable 0.5.3/main release history not modified.
+
+Read-only 19:51:18Z audit: 562 transactions, no unresolved state/protected-save
+review, no running game/foreign lease. No runtime write/transaction/launch.
+Restoration NOT_RUN. The launcher has no controller entry-only scenario; manual
+hold occurs after mouse workspace capture, physical allowances are scenario-bound.
+Actual live route audit is not complete. Prepared explicit
+[no-cast entry/exit protocol plan](docs/CONTROLLER-ENTRY-EXIT-PLAN.md) instead of
+relabeling a mouse run or bypassing guards. Required historical full-history
+purity cost exceeds ordinary 30-minute policy; no broad wrapper launched.
+Next: guard/observer extension with positive/negative tests, new observer identity,
+separately selected safety/purity budget and exclusive DATA window, entry/exit
+first, then only justified finite-resource cases. Keep PR draft and editor deferred.
+Final handoff checks: local links/conflict markers 74/0, frozen old/new artifact
+identities 4/0, whitespace clean. No source/script/test/version delta follows
+the frozen merge product; this handoff is documentation only.
+
+## 2026-10-17 release integration candidate
+
+Merged main `dcf718fd7b70cf453dd25aa693fefc6aa503d826` into the controller
+feature branch after correction checkpoint `8e4677b`. Kept both histories and
+all main branding, license, release receipts, publisher/build-order changes and
+two corrected wiring fixtures. Those scripts/LICENSE/CHANGELOG are byte-identical
+to main; no guard was weakened. Resolved seven content conflicts by preserving
+both documentation histories and advancing local prerelease metadata consistently
+to 0.5.4-controller.1 / CLR 0.5.4.0. No release/default-branch integration.
+
+Integration Test-Development selection adds the two main-corrected fixtures to
+the review selection: 45/0 behavior, source47/0, build1/0, test build successful;
+6.4 s reported / 6.680194 s child wall. Log
+`artifacts/controller-ui/review-main-integration.log`. Diff whitespace clean;
+no remaining conflict markers. Original 0.5.2-controller.1 ZIP remains untouched.
+Next: freeze this clean merge commit, run its focused selection, create a separate
+deterministic local candidate, inspect guarded entry/exit prerequisites/budget.
+
+## 2026-10-17 PR review corrections
+
+Intake `0539c081db0a6c75d57e5df95805900686e6e2fb`, clean
+`codex/kingmaker-buff-planner-controller-ui`, version 0.5.2-controller.1.
+Fixed all three reported P2s: owned entry detach/idempotence; authoritative
+persistence header/explanations; latest refusal over historical success.
+17 controller + 26 neighbors passed 43/0 via the exact Test-Development command
+in [review receipt](docs/CONTROLLER-UI-REVIEW-FIXES.md), source43/build1/test
+compile passed; 6.3 s reported / 6.5082444 s child wall. Failed reproductions
+and intermediate correction logs remain, not relabeled. Detached actual-native
+cleanup is exercised; live input subscription/handoff remains unproved.
+Original frozen product `d04c1a7` and its package are untouched, historical and
+not the next live candidate. Next: commit corrections, non-destructively merge
+current main `dcf718f` preserving 0.5.3 branding/license/publisher changes,
+validate affected integration and identify a distinct candidate. Then inspect
+the guarded entry/exit-only route and its budget before any live action.
+PR remains draft; full editor deferred; no game or installation interaction.
+
+## 2026-10-17 owner-requested draft PR preparation
+
+The owner explicitly requested a PR after local candidate delivery. This permits
+the guarded feature-branch push and draft PR, not merge, tag, release, runtime
+interaction or permanent installation. Intake HEAD
+`acd56f9909e2ae9ee7a9e16121d25910ace213f4` on
+`codex/kingmaker-buff-planner-controller-ui` was clean; candidate version remains
+0.5.2-controller.1 and frozen product remains `d04c1a7` (full receipt below).
+
+`scripts/Test-GuardedPush.ps1` passed 6/0 in 4.485 s child wall time.
+Read-only `git ls-remote` and an exact-commit fetch established current main
+`dcf718fd7b70cf453dd25aa693fefc6aa503d826`; merge-base is preserved mission
+base `2194d0f0f597ebe8b8423f91f8e1fb6b1f65fdb7`. The PR three-dot diff contains
+only this mission's three commits, not main's later branding/licensing work.
+No existing PR for this branch was found. No main merge, source rewrite or
+artifact rebuild is selected for this publication-only request. Draft review
+must reconcile later main changes before any eventual merge and retain native/
+physical qualification gaps. Historical no-PR statements describe the earlier
+candidate checkpoint, not a continuing prohibition after this new request.
+
+PR documentation/link/boundary checks passed 9/0; `git diff --check` passed.
+Next: documentation-only commit, repeat guarded-push test on its clean HEAD,
+guarded push, create and verify a draft PR against main.
+No runtime transaction was started; restoration remains NOT_RUN.
+
+## 2026-10-17 preserved execution candidate delivery
+
+Branch `codex/kingmaker-buff-planner-controller-ui`; source milestone
+`afa108f1fd2cc76f49f466c62bd1572f31663d15`, frozen product/harness HEAD
+`d04c1a781770194966fa55df15000d627e14662d`, version 0.5.2-controller.1,
+CLR 0.5.2.0. Later changes are documentation only; full controller editor remains
+DEFERRED and no optional source follow-on obscures this execution candidate.
+
+Frozen Test-Development exact selection in the candidate receipt: source 43/0,
+production build 1/0, successful test compilation, behavior 38/0, 6.2 s reported
+(6.4462946 s child wall). Build-Release: two identical source43/build1/package4/
+creation1 passes, final package validation 4/0, release assertions 3/0,
+8.294 s stopwatch (8.4338511 s child wall). Links before freeze 15/0,
+inspector parser 1/0, diff whitespace clean. No broad runtime/purity campaign.
+Final documentation checks: relevant links 19/0, receipt/artifact identity 6/0;
+`artifacts/controller-ui/documentation-final.log`. Product bytes were not rebuilt
+for this later documentation checkpoint.
+
+ZIP `artifacts/release/0.5.2-controller.1/KingmakerBuffPlanner-0.5.2-controller.1.zip`;
+SHA-256 `50c85871a64039702786fca12586cd49a643b0ad3908f565ef4f03278b882bd5`;
+DLL `4b5d2b0c5fbbdfd2d898e359b4d6da780c859a62358cbf6306e967c9c217e19f`;
+MVID `72d854ad-48ce-4d2d-8140-7769f2ba7ec5`. Exact paths/manifests/test
+identity and retained logs: [candidate receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.2-CONTROLLER.1.md).
+
+DATA Windows PnP sees the owner's USB Xbox 360 controller; game recognition is
+unobserved. Foreign game/lease active at 16:48:33Z, PID29980; 562 project
+transactions Restored/no unresolved project transaction. No foreign interruption,
+runtime staging/launch, live save/profile/settings mutation or allowance.
+Restoration NOT_RUN. No push/PR/merge/tag/publication/permanent installation.
+All E01–E13 live gaps remain explicit; no C-series PASS is reused.
+
+Rejected theories and boundaries are retained in implementation/acceptance.
+Exact next action: owner reviews the preserved candidate; prepare narrowly tested
+guarded controller observer/allowance support, then select an exclusive DATA
+qualification window and budget preserving all existing safety/purity/restoration.
+Existing mouse manual/physical scenarios cannot be relabeled as controller proof.
+
+## 2026-10-17 execution candidate freeze preparation
+
+Entry/source milestone `afa108f1fd2cc76f49f466c62bd1572f31663d15` is preserved
+on `codex/kingmaker-buff-planner-controller-ui`. Its final entry selection passed
+13/0 in 7.2 s (source 43/0, production build 1/0). The existing prerelease
+mechanism identifies the local candidate as `0.5.2-controller.1`, CLR 0.5.2.0;
+only version metadata/player and architecture documentation follow that source
+milestone. Stable releases/archives are untouched. No optional editor work.
+
+The read-only 16:48:33Z audit found 562 project transactions Restored and no
+unresolved project transaction; foreign Kingmaker PID 29980/lease were active.
+No interaction or mutation was attempted. Relevant new documentation links 3/0
+and `git diff --check` passed. Next commands on the clean candidate product HEAD:
+the implementation's exact 38-test Test-Development selection, then
+`scripts/Build-Release.ps1` (its two deterministic Build-Local passes and strict
+package validation). These are pending at this preparation checkpoint; a separate
+receipt will bind their results/hashes/MVID to the frozen product, not later docs.
+
+## 2026-10-17 controller execution-first source checkpoint
+
+Branch `codex/kingmaker-buff-planner-controller-ui`, preserved exact intake HEAD
+`2194d0f0f597ebe8b8423f91f8e1fb6b1f65fdb7`, version 0.5.2. Clean intake;
+existing worktrees retained. Read-only origin/main is the supplied
+`dcf718fd7b70cf453dd25aa693fefc6aa503d826`. No history replacement/fetch merge.
+Revision 2 explicitly replaces full-editor-first scope; mission saved in
+`planning/KBP-CONTROLLER-UI-MISSION.md`.
+
+Native menu entry/semantic focus, mapped edges/neutral latch, explicit Stop,
+owned native input layer/base dispatch suppression, cold shared-session binding,
+canonical Run and controller-readable refusal/result details implemented.
+Classic remains unchanged with a mouse setup explanation. No mouse navigation
+or hover rewrite, second planner/profile/executor or new packaged dependency.
+
+Commands/evidence: explicit Test-Development selection in controller implementation;
+initial focused behavior 21/0 in 6.2 s; reviewed behavior 38/0 in 6.5 s,
+source 43/0, production build 1/0, test build successful. Intermediate new-code
+compiler errors were corrected; no known baseline failure converted to PASS.
+`artifacts/controller-ui/development-*.log`, `prefix-selection.json` and private
+assembly IL evidence retain their original inputs. Assembly-CSharp SHA-256
+`3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`,
+MVID `07fa1e4d-8618-41b3-9b8d-faa17d3b26f7`.
+
+Owner plugged USB controller into DATA; Windows reports Xbox 360/HID controller
+OK. Foreign Kingmaker/lease observed, untouched, subsequently released. No game
+interaction, staging, runtime transaction, settings/profile/save modification,
+push/PR/tag/release/permanent install. Restoration NOT_RUN. Offline script-backed
+effect/spend outcomes do not establish native buffs or physical input.
+
+Rejected: hidden editor initialization, global navigation, hotkey emulation,
+fullscreen Stop, PushLayer-only isolation, device detection as gameplay proof,
+old C-series evidence reuse. Physical/startup/layout/native outcomes remain
+pending; full editor DEFERRED. Next: freeze execution source, stamp a distinct
+local candidate, run the focused selection on frozen identity, package through
+the existing deterministic route and record exact hashes/MVID separately from
+documentation HEAD. Guarded controller protocol/observations follow owner review.
+
 ## 2026-10-14 human-feedback rc4 runtime-finding checkpoint
 
 Continued `codex/kingmaker-buff-planner-human-feedback` from reviewed HEAD

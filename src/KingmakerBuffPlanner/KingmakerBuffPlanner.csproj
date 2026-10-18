@@ -40,6 +40,14 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="Rewired_Core">
+      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\Rewired_Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UniRx">
+      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UniRx.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UnityModManager">
       <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityModManager\UnityModManager.dll</HintPath>
       <Private>False</Private>
@@ -302,6 +310,23 @@
     <Compile Include="UI\NativeThemeRecovery.cs" />
     <Compile Include="UI\ControlCaptionFit.cs" />
     <Compile Include="UI\PlannerNativeTheme.cs" />
+    <Compile Include="UI\ControllerRoutineModel.cs" />
+    <Compile Include="UI\ControllerPresentationHost.cs" />
+    <Compile Include="UI\ControllerWorkspaceFocus.cs" />
+    <Compile Include="UI\ControllerOwnedItems.cs" />
+    <Compile Include="UI\ControllerWorkspaceNavigator.cs" />
+    <Compile Include="UI\ControllerNativeMenuCard.cs" />
+    <Compile Include="UI\ControllerTransitionInputGuard.cs" />
+    <Compile Include="UI\PlannerWorkspaceTextProbe.cs" />
+    <Compile Include="UI\ControllerLayerOwnership.cs" />
+    <Compile Include="UI\ControllerEntryRegistry.cs" />
+    <Compile Include="UI\ControllerRoutineView.cs" />
+    <Compile Include="UI\ControllerEditorInputBoundary.cs" />
+    <Compile Include="UI\ControllerSpellbookIntegration.cs" />
+    <Compile Include="UI\ControllerSurfaceHandoff.cs" />
+    <Compile Include="UI\ControllerQueuedModeAction.cs" />
+    <Compile Include="UI\ControllerRoutineMenu.cs" />
+    <Compile Include="UI\ControllerRoutineIntegration.cs" />
     <Compile Include="UI\PlannerNativeThemeSurface.cs" />
     <Compile Include="UI\NativeSpriteContract.cs" />
     <Compile Include="UI\ParchmentTreatment.cs" />

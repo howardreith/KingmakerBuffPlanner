@@ -1,3 +1,92 @@
+# Mr. Bard's Kingmaker Buff Planner 0.6.0
+
+Owner-authorized full release of the controller planner implementation. The exact
+release has not been run in the game; native F01-F10 remain NOT_RUN. New native
+card, semantic authoring/search, workspace text repair and shared entry/run
+handoffs do not inherit Alpha4's qualification. The established pre-runtime
+publisher retains complete offline C# tests, publisher checks, reproducible
+builds and strict package validation. No unrelated mod, saves, settings or
+permanent installation is changed. See the
+[0.6.0 release notes](RELEASE-NOTES-0.6.0.md) and
+[release record](RELEASE-0.6.0-RECORD.md).
+
+---
+
+# Historical local source candidate 0.5.4-controller.4 — full controller planner (unqualified)
+
+Implements semantic controller focus over the existing workspace's authoring
+controls, controller search/text modal, exact source/recipient/options/order/Undo/
+recovery paths, a genuine native campaign-menu card and direct spellbook access.
+Run hands off safely to selected-routine confirmation; shared execution remains
+canonical. Adds owned transition input protection, root-canvas host selection,
+inactive-parent-safe TMP initialization, owned controller font materials and
+bounded first/settled workspace diagnostics. Mouse navigation/highlight behavior
+is retained. Alpha 3's text-cancel and viewport-scroll corrections remain.
+
+This assignment is NOT complete/native-qualified. Actual new-byte card, controller-
+only authoring, rendering at 1920x1200/compact, finite-resource execution and
+lifecycle/restoration still require guarded observations. [Inventory](CONTROLLER-AUTHORING-CAPABILITIES.md).
+No new public release/tag, push/PR edit, main merge, installation or gameplay-mod
+change selected. Existing published Alpha 3 is untouched.
+
+## Historical controller test alpha 0.5.4-controller.3 — focused review corrections
+
+Includes the .2 same-session Configure/editor access, console-book entry and
+text-container initialization repair. Fixes two reviewed presentation/input cases:
+owned TMP Escape cancellation is captured before focus is lost, even when the
+planner observes the key later; controller result scrolling now advances by
+three-quarters of the viewport rather than a fraction of the whole report.
+No extra editor layer is dismissed by the text-cancel press; long reports retain
+overlap between views. Existing shared Back latch and execution path remain.
+
+Owner requested an alpha for testing and PR update, not native qualification or
+stable release. Full graph editing/native fan card remain deferred. See
+[test instructions and limits](CONTROLLER-ALPHA-0.5.4-CONTROLLER.3-NOTES.md).
+
+## Historical local review candidate 0.5.4-controller.2 — controller editor access/layout repair
+
+Not published, installed or native-qualified. Adds Configure plans into the
+ACTUAL editor in a controller-started campaign, with mouse/keyboard authoring,
+canonical autosave and a neutral-gated return to quick access in the same session.
+Fixes text creation order against installed TMP default-container initialization;
+essential messages/controls are unpaged and longer results get a scrollable view.
+Adds a context-scoped console-book footer into that editor, preserving native Y
+book switching/Metamagic and retaining the accepted campaign-menu shortcut.
+Full controller graph editing, native fan card and original-book reconstruction
+remain deferred. Native rendering (1920x1200/compact), pointer/text interaction,
+physical input and full author/save/return/run qualification are NOT_RUN.
+No gameplay-mod changes/dependencies, release/tag/push, merge or permanent install.
+The 0.5.4-controller.1 published frozen alpha below remains unchanged.
+
+## Historical local candidate 0.5.4-controller.1 — controller execution
+
+Not published or permanently installed. Integrates the controller mission with
+0.5.3 branding/licensing and publisher changes, plus the three PR review fixes.
+The version suffix identifies a local candidate, not a new stable release.
+The original 0.5.2-controller.1 candidate and evidence remain historical.
+
+Create/edit plans with mouse and keyboard; run saved routines and request Stop
+with a controller in native controller mode.
+
+- Adds a Buff Planner entry with a native mapped-button hint to the campaign
+  controller menu, plus Long / Important / Short and explicit Stop.
+- Uses the same campaign session, latest-edit durability barrier, strict/subset
+  policy, exact casting projection and Instant/Animated host as the mouse routes.
+- Adds visible focus, current mode/policy/save state and paged per-casting results
+  and refusal reasons; controller refusals do not open the mouse editor.
+- Uses the native input stack and scoped binding ownership, with neutral latching
+  and lifecycle cleanup. Retained Classic choices direct the player to mouse
+  setup; controller Classic execution and full controller editing are deferred.
+
+Source-tested with named qualification gaps: cold-controller startup, physical
+mapping/isolation, game rendering, actual effects/resources and live restoration
+are pending. Windows device detection is not gameplay qualification. See
+[implementation](CONTROLLER-UI-IMPLEMENTATION.md) and
+[E01–E13 acceptance](CONTROLLER-UI-ACCEPTANCE.md). No controller-support claim for
+Steam Deck, Linux, consoles, other device families or remappings.
+
+---
+
 # Mr. Bard's Kingmaker Buff Planner 0.5.3
 
 Owner-authorized stable release, 2026-10-15.

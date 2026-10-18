@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using KingmakerBuffPlanner.Compatibility;
 using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Effects;
@@ -97,6 +98,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("cantrips-cast-at-will-through-the-class-ability", TestCantripsCastAtWill);
             Run("at-will-cantrip-choice-refuses-what-is-not-the-authored-cantrip", TestAtWillCantripChoice);
             Run("classic-run-advances-only-while-the-world-runs", TestWorldGatedClassicRun);
+            Run("classic-cleanup-compiled-order-regression", TestClassicCleanupCompiledOrder);
             Run("live-run-stops-at-its-overall-deadline-or-abort-marker", TestLiveRunStopRule);
             Run("physical-input-helper-shares-the-game-s-physical-pixel-space",
                 TestPhysicalInputDpiContract);
@@ -8171,6 +8173,13 @@ namespace KingmakerBuffPlanner.Tests
             const string gatedRun = "IEnumerator work = new WorldGatedEnumerator(runner.Run(preview.Plan, LastExecutionReport),\n                worldRuns);";
             int gatedAt = sessionSource.IndexOf(gatedRun, StringComparison.Ordinal);
             int executingAt = sessionSource.IndexOf("            IsExecuting = true;\n", StringComparison.Ordinal);
+            Assembly product = Assembly.LoadFrom(Path.Combine(directory.FullName, "artifacts", "build", "Release", "KingmakerBuffPlanner.dll"));
+            Type rootType = product.GetType("KingmakerBuffPlanner.UI.BuffPlannerUiRoot", true);
+            Type screenType = product.GetType("KingmakerBuffPlanner.UI.BuffPlannerScreenController", true);
+            const BindingFlags instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            bool releaseResetsBeforeClose = ClassicCleanupResetsBeforeClose(
+                rootType.GetMethod("ReleasePlayerUi", instance), rootType.GetField("_closeScreenForClassicRun", instance),
+                rootType.GetMethod("CloseCastingWorkspace", instance), screenType.GetMethod("Close", instance));
             if (gatedAt < 0 || executingAt < 0 || executingAt > gatedAt ||
                 !sessionSource.Contains("Func<bool> worldRuns = ClassicWorldRuns ?? (() => true);") ||
                 rootSource.Contains("new WorldGatedEnumerator(_session.ExecuteRoutine(") ||
@@ -8179,7 +8188,7 @@ namespace KingmakerBuffPlanner.Tests
                     "                        if (ClassicRunScreenPolicy.CloseAfterPress(_session.IsExecuting,") ||
                 System.Text.RegularExpressions.Regex.Matches(rootSource, "_closeScreenForClassicRun = true;").Count != 1 ||
                 !rootSource.Contains("        private void EndClassicRun(string reason)\n        {\n            _closeScreenForClassicRun = false;") ||
-                !rootSource.Contains("        private void ReleasePlayerUi()\n        {\n            _closeScreenForClassicRun = false;") ||
+                !releaseResetsBeforeClose ||
                 !rootSource.Contains("                if (_closeScreenForClassicRun)\n                {\n                    _closeScreenForClassicRun = false;") ||
                 !rootSource.Contains("if (_screen != null && !CastingFirstActive)\n                _screen.Present(result,") ||
                 System.Text.RegularExpressions.Regex.Matches(rootSource, "_screen.DiscardUnshownResult\\(\\);").Count != 2 ||
@@ -8193,6 +8202,57 @@ namespace KingmakerBuffPlanner.Tests
                 !File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner", "UI",
                     "BuffPlannerHudButtonController.cs")).Contains("return _session.ClassicRunHeld"))
                 throw new InvalidOperationException("The Classic run's checks, gate, screen close or result are not where they belong.");
+        }
+
+        // Validate the actual field reset BEFORE both close calls, not its
+        // adjacency to an opening brace. Controller cleanup may legitimately
+        // precede it. Missing/late resets must still fail this contract.
+        private static bool ClassicCleanupResetsBeforeClose(MethodBase method, FieldInfo flag, params MethodInfo[] closes)
+        {
+            if (method == null || flag == null || closes.Any(c => c == null)) return false;
+            byte[] il = method.GetMethodBody().GetILAsByteArray();
+            int position = 0, previous = -1, reset = -1;
+            var closeOffsets = new Dictionary<MethodInfo, int>();
+            while (position < il.Length)
+            {
+                int offset = position, op = il[position++];
+                if (op == 0xfe) op = 0xfe00 | il[position++];
+                int size;
+                if (!IlOperandSize(op, il, position, out size)) throw new InvalidOperationException("Unknown cleanup IL opcode.");
+                if (op == 0x7d || op == 0x28 || op == 0x6f)
+                {
+                    MemberInfo member = method.Module.ResolveMember(BitConverter.ToInt32(il, position));
+                    if (op == 0x7d && previous == 0x16 && member.Module == flag.Module && member.MetadataToken == flag.MetadataToken)
+                        reset = offset;
+                    foreach (MethodInfo close in closes)
+                        if (member.Module == close.Module && member.MetadataToken == close.MetadataToken && !closeOffsets.ContainsKey(close))
+                            closeOffsets.Add(close, offset);
+                }
+                previous = op; position += size;
+            }
+            return reset >= 0 && closes.All(c => closeOffsets.ContainsKey(c) && reset < closeOffsets[c]);
+        }
+
+        private sealed class ClassicCleanupContractFixture
+        {
+            internal bool ClosePending;
+            private void ReleaseController() { }
+            private void CloseWorkspace() { }
+            private void CloseScreen() { }
+            internal void Safe() { ReleaseController(); ClosePending = false; CloseWorkspace(); CloseScreen(); }
+            internal void Missing() { ReleaseController(); CloseWorkspace(); CloseScreen(); }
+            internal void TooLate() { ReleaseController(); CloseWorkspace(); ClosePending = false; CloseScreen(); }
+            internal void WrongValue() { ClosePending = true; CloseWorkspace(); CloseScreen(); }
+        }
+
+        private static void TestClassicCleanupCompiledOrder()
+        {
+            Type type = typeof(ClassicCleanupContractFixture);
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            foreach (string name in new[] { "Safe", "Missing", "TooLate", "WrongValue" })
+                if (ClassicCleanupResetsBeforeClose(type.GetMethod(name, flags), type.GetField("ClosePending", flags),
+                    type.GetMethod("CloseWorkspace", flags), type.GetMethod("CloseScreen", flags)) != (name == "Safe"))
+                    throw new InvalidOperationException("Cleanup-order judge accepted/rejected the wrong sequence: " + name);
         }
 
         // A cast's confirmation window of three frames: it confirms only if

@@ -1,3 +1,118 @@
+## 0.6.0 publication authority and native boundary
+
+Owner explicitly authorizes merge/push/full release with a new version. Existing
+OwnerAuthorizedPreRuntime route is selected; human/native acceptance is not
+asserted. Native gaps below are qualification gaps, not a claim publication is
+unauthorized. Keep old artifacts, occupied worktrees and active Alpha4 purity
+process untouched. [Current release record](docs/RELEASE-0.6.0-RECORD.md).
+
+## Historical full-controller native boundary
+
+Alpha4 published for manual testing. Subsequent broad check stopped577/1 on
+baseline brittle Classic source adjacency before purity. Matched Alpha3 fails
+too. Compiled-order correction focused39/0; extended exact-product source/safety
+sequence selected with separate harness identity. [Record](docs/CONTROLLER-ALPHA4-PUBLICATION.md).
+No original FAIL promoted to PASS; no new product/native qualification.
+ef63e54 corrected reader579/0; combined scratch-filesystem cleanup FAIL, then
+isolated unchanged filesystem suite38/0. Remaining safety children RUNNING since
+02:31:31Z, owned WindowsPS5.1 PID26124/exec83416; buffered remaining-safety-stages.log.
+Do not duplicate it. Original frozen source reader failure still blocks claiming
+a full source aggregate PASS or silently bypassing the runtime launcher's gate.
+
+Owner has now authorized the extended checks and requested an alpha first.
+Publication of frozen .4/69a48a4 is DONE; no full publisher rebuild or native claim.
+Finish the controller route before
+live use, retaining mandatory source/WhatIf/Steam/save/lease/restoration guards.
+
+Local .4 implementation is source-tested, not mission-complete. F01-F10 all
+NOT_RUN; physical authoring/card activation/layout/execution and mouse regression
+must not inherit Alpha 3 results. Owner NOW confirmed DATA free. Existing Steam,
+lease/transaction/review and Automation-pair checks PASS, no launch. Mandatory
+full-history purity forecast exceeds the ordinary ceiling (~4h27m for one
+two-inventory sampled subset, complete sequence longer): owner subsequently
+authorized the extended window, now in progress. See
+[exact preflight and unfinished controller route](docs/CONTROLLER-NATIVE-PREFLIGHT-2026-10-17.md).
+The latest attributed screenshot remains unavailable. Installed DATA KBP is old
+0.1.1-rc3, not evidence of the owner's .3 screen. No game/foreign lease at intake
+does not authorize desktop takeover. Controller-specific guarded no-cast
+observer/launcher support still needs implementation/review before automation;
+existing mouse-workspace routes are not equivalent. Preserve full safety/source,
+WhatIf/Steam/lease/fixture/restoration guards; no broad historical campaign selected.
+Frozen product69a48a4 passed focused64/0 in7.3s and deterministic packaging;
+[exact local .4 identity](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.4.md).
+No remaining compile/test failure.
+No runtime transaction occurred; restoration NOT_RUN, not PASS. No release/tag,
+push/PR mutation, main merge or permanent install authorized for this larger scope.
+
+## Historical access/Alpha handoffs (not current authority)
+
+> **Current access/layout repair:**
+> **ACTIVE full-controller assignment:** [mission](planning/KBP-FULL-CONTROLLER-MISSION.md).
+> Native card, full semantic authoring/text entry and actual workspace rendering
+> are required, not optional. IN_PROGRESS; no completion/native PASS claimed.
+> .3 fixes are published as owner-requested non-Latest test alpha; draft PR #10
+> updated. Frozen product 7a7faec, 62/0 and deterministic package PASS. See
+> [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.3.md). Actual no-cast
+> Configure/author/save/return/render/input qualification remains NOT_RUN.
+> .3 review fixes have no source/build blocker (focused 38/0); owner now requests
+> alpha publication and PR update. Existing native authoring/rendering gaps
+> remain explicit and must not be promoted by the test release.
+> Owner subsequently requested the PR: guarded feature-branch push/update of
+> existing draft #10 is now authorized (helper WhatIf 6/0). Native gaps below
+> do not block publishing source for review; release/merge/install stay separate.
+> Frozen candidate .2 is available: product 32f6385, focused 60/0 and deterministic
+> package PASS. See [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.2.md).
+> No source/build blocker; actual authoring/pointer/layout and new native book
+> path are unqualified. This is not a controller-support-complete handoff.
+>
+> Source implementation follows the
+> [corrected mission](planning/KBP-CONTROLLER-ACCESS-REPAIR-MISSION.md); do not
+> revert to execution-only acceptance. Native qualification is NOT_RUN: foreign
+> Kingmaker PID 22596 / KMG compatibility lease observed 2026-10-17T23:50Z and
+> left untouched. Existing guarded scenarios do not establish this cold-controller
+> mixed-input authoring route; no substitute mouse scenario was launched.
+> Need exclusive guarded entry/editor/return, rendered 1920x1200 then compact,
+> real text/click/scroll and input-restoration observations, before finite-resource
+> casts. Native card and safe book-context reconstruction remain deferred; full
+> controller graph editing is not implemented. Published alpha 1 is unchanged.
+> All three owner photos were inspected; the clipped old quick panel is confirmed,
+> not a native rendering PASS for this candidate. See receipt for image hashes.
+>
+> **Historical October 17 alpha:** owner-authorized artifact-only
+> [Controller Alpha 1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.1)
+> is published for testing on another PC. No tests/rebuilds or local runtime
+> actions were selected. [Receipt](docs/evidence/controller-alpha-0.5.4-controller.1.md).
+> Native qualification remains unproved; await entry/exit-first owner feedback.
+> PR stays draft; no stable release, main merge or permanent installation.
+>
+> **Previous October 17 PR review handoff:** three P2 fixes committed at
+> `8e4677ba2bb92969a30037875d3bf041f380ab9c`; main integrated at frozen product
+> `9aec44e374b26b3561fa4402912c77a23a4e08ac`, 0.5.4-controller.1. Focused 45/0,
+> deterministic local package PASS; [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.1.md).
+> Live qualification is BLOCKED on the controller-specific guarded observer
+> route and separately selected safety/purity budget/exclusive window. No game
+> or foreign lease at the 19:51:18Z audit; no unresolved transaction/save review.
+> That transient observation is not permission to take over the desktop. First
+> observation is entry/exit only, no casting; [precise preparation](docs/CONTROLLER-ENTRY-EXIT-PLAN.md).
+> PR stays draft; full editor deferred; release/permanent install unauthorized.
+>
+> **Initial October 17 controller qualification gap:** the execution candidate
+> is source-tested; cold-controller startup, actual mapped input, rendered layout,
+> native effects/resources and lifecycle/restoration remain unqualified. Windows
+> sees the owner's USB Xbox 360 controller. A foreign game/lease was observed and
+> left untouched, then cleared; it is not a permanent hardware blocker. Existing
+> mouse-oriented live scenarios cannot qualify this path without a scoped guarded
+> controller observer/allowance extension. See the exact remaining procedure in
+> [controller acceptance](docs/CONTROLLER-UI-ACCEPTANCE.md). Do not restart old
+> full-source/live campaigns, change loader settings or permanently install.
+> Local candidate is preserved at product
+> `d04c1a781770194966fa55df15000d627e14662d`, version 0.5.2-controller.1,
+> focused 38/0 with deterministic validated ZIP; packaging is not blocked.
+> [Identity/commands](docs/CONTROLLER-UI-CANDIDATE-0.5.2-CONTROLLER.1.md).
+> The reviewed defects have source fixes and regressions; the original ZIP is
+> historical, not the next live candidate. Main integration uses distinct local
+> candidate 0.5.4-controller.1. Native entry/exit handoff must pass before casts.
+>
 > **Current October 14 release status:** no release-engineering blocker remains.
 > Stable `v0.5.2` is merged, public, non-prerelease, Latest, checksummed and
 > independently downloaded/validated. At the owner's explicit request the

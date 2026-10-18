@@ -1,3 +1,10 @@
+> **Current full-controller assignment:** readable workspace, real native card,
+> controller-only authoring/search/recovery are mandatory, not deferred. Local
+> product69a48a4/.4 implements these source paths, focused64/0 and deterministic
+> packaging PASS. Assignment IN_PROGRESS: F01-F10 NOT_RUN and the guarded no-cast
+> controller observer route unfinished. [Receipt](CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.4.md).
+> Historical records below keep their own scope/artifacts and qualify no new bytes.
+>
 > **Current 0.5.1-rc5 preparation:** exact packaged source `ec3d5f8` makes the
 > full native planning sequence executable on the three-recipient/one-seed
 > fixture and adds the explicit guarded windowed-1920x1200 request with Unity,

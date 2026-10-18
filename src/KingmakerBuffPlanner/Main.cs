@@ -39,6 +39,11 @@ namespace KingmakerBuffPlanner
             modEntry.OnGUI = OnGui;
             _log.Info("[KBP-BOOT] callbacks assigned;OnToggle=true;OnUpdate=true;" +
                 "OnUnload=true;OnGUI=true.");
+            try { ControllerRoutineIntegration.Install(_log); }
+            catch (Exception exception)
+            {
+                _log.Error("[KBP-CONTROLLER] integration unavailable;existing mouse entry points remain available.", exception);
+            }
             try
             {
                 PlannerPointerOwnership.Install(_log);
@@ -172,6 +177,7 @@ namespace KingmakerBuffPlanner
             if (runtime == null || !runtime.Update()) return;
             _runtimeTest = null;
             BuffPlannerUiRoot.DestroyOwned();
+            ControllerRoutineIntegration.Uninstall();
             PlannerPointerOwnership.Uninstall();
             PlannerHotkey.Uninstall();
         }
@@ -230,6 +236,7 @@ namespace KingmakerBuffPlanner
             }
             _runtimeTest = null;
             BuffPlannerUiRoot.DestroyOwned();
+            ControllerRoutineIntegration.Uninstall();
             PlannerPointerOwnership.Uninstall();
             PlannerHotkey.Uninstall();
             _log.Info("[KBP-BOOT] unloaded;disposed=true.");
