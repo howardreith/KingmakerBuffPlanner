@@ -45,6 +45,7 @@ namespace KingmakerBuffPlanner.UI
             internal Texture2D Texture;
             internal Sprite Icon;
             internal Transform OwnedRoot;
+            internal bool Removed;
         }
 
         internal static void Install(HarmonyInstance harmony, ModLog log)
@@ -62,8 +63,7 @@ namespace KingmakerBuffPlanner.UI
         internal static void SetEnabled(bool enabled)
         {
             _enabled = enabled;
-            if (!enabled) foreach (Entry entry in Entries.Values.ToArray())
-                try { Remove(entry); } catch (Exception exception) { _log.Error("[KBP-CONTROLLER-CARD] owned cleanup failed.", exception); }
+            if (!enabled) foreach (Entry entry in Entries.Values.ToArray()) SafeRemove(entry);
         }
 
         private static void Created(InGameMenuView __instance)
@@ -72,9 +72,10 @@ namespace KingmakerBuffPlanner.UI
             Entry entry = null;
             try
             {
-                foreach (Entry stale in Entries.Values.Where(e => e.Menu == null).ToArray()) Remove(stale);
+                foreach (Entry stale in Entries.Values.Where(e => e.Menu == null).ToArray()) SafeRemove(stale);
                 if (!Entries.TryGetValue(__instance, out entry) || entry.Card == null)
                 {
+                    if (entry != null) SafeRemove(entry);
                     InGameMenuEntityView donor = (InGameMenuEntityView)Rest.GetValue(__instance);
                     if (donor == null) throw new InvalidOperationException("Native campaign card art is not ready.");
                     entry = new Entry { Menu = __instance, Collection = (CartCollectionManagerView)Collection.GetValue(__instance),
@@ -113,7 +114,7 @@ namespace KingmakerBuffPlanner.UI
             }
             catch (Exception exception)
             {
-                if (entry != null) Remove(entry);
+                if (entry != null) SafeRemove(entry);
                 _log.Error("[KBP-CONTROLLER-CARD] construction failed;native entries retained.", exception);
             }
         }
@@ -174,9 +175,15 @@ namespace KingmakerBuffPlanner.UI
             {
                 Unbind(entry);
                 bool fired = false;
+                Game game = Game.Instance;
+                object area = game.CurrentlyLoadedArea;
+                object ui = game.RootUiContext.InGameUiContext;
+                string campaign = game.Player.GameId;
                 entry.Model = new InGameMenuEntityVM(() =>
                 {
-                    if (fired || !_enabled || entry.Menu == null) return;
+                    if (fired || entry.Removed || !_enabled || entry.Menu == null || Game.Instance != game ||
+                        game.Player == null || game.Player.GameId != campaign || !ReferenceEquals(game.CurrentlyLoadedArea, area) ||
+                        game.RootUiContext == null || !ReferenceEquals(game.RootUiContext.InGameUiContext, ui)) return;
                     fired = true;
                     if (OpenRequested != null) OpenRequested(entry.Menu, entry.Layer, entry.Below,
                         (TMP_Text)Title.GetValue(entry.Card));
@@ -186,7 +193,7 @@ namespace KingmakerBuffPlanner.UI
                 entry.Card.Bind(entry.Model);
                 ControllerOwnedItems.Ensure(__result[0], entry.Card);
             }
-            catch (Exception exception) { Remove(entry); _log.Error("[KBP-CONTROLLER-CARD] binding failed;native menu retained.", exception); }
+            catch (Exception exception) { SafeRemove(entry); _log.Error("[KBP-CONTROLLER-CARD] binding failed;native menu retained.", exception); }
         }
 
         internal static void NoteLayer(BaseGameMenuView menu, InputLayer layer)
@@ -209,6 +216,7 @@ namespace KingmakerBuffPlanner.UI
 
         private static void Remove(Entry entry)
         {
+            entry.Removed = true; // stale native VM callbacks must never reopen after partial cleanup
             Entries.Remove(entry.Menu);
             try
             {
@@ -244,8 +252,13 @@ namespace KingmakerBuffPlanner.UI
 
         internal static void Tick()
         {
-            foreach (Entry entry in Entries.Values.Where(e => e.Menu == null).ToArray())
-                try { Remove(entry); } catch (Exception exception) { _log.Error("[KBP-CONTROLLER-CARD] stale cleanup failed.", exception); }
+            foreach (Entry entry in Entries.Values.Where(e => e.Menu == null).ToArray()) SafeRemove(entry);
+        }
+
+        private static void SafeRemove(Entry entry)
+        {
+            try { Remove(entry); }
+            catch (Exception exception) { _log.Error("[KBP-CONTROLLER-CARD] owned cleanup failed;native callbacks not interrupted.", exception); }
         }
     }
 }

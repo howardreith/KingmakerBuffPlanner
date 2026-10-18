@@ -1,5 +1,33 @@
 # Controller execution acceptance
 
+## ACTIVE full-controller mission — F01-F10 required
+
+Mouse-required authoring and deferred native-card/full-authoring statements below
+are historical, superseded by [the new mission](../planning/KBP-FULL-CONTROLLER-MISSION.md).
+[Capability/evidence inventory](CONTROLLER-AUTHORING-CAPABILITIES.md).
+Version .4 source progress is not completion of the assignment; no new native
+PASS is claimed. Previous E/C/A evidence remains under its original IDs.
+
+| ID | Required native observation | Status |
+| --- | --- | --- |
+| F01 | Cold controller menu, exactly one readable real card, native entries intact | NOT_RUN |
+| F02 | Native selection opens planner once; highlight/Back do not; repeated registration stable | NOT_RUN |
+| F03 | Actual initial/settled readable workspace at 1920x1200 and compact, both menu/book origins | NOT_RUN |
+| F04 | Controller-only empty-plan filter/search/exact source/recipient/autosave, beyond first viewport | NOT_RUN |
+| F05 | Multiple recipients/routines, explicit edits/options/order/remove/Undo, exact saved data | NOT_RUN |
+| F06 | Complete descriptions/Resources/options/keyboard/recovery/results; one-layer Back | NOT_RUN |
+| F07 | Reopen/book access/session persistence; native book controls retained | NOT_RUN |
+| F08 | Separately authorized finite-resource independent routines/refusals/Stop | NOT_RUN |
+| F09 | Held/repeated input, gap ownership, failure/takeover/device/context lifecycle | NOT_RUN |
+| F10 | Fresh native mouse HUD/hotkey/editor/spellbook/hover regression and exact restoration | NOT_RUN |
+
+No runtime transaction occurred; restoration NOT_RUN, not PASS. Current-session
+authority and the narrow guarded controller observer/launcher route remain gates.
+Do not substitute older mouse scenarios, direct session calls or owner's old
+screenshots for new-byte physical/native evidence. Source work continues safely.
+
+## Historical alpha and mixed-input records
+
 ## Alpha .3 focused review correction (native gates unchanged)
 
 Selected source-tested product `7a7faec`, frozen 62/0 and deterministic package;

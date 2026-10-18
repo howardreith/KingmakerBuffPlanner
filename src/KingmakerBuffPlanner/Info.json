@@ -2,7 +2,7 @@
   "Id": "KingmakerBuffPlanner",
   "DisplayName": "Mr. Bard's Kingmaker Buff Planner",
   "Author": "Mr. Bard",
-  "Version": "0.5.4-controller.3",
+  "Version": "0.5.4-controller.4",
   "ManagerVersion": "0.28.2",
   "GameVersion": "2.1.7",
   "AssemblyName": "KingmakerBuffPlanner.dll",

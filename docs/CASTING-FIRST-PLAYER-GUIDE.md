@@ -1,5 +1,23 @@
 # Buff Planner: player guide (0.5.2)
 
+## Local full-controller candidate 0.5.4-controller.4 (unqualified)
+
+The new requirement is controller-only authoring, not mandatory mouse use. Source
+now adds a real native campaign-menu card opening the planner, semantic region
+focus, a controller search keyboard and shared authoring actions. D-pad/left
+stick navigates; Left/Right changes regions; displayed bumper actions change
+routine; Confirm selects only the focused control. Context inspects; right stick
+scrolls; Back dismisses one layer. Run releases editing ownership and opens the
+selected routine's confirmation/status surface before a separate Run press.
+
+The spellbook entry opens the same planner; the existing shortcut remains quick
+access. A retained Classic choice requires explicit controller-readable switch
+consent, never a silent mode change. Autosave/recovery and all exact casting
+semantics in the mouse guide remain shared. Full input/rendering/native card
+acceptance is NOT_RUN; this is not a controller-support-complete claim or public
+release. See [capabilities and gaps](CONTROLLER-AUTHORING-CAPABILITIES.md).
+The mixed-input alpha limitations below are historical, not the active goal.
+
 ## Controller test alpha 0.5.4-controller.3
 
 Includes the same-session workflow below. Escape/Back while typing should leave

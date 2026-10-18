@@ -1,3 +1,21 @@
+## Current full-controller implementation checkpoint
+
+Local .4 source adds semantic authoring/navigation/search, the real native card,
+shared editor/run handoffs and controller workspace text lifetime/material repair.
+Foundation e4dcbfc and card checkpoint 117b7f1; integration freeze follows. Focused
+development **64/0**, 6.5 s, source47/build1/test compile PASS. See
+[capabilities and exact evidence limits](docs/CONTROLLER-AUTHORING-CAPABILITIES.md).
+F01-F10 remain NOT_RUN. Do not call this completion: no new native pixels,
+physical controller authoring/card input, or effects/resources demonstrated.
+Latest owner clue: spellbook-origin rendering worse than main-menu origin.
+Current-session DATA availability was requested, not received; new screenshot
+not present at inspection. Guarded controller-specific no-cast observer/launcher
+route remains unfinished. Do not run an old mouse scenario as a substitute.
+No desktop/game/install/Mods/settings/profile/save mutations occurred. Prepare
+local candidate/PR text; no remote writes authorized by the new mission.
+
+## Historical Alpha 3 / earlier access handoffs (superseded scope)
+
 > **Current controller ACCESS repair (owner correction):**
 > **ACTIVE SCOPE REPLACEMENT:** [full controller mission](planning/KBP-FULL-CONTROLLER-MISSION.md).
 > Readable workspace, real native menu card and controller-only authoring/search

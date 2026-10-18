@@ -56,7 +56,10 @@ namespace KingmakerBuffPlanner.UI
         private object _controllerArea;
         private object _controllerUi;
         private string _controllerCampaign;
+        private bool _controllerAreaUnloading;
         private bool _editorReturnRequested;
+        private string _controllerConfirmRoutine;
+        private ControllerTransitionInputGuard _controllerTransition;
         private readonly ControllerActivationLatch _authoringExitLatch = new ControllerActivationLatch();
         private ControllerSurfaceHandoff _controllerBookHandoff;
         private ControllerSurfaceHandoff _controllerQuickReturn;
@@ -189,7 +192,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal static bool ControllerAuthoringAvailable
         {
-            get { return _instance != null && _instance._enabled && _instance._castingHost != null &&
+            get { return _instance != null && _instance._enabled && !_instance._controllerAreaUnloading && _instance._castingHost != null &&
                 !_instance._castingHost.IsRunning && _instance._castingWorkspace == null &&
                 _instance._controllerRoutines == null && _instance._controllerBookHandoff == null; }
         }
@@ -1717,13 +1720,13 @@ namespace KingmakerBuffPlanner.UI
             Kingmaker.UI._ConsoleUI.InGameMenu.BaseGameMenuView nativeMenu, TMPro.TMP_Text donor)
         {
             BuffPlannerUiRoot root = _instance;
-            if (root == null || !root._enabled || root._controllerRoutines != null ||
+            if (root == null || !root._enabled || root._controllerAreaUnloading || root._controllerRoutines != null ||
                 Game.Instance == null || !Game.Instance.IsControllerGamepad ||
                 Game.Instance.CurrentMode != GameModeType.Default ||
                 root._castingWorkspace != null || root._screen.IsOpen) return;
             try
             {
-                root._controllerHost = nativeMenu.GetComponentInParent<Canvas>();
+                root._controllerHost = ControllerPresentationHost.Resolve(nativeMenu);
                 root._controllerDonor = donor;
                 root._controllerArea = Game.Instance.CurrentlyLoadedArea;
                 root._controllerUi = Game.Instance.RootUiContext.InGameUiContext;
@@ -1742,7 +1745,7 @@ namespace KingmakerBuffPlanner.UI
         private bool ControllerContextValid()
         {
             Game game = Game.Instance;
-            return _enabled && Application.isFocused && game != null && game.IsControllerGamepad &&
+            return _enabled && !_controllerAreaUnloading && Application.isFocused && game != null && game.IsControllerGamepad &&
                 game.Player != null && game.Player.GameId == _controllerCampaign &&
                 ReferenceEquals(game.CurrentlyLoadedArea, _controllerArea) && game.RootUiContext != null &&
                 ReferenceEquals(game.RootUiContext.InGameUiContext, _controllerUi) && _controllerHost != null &&
@@ -1755,14 +1758,14 @@ namespace KingmakerBuffPlanner.UI
             Kingmaker.Assets.Console.GamepadInput.InputLayer sourceLayer, TMPro.TMP_Text donor)
         {
             BuffPlannerUiRoot root = _instance;
-            if (root == null || !root._enabled || root._controllerBookHandoff != null ||
+            if (root == null || !root._enabled || root._controllerAreaUnloading || root._controllerBookHandoff != null ||
                 root._castingWorkspace != null || root._controllerRoutines != null || root._castingHost.IsRunning ||
                 book == null || ControllerSpellbookIntegration.Model(book) == null || donor == null || donor.font == null) return;
             var pad = Kingmaker.Assets.Console.GamepadInput.GamePad.Instance;
             int index = pad.Layers.IndexOf(sourceLayer);
             if (index < 0 || pad.CurrentInputLayer != sourceLayer) return;
             var below = index == 0 ? pad.BaseLayer : pad.Layers[index - 1];
-            root._controllerHost = book.GetComponentInParent<Canvas>();
+            root._controllerHost = ControllerPresentationHost.Resolve(book);
             root._controllerDonor = donor;
             root._controllerCampaign = Game.Instance.Player.GameId;
             root._controllerArea = Game.Instance.CurrentlyLoadedArea;
@@ -1770,21 +1773,63 @@ namespace KingmakerBuffPlanner.UI
             var vm = ControllerSpellbookIntegration.Model(book);
             root._controllerBookHandoff = new ControllerSurfaceHandoff(
                 () => root.ControllerContextValid() && !root._castingHost.IsRunning &&
-                    (ReferenceEquals(pad.CurrentInputLayer, sourceLayer) || ReferenceEquals(pad.CurrentInputLayer, below)),
+                    (ReferenceEquals(pad.CurrentInputLayer, sourceLayer) || ReferenceEquals(pad.CurrentInputLayer, below) || root.TransitionCurrent),
                 () => book != null && ControllerSpellbookIntegration.Showing(book) && ControllerSpellbookIntegration.Model(book) == vm && !vm.MetamagicBuilderMode.Value &&
                     ReferenceEquals(pad.CurrentInputLayer, sourceLayer),
-                () => vm.Back(),
+                () => { vm.Back(); root.AcquireTransition(below); },
                 () => Game.Instance.CurrentMode == GameModeType.Default && !ControllerSpellbookIntegration.Showing(book) &&
-                    ReferenceEquals(pad.CurrentInputLayer, below),
-                () => root.BeginControllerAuthoring());
+                    (ReferenceEquals(pad.CurrentInputLayer, below) || root.TransitionCurrent),
+                () => { root.ReleaseTransition(); root.BeginControllerAuthoring(); });
         }
 
-        private void BeginControllerAuthoring()
+        internal static void RequestControllerEditorFromCard(
+            Kingmaker.UI._ConsoleUI.InGameMenu.InGameMenuView menu,
+            Kingmaker.Assets.Console.GamepadInput.InputLayer source,
+            Kingmaker.Assets.Console.GamepadInput.InputLayer below, TMPro.TMP_Text donor)
+        {
+            BuffPlannerUiRoot root = _instance;
+            if (root == null || !root._enabled || root._controllerAreaUnloading || root._controllerBookHandoff != null || root._castingWorkspace != null ||
+                root._controllerRoutines != null || menu == null || source == null || below == null) return;
+            var pad = Kingmaker.Assets.Console.GamepadInput.GamePad.Instance;
+            root._controllerHost = ControllerPresentationHost.Resolve(menu);
+            root._controllerDonor = donor;
+            root._controllerCampaign = Game.Instance.Player.GameId;
+            root._controllerArea = Game.Instance.CurrentlyLoadedArea;
+            root._controllerUi = Game.Instance.RootUiContext.InGameUiContext;
+            root.AcquireTransition(below);
+            // The native VM calls its selected card action during disposal.
+            // Never call Deselect/Confirm again from this route.
+            root._controllerBookHandoff = new ControllerSurfaceHandoff(
+                () => root.ControllerContextValid() && (ReferenceEquals(pad.CurrentInputLayer, source) || ReferenceEquals(pad.CurrentInputLayer, below) || root.TransitionCurrent),
+                () => true, () => { },
+                () => Game.Instance.CurrentMode == GameModeType.Default && (menu == null || !menu.gameObject.activeInHierarchy) &&
+                    !pad.Layers.Contains(source) && (ReferenceEquals(pad.CurrentInputLayer, below) || root.TransitionCurrent),
+                () => { root.ReleaseTransition(); if (root._castingHost.IsRunning) root.OpenControllerQuick(); else root.BeginControllerAuthoring(); });
+        }
+
+        private bool TransitionCurrent { get { return _controllerTransition != null && _controllerTransition.Current && !_controllerTransition.Canceled; } }
+        private void AcquireTransition(Kingmaker.Assets.Console.GamepadInput.InputLayer below)
+        {
+            if (_controllerTransition == null && ReferenceEquals(Kingmaker.Assets.Console.GamepadInput.GamePad.Instance.CurrentInputLayer, below))
+                _controllerTransition = new ControllerTransitionInputGuard(_controllerHost, below);
+        }
+        private void ReleaseTransition()
+        {
+            var owned = _controllerTransition; _controllerTransition = null;
+            if (owned != null) owned.Dispose();
+        }
+
+        private void BeginControllerAuthoring(bool convertClassic = false)
         {
             if (!ControllerContextValid() || _castingHost.IsRunning) return;
             CloseControllerRoutines();
+            if (!CastingFirstActive && convertClassic)
+            {
+                string refused = SetPlannerMode(PlannerMode.CastingFirst);
+                if (refused != null) { OpenControllerQuick(refused); return; }
+            }
             if (!CastingFirstActive)
-                OpenControllerQuick("Classic is retained. Select casting-first in mod settings using mouse/keyboard; it has not been switched.");
+                OpenControllerQuick("Classic is retained. Open Review casting-first setup for controller-readable switch consent. Nothing has been switched.");
             else if (!OpenCastingWorkspace() && ControllerContextValid())
                 OpenControllerQuick("The editor could not open. Input was released. See the log for the unavailable host/input contract.");
         }
@@ -1800,8 +1845,7 @@ namespace KingmakerBuffPlanner.UI
                 string unavailable = null;
                 string campaign = Game.Instance.Player == null ? null : Game.Instance.Player.GameId;
                 if (!root.CastingFirstActive)
-                    unavailable = "Classic is selected. Use mouse and keyboard to select the casting-first planner " +
-                        "in mod settings and review/save its imported plan. Classic has not been switched.";
+                    unavailable = "Classic is selected. Review casting-first setup to read and approve the one-way switch. Classic has not been switched.";
                 else if (string.IsNullOrWhiteSpace(campaign))
                     unavailable = "No campaign profile is available. Return after the campaign has loaded.";
                 else
@@ -1819,7 +1863,13 @@ namespace KingmakerBuffPlanner.UI
                     routine => root.StartCastingFirstRoutine(routine, root.PresentQuickResult, null, false),
                     () => root._castingHost.RequestStop(CastingExecutionHost.PlayerStopReason),
                     () => root._castingHost.IsRunning,
-                    () => root._castingHost.ActiveScopeRoutineId);
+                    () => root._castingHost.ActiveScopeRoutineId, !root.CastingFirstActive);
+                if (_controllerConfirmRoutine != null)
+                {
+                    model.FocusRoutine(_controllerConfirmRoutine);
+                    notice = "Confirm Run " + (session == null ? _controllerConfirmRoutine : session.RoutineDisplayName(_controllerConfirmRoutine)) + ". Nothing has been cast yet.";
+                    _controllerConfirmRoutine = null;
+                }
                 root._controllerRoutines = new ControllerRoutineMenu(_controllerDonor, model, root._log.Info);
                 if (notice != null) root._controllerRoutines.ShowResult(notice);
         }
@@ -1834,28 +1884,46 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
+        private void RequestControllerRun(string routine)
+        {
+            if (_controllerEditor == null || _castingHost.IsRunning || !ControllerContextValid()) return;
+            _controllerConfirmRoutine = routine;
+            RequestWorkspaceClose();
+        }
+
         private void TickControllerAuthoring()
         {
+            if (_controllerTransition != null && (!ControllerContextValid() || !_controllerTransition.Current || _controllerTransition.Canceled))
+            {
+                if (_controllerBookHandoff != null) _controllerBookHandoff.Cancel();
+                if (_controllerQuickReturn != null) _controllerQuickReturn.Cancel();
+                // A deliberate Back remains owned until release. Context loss
+                // or native takeover cleans immediately without reopening.
+                if (!ControllerContextValid() || !_controllerTransition.Current || ControllerRoutineMenu.ControlsAreNeutral()) ReleaseTransition();
+            }
+            ControllerNativeMenuCard.Tick();
             ControllerSpellbookIntegration.Tick();
             if (_controllerQuickReturn != null && _controllerQuickReturn.Tick(ControllerRoutineMenu.ControlsAreNeutral(), Time.frameCount))
-                _controllerQuickReturn = null;
+            { _controllerQuickReturn = null; if (_controllerTransition != null && !_controllerTransition.Canceled) ReleaseTransition(); }
             if (_controllerBookHandoff != null && _controllerBookHandoff.Tick(ControllerRoutineMenu.ControlsAreNeutral(), Time.frameCount))
-                _controllerBookHandoff = null;
+            { _controllerBookHandoff = null; if (_controllerTransition != null && !_controllerTransition.Canceled) ReleaseTransition(); }
             if (_controllerEditor != null)
             {
                 if (!_controllerEditor.Valid) { CloseCastingWorkspace(); return; }
                 _controllerEditor.Tick();
                 if (!_editorReturnRequested || !_authoringExitLatch.CanRelease(ControllerRoutineMenu.ControlsAreNeutral() &&
                     !Input.GetMouseButton(0) && !Input.GetMouseButton(1), Time.frameCount)) return;
+                string confirmRoutine = _controllerConfirmRoutine;
                 CloseCastingWorkspace();
                 if (ControllerContextValid())
                 {
                     var pad = Kingmaker.Assets.Console.GamepadInput.GamePad.Instance;
                     var expected = pad.CurrentInputLayer;
+                    AcquireTransition(expected);
                     _controllerQuickReturn = new ControllerSurfaceHandoff(
-                        () => ControllerContextValid() && ReferenceEquals(pad.CurrentInputLayer, expected),
+                        () => ControllerContextValid() && (ReferenceEquals(pad.CurrentInputLayer, expected) || TransitionCurrent),
                         () => true, () => { }, () => Game.Instance.CurrentMode == GameModeType.Default,
-                        () => OpenControllerQuick());
+                        () => { ReleaseTransition(); _controllerConfirmRoutine = confirmRoutine; OpenControllerQuick(); });
                 }
             }
             else if (_controllerRoutines != null && _controllerRoutines.ConfigureReady)
@@ -1863,7 +1931,7 @@ namespace KingmakerBuffPlanner.UI
                 if (!ControllerContextValid()) { CloseControllerRoutines(); return; }
                 if (_castingHost.IsRunning)
                 { _controllerRoutines.ShowResult("Select Stop before opening the editor."); return; }
-                BeginControllerAuthoring();
+                BeginControllerAuthoring(_controllerRoutines.ConversionApproved);
             }
         }
 
@@ -1951,12 +2019,14 @@ namespace KingmakerBuffPlanner.UI
                     // cannot switch planners (SetPlannerMode refuses there).
                     CastingWorkspaceDevSelection.Enabled || _controllerEditor != null ? (Action)null
                         : () => SwitchPlannerFromScreen(PlannerMode.Classic),
-                    value => _log.Info(value), _controllerEditor != null);
+                    value => _log.Info(value), _controllerEditor != null,
+                    _controllerEditor == null ? (Action<string>)null : RequestControllerRun);
                 // For the controller route, construct the real presentation
                 // and Close control before acquiring its input ownership.
                 if (_controllerEditor != null)
                 {
                     _controllerEditor.TextRoot = _castingWorkspace.RootObject.transform;
+                    _controllerEditor.Command = _castingWorkspace.ControllerCommand;
                     lease = BuffPlannerInputLease.Acquire(boundary);
                 }
                 double constructionMilliseconds = ElapsedMilliseconds(constructionStarted);
@@ -1972,7 +2042,7 @@ namespace KingmakerBuffPlanner.UI
                     constructionMilliseconds, reconciliationMilliseconds);
                 _castingWorkspace.RefreshView();
                 if (_controllerEditor != null)
-                    _castingWorkspace.ShowNotice("Edit with mouse and keyboard; changes autosave. Close returns to controller routines. Back dismisses the top layer first.");
+                    _castingWorkspace.ShowNotice("Controller: D-pad moves focus; Left/Right changes regions; bumpers choose routines; Context inspects; right stick scrolls. Confirm selects the focused action. Changes autosave. Back dismisses one layer.");
                 if (reconciliation != null && reconciliation.Applied)
                     _castingWorkspace.ShowNotice(reconciliation.Notice);
                 _castingWorkspaceOpens++;
@@ -2001,6 +2071,7 @@ namespace KingmakerBuffPlanner.UI
         private void CloseCastingWorkspace()
         {
             _editorReturnRequested = false;
+            _controllerConfirmRoutine = null;
             if (_workspaceInputLease != null)
             {
                 _workspaceInputLease.Dispose();
@@ -2701,6 +2772,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void SignalLifecycle(string name, bool unloading)
         {
+            _controllerAreaUnloading = unloading;
             _lifecycleSignalCount++;
             int seen;
             _lifecycleSignalsByName[name] = _lifecycleSignalsByName.TryGetValue(name, out seen) ? seen + 1 : 1;
@@ -2770,7 +2842,13 @@ namespace KingmakerBuffPlanner.UI
 
         private void OnApplicationFocus(bool focused)
         {
-            if (!focused) CloseControllerRoutines();
+            if (!focused)
+            {
+                if (_controllerQuickReturn != null) _controllerQuickReturn.Cancel();
+                if (_controllerBookHandoff != null) _controllerBookHandoff.Cancel();
+                ReleaseTransition(); CloseControllerRoutines();
+                if (_controllerEditor != null) CloseCastingWorkspace();
+            }
         }
 
         private void OnEnable()
@@ -2786,6 +2864,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void ReleasePlayerUi()
         {
+            ReleaseTransition();
             if (_controllerQuickReturn != null) _controllerQuickReturn.Cancel();
             _controllerQuickReturn = null;
             if (_controllerBookHandoff != null) _controllerBookHandoff.Cancel();
@@ -2801,6 +2880,7 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed) return;
             _disposed = true;
+            ReleaseTransition();
             if (_controllerQuickReturn != null) _controllerQuickReturn.Cancel();
             _controllerQuickReturn = null;
             if (_controllerBookHandoff != null) _controllerBookHandoff.Cancel();

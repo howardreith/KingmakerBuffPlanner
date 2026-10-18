@@ -67,6 +67,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal bool IsOpen { get { return !_disposed; } }
         internal bool ConfigureReady { get; private set; }
+        internal bool ConversionApproved { get { return _model.ConversionApproved; } }
 
         private void Add(List<object> bindings, int action, ControllerRoutineCommand command)
         {
@@ -122,7 +123,7 @@ namespace KingmakerBuffPlanner.UI
                         case ControllerRoutineCommand.PreviousPage: if (_model.ResultsOpen) _view.TurnPage(-1); break;
                         case ControllerRoutineCommand.NextPage: if (_model.ResultsOpen) _view.TurnPage(1); break;
                         case ControllerRoutineCommand.Confirm: _model.Confirm(); break;
-                        case ControllerRoutineCommand.Back: if (!_model.CloseResults()) _closing = true; _latch.Reset(); break;
+                        case ControllerRoutineCommand.Back: if (!_model.CloseResults() && !_model.CloseConversionReview()) _closing = true; _latch.Reset(); break;
                     }
                     Refresh();
                 }

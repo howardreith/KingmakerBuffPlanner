@@ -123,10 +123,14 @@ namespace KingmakerBuffPlanner.UI
         private readonly Func<string> _activeRoutine;
         private readonly string _unavailable;
         private bool _configureRequested;
+        private readonly bool _requiresConversion;
+        private bool _reviewingConversion;
+        internal bool ConversionApproved { get { return _requiresConversion && _reviewingConversion && _configureRequested; } }
 
         internal ControllerRoutineModel(CastingWorkspaceSession session, string unavailable,
-            Func<string, bool> run, Action stop, Func<bool> running, Func<string> activeRoutine)
+            Func<string, bool> run, Action stop, Func<bool> running, Func<string> activeRoutine, bool requiresConversion = false)
         {
+            _requiresConversion = requiresConversion;
             _session = session;
             _unavailable = unavailable;
             _run = run;
@@ -137,21 +141,22 @@ namespace KingmakerBuffPlanner.UI
             if (session != null && session.Document.Castings.Count == 0)
                 Message = (session.LoadStatus == CastingPlanLoadStatus.Absent
                     ? "No saved casting plan was found for this campaign. " : "No buffs are configured in this campaign plan. ") +
-                    "Choose Configure plans to open the planner here; use mouse and keyboard to edit. Changes autosave.";
+                    "Choose Configure plans to open the controller planner here. Changes autosave.";
             if (session != null && session.PersistenceBlocked)
                 Message = "The saved plan could not be loaded: " + session.LoadWarning +
-                    ". Use the mouse/keyboard editor's recovery controls, then return here.";
+                    ". Open the planner's recovery controls, then return here.";
             if (session != null)
             {
                 string saveProblem = WorkspaceFooterText.SaveProblem(session.FooterSaveState);
                 if (saveProblem != null)
                     Message = saveProblem + "\n" + (session.PersistenceBlocked ? Message :
-                        session.LoadWarning + "\nUse the mouse/keyboard editor's recovery controls, then return here.") +
+                        session.LoadWarning + "\nOpen the planner's recovery controls, then return here.") +
                         (session.LegacyImportBlocked ? "\n" + session.LegacyImportBlockReason : string.Empty);
                 string latest = ControllerRoutineDetails.LatestOutcome(session);
                 if (latest != null) Message = latest;
             }
             if (Running) Focus = 3;
+            else if (requiresConversion) Focus = 4;
             else if (session != null && session.Document.Castings.Count == 0) Focus = 4;
         }
 
@@ -160,7 +165,7 @@ namespace KingmakerBuffPlanner.UI
         internal bool ResultsOpen { get; private set; }
         internal bool ConfigureRequested { get { return _configureRequested; } }
         internal string Summary { get { return Message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Ready."; } }
-        internal string ConfirmHint { get { return Focus == 4 ? "Open planner" : Focus == 5 ? "View results" : Focus == 3 ? "Stop" : "Run " + Row(Focus).Substring(4).Split('(')[0].Trim(); } }
+        internal string ConfirmHint { get { return Focus == 4 ? (_requiresConversion ? (_reviewingConversion ? "Switch planner" : "Review setup") : "Open planner") : Focus == 5 ? "View results" : Focus == 3 ? "Stop" : "Run " + Row(Focus).Substring(4).Split('(')[0].Trim(); } }
         internal bool Running { get { return _running(); } }
         internal string ActiveRoutine { get { return _activeRoutine(); } }
         internal string CampaignId { get { return _session == null ? null : _session.CampaignId; } }
@@ -179,7 +184,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal string Row(int index)
         {
-            if (index == 4) return "Configure plans (mouse + keyboard)";
+            if (index == 4) return _requiresConversion ? (_reviewingConversion ? "Switch to casting-first planner" : "Review casting-first setup") : "Configure plans";
             if (index == 5) return "View results / explanations";
             if (index == 3) return Running ? "Stop " + (ActiveRoutine ?? "running routine") : "Stop (no active run)";
             string id = RoutineIds[index];
@@ -197,6 +202,12 @@ namespace KingmakerBuffPlanner.UI
             Focus = order[(Array.IndexOf(order, Focus) + (direction < 0 ? 5 : 1)) % order.Length];
         }
 
+        internal void FocusRoutine(string id)
+        {
+            int index = Array.IndexOf(RoutineIds, id);
+            if (index >= 0) Focus = index;
+        }
+
         internal bool Available(int index)
         {
             if (index == 4) return !Running;
@@ -212,12 +223,30 @@ namespace KingmakerBuffPlanner.UI
             return true;
         }
 
+        internal bool CloseConversionReview()
+        {
+            if (!_reviewingConversion || _configureRequested) return false;
+            _reviewingConversion = false;
+            Message = "Classic is retained unchanged. Review casting-first setup to read the switch consent.";
+            return true;
+        }
+
         internal void Confirm()
         {
             if (ResultsOpen) return;
             if (Focus == 5) { ResultsOpen = true; return; }
             if (Focus == 4)
             {
+                if (_requiresConversion && !Running)
+                {
+                    if (!_reviewingConversion)
+                    {
+                        _reviewingConversion = true;
+                        Message = "Classic is retained. Switching is one-way: the Classic file is preserved and archived by the existing import path. Review unresolved imports in the planner. Confirm Switch to casting-first planner to consent, or Back to keep Classic unchanged.";
+                    }
+                    else _configureRequested = true;
+                    return;
+                }
                 if (Running) Message = "Stop the active routine before opening the editor. Select Stop; completed buffs are kept.";
                 else if (_session == null) Message = _unavailable ?? "The campaign session is unavailable. Return after loading finishes.";
                 else _configureRequested = true;
@@ -259,8 +288,8 @@ namespace KingmakerBuffPlanner.UI
 
     internal static class ControllerRoutineDetails
     {
-        private const string RepairNote = "\nPlan repair uses the mouse/keyboard editor. Back returns to the game. " +
-            "Use the editor's Retry save/Reload controls when needed.";
+        private const string RepairNote = "\nOpen the planner for repair. Back returns to the game. " +
+            "Use the planner's Retry save/Reload controls when needed.";
 
         internal static string LatestOutcome(CastingWorkspaceSession session)
         {

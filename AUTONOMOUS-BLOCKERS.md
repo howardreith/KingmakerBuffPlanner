@@ -1,3 +1,20 @@
+## Current full-controller native boundary
+
+Local .4 implementation is source-tested, not mission-complete. F01-F10 all
+NOT_RUN; physical authoring/card activation/layout/execution and mouse regression
+must not inherit Alpha 3 results. Current exclusive DATA availability confirmation
+and the latest attributed screenshot are missing. Installed DATA KBP is old
+0.1.1-rc3, not evidence of the owner's .3 screen. No game/foreign lease at intake
+does not authorize desktop takeover. Controller-specific guarded no-cast
+observer/launcher support still needs implementation/review before automation;
+existing mouse-workspace routes are not equivalent. Preserve full safety/source,
+WhatIf/Steam/lease/fixture/restoration guards; no broad historical campaign selected.
+Source integration passed focused 64/0 in 6.5 s; no remaining compile/test failure.
+No runtime transaction occurred; restoration NOT_RUN, not PASS. No release/tag,
+push/PR mutation, main merge or permanent install authorized for this larger scope.
+
+## Historical access/Alpha handoffs (not current authority)
+
 > **Current access/layout repair:**
 > **ACTIVE full-controller assignment:** [mission](planning/KBP-FULL-CONTROLLER-MISSION.md).
 > Native card, full semantic authoring/text entry and actual workspace rendering

@@ -82,6 +82,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Dictionary<string, Material> _materials = new Dictionary<string, Material>(StringComparer.Ordinal);
         private readonly Dictionary<PlannerTextRole, Material> _controllerMaterials = new Dictionary<PlannerTextRole, Material>();
         private readonly bool _controller;
+        private readonly HashSet<string> _initializationSamples = new HashSet<string>();
 
         internal TMP_FontAsset BodyFont { get; private set; }
         internal bool HasInitialFont { get; private set; }
@@ -188,7 +189,11 @@ namespace KingmakerBuffPlanner.UI
             // No native object or global TMP setting is changed.
             TextMeshProUGUI label = go.AddComponent<TextMeshProUGUI>();
             if (BodyFont != null) label.font = BodyFont;
+            bool sample = _controller && _initializationSamples.Count < 8 &&
+                (name == "Title" || name == "Name" || name == "BuffName" || name == "LaneTitle" || name == "SaveStatus" || name == "Placeholder" || name == "Result") && _initializationSamples.Add(name);
+            if (sample) Debug.Log("[KBP-WORKSPACE-TEXT-INIT] name=" + name + ";phase=before-activation;rect=" + rect.rect + ";active=" + go.activeInHierarchy);
             go.SetActive(true);
+            if (sample) Debug.Log("[KBP-WORKSPACE-TEXT-INIT] name=" + name + ";phase=after-awake-unparented;rect=" + rect.rect + ";active=" + go.activeInHierarchy);
             label.autoSizeTextContainer = false;
             label.enableAutoSizing = false;
             label.margin = Vector4.zero;
@@ -200,6 +205,7 @@ namespace KingmakerBuffPlanner.UI
             label.richText = true;
             label.raycastTarget = false;
             label.text = role == PlannerTextRole.Title ? Ornamented(text) : text ?? string.Empty;
+            if (sample) Debug.Log("[KBP-WORKSPACE-TEXT-INIT] name=" + name + ";phase=styled-and-parented;rect=" + rect.rect + ";active=" + go.activeInHierarchy + ";text=" + label.text);
             return label;
         }
 
@@ -228,6 +234,8 @@ namespace KingmakerBuffPlanner.UI
                 owned = new Material(BodyFont.material) { name = "KBP.ControllerText." + role };
                 owned.DisableKeyword("UNITY_UI_CLIP_RECT");
                 owned.DisableKeyword("UNITY_UI_ALPHACLIP");
+                owned.DisableKeyword("MASK_HARD");
+                owned.DisableKeyword("MASK_SOFT");
                 if (owned.HasProperty("_StencilComp")) owned.SetFloat("_StencilComp", 8);
                 if (owned.HasProperty("_Stencil")) owned.SetFloat("_Stencil", 0);
                 if (owned.HasProperty("_StencilOp")) owned.SetFloat("_StencilOp", 0);

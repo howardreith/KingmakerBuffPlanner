@@ -1,5 +1,40 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17/18 full-controller scope and local implementation
+
+Owner supersedes mouse-required authoring and deferred card/full-authoring scope.
+Intake clean branch codex/kingmaker-buff-planner-controller-ui at e08031ba;
+read-only PR #10 OPEN/DRAFT matches. Preserve all frozen .1/.2/.3 artifacts,
+Alpha 3 cancellation/viewport-scroll fixes and working KMG/CotW startup. No other
+mod touched. Foundation e4dcbfc: current mission, safe inactive-parent text
+initialization, controller-owned materials/root host, semantic focus/grid/repeat.
+Card checkpoint 117b7f1: actual native view/VM/cart/navigation adapter, passive art
+only, code-drawn icon, MIT attribution; integration is subsequent source work.
+Current working .4 integrates controller commands into existing control callbacks,
+exact source/recipient/edit/options/recovery/services, source-aware card/book/run
+handoffs, owned transition input, Classic consent and no physical typing requirement.
+Owner reports spellbook origin rendered worse: compare canvas/material/lifetime
+for both sources; no build-matched pixels prove cause or correction yet.
+
+Selected Test-Development prefixes controller-,planner-escape-,native-text-material-,
+native-source-tabs-,input-lease-,native-window-takes-,casting-workspace-campaign-bound-,
+spellbook-entry-,graph-,native-theme-: **64/0**, 6.5 s; source47/build1/test compile
+PASS; artifacts/controller-access/full-controller-final-development.log. Earlier
+45/0, 37/0 and rendering4/0 logs retained separately. Two compile iterations
+corrected nonexistent routine Order and Component/Canvas signature; not baseline
+failures. Private installed IL evidence under artifacts/controller-access is not
+distributed. Installed DATA DLL 0.1.1-rc3, SHA256
+78407dd4c7240ce25c7654715854e83061da744a18d8eb4a2198fdffec5e3080,
+MVID c0cc9cbc-8075-4d98-a32e-29972aafa7fa; not screenshot identity. No game or
+foreign lease at intake, but current exclusive session confirmation remains
+pending. No runtime/staging/settings/profile/save mutations; restoration NOT_RUN.
+F01-F10 NOT_RUN; assignment IN_PROGRESS, not controller-support-complete.
+Next: freeze distinct .4, focused frozen validation/deterministic local package;
+then complete guarded no-cast controller observer route and, after authority and
+prerequisites, record real card -> author/search/save/return, initial/settled
+1920x1200 and compact frames from both origins. Finite-resource execution later.
+No remote writes/release/tag/merge/permanent installation authorized or performed.
+
 ## 2026-10-17 owner-requested Alpha 3 publication / PR update
 
 Published v0.5.4-controller.3 at 2026-10-18T00:39:48Z, product/tag

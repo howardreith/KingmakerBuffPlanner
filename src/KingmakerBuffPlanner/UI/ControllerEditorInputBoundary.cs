@@ -20,6 +20,9 @@ namespace KingmakerBuffPlanner.UI
     {
         internal static ControllerEditorInputBoundary Active { get; private set; }
         internal Transform TextRoot { private get; set; }
+        internal Action<ControllerWorkspaceCommand> Command { private get; set; }
+        private ControllerWorkspaceCommand? _pendingCommand;
+        private readonly ControllerNavigationRepeat _repeat = new ControllerNavigationRepeat();
         private readonly Action _back;
         private readonly ControllerActivationLatch _latch = new ControllerActivationLatch();
         private InputLayer _layer;
@@ -64,21 +67,23 @@ namespace KingmakerBuffPlanner.UI
             Game game = Game.Instance;
             if (game == null || !game.IsControllerGamepad || game.CurrentMode != GameModeType.Default ||
                 game.Player == null || game.RootUiContext == null || game.RootUiContext.InGameUiContext == null ||
-                !GamePad.HasInstance || EventSystem.current == null)
+                !GamePad.HasInstance)
                 throw new InvalidOperationException("Controller campaign input is not ready.");
             _events = EventSystem.current;
             _pad = GamePad.Instance;
-            _module = _events.currentInputModule as RewiredStandaloneInputModule;
-            if (_module == null) throw new InvalidOperationException("The native Rewired mouse input module is unavailable.");
+            _module = _events == null ? null : _events.currentInputModule as RewiredStandaloneInputModule;
             _campaign = game.Player.GameId;
             _area = game.CurrentlyLoadedArea;
             _ui = game.RootUiContext.InGameUiContext;
             if (ModeQueue == null || ModeQueue.FieldType != typeof(List<Action>))
                 throw new InvalidOperationException("Unverified native mode queue contract.");
             _modeQueue = (List<Action>)ModeQueue.GetValue(game);
-            _previousMice = new List<PlayerMouse>(_module.PlayerMice);
-            _mouseAllowed = _module.allowMouseInput;
-            _navigation = _events.sendNavigationEvents;
+            if (_module != null)
+            {
+                _previousMice = new List<PlayerMouse>(_module.PlayerMice);
+                _mouseAllowed = _module.allowMouseInput;
+            }
+            _navigation = _events != null && _events.sendNavigationEvents;
             _cursorVisible = Cursor.visible;
             _cursorLock = Cursor.lockState;
             return this;
@@ -88,19 +93,28 @@ namespace KingmakerBuffPlanner.UI
         {
             try
             {
-                _layer = new InputLayer { ContextName = "KingmakerBuffPlanner.MixedInputEditor", CursorEnabled = false };
+                _layer = new InputLayer { ContextName = "KingmakerBuffPlanner.ControllerEditor", CursorEnabled = false };
                 InputBindStruct back = _layer.AddButton(_ =>
                 {
                     RequestBack();
                 }, RewiredConsts.Action.Decline, InputActionEventType.ButtonJustPressed, false, false);
-                _ownership = new ControllerLayerOwnership(_layer, () => _pad.CurrentInputLayer, back.Binds);
+                var bindings = back.Binds.Cast<object>().ToList();
+                AddCommand(bindings, RewiredConsts.Action.Confirm, ControllerWorkspaceCommand.Confirm);
+                AddCommand(bindings, RewiredConsts.Action.Func01, ControllerWorkspaceCommand.Inspect);
+                AddCommand(bindings, RewiredConsts.Action.LeftUp, ControllerWorkspaceCommand.PreviousRoutine);
+                AddCommand(bindings, RewiredConsts.Action.RightUp, ControllerWorkspaceCommand.NextRoutine);
+                foreach (int action in new[] { RewiredConsts.Action.DPadUp, RewiredConsts.Action.DPadDown, RewiredConsts.Action.DPadLeft, RewiredConsts.Action.DPadRight })
+                    bindings.AddRange(_layer.AddButton(_ => { }, action, InputActionEventType.ButtonJustPressed, false, false).Binds.Cast<object>());
+                _ownership = new ControllerLayerOwnership(_layer, () => _pad.CurrentInputLayer, bindings);
                 Active = this;
                 _ownership.Acquired(_pad.PushLayer(_layer));
-                _module.allowMouseInput = false;
-                _module.PlayerMice = new List<PlayerMouse>();
-                _ownedMice = _module.PlayerMice; // native setter copies the list
-                _events.sendNavigationEvents = false;
-                _events.SetSelectedGameObject(null);
+                if (_module != null)
+                {
+                    _module.allowMouseInput = false;
+                    _module.PlayerMice = new List<PlayerMouse>();
+                    _ownedMice = _module.PlayerMice; // native setter copies the list
+                }
+                if (_events != null) { _events.sendNavigationEvents = false; _events.SetSelectedGameObject(null); }
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
                 var before = new HashSet<Action>(_modeQueue);
@@ -127,12 +141,34 @@ namespace KingmakerBuffPlanner.UI
                         (game.CurrentMode == GameModeType.Default && _pendingStart != null &&
                          _pendingStart.Pending && _modeWaitFrames < 120)) &&
                     _ownership != null && GamePad.HasInstance && ReferenceEquals(GamePad.Instance, _pad) && _ownership.IsCurrent &&
-                    EventSystem.current == _events && _module != null && _module.isActiveAndEnabled &&
+                    (_events == null || EventSystem.current == _events) && (_module == null || _module.isActiveAndEnabled) &&
                     GamePad.Instance.Player.controllers.joystickCount > 0;
             }
         }
 
         internal bool Allows(BindDescription binding) { return _ownership == null || _ownership.Allows(binding); }
+
+        private void AddCommand(List<object> bindings, int action, ControllerWorkspaceCommand command)
+        {
+            bindings.AddRange(_layer.AddButton(_ =>
+            {
+                if (Valid && _latch.Take(Time.frameCount)) _pendingCommand = command;
+            }, action, InputActionEventType.ButtonJustPressed, false, false).Binds.Cast<object>());
+        }
+
+        private ControllerWorkspaceCommand? Navigation()
+        {
+            var player = _pad.Player;
+            float x = player.GetAxis(RewiredConsts.Action.LeftStickX), y = player.GetAxis(RewiredConsts.Action.LeftStickY);
+            if (player.GetButton(RewiredConsts.Action.DPadUp) || y > .55f) return ControllerWorkspaceCommand.Up;
+            if (player.GetButton(RewiredConsts.Action.DPadDown) || y < -.55f) return ControllerWorkspaceCommand.Down;
+            if (player.GetButton(RewiredConsts.Action.DPadLeft) || x < -.55f) return ControllerWorkspaceCommand.Left;
+            if (player.GetButton(RewiredConsts.Action.DPadRight) || x > .55f) return ControllerWorkspaceCommand.Right;
+            float scroll = player.GetAxis(RewiredConsts.Action.RightStickY);
+            if (scroll > .55f) return ControllerWorkspaceCommand.ScrollUp;
+            if (scroll < -.55f) return ControllerWorkspaceCommand.ScrollDown;
+            return null;
+        }
 
         internal void RequestBack()
         {
@@ -142,7 +178,7 @@ namespace KingmakerBuffPlanner.UI
 
         private TMPro.TMP_InputField SelectedText()
         {
-            return _events.currentSelectedGameObject == null ? null :
+            return _events == null || _events.currentSelectedGameObject == null ? null :
                 _events.currentSelectedGameObject.GetComponent<TMPro.TMP_InputField>();
         }
 
@@ -163,9 +199,14 @@ namespace KingmakerBuffPlanner.UI
             if (!_armed && _latch.Ready(Time.frameCount))
             {
                 _armed = true;
-                _module.allowMouseInput = true;
+                if (_module != null) _module.allowMouseInput = true;
             }
             _backIntent.Complete(_latch, neutral, Time.frameCount);
+            ControllerWorkspaceCommand? command = _pendingCommand;
+            _pendingCommand = null;
+            if (command.HasValue && Command != null) Command(command.Value);
+            ControllerWorkspaceCommand? navigation = _latch.Ready(Time.frameCount) ? Navigation() : null;
+            if (_repeat.Take(navigation, Time.unscaledTime) && Command != null) Command(navigation.Value);
         }
 
         public void YieldFullScreenOwnership() { _modeOwned = false; }

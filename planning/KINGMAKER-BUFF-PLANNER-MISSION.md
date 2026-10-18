@@ -1,3 +1,15 @@
+## ACTIVE controller scope replacement - October 17/18, 2026
+
+Follow [the full controller mission](KBP-FULL-CONTROLLER-MISSION.md), not the
+historical execution-only/mixed-input completion boundaries. All three are
+mandatory: readable actual workspace, a real native campaign-menu card, and
+controller-only authoring/search/recovery. Local implementation is IN_PROGRESS;
+new F01-F10 native evidence is required. Preserve Alpha 3 and its review fixes,
+working unrelated mods, canonical services and all runtime protection. No new
+remote publication/push/merge or permanent installation is authorized.
+
+## Historical checkpoints
+
 ## Stable 0.5.2 publication - October 14, 2026
 
 On explicit owner authorization, the human-feedback branch was merged into

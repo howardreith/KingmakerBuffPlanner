@@ -1,4 +1,21 @@
-# Controller test alpha 0.5.4-controller.3 — focused review corrections
+# Local source candidate 0.5.4-controller.4 — full controller planner (unqualified)
+
+Implements semantic controller focus over the existing workspace's authoring
+controls, controller search/text modal, exact source/recipient/options/order/Undo/
+recovery paths, a genuine native campaign-menu card and direct spellbook access.
+Run hands off safely to selected-routine confirmation; shared execution remains
+canonical. Adds owned transition input protection, root-canvas host selection,
+inactive-parent-safe TMP initialization, owned controller font materials and
+bounded first/settled workspace diagnostics. Mouse navigation/highlight behavior
+is retained. Alpha 3's text-cancel and viewport-scroll corrections remain.
+
+This assignment is NOT complete/native-qualified. Actual new-byte card, controller-
+only authoring, rendering at 1920x1200/compact, finite-resource execution and
+lifecycle/restoration still require guarded observations. [Inventory](CONTROLLER-AUTHORING-CAPABILITIES.md).
+No new public release/tag, push/PR edit, main merge, installation or gameplay-mod
+change selected. Existing published Alpha 3 is untouched.
+
+## Historical controller test alpha 0.5.4-controller.3 — focused review corrections
 
 Includes the .2 same-session Configure/editor access, console-book entry and
 text-container initialization repair. Fixes two reviewed presentation/input cases:

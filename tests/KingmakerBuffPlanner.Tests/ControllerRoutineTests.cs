@@ -44,6 +44,13 @@ namespace KingmakerBuffPlanner.Tests
             Run("controller-editor-back-keeps-text-intent-and-single-edge", TestControllerTextBack);
             Run("controller-editor-back-cancellation-before-and-after-request", TestControllerTextBackOrdering);
             Run("controller-results-scroll-exposes-short-medium-long-reports", TestControllerResultsScroll);
+            Run("controller-workspace-text-initializes-before-parenting", TestControllerWorkspaceTextContract);
+            Run("controller-workspace-focus-stable-keys-and-disabled-actions", TestWorkspaceFocus);
+            Run("controller-workspace-navigation-repeat-is-bounded", TestWorkspaceRepeat);
+            Run("controller-workspace-keyboard-apply-cancel-without-physical-typing", TestWorkspaceKeyboard);
+            Run("controller-native-card-registration-keeps-foreign-identities", TestNativeCardIdentities);
+            Run("controller-workspace-authoring-through-semantic-focus", () => TestWorkspaceSemanticAuthoring(root));
+            Run("controller-classic-switch-requires-explicit-review-consent", TestControllerClassicConsent);
         }
 
         private static void TestControllerActivationLatch()
@@ -464,7 +471,7 @@ namespace KingmakerBuffPlanner.Tests
             fixture.Menu.Confirm();
             foreach (CastingBlocker blocker in fixture.LastApply.BlockingCastings)
                 Assert(fixture.Menu.Message.Contains(fixture.Session.CastingLabel(blocker.CastingId)));
-            Assert(fixture.Menu.Message.Contains("mouse/keyboard editor"));
+            Assert(fixture.Menu.Message.Contains("Open the planner for repair"));
             fixture.Session.SetAvailabilityPolicy(ExecutionProfile.CastAvailable);
             fixture.Menu.Confirm();
             fixture.Pump();
@@ -535,7 +542,7 @@ namespace KingmakerBuffPlanner.Tests
             FocusController(menu, 0); // explicitly choose Run Long; default is recovery access
             menu.Confirm();
             Assert(!result.Allowed && boundary.RecordedSubmissions.Count == 0 && File.ReadAllText(path) == bytes);
-            Assert(menu.Message.Contains("mouse/keyboard editor"));
+            Assert(menu.Message.Contains("Open the planner for repair"));
         }
 
         private static ControllerRoutineModel ReopenController(ControllerFixture fixture)
@@ -563,7 +570,7 @@ namespace KingmakerBuffPlanner.Tests
             var reopened = ReopenController(fixture);
             Assert(ReferenceEquals(fixture.Session.LastRunReport, first));
             Assert(reopened.Message.Contains(refusal) && reopened.Message != success &&
-                reopened.Message.Contains("mouse/keyboard editor"));
+                reopened.Message.Contains("Open the planner for repair"));
             fixture.Inputs = PolicyInputs(fixture.Inputs, false);
             fixture.Menu.Confirm();
             fixture.Pump();
@@ -818,6 +825,156 @@ namespace KingmakerBuffPlanner.Tests
             Assert(ControllerResultScroll.Next(.5f, 10000, 0, 1) == .5f);
             Assert(ControllerResultScroll.Next(.5f, 10000, 440, 0) == .5f);
             Assert(ControllerResultScroll.Next(.5f, 440, 440, 1) == 1);
+        }
+
+        private static void TestControllerWorkspaceTextContract()
+        {
+            Assembly product = Assembly.LoadFrom(Path.Combine(FindRepositoryRoot(), "artifacts", "build", "Release", "KingmakerBuffPlanner.dll"));
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            Type kit = product.GetType("KingmakerBuffPlanner.UI.PlannerNativeKit", true);
+            string[] calls = ControllerIlCalls(kit.GetMethod("Text", flags)).Select(m => m.Name).ToArray();
+            Assert(Array.IndexOf(calls, "SetActive") >= 0 && Array.LastIndexOf(calls, "SetParent") > Array.LastIndexOf(calls, "SetActive"));
+            Assert(calls.Contains("set_autoSizeTextContainer") && calls.Contains("set_margin"));
+            Type host = product.GetType("KingmakerBuffPlanner.UI.ControllerPresentationHost", true);
+            Assert(ControllerIlCalls(host.GetMethod("Resolve", flags)).Any(m => m.Name == "get_rootCanvas"));
+            Assert(kit.GetInterfaces().Contains(typeof(IDisposable)));
+        }
+
+        private static void TestWorkspaceFocus()
+        {
+            int oldActions = 0, newActions = 0;
+            var focus = new ControllerWorkspaceFocus();
+            focus.Replace(new[] {
+                new ControllerFocusItem("buff/a", "Catalogue", "Same name", true, () => oldActions++),
+                new ControllerFocusItem("provider/unit-a/book-a", "Casters", "Same name", true, () => oldActions++),
+                new ControllerFocusItem("provider/unit-a/book-b", "Casters", "Same name", false, () => oldActions++) });
+            focus.Move(1, true); focus.Move(1, false);
+            Assert(focus.Key == "provider/unit-a/book-b" && focus.Confirm().Contains("Unavailable") && oldActions == 0);
+            focus.Replace(new[] {
+                new ControllerFocusItem("buff/a", "Catalogue", "Renamed", true, () => newActions++),
+                new ControllerFocusItem("provider/unit-a/book-b", "Casters", "Changed display", true, () => newActions++),
+                new ControllerFocusItem("provider/unit-a/book-a", "Casters", "Same name", true, () => oldActions++) });
+            Assert(focus.Key == "provider/unit-a/book-b" && focus.Confirm() == null && newActions == 1 && oldActions == 0);
+            focus.Replace(focus.Items.Where(i => i.Key != "provider/unit-a/book-b").ToArray());
+            Assert(focus.Key == "provider/unit-a/book-a");
+            focus.Replace(new ControllerFocusItem[0]);
+            Assert(focus.Key == null && focus.Confirm().Contains("No controls"));
+        }
+
+        private static void TestWorkspaceRepeat()
+        {
+            var repeat = new ControllerNavigationRepeat();
+            Assert(repeat.Take(ControllerWorkspaceCommand.Down, 0));
+            Assert(!repeat.Take(ControllerWorkspaceCommand.Down, .1f));
+            Assert(repeat.Take(ControllerWorkspaceCommand.Down, .38f));
+            Assert(!repeat.Take(ControllerWorkspaceCommand.Down, .39f));
+            Assert(repeat.Take(ControllerWorkspaceCommand.Down, .49f));
+            Assert(repeat.Take(ControllerWorkspaceCommand.Up, .50f));
+            Assert(!repeat.Take(null, .6f) && repeat.Take(ControllerWorkspaceCommand.Up, .61f));
+        }
+
+        private static void SelectKeyboardKey(ControllerSearchKeyboard keyboard, string key)
+        {
+            int index = Array.IndexOf(ControllerSearchKeyboard.Keys, key);
+            Assert(index >= 0);
+            for (int i = 0; keyboard.Focus / ControllerSearchKeyboard.Columns != index / ControllerSearchKeyboard.Columns && i < 10; i++) keyboard.Move(0, 1);
+            for (int i = 0; keyboard.Focus != index && i < 10; i++) keyboard.Move(1, 0);
+            Assert(keyboard.Focus == index);
+            keyboard.Confirm();
+        }
+
+        private static void TestWorkspaceKeyboard()
+        {
+            string original = "existing filter";
+            var keyboard = new ControllerSearchKeyboard(original);
+            SelectKeyboardKey(keyboard, "Clear");
+            foreach (char c in "bull") SelectKeyboardKey(keyboard, c.ToString());
+            SelectKeyboardKey(keyboard, "Space"); SelectKeyboardKey(keyboard, "s");
+            SelectKeyboardKey(keyboard, "Delete"); SelectKeyboardKey(keyboard, "Apply");
+            Assert(keyboard.Finished && keyboard.Accepted && keyboard.Draft == "bull ");
+            var canceled = new ControllerSearchKeyboard(original);
+            SelectKeyboardKey(canceled, "Clear"); SelectKeyboardKey(canceled, "a"); canceled.Cancel();
+            Assert(canceled.Finished && !canceled.Accepted && original == "existing filter");
+            var navigation = new ControllerSearchKeyboard("");
+            var visited = new HashSet<int>();
+            for (int row = 0; row < 6; row++)
+            {
+                for (int col = 0; col < 8; col++) { visited.Add(navigation.Focus); navigation.Move(1, 0); }
+                navigation.Move(0, 1);
+            }
+            Assert(visited.Count == ControllerSearchKeyboard.Keys.Length);
+        }
+
+        private static void TestNativeCardIdentities()
+        {
+            Assembly game = Assembly.LoadFrom(Path.Combine(Environment.GetEnvironmentVariable("KBP_TEST_GAME_PATH"), "Kingmaker_Data", "Managed", "Assembly-CSharp.dll"));
+            Type vm = game.GetType("Kingmaker.UI._ConsoleUI.InGameMenu.InGameMenuEntityVM", true);
+            int actions = 0;
+            object own = Activator.CreateInstance(vm, new object[] { (Action)(() => actions++), "Buff Planner", false, true });
+            object native = Activator.CreateInstance(vm, new object[] { (Action)(() => actions++), "Rest", false, true });
+            object foreign = Activator.CreateInstance(vm, new object[] { (Action)(() => actions++), "Foreign", false, true });
+            var models = new List<object> { native };
+            var navigation = new List<object> { native };
+            foreach (var list in new[] { models, navigation })
+            {
+                ControllerOwnedItems.Ensure(list, own); ControllerOwnedItems.Ensure(list, own);
+                list.Add(foreign); ControllerOwnedItems.Remove(list, own); ControllerOwnedItems.Remove(list, own);
+                Assert(list.SequenceEqual(new[] { native, foreign }));
+                ControllerOwnedItems.Ensure(list, own);
+                Assert(list.SequenceEqual(new[] { native, foreign, own }));
+            }
+            Assert(actions == 0); // registration/focus ownership is not activation
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            Assert(game.GetType("Kingmaker.UI._ConsoleUI.InGameMenu.InGameMenuView", true).GetMethod("BindEntities", flags) != null);
+            Assert(ControllerIlCalls(vm.GetMethod("DisposeImplementation", flags)).All(m => m.Name != "StartAction"));
+        }
+
+        private static void TestWorkspaceSemanticAuthoring(string root)
+        {
+            var fixture = new ControllerFixture(root, "semantic-author", count: 0);
+            CastingWorkspaceSession session = fixture.Session;
+            var focus = new ControllerWorkspaceFocus();
+            string provider = null;
+            Action chooseSource = () =>
+            {
+                var graph = session.BuildGraph(fixture.Inputs);
+                provider = graph.CasterById("unit-wizard").Sources.First().ProviderKey;
+                session.ClickGraphSource(provider, fixture.Inputs);
+            };
+            var items = new[] {
+                new ControllerFocusItem("buff/source-bulls", "Catalogue", "Bull", true, () => session.SelectGraphBuff("source-bulls", fixture.Inputs)),
+                new ControllerFocusItem("caster/unit-wizard", "Casters", "Wizard", true, () => session.ClickGraphCaster("unit-wizard", fixture.Inputs)),
+                new ControllerFocusItem("provider/exact", "Casters", "Exact book", true, chooseSource),
+                new ControllerFocusItem("target/unit-t1", "Recipients", "First", true, () => session.ClickGraphRecipient("unit-t1", fixture.Inputs)),
+                new ControllerFocusItem("target/unit-t2", "Recipients", "Second", true, () => session.ClickGraphRecipient("unit-t2", fixture.Inputs)) };
+            focus.Replace(items);
+            string before = session.DocumentIntentSignature();
+            for (int i = 0; i < 30; i++) { focus.Move(1, true); focus.Move(1, false); }
+            Assert(session.DocumentIntentSignature() == before && fixture.Host.StartedRuns == 0);
+            foreach (ControllerFocusItem item in items) { focus.Restore(item.Key); Assert(focus.Confirm() == null); }
+            Assert(session.Document.Castings.Count == 2 && session.Document.Castings.All(c => c.CasterUnitId == "unit-wizard"));
+            var first = session.Document.Castings.First();
+            session.FocusGraphCasting(first.CastingId);
+            Assert(session.SetFocusedRecastPolicy(ExistingEffectPolicy.Overwrite).Applied);
+            Assert(session.MoveFocusedCastingWithinRoutine(1).Applied);
+            Assert(session.RemoveFocusedCasting().Applied && session.Undo());
+            session.SelectRoutine("important");
+            focus.Restore("target/unit-t1"); Assert(focus.Confirm() == null);
+            Assert(session.Document.Castings.Count(c => c.RoutineId == "long") == 2);
+            Assert(session.Document.Castings.Count(c => c.RoutineId == "important") == 1);
+            var restored = new CastingWorkspaceSession(fixture.Path, session.CampaignId);
+            Assert(restored.DocumentIntentSignature() == session.DocumentIntentSignature() && fixture.Host.StartedRuns == 0);
+        }
+
+        private static void TestControllerClassicConsent()
+        {
+            var menu = new ControllerRoutineModel(null, "Classic retained", _ => { throw new InvalidOperationException("Unexpected run"); },
+                () => { }, () => false, () => null, true);
+            Assert(menu.Focus == 4 && !menu.ConversionApproved);
+            menu.Confirm(); Assert(!menu.ConversionApproved && menu.Message.Contains("one-way") && menu.Row(4).Contains("Switch"));
+            Assert(menu.CloseConversionReview() && !menu.ConversionApproved);
+            menu.Confirm(); menu.Confirm();
+            Assert(menu.ConfigureRequested && menu.ConversionApproved);
         }
 
         private static void TestControllerBookHandoffCancel()

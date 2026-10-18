@@ -1,5 +1,14 @@
 # Controller execution implementation
 
+## ACTIVE scope: full controller planner, native card and workspace repair
+
+The [latest mission](../planning/KBP-FULL-CONTROLLER-MISSION.md) replaces all
+mouse-required/deferred-card/editor completion boundaries below. The .4 local
+source implementation and operation inventory are described in
+[controller authoring capabilities](CONTROLLER-AUTHORING-CAPABILITIES.md).
+This assignment remains IN_PROGRESS pending native acceptance, not complete
+because source tests pass. Earlier alpha receipts/qualifications stay historical.
+
 ## Alpha .3 review correction
 
 Frozen product `7a7faec9a0824ff192271d12d1a9cde4199452cf`, focused 62/0,

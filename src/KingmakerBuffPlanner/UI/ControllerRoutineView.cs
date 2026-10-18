@@ -63,7 +63,7 @@ namespace KingmakerBuffPlanner.UI
                 Hint(panel, donor, RewiredConsts.Action.DPadUp, "Select", 22, 560, 130);
                 _confirm = Hint(panel, donor, RewiredConsts.Action.Confirm, "", 220, 560, 330);
                 _back = Hint(panel, donor, RewiredConsts.Action.Decline, "Back to game", 590, 560, 220);
-                Label(panel, donor, "AuthoringNote", "Configure uses mouse and keyboard in this session.", 20, 22, 612, 836, 32);
+                Label(panel, donor, "AuthoringNote", "Configure opens the controller planner. Changes autosave.", 20, 22, 612, 836, 32);
                 BuildResults(panel, donor);
                 _settleFrame = Time.frameCount + 2;
             }
@@ -190,7 +190,7 @@ namespace KingmakerBuffPlanner.UI
             catch { UnityEngine.Object.Destroy(hint.gameObject); throw; }
         }
 
-        private static TMP_Text Hint(Transform parent, TMP_Text donor, int action, string text, float x, float y, float width = 350)
+        internal static TMP_Text Hint(Transform parent, TMP_Text donor, int action, string text, float x, float y, float width = 350)
         {
             RectTransform icon = Rect(parent, "HintIcon", new Vector2(0, 1), new Vector2(0, 1));
             Place(icon, x, y, 32, 32);

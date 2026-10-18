@@ -65,6 +65,8 @@ namespace KingmakerBuffPlanner.UI
                     .GetMethod("TextDeactivatePrefix", BindingFlags.Static | BindingFlags.NonPublic)), null, null);
                 try { ControllerSpellbookIntegration.Install(_harmony, log); }
                 catch (Exception exception) { log.Error("[KBP-CONTROLLER-BOOK] optional footer contracts unavailable;quick access retained.", exception); }
+                ControllerNativeMenuCard.OpenRequested = BuffPlannerUiRoot.RequestControllerEditorFromCard;
+                ControllerNativeMenuCard.Install(_harmony, log);
             }
             catch { Uninstall(); throw; }
             _log.Info("[KBP-CONTROLLER] native menu entry and scoped binding ownership installed;action=Func01;event=ButtonJustPressed.");
@@ -74,6 +76,7 @@ namespace KingmakerBuffPlanner.UI
         {
             _enabled = enabled;
             ControllerSpellbookIntegration.SetEnabled(enabled);
+            ControllerNativeMenuCard.SetEnabled(enabled);
             if (!enabled && ActiveMenu != null) ActiveMenu.Dispose();
             foreach (GameObject hint in Hints.Values)
                 if (hint != null) hint.SetActive(enabled);
@@ -87,6 +90,7 @@ namespace KingmakerBuffPlanner.UI
             GameObject hint = null;
             try
             {
+                ControllerNativeMenuCard.NoteLayer(__instance, __result);
                 foreach (BaseGameMenuView stale in EntryLayers.Keys.Where(candidate => candidate == null).ToArray())
                     RemoveEntry(stale);
                 InputLayer previousLayer;
@@ -190,6 +194,7 @@ namespace KingmakerBuffPlanner.UI
         {
             try
             {
+                if (ControllerTransitionInputGuard.Active != null) return ControllerTransitionInputGuard.Active.Allows(__instance);
                 if (!ControllerSpellbookIntegration.AllowsDispatch(__instance)) return false;
                 ControllerEditorInputBoundary editor = ControllerEditorInputBoundary.Active;
                 if (editor != null) return editor.Allows(__instance);
@@ -215,7 +220,11 @@ namespace KingmakerBuffPlanner.UI
             try
             {
                 try { SetEnabled(false); }
-                finally { Entries.Clear(); }
+                finally
+                {
+                    try { if (ControllerTransitionInputGuard.Active != null) ControllerTransitionInputGuard.Active.Dispose(); }
+                    finally { Entries.Clear(); }
+                }
             }
             finally
             {
@@ -227,10 +236,13 @@ namespace KingmakerBuffPlanner.UI
                     if (_getLayer != null) _harmony.Unpatch(_getLayer, HarmonyPatchType.Postfix, HarmonyId);
                     if (_dispatch != null) _harmony.Unpatch(_dispatch, HarmonyPatchType.Prefix, HarmonyId);
                     if (_deactivateText != null) _harmony.Unpatch(_deactivateText, HarmonyPatchType.Prefix, HarmonyId);
+                    foreach (string method in new[] { "InitializeCartCollection", "BindEntities" })
+                        _harmony.Unpatch(typeof(InGameMenuView).GetMethod(method, InstanceMembers), HarmonyPatchType.Postfix, HarmonyId);
                     foreach (string method in new[] { "CreateInputs", "Hide" })
                         _harmony.Unpatch(typeof(Kingmaker.UI._ConsoleUI.SpellBook.SpellBookView).GetMethod(method, InstanceMembers), HarmonyPatchType.Postfix, HarmonyId);
                 }
                 _harmony = null;
+                ControllerNativeMenuCard.OpenRequested = null;
             }
         }
     }
