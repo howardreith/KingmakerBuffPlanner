@@ -6,8 +6,10 @@ The [latest mission](../planning/KBP-FULL-CONTROLLER-MISSION.md) replaces all
 mouse-required/deferred-card/editor completion boundaries below. The .4 local
 source implementation and operation inventory are described in
 [controller authoring capabilities](CONTROLLER-AUTHORING-CAPABILITIES.md).
-Frozen .4 product69a48a4, focused64/0 and deterministic local package:
+Frozen .4 product69a48a4, focused64/0 and deterministic package:
 [identity/qualification receipt](CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.4.md).
+Owner-authorized Alpha4 is published for manual testing; subsequent checks and
+their preserved failures are separate: [publication/check record](CONTROLLER-ALPHA4-PUBLICATION.md).
 This assignment remains IN_PROGRESS pending native acceptance, not complete
 because source tests pass. Earlier alpha receipts/qualifications stay historical.
 

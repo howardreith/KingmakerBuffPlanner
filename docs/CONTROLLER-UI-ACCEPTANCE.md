@@ -26,9 +26,12 @@ post-publication checks](CONTROLLER-ALPHA4-PUBLICATION.md). No native status cha
 | F10 | Fresh native mouse HUD/hotkey/editor/spellbook/hover regression and exact restoration | NOT_RUN |
 
 No runtime transaction occurred; restoration NOT_RUN, not PASS. Owner now confirms
-DATA free; Steam/save/lease/recovery readiness passes. The narrow guarded
-controller observer/loader route and extended purity-validation budget remain
-gates: [current preflight](CONTROLLER-NATIVE-PREFLIGHT-2026-10-17.md).
+DATA free; Steam/save/lease/recovery readiness passed at intake. Owner then
+authorized the extended window; safety checks are in progress, with preserved
+source-reader/intermittent scratch-harness failures. The narrow guarded
+controller observer/loader route remains unfinished, and no full source gate
+PASS or runtime bypass is inferred. [Current check record](CONTROLLER-ALPHA4-PUBLICATION.md)
+and [historical preflight](CONTROLLER-NATIVE-PREFLIGHT-2026-10-17.md).
 Do not substitute older mouse scenarios, direct session calls or owner's old
 screenshots for new-byte physical/native evidence. Source work continues safely.
 
