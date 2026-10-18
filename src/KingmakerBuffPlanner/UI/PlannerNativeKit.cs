@@ -35,7 +35,7 @@ namespace KingmakerBuffPlanner.UI
         Action
     }
 
-    internal sealed class PlannerNativeKit
+    internal sealed class PlannerNativeKit : IDisposable
     {
         // Native inks measured from the spellbook and its spell description.
         internal static readonly Color TitleInk = new Color(0.188f, 0.133f, 0.075f, 1f);
@@ -80,12 +80,23 @@ namespace KingmakerBuffPlanner.UI
 
         private readonly Dictionary<string, Sprite> _sprites = new Dictionary<string, Sprite>(StringComparer.Ordinal);
         private readonly Dictionary<string, Material> _materials = new Dictionary<string, Material>(StringComparer.Ordinal);
+        private readonly Dictionary<PlannerTextRole, Material> _controllerMaterials = new Dictionary<PlannerTextRole, Material>();
+        private readonly bool _controller;
 
         internal TMP_FontAsset BodyFont { get; private set; }
         internal bool HasInitialFont { get; private set; }
 
-        private PlannerNativeKit()
+        private PlannerNativeKit(bool controller = false)
         {
+            _controller = controller;
+        }
+
+        internal static PlannerNativeKit Controller(Component canvas)
+        {
+            // Per-workspace ownership, not the mouse kit's static donor cache.
+            var kit = new PlannerNativeKit(true);
+            kit.Load(canvas);
+            return kit;
         }
 
         internal static PlannerNativeKit Resolve(Component canvas)
@@ -171,10 +182,17 @@ namespace KingmakerBuffPlanner.UI
             go.SetActive(false);
             go.layer = parent == null ? 0 : parent.gameObject.layer;
             var rect = go.AddComponent<RectTransform>();
-            rect.SetParent(parent, false);
+            // Awake is deferred under an inactive ancestor, even after
+            // SetActive(true). Initialize this OWNED label while unparented;
+            // only then attach it and let the caller establish final geometry.
+            // No native object or global TMP setting is changed.
             TextMeshProUGUI label = go.AddComponent<TextMeshProUGUI>();
             if (BodyFont != null) label.font = BodyFont;
             go.SetActive(true);
+            label.autoSizeTextContainer = false;
+            label.enableAutoSizing = false;
+            label.margin = Vector4.zero;
+            rect.SetParent(parent, false);
             Style(label, role, size);
             label.alignment = alignment;
             label.enableWordWrapping = true;
@@ -199,6 +217,26 @@ namespace KingmakerBuffPlanner.UI
 
         private Material MaterialFor(PlannerTextRole role)
         {
+            if (_controller && BodyFont != null && BodyFont.material != null)
+            {
+                Material owned;
+                if (_controllerMaterials.TryGetValue(role, out owned) && owned != null) return owned;
+                // A mouse-window role material can carry a live clipping or
+                // stencil context. Start from the verified font atlas, retain
+                // native role ink/weight in Style, and let EACH owned label's
+                // MaskableGraphic apply its actual local masks normally.
+                owned = new Material(BodyFont.material) { name = "KBP.ControllerText." + role };
+                owned.DisableKeyword("UNITY_UI_CLIP_RECT");
+                owned.DisableKeyword("UNITY_UI_ALPHACLIP");
+                if (owned.HasProperty("_StencilComp")) owned.SetFloat("_StencilComp", 8);
+                if (owned.HasProperty("_Stencil")) owned.SetFloat("_Stencil", 0);
+                if (owned.HasProperty("_StencilOp")) owned.SetFloat("_StencilOp", 0);
+                if (owned.HasProperty("_StencilReadMask")) owned.SetFloat("_StencilReadMask", 255);
+                if (owned.HasProperty("_StencilWriteMask")) owned.SetFloat("_StencilWriteMask", 255);
+                if (owned.HasProperty("_ColorMask")) owned.SetFloat("_ColorMask", 15);
+                _controllerMaterials[role] = owned;
+                return owned;
+            }
             Material material;
             string name = role == PlannerTextRole.Button ? ButtonMaterialName
                 : role == PlannerTextRole.Action ? ActionMaterialName : BodyMaterialName;
@@ -415,6 +453,13 @@ namespace KingmakerBuffPlanner.UI
             button.interactable = enabled;
             TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
             if (label != null) label.alpha = enabled ? 1f : 0.45f;
+        }
+
+        public void Dispose()
+        {
+            foreach (Material material in _controllerMaterials.Values)
+                if (material != null) UnityEngine.Object.Destroy(material);
+            _controllerMaterials.Clear();
         }
 
         // The native ornamental rule (Separator_left / middle / right), as

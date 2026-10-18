@@ -1,5 +1,9 @@
 # Controller access and rendering repair — owner correction, October 17, 2026
 
+Historical scope: superseded by [full controller mission](KBP-FULL-CONTROLLER-MISSION.md).
+Mouse-required authoring and deferring the native card/full gamepad workflow are
+no longer acceptable completion boundaries. Keep the implementation/evidence below.
+
 This supersedes the execution-only acceptance boundary in
 KBP-CONTROLLER-UI-MISSION.md. Keep that frozen milestone and its artifacts.
 Continue PR #10's legitimate branch, intake 2a04579a4600; no reset instruction.

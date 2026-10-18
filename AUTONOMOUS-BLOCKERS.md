@@ -1,4 +1,7 @@
 > **Current access/layout repair:**
+> **ACTIVE full-controller assignment:** [mission](planning/KBP-FULL-CONTROLLER-MISSION.md).
+> Native card, full semantic authoring/text entry and actual workspace rendering
+> are required, not optional. IN_PROGRESS; no completion/native PASS claimed.
 > .3 fixes are published as owner-requested non-Latest test alpha; draft PR #10
 > updated. Frozen product 7a7faec, 62/0 and deterministic package PASS. See
 > [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.3.md). Actual no-cast

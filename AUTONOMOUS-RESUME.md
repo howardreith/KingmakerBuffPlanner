@@ -1,4 +1,10 @@
 > **Current controller ACCESS repair (owner correction):**
+> **ACTIVE SCOPE REPLACEMENT:** [full controller mission](planning/KBP-FULL-CONTROLLER-MISSION.md).
+> Readable workspace, real native menu card and controller-only authoring/search
+> are ALL required. Earlier mixed-input/deferred-card banners are history, not
+> current acceptance. Preserve Alpha 3's Escape/scroll fixes. New work local only;
+> no publication/push/merge/install selected. Owner says spellbook entry rendered
+> worse than campaign-menu entry: compare hosts/materials/initialization, not saves.
 > Owner-requested [Alpha 3](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.3)
 > published 2026-10-18T00:39:48Z as non-Latest prerelease; exact product/tag,
 > download-verified hashes and pending native checks are in the .3 receipt.

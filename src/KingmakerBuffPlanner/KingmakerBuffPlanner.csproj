@@ -311,6 +311,10 @@
     <Compile Include="UI\ControlCaptionFit.cs" />
     <Compile Include="UI\PlannerNativeTheme.cs" />
     <Compile Include="UI\ControllerRoutineModel.cs" />
+    <Compile Include="UI\ControllerPresentationHost.cs" />
+    <Compile Include="UI\PlannerWorkspaceTextProbe.cs" />
+    <Compile Include="UI\ControllerWorkspaceFocus.cs" />
+    <Compile Include="UI\ControllerOwnedItems.cs" />
     <Compile Include="UI\ControllerLayerOwnership.cs" />
     <Compile Include="UI\ControllerEntryRegistry.cs" />
     <Compile Include="UI\ControllerRoutineView.cs" />
