@@ -1,5 +1,32 @@
 # Controller execution implementation
 
+## Alpha .3 review correction
+
+The .2 claim that Back preserved text intent even when TMP canceled before the
+request was not fully supported. Its test recorded focused intent first. The
+review identified the missing ordering, now addressed in .3: a Harmony12 prefix
+observes installed TMP_InputField.DeactivateInputField before it clears focus.
+Only a canceled, focused field inside the current mixed-input editor's exact
+root is recorded. Other native/mouse fields are untouched. The common production
+ControllerBackIntent request path retains that field's current edge even if
+selection/focus are already gone when keyboard polling arrives; it also handles
+cancellation after Request, and never consumes a later Back from a stale flag.
+The existing neutral latch remains the only native/keyboard dispatcher gate.
+Cleanup unpatches the exact owned prefix with the other controller patches.
+
+TurnPage uses actual content/viewport rect heights and ControllerResultScroll
+to move 75% of the viewport, clamped over the scroll range. It stops existing
+ScrollRect inertia first. Short/equal/empty content has no scroll range or
+division by zero. Forward/backward tests verify every complete synthetic report
+line becomes visible, including endpoints, through 100,000 layout units.
+
+Focused development: 38/0 (6.0 s reported) before freeze; production/source
+builds pass. New tests execute the same production request/scroll algorithms
+with substituted field/device/window boundaries; installed TMP and production
+adapter wiring are also assembly-inspected, not live field/rendered acceptance.
+Native A01-A08 remain NOT_RUN. Owner authorizes a new alpha and updating draft
+PR #10, not a default-branch merge, permanent install or other mod change.
+
 ## Current owner correction: actual editor access and layout repair
 
 Frozen .2 product 32f6385, focused 60/0, deterministic package and exact identities:

@@ -1,5 +1,31 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17 alpha .3 review corrections / product freeze
+
+Continued clean PR #10 branch at 2144f2c470fc34084c016c79f9558811c6abce69;
+remote matches, PR OPEN/DRAFT. Owner explicitly requested two reviewed fixes,
+PR update and a new alpha. Version .3 is new; .1 published and .2 local frozen
+artifacts untouched. No other mod/game/save/settings edits or runtime selected.
+Installed TMP KeyPressed sets m_WasCanceled for Escape, then OnUpdateSelected
+calls DeactivateInputField, which clears m_AllowInput before end-edit. Private
+assembly evidence: artifacts/controller-access/review-tmp-cancel.private.txt.
+Added owned-root cancellation observation before deactivation, retained through
+the shared production Back request path regardless of selected/focused state
+at poll time. Only the current edge is retained, not a stale wasCanceled flag.
+This corrects the .2 receipt's too-strong pre-request ordering claim. Results
+now move 75% of viewport height and stop inertia, preserving readable overlap.
+
+Explicit development command: powershell.exe -NoProfile -ExecutionPolicy Bypass
+-File scripts/Test-Development.ps1 -Only
+'controller-,planner-escape-,native-text-material-,native-source-tabs-,input-lease-,native-window-takes-,casting-workspace-campaign-bound-,spellbook-entry-'.
+PASS=38 FAIL=0, 6.0 s reported / 6.196 s child wall; source47/build1/test compile
+PASS. Log artifacts/controller-access/review-fixes-development.log. Includes new
+before/after-cancel, no-nested-layer/second-press and complete report-line scroll
+coverage to 100,000 units. No native usability/pixel/input PASS. Freeze source,
+run focused neighbors/package in clean isolated output, guarded push and publish
+a non-Latest alpha with exact hash/MVID receipt; keep PR draft. No stable merge,
+installation, KMG/CotW work or broad compatibility/runtime campaign is selected.
+
 ## 2026-10-17 owner-requested PR access/layout update
 
 Owner requested opening a PR after the local candidate handoff. Read-only GitHub

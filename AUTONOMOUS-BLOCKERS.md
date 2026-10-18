@@ -1,4 +1,7 @@
 > **Current access/layout repair:**
+> .3 review fixes have no source/build blocker (focused 38/0); owner now requests
+> alpha publication and PR update. Existing native authoring/rendering gaps
+> remain explicit and must not be promoted by the test release.
 > Owner subsequently requested the PR: guarded feature-branch push/update of
 > existing draft #10 is now authorized (helper WhatIf 6/0). Native gaps below
 > do not block publishing source for review; release/merge/install stay separate.

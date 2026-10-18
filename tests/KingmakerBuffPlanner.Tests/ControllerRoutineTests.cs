@@ -42,6 +42,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("controller-spellbook-native-close-and-conflict-selection", TestControllerBookContracts);
             Run("controller-queued-mode-actions-own-exact-request", TestControllerModeQueue);
             Run("controller-editor-back-keeps-text-intent-and-single-edge", TestControllerTextBack);
+            Run("controller-editor-back-cancellation-before-and-after-request", TestControllerTextBackOrdering);
+            Run("controller-results-scroll-exposes-short-medium-long-reports", TestControllerResultsScroll);
         }
 
         private static void TestControllerActivationLatch()
@@ -654,6 +656,19 @@ namespace KingmakerBuffPlanner.Tests
             Type ui = tmp.GetType("TMPro.TextMeshProUGUI", true);
             Assert(ControllerIlCalls(ui.GetMethod("Awake", flags)).Any(m => m.Name == "LoadDefaultSettings"));
             Assert(ControllerIlCalls(text.GetMethod("LoadDefaultSettings", flags)).Any(m => m.Name == "set_sizeDelta"));
+            Type input = tmp.GetType("TMPro.TMP_InputField", true);
+            Assert(input.GetProperty("wasCanceled").PropertyType == typeof(bool));
+            Assert(input.GetMethod("DeactivateInputField", flags, null, Type.EmptyTypes, null).ReturnType == typeof(void));
+            string[] update = ControllerIlCalls(input.GetMethod("OnUpdateSelected", flags)).Select(m => m.Name).ToArray();
+            Assert(Array.IndexOf(update, "KeyPressed") < Array.IndexOf(update, "DeactivateInputField"));
+            Assembly product = Assembly.LoadFrom(Path.Combine(FindRepositoryRoot(), "artifacts", "build", "Release", "KingmakerBuffPlanner.dll"));
+            Type boundary = product.GetType("KingmakerBuffPlanner.UI.ControllerEditorInputBoundary", true);
+            Assert(ControllerIlCalls(boundary.GetMethod("RequestBack", flags)).Any(m => m.Name == "Request" && m.DeclaringType.Name == "ControllerBackIntent`1"));
+            Type integration = product.GetType("KingmakerBuffPlanner.UI.ControllerRoutineIntegration", true);
+            Assert(ControllerIlCalls(integration.GetMethod("TextDeactivatePrefix", flags | BindingFlags.Static))
+                .Any(m => m.Name == "ObserveTextCancellation" && m.DeclaringType == boundary));
+            Type results = product.GetType("KingmakerBuffPlanner.UI.ControllerRoutineView", true);
+            Assert(ControllerIlCalls(results.GetMethod("TurnPage", flags)).Any(m => m.Name == "Next" && m.DeclaringType.Name == "ControllerResultScroll"));
             Assembly game = Assembly.LoadFrom(Path.Combine(managed, "Assembly-CSharp.dll"));
             Type pointer = game.GetType("Rewired.Integration.UnityUI.RewiredPointerInputModule", true);
             Assert(ControllerIlCalls(pointer.GetMethod("GetMouseInputSource", flags)).Any(m => m.Name == "get_defaultMouseInputSource"));
@@ -710,22 +725,99 @@ namespace KingmakerBuffPlanner.Tests
         private static void TestControllerTextBack()
         {
             var latch = new ControllerActivationLatch();
-            var back = new ControllerBackIntent();
             int texts = 0, windows = 0;
+            var field = new ControllerTextField { Focused = true };
+            var back = new ControllerBackIntent<ControllerTextField>(() => field, text => text.Focused,
+                text => texts++, () => windows++);
             latch.Observe(true, 1);
-            Assert(back.Request(latch, 2, true));
+            Assert(back.Request(latch, 2));
             // Native binding and keyboard polling cannot independently accept
             // this frame. Later field cancellation must not change its intent.
-            Assert(!back.Request(latch, 2, false) && !back.Request(latch, 3, false));
-            for (int frame = 3; frame < 8; frame++) back.Complete(latch, false, frame, () => texts++, () => windows++);
-            back.Complete(latch, true, 8, () => texts++, () => windows++);
-            back.Complete(latch, true, 9, () => texts++, () => windows++);
-            back.Complete(latch, true, 10, () => texts++, () => windows++);
+            field.Focused = false;
+            Assert(!back.Request(latch, 2) && !back.Request(latch, 3));
+            for (int frame = 3; frame < 8; frame++) back.Complete(latch, false, frame);
+            back.Complete(latch, true, 8);
+            back.Complete(latch, true, 9);
+            back.Complete(latch, true, 10);
             Assert(texts == 1 && windows == 0);
-            Assert(back.Request(latch, 11, false));
-            back.Complete(latch, true, 12, () => texts++, () => windows++);
-            back.Complete(latch, true, 13, () => texts++, () => windows++);
+            Assert(back.Request(latch, 11));
+            back.Complete(latch, true, 12);
+            back.Complete(latch, true, 13);
             Assert(texts == 1 && windows == 1);
+        }
+
+        private sealed class ControllerTextField { internal bool Focused; }
+
+        private static void TestControllerTextBackOrdering()
+        {
+            foreach (bool cancelFirst in new[] { true, false })
+            foreach (bool nestedSurface in new[] { true, false })
+            {
+                var latch = new ControllerActivationLatch();
+                var field = new ControllerTextField { Focused = true };
+                ControllerTextField selected = field;
+                int texts = 0, nested = 0, closes = 0;
+                // This is the production request/cancellation/complete path;
+                // only native field selection/focus and window callbacks vary.
+                var back = new ControllerBackIntent<ControllerTextField>(() => selected, text => text.Focused,
+                    text => { Assert(ReferenceEquals(text, field)); text.Focused = false; texts++; },
+                    () => { if (nestedSurface) nested++; else closes++; });
+                latch.Observe(true, 0);
+                if (!cancelFirst) Assert(back.Request(latch, 1));
+                // The installed DeactivateInputField prefix observes cancellation
+                // while focused, before TMP clears focus (and possibly selection).
+                back.ObserveTextCancellation(field, 1);
+                field.Focused = false;
+                selected = null;
+                if (cancelFirst) Assert(back.Request(latch, 1));
+                Assert(!back.Request(latch, 1)); // native/keyboard duplicate
+                back.Complete(latch, false, 1);
+                back.Complete(latch, true, 2);
+                back.Complete(latch, true, 3);
+                Assert(texts == 1 && nested == 0 && closes == 0);
+                // A stale cancellation cannot consume the second intentional
+                // press; with no nested surface this is the actual close path.
+                Assert(back.Request(latch, 4));
+                back.Complete(latch, false, 4);
+                back.Complete(latch, true, 5);
+                back.Complete(latch, true, 6);
+                Assert(texts == 1 && nested == (nestedSurface ? 1 : 0) && closes == (nestedSurface ? 0 : 1));
+            }
+        }
+
+        private static void TestControllerResultsScroll()
+        {
+            const float viewport = 440;
+            foreach (float height in new[] { 0f, 220f, 440f, 1000f, 10000f, 100000f })
+            foreach (int direction in new[] { 1, -1 })
+            {
+                float range = Math.Max(0, height - viewport);
+                float position = direction > 0 ? 1 : 0;
+                float previousTop = (1 - position) * range;
+                // Each synthetic 22-unit report line is visible in at least
+                // one view; first/last lines and both directions are included.
+                int lines = (int)Math.Ceiling(height / 22);
+                var visible = new bool[lines];
+                int moves = 0;
+                while (true)
+                {
+                    float top = (1 - position) * range;
+                    Assert(Math.Abs(top - previousTop) <= .751f * viewport);
+                    for (int line = 0; line < lines; line++)
+                        if (line * 22 >= top - .1f && Math.Min(height, (line + 1) * 22) <= top + viewport + .1f)
+                            visible[line] = true;
+                    float next = ControllerResultScroll.Next(position, height, viewport, direction);
+                    if (next == position || range == 0) break;
+                    previousTop = top;
+                    position = next;
+                    Assert(++moves < 1000);
+                }
+                Assert(visible.All(seen => seen));
+                Assert(range == 0 || position == (direction > 0 ? 0 : 1));
+            }
+            Assert(ControllerResultScroll.Next(.5f, 10000, 0, 1) == .5f);
+            Assert(ControllerResultScroll.Next(.5f, 10000, 440, 0) == .5f);
+            Assert(ControllerResultScroll.Next(.5f, 440, 440, 1) == 1);
         }
 
         private static void TestControllerBookHandoffCancel()

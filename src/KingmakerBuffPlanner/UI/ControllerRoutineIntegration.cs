@@ -23,6 +23,7 @@ namespace KingmakerBuffPlanner.UI
         private static HarmonyInstance _harmony;
         private static MethodInfo _getLayer;
         private static MethodInfo _dispatch;
+        private static MethodInfo _deactivateText;
         private static MethodInfo _deselect;
         private static FieldInfo _binds;
         private static FieldInfo _actionsUsed;
@@ -47,9 +48,11 @@ namespace KingmakerBuffPlanner.UI
                 new[] { typeof(InputActionEventData) }, null);
             _binds = typeof(InputLayer).GetField("m_Binds", InstanceMembers);
             _actionsUsed = typeof(InputLayer).GetField("m_ActionsUsed", InstanceMembers);
+            _deactivateText = typeof(TMP_InputField).GetMethod("DeactivateInputField", InstanceMembers, null, Type.EmptyTypes, null);
             if (_getLayer == null || _getLayer.ReturnType != typeof(InputLayer) || _deselect == null ||
                 _dispatch == null || _binds == null || _binds.FieldType != typeof(List<BindDescription>) ||
-                _actionsUsed == null || _actionsUsed.FieldType != typeof(Dictionary<int, BindDescription>))
+                _actionsUsed == null || _actionsUsed.FieldType != typeof(Dictionary<int, BindDescription>) ||
+                _deactivateText == null || _deactivateText.ReturnType != typeof(void))
                 throw new InvalidOperationException("The native controller routine contracts do not match this installation.");
             _harmony = HarmonyInstance.Create(HarmonyId);
             try
@@ -58,6 +61,8 @@ namespace KingmakerBuffPlanner.UI
                     .GetMethod("MenuLayerPostfix", BindingFlags.Static | BindingFlags.NonPublic)), null);
                 _harmony.Patch(_dispatch, new HarmonyMethod(typeof(ControllerRoutineIntegration)
                     .GetMethod("DispatchPrefix", BindingFlags.Static | BindingFlags.NonPublic)), null, null);
+                _harmony.Patch(_deactivateText, new HarmonyMethod(typeof(ControllerRoutineIntegration)
+                    .GetMethod("TextDeactivatePrefix", BindingFlags.Static | BindingFlags.NonPublic)), null, null);
                 try { ControllerSpellbookIntegration.Install(_harmony, log); }
                 catch (Exception exception) { log.Error("[KBP-CONTROLLER-BOOK] optional footer contracts unavailable;quick access retained.", exception); }
             }
@@ -170,6 +175,17 @@ namespace KingmakerBuffPlanner.UI
             _deselect.Invoke(view, null);
         }
 
+        private static void TextDeactivatePrefix(TMP_InputField __instance)
+        {
+            // Observe only, never cancel/replace TMP's own text behavior. The
+            // active boundary filters exact selection and owned input lifetime.
+            ControllerEditorInputBoundary editor = ControllerEditorInputBoundary.Active;
+            if (editor == null) return;
+            try { editor.ObserveTextCancellation(__instance); }
+            catch (Exception exception)
+            { _log.Error("[KBP-CONTROLLER] text cancellation observation failed.", exception); }
+        }
+
         private static bool DispatchPrefix(BindDescription __instance)
         {
             try
@@ -210,6 +226,7 @@ namespace KingmakerBuffPlanner.UI
                 {
                     if (_getLayer != null) _harmony.Unpatch(_getLayer, HarmonyPatchType.Postfix, HarmonyId);
                     if (_dispatch != null) _harmony.Unpatch(_dispatch, HarmonyPatchType.Prefix, HarmonyId);
+                    if (_deactivateText != null) _harmony.Unpatch(_deactivateText, HarmonyPatchType.Prefix, HarmonyId);
                     foreach (string method in new[] { "CreateInputs", "Hide" })
                         _harmony.Unpatch(typeof(Kingmaker.UI._ConsoleUI.SpellBook.SpellBookView).GetMethod(method, InstanceMembers), HarmonyPatchType.Postfix, HarmonyId);
                 }

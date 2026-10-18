@@ -1,4 +1,9 @@
 > **Current controller ACCESS repair (owner correction):**
+> Owner's new review requests two fixes, draft PR update and a new alpha.
+> .3 implements pre-request owned TMP cancellation tracking and overlapping
+> viewport result scrolling; focused development 38/0. Native authoring/layout
+> remain NOT_RUN; do not restore old broad campaigns or change other mods.
+> The .2 identities/publication boundaries below are historical, not new authority.
 > The owner's subsequent request to open a PR authorizes guarded publication of
 > this feature branch and updating existing draft PR #10, not a duplicate PR,
 > release, merge or installation. Guarded-push WhatIf check: 6/0. The earlier

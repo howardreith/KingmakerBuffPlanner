@@ -1,5 +1,11 @@
 # Mr. Bard's Kingmaker Buff Planner
 
+Controller test alpha **0.5.4-controller.3** includes the same-session Configure
+route below, plus review fixes for text-field Escape ordering and long-results
+scrolling. This remains an experimental, source-tested build: in-game pointer,
+authoring and rendered-layout acceptance are pending. See the
+[alpha notes](docs/CONTROLLER-ALPHA-0.5.4-CONTROLLER.3-NOTES.md).
+
 Local access/layout repair **0.5.4-controller.2** adds Configure plans into the
 actual editor from a controller-started session, with mouse/keyboard authoring,
 same-session return and a console-book entry. Essential quick-menu text is no

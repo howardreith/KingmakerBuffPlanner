@@ -52,22 +52,61 @@ namespace KingmakerBuffPlanner.UI
         }
     }
 
-    internal sealed class ControllerBackIntent
+    // Native TMP cancellation is observed BEFORE DeactivateInputField clears
+    // focus. Retain that edge independently of selected/focused state at poll
+    // time; never use a lingering wasCanceled flag on a later Back press.
+    internal sealed class ControllerBackIntent<T> where T : class
     {
+        private readonly Func<T> _selected;
+        private readonly Func<T, bool> _focused;
+        private readonly Action<T> _leaveText;
+        private readonly Action _back;
         private bool _pending;
-        private bool _textOnly;
-        internal bool Request(ControllerActivationLatch latch, int frame, bool textEditing)
+        private T _pendingText;
+        private T _canceledText;
+        private int _canceledFrame = int.MinValue;
+
+        internal ControllerBackIntent(Func<T> selected, Func<T, bool> focused, Action<T> leaveText, Action back)
+        { _selected = selected; _focused = focused; _leaveText = leaveText; _back = back; }
+
+        internal void ObserveTextCancellation(T field, int frame)
+        {
+            _canceledText = field;
+            _canceledFrame = frame;
+            if (_pending) _pendingText = field;
+        }
+
+        internal bool Request(ControllerActivationLatch latch, int frame)
         {
             if (_pending || !latch.Take(frame)) return false;
             _pending = true;
-            _textOnly = textEditing;
+            T field = _selected();
+            _pendingText = field != null && _focused(field) ? field :
+                frame == _canceledFrame ? _canceledText : null;
             return true;
         }
-        internal void Complete(ControllerActivationLatch latch, bool neutral, int frame, Action leaveText, Action back)
+        internal void Complete(ControllerActivationLatch latch, bool neutral, int frame)
         {
             if (!_pending || !latch.CanRelease(neutral, frame)) return;
             _pending = false;
-            if (_textOnly) leaveText(); else back();
+            T field = _pendingText;
+            _pendingText = _canceledText = null;
+            _canceledFrame = int.MinValue;
+            if (field != null) _leaveText(field); else _back();
+        }
+    }
+
+    internal static class ControllerResultScroll
+    {
+        // A percentage of the REPORT skips increasingly large sections. Move
+        // 3/4 of the actual viewport instead, leaving overlap at every length.
+        internal static float Next(float position, float contentHeight, float viewportHeight, int direction)
+        {
+            position = Math.Max(0, Math.Min(1, position));
+            if (contentHeight <= viewportHeight) return 1;
+            if (viewportHeight <= 0 || direction == 0) return position;
+            float distance = .75f * viewportHeight / (contentHeight - viewportHeight);
+            return Math.Max(0, Math.Min(1, position - Math.Sign(direction) * distance));
         }
     }
 

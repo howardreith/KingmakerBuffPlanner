@@ -1,5 +1,11 @@
 # Local access/layout repair candidate — 0.5.4-controller.2
 
+Historical candidate, superseded by .3. Review found the text-only intent claim
+below was stronger than its test: cancellation BEFORE Request was not covered.
+The .3 correction observes owned TMP cancellation before focus loss and adds
+both orderings; it also replaces report-percentage scrolling with viewport steps.
+Original .2 artifacts, identities, tests and owner handoff receipt stay unchanged.
+
 **Source-tested with named native qualification gaps. Not published or installed.**
 The owner correction requires real same-session editor access, not merely a
 run-only selector. Implementation is preserved, but rendered/mixed-input

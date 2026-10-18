@@ -101,7 +101,9 @@ namespace KingmakerBuffPlanner.UI
 
         internal void TurnPage(int direction)
         {
-            _scroll.verticalNormalizedPosition = Mathf.Clamp01(_scroll.verticalNormalizedPosition - direction * .15f);
+            _scroll.StopMovement();
+            _scroll.verticalNormalizedPosition = ControllerResultScroll.Next(_scroll.verticalNormalizedPosition,
+                _scroll.content.rect.height, _scroll.viewport.rect.height, direction);
         }
 
         private void BuildResults(RectTransform panel, TMP_Text donor)

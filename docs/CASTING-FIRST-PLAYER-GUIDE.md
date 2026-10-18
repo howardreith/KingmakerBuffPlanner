@@ -1,5 +1,14 @@
 # Buff Planner: player guide (0.5.2)
 
+## Controller test alpha 0.5.4-controller.3
+
+Includes the same-session workflow below. Escape/Back while typing should leave
+text editing only, even if TMP cancels first; a second deliberate press dismisses
+the next layer. Long results scroll by overlapping viewport-sized steps, not a
+percentage of the whole report. Native usability is still unqualified; first
+test Configure -> mouse click/scroll/text -> autosave -> Close -> count/status ->
+Back without casting. [Alpha notes](CONTROLLER-ALPHA-0.5.4-CONTROLLER.3-NOTES.md).
+
 ## Local access-repair candidate (0.5.4-controller.2)
 
 Not yet qualified in-game or publicly released. The intended new same-session

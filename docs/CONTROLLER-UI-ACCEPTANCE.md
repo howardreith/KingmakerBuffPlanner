@@ -1,5 +1,17 @@
 # Controller execution acceptance
 
+## Alpha .3 focused review correction (native gates unchanged)
+
+Version 0.5.4-controller.3 corrects .2's untested pre-request text cancellation
+ordering and report-length-dependent scroll jumps. Offline regressions exercise
+the production field-context request path with cancellation before/after it,
+duplicate native/keyboard request, no nested surface/editor Close risk and a
+second deliberate Back. Scroll coverage uses short/medium/very long content,
+full visible lines, overlapping views, both directions and first/last entries.
+Development 38/0 before product freeze. These results do not exercise a live
+TMP field or rendered ScrollRect; A02/A06/A07 remain NOT_RUN. First authorized
+native no-cast authoring checks must include these two reviewed cases.
+
 ## Access/layout correction — current gate, not run-only completion
 
 Frozen product 32f6385206694b7cdb102d1b938f7b2b1acb2d1b / 0.5.4-controller.2:

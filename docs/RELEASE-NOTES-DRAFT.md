@@ -1,4 +1,18 @@
-# Local review candidate 0.5.4-controller.2 — controller editor access/layout repair
+# Controller test alpha 0.5.4-controller.3 — focused review corrections
+
+Includes the .2 same-session Configure/editor access, console-book entry and
+text-container initialization repair. Fixes two reviewed presentation/input cases:
+owned TMP Escape cancellation is captured before focus is lost, even when the
+planner observes the key later; controller result scrolling now advances by
+three-quarters of the viewport rather than a fraction of the whole report.
+No extra editor layer is dismissed by the text-cancel press; long reports retain
+overlap between views. Existing shared Back latch and execution path remain.
+
+Owner requested an alpha for testing and PR update, not native qualification or
+stable release. Full graph editing/native fan card remain deferred. See
+[test instructions and limits](CONTROLLER-ALPHA-0.5.4-CONTROLLER.3-NOTES.md).
+
+## Historical local review candidate 0.5.4-controller.2 — controller editor access/layout repair
 
 Not published, installed or native-qualified. Adds Configure plans into the
 ACTUAL editor in a controller-started campaign, with mouse/keyboard authoring,

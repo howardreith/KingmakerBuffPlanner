@@ -1954,7 +1954,11 @@ namespace KingmakerBuffPlanner.UI
                     value => _log.Info(value), _controllerEditor != null);
                 // For the controller route, construct the real presentation
                 // and Close control before acquiring its input ownership.
-                if (_controllerEditor != null) lease = BuffPlannerInputLease.Acquire(boundary);
+                if (_controllerEditor != null)
+                {
+                    _controllerEditor.TextRoot = _castingWorkspace.RootObject.transform;
+                    lease = BuffPlannerInputLease.Acquire(boundary);
+                }
                 double constructionMilliseconds = ElapsedMilliseconds(constructionStarted);
                 _workspaceInputLease = lease;
                 lease = null;

@@ -19,6 +19,7 @@ namespace KingmakerBuffPlanner.UI
     internal sealed class ControllerEditorInputBoundary : IPlannerInputBoundary
     {
         internal static ControllerEditorInputBoundary Active { get; private set; }
+        internal Transform TextRoot { private get; set; }
         private readonly Action _back;
         private readonly ControllerActivationLatch _latch = new ControllerActivationLatch();
         private InputLayer _layer;
@@ -33,8 +34,7 @@ namespace KingmakerBuffPlanner.UI
         private bool _cursorVisible;
         private CursorLockMode _cursorLock;
         private bool _modeOwned;
-        private readonly ControllerBackIntent _backIntent = new ControllerBackIntent();
-        private TMPro.TMP_InputField _backText;
+        private readonly ControllerBackIntent<TMPro.TMP_InputField> _backIntent;
         private bool _armed;
         private bool _restored;
         private string _campaign;
@@ -46,7 +46,17 @@ namespace KingmakerBuffPlanner.UI
         private static readonly FieldInfo ModeQueue = typeof(Game).GetField("m_BeforeTickActions",
             BindingFlags.Instance | BindingFlags.NonPublic);
 
-        internal ControllerEditorInputBoundary(Action back) { _back = back; }
+        internal ControllerEditorInputBoundary(Action back)
+        {
+            _back = back;
+            _backIntent = new ControllerBackIntent<TMPro.TMP_InputField>(SelectedText, field => field.isFocused,
+                field =>
+                {
+                    if (field == null) return;
+                    if (field.isFocused) field.DeactivateInputField();
+                    if (_events.currentSelectedGameObject == field.gameObject) _events.SetSelectedGameObject(null);
+                }, _back);
+        }
         public bool PlannerModeRequested { get { return _modeOwned && _ownership != null && _ownership.IsCurrent; } }
 
         public object CaptureState()
@@ -127,9 +137,20 @@ namespace KingmakerBuffPlanner.UI
         internal void RequestBack()
         {
             if (!Valid) return;
-            var field = _events.currentSelectedGameObject == null ? null :
+            _backIntent.Request(_latch, Time.frameCount);
+        }
+
+        private TMPro.TMP_InputField SelectedText()
+        {
+            return _events.currentSelectedGameObject == null ? null :
                 _events.currentSelectedGameObject.GetComponent<TMPro.TMP_InputField>();
-            if (_backIntent.Request(_latch, Time.frameCount, field != null && field.isFocused)) _backText = field;
+        }
+
+        internal void ObserveTextCancellation(TMPro.TMP_InputField field)
+        {
+            if (field != null && TextRoot != null && field.transform.IsChildOf(TextRoot) &&
+                Valid && field.isFocused && field.wasCanceled)
+                _backIntent.ObserveTextCancellation(field, Time.frameCount);
         }
 
         internal void Tick()
@@ -144,17 +165,7 @@ namespace KingmakerBuffPlanner.UI
                 _armed = true;
                 _module.allowMouseInput = true;
             }
-            _backIntent.Complete(_latch, neutral, Time.frameCount, () =>
-            {
-                // TMP may already have handled keyboard Escape. Keep the
-                // ORIGINAL text-only intent rather than closing another layer.
-                if (_backText != null)
-                {
-                    if (_backText.isFocused) _backText.DeactivateInputField();
-                    if (_events.currentSelectedGameObject == _backText.gameObject) _events.SetSelectedGameObject(null);
-                }
-                _backText = null;
-            }, _back);
+            _backIntent.Complete(_latch, neutral, Time.frameCount);
         }
 
         public void YieldFullScreenOwnership() { _modeOwned = false; }
