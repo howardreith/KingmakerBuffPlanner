@@ -1,5 +1,15 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17/18 owner requests Alpha4 before extended checks
+
+Owner explicitly requests alpha publication for manual testing first, then
+continuation of the discussed extended guarded checks. Select unchanged frozen
+product69a48a4/.4; focused64/0 and deterministic ZIP already verified. Prepare
+manual no-cast/full-controller notes, guarded feature-branch push, draft
+prerelease upload, download/hash validation then publish non-Latest. No new
+native acceptance inferred, no main merge or normal-install replacement. Public
+tag must point to product, not later docs. Prior alpha artifacts preserved.
+
 ## 2026-10-17 DATA availability and read-only native preflight
 
 Owner confirms DATA free for guarded disposable-fixture work; no longer blocked

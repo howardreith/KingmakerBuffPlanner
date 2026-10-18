@@ -1,5 +1,11 @@
 ## Current full-controller implementation checkpoint
 
+Owner NOW requests publishing the unchanged .4 test alpha BEFORE continuing
+guarded checks, and authorizes the extended validation window discussed in the
+preflight. Use artifact-only publication of frozen69a48a4; no rebuild/relabel of
+documentation HEAD, no main merge/permanent install. Preserve all guards.
+[Manual alpha notes](docs/CONTROLLER-ALPHA-0.5.4-CONTROLLER.4-NOTES.md).
+
 Local .4 source adds semantic authoring/navigation/search, the real native card,
 shared editor/run handoffs and controller workspace text lifetime/material repair.
 Foundation e4dcbfc, card117b7f1, integration baf221b; frozen product69a48a4.

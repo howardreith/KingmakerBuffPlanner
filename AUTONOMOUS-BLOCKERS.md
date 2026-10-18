@@ -1,5 +1,10 @@
 ## Current full-controller native boundary
 
+Owner has now authorized the extended checks and requested an alpha first.
+Publish frozen .4/69a48a4 through the established artifact-only route; no full
+publisher rebuild and no native claim. Then finish the controller route before
+live use, retaining mandatory source/WhatIf/Steam/save/lease/restoration guards.
+
 Local .4 implementation is source-tested, not mission-complete. F01-F10 all
 NOT_RUN; physical authoring/card activation/layout/execution and mouse regression
 must not inherit Alpha 3 results. Owner NOW confirmed DATA free. Existing Steam,
