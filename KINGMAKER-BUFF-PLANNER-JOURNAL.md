@@ -1,5 +1,25 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17 owner-requested PR access/layout update
+
+Owner requested opening a PR after the local candidate handoff. Read-only GitHub
+check found existing #10 OPEN/DRAFT, feature branch head
+2a04579a460064d53f4f87d34defb22a96dbc227, base main. Reuse/update that PR rather
+than create a duplicate. Local reviewed documentation HEAD before this receipt
+was 4aa49bd3345c271381d14d0e1da8bcebfd1bb593; frozen product stays
+32f6385206694b7cdb102d1b938f7b2b1acb2d1b, version 0.5.4-controller.2.
+No source rebuild or test rerun selected: existing frozen 60/0 (7.0 s) and
+deterministic candidate identity remain unchanged. Explicit additional check:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GuardedPush.ps1,
+PASS=6 FAIL=0, 2.504 s child wall. Its clean-tree, approved-origin/branch,
+credential/generated-file and fast-forward checks are preserved. Publish only
+through the owned lab Push-KingmakerBuffPlanner.ps1 helper; require returned
+remote HEAD/PR head to match this receipt commit before reporting success.
+Update PR title/body for actual editor access/layout repair, retain draft and
+historical identities, expose all NOT_RUN native gates and deferred card/full
+gamepad editing. No release assets, tags, default-branch merge, installation,
+game interaction or save changes are authorized/performed by this PR request.
+
 ## 2026-10-17 frozen controller access candidate .2 / local handoff
 
 Product 32f6385206694b7cdb102d1b938f7b2b1acb2d1b preserved in clean detached

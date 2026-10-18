@@ -1,10 +1,15 @@
 > **Current controller ACCESS repair (owner correction):**
+> The owner's subsequent request to open a PR authorizes guarded publication of
+> this feature branch and updating existing draft PR #10, not a duplicate PR,
+> release, merge or installation. Guarded-push WhatIf check: 6/0. The earlier
+> no-push statements below describe the completed local-only checkpoint.
 > Frozen local 0.5.4-controller.2 product 32f6385206694b7cdb102d1b938f7b2b1acb2d1b,
 > 60/0 focused tests, deterministic two-build package PASS; exact ZIP/DLL/MVID
 > and native gaps: [candidate receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.2.md).
 > Clean detached product worktree: private/worktrees/KBP-CONTROLLER-ACCESS02-VERIFIED.
 > Parent checkout is documentation/review; do not rebuild its later HEAD over
-> the frozen package. PR #10 remains remote 2a04579, draft; no push selected.
+> the frozen package. PR #10 was remote 2a04579 at the pre-push audit, open/draft;
+> now selected for this owner's authorized feature-branch update.
 >
 > [mission](planning/KBP-CONTROLLER-ACCESS-REPAIR-MISSION.md) supersedes the old
 > run-only gate. Real Configure -> existing editor -> same-session return is

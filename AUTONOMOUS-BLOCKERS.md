@@ -1,4 +1,7 @@
 > **Current access/layout repair:**
+> Owner subsequently requested the PR: guarded feature-branch push/update of
+> existing draft #10 is now authorized (helper WhatIf 6/0). Native gaps below
+> do not block publishing source for review; release/merge/install stay separate.
 > Frozen candidate .2 is available: product 32f6385, focused 60/0 and deterministic
 > package PASS. See [receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.2.md).
 > No source/build blocker; actual authoring/pointer/layout and new native book
