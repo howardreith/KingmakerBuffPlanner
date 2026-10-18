@@ -9,8 +9,11 @@ Frozen focused **64/0**, 7.3 s, deterministic local packaging PASS. See
 F01-F10 remain NOT_RUN. Do not call this completion: no new native pixels,
 physical controller authoring/card input, or effects/resources demonstrated.
 Latest owner clue: spellbook-origin rendering worse than main-menu origin.
-Current-session DATA availability was requested, not received; new screenshot
-not present at inspection. Guarded controller-specific no-cast observer/launcher
+Owner now confirms DATA free; read-only Steam, lease/transaction/review and
+Automation-pair prerequisites PASS. No native launch: current full-history
+purity estimate exceeds the ordinary validation ceiling. Obtain separately
+selected extended budget; [preflight evidence](docs/CONTROLLER-NATIVE-PREFLIGHT-2026-10-17.md).
+New screenshot not present at inspection. Guarded controller-specific no-cast observer/launcher
 route remains unfinished. Do not run an old mouse scenario as a substitute.
 No desktop/game/install/Mods/settings/profile/save mutations occurred. Prepare
 local candidate/PR text; no remote writes authorized by the new mission.

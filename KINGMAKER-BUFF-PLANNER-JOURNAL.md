@@ -1,5 +1,24 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17 DATA availability and read-only native preflight
+
+Owner confirms DATA free for guarded disposable-fixture work; no longer blocked
+on availability. Clean intake99d6d9c; product69a48a4/.4 preserved, no new build.
+Four existing read-only prerequisite groups PASS: foreign lease; unresolved
+transaction/fixture/protected-review; Steam exact offline/cloud/app safety;
+authorized Automation pair. No game process/lease/transaction created. Exact
+console main-menu/load contracts inspected privately; old manual scenario is
+mouse-specific, not cold-controller evidence. Controller route remains unfinished.
+20s bounded count reaches317699 historical files before finishing backups;
+128-file existing hash helper sample3.224s extrapolates16016s for just one
+two-inventory subset. Full mandatory purity/aggregate longer, over ordinary
+30-minute ceiling; not launched or bypassed. Read-only probe/process invocation
+corrections are disclosed in [preflight](docs/CONTROLLER-NATIVE-PREFLIGHT-2026-10-17.md).
+No live input/desktop/Mods/settings/profile/save change; restoration and F01-F10
+NOT_RUN. No source or behavior retest claimed for these documentation changes.
+Next requires safe controller-specific route implementation plus a separately
+selected extended safety-validation budget, not another availability request.
+
 ## 2026-10-17/18 full-controller scope and local implementation
 
 Frozen product69a48a4d4c6484abf84549ab8bb062195cedb380, local .4, after

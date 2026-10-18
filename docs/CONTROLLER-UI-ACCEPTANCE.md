@@ -23,8 +23,10 @@ PASS is claimed. Previous E/C/A evidence remains under its original IDs.
 | F09 | Held/repeated input, gap ownership, failure/takeover/device/context lifecycle | NOT_RUN |
 | F10 | Fresh native mouse HUD/hotkey/editor/spellbook/hover regression and exact restoration | NOT_RUN |
 
-No runtime transaction occurred; restoration NOT_RUN, not PASS. Current-session
-authority and the narrow guarded controller observer/launcher route remain gates.
+No runtime transaction occurred; restoration NOT_RUN, not PASS. Owner now confirms
+DATA free; Steam/save/lease/recovery readiness passes. The narrow guarded
+controller observer/loader route and extended purity-validation budget remain
+gates: [current preflight](CONTROLLER-NATIVE-PREFLIGHT-2026-10-17.md).
 Do not substitute older mouse scenarios, direct session calls or owner's old
 screenshots for new-byte physical/native evidence. Source work continues safely.
 

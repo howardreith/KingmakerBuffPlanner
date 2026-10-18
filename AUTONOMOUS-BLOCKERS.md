@@ -2,8 +2,13 @@
 
 Local .4 implementation is source-tested, not mission-complete. F01-F10 all
 NOT_RUN; physical authoring/card activation/layout/execution and mouse regression
-must not inherit Alpha 3 results. Current exclusive DATA availability confirmation
-and the latest attributed screenshot are missing. Installed DATA KBP is old
+must not inherit Alpha 3 results. Owner NOW confirmed DATA free. Existing Steam,
+lease/transaction/review and Automation-pair checks PASS, no launch. Mandatory
+full-history purity forecast exceeds the ordinary ceiling (~4h27m for one
+two-inventory sampled subset, complete sequence longer): separately select and
+authorize an extended validation budget before starting it. See
+[exact preflight and unfinished controller route](docs/CONTROLLER-NATIVE-PREFLIGHT-2026-10-17.md).
+The latest attributed screenshot remains unavailable. Installed DATA KBP is old
 0.1.1-rc3, not evidence of the owner's .3 screen. No game/foreign lease at intake
 does not authorize desktop takeover. Controller-specific guarded no-cast
 observer/launcher support still needs implementation/review before automation;
