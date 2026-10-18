@@ -46,12 +46,6 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Corrected reader build failed.' }
     $reader = Join-Path $harnessRoot 'artifacts\tests\KingmakerBuffPlanner.Tests.exe'
     Write-Host ('ALPHA4 corrected-reader harnessHead=' + (& git -C $harnessRoot rev-parse HEAD).Trim() + '; readerSha256=' + (Get-KbpSha256 $reader))
-    $PSDefaultParameterValues = @{}
-    foreach ($key in $oldDefaults.Keys) { $PSDefaultParameterValues[$key] = $oldDefaults[$key] }
-    # Fail rather than silently multiplying an already long full-history
-    # window. These controls do not shorten its inventories or omit checks.
-    $PSDefaultParameterValues['Invoke-KbpLivePurityWindow:Attempts'] = 1
-    $PSDefaultParameterValues['Invoke-KbpLivePurityWindow:LeaseWaitSeconds'] = 120
     Push-Location $frozen
     try {
         & (Join-Path $frozen 'scripts\Test-RuntimeLauncherArguments.ps1')
@@ -64,7 +58,19 @@ try {
             'Test-DeploymentWhatIf.ps1', 'Test-RuntimeLauncherFileWhatIf.ps1',
             'Test-FixtureInventoryEvidence.ps1', 'Test-RestoreInstallLocal.ps1', 'Test-PublishReleaseGate.ps1')) {
             Write-Host ('ALPHA4 safety-stage=' + $stage + '; elapsedSeconds=' + [Math]::Round($started.Elapsed.TotalSeconds, 1))
-            & (Join-Path $frozen ('scripts\' + $stage))
+            try {
+                # Only the real full-history comparisons use a bounded attempt
+                # count. The fixture harness must retain its normal defaults:
+                # it deliberately exercises foreign-overlap retry behavior.
+                if ($stage -cin @('Test-DeploymentWhatIf.ps1', 'Test-RuntimeLauncherFileWhatIf.ps1')) {
+                    $PSDefaultParameterValues = @{}
+                    foreach ($key in $oldDefaults.Keys) { $PSDefaultParameterValues[$key] = $oldDefaults[$key] }
+                    $PSDefaultParameterValues['Invoke-KbpLivePurityWindow:Attempts'] = 1
+                    $PSDefaultParameterValues['Invoke-KbpLivePurityWindow:LeaseWaitSeconds'] = 120
+                }
+                & (Join-Path $frozen ('scripts\' + $stage))
+            }
+            finally { $PSDefaultParameterValues = $oldDefaults }
         }
     }
     finally { Pop-Location }

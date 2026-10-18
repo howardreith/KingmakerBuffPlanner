@@ -40,9 +40,19 @@ product/DLL/package and identical linked production inputs. It compiles the
 corrected harness separately, then runs its full C# suite against Alpha4's actual
 source and DLL from the frozen working directory. Every remaining original
 source/safety aggregate child follows, unchanged, with full-history purity intact.
-Purity attempts1, foreign lease wait120s fail early rather than silently retrying.
+Real full-history purity attempts1, foreign lease wait120s fail early rather than
+silently retrying; bounded fixture tests retain their normal retry defaults.
 No native stage/installation is authorized by this checker. Its result is separate
 from the original failed wrapper, not a claim that the old wrapper passed.
+
+First corrected-reader invocation (a643b8a harness) passed launcher28/0, source47/0,
+package6/0 and C#579/0. It then FAILED in the synthetic foreign-once retry case:
+the wrapper's attempts1 default incorrectly reached the bounded fixture harness.
+This is a wrapper-scoping defect, not an observed foreign lease or product failure.
+Log: artifacts/controller-alpha4/corrected-reader-source-safety.log. The wrapper
+now scopes those defaults to the two actual full-history guard stages only,
+restoring caller defaults exception-safely after each stage. The unchanged retry
+fixture is rerun as behavioral coverage; no validator/assertion was weakened.
 
 Owner-authorized extended checks are in progress. No native/pixel/input/resource
 PASS, game launch, live staging/settings/profile/save changes or restoration

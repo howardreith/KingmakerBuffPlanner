@@ -1,5 +1,14 @@
 # Kingmaker Buff Planner Journal
 
+## Alpha4 corrected-reader wrapper retry scoping
+
+a643b8a harness: launcher28/0, source47/0, package6/0, C#579/0; then FAIL in
+synthetic foreign-once retry. Wrapper globally limited attempts to1, including
+the fixture's deliberate retry scenario. Scoped the limit to actual deployment/
+launcher full-history stages, restored defaults after each; fixture unchanged.
+No product/game/installation/save changes. Preserve first log; corrected v2 run
+must prove fixture retry behavior before any real purity comparison.
+
 ## 2026-10-17/18 Alpha4 publication and corrected-reader safety selection
 
 Published02:18:48Z, product/tag69a48a4, notes/pushed brancha78b6ab. Draft ZIP and

@@ -7,11 +7,14 @@ matched Alpha3 fails once too. Corrected compiled-order reader has missing/late/
 wrong-value negatives, focused39/0. Test-ControllerAlpha4Safety runs that corrected
 reader and all remaining original guard children with separate harness identity.
 Original FAIL and frozen Alpha4 bytes remain preserved; no native PASS.
+First corrected-reader sequence passed C#579/0, arguments28/0, source47/0,
+package6/0, then failed its synthetic retry fixture because the wrapper applied
+its real-scan attempt limit too broadly. Limit now scoped to the two real purity
+stages, not bounded fixture tests. Preserve failed log; next run uses v2 log.
 
-Owner NOW requests publishing the unchanged .4 test alpha BEFORE continuing
-guarded checks, and authorizes the extended validation window discussed in the
-preflight. Use artifact-only publication of frozen69a48a4; no rebuild/relabel of
-documentation HEAD, no main merge/permanent install. Preserve all guards.
+Owner requested publication of unchanged .4 before extended guarded checks;
+publication is DONE. Continue the authorized extended window without rebuilding
+or relabeling frozen69a48a4. No main merge/permanent install. Preserve all guards.
 [Manual alpha notes](docs/CONTROLLER-ALPHA-0.5.4-CONTROLLER.4-NOTES.md).
 
 Local .4 source adds semantic authoring/navigation/search, the real native card,
@@ -23,14 +26,14 @@ Frozen focused **64/0**, 7.3 s, deterministic local packaging PASS. See
 F01-F10 remain NOT_RUN. Do not call this completion: no new native pixels,
 physical controller authoring/card input, or effects/resources demonstrated.
 Latest owner clue: spellbook-origin rendering worse than main-menu origin.
-Owner now confirms DATA free; read-only Steam, lease/transaction/review and
-Automation-pair prerequisites PASS. No native launch: current full-history
-purity estimate exceeds the ordinary validation ceiling. Obtain separately
-selected extended budget; [preflight evidence](docs/CONTROLLER-NATIVE-PREFLIGHT-2026-10-17.md).
+Owner confirmed DATA free; read-only Steam, lease/transaction/review and
+Automation-pair prerequisites PASS at intake. Extended checks NOW authorized;
+no native launch yet. [Preflight evidence](docs/CONTROLLER-NATIVE-PREFLIGHT-2026-10-17.md).
 New screenshot not present at inspection. Guarded controller-specific no-cast observer/launcher
 route remains unfinished. Do not run an old mouse scenario as a substitute.
 No desktop/game/install/Mods/settings/profile/save mutations occurred. Prepare
-local candidate/PR text; no remote writes authorized by the new mission.
+controller-specific guarded route. Alpha4 publication/associated branch push was
+separately authorized and completed; no new artifact/merge authorization inferred.
 
 ## Historical Alpha 3 / earlier access handoffs (superseded scope)
 
