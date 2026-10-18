@@ -1,5 +1,19 @@
 # Kingmaker Buff Planner Journal
 
+## Alpha4 extended checks: preserved intermittent fixture failure, remaining stages running
+
+ef63e54 v2: arguments28/0, source47/0, package6/0, corrected C#579/0; scratch
+Info.json cleanup FAIL, original exception obscured. Synthetic transaction records
+Restored/verified, no lock; leftover synthetic files retained. One isolated unchanged
+filesystem suite38/0 including retry cases; combined FAIL not erased. Resumed
+remaining original safety children02:31:31Z, WindowsPS5.1 PID26124, exec83416,
+buffered remaining-safety-stages.log. No native launch/staging or new product.
+Original source gate still FAIL, no runtime bypass/qualification receipt inferred.
+Additional read-only exact-assembly inspection identifies console main-menu load
+service as MainMenuUiCanvasPartContext, distinct from in-campaign CommonUiLoadService;
+private controller-native-load-services evidence retains actual IL. No observer
+implementation/native load evidence inferred from that inspection.
+
 ## Alpha4 corrected-reader wrapper retry scoping
 
 a643b8a harness: launcher28/0, source47/0, package6/0, C#579/0; then FAIL in

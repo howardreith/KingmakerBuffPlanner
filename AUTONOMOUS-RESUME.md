@@ -10,7 +10,12 @@ Original FAIL and frozen Alpha4 bytes remain preserved; no native PASS.
 First corrected-reader sequence passed C#579/0, arguments28/0, source47/0,
 package6/0, then failed its synthetic retry fixture because the wrapper applied
 its real-scan attempt limit too broadly. Limit now scoped to the two real purity
-stages, not bounded fixture tests. Preserve failed log; next run uses v2 log.
+stages, not bounded fixture tests. v2 again579/0 then failed on scratch-file
+cleanup; isolated unchanged filesystem harness38/0. Keep combined failure and
+isolated pass separate. Remaining safety children running since02:31:31Z in
+WindowsPS5.1 PID26124, exec83416; buffered remaining-safety-stages.log. Do not
+launch duplicate scans; inspect/wait that owned session and record its outcome.
+Full original source gate is still FAIL, not waived by reader-only evidence.
 
 Owner requested publication of unchanged .4 before extended guarded checks;
 publication is DONE. Continue the authorized extended window without rebuilding

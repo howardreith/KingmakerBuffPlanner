@@ -5,10 +5,15 @@ baseline brittle Classic source adjacency before purity. Matched Alpha3 fails
 too. Compiled-order correction focused39/0; extended exact-product source/safety
 sequence selected with separate harness identity. [Record](docs/CONTROLLER-ALPHA4-PUBLICATION.md).
 No original FAIL promoted to PASS; no new product/native qualification.
+ef63e54 corrected reader579/0; combined scratch-filesystem cleanup FAIL, then
+isolated unchanged filesystem suite38/0. Remaining safety children RUNNING since
+02:31:31Z, owned WindowsPS5.1 PID26124/exec83416; buffered remaining-safety-stages.log.
+Do not duplicate it. Original frozen source reader failure still blocks claiming
+a full source aggregate PASS or silently bypassing the runtime launcher's gate.
 
 Owner has now authorized the extended checks and requested an alpha first.
-Publish frozen .4/69a48a4 through the established artifact-only route; no full
-publisher rebuild and no native claim. Then finish the controller route before
+Publication of frozen .4/69a48a4 is DONE; no full publisher rebuild or native claim.
+Finish the controller route before
 live use, retaining mandatory source/WhatIf/Steam/save/lease/restoration guards.
 
 Local .4 implementation is source-tested, not mission-complete. F01-F10 all
@@ -16,8 +21,8 @@ NOT_RUN; physical authoring/card activation/layout/execution and mouse regressio
 must not inherit Alpha 3 results. Owner NOW confirmed DATA free. Existing Steam,
 lease/transaction/review and Automation-pair checks PASS, no launch. Mandatory
 full-history purity forecast exceeds the ordinary ceiling (~4h27m for one
-two-inventory sampled subset, complete sequence longer): separately select and
-authorize an extended validation budget before starting it. See
+two-inventory sampled subset, complete sequence longer): owner subsequently
+authorized the extended window, now in progress. See
 [exact preflight and unfinished controller route](docs/CONTROLLER-NATIVE-PREFLIGHT-2026-10-17.md).
 The latest attributed screenshot remains unavailable. Installed DATA KBP is old
 0.1.1-rc3, not evidence of the owner's .3 screen. No game/foreign lease at intake

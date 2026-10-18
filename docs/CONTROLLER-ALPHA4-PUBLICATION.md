@@ -54,8 +54,43 @@ now scopes those defaults to the two actual full-history guard stages only,
 restoring caller defaults exception-safely after each stage. The unchanged retry
 fixture is rerun as behavioral coverage; no validator/assertion was weakened.
 
+The ef63e54 v2 sequence again passed arguments28/0, source47/0, package6/0 and
+C#579/0 (about24s to filesystem-stage entry), then FAILED deleting a locked
+Info.json in its private `game-held-entry` scratch fixture. The preceding
+exception was obscured by that cleanup exception, so the original cause is
+not claimed. Its synthetic transient transaction records Restored and
+restorationVerified=true, no deployment lock; nine leftover synthetic files
+are retained as evidence, not removed. No real installation was involved.
+Log: artifacts/controller-alpha4/corrected-reader-source-safety-v2.log,
+SHA256 b6810e9d0023bbe5da930e02e76b14dcfa6a204adb02070365a6be319f704119.
+
+One isolated invocation of unchanged frozen Test-RuntimeHarness then passed38/0
+(approximately15s file timestamps), including foreign-overlap retry behavior.
+Log: artifacts/controller-alpha4/runtime-harness-retry-diagnostic.log,
+SHA256 32d454fd5f1bd1b2294a6b96d324b59eb2f0f3486acabda579f22c1b2f84633c.
+The combined-sequence failure remains FAIL/intermittent; the isolated PASS does
+not retroactively pass that invocation or establish native restoration.
+
+At02:31:31Z, resumed only the remaining unchanged safety children against clean
+frozen69a48a4 and its verified DLL: PhysicalSearchEvidence, ProblemNavigationEvidence,
+SpellbookEntryEvidence, DeploymentWhatIf, RuntimeLauncherFileWhatIf,
+FixtureInventoryEvidence, RestoreInstallLocal, PublishReleaseGate. Required Windows
+PowerShell5.1 process26124, parent22136, exec session83416; log
+artifacts/controller-alpha4/remaining-safety-stages.log. The child output is buffered;
+do not interpret a temporarily empty log as PASS or restart a concurrent scan.
+Read-only process counters establish continuing work, not a check verdict.
+Real purity attempt/foreign-wait limits apply only to its two live comparison
+scripts, exception-safely restored; no inventories or original checks omitted.
+An earlier direct invocation correctly refused PowerShell7 before any stage.
+
 Owner-authorized extended checks are in progress. No native/pixel/input/resource
 PASS, game launch, live staging/settings/profile/save changes or restoration
 claimed. Controller-specific observer/loader work remains a separate required
 task before any controller game test; changed compiled bytes need their own
 identity/evidence. No automatic new alpha/retag/main merge/permanent installation.
+
+The original frozen source aggregate still fails its baseline Classic reader.
+This separately corrected reader result is NOT an accepted reusable runtime-
+launcher qualification receipt; do not bypass the launcher's own source gate.
+Further runtime work needs a coherent passing current harness/product selection
+as well as the controller-specific route, not an undocumented skip.
