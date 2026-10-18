@@ -5,6 +5,8 @@ three: readable workspace, real native card, controller-only authoring. Previous
 mixed-input/card/editor deferrals are historical and no longer completion criteria.
 Local candidate 0.5.4-controller.4 is not published or native-qualified. This
 checkpoint is not completion of the assignment; F01-F10 require new native evidence.
+Frozen product69a48a4 and deterministic package/64-test frozen evidence:
+[candidate receipt](CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.4.md).
 
 ## Implemented paths and exact boundary
 

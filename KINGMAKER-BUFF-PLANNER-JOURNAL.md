@@ -2,6 +2,19 @@
 
 ## 2026-10-17/18 full-controller scope and local implementation
 
+Frozen product69a48a4d4c6484abf84549ab8bb062195cedb380, local .4, after
+integration baf221b and authoritative mission-mirror alignment. Clean frozen
+focused64/0,7.3s; deterministic DLL/ZIP/build/package PASS. Exact hashes/MVID,
+commands/logs/environment and remaining native work:
+[.4 receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.4.md).
+No source rebuild for subsequent documentation, no remote writes. Scope remains
+IN_PROGRESS; F01-F10 NOT_RUN. Guarded controller observer route is still required.
+Distinct .4 ZIP and local test note copied into the handoff folder; ZIP hash
+matched. No prior artifact overwritten. Compiled BuildInfo/MVID re-inspected,
+frozen tree clean. Current-scope23 local links and whitespace checks passed;
+initial link-check command's root-path handling was corrected before the strict
+successful pass. No new DLL build or native qualification for documentation.
+
 Owner supersedes mouse-required authoring and deferred card/full-authoring scope.
 Intake clean branch codex/kingmaker-buff-planner-controller-ui at e08031ba;
 read-only PR #10 OPEN/DRAFT matches. Preserve all frozen .1/.2/.3 artifacts,

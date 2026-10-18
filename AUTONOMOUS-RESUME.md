@@ -2,8 +2,9 @@
 
 Local .4 source adds semantic authoring/navigation/search, the real native card,
 shared editor/run handoffs and controller workspace text lifetime/material repair.
-Foundation e4dcbfc and card checkpoint 117b7f1; integration freeze follows. Focused
-development **64/0**, 6.5 s, source47/build1/test compile PASS. See
+Foundation e4dcbfc, card117b7f1, integration baf221b; frozen product69a48a4.
+Frozen focused **64/0**, 7.3 s, deterministic local packaging PASS. See
+[exact .4 artifact receipt](docs/CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.4.md) and
 [capabilities and exact evidence limits](docs/CONTROLLER-AUTHORING-CAPABILITIES.md).
 F01-F10 remain NOT_RUN. Do not call this completion: no new native pixels,
 physical controller authoring/card input, or effects/resources demonstrated.

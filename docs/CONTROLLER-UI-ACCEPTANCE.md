@@ -5,6 +5,8 @@
 Mouse-required authoring and deferred native-card/full-authoring statements below
 are historical, superseded by [the new mission](../planning/KBP-FULL-CONTROLLER-MISSION.md).
 [Capability/evidence inventory](CONTROLLER-AUTHORING-CAPABILITIES.md).
+Frozen local .4 product 69a48a4, focused64/0 and deterministic package PASS:
+[exact artifact receipt](CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.4.md).
 Version .4 source progress is not completion of the assignment; no new native
 PASS is claimed. Previous E/C/A evidence remains under its original IDs.
 

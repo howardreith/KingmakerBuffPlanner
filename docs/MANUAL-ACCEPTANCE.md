@@ -1,7 +1,9 @@
-> **Current October 17 controller acceptance:** review the execution candidate
-> against [E01–E13](CONTROLLER-UI-ACCEPTANCE.md), including physical input and
-> restoration. Mouse-based authoring is permitted. Full controller editing is
-> deferred and is not an execution gate; old C-series evidence remains separate.
+> **Current full-controller acceptance:** [F01-F10](CONTROLLER-UI-ACCEPTANCE.md)
+> require readable workspace, actual native card and entirely controller-operated
+> authoring/search/autosave/recovery before completion. Mouse-only authoring is no
+> longer sufficient. First guarded native stage is no-cast card -> author -> save
+> -> return, both book/menu origins, first/settled1920x1200 and compact frames.
+> Current .4 has no new native evidence; prior C/E/A records stay historical.
 >
 > **Current 0.5.1-rc5 human-feedback acceptance:** exact candidate `ec3d5f8`
 > is focused-tested, packaged and frozen but **NOT_RUN**. The first selected
