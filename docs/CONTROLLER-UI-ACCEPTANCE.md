@@ -9,6 +9,8 @@ Frozen local .4 product 69a48a4, focused64/0 and deterministic package PASS:
 [exact artifact receipt](CONTROLLER-UI-CANDIDATE-0.5.4-CONTROLLER.4.md).
 Version .4 source progress is not completion of the assignment; no new native
 PASS is claimed. Previous E/C/A evidence remains under its original IDs.
+Alpha4 is now owner-published for manual testing; [publication and separate
+post-publication checks](CONTROLLER-ALPHA4-PUBLICATION.md). No native status changed.
 
 | ID | Required native observation | Status |
 | --- | --- | --- |

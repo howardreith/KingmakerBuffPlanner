@@ -1,5 +1,13 @@
 ## Current full-controller implementation checkpoint
 
+**Alpha4 published** 2026-10-18T02:18:48Z; product69a48a4, non-Latest prerelease,
+downloaded hashes verified. [Publication/check record](docs/CONTROLLER-ALPHA4-PUBLICATION.md).
+Broad check stopped577/1 before purity on brittle Classic source adjacency;
+matched Alpha3 fails once too. Corrected compiled-order reader has missing/late/
+wrong-value negatives, focused39/0. Test-ControllerAlpha4Safety runs that corrected
+reader and all remaining original guard children with separate harness identity.
+Original FAIL and frozen Alpha4 bytes remain preserved; no native PASS.
+
 Owner NOW requests publishing the unchanged .4 test alpha BEFORE continuing
 guarded checks, and authorizes the extended validation window discussed in the
 preflight. Use artifact-only publication of frozen69a48a4; no rebuild/relabel of

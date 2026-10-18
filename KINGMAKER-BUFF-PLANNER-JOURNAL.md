@@ -1,5 +1,19 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-17/18 Alpha4 publication and corrected-reader safety selection
+
+Published02:18:48Z, product/tag69a48a4, notes/pushed brancha78b6ab. Draft ZIP and
+checksum downloaded/matched; flags/tag/unchanged main/stableLatest0.5.3 verified.
+Guarded push WhatIf6/0; PR stays draft. [Publication/evidence record](docs/CONTROLLER-ALPHA4-PUBLICATION.md).
+Owner authorized extended checks after publication. Broad28/0arguments47/0source
+577/1C# stopped before purity; matched Alpha3 reproduces failure once (0/1).
+Classic behavior passes; first-statement source assertion rejected controller
+cleanup preceding the reset. Reader now checks compiled reset-before-both-close,
+with missing/late/wrong-value negatives; focused39/0,5.7s. Production untouched.
+Narrow exact-product corrected-reader sequence retains all remaining source/safety
+children/full-history inventories (attempts1/leasewait120). Not old-wrapper PASS,
+native qualification, new product or retag authority. No game/live transaction.
+
 ## 2026-10-17/18 owner requests Alpha4 before extended checks
 
 Owner explicitly requests alpha publication for manual testing first, then

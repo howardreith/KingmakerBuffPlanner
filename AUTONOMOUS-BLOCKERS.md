@@ -1,5 +1,11 @@
 ## Current full-controller native boundary
 
+Alpha4 published for manual testing. Subsequent broad check stopped577/1 on
+baseline brittle Classic source adjacency before purity. Matched Alpha3 fails
+too. Compiled-order correction focused39/0; extended exact-product source/safety
+sequence selected with separate harness identity. [Record](docs/CONTROLLER-ALPHA4-PUBLICATION.md).
+No original FAIL promoted to PASS; no new product/native qualification.
+
 Owner has now authorized the extended checks and requested an alpha first.
 Publish frozen .4/69a48a4 through the established artifact-only route; no full
 publisher rebuild and no native claim. Then finish the controller route before

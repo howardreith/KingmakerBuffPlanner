@@ -1,9 +1,11 @@
 # Mr. Bard's Kingmaker Buff Planner
 
-Active local work **0.5.4-controller.4** targets full controller authoring, its
+[Controller test Alpha4 **0.5.4-controller.4**](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.4)
+targets full controller authoring, its
 own native menu card and actual workspace rendering repair. No mouse prerequisite
 is accepted for this assignment. Source paths exist, but native acceptance is
-**NOT_RUN** and the assignment is not complete. This is not a new public release;
+**NOT_RUN** and the assignment is not complete. Owner-authorized experimental
+prerelease, not stable support; [manual notes](docs/CONTROLLER-ALPHA-0.5.4-CONTROLLER.4-NOTES.md),
 [capability inventory](docs/CONTROLLER-AUTHORING-CAPABILITIES.md) and
 [required acceptance](docs/CONTROLLER-UI-ACCEPTANCE.md) separate source from proof.
 Earlier mixed-input/card/editor deferrals below describe the older alphas only.
