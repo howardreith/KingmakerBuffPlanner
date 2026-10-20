@@ -2,7 +2,7 @@
 
 ## Scope and evidence
 
-Branch: `codex/kingmaker-buff-planner/linux-2.1.5d`, based on
+Branch: `codex/kingmaker-buff-planner-linux-2.1.5d`, based on
 `2bc6cc19e3e4a1c5feb1c8cd511d48dfb568606e`. The isolated manifest
 commit is `bc00dbd`. Published 0.6.0 remains unchanged. UMM `Id`, minimum
 manager version `0.28.2`, assembly name, entry point, requirements, and
@@ -12,6 +12,11 @@ UMM discards the letter suffix when detecting a game version; the lab's
 Windows log reports `2.1.7b` as `2.1.7`. This metadata admits the requested
 `2.1.5d` build through that gate; it does not establish API or gameplay
 compatibility.
+
+The first local branch spelling used a slash before `linux-2.1.5d`. GitHub
+rejected its guarded push with a remote ref directory/file conflict. The
+branch was renamed to the hyphenated spelling above without rewriting any
+commit.
 
 The available lab game is **Windows Kingmaker 2.1.7b**, with UMM **0.33.0.0**
 (`Kingmaker_Data/Managed/UnityModManager/Log.txt`, lines 2-12). No native

@@ -2,7 +2,7 @@
 
 ## Native Linux 2.1.5d trial candidate
 
-Branch `codex/kingmaker-buff-planner/linux-2.1.5d`, base `2bc6cc1`, manifest
+Branch `codex/kingmaker-buff-planner-linux-2.1.5d`, base `2bc6cc1`, manifest
 commit `bc00dbd`, versioned product commit `2d30ff970fa65f9a1f1422e4eef15d854511c73b`.
 The initial 0.6.0 diagnostic changes only `GameVersion` 2.1.7 to 2.1.5;
 strict package6/0 and five-entry byte comparison0 unexpected differences,

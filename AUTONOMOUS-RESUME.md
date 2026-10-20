@@ -1,6 +1,6 @@
 ## Linux 2.1.5d experimental candidate — native acceptance pending
 
-Branch `codex/kingmaker-buff-planner/linux-2.1.5d`; product commit
+Branch `codex/kingmaker-buff-planner-linux-2.1.5d`; product commit
 `2d30ff970fa65f9a1f1422e4eef15d854511c73b`, version 0.6.1. Manifest-only
 diagnostic retains published 0.6.0 DLL; versioned candidate ZIP
 `2f0b1247aa3a12935c6c077d6117fc423ce5402c0025407110b811660d0f37b7`
