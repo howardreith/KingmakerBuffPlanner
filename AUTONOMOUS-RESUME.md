@@ -1,3 +1,15 @@
+## 0.6.3 release published — 2026-10-20
+
+Full v0.6.3 is GitHub Latest at tagged product
+`f82555c2c52d2580b187be7006555c855a8862fe` (version 0.6.3).
+Owner-authorized pre-runtime checks: source 47/0, offline C# 582/0,
+publisher 8/0, deterministic builds 2 and package 6/0. ZIP SHA-256
+`ee1ca6c22e684514a0ecd880d4c896160361b04a4484f905cdbe326f653d56c7`.
+No game, install, save, or native F02 run occurred. See
+[release record](docs/RELEASE-0.6.3-RECORD.md). Exact next action:
+guarded native no-cast RT/R2 card → editor → Back → repeat observation,
+then active-run card → quick controls → Stop, recording diagnostic stages.
+
 ## Full release 0.6.2 published and verified — native Linux acceptance pending
 
 PR11 MERGED; guarded main product `6090e6232c9dcec7d8e890585aef8976ef87c70a`.
