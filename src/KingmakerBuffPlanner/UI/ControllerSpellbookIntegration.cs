@@ -61,7 +61,13 @@ namespace KingmakerBuffPlanner.UI
 
         private static void Created(SpellBookView __instance)
         {
-            if (!_enabled || Game.Instance == null || !Game.Instance.IsControllerGamepad) return;
+            if (!_enabled) return;
+            if (Game.Instance == null || !Game.Instance.IsControllerGamepad)
+            {
+                _log.Info("[KBP-CONTROLLER-BOOK] entry-skipped:controller-unavailable;view=" +
+                    (__instance == null ? "null" : __instance.GetInstanceID().ToString()));
+                return;
+            }
             Entry entry = null;
             try
             {
@@ -78,7 +84,11 @@ namespace KingmakerBuffPlanner.UI
                 if (!action.HasValue) { _log.Info("[KBP-CONTROLLER-BOOK] no conflict-free footer action;native controls unchanged."); return; }
                 entry.Action = action.Value;
                 TMP_Text donor = __instance.GetComponentsInChildren<TMP_Text>(true).FirstOrDefault(t => t != null && t.font != null);
-                if (donor == null) return;
+                if (donor == null)
+                {
+                    _log.Info("[KBP-CONTROLLER-BOOK] entry-skipped:missing-donor;view=" + __instance.GetInstanceID());
+                    return;
+                }
                 entry.Hint = ControllerRoutineView.BookHint(__instance.transform, donor, action.Value);
                 bool added = Entries.Ensure(entry.Layer, (List<BindDescription>)Binds.GetValue(entry.Layer),
                     bind => bind.ActionId == action.Value, alive =>
@@ -90,7 +100,12 @@ namespace KingmakerBuffPlanner.UI
                         }, action.Value, InputActionEventType.ButtonJustPressed, false, false).Binds.ToArray();
                         return entry.Bindings;
                     });
-                if (!added) { UnityEngine.Object.Destroy(entry.Hint); return; }
+                if (!added)
+                {
+                    UnityEngine.Object.Destroy(entry.Hint);
+                    _log.Info("[KBP-CONTROLLER-BOOK] entry-skipped:action-conflict;view=" + __instance.GetInstanceID());
+                    return;
+                }
                 Views.Add(__instance, entry);
                 entry.Hint.SetActive(false); // shown only by active-owner Tick
                 _log.Info("[KBP-CONTROLLER-BOOK] footer registered;action=" + action.Value + ";destination=actual-editor;partyWide=true.");

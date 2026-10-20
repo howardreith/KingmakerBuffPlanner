@@ -197,6 +197,8 @@ namespace KingmakerBuffPlanner.UI
                 _instance._controllerRoutines == null && _instance._controllerBookHandoff == null; }
         }
 
+        internal static bool HasInstance { get { return _instance != null; } }
+
         // The stored mode, or null before the root is constructed (the
         // settings page can draw before the first update).
         internal static PlannerMode? SelectedPlannerMode

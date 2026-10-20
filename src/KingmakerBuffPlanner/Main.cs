@@ -21,6 +21,10 @@ namespace KingmakerBuffPlanner
         private static bool _hotkeyArmedLogged;
         private static string _lastSnapshot = "bootstrap-not-loaded";
         private static int _hotkeyKeydownCount;
+        private static UnityModManager.ModEntry _modEntry;
+        private static PlannerUpdateDriver _updateDriver;
+        private static PlannerUpdateFrameGate _updateFrameGate = new PlannerUpdateFrameGate();
+        private static string _updateSource = "UMM.OnUpdate";
 
         internal static bool HotkeyArmed { get { return _hotkeyArmedLogged && _enabled; } }
         internal static int HotkeyKeydownCount { get { return _hotkeyKeydownCount; } }
@@ -30,6 +34,10 @@ namespace KingmakerBuffPlanner
             if (modEntry == null) throw new ArgumentNullException("modEntry");
 
             _log = new ModLog(modEntry.Logger);
+            _modEntry = modEntry;
+            _updateFrameGate = new PlannerUpdateFrameGate();
+            _firstUpdateLogged = false;
+            _hotkeyArmedLogged = false;
             _log.Info("[KBP-BOOT] Main.Load entered; assembly=" +
                 typeof(Main).Assembly.FullName + ";modEntry.Enabled=" + modEntry.Enabled + ".");
             _modPath = modEntry.Path;
@@ -90,7 +98,35 @@ namespace KingmakerBuffPlanner
                 catch (Exception exception) { _log.Error("[KBP-PROBE] disable shutdown failed.", exception); }
             }
             BuffPlannerUiRoot.SetEnabled(value);
+            if (value) EnsureUpdateDriver();
             return true;
+        }
+
+        // UMM's UI MonoBehaviour normally dispatches OnUpdate. Some valid
+        // installations load mods without ever spawning that UI host; native
+        // Harmony callbacks still run, but the planner root would stay absent.
+        private static void EnsureUpdateDriver()
+        {
+            if (_updateDriver != null) return;
+            GameObject owner = null;
+            try
+            {
+                owner = new GameObject("KingmakerBuffPlanner.UpdateDriver");
+                UnityEngine.Object.DontDestroyOnLoad(owner);
+                _updateDriver = owner.AddComponent<PlannerUpdateDriver>();
+                _log.Info("[KBP-BOOT] owned update driver installed;instance=" + owner.GetInstanceID() + ".");
+            }
+            catch (Exception exception)
+            {
+                if (owner != null) UnityEngine.Object.Destroy(owner);
+                _log.Error("[KBP-BOOT] owned update driver unavailable;UMM update remains registered.", exception);
+            }
+        }
+
+        internal static void OnDriverUpdate(float deltaTime)
+        {
+            if (_managerEnabled && _modEntry != null)
+                PumpUpdate(_modEntry, deltaTime, "owned-driver");
         }
 
         // The mod manager's toggle as the runtime qualification drives it
@@ -114,6 +150,13 @@ namespace KingmakerBuffPlanner
 
         private static void OnUpdate(UnityModManager.ModEntry modEntry, float deltaTime)
         {
+            PumpUpdate(modEntry, deltaTime, "UMM.OnUpdate");
+        }
+
+        private static void PumpUpdate(UnityModManager.ModEntry modEntry, float deltaTime, string source)
+        {
+            if (!_updateFrameGate.TryEnter(Time.frameCount)) return;
+            _updateSource = source;
             RuntimePerformanceDiagnostics.FrameStarted();
             long startedAt = RuntimePerformanceDiagnostics.BeginOperation();
             try
@@ -134,7 +177,8 @@ namespace KingmakerBuffPlanner
             {
                 _firstUpdateLogged = true;
                 _log.Info("[KBP-BOOT] OnUpdate first tick;enabled=" + _enabled +
-                    ";modEntry.Active=" + (modEntry != null && modEntry.Active) + ".");
+                    ";modEntry.Active=" + (modEntry != null && modEntry.Active) +
+                    ";source=" + _updateSource + ".");
             }
 
             bool hotkeyDown = false;
@@ -145,7 +189,7 @@ namespace KingmakerBuffPlanner
                 {
                     _hotkeyArmedLogged = true;
                     _log.Info("[KBP-BOOT] PlannerHotkey handler armed;binding=" +
-                        PlannerHotkey.Binding + ";source=UMM.OnUpdate.");
+                        PlannerHotkey.Binding + ";source=" + _updateSource + ".");
                 }
             }
             catch (Exception exception)
@@ -162,7 +206,7 @@ namespace KingmakerBuffPlanner
                     {
                         _hotkeyKeydownCount++;
                         _log.Info("[KBP-BOOT] PlannerHotkey keydown observed;binding=" +
-                            PlannerHotkey.Binding + ";source=UMM.OnUpdate.");
+                            PlannerHotkey.Binding + ";source=" + _updateSource + ".");
                         BuffPlannerUiRoot.HandlePlannerHotkey();
                     }
                     BuffPlannerUiRoot.TickOwned(deltaTime);
@@ -229,12 +273,16 @@ namespace KingmakerBuffPlanner
         private static bool OnUnload(UnityModManager.ModEntry modEntry)
         {
             _enabled = false;
+            _managerEnabled = false;
             if (_runtimeTest != null)
             {
                 try { _runtimeTest.Shutdown("mod-unload"); }
                 catch (Exception exception) { _log.Error("[KBP-PROBE] unload shutdown failed.", exception); }
             }
             _runtimeTest = null;
+            if (_updateDriver != null) UnityEngine.Object.Destroy(_updateDriver.gameObject);
+            _updateDriver = null;
+            _modEntry = null;
             BuffPlannerUiRoot.DestroyOwned();
             ControllerRoutineIntegration.Uninstall();
             PlannerPointerOwnership.Uninstall();
@@ -242,5 +290,10 @@ namespace KingmakerBuffPlanner
             _log.Info("[KBP-BOOT] unloaded;disposed=true.");
             return true;
         }
+    }
+
+    public sealed class PlannerUpdateDriver : MonoBehaviour
+    {
+        private void Update() { Main.OnDriverUpdate(Time.deltaTime); }
     }
 }
