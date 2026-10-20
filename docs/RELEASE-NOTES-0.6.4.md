@@ -2,8 +2,8 @@
 
 **Owner-authorized release.** The owner tested `v0.6.4-alpha.1` on the main
 laptop and reported that controller functionality is now usable, with further
-improvements still needed. This exact 0.6.4 release has not been run in the
-game. The owner has not supplied a detailed acceptance trace for the stable
+improvements still needed. This exact 0.6.4 release has not been run in the game.
+The owner has not supplied a detailed acceptance trace for the stable
 package, so the spellbook entry and the wider controller authoring and casting
 flows remain unverified here.
 
