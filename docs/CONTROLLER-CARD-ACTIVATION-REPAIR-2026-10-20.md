@@ -1,5 +1,35 @@
 # Controller card activation repair — 2026-10-20
 
+## PR #12 review correction
+
+Product commit `69f114caae5dd80d410e7dfdebd5d0b810628c6c`, version `0.6.2`,
+restores the active-run route. A card request is now admitted while the casting
+host runs. After the native menu releases its layer and controls are neutral,
+the destination checks the current running state: it opens quick controls with
+Stop for an active run, or begins authoring otherwise. Authoring remains blocked
+during execution. The terminal card diagnostic distinguishes
+`destination-opened:editor`, `destination-opened:running-controls`,
+`destination-opened:classic-review`, `destination-opened:editor-recovery`, and
+`handoff-canceled:destination-unavailable`.
+
+The new detached regression starts an animated two-cast routine, keeps its first
+cast in flight while the original controls are abandoned, completes the native
+release/neutral handoff, reopens quick controls through production destination
+routing, selects Stop, and verifies cancellation before the second cast. It also
+checks the distinct editor, Classic review, recovery, and unavailable outcomes.
+The native Back UI and actual RT/R2 menu are not driven by this detached test.
+
+At that committed product, `powershell -NoProfile -ExecutionPolicy Bypass -File
+scripts/Test-Development.ps1 -Only 'controller-'` completed in 6.2 seconds:
+source validation `47/0`, production build `1/0`, controller tests `37/0`.
+The built DLL SHA-256 was
+`5E8CB0D5A428D6F481E87E22D1FFE0A8FCC3DEB14D6085433638CB78A1DDE4AD`.
+`git diff --check` passed. No live game, installation, Mods staging, save edit,
+package, or release was performed. F02 remains **NOT_RUN**. The exact next
+action remains the guarded, no-cast native card → editor → Back → repeat
+observation below, with an added active-run card → quick controls → Stop case
+once the basic entry route is observed.
+
 ## Scope and source identity
 
 - Branch: `codex/kingmaker-buff-planner-controller-card-activation`.

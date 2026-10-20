@@ -1,5 +1,22 @@
 # Kingmaker Buff Planner Journal
 
+## PR #12 controller card review correction — 2026-10-20
+
+Branch `codex/kingmaker-buff-planner-controller-card-activation`, product
+`69f114caae5dd80d410e7dfdebd5d0b810628c6c`, version `0.6.2`.
+Restored the running-routine card route to quick controls and Stop; classified
+editor, running controls, Classic review, recovery, and unavailable terminal
+outcomes. `powershell -NoProfile -ExecutionPolicy Bypass -File
+scripts/Test-Development.ps1 -Only 'controller-'`: source `47/0`, build `1/0`,
+controller `37/0`, 6.2 seconds; DLL SHA-256
+`5E8CB0D5A428D6F481E87E22D1FFE0A8FCC3DEB14D6085433638CB78A1DDE4AD`.
+Detached regression covers animated start, closed controls, card handoff,
+reopened Stop, and no second cast. Native F02 remains NOT_RUN; no install,
+gameplay, save, package, or release change. See
+[repair record](docs/CONTROLLER-CARD-ACTIVATION-REPAIR-2026-10-20.md).
+Next: guarded native no-cast card → editor → Back → repeat observation,
+then active-run card → controls → Stop if the first route succeeds.
+
 ## Controller card activation repair — 2026-10-20
 
 Branch `codex/kingmaker-buff-planner-controller-card-activation`, product
