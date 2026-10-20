@@ -49,6 +49,8 @@ namespace KingmakerBuffPlanner.Tests
             Run("controller-workspace-navigation-repeat-is-bounded", TestWorkspaceRepeat);
             Run("controller-workspace-keyboard-apply-cancel-without-physical-typing", TestWorkspaceKeyboard);
             Run("controller-native-card-registration-keeps-foreign-identities", TestNativeCardIdentities);
+            Run("controller-card-layer-capture-before-after-and-rebind", TestControllerCardLayerCapture);
+            Run("controller-card-handoff-release-cancel-and-neutral", TestControllerCardHandoff);
             Run("controller-workspace-authoring-through-semantic-focus", () => TestWorkspaceSemanticAuthoring(root));
             Run("controller-classic-switch-requires-explicit-review-consent", TestControllerClassicConsent);
         }
@@ -245,6 +247,12 @@ namespace KingmakerBuffPlanner.Tests
             Type layer = assembly.GetType("Kingmaker.Assets.Console.GamepadInput.InputLayer", true);
             Type menu = assembly.GetType("Kingmaker.UI._ConsoleUI.InGameMenu.BaseGameMenuView", true);
             Type binding = assembly.GetType("Kingmaker.Assets.Console.GamepadInput.BindDescription", true);
+            object detachedPad = System.Runtime.Serialization.FormatterServices.GetUninitializedObject(pad);
+            object baseLayer = Activator.CreateInstance(layer);
+            pad.GetField("m_BaseLayer", flags).SetValue(detachedPad, baseLayer);
+            pad.GetField("m_Layers", flags).SetValue(detachedPad,
+                Activator.CreateInstance(typeof(List<>).MakeGenericType(layer)));
+            Assert(ReferenceEquals(pad.GetProperty("CurrentInputLayer", flags).GetValue(detachedPad, null), baseLayer));
             Assert(pad.GetMethod("PushLayer", flags).ReturnType == typeof(IDisposable));
             string[] push = ControllerIlCalls(pad.GetMethod("PushLayer", flags)).Select(call => call.Name).ToArray();
             Assert(push.Contains("Unbind") && push.Contains("Bind"));
@@ -252,6 +260,11 @@ namespace KingmakerBuffPlanner.Tests
             Assert(pop.Contains("Contains") && pop.Contains("Remove") && pop.Contains("Bind"));
             MethodInfo getLayer = menu.GetMethod("GetInputLayer", flags);
             Assert(getLayer != null && getLayer.ReturnType == layer && !getLayer.IsPublic);
+            string[] bind = ControllerIlCalls(menu.GetMethod("Bind", flags)).Select(call => call.Name).ToArray();
+            Assert(Array.IndexOf(bind, "BindEntities") < Array.IndexOf(bind, "GetInputLayer") &&
+                Array.IndexOf(bind, "GetInputLayer") < Array.IndexOf(bind, "PushLayer"));
+            string[] destroy = ControllerIlCalls(menu.GetMethod("DestroyViewImplementation", flags)).Select(call => call.Name).ToArray();
+            Assert(Array.IndexOf(destroy, "PopLayer") < Array.IndexOf(destroy, "SetActive"));
             string[] deselect = ControllerIlCalls(menu.GetMethod("Deselect", flags)).Select(call => call.Name).ToArray();
             Assert(deselect.SequenceEqual(new[] { "SetSelected", "SetCartsPositions", "get_ViewModel", "Confirm" }));
             // The base layer remains bound under a pushed native menu, hence
@@ -927,6 +940,86 @@ namespace KingmakerBuffPlanner.Tests
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
             Assert(game.GetType("Kingmaker.UI._ConsoleUI.InGameMenu.InGameMenuView", true).GetMethod("BindEntities", flags) != null);
             Assert(ControllerIlCalls(vm.GetMethod("DisposeImplementation", flags)).All(m => m.Name != "StartAction"));
+            Type parent = game.GetType("Kingmaker.UI._ConsoleUI.InGameMenu.InGameMenuVM", true);
+            Assert(ControllerIlCalls(parent.GetMethod("DisposeImplementation", flags)).Any(m => m.Name == "StartAction"));
+        }
+
+        private static void TestControllerCardLayerCapture()
+        {
+            var captures = new ControllerMenuLayerCapture<object, object>();
+            object menu = new object(), baseLayer = new object(), source = new object(), below, found;
+            var stack = new List<object>();
+            Assert(!captures.TryGet(menu, out found, out below));
+            // GetInputLayer may be observed before the card is constructed.
+            Assert(captures.Observe(menu, source, baseLayer, baseLayer, stack));
+            Assert(captures.TryGet(menu, out found, out below) && ReferenceEquals(found, source) && ReferenceEquals(below, baseLayer));
+            // A repeated call after native PushLayer must retain the real owner.
+            stack.Add(source);
+            Assert(captures.Observe(menu, source, source, baseLayer, stack));
+            Assert(captures.TryGet(menu, out found, out below) && ReferenceEquals(below, baseLayer));
+            object native = new object();
+            stack.Insert(0, native);
+            Assert(captures.Observe(menu, source, source, baseLayer, stack));
+            Assert(captures.TryGet(menu, out found, out below) && ReferenceEquals(below, native));
+            captures.Remove(menu);
+            Assert(!captures.TryGet(menu, out found, out below));
+            stack.Clear();
+            object newSource = new object();
+            Assert(captures.Observe(menu, newSource, baseLayer, baseLayer, stack));
+            Assert(captures.TryGet(menu, out found, out below) && ReferenceEquals(found, newSource));
+            // A source that claims current ownership without stack membership
+            // cannot inherit the preceding menu's observation.
+            Assert(!captures.Observe(menu, source, source, baseLayer, stack));
+            Assert(!captures.TryGet(menu, out found, out below));
+            Assert(captures.Observe(menu, source, null, null, stack));
+            Assert(captures.TryGet(menu, out found, out below) && below == null);
+            captures.Clear();
+            Assert(!captures.TryGet(menu, out found, out below));
+        }
+
+        private static void TestControllerCardHandoff()
+        {
+            int opens = 0, closes = 0;
+            bool valid = true, source = true, released = false;
+            var stages = new List<string>();
+            var handoff = new ControllerSurfaceHandoff(() => valid, () => source,
+                () => closes++, () => released, () => opens++, stages.Add,
+                () => "native-takeover");
+            for (int frame = 0; frame < 8; frame++) Assert(!handoff.Tick(false, frame));
+            Assert(closes == 0 && opens == 0);
+            for (int frame = 8; frame < 11; frame++) handoff.Tick(true, frame);
+            Assert(closes == 1 && opens == 0);
+            source = false; released = true;
+            for (int frame = 11; frame < 15; frame++) handoff.Tick(true, frame);
+            Assert(opens == 1 && handoff.Tick(true, 15));
+            Assert(stages.SequenceEqual(new[] { "source-released", "destination-opened" }));
+            var unavailableStages = new List<string>();
+            var unavailable = new ControllerSurfaceHandoff(() => true, () => true,
+                () => { }, () => true, () => { }, unavailableStages.Add, null, () => false);
+            for (int frame = 0; frame < 8; frame++) unavailable.Tick(true, frame);
+            Assert(unavailable.Outcome == "handoff-canceled:destination-unavailable" &&
+                unavailableStages.SequenceEqual(new[] { "source-released", unavailable.Outcome }));
+            var exceptionStages = new List<string>();
+            var broken = new ControllerSurfaceHandoff(() => true, () => true,
+                () => { }, () => true, () => { throw new InvalidOperationException("destination"); }, exceptionStages.Add);
+            bool threw = false;
+            try { for (int frame = 0; frame < 8; frame++) broken.Tick(true, frame); }
+            catch (InvalidOperationException) { threw = true; }
+            Assert(threw && broken.Outcome == "handoff-canceled:destination-exception" &&
+                broken.Tick(true, 9) && exceptionStages.Count == 2);
+            foreach (string reason in new[] { "native-takeover", "lost-context", "source", "timeout", "cancel" })
+            {
+                int rejectedOpens = 0;
+                var reports = new List<string>();
+                bool context = reason != "native-takeover" && reason != "lost-context";
+                var rejected = new ControllerSurfaceHandoff(() => context, () => reason != "source",
+                    () => { }, () => false, () => rejectedOpens++, reports.Add,
+                    () => reason);
+                if (reason == "cancel") rejected.Cancel();
+                for (int frame = 0; frame < 185; frame++) rejected.Tick(true, frame);
+                Assert(rejectedOpens == 0 && reports.Count == 1 &&
+                    reports[0] == "handoff-canceled:" + reason && rejected.Outcome == reports[0]);
+            }
         }
 
         private static void TestWorkspaceSemanticAuthoring(string root)

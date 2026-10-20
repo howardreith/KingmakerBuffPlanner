@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Harmony12;
 using Kingmaker;
 using Kingmaker.Assets.Console.GamepadInput;
@@ -29,9 +30,11 @@ namespace KingmakerBuffPlanner.UI
         private static readonly FieldInfo Rect = typeof(InGameMenuEntityView).GetField("m_Rect", Fields);
         private static readonly FieldInfo Navigation = typeof(BaseGameMenuView).GetField("m_NavigationCollection", Fields);
         private static readonly Dictionary<InGameMenuView, Entry> Entries = new Dictionary<InGameMenuView, Entry>();
+        private static readonly ControllerMenuLayerCapture<InGameMenuView, InputLayer> LayerCaptures =
+            new ControllerMenuLayerCapture<InGameMenuView, InputLayer>();
         private static ModLog _log;
         private static bool _enabled;
-        internal static Action<InGameMenuView, InputLayer, InputLayer, TMP_Text> OpenRequested { get; set; }
+        internal static Func<InGameMenuView, InputLayer, InputLayer, TMP_Text, Canvas, int, bool> OpenRequested { get; set; }
         private sealed class Entry
         {
             internal InGameMenuView Menu;
@@ -42,10 +45,12 @@ namespace KingmakerBuffPlanner.UI
             internal List<List<IConsoleMultiNavigationEntity>> Rows;
             internal InputLayer Layer, Below;
             internal PlannerNativeKit Kit;
+            internal Canvas Host;
             internal Texture2D Texture;
             internal Sprite Icon;
             internal Transform OwnedRoot;
             internal bool Removed;
+            internal int Generation;
         }
 
         internal static void Install(HarmonyInstance harmony, ModLog log)
@@ -63,7 +68,11 @@ namespace KingmakerBuffPlanner.UI
         internal static void SetEnabled(bool enabled)
         {
             _enabled = enabled;
-            if (!enabled) foreach (Entry entry in Entries.Values.ToArray()) SafeRemove(entry);
+            if (!enabled)
+            {
+                foreach (Entry entry in Entries.Values.ToArray()) SafeRemove(entry);
+                LayerCaptures.Clear();
+            }
         }
 
         private static void Created(InGameMenuView __instance)
@@ -78,8 +87,9 @@ namespace KingmakerBuffPlanner.UI
                     if (entry != null) SafeRemove(entry);
                     InGameMenuEntityView donor = (InGameMenuEntityView)Rest.GetValue(__instance);
                     if (donor == null) throw new InvalidOperationException("Native campaign card art is not ready.");
+                    Canvas host = ControllerPresentationHost.Resolve(__instance);
                     entry = new Entry { Menu = __instance, Collection = (CartCollectionManagerView)Collection.GetValue(__instance),
-                        Kit = PlannerNativeKit.Controller(ControllerPresentationHost.Resolve(__instance)) };
+                        Host = host, Kit = PlannerNativeKit.Controller(host) };
                     var map = new Dictionary<Transform, Transform>();
                     Transform owned = CopyVisual(donor.transform, donor.transform.parent, entry.Kit, map,
                         created => { entry.OwnedRoot = created; created.gameObject.SetActive(false); });
@@ -97,6 +107,9 @@ namespace KingmakerBuffPlanner.UI
                         if (image != null) { image.sprite = entry.Icon; image.preserveAspect = true; image.color = Color.white; }
                     }
                     Entries[__instance] = entry;
+                    InputLayer source, below;
+                    if (LayerCaptures.TryGet(__instance, out source, out below))
+                    { entry.Layer = source; entry.Below = below; }
                 }
                 var current = (List<ICartCollectionEntity>)Cards.GetValue(entry.Collection);
                 if (!current.Any(card => ReferenceEquals(card, entry.Card)))
@@ -174,6 +187,13 @@ namespace KingmakerBuffPlanner.UI
             try
             {
                 Unbind(entry);
+                // Native BindEntities precedes GetInputLayer on this build. A
+                // capture used by an earlier binding must not serve a new VM.
+                InputLayer observed, predecessor;
+                if (LayerCaptures.TryGet(__instance, out observed, out predecessor) &&
+                    ReferenceEquals(observed, entry.Layer) && entry.Generation > 0)
+                { LayerCaptures.Remove(__instance); entry.Layer = null; entry.Below = null; }
+                entry.Generation++;
                 bool fired = false;
                 Game game = Game.Instance;
                 object area = game.CurrentlyLoadedArea;
@@ -181,12 +201,26 @@ namespace KingmakerBuffPlanner.UI
                 string campaign = game.Player.GameId;
                 entry.Model = new InGameMenuEntityVM(() =>
                 {
-                    if (fired || entry.Removed || !_enabled || entry.Menu == null || Game.Instance != game ||
-                        game.Player == null || game.Player.GameId != campaign || !ReferenceEquals(game.CurrentlyLoadedArea, area) ||
-                        game.RootUiContext == null || !ReferenceEquals(game.RootUiContext.InGameUiContext, ui)) return;
+                    if (fired) return;
                     fired = true;
-                    if (OpenRequested != null) OpenRequested(entry.Menu, entry.Layer, entry.Below,
-                        (TMP_Text)Title.GetValue(entry.Card));
+                    _log.Info("[KBP-CONTROLLER-CARD] card-selected;" + Describe(entry));
+                    if (entry.Removed || !_enabled || entry.Menu == null || Game.Instance != game ||
+                        game.Player == null || game.Player.GameId != campaign || !ReferenceEquals(game.CurrentlyLoadedArea, area) ||
+                        game.RootUiContext == null || !ReferenceEquals(game.RootUiContext.InGameUiContext, ui))
+                    { _log.Info("[KBP-CONTROLLER-CARD] request-refused:stale-context;" + Describe(entry)); return; }
+                    if (entry.Layer == null || !LayerCaptures.TryGet(entry.Menu, out observed, out predecessor) ||
+                        !ReferenceEquals(observed, entry.Layer))
+                    { _log.Info("[KBP-CONTROLLER-CARD] request-refused:missing-layer-capture;" + Describe(entry)); return; }
+                    try
+                    {
+                        if (OpenRequested == null)
+                            _log.Info("[KBP-CONTROLLER-CARD] request-refused:handler-unavailable;" + Describe(entry));
+                        else if (!OpenRequested(entry.Menu, entry.Layer, entry.Below,
+                            (TMP_Text)Title.GetValue(entry.Card), entry.Host, entry.Generation))
+                            _log.Info("[KBP-CONTROLLER-CARD] request-refused:admission;" + Describe(entry));
+                    }
+                    catch (Exception exception)
+                    { _log.Error("[KBP-CONTROLLER-CARD] request-refused:exception;" + Describe(entry), exception); }
                 }, "Buff Planner", false, true);
                 entry.MenuModel = viewModel; entry.Rows = __result;
                 ControllerOwnedItems.Ensure((List<InGameMenuEntityVM>)Models.GetValue(viewModel), entry.Model);
@@ -198,10 +232,34 @@ namespace KingmakerBuffPlanner.UI
 
         internal static void NoteLayer(BaseGameMenuView menu, InputLayer layer)
         {
+            if (!(menu is InGameMenuView) || !GamePad.HasInstance) return;
+            var native = (InGameMenuView)menu;
+            var pad = GamePad.Instance;
+            if (!LayerCaptures.Observe(native, layer, pad.CurrentInputLayer, pad.BaseLayer, pad.Layers))
+            { _log.Info("[KBP-CONTROLLER-CARD] layer-capture-refused;menu=" + native.GetInstanceID()); return; }
             Entry entry;
-            if (menu is InGameMenuView && Entries.TryGetValue((InGameMenuView)menu, out entry))
-            { entry.Layer = layer; entry.Below = GamePad.Instance.CurrentInputLayer ?? GamePad.Instance.BaseLayer; }
+            if (Entries.TryGetValue(native, out entry))
+            { LayerCaptures.TryGet(native, out entry.Layer, out entry.Below); }
+            _log.Info("[KBP-CONTROLLER-CARD] layer-captured;menu=" + native.GetInstanceID() +
+                ";generation=" + (entry == null ? 0 : entry.Generation) + ";source=" + DescribeLayer(layer) +
+                ";below=" + DescribeLayer(entry == null ? CapturedBelow(native) : entry.Below) +
+                ";current=" + DescribeLayer(pad.CurrentInputLayer) + ";base=" + DescribeLayer(pad.BaseLayer) +
+                ";sourceInStack=" + pad.Layers.Contains(layer) +
+                ";mode=" + (Game.Instance == null ? "null" : Game.Instance.CurrentMode.ToString()) +
+                ";visible=" + native.gameObject.activeInHierarchy);
         }
+
+        private static InputLayer CapturedBelow(InGameMenuView menu)
+        { InputLayer source, below; LayerCaptures.TryGet(menu, out source, out below); return below; }
+
+        private static string DescribeLayer(InputLayer layer)
+        { return layer == null ? "null" : layer.ContextName + "#" + RuntimeHelpers.GetHashCode(layer); }
+
+        private static string Describe(Entry entry)
+        { return "menu=" + (entry.Menu == null ? "null" : entry.Menu.GetInstanceID().ToString()) +
+            ";card=" + (entry.Card == null ? "null" : entry.Card.GetInstanceID().ToString()) +
+            ";generation=" + entry.Generation + ";source=" + DescribeLayer(entry.Layer) +
+            ";below=" + DescribeLayer(entry.Below); }
 
         private static void Unbind(Entry entry)
         {
@@ -218,6 +276,7 @@ namespace KingmakerBuffPlanner.UI
         {
             entry.Removed = true; // stale native VM callbacks must never reopen after partial cleanup
             Entries.Remove(entry.Menu);
+            LayerCaptures.Remove(entry.Menu);
             try
             {
                 // Operate on the CURRENT native collection; never feed an old

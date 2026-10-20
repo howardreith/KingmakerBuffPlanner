@@ -316,6 +316,7 @@
     <Compile Include="UI\ControllerOwnedItems.cs" />
     <Compile Include="UI\ControllerWorkspaceNavigator.cs" />
     <Compile Include="UI\ControllerNativeMenuCard.cs" />
+    <Compile Include="UI\ControllerMenuLayerCapture.cs" />
     <Compile Include="UI\ControllerTransitionInputGuard.cs" />
     <Compile Include="UI\PlannerWorkspaceTextProbe.cs" />
     <Compile Include="UI\ControllerLayerOwnership.cs" />
