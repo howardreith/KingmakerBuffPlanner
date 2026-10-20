@@ -1,5 +1,24 @@
 # Kingmaker Buff Planner Journal
 
+## Full 0.6.3 release published — native controller acceptance pending
+
+2026-10-20: [PR #12](https://github.com/howardreith/KingmakerBuffPlanner/pull/12)
+merged at `cc2f165`; release preparation branch
+`codex/kingmaker-buff-planner-release-0.6.3` committed `59eda0f`; isolated
+main integration product `f82555c2c52d2580b187be7006555c855a8862fe`.
+Owner-authorized pre-runtime publisher passed source **47/0**, offline C#
+**582/0**, publisher **8/0**, two identical builds, and strict package
+validation **6/0** per package. Published full/non-draft/non-prerelease
+GitHub Latest v0.6.3 at 17:35:34 UTC. Annotated tag peels to product;
+downloaded ZIP and checksum match. ZIP SHA-256
+`ee1ca6c22e684514a0ecd880d4c896160361b04a4484f905cdbe326f653d56c7`;
+DLL `9d251916f2835119ef4a906b522593d846af5f70043485d94c84e816185165df`.
+[Full record](docs/RELEASE-0.6.3-RECORD.md) gives commands, paths, limits,
+rejected null/base theory, and next action. The exact release was not run in
+the game; native F02 remains NOT_RUN. No installation, save, or other mod
+was changed. Next: guarded no-cast controller card → editor → Back → repeat,
+then active-run card → quick controls → Stop.
+
 ## PR #12 controller card review correction — 2026-10-20
 
 Branch `codex/kingmaker-buff-planner-controller-card-activation`, product
