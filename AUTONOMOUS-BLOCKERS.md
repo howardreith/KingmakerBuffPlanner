@@ -1,3 +1,14 @@
+## Linux 2.1.5d acceptance
+
+The public `v0.6.1-linux.1` experimental prerelease is published, but native Linux
+2.1.5d runtime acceptance is **NOT RUN**: no authorized installation or exact
+managed assemblies were available in the lab. The Linux user should test the
+published ZIP on a disposable campaign and provide the first failure/logs.
+The separate manifest-only diagnostic remains available for lab comparison.
+See [the candidate record](docs/LINUX-2.1.5D-CANDIDATE.md) for hashes,
+manual steps, logs, and the first-failure decision point. No controller
+contract absence or gameplay compatibility is inferred.
+
 ## 0.6.0 publication authority and native boundary
 
 Publication is DONE: PR10 merged; product c98b434, v0.6.0 Latest02:52:33Z,

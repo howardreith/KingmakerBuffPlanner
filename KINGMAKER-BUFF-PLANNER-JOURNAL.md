@@ -1,5 +1,38 @@
 # Kingmaker Buff Planner Journal
 
+## Owner-authorized public Linux trial prerelease
+
+2026-10-20T03:27:08Z `v0.6.1-linux.1` published as prerelease/non-Latest;
+annotated tag peels to product `be68ca0ef00137e5fef344b4ea43ad81d073fa96`.
+ZIP `adf4c974e0579675665a35968f3f12ebbf6c5ac15b2aa59f373990b7e8b82942`;
+DLL `b513a28fb3d65e89f34f145a806ca7867ace267a09e4e5fb2eee1856d8f3489e`.
+OwnerAuthorizedPreRuntime source47/0, offline C#579/0, publisher8/0,
+deterministic2 and strict package6/0. First publisher stopped on local
+historical tag conflicts before validation/publication; fresh isolated clone
+of pushed HEAD completed unmodified gate. Downloaded assets independently
+verified. No native Linux/Windows game run, merge, or commenter reply; draft
+PR11 stays open and stable0.6.0 remains Latest. Acceptance NOT_RUN, not
+confirmed Linux compatibility. [Receipt/manual trial](docs/LINUX-2.1.5D-CANDIDATE.md)
+has commands, hashes, paths, uncertainty and next action.
+
+## Native Linux 2.1.5d trial candidate
+
+Branch `codex/kingmaker-buff-planner-linux-2.1.5d`, base `2bc6cc1`, manifest
+commit `bc00dbd`, versioned product commit `2d30ff970fa65f9a1f1422e4eef15d854511c73b`.
+The initial 0.6.0 diagnostic changes only `GameVersion` 2.1.7 to 2.1.5;
+strict package6/0 and five-entry byte comparison0 unexpected differences,
+published DLL unchanged. Versioned 0.6.1 ZIP `2f0b1247aa3a12935c6c077d6117fc423ce5402c0025407110b811660d0f37b7`;
+two deterministic builds, source47/0 each, build1/0 each, package6/0 each,
+final package6/0, wrapper3/0. Log and release manifest under `artifacts`;
+[candidate record](docs/LINUX-2.1.5D-CANDIDATE.md) has full identities.
+Windows 2.1.7b/UMM0.33.0.0 references were available, no Linux2.1.5d
+installation/assemblies. No runtime, Windows game regression, or C# behavior
+suite selected. Controller API absence remains an unproven theory. Linux
+acceptance NOT_RUN; next action is exact diagnostic on native Linux, first
+exception if any, then exact 0.6.1 smoke test. Guarded WhatIf6/0 and remote
+push verified4553e99; [draft PR11](https://github.com/howardreith/KingmakerBuffPlanner/pull/11)
+targets main2bc6cc1. No public release/merge.
+
 ## Full release0.6.0 published and verified
 
 PR10 merged02:51:49Z; guarded main integration product c98b43446c13534a2d165b6ca18a264602957758.

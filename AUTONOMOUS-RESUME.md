@@ -1,3 +1,30 @@
+## Public Linux 2.1.5d trial prerelease — native acceptance pending
+
+Owner-authorized `v0.6.1-linux.1` published as prerelease, not Latest,
+2026-10-20T03:27:08Z. Tag peels to product `be68ca0ef00137e5fef344b4ea43ad81d073fa96`;
+ZIP SHA256 `adf4c974e0579675665a35968f3f12ebbf6c5ac15b2aa59f373990b7e8b82942`,
+DLL `b513a28fb3d65e89f34f145a806ca7867ace267a09e4e5fb2eee1856d8f3489e`.
+Offline source47/0, C#579/0, publisher8/0, two deterministic builds and
+final package6/0. Published assets downloaded and hashes verified. Initial
+publisher stopped on pre-existing local tag conflicts before qualification;
+fresh clone of exact pushed HEAD completed. No native Linux environment or
+gameplay run, Linux acceptance NOT_RUN. Stable0.6.0 Latest and draft PR11
+preserved, no merge. [Full receipt/manual test](docs/LINUX-2.1.5D-CANDIDATE.md).
+Next action: Linux user's disposable-campaign trial and first exception/logs.
+
+## Linux 2.1.5d experimental candidate — native acceptance pending
+
+Branch `codex/kingmaker-buff-planner-linux-2.1.5d`; product commit
+`2d30ff970fa65f9a1f1422e4eef15d854511c73b`, version 0.6.1. Manifest-only
+diagnostic retains published 0.6.0 DLL; versioned candidate ZIP
+`2f0b1247aa3a12935c6c077d6117fc423ce5402c0025407110b811660d0f37b7`
+passed deterministic build and strict package checks. No native Linux 2.1.5d
+installation/assemblies available; Linux acceptance **NOT RUN**. No Windows game
+run; C# logic unchanged. Exact package paths, commands, pass/fail counts,
+manual procedure, rejected controller theory, and next action are in
+[the candidate record](docs/LINUX-2.1.5D-CANDIDATE.md). Existing 0.6.0 public
+release and historical controller evidence remain unchanged.
+
 ## Current owner-authorized 0.6.0 full release — DONE
 
 PR10 MERGED; main product c98b43446c13534a2d165b6ca18a264602957758. Full GitHub
