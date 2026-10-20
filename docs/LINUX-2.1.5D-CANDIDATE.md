@@ -67,12 +67,18 @@ review artifact, not a public release.
 
 ## Manual native Linux trial
 
+For a public tester, install the `KingmakerBuffPlanner-0.6.1-linux.1.zip`
+asset from the [experimental prerelease](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.1-linux.1).
+The manifest-only diagnostic above is a lab-local comparison package. The
+same workflow and logging instructions apply to either package; record which
+one was used. Neither package has native Linux gameplay evidence yet.
+
 1. On an actual native Linux **2.1.5d** installation, record the game version,
    Linux distribution, UMM version, and installation path. Back up the entire
    existing `Mods/KingmakerBuffPlanner` directory, including `UserSettings`,
    outside `Mods`. Use a disposable campaign, not a personal save. Install the
-   exact **manifest-only diagnostic ZIP** above through UMM and confirm its
-   checksum before launching. Keep the public release ZIP separate.
+   exact selected ZIP through UMM and confirm its checksum before launching.
+   Keep the stable 0.6.0 release ZIP separate.
 2. Load the disposable campaign. Confirm UMM loads and enables the mod without
    relevant exceptions. Open and close the planner through the HUD gear,
    spellbook **BUFF PLANNER** button, and Ctrl+Shift+B. Confirm controls render,
@@ -98,8 +104,8 @@ present. Include the exact candidate checksum and the point of failure
 Check for a platform-specific log location rather than assuming the Windows
 path layout. Do not use Windows via Proton as native Linux evidence.
 
-After the diagnostic succeeds, repeat a small load/open/save/cast smoke test
-on the exact 0.6.1 ZIP before calling that final package compatible. The
+If the lab-local diagnostic succeeds, repeat a small load/open/save/cast
+smoke test on the exact public prerelease before calling it compatible. The
 versioned DLL is a different binary even though planner code is unchanged.
 
 ## Focused checkpoint

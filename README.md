@@ -10,11 +10,11 @@ controller input, rendered layout or gameplay outcomes. See
 [controls/capabilities](docs/CONTROLLER-AUTHORING-CAPABILITIES.md) and
 [native acceptance](docs/CONTROLLER-UI-ACCEPTANCE.md).
 
-**Experimental local 0.6.1 candidate:** lowers Unity Mod Manager's numeric
-minimum game version to 2.1.5 for a native Linux 2.1.5d trial. Native Linux
-loading and gameplay remain **NOT RUN / unverified**. See the
-[candidate and manual test](docs/LINUX-2.1.5D-CANDIDATE.md). The public 0.6.0
-release remains unchanged.
+**Experimental [0.6.1-linux.1 prerelease](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.1-linux.1):**
+lowers Unity Mod Manager's numeric minimum game version to 2.1.5 for a native
+Linux 2.1.5d trial. Native Linux loading and gameplay remain **NOT RUN /
+unverified**. See the [candidate and manual test](docs/LINUX-2.1.5D-CANDIDATE.md).
+The public 0.6.0 release remains Latest.
 
 ## Historical releases and controller previews
 
@@ -82,7 +82,8 @@ available policy, responsiveness instrumentation and ordinary-cased Run labels.
 
 Mr. Bard's Kingmaker Buff Planner is a standalone Unity Mod Manager mod built
 against **Windows Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b**. The
-0.6.1 candidate allows a native Linux 2.1.5d trial but has not passed it.
+0.6.1-linux.1 prerelease allows a native Linux 2.1.5d trial but has not
+passed it.
 
 It plans and applies party buffs while preserving Kingmaker targeting,
 spell-slot, resource, duration, material-component, and metamagic semantics. It

@@ -1,4 +1,14 @@
-# Mr. Bard's Kingmaker Buff Planner 0.6.1 — experimental local candidate
+# Mr. Bard's Kingmaker Buff Planner 0.6.1-linux.1 — experimental prerelease
+
+The owner authorized a public prerelease so a native Linux 2.1.5d user can
+try the lower UMM game-version floor. This exact prerelease has not been run
+in the game. Native Linux behavior remains unverified. See the
+[prerelease notes](RELEASE-NOTES-0.6.1-LINUX.1.md) and
+[manual trial](LINUX-2.1.5D-CANDIDATE.md). Stable 0.6.0 remains unchanged.
+
+---
+
+# Mr. Bard's Kingmaker Buff Planner 0.6.1 — historical local candidate
 
 Lowers Unity Mod Manager's minimum numeric game version from 2.1.7 to 2.1.5
 for a native Linux 2.1.5d compatibility trial. No planner, controller,
