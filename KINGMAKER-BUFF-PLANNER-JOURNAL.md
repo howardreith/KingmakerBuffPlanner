@@ -12,6 +12,22 @@ admission gap, evidence limits, and exact next guarded no-cast action are in
 [the repair record](docs/CONTROLLER-CARD-ACTIVATION-REPAIR-2026-10-20.md).
 No live controller result, installation change, push, or release is claimed.
 
+## Full 0.6.2 release published and verified
+
+PR11 merged2026-10-20T12:10:28Z; non-fast-forward guarded main push product
+`6090e6232c9dcec7d8e890585aef8976ef87c70a`. OwnerAuthorizedPreRuntime
+source47/0, C#579/0, publisher8/0, deterministic2 and strict package6/0.
+Published2026-10-20T12:11:41Z, full/non-draft/non-prerelease, Latest.
+Annotated tag peels to product; independently downloaded ZIP and checksum
+match GitHub digests. ZIP SHA256
+`b9a465691a07d8927b9cf46b66da57167659284282c8da551c483ed3a3dddfb1`,
+DLL `d3cd91b2c76f2f8a4ccefeea77b96aee9ee80dfc16532aee7250d6e43972dcfb`.
+Full identities, commands, artifact paths, rejected controller theory,
+uncertainty and next action in [release record](docs/RELEASE-0.6.2-RECORD.md).
+Occupied main worktree/old releases preserved; no game/install/save/settings/
+unrelated-mod mutation. Native Linux 2.1.5d acceptance NOT_RUN. Next action:
+exact 0.6.2 ZIP on disposable native Linux campaign, first exception/logs.
+
 ## Owner-authorized public Linux trial prerelease
 
 2026-10-20T03:27:08Z `v0.6.1-linux.1` published as prerelease/non-Latest;
