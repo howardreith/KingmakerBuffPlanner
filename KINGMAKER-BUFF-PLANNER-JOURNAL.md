@@ -1,5 +1,17 @@
 # Kingmaker Buff Planner Journal
 
+## Controller card activation repair — 2026-10-20
+
+Branch `codex/kingmaker-buff-planner-controller-card-activation`, product
+`86414032510d5302326dadbb9800b83522ded43a`, version `0.6.2`.
+Focused command `scripts/Test-Development.ps1 -Only 'controller-'` passed
+source `47/0`, build `1/0`, controller tests `36/0`; DLL SHA-256
+`AB35DA10AAB3104E8C19D5896788AAF803F6C58650258DDDB03462587FE3B3C3`.
+Native installed assembly and mod hashes, rejected null/base theory, source
+admission gap, evidence limits, and exact next guarded no-cast action are in
+[the repair record](docs/CONTROLLER-CARD-ACTIVATION-REPAIR-2026-10-20.md).
+No live controller result, installation change, push, or release is claimed.
+
 ## Owner-authorized public Linux trial prerelease
 
 2026-10-20T03:27:08Z `v0.6.1-linux.1` published as prerelease/non-Latest;
