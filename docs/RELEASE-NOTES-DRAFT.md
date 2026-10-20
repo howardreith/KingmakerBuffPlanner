@@ -1,3 +1,18 @@
+# Mr. Bard's Kingmaker Buff Planner 0.6.1 — experimental local candidate
+
+Lowers Unity Mod Manager's minimum numeric game version from 2.1.7 to 2.1.5
+for a native Linux 2.1.5d compatibility trial. No planner, controller,
+casting, or persistence logic changed. The 0.6.1 DLL differs from 0.6.0 only
+because of the version and source-revision stamps; a separate diagnostic ZIP
+uses the exact published 0.6.0 DLL with only the manifest edited.
+
+Native Linux 2.1.5d loading, mouse use, saved plans, and casting are **NOT RUN /
+unverified**. The installed Windows 2.1.7b API references remain the build
+source. This is a local review candidate, not a published release or a
+compatibility certification. See the [candidate record and test steps](LINUX-2.1.5D-CANDIDATE.md).
+
+---
+
 # Mr. Bard's Kingmaker Buff Planner 0.6.0
 
 Owner-authorized full release of the controller planner implementation. The exact
