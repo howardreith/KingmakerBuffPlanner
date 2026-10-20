@@ -1,5 +1,21 @@
 # Kingmaker Buff Planner Journal
 
+## Native Linux 2.1.5d trial candidate
+
+Branch `codex/kingmaker-buff-planner/linux-2.1.5d`, base `2bc6cc1`, manifest
+commit `bc00dbd`, versioned product commit `2d30ff970fa65f9a1f1422e4eef15d854511c73b`.
+The initial 0.6.0 diagnostic changes only `GameVersion` 2.1.7 to 2.1.5;
+strict package6/0 and five-entry byte comparison0 unexpected differences,
+published DLL unchanged. Versioned 0.6.1 ZIP `2f0b1247aa3a12935c6c077d6117fc423ce5402c0025407110b811660d0f37b7`;
+two deterministic builds, source47/0 each, build1/0 each, package6/0 each,
+final package6/0, wrapper3/0. Log and release manifest under `artifacts`;
+[candidate record](docs/LINUX-2.1.5D-CANDIDATE.md) has full identities.
+Windows 2.1.7b/UMM0.33.0.0 references were available, no Linux2.1.5d
+installation/assemblies. No runtime, Windows game regression, or C# behavior
+suite selected. Controller API absence remains an unproven theory. Linux
+acceptance NOT_RUN; next action is exact diagnostic on native Linux, first
+exception if any, then exact 0.6.1 smoke test. No public release/merge.
+
 ## Full release0.6.0 published and verified
 
 PR10 merged02:51:49Z; guarded main integration product c98b43446c13534a2d165b6ca18a264602957758.

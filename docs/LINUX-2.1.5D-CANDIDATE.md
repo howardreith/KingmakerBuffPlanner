@@ -33,7 +33,7 @@ failure. The first Linux exception, if any, should drive a focused repair.
 | Purpose | File | Identity |
 | --- | --- | --- |
 | First compatibility trial | `artifacts/linux-2.1.5d/KingmakerBuffPlanner-0.6.0-linux-2.1.5d-manifest-only-diagnostic.zip` | SHA256 `f7386a8408ce8592414100056a90832e4b6cf1451517757df55b96644240da07` |
-| Separately versioned review candidate | `artifacts/release/0.6.1/KingmakerBuffPlanner-0.6.1.zip` | Recorded after build below |
+| Separately versioned review candidate | `artifacts/release/0.6.1/KingmakerBuffPlanner-0.6.1.zip` | SHA256 `2f0b1247aa3a12935c6c077d6117fc423ce5402c0025407110b811660d0f37b7` |
 
 The diagnostic ZIP is the published 0.6.0 ZIP with only `Info.json` replaced.
 Its DLL SHA256 is the unchanged published
@@ -44,6 +44,14 @@ at `artifacts/release060-download/KingmakerBuffPlanner-0.6.0.zip`, SHA256
 `54a7b98535e2127e09200fc7ea330de7bfc7569e05834ab3e210066619921dfa`.
 The versioned candidate rebuild changes DLL version and source-revision
 stamps; no C# planner code changed.
+
+The 0.6.1 package was built from exact source commit
+`2d30ff970fa65f9a1f1422e4eef15d854511c73b` and has DLL SHA256
+`54bee66a2b99c1352479bdb50eee50090836cd0e94afdbd944371d05f94bcbcb`
+and MVID `2d77565d-b64b-4af6-a67f-95b45ee49616`. The product diff from
+0.6.0 contains only `Info.json` version/minimum-game metadata and assembly
+version fields; no C# execution path changed. The 0.6.1 archive is a local
+review artifact, not a public release.
 
 ## Manual native Linux trial
 
@@ -84,12 +92,28 @@ versioned DLL is a different binary even though planner code is unchanged.
 
 ## Focused checkpoint
 
-At manifest commit `bc00dbd`, strict package validation on the diagnostic
+At manifest commit `bc00dbdb97bcc3e0e82dc8880ebfe90e7973d02e`, strict package validation on the diagnostic
 reported **PASS=6 FAIL=0**. Archive comparison reported **5 entries checked,
 0 unexpected differences**; only `Info.json` differs, and the DLL hash and
 MVID match the published 0.6.0 release. No C# tests or product rebuild were
 selected for this metadata-only diagnostic, per
 [`VALIDATION-POLICY.md`](VALIDATION-POLICY.md). No theory about missing Linux
-controller APIs has been accepted as a defect. Exact next action: build and
-validate the 0.6.1 review package, then run the manual native Linux trial
-above when that environment becomes available.
+controller APIs has been accepted as a defect.
+
+At versioned product commit `2d30ff970fa65f9a1f1422e4eef15d854511c73b`,
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Build-Release.ps1`
+completed in 12.87 seconds. Its two builds each reported source validation
+**47/0**, production build **1/0**, and local package validation **6/0**;
+final strict package validation reported **6/0** and the release wrapper
+**3/0**, with two identical ZIP and DLL hashes. The captured output is
+`artifacts/linux-2.1.5d/build-release.log` and the generated identity record
+is `artifacts/release/0.6.1/release-manifest.json`. No offline C# behavior
+suite or Windows gameplay check was selected because no C# logic changed.
+These checks do not establish native Linux load or gameplay behavior.
+
+Rejected theory: controller contracts might be absent on 2.1.5d; no 2.1.5d
+assemblies or exception were available to prove that. Remaining uncertainty:
+all seven native acceptance steps in the task, including controller behavior
+to the extent claimed, are untested. Exact next action: run the diagnostic
+manual trial on native Linux 2.1.5d, capture the first exception if it fails,
+and then smoke test the exact 0.6.1 package before confirming support.

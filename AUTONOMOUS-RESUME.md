@@ -1,3 +1,16 @@
+## Linux 2.1.5d experimental candidate — native acceptance pending
+
+Branch `codex/kingmaker-buff-planner/linux-2.1.5d`; product commit
+`2d30ff970fa65f9a1f1422e4eef15d854511c73b`, version 0.6.1. Manifest-only
+diagnostic retains published 0.6.0 DLL; versioned candidate ZIP
+`2f0b1247aa3a12935c6c077d6117fc423ce5402c0025407110b811660d0f37b7`
+passed deterministic build and strict package checks. No native Linux 2.1.5d
+installation/assemblies available; Linux acceptance **NOT RUN**. No Windows game
+run; C# logic unchanged. Exact package paths, commands, pass/fail counts,
+manual procedure, rejected controller theory, and next action are in
+[the candidate record](docs/LINUX-2.1.5D-CANDIDATE.md). Existing 0.6.0 public
+release and historical controller evidence remain unchanged.
+
 ## Current owner-authorized 0.6.0 full release — DONE
 
 PR10 MERGED; main product c98b43446c13534a2d165b6ca18a264602957758. Full GitHub
