@@ -14,7 +14,9 @@ Windows 2.1.7b/UMM0.33.0.0 references were available, no Linux2.1.5d
 installation/assemblies. No runtime, Windows game regression, or C# behavior
 suite selected. Controller API absence remains an unproven theory. Linux
 acceptance NOT_RUN; next action is exact diagnostic on native Linux, first
-exception if any, then exact 0.6.1 smoke test. No public release/merge.
+exception if any, then exact 0.6.1 smoke test. Guarded WhatIf6/0 and remote
+push verified4553e99; [draft PR11](https://github.com/howardreith/KingmakerBuffPlanner/pull/11)
+targets main2bc6cc1. No public release/merge.
 
 ## Full release0.6.0 published and verified
 

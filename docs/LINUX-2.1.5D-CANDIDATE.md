@@ -18,6 +18,13 @@ rejected its guarded push with a remote ref directory/file conflict. The
 branch was renamed to the hyphenated spelling above without rewriting any
 commit.
 
+[Draft PR #11](https://github.com/howardreith/KingmakerBuffPlanner/pull/11)
+targets `main` at `2bc6cc19e3e4a1c5feb1c8cd511d48dfb568606e`. The
+project-owned guarded push WhatIf passed **6/0**; its real push verified
+`4553e99d5acbb9f13887bae1e03677108347e48d` before this documentation
+receipt. The PR is draft and the 0.6.1 ZIP remains local only. No merge, tag,
+or public release was made.
+
 The available lab game is **Windows Kingmaker 2.1.7b**, with UMM **0.33.0.0**
 (`Kingmaker_Data/Managed/UnityModManager/Log.txt`, lines 2-12). No native
 Linux 2.1.5d installation or exact managed assemblies were found in the
