@@ -1,3 +1,15 @@
+# Mr. Bard's Kingmaker Buff Planner 0.6.2
+
+The owner authorizes a full release with the same 2.1.5 UMM minimum as the
+experimental Linux trial. This exact 0.6.2 release has not been run in the
+game. Native Linux 2.1.5d compatibility remains unverified. The planner,
+controller, casting, and profile logic is unchanged from 0.6.1-linux.1;
+0.6.2 changes version and source-revision stamps. See the
+[release notes](RELEASE-NOTES-0.6.2.md) and
+[manual trial](LINUX-2.1.5D-CANDIDATE.md).
+
+---
+
 # Mr. Bard's Kingmaker Buff Planner 0.6.1-linux.1 — experimental prerelease
 
 The owner authorized a public prerelease so a native Linux 2.1.5d user can
