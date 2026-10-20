@@ -1782,30 +1782,95 @@ namespace KingmakerBuffPlanner.UI
                 () => { root.ReleaseTransition(); root.BeginControllerAuthoring(); });
         }
 
-        internal static void RequestControllerEditorFromCard(
+        internal static bool RequestControllerEditorFromCard(
             Kingmaker.UI._ConsoleUI.InGameMenu.InGameMenuView menu,
             Kingmaker.Assets.Console.GamepadInput.InputLayer source,
-            Kingmaker.Assets.Console.GamepadInput.InputLayer below, TMPro.TMP_Text donor)
+            Kingmaker.Assets.Console.GamepadInput.InputLayer below, TMPro.TMP_Text donor, Canvas host, int generation)
         {
             BuffPlannerUiRoot root = _instance;
-            if (root == null || !root._enabled || root._controllerAreaUnloading || root._controllerBookHandoff != null || root._castingWorkspace != null ||
-                root._controllerRoutines != null || menu == null || source == null || below == null) return;
+            if (root == null) return false;
+            string refusal = null;
+            if (!root._enabled) refusal = "disabled";
+            else if (root._controllerAreaUnloading) refusal = "area-unloading";
+            else if (root._controllerBookHandoff != null) refusal = "handoff-active";
+            else if (root._castingWorkspace != null || root._controllerRoutines != null) refusal = "destination-busy";
+            else if (menu == null || source == null) refusal = "missing-source";
+            else if (donor == null || donor.font == null) refusal = "missing-donor";
+            else if (host == null || !host.gameObject.activeInHierarchy) refusal = "missing-host";
+            else if (!Kingmaker.Assets.Console.GamepadInput.GamePad.HasInstance) refusal = "missing-gamepad";
+            else if (Game.Instance == null || Game.Instance.Player == null || Game.Instance.RootUiContext == null ||
+                Game.Instance.RootUiContext.InGameUiContext == null) refusal = "missing-game-context";
+            if (refusal != null)
+            {
+                root._log.Info("[KBP-CONTROLLER-CARD] request-refused:" + refusal +
+                    ";menu=" + (menu == null ? "null" : menu.GetInstanceID().ToString()) +
+                    ";generation=" + generation + ";source=" + CardLayer(source) + ";below=" + CardLayer(below));
+                return false;
+            }
             var pad = Kingmaker.Assets.Console.GamepadInput.GamePad.Instance;
-            root._controllerHost = ControllerPresentationHost.Resolve(menu);
-            root._controllerDonor = donor;
-            root._controllerCampaign = Game.Instance.Player.GameId;
-            root._controllerArea = Game.Instance.CurrentlyLoadedArea;
-            root._controllerUi = Game.Instance.RootUiContext.InGameUiContext;
-            root.AcquireTransition(below);
-            // The native VM calls its selected card action during disposal.
-            // Never call Deselect/Confirm again from this route.
-            root._controllerBookHandoff = new ControllerSurfaceHandoff(
-                () => root.ControllerContextValid() && (ReferenceEquals(pad.CurrentInputLayer, source) || ReferenceEquals(pad.CurrentInputLayer, below) || root.TransitionCurrent),
-                () => true, () => { },
-                () => Game.Instance.CurrentMode == GameModeType.Default && (menu == null || !menu.gameObject.activeInHierarchy) &&
-                    !pad.Layers.Contains(source) && (ReferenceEquals(pad.CurrentInputLayer, below) || root.TransitionCurrent),
-                () => { root.ReleaseTransition(); if (root._castingHost.IsRunning) root.OpenControllerQuick(); else root.BeginControllerAuthoring(); });
+            if (!ReferenceEquals(pad.CurrentInputLayer, source) && !ReferenceEquals(pad.CurrentInputLayer, below))
+            { root._log.Info("[KBP-CONTROLLER-CARD] request-refused:native-takeover;" + CardState(menu, source, below, pad, generation)); return false; }
+            if (pad.Layers.Contains(source) && !ReferenceEquals(pad.CurrentInputLayer, source))
+            { root._log.Info("[KBP-CONTROLLER-CARD] request-refused:source-not-current;" + CardState(menu, source, below, pad, generation)); return false; }
+            try
+            {
+                root._controllerHost = host;
+                root._controllerDonor = donor;
+                root._controllerCampaign = Game.Instance.Player.GameId;
+                root._controllerArea = Game.Instance.CurrentlyLoadedArea;
+                root._controllerUi = Game.Instance.RootUiContext.InGameUiContext;
+                root.AcquireTransition(below);
+                // The native VM calls its selected card action during disposal.
+                // Never call Deselect/Confirm again from this route.
+                string destinationOutcome = null;
+                root._controllerBookHandoff = new ControllerSurfaceHandoff(
+                    () => root.ControllerContextValid() && (ReferenceEquals(pad.CurrentInputLayer, source) || ReferenceEquals(pad.CurrentInputLayer, below) || root.TransitionCurrent),
+                    () => true, () => { },
+                    () => Game.Instance.CurrentMode == GameModeType.Default && (menu == null || !menu.gameObject.activeInHierarchy) &&
+                        !pad.Layers.Contains(source) && (ReferenceEquals(pad.CurrentInputLayer, below) || root.TransitionCurrent),
+                    () =>
+                    {
+                        root.ReleaseTransition();
+                        destinationOutcome = ControllerCardDestination.Open(
+                            () => root._castingHost.IsRunning,
+                            () => root.OpenControllerQuick(),
+                            () => root.BeginControllerAuthoring(),
+                            () => root._controllerRoutines != null,
+                            () => root._castingWorkspace != null,
+                            () => !root.CastingFirstActive);
+                    },
+                    stage => root._log.Info("[KBP-CONTROLLER-CARD] " + stage +
+                        ";" + CardState(menu, source, below, pad, generation)),
+                    () => !root.ControllerContextValid() ? "lost-context" : "native-takeover",
+                    null, () => destinationOutcome ?? "handoff-canceled:destination-unavailable");
+                root._log.Info("[KBP-CONTROLLER-CARD] handoff-requested;" + CardState(menu, source, below, pad, generation));
+                return true;
+            }
+            catch (Exception exception)
+            {
+                root._controllerBookHandoff = null;
+                root.ReleaseTransition();
+                root._log.Error("[KBP-CONTROLLER-CARD] request-refused:exception;" + CardState(menu, source, below, pad, generation), exception);
+                return false;
+            }
         }
+
+        private static string CardState(Kingmaker.UI._ConsoleUI.InGameMenu.InGameMenuView menu,
+            Kingmaker.Assets.Console.GamepadInput.InputLayer source,
+            Kingmaker.Assets.Console.GamepadInput.InputLayer below,
+            Kingmaker.Assets.Console.GamepadInput.GamePad pad, int generation)
+        {
+            return "menu=" + (menu == null ? "null" : menu.GetInstanceID().ToString()) +
+                ";generation=" + generation +
+                ";visible=" + (menu != null && menu.gameObject.activeInHierarchy) +
+                ";mode=" + (Game.Instance == null ? "null" : Game.Instance.CurrentMode.ToString()) +
+                ";source=" + CardLayer(source) + ";below=" + CardLayer(below) +
+                ";current=" + CardLayer(pad.CurrentInputLayer) + ";base=" + CardLayer(pad.BaseLayer) +
+                ";sourceInStack=" + pad.Layers.Contains(source);
+        }
+
+        private static string CardLayer(Kingmaker.Assets.Console.GamepadInput.InputLayer layer)
+        { return layer == null ? "null" : layer.ContextName + "#" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(layer); }
 
         private bool TransitionCurrent { get { return _controllerTransition != null && _controllerTransition.Current && !_controllerTransition.Canceled; } }
         private void AcquireTransition(Kingmaker.Assets.Console.GamepadInput.InputLayer below)

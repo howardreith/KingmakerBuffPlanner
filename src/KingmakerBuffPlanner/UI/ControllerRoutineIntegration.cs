@@ -84,13 +84,18 @@ namespace KingmakerBuffPlanner.UI
 
         private static void MenuLayerPostfix(BaseGameMenuView __instance, InputLayer __result)
         {
-            if (!_enabled || __instance == null || __result == null || Game.Instance == null ||
+            if (!_enabled || __instance == null || __result == null) return;
+            // Capture the campaign card's layer even if the optional Func01
+            // entry is unavailable in the current game mode. The card has its
+            // own native Confirm route and is bound before GetInputLayer.
+            try { ControllerNativeMenuCard.NoteLayer(__instance, __result); }
+            catch (Exception exception) { _log.Error("[KBP-CONTROLLER-CARD] layer capture failed.", exception); }
+            if (Game.Instance == null ||
                 !Game.Instance.IsControllerGamepad || Game.Instance.CurrentMode != GameModeType.Default ||
                 Game.Instance.RootUiContext == null || Game.Instance.RootUiContext.InGameUiContext == null) return;
             GameObject hint = null;
             try
             {
-                ControllerNativeMenuCard.NoteLayer(__instance, __result);
                 foreach (BaseGameMenuView stale in EntryLayers.Keys.Where(candidate => candidate == null).ToArray())
                     RemoveEntry(stale);
                 InputLayer previousLayer;
