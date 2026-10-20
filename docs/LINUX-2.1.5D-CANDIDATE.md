@@ -1,12 +1,24 @@
 # Native Linux Kingmaker 2.1.5d trial
 
+## Current full release 0.6.2
+
+[v0.6.2](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.2)
+is the owner-authorized full release and GitHub Latest. Its installable ZIP
+is `KingmakerBuffPlanner-0.6.2.zip`, SHA256
+`b9a465691a07d8927b9cf46b66da57167659284282c8da551c483ed3a3dddfb1`.
+The exact package has not been run in the game. Native Linux 2.1.5d
+compatibility is **NOT RUN / unverified**. Use the manual workflow below with
+this exact ZIP; [the release record](RELEASE-0.6.2-RECORD.md) has the
+source, package, validation, and publication identities. The earlier
+0.6.1-linux.1 trial prerelease is preserved in the history below.
+
 ## Public trial prerelease
 
 The owner authorized publication for the Linux user to try without owner-side
 native testing. [v0.6.1-linux.1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.1-linux.1)
 was published on 2026-10-20 at 03:27:08 UTC as a **prerelease**, not Latest;
-stable v0.6.0 remains Latest. The annotated tag peels to exact product
-commit `be68ca0ef00137e5fef344b4ea43ad81d073fa96`. The installable ZIP
+stable v0.6.0 was Latest at that checkpoint. The annotated tag peels to exact
+product commit `be68ca0ef00137e5fef344b4ea43ad81d073fa96`. The installable ZIP
 SHA256 is `adf4c974e0579675665a35968f3f12ebbf6c5ac15b2aa59f373990b7e8b82942`
 (924242 bytes); DLL SHA256 is
 `b513a28fb3d65e89f34f145a806ca7867ace267a09e4e5fb2eee1856d8f3489e`,
@@ -28,11 +40,12 @@ because historical local tags conflicted with remote tags, before tests,
 tagging, or publication. A fresh isolated clone of the same pushed commit
 completed the unmodified publisher; no old tags were rewritten. No game was
 launched. Native Linux 2.1.5d acceptance remains **NOT RUN / unverified**;
-Windows 2.1.7b gameplay was not rerun. Draft PR #11 remains open; no merge.
+Windows 2.1.7b gameplay was not rerun. PR #11 was draft and unmerged at
+this prerelease checkpoint; it later merged for 0.6.2.
 
-Exact next action: the Linux user installs the named prerelease ZIP on a
-disposable 2.1.5d campaign, follows the manual trial below, and supplies
-the first exception plus UMM/Unity logs if any step fails. No missing
+At that checkpoint, the next action was for a Linux user to install the
+prerelease ZIP on a disposable 2.1.5d campaign, follow the manual trial below,
+and supply the first exception plus UMM/Unity logs if any step failed. No missing
 controller API is assumed without that evidence.
 
 ## Scope and evidence
@@ -53,13 +66,13 @@ rejected its guarded push with a remote ref directory/file conflict. The
 branch was renamed to the hyphenated spelling above without rewriting any
 commit.
 
-[Draft PR #11](https://github.com/howardreith/KingmakerBuffPlanner/pull/11)
+[PR #11 (then draft)](https://github.com/howardreith/KingmakerBuffPlanner/pull/11)
 targets `main` at `2bc6cc19e3e4a1c5feb1c8cd511d48dfb568606e`. The
 project-owned guarded push WhatIf passed **6/0**; its real push verified
 `4553e99d5acbb9f13887bae1e03677108347e48d` before this documentation
 receipt. At that checkpoint the PR was draft and the separate 0.6.1 ZIP was
 local only. The later public prerelease above has a different version and
-bytes; the PR is still draft and no merge was made.
+bytes. PR #11 subsequently merged into main for 0.6.2.
 
 The available lab game is **Windows Kingmaker 2.1.7b**, with UMM **0.33.0.0**
 (`Kingmaker_Data/Managed/UnityModManager/Log.txt`, lines 2-12). No native
@@ -103,9 +116,9 @@ review artifact, not a public release.
 
 ## Manual native Linux trial
 
-For a public tester, install the `KingmakerBuffPlanner-0.6.1-linux.1.zip`
-asset from the [experimental prerelease](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.1-linux.1).
-Verify SHA256 `adf4c974e0579675665a35968f3f12ebbf6c5ac15b2aa59f373990b7e8b82942`.
+For a public tester, install the `KingmakerBuffPlanner-0.6.2.zip` asset
+from the [full release](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.2).
+Verify SHA256 `b9a465691a07d8927b9cf46b66da57167659284282c8da551c483ed3a3dddfb1`.
 The manifest-only diagnostic above is a lab-local comparison package. The
 same workflow and logging instructions apply to either package; record which
 one was used. Neither package has native Linux gameplay evidence yet.
@@ -142,7 +155,7 @@ Check for a platform-specific log location rather than assuming the Windows
 path layout. Do not use Windows via Proton as native Linux evidence.
 
 If the lab-local diagnostic succeeds, repeat a small load/open/save/cast
-smoke test on the exact public prerelease before calling it compatible. The
+smoke test on the exact 0.6.2 release before calling it compatible. The
 versioned DLL is a different binary even though planner code is unchanged.
 
 ## Focused checkpoint

@@ -1,3 +1,20 @@
+## Full release 0.6.2 published and verified — native Linux acceptance pending
+
+PR11 MERGED; guarded main product `6090e6232c9dcec7d8e890585aef8976ef87c70a`.
+Owner-authorized pre-runtime publisher source47/0, complete offline C#579/0,
+publisher8/0, two deterministic builds and final package6/0. Full/non-draft/
+non-prerelease GitHub Latest v0.6.2 published2026-10-20T12:11:41Z. Annotated
+tag peels to exact product; downloaded ZIP and checksum verified. ZIP SHA256
+`b9a465691a07d8927b9cf46b66da57167659284282c8da551c483ed3a3dddfb1`;
+DLL `d3cd91b2c76f2f8a4ccefeea77b96aee9ee80dfc16532aee7250d6e43972dcfb`.
+No native Linux 2.1.5d environment/gameplay or Windows game regression was
+run; Linux compatibility **NOT RUN / unverified**. No installation, other
+mod, save, or settings mutation. [Full receipt](docs/RELEASE-0.6.2-RECORD.md)
+and [manual trial](docs/LINUX-2.1.5D-CANDIDATE.md). This documentation HEAD
+postdates the tagged product; do not rebuild or relabel the published ZIP.
+Exact next action: Linux user's disposable-campaign test and first logs if
+any step fails.
+
 ## Public Linux 2.1.5d trial prerelease — native acceptance pending
 
 Owner-authorized `v0.6.1-linux.1` published as prerelease, not Latest,
