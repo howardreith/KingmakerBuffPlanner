@@ -51,6 +51,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("controller-native-card-registration-keeps-foreign-identities", TestNativeCardIdentities);
             Run("controller-card-layer-capture-before-after-and-rebind", TestControllerCardLayerCapture);
             Run("controller-card-handoff-release-cancel-and-neutral", TestControllerCardHandoff);
+            Run("controller-card-reopens-running-stop-and-reports-destinations", () => TestControllerCardDestination(root));
             Run("controller-workspace-authoring-through-semantic-focus", () => TestWorkspaceSemanticAuthoring(root));
             Run("controller-classic-switch-requires-explicit-review-consent", TestControllerClassicConsent);
         }
@@ -521,6 +522,10 @@ namespace KingmakerBuffPlanner.Tests
             Assert(open.Contains("EnsureCastingSession(out session, refresh)") &&
                 open.Contains("StartCastingFirstRoutine(routine, root.PresentQuickResult, null, false)") &&
                 !open.Contains("OpenSetup(") && !open.Contains("new CastingWorkspaceScreenView"));
+            string card = MemberBody(root, "internal static bool RequestControllerEditorFromCard(");
+            Assert(card.Contains("ControllerCardDestination.Open(") &&
+                card.Contains("() => root._castingHost.IsRunning") &&
+                !card.Contains("root._castingHost.IsRunning) refusal"));
             string start = MemberBody(root, "private bool StartCastingFirstRoutine(");
             Assert(start.Contains("CastingRunPolicy.Apply(session, requestedMode, routineId, inputs)") &&
                 start.Contains("if (openEditorOnRefusal && CastingRunPresentation.OpensPlanner(result)"));
@@ -1019,6 +1024,60 @@ namespace KingmakerBuffPlanner.Tests
                 for (int frame = 0; frame < 185; frame++) rejected.Tick(true, frame);
                 Assert(rejectedOpens == 0 && reports.Count == 1 &&
                     reports[0] == "handoff-canceled:" + reason && rejected.Outcome == reports[0]);
+            }
+        }
+
+        private static void TestControllerCardDestination(string root)
+        {
+            var fixture = new ControllerFixture(root, "card-stop", "animated", count: 2);
+            fixture.Menu.Confirm();
+            Assert(fixture.Host.IsRunning);
+            fixture.Host.Pump();
+            Assert(fixture.Host.ActiveCastingInFlight);
+            // The detached model represents controls closed by Back; execution
+            // continues without that presentation until the card is reopened.
+            ControllerRoutineModel reopened = null;
+            int editorOpens = 0, quickOpens = 0;
+            string destination = null;
+            bool released = false;
+            var stages = new List<string>();
+            var handoff = new ControllerSurfaceHandoff(() => true, () => true,
+                () => { }, () => released,
+                () => destination = ControllerCardDestination.Open(
+                    () => fixture.Host.IsRunning,
+                    () =>
+                    {
+                        quickOpens++;
+                        reopened = new ControllerRoutineModel(fixture.Session, null, _ => false,
+                            () => fixture.Host.RequestStop(CastingExecutionHost.PlayerStopReason),
+                            () => fixture.Host.IsRunning, () => fixture.Host.ActiveScopeRoutineId);
+                    },
+                    () => editorOpens++, () => reopened != null, () => editorOpens > 0, () => false),
+                stages.Add, null, null, () => destination);
+            for (int frame = 0; frame < 4; frame++) Assert(!handoff.Tick(false, frame));
+            Assert(reopened == null && quickOpens == 0 && editorOpens == 0);
+            for (int frame = 4; frame < 8; frame++) handoff.Tick(true, frame);
+            released = true;
+            for (int frame = 8; frame < 12; frame++) handoff.Tick(true, frame);
+            Assert(handoff.Outcome == "destination-opened:running-controls" &&
+                stages.SequenceEqual(new[] { "source-released", handoff.Outcome }) &&
+                quickOpens == 1 && editorOpens == 0 && reopened != null && reopened.Focus == 3);
+            reopened.Confirm();
+            Assert(fixture.Host.ActiveStopRequested == CastingExecutionHost.PlayerStopReason);
+            fixture.Pump();
+            Assert(fixture.Host.LastReport.Cancelled && fixture.Host.LastReport.NotProcessed == 1 &&
+                fixture.Animated.Started.Count == 1 && quickOpens == 1 && editorOpens == 0);
+            Assert(handoff.Tick(true, 12) && quickOpens == 1);
+
+            foreach (string expected in new[] { "editor", "classic-review", "editor-recovery", "unavailable" })
+            {
+                bool editor = expected == "editor";
+                bool quick = expected == "classic-review" || expected == "editor-recovery";
+                string outcome = ControllerCardDestination.Open(() => false, () =>
+                    { throw new InvalidOperationException("Unexpected running controls"); },
+                    () => { }, () => quick, () => editor, () => expected == "classic-review");
+                Assert(outcome == (expected == "unavailable" ? "handoff-canceled:destination-unavailable" :
+                    "destination-opened:" + expected));
             }
         }
 

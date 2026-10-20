@@ -1793,7 +1793,7 @@ namespace KingmakerBuffPlanner.UI
             if (!root._enabled) refusal = "disabled";
             else if (root._controllerAreaUnloading) refusal = "area-unloading";
             else if (root._controllerBookHandoff != null) refusal = "handoff-active";
-            else if (root._castingWorkspace != null || root._controllerRoutines != null || root._castingHost.IsRunning) refusal = "destination-busy";
+            else if (root._castingWorkspace != null || root._controllerRoutines != null) refusal = "destination-busy";
             else if (menu == null || source == null) refusal = "missing-source";
             else if (donor == null || donor.font == null) refusal = "missing-donor";
             else if (host == null || !host.gameObject.activeInHierarchy) refusal = "missing-host";
@@ -1822,16 +1822,27 @@ namespace KingmakerBuffPlanner.UI
                 root.AcquireTransition(below);
                 // The native VM calls its selected card action during disposal.
                 // Never call Deselect/Confirm again from this route.
+                string destinationOutcome = null;
                 root._controllerBookHandoff = new ControllerSurfaceHandoff(
                     () => root.ControllerContextValid() && (ReferenceEquals(pad.CurrentInputLayer, source) || ReferenceEquals(pad.CurrentInputLayer, below) || root.TransitionCurrent),
                     () => true, () => { },
                     () => Game.Instance.CurrentMode == GameModeType.Default && (menu == null || !menu.gameObject.activeInHierarchy) &&
                         !pad.Layers.Contains(source) && (ReferenceEquals(pad.CurrentInputLayer, below) || root.TransitionCurrent),
-                    () => { root.ReleaseTransition(); root.BeginControllerAuthoring(); },
+                    () =>
+                    {
+                        root.ReleaseTransition();
+                        destinationOutcome = ControllerCardDestination.Open(
+                            () => root._castingHost.IsRunning,
+                            () => root.OpenControllerQuick(),
+                            () => root.BeginControllerAuthoring(),
+                            () => root._controllerRoutines != null,
+                            () => root._castingWorkspace != null,
+                            () => !root.CastingFirstActive);
+                    },
                     stage => root._log.Info("[KBP-CONTROLLER-CARD] " + stage +
                         ";" + CardState(menu, source, below, pad, generation)),
                     () => !root.ControllerContextValid() ? "lost-context" : "native-takeover",
-                    () => root._castingWorkspace != null);
+                    null, () => destinationOutcome ?? "handoff-canceled:destination-unavailable");
                 root._log.Info("[KBP-CONTROLLER-CARD] handoff-requested;" + CardState(menu, source, below, pad, generation));
                 return true;
             }
