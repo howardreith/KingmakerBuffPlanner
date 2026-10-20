@@ -206,6 +206,7 @@
     <Compile Include="Infrastructure\Hashing.cs" />
     <Compile Include="Infrastructure\ModLog.cs" />
     <Compile Include="Main.cs" />
+    <Compile Include="Infrastructure\PlannerUpdateFrameGate.cs" />
     <Compile Include="Planning\ResourceLedger.cs" />
     <Compile Include="Planning\RoutinePlanService.cs" />
     <Compile Include="Planning\CastingAuthoringService.cs" />

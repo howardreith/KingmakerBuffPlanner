@@ -7,6 +7,7 @@ using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
+using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.UI;
@@ -22,6 +23,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("controller-entry-retained-layer-unload-reinstall", TestControllerEntryLifecycle);
             Run("controller-entry-native-detach-keeps-foreign-bindings", TestControllerNativeDetach);
             Run("controller-native-assembly-entry-and-stack-contracts", TestControllerNativeContracts);
+            Run("controller-update-driver-dispatch-and-single-frame", TestControllerUpdateDriver);
             Run("controller-cold-saved-session-selects-each-routine", () => TestControllerColdSession(root));
             Run("controller-browsing-is-read-only", () => TestControllerBrowsing(root));
             Run("controller-latest-session-edit-and-failed-save", () => TestControllerDurability(root));
@@ -532,6 +534,30 @@ namespace KingmakerBuffPlanner.Tests
             string integration = WithoutComments(ProductionSource("UI", "ControllerRoutineIntegration.cs"));
             Assert(integration.Contains("bind.ActionId == RewiredConsts.Action.Func01") &&
                 integration.Contains("InputActionEventType.ButtonJustPressed"));
+        }
+
+        private static void TestControllerUpdateDriver()
+        {
+            var gate = new PlannerUpdateFrameGate();
+            Assert(gate.TryEnter(100) && !gate.TryEnter(100) && gate.TryEnter(101));
+            Assert(!gate.TryEnter(101) && gate.TryEnter(102));
+
+            string main = WithoutComments(ProductionSource("Main.cs"));
+            string toggle = MemberBody(main, "private static bool OnToggle(");
+            string install = MemberBody(main, "private static void EnsureUpdateDriver()");
+            string driver = MemberBody(main, "internal static void OnDriverUpdate(");
+            string dispatch = MemberBody(main, "private static void PumpUpdate(");
+            string unload = MemberBody(main, "private static bool OnUnload(");
+            Assert(toggle.Contains("if (value) EnsureUpdateDriver()") &&
+                install.Contains("owner.AddComponent<PlannerUpdateDriver>()") &&
+                driver.Contains("PumpUpdate(_modEntry, deltaTime, \"owned-driver\")") &&
+                dispatch.Contains("_updateFrameGate.TryEnter(Time.frameCount)") &&
+                dispatch.Contains("OnUpdateCore(modEntry, deltaTime)") &&
+                unload.Contains("Destroy(_updateDriver.gameObject)"));
+            Assert(main.Contains("private void Update() { Main.OnDriverUpdate(Time.deltaTime); }") &&
+                MemberBody(main, "private static void OnUpdate(").Contains("PumpUpdate(modEntry, deltaTime, \"UMM.OnUpdate\")"));
+            string card = ProductionSource("UI", "ControllerNativeMenuCard.cs");
+            Assert(card.Contains("BuffPlannerUiRoot.HasInstance ? \"admission\" : \"root-absent\""));
         }
 
         private static void TestControllerCorruptPlan(string root)

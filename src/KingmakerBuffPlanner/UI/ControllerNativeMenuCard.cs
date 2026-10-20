@@ -217,7 +217,8 @@ namespace KingmakerBuffPlanner.UI
                             _log.Info("[KBP-CONTROLLER-CARD] request-refused:handler-unavailable;" + Describe(entry));
                         else if (!OpenRequested(entry.Menu, entry.Layer, entry.Below,
                             (TMP_Text)Title.GetValue(entry.Card), entry.Host, entry.Generation))
-                            _log.Info("[KBP-CONTROLLER-CARD] request-refused:admission;" + Describe(entry));
+                            _log.Info("[KBP-CONTROLLER-CARD] request-refused:" +
+                                (BuffPlannerUiRoot.HasInstance ? "admission" : "root-absent") + ";" + Describe(entry));
                     }
                     catch (Exception exception)
                     { _log.Error("[KBP-CONTROLLER-CARD] request-refused:exception;" + Describe(entry), exception); }

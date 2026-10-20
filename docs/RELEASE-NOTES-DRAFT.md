@@ -1,3 +1,19 @@
+# Mr. Bard's Kingmaker Buff Planner 0.6.4-alpha.1
+
+Owner-authorized pre-runtime alpha release of the controller entry repair in
+PR #13. This exact release has not been run in the game. The 0.6.3 laptop log
+showed that the native Buff Planner card received Confirm/A but refused the
+request before handoff because the planner controller had never been
+constructed. This alpha adds an owned Unity update driver so the controller
+can initialize when UMM's UI update host does not appear. It also identifies
+missing-root card refusals and records spellbook entry skip reasons. The native
+RT/R2 card to planner and spellbook routes still need the owner's laptop test;
+no casting or plan edits are part of the initial check. See the
+[alpha notes](RELEASE-NOTES-0.6.4-ALPHA.1.md) and
+[log investigation](CONTROLLER-ENTRY-0.6.3-LOG-INVESTIGATION.md).
+
+---
+
 # Mr. Bard's Kingmaker Buff Planner 0.6.3
 
 Owner-authorized pre-runtime release of the controller campaign-card repair
