@@ -1,13 +1,14 @@
 # Mr. Bard's Kingmaker Buff Planner
 
-**Release: [0.6.3](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.3).**
-This owner-authorized release includes the native controller campaign-card
-handoff repair and restores access to Stop through the card while a routine
-runs. The exact 0.6.3 package has **not been run in the game**; native
-controller acceptance remains **NOT_RUN**. The 2.1.5 UMM minimum is unchanged,
-and native Linux 2.1.5d loading and gameplay remain unverified. See the
-[release notes](docs/RELEASE-NOTES-0.6.3.md) and
-[controller repair record](docs/CONTROLLER-CARD-ACTIVATION-REPAIR-2026-10-20.md).
+**Release: [0.6.4](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.4).**
+This owner-authorized release promotes the controller entry repair tested in
+`v0.6.4-alpha.1`. The owner reports that alpha's controller functionality is
+usable, with further improvements needed. The exact stable package has not
+been run in the game, and detailed spellbook and wider controller acceptance
+remain unverified. The 2.1.5 UMM minimum is unchanged; native Linux 2.1.5d
+loading and gameplay remain unverified. See the
+[release notes](docs/RELEASE-NOTES-0.6.4.md) and
+[0.6.3 log investigation](docs/CONTROLLER-ENTRY-0.6.3-LOG-INVESTIGATION.md).
 
 **Experimental [0.6.1-linux.1 prerelease](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.1-linux.1):**
 lowers Unity Mod Manager's numeric minimum game version to 2.1.5 for a native
@@ -18,7 +19,7 @@ The 0.6.1-linux.1 prerelease and earlier 0.6.0 release remain available.
 ## Historical releases and controller previews
 
 The version-specific statements below record earlier releases, not current
-0.6.3 scope or evidence. Prior alphas and their receipts remain unchanged.
+0.6.4 scope or evidence. Prior alphas and their receipts remain unchanged.
 
 [Controller test Alpha4 **0.5.4-controller.4**](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.4)
 targets full controller authoring, its
@@ -81,7 +82,7 @@ available policy, responsiveness instrumentation and ordinary-cased Run labels.
 
 Mr. Bard's Kingmaker Buff Planner is a standalone Unity Mod Manager mod built
 against **Windows Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b**. The
-0.6.3 retains the native Linux 2.1.5d version gate but has not passed a
+0.6.4 retains the native Linux 2.1.5d version gate but has not passed a
 native Linux trial.
 
 It plans and applies party buffs while preserving Kingmaker targeting,
@@ -91,7 +92,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.6.3.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.6.4.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including
@@ -110,8 +111,10 @@ Unity Mod Manager lists 0.5.2 and earlier as **Kingmaker Buff Planner**; from
 In native controller mode, load a campaign and select the Buff Planner card in
 the RT/R2 campaign menu. Follow the displayed mapped controls for focus,
 routine selection, search, authoring and Back. The controller spellbook footer
-opens the same planner; the displayed quick shortcut remains available. Native
-controller acceptance is NOT_RUN; start with no-cast editing on a disposable plan.
+opens the same planner; the displayed quick shortcut remains available. The
+owner reports basic controller functionality in the 0.6.4 alpha; detailed
+acceptance of the exact stable package is pending. Start with no-cast editing
+on a disposable plan.
 
 In mouse mode, load a campaign, then open the planner with the HUD's gear button, the
 spellbook's **BUFF PLANNER** button or Ctrl+Shift+B. Pick a buff, a caster

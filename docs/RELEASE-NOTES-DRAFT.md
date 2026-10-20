@@ -1,3 +1,17 @@
+# Mr. Bard's Kingmaker Buff Planner 0.6.4
+
+Owner-authorized release of the controller entry repair from PR #13. The
+owner tested `v0.6.4-alpha.1` on the main laptop and reported controller
+functionality is usable, with further improvements needed. This exact 0.6.4
+release has not been run in the game. The 0.6.3 log showed that the native
+card received Confirm/A but could not find the planner controller. The repair
+adds a mod-owned update driver and bounded card and spellbook diagnostics.
+The detailed spellbook and wider controller acceptance routes remain
+unverified. See the [release notes](RELEASE-NOTES-0.6.4.md) and
+[log investigation](CONTROLLER-ENTRY-0.6.3-LOG-INVESTIGATION.md).
+
+---
+
 # Mr. Bard's Kingmaker Buff Planner 0.6.4-alpha.1
 
 Owner-authorized pre-runtime alpha release of the controller entry repair in
