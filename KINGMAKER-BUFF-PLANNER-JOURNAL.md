@@ -1,5 +1,20 @@
 # Kingmaker Buff Planner Journal
 
+## Owner-authorized public Linux trial prerelease
+
+2026-10-20T03:27:08Z `v0.6.1-linux.1` published as prerelease/non-Latest;
+annotated tag peels to product `be68ca0ef00137e5fef344b4ea43ad81d073fa96`.
+ZIP `adf4c974e0579675665a35968f3f12ebbf6c5ac15b2aa59f373990b7e8b82942`;
+DLL `b513a28fb3d65e89f34f145a806ca7867ace267a09e4e5fb2eee1856d8f3489e`.
+OwnerAuthorizedPreRuntime source47/0, offline C#579/0, publisher8/0,
+deterministic2 and strict package6/0. First publisher stopped on local
+historical tag conflicts before validation/publication; fresh isolated clone
+of pushed HEAD completed unmodified gate. Downloaded assets independently
+verified. No native Linux/Windows game run, merge, or commenter reply; draft
+PR11 stays open and stable0.6.0 remains Latest. Acceptance NOT_RUN, not
+confirmed Linux compatibility. [Receipt/manual trial](docs/LINUX-2.1.5D-CANDIDATE.md)
+has commands, hashes, paths, uncertainty and next action.
+
 ## Native Linux 2.1.5d trial candidate
 
 Branch `codex/kingmaker-buff-planner-linux-2.1.5d`, base `2bc6cc1`, manifest

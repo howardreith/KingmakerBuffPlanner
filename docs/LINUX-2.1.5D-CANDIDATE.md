@@ -1,5 +1,40 @@
 # Native Linux Kingmaker 2.1.5d trial
 
+## Public trial prerelease
+
+The owner authorized publication for the Linux user to try without owner-side
+native testing. [v0.6.1-linux.1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.1-linux.1)
+was published on 2026-10-20 at 03:27:08 UTC as a **prerelease**, not Latest;
+stable v0.6.0 remains Latest. The annotated tag peels to exact product
+commit `be68ca0ef00137e5fef344b4ea43ad81d073fa96`. The installable ZIP
+SHA256 is `adf4c974e0579675665a35968f3f12ebbf6c5ac15b2aa59f373990b7e8b82942`
+(924242 bytes); DLL SHA256 is
+`b513a28fb3d65e89f34f145a806ca7867ace267a09e4e5fb2eee1856d8f3489e`,
+MVID `8860e5ea-df57-4794-a09f-b30a3a7dd1a2`. The published checksum asset
+SHA256 is `fa23b8b18fe1b636d0cbac75d18765dba872b546fd4eeaa381fb96da696058ff`.
+Both assets were downloaded independently under
+`artifacts/linux-2.1.5d/published-download`; their hashes match the GitHub
+asset digests and checksum contents. The original 0.6.0 release assets remain
+unchanged.
+
+The repository publisher's owner-authorized pre-runtime route reported source
+validation **47/0**, complete offline C# **579/0**, publisher gate **8/0**,
+two deterministic clean DLL/ZIP builds, and strict package validation
+**6/0** on the final ZIP. The publisher log is
+`artifacts/linux-2.1.5d/prerelease-publish-isolated.log`; the build receipt
+is `private/release/linux-215d-publish/artifacts/release/0.6.1-linux.1/release-manifest.json`.
+The first attempt in the shared checkout stopped at `git fetch --tags`
+because historical local tags conflicted with remote tags, before tests,
+tagging, or publication. A fresh isolated clone of the same pushed commit
+completed the unmodified publisher; no old tags were rewritten. No game was
+launched. Native Linux 2.1.5d acceptance remains **NOT RUN / unverified**;
+Windows 2.1.7b gameplay was not rerun. Draft PR #11 remains open; no merge.
+
+Exact next action: the Linux user installs the named prerelease ZIP on a
+disposable 2.1.5d campaign, follows the manual trial below, and supplies
+the first exception plus UMM/Unity logs if any step fails. No missing
+controller API is assumed without that evidence.
+
 ## Scope and evidence
 
 Branch: `codex/kingmaker-buff-planner-linux-2.1.5d`, based on
@@ -22,8 +57,9 @@ commit.
 targets `main` at `2bc6cc19e3e4a1c5feb1c8cd511d48dfb568606e`. The
 project-owned guarded push WhatIf passed **6/0**; its real push verified
 `4553e99d5acbb9f13887bae1e03677108347e48d` before this documentation
-receipt. The PR is draft and the 0.6.1 ZIP remains local only. No merge, tag,
-or public release was made.
+receipt. At that checkpoint the PR was draft and the separate 0.6.1 ZIP was
+local only. The later public prerelease above has a different version and
+bytes; the PR is still draft and no merge was made.
 
 The available lab game is **Windows Kingmaker 2.1.7b**, with UMM **0.33.0.0**
 (`Kingmaker_Data/Managed/UnityModManager/Log.txt`, lines 2-12). No native
@@ -69,6 +105,7 @@ review artifact, not a public release.
 
 For a public tester, install the `KingmakerBuffPlanner-0.6.1-linux.1.zip`
 asset from the [experimental prerelease](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.1-linux.1).
+Verify SHA256 `adf4c974e0579675665a35968f3f12ebbf6c5ac15b2aa59f373990b7e8b82942`.
 The manifest-only diagnostic above is a lab-local comparison package. The
 same workflow and logging instructions apply to either package; record which
 one was used. Neither package has native Linux gameplay evidence yet.

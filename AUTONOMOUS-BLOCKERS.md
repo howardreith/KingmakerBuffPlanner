@@ -1,9 +1,10 @@
 ## Linux 2.1.5d acceptance
 
-The 0.6.1 experimental package is built and validated, but native Linux
+The public `v0.6.1-linux.1` experimental prerelease is published, but native Linux
 2.1.5d runtime acceptance is **NOT RUN**: no authorized installation or exact
-managed assemblies were available in the lab. Run the manifest-only
-diagnostic first on that build, then smoke test the exact versioned ZIP.
+managed assemblies were available in the lab. The Linux user should test the
+published ZIP on a disposable campaign and provide the first failure/logs.
+The separate manifest-only diagnostic remains available for lab comparison.
 See [the candidate record](docs/LINUX-2.1.5D-CANDIDATE.md) for hashes,
 manual steps, logs, and the first-failure decision point. No controller
 contract absence or gameplay compatibility is inferred.
