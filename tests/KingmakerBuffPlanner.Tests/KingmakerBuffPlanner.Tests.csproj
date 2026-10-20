@@ -50,6 +50,7 @@
     <Compile Include="NativeUiFinishTests.cs" />
     <Compile Include="HumanFeedbackRefinementTests.cs" />
     <Compile Include="ControllerRoutineTests.cs" />
+    <Compile Include="ControllerWorkspaceNavigationTests.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\Infrastructure\PlannerUpdateFrameGate.cs"><Link>Infrastructure\PlannerUpdateFrameGate.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ControllerWorkspaceFocus.cs"><Link>UI\ControllerWorkspaceFocus.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ControllerOwnedItems.cs"><Link>UI\ControllerOwnedItems.cs</Link></Compile>
