@@ -1,3 +1,19 @@
+# Mr. Bard's Kingmaker Buff Planner 0.6.3
+
+Owner-authorized pre-runtime release of the controller campaign-card repair
+merged in PR #12. This exact release has not been run in the game. The native
+RT/R2 menu → Buff Planner card → Confirm/A → editor sequence remains to be
+observed. The repair retains menu-layer capture across native binding order,
+waits for the native owner and held controls to release, and reports the
+handoff stage. During an active routine, the card reopens quick controls with
+Stop. Classic review and editor recovery screens are recorded as successful
+destinations. The 2.1.5 UMM game-version minimum is unchanged; native Linux
+2.1.5d behavior remains unverified. See the
+[release notes](RELEASE-NOTES-0.6.3.md) and
+[controller repair record](CONTROLLER-CARD-ACTIVATION-REPAIR-2026-10-20.md).
+
+---
+
 # Mr. Bard's Kingmaker Buff Planner 0.6.2
 
 The owner authorizes a full release with the same 2.1.5 UMM minimum as the
