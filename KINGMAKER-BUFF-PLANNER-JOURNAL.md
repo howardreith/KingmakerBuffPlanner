@@ -4245,3 +4245,28 @@ Receipt remains PARTIAL. Exact records and next separately budgeted guarded
 - Not run: Test-SourceOnly, purity windows, runtime harness, game launch,
   install, Mods or save access; no in-game run of 0.5.3. Receipt:
   `docs/evidence/release-0.5.3-receipt.md`. Nexus upload not performed.
+
+## Controller navigation source repair — 2026-10-20
+
+- Owner supplied a 39.59-second recording; visible focus disappears while
+  `Catalogue > Spells` remains in the footer. Original engine cause is unproven.
+- Branch `codex/kingmaker-buff-planner-controller-navigation`, base
+  `df61617dc592df54bd3285c48d7eafe5aa66373c`, product source
+  `e9dee2156de48a60e64f283fea4a4d3416e316c6`. Version 0.6.4-alpha.1 unchanged.
+- Added spatial directions/no wrap, horizontal aim through wide rows, stable
+  focus restoration, scroll visibility reconciliation, and persistent root
+  border rendering. Retained existing action callbacks and input boundaries.
+- Actual pure model and 13 new behavior cases plus three existing neighboring
+  cases compiled under C#7.3/warnings-as-errors and ran on .NET8: **16/0**.
+  Six changed C# files parsed in C#7.3: **6/0**. `git diff --check` passed.
+  Final focused run plus syntax completed in about 1.45 seconds. A new partial
+  row/filter overlap assertion first failed 15/1; original failure retained,
+  then the scroll-container restriction passed 16/0. Commands/logs/hashes are
+  recorded in the source handoff. No Unity stubs or native PASS claims.
+- Windows device offline; required game assemblies and the external guarded
+  push helper unavailable. No production DLL/package, game, install, save,
+  push, PR, merge, or release. This is a local reviewable source checkpoint.
+- Exact next action: transfer source bundle to isolated Windows checkout;
+  Test-Development.ps1 -Only 'controller-workspace-', then guarded native
+  focus/scroll/rebuild checklist with exact candidate identity and restoration.
+  Full [record](docs/CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md).

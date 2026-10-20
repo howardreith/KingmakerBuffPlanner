@@ -1,3 +1,18 @@
+## Controller navigation source repair — October 20, 2026
+
+Owner video confirms logical Spells focus with no visible marker at roughly
+0:09.25–0:14.5. Local branch
+`codex/kingmaker-buff-planner-controller-navigation`, product source
+`e9dee2156de48a60e64f283fea4a4d3416e316c6`, base `df61617`. Spatial navigation,
+retained horizontal aim, persistent opaque focus border, and visible scroll
+focus are implemented. Focused pure C# **16/0**, changed C# syntax **6/0**;
+full production build and native visual/controller acceptance **NOT RUN**.
+Version remains 0.6.4-alpha.1; no DLL, install, save change, push or release.
+Windows device and external guarded push helper unavailable. Transfer the source
+bundle to an isolated Windows checkout, run the existing focused production
+selector, then the [specific native checklist](docs/CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md).
+Do not relabel old release or runtime evidence as validation of this repair.
+
 ## 0.6.3 release published — 2026-10-20
 
 Full v0.6.3 is GitHub Latest at tagged product
