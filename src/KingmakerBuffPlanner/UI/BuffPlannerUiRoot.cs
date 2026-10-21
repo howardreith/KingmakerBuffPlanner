@@ -2109,7 +2109,7 @@ namespace KingmakerBuffPlanner.UI
                     constructionMilliseconds, reconciliationMilliseconds);
                 _castingWorkspace.RefreshView();
                 if (_controllerEditor != null)
-                    _castingWorkspace.ShowNotice("Controller: D-pad moves focus; Left/Right changes regions; bumpers choose routines; Context inspects; right stick scrolls. Confirm selects the focused action. Changes autosave. Back dismisses one layer.");
+                    _castingWorkspace.ShowNotice("Controller: D-pad moves to adjacent controls; bumpers choose routines; Context inspects; right stick scrolls. Confirm selects the highlighted action. Changes autosave. Back dismisses one layer.");
                 if (reconciliation != null && reconciliation.Applied)
                     _castingWorkspace.ShowNotice(reconciliation.Notice);
                 _castingWorkspaceOpens++;

@@ -4245,3 +4245,124 @@ Receipt remains PARTIAL. Exact records and next separately budgeted guarded
 - Not run: Test-SourceOnly, purity windows, runtime harness, game launch,
   install, Mods or save access; no in-game run of 0.5.3. Receipt:
   `docs/evidence/release-0.5.3-receipt.md`. Nexus upload not performed.
+
+## Controller navigation source repair — 2026-10-20
+
+- Owner supplied a 39.59-second recording; visible focus disappears while
+  `Catalogue > Spells` remains in the footer. Original engine cause is unproven.
+- Branch `codex/kingmaker-buff-planner-controller-navigation`, base
+  `df61617dc592df54bd3285c48d7eafe5aa66373c`, product source
+  `e9dee2156de48a60e64f283fea4a4d3416e316c6`. Version 0.6.4-alpha.1 unchanged.
+- Added spatial directions/no wrap, horizontal aim through wide rows, stable
+  focus restoration, scroll visibility reconciliation, and persistent root
+  border rendering. Retained existing action callbacks and input boundaries.
+- Actual pure model and 13 new behavior cases plus three existing neighboring
+  cases compiled under C#7.3/warnings-as-errors and ran on .NET8: **16/0**.
+  Six changed C# files parsed in C#7.3: **6/0**. `git diff --check` passed.
+  Final focused run plus syntax completed in about 1.45 seconds. A new partial
+  row/filter overlap assertion first failed 15/1; original failure retained,
+  then the scroll-container restriction passed 16/0. Commands/logs/hashes are
+  recorded in the source handoff. No Unity stubs or native PASS claims.
+- Windows device offline; required game assemblies and the external guarded
+  push helper unavailable. No production DLL/package, game, install, save,
+  push, PR, merge, or release. This is a local reviewable source checkpoint.
+- Exact next action: transfer source bundle to isolated Windows checkout;
+  Test-Development.ps1 -Only 'controller-workspace-', then guarded native
+  focus/scroll/rebuild checklist with exact candidate identity and restoration.
+  Full [record](docs/CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md).
+
+## Controller navigation Windows integration — 2026-10-20
+
+- Owner requested implementation on a branch from the default branch and a PR.
+  Imported the handoff bundle (SHA-256
+  `a51bbcc834b1435192151df528e3fe0fba7507c7fc8b47fd6e55c995318a9a7a`)
+  into an isolated worktree. Its required base `df61617` is an ancestor of
+  current `origin/main` `6914ef2`.
+- Branch `codex/kingmaker-buff-planner-controller-navigation-review` began at
+  `6914ef2`; source cherry-pick `0887225` and handoff-document cherry-pick
+  `8acf31c` applied without conflicts. Main's intervening files concern stable
+  version 0.6.4 and release notes, not the modified navigation source.
+- `git diff --check origin/main...HEAD`: pass. Supervised command
+  `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Development.ps1 -Only 'controller-workspace-'`:
+  source **47/0**, production build **1/0**, focused tests **18/0** in 10.5
+  seconds. Local ignored log:
+  `artifacts/validation/controller-navigation-development.log`. DLL SHA-256
+  `aac0ca90bf9f5574cf25da9e6748085020558725bb9cce35b2b9098d7851472b`.
+- Version is 0.6.4. Handoff's portable 16/0 and C# syntax 6/0 remain
+  attributed to its original environment. No game launch, install, save
+  mutation, release packaging, or native visual qualification occurred in this
+  Windows integration. The earlier recording does not prove the new rendering.
+- Rejected theory: the original recording's catalogue scroll sequence proves
+  a general auto-reveal failure. It shows focus loss with logical Spells focus;
+  the source separately exposed an offscreen confirm path.
+- Exact next action: review documentation links and diff, commit this
+  integration record, run the guarded push helper and open a PR to main. Native
+  acceptance stays pending under the focused checklist in
+  `docs/CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md`.
+
+## PR #14 Inspector text scrolling review correction — 2026-10-20
+
+- Review of PR head `11163092846cfa7a22ee13c7be8eb30fc25e996b` against
+  `6914ef2` identified a P2 regression: a text-only Inspector notice section
+  had no visible button, so right-stick scroll and the next frame revealed the
+  old acknowledgement button, reversing the requested scroll. This is a
+  source-level reproduction, not a Unity or physical-controller observation.
+- Branch `codex/kingmaker-buff-planner-controller-navigation-review`, source
+  commit `fec94dfd7b548eb7c093d6f2fb4404caaf435ed6`: retain pane-level reading focus with a viewport border;
+  neither manual scroll nor frame reconciliation reveals an offscreen button.
+  Confirm/Inspect are inactive in this state, and a newly visible button
+  restores actionable focus. Added a focused Inspector notice regression.
+- First `Test-Development.ps1 -Only 'controller-workspace-'` after the edit:
+  source **47/0**, build **1/0**, focused tests **18/1**. The failure was an
+  existing empty-scope assertion; `Confirm` now reports no controls before the
+  reading-position message when the scope is empty. The next focused run passed
+  tests **19/0** on the edited tree.
+- Final source-stamped command on `fec94dfd7b548eb7c093d6f2fb4404caaf435ed6`:
+  `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Development.ps1 -Only 'controller-workspace-'`:
+  source **47/0**, production build **1/0**, focused tests **19/0**, 6.3
+  seconds. DLL SHA-256
+  `128da9e32a38dd00fb48930a64979c0c943af0ce27a7af314b61a79ce1ddfac2`.
+  Local ignored evidence:
+  `artifacts/validation/controller-navigation-review-fec94df.log`.
+- `git diff --check` passed. Rejected approach: revealing the retained
+  acknowledgement button whenever no visible control exists, since that
+  cancels the user's reading scroll. Version remains 0.6.4. No game launch,
+  installation, save mutation, package or release; native focus rendering is
+  still uncertain. Exact next action: commit these records, use the guarded
+  push helper for PR #14, then perform the focused native checklist before
+  declaring visual acceptance.
+
+## 0.6.5-alpha.1 controller navigation prerelease — 2026-10-20
+
+- Owner requested an alpha for native testing after the PR #14 Inspector
+  review correction. Prepared version `0.6.5-alpha.1` on branch
+  `codex/kingmaker-buff-planner-controller-navigation-review`; product/tag
+  commit `1f5d1af5c8ea3f92bc41e0e3165ecef57cdf5341`.
+- Prepublication source validation **47/0**, release-note version and
+  owner-authorized pre-runtime wording check, relative-link check **3/0**,
+  `git diff --check` passed. Guarded push tests **6/0**; the project-owned
+  helper pushed the product commit.
+- The first publisher invocation stopped before validation and publication:
+  historical local tags in the long-lived worktree would be clobbered by
+  `git fetch --tags`. Rejected tag deletion or overwrite. A clean isolated
+  clone at `private/release/065-alpha-controller-navigation` had the exact
+  pushed HEAD and no local tag conflict.
+- Successful repository publisher command:
+  `scripts/Publish-Release.ps1 -Publish
+  -ConfirmOwnerAuthorizedPreRuntimeRelease -AllowFeatureBranchPrerelease
+  -ReleaseNotesPath docs/RELEASE-NOTES-0.6.5-ALPHA.1.md`. Source **47/0**,
+  complete offline C# **597/0**, publisher gate **8/0**, two deterministic
+  builds, strict package **6/0**. Ignored log:
+  `private/release/065-alpha-controller-navigation/artifacts/validation/publish-0.6.5-alpha.1.log`.
+- Published `v0.6.5-alpha.1` as non-draft prerelease. Annotated tag object
+  `ed8ad1f312d529706d115bad3a947123a216bbe9` peels to product commit.
+  ZIP SHA-256 `6d8e4985dbecb7355fff4a73aea16f284a17ab60b91a1cbf917aa273ec8f0cd1`;
+  DLL SHA-256 `b39620ed4f71e303e19acfd5211d8765176781c095837a4ef09e213ced7798f0`;
+  MVID `ba9b2683-8edc-4c3b-8032-6a0847086a85`.
+- Independent GitHub checks confirmed prerelease/non-draft status, stable
+  v0.6.4 still Latest, and downloaded ZIP/checksum matching local bytes:
+  **2/0**. No game, installation, save or profile mutation occurred. Native
+  focus rendering remains uncertain. Exact next action: owner runs the
+  focused six-second Spells and text-only Inspector scroll sequence with this
+  exact ZIP, retaining the matching UMM/Unity log. Full
+  [record](docs/RELEASE-0.6.5-ALPHA.1-RECORD.md).

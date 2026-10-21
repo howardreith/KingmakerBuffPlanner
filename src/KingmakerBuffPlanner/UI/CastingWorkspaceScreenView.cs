@@ -247,6 +247,7 @@ namespace KingmakerBuffPlanner.UI
         internal bool ControllerResourcesOpen { get { return _resources != null && _resources.gameObject.activeSelf; } }
         internal ScrollRect ControllerResourcesScroll { get { return _resourcesScroll; } }
         internal string ControllerEditingKey { get { return _session.EditingFocusCastingId ?? "draft"; } }
+        internal string ControllerInitialFocusKey { get { return _lastView == null ? null : "buff/" + _lastView.SelectedSourceId; } }
         internal void ControllerCommand(ControllerWorkspaceCommand command) { if (_controllerNavigation != null) _controllerNavigation.Execute(command); }
         internal void ControllerCycleRoutine(int direction)
         {
@@ -506,6 +507,7 @@ namespace KingmakerBuffPlanner.UI
         {
             _descriptionShownLastFrame = NativeDescriptionPresenter.IsOpen;
             FitSourceTabs();
+            if (_controllerNavigation != null) _controllerNavigation.NoteFrameEnd();
             if (_controllerAuthoring && !_controllerTextSettled)
             {
                 _controllerTextSettled = true;
@@ -2033,6 +2035,7 @@ namespace KingmakerBuffPlanner.UI
                         ? new Color(1f, 0.95f, 0.84f, 0.95f) : new Color(1f, 1f, 1f, 0f));
                 Button button = rect.gameObject.AddComponent<Button>();
                 button.targetGraphic = background;
+                if (_controllerAuthoring) ControllerControlIdentity.Set(button, "buff/" + captured, "Catalogue");
                 ApplyRowHover(button, entry.Selected);
                 button.onClick.AddListener(() => Command(
                     () => _session.SelectGraphBuff(captured, _inputs()), "buff-switch"));

@@ -48,6 +48,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("controller-results-scroll-exposes-short-medium-long-reports", TestControllerResultsScroll);
             Run("controller-workspace-text-initializes-before-parenting", TestControllerWorkspaceTextContract);
             Run("controller-workspace-focus-stable-keys-and-disabled-actions", TestWorkspaceFocus);
+            RunControllerWorkspaceNavigationTests();
             Run("controller-workspace-navigation-repeat-is-bounded", TestWorkspaceRepeat);
             Run("controller-workspace-keyboard-apply-cancel-without-physical-typing", TestWorkspaceKeyboard);
             Run("controller-native-card-registration-keeps-foreign-identities", TestNativeCardIdentities);
@@ -889,10 +890,13 @@ namespace KingmakerBuffPlanner.Tests
             int oldActions = 0, newActions = 0;
             var focus = new ControllerWorkspaceFocus();
             focus.Replace(new[] {
-                new ControllerFocusItem("buff/a", "Catalogue", "Same name", true, () => oldActions++),
-                new ControllerFocusItem("provider/unit-a/book-a", "Casters", "Same name", true, () => oldActions++),
-                new ControllerFocusItem("provider/unit-a/book-b", "Casters", "Same name", false, () => oldActions++) });
-            focus.Move(1, true); focus.Move(1, false);
+                new ControllerFocusItem("buff/a", "Catalogue", "Same name", true, () => oldActions++,
+                    bounds: new ControllerFocusBounds(0, 100, 100, 140)),
+                new ControllerFocusItem("provider/unit-a/book-a", "Casters", "Same name", true, () => oldActions++,
+                    bounds: new ControllerFocusBounds(200, 100, 300, 140)),
+                new ControllerFocusItem("provider/unit-a/book-b", "Casters", "Same name", false, () => oldActions++,
+                    bounds: new ControllerFocusBounds(200, 40, 300, 80)) });
+            focus.Move(ControllerWorkspaceCommand.Right); focus.Move(ControllerWorkspaceCommand.Down);
             Assert(focus.Key == "provider/unit-a/book-b" && focus.Confirm().Contains("Unavailable") && oldActions == 0);
             focus.Replace(new[] {
                 new ControllerFocusItem("buff/a", "Catalogue", "Renamed", true, () => newActions++),
@@ -1120,15 +1124,25 @@ namespace KingmakerBuffPlanner.Tests
                 session.ClickGraphSource(provider, fixture.Inputs);
             };
             var items = new[] {
-                new ControllerFocusItem("buff/source-bulls", "Catalogue", "Bull", true, () => session.SelectGraphBuff("source-bulls", fixture.Inputs)),
-                new ControllerFocusItem("caster/unit-wizard", "Casters", "Wizard", true, () => session.ClickGraphCaster("unit-wizard", fixture.Inputs)),
-                new ControllerFocusItem("provider/exact", "Casters", "Exact book", true, chooseSource),
-                new ControllerFocusItem("target/unit-t1", "Recipients", "First", true, () => session.ClickGraphRecipient("unit-t1", fixture.Inputs)),
-                new ControllerFocusItem("target/unit-t2", "Recipients", "Second", true, () => session.ClickGraphRecipient("unit-t2", fixture.Inputs)) };
+                new ControllerFocusItem("buff/source-bulls", "Catalogue", "Bull", true, () => session.SelectGraphBuff("source-bulls", fixture.Inputs),
+                    bounds: new ControllerFocusBounds(0, 600, 100, 640)),
+                new ControllerFocusItem("caster/unit-wizard", "Casters", "Wizard", true, () => session.ClickGraphCaster("unit-wizard", fixture.Inputs),
+                    bounds: new ControllerFocusBounds(200, 600, 300, 640)),
+                new ControllerFocusItem("provider/exact", "Casters", "Exact book", true, chooseSource,
+                    bounds: new ControllerFocusBounds(200, 540, 300, 580)),
+                new ControllerFocusItem("target/unit-t1", "Recipients", "First", true, () => session.ClickGraphRecipient("unit-t1", fixture.Inputs),
+                    bounds: new ControllerFocusBounds(600, 600, 700, 640)),
+                new ControllerFocusItem("target/unit-t2", "Recipients", "Second", true, () => session.ClickGraphRecipient("unit-t2", fixture.Inputs),
+                    bounds: new ControllerFocusBounds(600, 540, 700, 580)) };
             focus.Replace(items);
             string before = session.DocumentIntentSignature();
-            for (int i = 0; i < 30; i++) { focus.Move(1, true); focus.Move(1, false); }
-            Assert(session.DocumentIntentSignature() == before && fixture.Host.StartedRuns == 0);
+            var visited = new HashSet<string> { focus.Key };
+            for (int i = 0; i < 30; i++)
+            {
+                focus.Move(ControllerWorkspaceCommand.Right); visited.Add(focus.Key);
+                focus.Move(ControllerWorkspaceCommand.Down); visited.Add(focus.Key);
+            }
+            Assert(visited.Count > 1 && session.DocumentIntentSignature() == before && fixture.Host.StartedRuns == 0);
             foreach (ControllerFocusItem item in items) { focus.Restore(item.Key); Assert(focus.Confirm() == null); }
             Assert(session.Document.Castings.Count == 2 && session.Document.Castings.All(c => c.CasterUnitId == "unit-wizard"));
             var first = session.Document.Castings.First();

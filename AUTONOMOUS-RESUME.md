@@ -1,3 +1,68 @@
+## Published 0.6.5-alpha.1 controller navigation preview — 2026-10-20
+
+Owner-requested prerelease `v0.6.5-alpha.1` is published from PR #14 source
+`1f5d1af5c8ea3f92bc41e0e3165ecef57cdf5341`. ZIP SHA-256
+`6d8e4985dbecb7355fff4a73aea16f284a17ab60b91a1cbf917aa273ec8f0cd1`;
+DLL SHA-256
+`b39620ed4f71e303e19acfd5211d8765176781c095837a4ef09e213ced7798f0`.
+The clean-clone publisher passed source 47/0, offline C# 597/0, publisher
+gate 8/0, two deterministic builds and package 6/0. GitHub download matched
+the local ZIP; stable 0.6.4 remains Latest. This exact alpha has NOT been run
+in the game. The [release record](docs/RELEASE-0.6.5-ALPHA.1-RECORD.md)
+separates tag identity from this later documentation commit. Exact next action:
+owner's focused native test of six-second Spells focus, spatial movement and
+text-only Inspector scrolling, with a matching UMM/Unity log. Do not infer a
+merge or stable release from the alpha.
+
+## PR #14 Inspector scroll review correction — 2026-10-20
+
+On `codex/kingmaker-buff-planner-controller-navigation-review`, source commit
+`fec94dfd7b548eb7c093d6f2fb4404caaf435ed6` addresses the review of `1116309`: right-stick scrolling through a
+text-only Inspector notice section now retains pane-level reading focus, and
+the following frame no longer reveals the offscreen acknowledgement button.
+Confirm/Inspect cannot act on that button until it is visible. Version 0.6.4.
+The source-stamped Windows selector `Test-Development.ps1 -Only
+'controller-workspace-'` passed source 47/0, build 1/0, focused tests 19/0
+in 6.3 seconds. DLL SHA-256
+`128da9e32a38dd00fb48930a64979c0c943af0ce27a7af314b61a79ce1ddfac2`;
+local ignored log `artifacts/validation/controller-navigation-review-fec94df.log`.
+The first focused run was 18/1 on an existing empty-scope message assertion;
+the final behavior retains that contract. Native rendered/controller acceptance
+is NOT RUN. Exact next action: commit this documentation checkpoint, guarded
+push to PR #14, then follow the [focused native checklist](docs/CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md)
+before claiming the controller issue is resolved.
+
+## Controller navigation Windows integration — 2026-10-20
+
+Owner-requested PR preparation uses branch
+`codex/kingmaker-buff-planner-controller-navigation-review` from current
+`origin/main` `6914ef2`. Handoff source/documentation became `0887225` and
+`8acf31c`; version is now 0.6.4 from main. The exact Windows development
+selector `Test-Development.ps1 -Only 'controller-workspace-'` passed source
+47/0, production build 1/0, and focused tests 18/0 in 10.5 seconds. DLL SHA-256
+`aac0ca90bf9f5574cf25da9e6748085020558725bb9cce35b2b9098d7851472b`;
+local log `artifacts/validation/controller-navigation-development.log`.
+The earlier 16/0 portable handoff result remains historical. Native rendered
+focus and controller acceptance are NOT RUN. Exact next action: finish the
+reviewable documentation checkpoint, use the guarded push helper, open a PR to
+main, then perform the [focused native checklist](docs/CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md)
+before claiming visual acceptance. Do not relabel the published 0.6.4 binary.
+
+## Controller navigation source repair — October 20, 2026
+
+Owner video confirms logical Spells focus with no visible marker at roughly
+0:09.25–0:14.5. Local branch
+`codex/kingmaker-buff-planner-controller-navigation`, product source
+`e9dee2156de48a60e64f283fea4a4d3416e316c6`, base `df61617`. Spatial navigation,
+retained horizontal aim, persistent opaque focus border, and visible scroll
+focus are implemented. Focused pure C# **16/0**, changed C# syntax **6/0**;
+full production build and native visual/controller acceptance **NOT RUN**.
+Version remains 0.6.4-alpha.1; no DLL, install, save change, push or release.
+Windows device and external guarded push helper unavailable. Transfer the source
+bundle to an isolated Windows checkout, run the existing focused production
+selector, then the [specific native checklist](docs/CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md).
+Do not relabel old release or runtime evidence as validation of this repair.
+
 ## 0.6.3 release published — 2026-10-20
 
 Full v0.6.3 is GitHub Latest at tagged product
