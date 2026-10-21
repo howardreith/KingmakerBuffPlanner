@@ -4270,3 +4270,32 @@ Receipt remains PARTIAL. Exact records and next separately budgeted guarded
   Test-Development.ps1 -Only 'controller-workspace-', then guarded native
   focus/scroll/rebuild checklist with exact candidate identity and restoration.
   Full [record](docs/CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md).
+
+## Controller navigation Windows integration — 2026-10-20
+
+- Owner requested implementation on a branch from the default branch and a PR.
+  Imported the handoff bundle (SHA-256
+  `a51bbcc834b1435192151df528e3fe0fba7507c7fc8b47fd6e55c995318a9a7a`)
+  into an isolated worktree. Its required base `df61617` is an ancestor of
+  current `origin/main` `6914ef2`.
+- Branch `codex/kingmaker-buff-planner-controller-navigation-review` began at
+  `6914ef2`; source cherry-pick `0887225` and handoff-document cherry-pick
+  `8acf31c` applied without conflicts. Main's intervening files concern stable
+  version 0.6.4 and release notes, not the modified navigation source.
+- `git diff --check origin/main...HEAD`: pass. Supervised command
+  `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Development.ps1 -Only 'controller-workspace-'`:
+  source **47/0**, production build **1/0**, focused tests **18/0** in 10.5
+  seconds. Local ignored log:
+  `artifacts/validation/controller-navigation-development.log`. DLL SHA-256
+  `aac0ca90bf9f5574cf25da9e6748085020558725bb9cce35b2b9098d7851472b`.
+- Version is 0.6.4. Handoff's portable 16/0 and C# syntax 6/0 remain
+  attributed to its original environment. No game launch, install, save
+  mutation, release packaging, or native visual qualification occurred in this
+  Windows integration. The earlier recording does not prove the new rendering.
+- Rejected theory: the original recording's catalogue scroll sequence proves
+  a general auto-reveal failure. It shows focus loss with logical Spells focus;
+  the source separately exposed an offscreen confirm path.
+- Exact next action: review documentation links and diff, commit this
+  integration record, run the guarded push helper and open a PR to main. Native
+  acceptance stays pending under the focused checklist in
+  `docs/CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md`.

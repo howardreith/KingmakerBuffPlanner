@@ -1,3 +1,19 @@
+## Controller navigation Windows integration — 2026-10-20
+
+Owner-requested PR preparation uses branch
+`codex/kingmaker-buff-planner-controller-navigation-review` from current
+`origin/main` `6914ef2`. Handoff source/documentation became `0887225` and
+`8acf31c`; version is now 0.6.4 from main. The exact Windows development
+selector `Test-Development.ps1 -Only 'controller-workspace-'` passed source
+47/0, production build 1/0, and focused tests 18/0 in 10.5 seconds. DLL SHA-256
+`aac0ca90bf9f5574cf25da9e6748085020558725bb9cce35b2b9098d7851472b`;
+local log `artifacts/validation/controller-navigation-development.log`.
+The earlier 16/0 portable handoff result remains historical. Native rendered
+focus and controller acceptance are NOT RUN. Exact next action: finish the
+reviewable documentation checkpoint, use the guarded push helper, open a PR to
+main, then perform the [focused native checklist](docs/CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md)
+before claiming visual acceptance. Do not relabel the published 0.6.4 binary.
+
 ## Controller navigation source repair — October 20, 2026
 
 Owner video confirms logical Spells focus with no visible marker at roughly

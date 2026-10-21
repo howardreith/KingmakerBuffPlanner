@@ -1,6 +1,31 @@
 # Controller workspace navigation repair — October 20, 2026
 
-## Status and identity
+## Windows integration checkpoint
+
+The verified handoff bundle was imported onto a new branch from the current
+default branch. This section records the Windows result; the original handoff
+account below remains attributed to its earlier source and environment.
+
+- Branch: `codex/kingmaker-buff-planner-controller-navigation-review`.
+- Default-branch base: `6914ef2` (`origin/main` at integration).
+- Integrated source commit: `0887225`; imported documentation commit: `8acf31c`.
+- Version: `0.6.4`, following the published stable release on `main`.
+- `git diff --check origin/main...HEAD`: passed.
+- `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Development.ps1 -Only 'controller-workspace-'`:
+  source validation **47/0**, production build **1/0**, controller workspace
+  tests **18/0**, in 10.5 seconds. Build DLL SHA-256:
+  `aac0ca90bf9f5574cf25da9e6748085020558725bb9cce35b2b9098d7851472b`.
+- Local log: `artifacts/validation/controller-navigation-development.log`
+  (ignored build evidence in the integration worktree).
+- Native input and visual acceptance remain **NOT RUN**. The Windows build and
+  focused tests establish a development checkpoint, not a game qualification.
+
+The imported source files match the handoff commit. Changes on `main` since its
+base affected version and release records, so no product-source conflict arose.
+The exact rendered focus behavior, including the reported six-second Spells
+case, still needs a guarded in-game observation before acceptance.
+
+## Original handoff status and identity
 
 Source repair prepared and reviewed locally; native visual acceptance is pending.
 
@@ -123,15 +148,7 @@ Kingmaker/Unity managed assemblies and the external guarded push helper at
 The repository requires that helper for publication, so a source bundle and
 reviewable patch are the handoff; direct git/API publication was not substituted.
 
-## Next check on the Windows game environment
-
-Import the bundle into an isolated checkout while preserving any occupied or
-dirty worktree. Read this repository's current AGENTS and validation policy.
-Run the existing focused production route:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Development.ps1 -Only 'controller-workspace-'
-```
+## Focused native acceptance still needed
 
 After the existing guarded runtime prerequisites, use the following focused
 native acceptance sequence. Record the exact candidate DLL/hash and screenshots;
