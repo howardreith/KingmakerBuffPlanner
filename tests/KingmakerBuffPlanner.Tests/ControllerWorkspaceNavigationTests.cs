@@ -18,6 +18,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("controller-workspace-spatial-fixed-controls-do-not-intercept-scroll", TestSpatialFixedControls);
             Run("controller-workspace-spatial-manual-scroll-keeps-visible-confirm", TestSpatialManualScroll);
             Run("controller-workspace-spatial-empty-viewport-refuses-hidden-action", TestSpatialEmptyViewport);
+            Run("controller-workspace-spatial-text-only-inspector-scroll-preserves-reading-focus", TestSpatialTextOnlyInspectorScroll);
             Run("controller-workspace-spatial-rebuild-keeps-identity-and-nearby-row", TestSpatialRebuild);
             Run("controller-workspace-spatial-layout-refresh-and-disabled-inspect", TestSpatialLayoutAndDisabled);
             Run("controller-workspace-spatial-modal-return-and-empty-scope", TestSpatialModalAndEmpty);
@@ -245,6 +246,32 @@ namespace KingmakerBuffPlanner.Tests
                 scroll: "catalogue", activate: () => actions++) });
             Assert(!focus.KeepVisible("catalogue"));
             Assert(focus.Confirm() != null && actions == 0);
+        }
+
+        private static void TestSpatialTextOnlyInspectorScroll()
+        {
+            int acknowledgements = 0;
+            var focus = new ControllerWorkspaceFocus();
+            focus.Replace(new[] { SpatialControl("acknowledge-imported-constraints", "Inspector",
+                0, 1000, 200, 32, scroll: "inspector", activate: () => acknowledgements++) });
+            focus.Restore("acknowledge-imported-constraints");
+            // A 600-pixel viewport initially ends at the button. Scrolling
+            // up through long wrapped notices leaves only text at offset 0.
+            focus.UpdateLayout(focus.Key, new ControllerFocusBounds(0, 1000, 200, 1032), false, "inspector");
+            Assert(!focus.KeepVisible("inspector") && focus.ReadingScrollKey == "inspector");
+            Assert(focus.Key == "acknowledge-imported-constraints");
+            // The following frame must keep pane reading focus, not request
+            // a reveal that would restore the old 432-pixel offset.
+            Assert(!focus.KeepVisible("inspector") && focus.ReadingScrollKey == "inspector");
+            Assert(focus.Confirm().Contains("No visible") && acknowledgements == 0);
+            focus.Replace(new[] { SpatialControl("acknowledge-imported-constraints", "Inspector",
+                0, 1000, 200, 32, visible: false, scroll: "inspector",
+                activate: () => acknowledgements++) });
+            Assert(!focus.KeepVisible("inspector") && focus.ReadingScrollKey == "inspector");
+            Assert(focus.Confirm() != null && acknowledgements == 0);
+            focus.UpdateLayout(focus.Key, new ControllerFocusBounds(0, 1000, 200, 1032), true, "inspector");
+            Assert(focus.KeepVisible("inspector") && focus.ReadingScrollKey == null);
+            Assert(focus.Confirm() == null && acknowledgements == 1);
         }
 
         private static void TestSpatialRebuild()

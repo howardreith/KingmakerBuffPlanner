@@ -57,6 +57,9 @@ namespace KingmakerBuffPlanner.UI
         private static readonly string[] BodyRegions = { "Catalogue", "Casters", "Castings", "Recipients", "Inspector" };
         private const float Tolerance = .5f;
         internal string Key { get; private set; }
+        // When a scroll pane shows only text, keep the pane selected without
+        // treating the retained offscreen button as an actionable control.
+        internal string ReadingScrollKey { get; private set; }
         internal ControllerFocusItem Current
         {
             get
@@ -92,7 +95,10 @@ namespace KingmakerBuffPlanner.UI
             if (key == null || !_byKey.ContainsKey(key)) return;
             if (Key != key) _horizontalAim = null;
             Key = key;
+            ReadingScrollKey = null;
         }
+
+        internal void ClearReading() { ReadingScrollKey = null; }
 
         internal void UpdateLayout(string key, ControllerFocusBounds bounds, bool visible, string scrollKey)
         {
@@ -102,6 +108,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal void Move(ControllerWorkspaceCommand command)
         {
+            ReadingScrollKey = null;
             ControllerFocusItem current = Current;
             if (current == null || !current.HasBounds) return;
             ControllerFocusItem next = null;
@@ -121,18 +128,20 @@ namespace KingmakerBuffPlanner.UI
         }
 
         // Manual scrolling must not leave Confirm aimed at an invisible row.
-        // False means the pane contains no visible controls; the bridge can
-        // reveal the existing item instead of pretending a new target exists.
+        // When no control is visible, retain a pane-level reading focus until
+        // scrolling or navigation brings an actionable control into view.
         internal bool KeepVisible(string scrollKey)
         {
             if (string.IsNullOrEmpty(scrollKey)) return false;
             ControllerFocusItem current = Current;
-            if (current != null && current.ScrollKey == scrollKey && current.HasBounds && current.Visible) return true;
+            if (current != null && current.ScrollKey == scrollKey && current.HasBounds && current.Visible)
+            { ReadingScrollKey = null; return true; }
             var candidates = _items.Where(i => i.HasBounds && i.Visible && i.ScrollKey == scrollKey).ToList();
             var sameRegion = current == null ? candidates : candidates.Where(i => i.Region == current.Region).ToList();
             ControllerFocusItem next = Nearest(sameRegion.Count == 0 ? candidates : sameRegion, current);
-            if (next == null) return false;
+            if (next == null) { ReadingScrollKey = scrollKey; return false; }
             Key = next.Key;
+            ReadingScrollKey = null;
             return true;
         }
 
@@ -251,6 +260,7 @@ namespace KingmakerBuffPlanner.UI
         {
             ControllerFocusItem item = Current;
             if (item == null) return "No controls in this view.";
+            if (ReadingScrollKey != null) return "No visible control in this scroll position.";
             if (!item.Visible) return "The focused control is outside the visible area.";
             if (!item.Enabled) return "Unavailable: " + item.Caption;
             item.Activate();

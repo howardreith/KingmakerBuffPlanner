@@ -28,6 +28,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly Dictionary<string, RectTransform> _rects = new Dictionary<string, RectTransform>();
         private readonly Vector3[] _corners = new Vector3[4];
         private RectTransform _outline;
+        private ScrollRect _readingScroll;
         private TMP_Text _hint;
         private RectTransform _modal;
         private ScrollRect _reader;
@@ -90,12 +91,25 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed || _modal != null) return;
             // Layout and scroll inertia can move a control without a new input.
+            if (_focus.ReadingScrollKey != null)
+            {
+                if (_readingScroll == null) _focus.ClearReading();
+                else
+                {
+                    RefreshLayout();
+                    if (!_focus.KeepVisible(_focus.ReadingScrollKey))
+                    { DrawPaneFocus(_readingScroll); return; }
+                    _readingScroll = null;
+                }
+            }
             RectTransform rect;
             if (_focus.Key != null && _rects.TryGetValue(_focus.Key, out rect) && rect != null && !IsVisible(rect))
             {
                 RefreshLayout();
-                string scrollKey = ScrollKey(rect);
-                if (scrollKey == null || !_focus.KeepVisible(scrollKey)) { DrawFocus(true); return; }
+                ScrollRect scroll = rect.GetComponentInParent<ScrollRect>();
+                if (scroll == null) { DrawFocus(true); return; }
+                if (!_focus.KeepVisible(Path(scroll.transform, _root)))
+                { _readingScroll = scroll; DrawPaneFocus(scroll); return; }
             }
             DrawFocus(false);
         }
@@ -108,6 +122,7 @@ namespace KingmakerBuffPlanner.UI
             if (_scope != scopeId)
             {
                 if (scopeId == "Resources") _resourcesOrigin = _focus.Key;
+                _focus.ClearReading(); _readingScroll = null;
                 _scope = scopeId;
             }
             var targets = new List<ControllerFocusItem>();
@@ -155,6 +170,16 @@ namespace KingmakerBuffPlanner.UI
             }
             if (scopeId == "Workspace" && _resourcesOrigin != null)
             { _focus.Restore(_resourcesOrigin); _resourcesOrigin = null; }
+            if (_focus.ReadingScrollKey != null && _readingScroll != null &&
+                Path(_readingScroll.transform, _root) == _focus.ReadingScrollKey)
+            {
+                RefreshLayout();
+                if (!_focus.KeepVisible(_focus.ReadingScrollKey))
+                { DrawPaneFocus(_readingScroll); return; }
+                _readingScroll = null;
+            }
+            else if (_focus.ReadingScrollKey != null)
+            { _focus.ClearReading(); _readingScroll = null; }
             DrawFocus(true);
         }
 
@@ -217,19 +242,25 @@ namespace KingmakerBuffPlanner.UI
                 return;
             }
             if (command == ControllerWorkspaceCommand.PreviousRoutine || command == ControllerWorkspaceCommand.NextRoutine)
-            { if (!_workspace.ControllerResourcesOpen) _workspace.ControllerCycleRoutine(command == ControllerWorkspaceCommand.PreviousRoutine ? -1 : 1); return; }
+            {
+                _focus.ClearReading(); _readingScroll = null;
+                if (!_workspace.ControllerResourcesOpen) _workspace.ControllerCycleRoutine(command == ControllerWorkspaceCommand.PreviousRoutine ? -1 : 1);
+                return;
+            }
             RefreshLayout();
             if (command == ControllerWorkspaceCommand.Up || command == ControllerWorkspaceCommand.Down ||
                 command == ControllerWorkspaceCommand.Left || command == ControllerWorkspaceCommand.Right)
-                _focus.Move(command);
+            { _readingScroll = null; _focus.Move(command); }
             if (command == ControllerWorkspaceCommand.Confirm)
             {
                 string unavailable = _focus.Confirm();
+                if (_focus.ReadingScrollKey != null) return;
                 if (unavailable != null) ShowText("Unavailable", unavailable);
                 Rebuild(); return;
             }
             if (command == ControllerWorkspaceCommand.Inspect)
             {
+                if (_focus.ReadingScrollKey != null) return;
                 ControllerFocusItem focused = _focus.Current;
                 if (focused != null && focused.Inspect != null) focused.Inspect();
                 return;
@@ -241,10 +272,13 @@ namespace KingmakerBuffPlanner.UI
                 RefreshLayout();
                 string scrollKey = scroll == null ? null : Path(scroll.transform, _root);
                 bool visible = scrollKey != null && _focus.KeepVisible(scrollKey);
-                // A pane with only explanatory text has no replacement target.
-                // In that case preserve its visible close control, or reveal the
-                // current control instead of leaving Confirm aimed off screen.
-                DrawFocus(!visible && !_workspace.ControllerResourcesOpen); return;
+                // Keep the requested scroll position while text fills the pane.
+                // A pane border replaces the hidden button border until a
+                // control returns to view; Confirm remains non-actionable.
+                _readingScroll = visible ? null : scroll;
+                if (_readingScroll != null) DrawPaneFocus(_readingScroll);
+                else DrawFocus(false);
+                return;
             }
             DrawFocus(true);
         }
@@ -331,13 +365,34 @@ namespace KingmakerBuffPlanner.UI
         private void DrawFocus(bool reveal)
         {
             if (_disposed || _outline == null || _modal != null) return;
+            if (_focus.ReadingScrollKey != null && _readingScroll != null)
+            { DrawPaneFocus(_readingScroll); return; }
             RectTransform rect;
             if (_focus.Key == null || !_rects.TryGetValue(_focus.Key, out rect) || rect == null)
             { _outline.gameObject.SetActive(false); return; }
             if (reveal) Reveal(rect);
+            if (!PlaceOutline(rect)) return;
+            ControllerFocusItem current = _focus.Current;
+            string caption = current == null ? "" : current.Caption.Split('\n')[0];
+            _hint.text = (current == null ? "" : current.Region + " > ") + caption +
+                "\nD-pad: move to adjacent controls. Right stick: scroll. Back leaves one layer.";
+        }
+
+        private void DrawPaneFocus(ScrollRect scroll)
+        {
+            if (_disposed || _outline == null || _modal != null) return;
+            if (scroll == null || scroll.viewport == null || !PlaceOutline(scroll.viewport))
+            { _outline.gameObject.SetActive(false); return; }
+            ControllerFocusItem current = _focus.Current;
+            _hint.text = (current == null ? "" : current.Region + " > ") + "Scrollable text" +
+                "\nRight stick: scroll. D-pad: return to controls. Back leaves one layer.";
+        }
+
+        private bool PlaceOutline(RectTransform rect)
+        {
             ControllerFocusBounds visible;
             if (!VisibleBounds(rect, out visible))
-            { _outline.gameObject.SetActive(false); return; }
+            { _outline.gameObject.SetActive(false); return false; }
             // Root ownership avoids stale mask culling and destruction when a
             // focused catalogue/inspector row is rebuilt. Clip explicitly so
             // the marker can never paint over another pane.
@@ -347,10 +402,7 @@ namespace KingmakerBuffPlanner.UI
             _outline.anchoredPosition = new Vector2(visible.CenterX, visible.CenterY);
             _outline.sizeDelta = new Vector2(visible.MaxX - visible.MinX, visible.MaxY - visible.MinY);
             _outline.SetAsLastSibling();
-            ControllerFocusItem current = _focus.Current;
-            string caption = current == null ? "" : current.Caption.Split('\n')[0];
-            _hint.text = (current == null ? "" : current.Region + " > ") + caption +
-                "\nD-pad: move to adjacent controls. Right stick: scroll. Back leaves one layer.";
+            return true;
         }
 
         private static void Reveal(RectTransform target)
