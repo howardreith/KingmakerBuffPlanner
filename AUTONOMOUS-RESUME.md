@@ -1,3 +1,19 @@
+## Published 0.6.6 stable controller navigation release — 2026-10-20
+
+The owner requested 0.6.6 after merging PR #14. The stable release
+[`v0.6.6`](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.6)
+is published and Latest from product commit
+`5b28efefee47448dbf187e8e37c7336314e054d0`. ZIP SHA-256
+`3685de56e61124b7456afddc15fcc7e29a478df0517452a84465ea3faeca6c1d`;
+DLL SHA-256
+`e5a4d2fff453a314247b6ecf8cc9277f136549dae227b3a6365441b196a23b81`.
+The downloaded asset matched local and published checksums. Independent
+post-publication offline C# tests passed 597/0, publisher gate 8/0 and package
+validation 6/0. This exact ZIP has not been run in the game. The
+[release record](docs/RELEASE-0.6.6-RECORD.md) explains the publisher lock
+and concurrent publication. Exact next action: owner tests six-second Spells
+focus and text-only Inspector scrolling with a matching UMM/Unity log.
+
 ## Published 0.6.5-alpha.1 controller navigation preview — 2026-10-20
 
 Owner-requested prerelease `v0.6.5-alpha.1` is published from PR #14 source

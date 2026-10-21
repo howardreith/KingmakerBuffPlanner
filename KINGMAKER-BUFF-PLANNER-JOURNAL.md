@@ -1,5 +1,24 @@
 # Kingmaker Buff Planner Journal
 
+## 2026-10-20 — 0.6.6 stable publication
+
+The owner requested 0.6.6 after PR #14 merged. Preparation branch
+`codex/kingmaker-buff-planner-release-0.6.6` started from merged `main`
+`25510dac2229def5c176f110bc0f847228d4a149`; product/tag commit is
+`5b28efefee47448dbf187e8e37c7336314e054d0`. The guarded helper pushed
+that commit (guard tests 6/0). Source validation passed 47/0. GitHub release
+`v0.6.6` is stable and Latest; ZIP SHA-256
+`3685de56e61124b7456afddc15fcc7e29a478df0517452a84465ea3faeca6c1d`,
+DLL SHA-256
+`e5a4d2fff453a314247b6ecf8cc9277f136549dae227b3a6365441b196a23b81`.
+Independent download hash and checksum matched; post-publication offline C#
+tests passed 597/0, publisher gate 8/0, downloaded package validation 6/0.
+The [release record](docs/RELEASE-0.6.6-RECORD.md) details a failed first
+publisher attempt due to a transient test runner file lock and the subsequent
+no-replace refusal after the exact candidate was published. No native test of
+this ZIP was run. Next: owner tests persistent Spells focus and Inspector
+text-only scrolling, retaining the matching UMM/Unity log.
+
 ## Full 0.6.3 release published — native controller acceptance pending
 
 2026-10-20: [PR #12](https://github.com/howardreith/KingmakerBuffPlanner/pull/12)
