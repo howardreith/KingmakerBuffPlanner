@@ -4331,3 +4331,38 @@ Receipt remains PARTIAL. Exact records and next separately budgeted guarded
   still uncertain. Exact next action: commit these records, use the guarded
   push helper for PR #14, then perform the focused native checklist before
   declaring visual acceptance.
+
+## 0.6.5-alpha.1 controller navigation prerelease — 2026-10-20
+
+- Owner requested an alpha for native testing after the PR #14 Inspector
+  review correction. Prepared version `0.6.5-alpha.1` on branch
+  `codex/kingmaker-buff-planner-controller-navigation-review`; product/tag
+  commit `1f5d1af5c8ea3f92bc41e0e3165ecef57cdf5341`.
+- Prepublication source validation **47/0**, release-note version and
+  owner-authorized pre-runtime wording check, relative-link check **3/0**,
+  `git diff --check` passed. Guarded push tests **6/0**; the project-owned
+  helper pushed the product commit.
+- The first publisher invocation stopped before validation and publication:
+  historical local tags in the long-lived worktree would be clobbered by
+  `git fetch --tags`. Rejected tag deletion or overwrite. A clean isolated
+  clone at `private/release/065-alpha-controller-navigation` had the exact
+  pushed HEAD and no local tag conflict.
+- Successful repository publisher command:
+  `scripts/Publish-Release.ps1 -Publish
+  -ConfirmOwnerAuthorizedPreRuntimeRelease -AllowFeatureBranchPrerelease
+  -ReleaseNotesPath docs/RELEASE-NOTES-0.6.5-ALPHA.1.md`. Source **47/0**,
+  complete offline C# **597/0**, publisher gate **8/0**, two deterministic
+  builds, strict package **6/0**. Ignored log:
+  `private/release/065-alpha-controller-navigation/artifacts/validation/publish-0.6.5-alpha.1.log`.
+- Published `v0.6.5-alpha.1` as non-draft prerelease. Annotated tag object
+  `ed8ad1f312d529706d115bad3a947123a216bbe9` peels to product commit.
+  ZIP SHA-256 `6d8e4985dbecb7355fff4a73aea16f284a17ab60b91a1cbf917aa273ec8f0cd1`;
+  DLL SHA-256 `b39620ed4f71e303e19acfd5211d8765176781c095837a4ef09e213ced7798f0`;
+  MVID `ba9b2683-8edc-4c3b-8032-6a0847086a85`.
+- Independent GitHub checks confirmed prerelease/non-draft status, stable
+  v0.6.4 still Latest, and downloaded ZIP/checksum matching local bytes:
+  **2/0**. No game, installation, save or profile mutation occurred. Native
+  focus rendering remains uncertain. Exact next action: owner runs the
+  focused six-second Spells and text-only Inspector scroll sequence with this
+  exact ZIP, retaining the matching UMM/Unity log. Full
+  [record](docs/RELEASE-0.6.5-ALPHA.1-RECORD.md).

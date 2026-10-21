@@ -1,3 +1,19 @@
+## Published 0.6.5-alpha.1 controller navigation preview — 2026-10-20
+
+Owner-requested prerelease `v0.6.5-alpha.1` is published from PR #14 source
+`1f5d1af5c8ea3f92bc41e0e3165ecef57cdf5341`. ZIP SHA-256
+`6d8e4985dbecb7355fff4a73aea16f284a17ab60b91a1cbf917aa273ec8f0cd1`;
+DLL SHA-256
+`b39620ed4f71e303e19acfd5211d8765176781c095837a4ef09e213ced7798f0`.
+The clean-clone publisher passed source 47/0, offline C# 597/0, publisher
+gate 8/0, two deterministic builds and package 6/0. GitHub download matched
+the local ZIP; stable 0.6.4 remains Latest. This exact alpha has NOT been run
+in the game. The [release record](docs/RELEASE-0.6.5-ALPHA.1-RECORD.md)
+separates tag identity from this later documentation commit. Exact next action:
+owner's focused native test of six-second Spells focus, spatial movement and
+text-only Inspector scrolling, with a matching UMM/Unity log. Do not infer a
+merge or stable release from the alpha.
+
 ## PR #14 Inspector scroll review correction — 2026-10-20
 
 On `codex/kingmaker-buff-planner-controller-navigation-review`, source commit
