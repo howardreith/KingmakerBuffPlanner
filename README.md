@@ -1,5 +1,10 @@
 # Mr. Bard's Kingmaker Buff Planner
 
+**Controller navigation preview: [0.6.5-alpha.1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.5-alpha.1).**
+This owner-authorized prerelease is for testing focus visibility and D-pad
+navigation. It has not been run in the game. See the
+[alpha notes](docs/RELEASE-NOTES-0.6.5-ALPHA.1.md).
+
 **Release: [0.6.4](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.4).**
 This owner-authorized release promotes the controller entry repair tested in
 `v0.6.4-alpha.1`. The owner reports that alpha's controller functionality is
