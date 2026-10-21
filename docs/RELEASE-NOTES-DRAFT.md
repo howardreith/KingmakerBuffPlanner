@@ -1,3 +1,14 @@
+# Mr. Bard's Kingmaker Buff Planner 0.6.6
+
+Owner-authorized stable release of the controller navigation repair merged in
+PR #14. This exact release has not been run in the game. It adds spatial D-pad
+focus, a persistent focus border and text-only Inspector scrolling without
+snap-back. Native rendered focus and physical-controller acceptance remain
+unverified. See the [release notes](RELEASE-NOTES-0.6.6.md) and
+[focused checklist](CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md).
+
+---
+
 # Mr. Bard's Kingmaker Buff Planner 0.6.5-alpha.1
 
 Owner-authorized pre-runtime alpha for controller navigation and focus

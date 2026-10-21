@@ -1,9 +1,14 @@
 # Mr. Bard's Kingmaker Buff Planner
 
+**Release: [0.6.6](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.6).**
+This owner-authorized release includes spatial controller navigation, a
+persistent focus border, and Inspector text scrolling without snap-back. The
+exact stable ZIP has not been run in the game. See the
+[release notes](docs/RELEASE-NOTES-0.6.6.md) and
+[controller checklist](docs/CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md).
+
 **Controller navigation preview: [0.6.5-alpha.1](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.5-alpha.1).**
-This owner-authorized prerelease is for testing focus visibility and D-pad
-navigation. It has not been run in the game. See the
-[alpha notes](docs/RELEASE-NOTES-0.6.5-ALPHA.1.md).
+See the [alpha notes](docs/RELEASE-NOTES-0.6.5-ALPHA.1.md).
 
 **Release: [0.6.4](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.4).**
 This owner-authorized release promotes the controller entry repair tested in
@@ -23,8 +28,8 @@ The 0.6.1-linux.1 prerelease and earlier 0.6.0 release remain available.
 
 ## Historical releases and controller previews
 
-The version-specific statements below record earlier releases, not current
-0.6.4 scope or evidence. Prior alphas and their receipts remain unchanged.
+The version-specific statements below record earlier releases. Prior alphas
+and their receipts remain unchanged.
 
 [Controller test Alpha4 **0.5.4-controller.4**](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.5.4-controller.4)
 targets full controller authoring, its
@@ -87,7 +92,7 @@ available policy, responsiveness instrumentation and ordinary-cased Run labels.
 
 Mr. Bard's Kingmaker Buff Planner is a standalone Unity Mod Manager mod built
 against **Windows Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b**. The
-0.6.4 retains the native Linux 2.1.5d version gate but has not passed a
+0.6.6 retains the native Linux 2.1.5d version gate but has not passed a
 native Linux trial.
 
 It plans and applies party buffs while preserving Kingmaker targeting,
@@ -97,7 +102,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.6.4.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.6.6.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including
