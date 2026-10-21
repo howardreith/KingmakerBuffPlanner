@@ -25,6 +25,33 @@ base affected version and release records, so no product-source conflict arose.
 The exact rendered focus behavior, including the reported six-second Spells
 case, still needs a guarded in-game observation before acceptance.
 
+## PR #14 review correction: text-only Inspector scrolling
+
+Review of `1116309` found that scrolling into a long, text-only imported
+constraint section could reveal the offscreen acknowledgement button and undo
+the requested scroll. The same fallback existed in the per-frame update.
+
+At source commit `fec94dfd7b548eb7c093d6f2fb4404caaf435ed6`, the navigator retains a pane-level reading focus
+when no control is visible inside the scrolled pane. The border marks the
+viewport, Confirm and Inspect cannot address the hidden button, and a later
+frame preserves the reading position. Scrolling until a control is visible
+restores button focus; directional navigation also leaves reading mode.
+
+- Focused regression: `controller-workspace-spatial-text-only-inspector-scroll-preserves-reading-focus`
+  covers the hidden acknowledgement button, subsequent frame reconciliation,
+  rebuild retention, blocked Confirm, and return to a visible button. The
+  bridge's scroll and frame paths both avoid `Reveal` while reading mode holds.
+- First focused run: source **47/0**, build **1/0**, tests **18/1**. An existing
+  empty-scope assertion required the no-controls message to take priority;
+  that behavior was retained.
+- Source-stamped run on `fec94dfd7b548eb7c093d6f2fb4404caaf435ed6`:
+  `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Development.ps1 -Only 'controller-workspace-'`
+  passed source **47/0**, build **1/0**, focused tests **19/0** in 6.3 seconds.
+  DLL SHA-256: `128da9e32a38dd00fb48930a64979c0c943af0ce27a7af314b61a79ce1ddfac2`.
+  Local ignored log: `artifacts/validation/controller-navigation-review-fec94df.log`.
+- `git diff --check`: passed. Native rendered/controller acceptance remains
+  **NOT RUN** for this corrected candidate.
+
 ## Original handoff status and identity
 
 Source repair prepared and reviewed locally; native visual acceptance is pending.

@@ -1,3 +1,21 @@
+## PR #14 Inspector scroll review correction — 2026-10-20
+
+On `codex/kingmaker-buff-planner-controller-navigation-review`, source commit
+`fec94dfd7b548eb7c093d6f2fb4404caaf435ed6` addresses the review of `1116309`: right-stick scrolling through a
+text-only Inspector notice section now retains pane-level reading focus, and
+the following frame no longer reveals the offscreen acknowledgement button.
+Confirm/Inspect cannot act on that button until it is visible. Version 0.6.4.
+The source-stamped Windows selector `Test-Development.ps1 -Only
+'controller-workspace-'` passed source 47/0, build 1/0, focused tests 19/0
+in 6.3 seconds. DLL SHA-256
+`128da9e32a38dd00fb48930a64979c0c943af0ce27a7af314b61a79ce1ddfac2`;
+local ignored log `artifacts/validation/controller-navigation-review-fec94df.log`.
+The first focused run was 18/1 on an existing empty-scope message assertion;
+the final behavior retains that contract. Native rendered/controller acceptance
+is NOT RUN. Exact next action: commit this documentation checkpoint, guarded
+push to PR #14, then follow the [focused native checklist](docs/CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md)
+before claiming the controller issue is resolved.
+
 ## Controller navigation Windows integration — 2026-10-20
 
 Owner-requested PR preparation uses branch

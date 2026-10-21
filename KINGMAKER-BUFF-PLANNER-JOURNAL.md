@@ -4299,3 +4299,35 @@ Receipt remains PARTIAL. Exact records and next separately budgeted guarded
   integration record, run the guarded push helper and open a PR to main. Native
   acceptance stays pending under the focused checklist in
   `docs/CONTROLLER-NAVIGATION-REPAIR-2026-10-20.md`.
+
+## PR #14 Inspector text scrolling review correction — 2026-10-20
+
+- Review of PR head `11163092846cfa7a22ee13c7be8eb30fc25e996b` against
+  `6914ef2` identified a P2 regression: a text-only Inspector notice section
+  had no visible button, so right-stick scroll and the next frame revealed the
+  old acknowledgement button, reversing the requested scroll. This is a
+  source-level reproduction, not a Unity or physical-controller observation.
+- Branch `codex/kingmaker-buff-planner-controller-navigation-review`, source
+  commit `fec94dfd7b548eb7c093d6f2fb4404caaf435ed6`: retain pane-level reading focus with a viewport border;
+  neither manual scroll nor frame reconciliation reveals an offscreen button.
+  Confirm/Inspect are inactive in this state, and a newly visible button
+  restores actionable focus. Added a focused Inspector notice regression.
+- First `Test-Development.ps1 -Only 'controller-workspace-'` after the edit:
+  source **47/0**, build **1/0**, focused tests **18/1**. The failure was an
+  existing empty-scope assertion; `Confirm` now reports no controls before the
+  reading-position message when the scope is empty. The next focused run passed
+  tests **19/0** on the edited tree.
+- Final source-stamped command on `fec94dfd7b548eb7c093d6f2fb4404caaf435ed6`:
+  `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Development.ps1 -Only 'controller-workspace-'`:
+  source **47/0**, production build **1/0**, focused tests **19/0**, 6.3
+  seconds. DLL SHA-256
+  `128da9e32a38dd00fb48930a64979c0c943af0ce27a7af314b61a79ce1ddfac2`.
+  Local ignored evidence:
+  `artifacts/validation/controller-navigation-review-fec94df.log`.
+- `git diff --check` passed. Rejected approach: revealing the retained
+  acknowledgement button whenever no visible control exists, since that
+  cancels the user's reading scroll. Version remains 0.6.4. No game launch,
+  installation, save mutation, package or release; native focus rendering is
+  still uncertain. Exact next action: commit these records, use the guarded
+  push helper for PR #14, then perform the focused native checklist before
+  declaring visual acceptance.
