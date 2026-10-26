@@ -1,0 +1,377 @@
+Assembly-CSharp SHA-256: 3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb
+Assembly-CSharp MVID: 07fa1e4d-8618-41b3-9b8d-faa17d3b26f7
+TargetType values: Enemy=0, Ally=1, Any=2
+
+=== Kingmaker.Blueprints.Facts.Fact members ===
+base System.Object
+field System.Boolean <Active>k__BackingField
+field System.Boolean <Initialized>k__BackingField
+field System.Boolean <IsDisposed>k__BackingField
+field Kingmaker.Blueprints.Facts.FactSourceCutscene <SourceCutscene>k__BackingField
+field Kingmaker.Items.ItemEntity <SourceItem>k__BackingField
+field Kingmaker.Blueprints.Facts.BlueprintFact Blueprint
+field System.Boolean m_Activating
+field System.Collections.Generic.List`1[[Kingmaker.Blueprints.GameLogicComponent, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] m_Components
+field System.Collections.Generic.List`1[[Kingmaker.Blueprints.Facts.Fact+LogicComponentData, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] m_ComponentsData
+field System.Boolean m_Deactivating
+field System.Boolean m_DidPostLoad
+field <null> m_LoadedComponents
+field System.Boolean m_Recalculating
+field System.Boolean m_TurnedOn
+property System.Boolean Active
+property System.Collections.Generic.List`1[[Kingmaker.Blueprints.GameLogicComponent, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] Components
+property System.Boolean Deactivating
+property System.String Description
+property UnityEngine.Sprite Icon
+property System.Boolean Initialized
+property System.Boolean IsDisposed
+property System.Boolean IsTurnedOn
+property Kingmaker.UnitLogic.Mechanics.MechanicsContext MaybeContext
+property System.String Name
+property Kingmaker.Blueprints.Facts.FactSourceCutscene SourceCutscene
+property Kingmaker.Items.ItemEntity SourceItem
+method System.Void Activate()
+method System.Void ActivateNewComponents()
+method System.Void CallComponents(System.Action`1[T])
+method System.Void Deactivate()
+method System.Void Dispose()
+method System.Collections.Generic.IEnumerable`1[[Kingmaker.Blueprints.GameLogicComponent, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] ExtractComponents()
+method T Get()
+method System.Boolean get_Active()
+method System.Collections.Generic.List`1[[Kingmaker.Blueprints.GameLogicComponent, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] get_Components()
+method System.Boolean get_Deactivating()
+method System.String get_Description()
+method UnityEngine.Sprite get_Icon()
+method System.Boolean get_Initialized()
+method System.Boolean get_IsDisposed()
+method System.Boolean get_IsTurnedOn()
+method Kingmaker.UnitLogic.Mechanics.MechanicsContext get_MaybeContext()
+method System.String get_Name()
+method Kingmaker.Blueprints.Facts.FactSourceCutscene get_SourceCutscene()
+method Kingmaker.Items.ItemEntity get_SourceItem()
+method System.Reflection.FieldInfo GetField(System.Type, System.String)
+method System.Collections.Generic.IEnumerable`1[[System.Reflection.FieldInfo, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]] GetFields(System.Type)
+method System.String GetOwnerDebug()
+method System.Int32 GetRank()
+method Kingmaker.EntitySystem.Entities.UnitEntityData GetSubscribingUnit()
+method System.Void InitializeLogicInternal(System.Boolean)
+method System.Void OnInitialized()
+method System.Void PostLoad()
+method System.Void PreSave()
+method System.Void Recalculate()
+method System.Collections.Generic.IEnumerable`1[T] SelectComponents(System.Func`2[T,System.Boolean])
+method System.Collections.Generic.IEnumerable`1[T] SelectComponents()
+method Kingmaker.UI.IUIDataProvider SelectUIData(Kingmaker.Assets.UI.UIDataType)
+method System.Void set_Active(System.Boolean)
+method System.Void set_Initialized(System.Boolean)
+method System.Void set_IsDisposed(System.Boolean)
+method System.Void set_SourceCutscene(Kingmaker.Blueprints.Facts.FactSourceCutscene)
+method System.Void set_SourceItem(Kingmaker.Items.ItemEntity)
+method System.String ToString()
+method System.Void TurnOff(System.Boolean)
+method System.Void TurnOn()
+
+=== Kingmaker.UnitLogic.Abilities.Ability members ===
+base Kingmaker.Blueprints.Facts.OwnedFact`1[[Kingmaker.UnitLogic.UnitDescriptor, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]]
+base field Kingmaker.UnitLogic.UnitDescriptor <Owner>k__BackingField
+base Kingmaker.Blueprints.Facts.OwnedFact
+base Kingmaker.Blueprints.Facts.Fact
+base field System.Boolean <Active>k__BackingField
+base field System.Boolean <Initialized>k__BackingField
+base field System.Boolean <IsDisposed>k__BackingField
+base field Kingmaker.Blueprints.Facts.FactSourceCutscene <SourceCutscene>k__BackingField
+base field Kingmaker.Items.ItemEntity <SourceItem>k__BackingField
+base field Kingmaker.Blueprints.Facts.BlueprintFact Blueprint
+base field System.Boolean m_Activating
+base field System.Collections.Generic.List`1[[Kingmaker.Blueprints.GameLogicComponent, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] m_Components
+base field System.Collections.Generic.List`1[[Kingmaker.Blueprints.Facts.Fact+LogicComponentData, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] m_ComponentsData
+base field System.Boolean m_Deactivating
+base field System.Boolean m_DidPostLoad
+base field <null> m_LoadedComponents
+base field System.Boolean m_Recalculating
+base field System.Boolean m_TurnedOn
+base System.Object
+field Kingmaker.UnitLogic.Abilities.AbilityParams <OverrideParams>k__BackingField
+field Kingmaker.UnitLogic.Spellbook <Spellbook>k__BackingField
+field Kingmaker.UnitLogic.Abilities.AbilityData <StickyTouch>k__BackingField
+field Kingmaker.UnitLogic.Abilities.AbilityData Data
+field System.Boolean m_Hidden
+property Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility Blueprint
+property System.Boolean Hidden
+property Kingmaker.UnitLogic.Abilities.AbilityParams OverrideParams
+property Kingmaker.UnitLogic.Spellbook Spellbook
+property Kingmaker.UnitLogic.Abilities.AbilityData StickyTouch
+method System.Void Dispose()
+method Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility get_Blueprint()
+method System.Boolean get_Hidden()
+method Kingmaker.UnitLogic.Abilities.AbilityParams get_OverrideParams()
+method Kingmaker.UnitLogic.Spellbook get_Spellbook()
+method Kingmaker.UnitLogic.Abilities.AbilityData get_StickyTouch()
+method System.Void set_Hidden(System.Boolean)
+method System.Void set_OverrideParams(Kingmaker.UnitLogic.Abilities.AbilityParams)
+method System.Void set_Spellbook(Kingmaker.UnitLogic.Spellbook)
+method System.Void set_StickyTouch(Kingmaker.UnitLogic.Abilities.AbilityData)
+
+=== Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility members ===
+base Kingmaker.Blueprints.Facts.BlueprintUnitFact
+base field System.Boolean m_AllowNonContextActions
+base field Kingmaker.Localization.LocalizedString m_Description
+base field Kingmaker.Localization.LocalizedString m_DisplayName
+base field UnityEngine.Sprite m_Icon
+base Kingmaker.Blueprints.Facts.BlueprintFact
+base Kingmaker.Blueprints.BlueprintScriptableObject
+base field Kingmaker.Blueprints.BlueprintComponent[] Components
+base field System.String m_AssetGuid
+base Kingmaker.Blueprints.PrototypeableObjectBase
+base field Kingmaker.Blueprints.PrototypeableObjectBase PrototypeLink
+base Kingmaker.Blueprints.SerializedScriptableObject
+base UnityEngine.ScriptableObject
+base UnityEngine.Object
+base field System.String cloneDestroyedMessage
+base field System.IntPtr m_CachedPtr
+base field System.String objectIsNullMessage
+base field System.Int32 OffsetOfInstanceIDInCPlusPlusObject
+base System.Object
+field System.Boolean ActionBarAutoFillIgnored
+field Kingmaker.UnitLogic.Commands.Base.UnitCommand+CommandType ActionType
+field Kingmaker.Visual.Animation.Kingmaker.Actions.UnitAnimationActionCastSpell+CastAnimationStyle Animation
+field Kingmaker.View.Animation.CastAnimationStyle AnimationStyle
+field Kingmaker.UnitLogic.Abilities.Metamagic AvailableMetamagic
+field System.Boolean CanTargetEnemies
+field System.Boolean CanTargetFriends
+field System.Boolean CanTargetPoint
+field System.Boolean CanTargetSelf
+field Kingmaker.Utility.Feet CustomRange
+field System.Boolean DisableLog
+field Kingmaker.UnitLogic.Abilities.Blueprints.AbilityEffectOnUnit EffectOnAlly
+field Kingmaker.UnitLogic.Abilities.Blueprints.AbilityEffectOnUnit EffectOnEnemy
+field System.Boolean HasFastAnimation
+field System.Boolean Hidden
+field Kingmaker.Localization.LocalizedString LocalizedDuration
+field Kingmaker.Localization.LocalizedString LocalizedSavingThrow
+field Kingmaker.UnitLogic.Abilities.Components.Base.IAbilityAvailabilityProvider[] m_CachedAvailabilityProviders
+field Kingmaker.UnitLogic.Abilities.Components.Base.IAbilityCasterChecker[] m_CachedCasterCheckers
+field Kingmaker.UnitLogic.Abilities.Components.Base.IAbilityTargetChecker[] m_CachedTargetCheckers
+field System.Boolean m_IsFullRoundAction
+field System.Boolean m_TargetMapObjects
+field Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData MaterialComponent
+field System.Boolean NeedEquipWeapons
+field Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility Parent
+field Kingmaker.UnitLogic.Abilities.Blueprints.AbilityRange Range
+field System.String[] ResourceAssetIds
+field System.Boolean SpellResistance
+field Kingmaker.UnitLogic.Abilities.Blueprints.AbilityType Type
+property Kingmaker.Utility.Feet AoERadius
+property Kingmaker.UnitLogic.Abilities.Components.TargetType AoETargets
+property Kingmaker.UnitLogic.Abilities.Components.Base.IAbilityAvailabilityProvider[] AvailabilityProviders
+property System.Boolean CanCastToDeadTarget
+property Kingmaker.UnitLogic.Abilities.Components.Base.IAbilityCasterChecker[] CasterCheckers
+property System.String Description
+property System.Boolean HasAnimation
+property System.Boolean HasVariants
+property System.Boolean IsCantrip
+property System.Boolean IsFullRoundAction
+property System.Boolean IsRangeCustom
+property System.Boolean IsSpell
+property System.Boolean IsStandardAction
+property Kingmaker.UnitLogic.Abilities.Components.AbilityProjectileType ProjectileType
+property System.String RawDescription
+property Kingmaker.Blueprints.Classes.Spells.SpellSchool School
+property System.String ShortenedDescription
+property Kingmaker.Blueprints.Classes.Spells.SpellDescriptor SpellDescriptor
+property Kingmaker.UnitLogic.Abilities.Components.AbilityEffectStickyTouch StickyTouch
+property Kingmaker.UnitLogic.Abilities.Components.Base.IAbilityTargetChecker[] TargetCheckers
+property System.Boolean TargetMapObjects
+property Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility[] Variants
+method System.Boolean <Validate>b__79_0(Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility)
+method Kingmaker.Utility.Feet get_AoERadius()
+method Kingmaker.UnitLogic.Abilities.Components.TargetType get_AoETargets()
+method Kingmaker.UnitLogic.Abilities.Components.Base.IAbilityAvailabilityProvider[] get_AvailabilityProviders()
+method System.Boolean get_CanCastToDeadTarget()
+method Kingmaker.UnitLogic.Abilities.Components.Base.IAbilityCasterChecker[] get_CasterCheckers()
+method System.String get_Description()
+method System.Boolean get_HasAnimation()
+method System.Boolean get_HasVariants()
+method System.Boolean get_IsCantrip()
+method System.Boolean get_IsFullRoundAction()
+method System.Boolean get_IsRangeCustom()
+method System.Boolean get_IsSpell()
+method System.Boolean get_IsStandardAction()
+method Kingmaker.UnitLogic.Abilities.Components.AbilityProjectileType get_ProjectileType()
+method System.String get_RawDescription()
+method Kingmaker.Blueprints.Classes.Spells.SpellSchool get_School()
+method System.String get_ShortenedDescription()
+method Kingmaker.Blueprints.Classes.Spells.SpellDescriptor get_SpellDescriptor()
+method Kingmaker.UnitLogic.Abilities.Components.AbilityEffectStickyTouch get_StickyTouch()
+method Kingmaker.UnitLogic.Abilities.Components.Base.IAbilityTargetChecker[] get_TargetCheckers()
+method System.Boolean get_TargetMapObjects()
+method Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility[] get_Variants()
+method System.Type GetFactType()
+method Kingmaker.Utility.Feet GetLineWidth()
+method Kingmaker.Utility.Feet GetRange(System.Boolean)
+method System.String[] GetResourceIds()
+method System.String GetShortenedDescription()
+method System.String GetTarget()
+method Kingmaker.Blueprints.FactCollection GetTargetCollection(Kingmaker.UnitLogic.UnitDescriptor)
+method UnityEngine.Sprite GetTargetImage()
+method UnityEngine.Sprite GetTargetImageSpellAoEAll(Kingmaker.Blueprints.Root.UIIcons)
+method UnityEngine.Sprite GetTargetImageSpellAoEEnemiesl(Kingmaker.Blueprints.Root.UIIcons)
+method UnityEngine.Sprite GetTargetImageSpellAoEFriends(Kingmaker.Blueprints.Root.UIIcons)
+method System.Boolean HasVariant(Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility)
+method System.Boolean IsInSpellList(Kingmaker.Blueprints.Classes.Spells.BlueprintSpellList)
+method System.Boolean IsInSpellListOfUnit(Kingmaker.UnitLogic.UnitDescriptor)
+method System.Void SetIsFullRoundAction(System.Boolean)
+method UnityEngine.Sprite SpritesSpellAoECreaturelNoTarget(Kingmaker.Blueprints.Root.UIIcons)
+method System.Void Validate(Kingmaker.Blueprints.Validation.ValidationContext)
+
+=== Kingmaker.UI.UnitSettings.MechanicActionBarSlotAbility members ===
+base Kingmaker.UI.UnitSettings.MechanicActionBarSlot
+base field System.Int32 <ResourceCount>k__BackingField
+base field System.Boolean HoverState
+base field System.Boolean m_IsCastingActive
+base field Kingmaker.EntitySystem.Entities.UnitEntityData Unit
+base System.Object
+field Kingmaker.UnitLogic.Abilities.AbilityData Ability
+property System.Boolean IsAutoUse
+property System.Boolean IsNotAvailable
+property System.Boolean IsVariantAbility
+method Kingmaker.UnitLogic.Abilities.AbilityData <GetConvertedAbilityData>b__21_0(Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility)
+method System.Boolean CanUseIfTurnBased()
+method System.Boolean get_IsAutoUse()
+method System.Boolean get_IsNotAvailable()
+method System.Boolean get_IsVariantAbility()
+method System.Object GetContentData()
+method System.Collections.Generic.List`1[[Kingmaker.UnitLogic.Abilities.AbilityData, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] GetConvertedAbilityData()
+method UnityEngine.Color GetDecorationColor()
+method UnityEngine.Sprite GetDecorationSprite()
+method System.String GetDescription()
+method UnityEngine.Sprite GetIcon()
+method System.Int32 GetResource()
+method System.String GetTitle()
+method System.Boolean IsBad()
+method System.Boolean IsCasting()
+method System.Boolean IsDisabled(System.Int32)
+method System.Void OnAutoUseToggle()
+method System.Void OnClick()
+method System.Void OnHover(System.Boolean)
+method System.Void UpdateSlotInternal(Kingmaker.UI.ActionBar.ActionBarSlot)
+method System.String WarningMessage()
+
+=== Kingmaker.UnitLogic.Commands.UnitUseAbility members ===
+base Kingmaker.UnitLogic.Commands.Base.UnitCommand
+base field Kingmaker.Controllers.Brain.Blueprints.BlueprintAiAction <AiAction>k__BackingField
+base field System.Boolean <AiEnableFiveFootStep>k__BackingField
+base field Kingmaker.Visual.Animation.Kingmaker.UnitAnimationActionHandle <Animation>k__BackingField
+base field System.Single <AnimatorTimeScale>k__BackingField
+base field System.Single <ApproachRadius>k__BackingField
+base field System.Boolean <Cutscene>k__BackingField
+base field System.Boolean <DidRun>k__BackingField
+base field Kingmaker.EntitySystem.Entities.UnitEntityData <Executor>k__BackingField
+base field System.Boolean <FinishedApproaching>k__BackingField
+base field System.Boolean <InterruptAsSoonAsPossible>k__BackingField
+base field System.Boolean <IsActed>k__BackingField
+base field System.Boolean <IsFinished>k__BackingField
+base field System.Boolean <IsMoveUnit>k__BackingField
+base field System.Boolean <IsStarted>k__BackingField
+base field Kingmaker.Visual.Animation.Kingmaker.Actions.UnitAnimationActionLocoMotion+WalkSpeedType <MovementType>k__BackingField
+base field System.Boolean <NeedLoS>k__BackingField
+base field System.Nullable`1[[System.Single, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]] <OverrideSpeed>k__BackingField
+base field Kingmaker.UnitLogic.Commands.Base.UnitCommand+ResultType <Result>k__BackingField
+base field System.Boolean <ShouldUpdateManualTarget>k__BackingField
+base field System.Nullable`1[[System.Single, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]] <SpeedLimit>k__BackingField
+base field Kingmaker.Utility.TargetWrapper <Target>k__BackingField
+base field System.Single <TimeSinceStart>k__BackingField
+base field Kingmaker.UnitLogic.Commands.Base.UnitCommand+CommandType <Type>k__BackingField
+base field System.Boolean CreatedByPlayer
+base field System.Boolean DontInterruptInTurnBasedMode
+base field System.Boolean HasAnimation
+base field System.Single InfiniteRange
+base field System.Boolean m_Accelerated
+base field Pathfinding.Path m_ForcedPath
+base field System.Boolean m_IgnoreCooldown
+base field System.Nullable`1[[System.TimeSpan, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]] m_IgnoreCooldownBeforeTime
+base field System.Boolean m_IsAnimationActHandled
+base field System.Single m_MaxApproachRadius
+base field System.Single m_PretendActTime
+base field System.Boolean m_StoredDoNotZeroOtherAnimations
+base field System.Single m_StoredWeightMultiplier
+base field System.Single MaxApproachCooldown
+base field System.Single MinApproachCooldown
+base field System.TimeSpan NextApproachTime
+base System.Object
+field System.Boolean <ConcentrationCheckFailed>k__BackingField
+field System.Boolean <DisableLog>k__BackingField
+field Kingmaker.Controllers.AbilityExecutionProcess <ExecutionProcess>k__BackingField
+field System.Boolean <ForceAlwaysHit>k__BackingField
+field System.Boolean <TestPauseOnCast>k__BackingField
+field System.Boolean m_AfterPrecastFxSpawned
+field Kingmaker.Visual.Animation.Kingmaker.Actions.UnitAnimationActionCastSpell+CastAnimationStyle m_CastAnimStyle
+field System.Boolean m_CastingDefensivelyCheck
+field System.Single m_CastTime
+field System.Collections.Generic.List`1[[UnityEngine.GameObject, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] m_GroundFxObjects
+field System.Collections.Generic.List`1[[UnityEngine.GameObject, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] m_HandFxObjects
+field System.Boolean m_IsEldritchArcherSpell
+field Kingmaker.Visual.Animation.Kingmaker.Actions.UnitAnimationActionCastSpell+SpecialBehaviourType m_Special
+field Kingmaker.UnitLogic.Abilities.AbilityData Spell
+property System.Boolean AiCanInterrupt
+property System.Boolean CanStart
+property System.Boolean ConcentrationCheckFailed
+property System.Boolean DisableLog
+property System.Boolean DontWaitForHands
+property Kingmaker.Controllers.AbilityExecutionProcess ExecutionProcess
+property System.Boolean ForceAlwaysHit
+property System.Boolean ForceCastOnBadTarget
+property System.Boolean IsInterruptible
+property System.Boolean IsTargetingDeadUnit
+property System.Boolean MarkManualTarget
+property System.Single MaxApproachRadius
+property System.Boolean NeedEquipWeapons
+property System.Boolean ShouldBeInterrupted
+property Kingmaker.Utility.TargetWrapper Target
+property System.Boolean TestPauseOnCast
+property Kingmaker.View.Animation.WeaponAnimationStyle WeaponStyle
+method System.Void <TriggerAnimation>b__56_0(Kingmaker.Visual.Animation.Kingmaker.UnitAnimationActionHandle)
+method System.Void CastAbilityFx(Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFxTime)
+method Kingmaker.UnitLogic.Commands.Base.UnitCommand CreateCastCommand(Kingmaker.UnitLogic.Abilities.AbilityData, Kingmaker.Utility.TargetWrapper)
+method System.Boolean FailIfConcentrationCheckFailed()
+method System.Boolean get_AiCanInterrupt()
+method System.Boolean get_CanStart()
+method System.Boolean get_ConcentrationCheckFailed()
+method System.Boolean get_DisableLog()
+method System.Boolean get_DontWaitForHands()
+method Kingmaker.Controllers.AbilityExecutionProcess get_ExecutionProcess()
+method System.Boolean get_ForceAlwaysHit()
+method System.Boolean get_ForceCastOnBadTarget()
+method System.Boolean get_IsInterruptible()
+method System.Boolean get_IsTargetingDeadUnit()
+method System.Boolean get_MarkManualTarget()
+method System.Single get_MaxApproachRadius()
+method System.Boolean get_NeedEquipWeapons()
+method System.Boolean get_ShouldBeInterrupted()
+method Kingmaker.Utility.TargetWrapper get_Target()
+method System.Boolean get_TestPauseOnCast()
+method Kingmaker.View.Animation.WeaponAnimationStyle get_WeaponStyle()
+method System.String GetInnerDataDescription()
+method UnityEngine.Vector3 GetTargetPoint()
+method System.Void Init(Kingmaker.EntitySystem.Entities.UnitEntityData)
+method System.Void MakeConcentrationCheck(Kingmaker.RuleSystem.Rules.Damage.RuleDealDamage)
+method System.Void MakeConcentrationCheckIfCastingIsDifficult()
+method Kingmaker.UnitLogic.Commands.Base.UnitCommand+ResultType OnAction()
+method System.Void OnEnded(System.Boolean)
+method System.Void OnStart()
+method System.Void OnTick()
+method System.Void OnTickApproaching()
+method System.Void set_ConcentrationCheckFailed(System.Boolean)
+method System.Void set_DisableLog(System.Boolean)
+method System.Void set_ExecutionProcess(Kingmaker.Controllers.AbilityExecutionProcess)
+method System.Void set_ForceAlwaysHit(System.Boolean)
+method System.Void set_Target(Kingmaker.Utility.TargetWrapper)
+method System.Void set_TestPauseOnCast(System.Boolean)
+method System.Void SpawnCastFx()
+method System.Void SpawnInterruptFx()
+method System.Void SpawnPrecastFx()
+method System.Collections.Generic.List`1[[UnityEngine.GameObject, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] SureGroundFxList()
+method System.Collections.Generic.List`1[[UnityEngine.GameObject, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] SureHandFxList()
+method System.Void TriggerAnimation()
+method System.Boolean TryCastingDefensively()
+method System.Boolean TryMergeInto(Kingmaker.UnitLogic.Commands.Base.UnitCommand)

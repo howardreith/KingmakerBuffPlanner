@@ -1,0 +1,19 @@
+{
+    "baseCommit":  "e7b544f6b86bdd552737a99539dd34eb228c89b0",
+    "testedCommit":  "eafb950a886c7ede741f0541d37b2140d9d4b500",
+    "branch":  "codex/kingmaker-buff-planner/resource-classification-repair",
+    "version":  "0.6.6",
+    "dllSha256":  "7e8a75c8cc45b5e77c0c02d419d67d1bce8c4ec8a1d7da58b9bdce66de0f0370",
+    "dllMvid":  "493b01aa-5955-429f-9b55-6735955742f9",
+    "runnerSha256":  "dd89d2f410bab34a4b5d90a8eb08046b5938f5a4aaf53f373c54addeaf538fd4",
+    "fixtureSha256":  "2d7cb3564a1f0b6355f168189c80119bc2c2c30c93217cbdb196c36982292a01",
+    "focusedPassed":  17,
+    "focusedFailed":  0,
+    "sourcePassed":  47,
+    "sourceFailed":  0,
+    "buildPassed":  1,
+    "buildFailed":  0,
+    "native":  "NOT_RUN",
+    "nativeReason":  "Current-product whole-history purity prerequisite exceeds ordinary 30-minute ceiling; no reuse permitted.",
+    "inspectionScriptSha256":  "a12734dda5645ea1eb5977c3e2bd6dc09dfbb346bb35ca1611ba717a9cc856a2"
+}

@@ -1,3 +1,17 @@
+## Limited-use repair limits, 2026-10-26
+
+Local implementation checkpoint is complete on source `eafb950a886c7ede741f0541d37b2140d9d4b500`
+(0.6.6); focused 17/0, source 47/0, build 1/0. [Exact branch/base/hash/commands and
+acceptance matrix](docs/LIMITED-USE-REPAIR-CHECKPOINT.md).
+Missing reporter log/plan/profile prevents identifying the original source.
+Native acceptance is NOT_RUN because mandatory current-product purity needs a
+separate qualification budget (historical 112-154 minutes, ordinary ceiling 30),
+not because the installed lab or protected save pair is absent. No launch or
+live mutation occurred. ItemEntity has no persistent instance ID: finite item
+support is session-bound, with saved intent retained unresolved after reload.
+Persistent item tracking is not implemented or claimed. Next action is the
+separately budgeted guarded native boundary described in the checkpoint.
+
 ## Linux 2.1.5d acceptance
 
 The full `v0.6.2` release is published and GitHub Latest, but native Linux

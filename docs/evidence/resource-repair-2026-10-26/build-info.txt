@@ -1,0 +1,8 @@
+﻿namespace KingmakerBuffPlanner
+{
+internal static class BuildInfo
+{
+internal const string Version = "0.6.6";
+internal const string Commit = "eafb950a886c7ede741f0541d37b2140d9d4b500";
+}
+}

@@ -131,7 +131,7 @@ $contracts = [ordered]@{
         'SpendMaterialComponent', 'get_Resource', 'get_ResourceCost', 'get_RequireMaterialComponent')
     'Kingmaker.Items.ItemEntity' = @(
         'get_IsSpendCharges', 'get_Charges', 'SpendCharges', 'get_Ability',
-        'ReapplyAbilities', 'ReapplyFactsForWielder')
+        'ReapplyAbilities', 'ReapplyFactsForWielder', 'OnDidEquipped')
     'Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment' = @('get_GainAbility')
     'Kingmaker.Items.ItemEntityUsable' = @()
     'Kingmaker.Blueprints.Facts.Fact' = @('get_SourceItem')

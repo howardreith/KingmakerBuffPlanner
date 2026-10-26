@@ -1,3 +1,20 @@
+## Current branch checkpoint: limited-use repair, 2026-10-26
+
+Branch `codex/kingmaker-buff-planner/resource-classification-repair`, isolated
+`private/worktrees/KBP-RESOURCE-REPAIR`; base `e7b544f6b86bdd552737a99539dd34eb228c89b0`.
+Tested source/test HEAD `eafb950a886c7ede741f0541d37b2140d9d4b500`, version 0.6.6.
+Focused selector 17 PASS / 0 FAIL, source 47/0, build 1/0. DLL SHA-256
+`7e8a75c8cc45b5e77c0c02d419d67d1bce8c4ec8a1d7da58b9bdce66de0f0370`.
+[Checkpoint, commands, tests, R1-R7 and evidence](docs/LIMITED-USE-REPAIR-CHECKPOINT.md).
+Single-item charge runs are supported with exact live-object binding; saved
+item tokens become unresolved on reload and require explicit reselection.
+The original tester source is unknown. Native controller/mouse/Animated rows
+are NOT_RUN: required whole-history purity exceeds the ordinary 30-minute
+policy ceiling; lab/Steam/protected-pair read-only prerequisites passed.
+Next: a separately budgeted guarded native qualification on the frozen product,
+then obtain the full tester casting record. Do not resume older campaigns,
+merge, publish, deploy manually, or contact the tester from this checkpoint.
+
 ## Published 0.6.6 stable controller navigation release — 2026-10-20
 
 The owner requested 0.6.6 after merging PR #14. The stable release

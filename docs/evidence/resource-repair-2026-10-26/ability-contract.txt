@@ -1,0 +1,237 @@
+Assembly-CSharp SHA-256: 3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb
+Assembly-CSharp MVID: 07fa1e4d-8618-41b3-9b8d-faa17d3b26f7
+TargetType values: Enemy=0, Ally=1, Any=2
+
+=== Kingmaker.UnitLogic.Abilities.AbilityData::.ctor(Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Kingmaker.UnitLogic.UnitDescriptor, Kingmaker.UnitLogic.Abilities.Ability, Kingmaker.Blueprints.Classes.Spells.BlueprintSpellbook) -> <constructor> ===
+IL_0000: ldarg.0
+IL_0001: ldc.i4.m1
+IL_0002: stfld        Kingmaker.UnitLogic.Abilities.AbilityData::DecorationColorNumber
+IL_0007: ldarg.0
+IL_0008: ldc.i4.m1
+IL_0009: stfld        Kingmaker.UnitLogic.Abilities.AbilityData::DecorationBorderNumber
+IL_000e: ldarg.0
+IL_000f: call         System.Object::.ctor
+IL_0014: ldarg.3
+IL_0015: brfalse.s    IL_0030
+IL_0017: ldarg.s      4
+IL_0019: ldnull
+IL_001a: call         UnityEngine.Object::op_Inequality
+IL_001f: brfalse.s    IL_0030
+IL_0021: ldstr        "Fact and spellbook can't be sources of ability in one time"
+IL_0026: call         System.Array::Empty
+IL_002b: call         UberDebug::LogError
+IL_0030: ldarg.0
+IL_0031: ldarg.1
+IL_0032: stfld        Kingmaker.UnitLogic.Abilities.AbilityData::Blueprint
+IL_0037: ldarg.0
+IL_0038: ldarg.2
+IL_0039: stfld        Kingmaker.UnitLogic.Abilities.AbilityData::Caster
+IL_003e: ldarg.0
+IL_003f: ldarg.3
+IL_0040: call         Kingmaker.UnitLogic.Abilities.AbilityData::set_Fact
+IL_0045: ldarg.0
+IL_0046: ldarg.s      4
+IL_0048: stfld        Kingmaker.UnitLogic.Abilities.AbilityData::m_SpellbookBlueprint
+IL_004d: ret
+
+=== Kingmaker.UnitLogic.Abilities.AbilityData::.ctor(Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Kingmaker.UnitLogic.UnitDescriptor) -> <constructor> ===
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldnull
+IL_0004: ldnull
+IL_0005: call         Kingmaker.UnitLogic.Abilities.AbilityData::.ctor
+IL_000a: ret
+
+=== Kingmaker.UnitLogic.Abilities.AbilityData::.ctor(Kingmaker.UnitLogic.Abilities.Ability) -> <constructor> ===
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: callvirt     Kingmaker.UnitLogic.Abilities.Ability::get_Blueprint
+IL_0007: ldarg.1
+IL_0008: callvirt     Kingmaker.Blueprints.Facts.OwnedFact`1[[Kingmaker.UnitLogic.UnitDescriptor, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]]::get_Owner
+IL_000d: ldarg.1
+IL_000e: ldnull
+IL_000f: call         Kingmaker.UnitLogic.Abilities.AbilityData::.ctor
+IL_0014: ret
+
+=== Kingmaker.UnitLogic.Abilities.AbilityData::.ctor(Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Kingmaker.UnitLogic.UnitDescriptor, Kingmaker.Blueprints.Classes.Spells.BlueprintSpellbook) -> <constructor> ===
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldnull
+IL_0004: ldarg.3
+IL_0005: call         Kingmaker.UnitLogic.Abilities.AbilityData::.ctor
+IL_000a: ret
+
+=== Kingmaker.UnitLogic.Abilities.AbilityData::.ctor(Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Kingmaker.UnitLogic.Spellbook) -> <constructor> ===
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: ldarg.2
+IL_0003: ldfld        Kingmaker.UnitLogic.Spellbook::Owner
+IL_0008: ldnull
+IL_0009: ldarg.2
+IL_000a: ldfld        Kingmaker.UnitLogic.Spellbook::Blueprint
+IL_000f: call         Kingmaker.UnitLogic.Abilities.AbilityData::.ctor
+IL_0014: ret
+
+=== Kingmaker.UnitLogic.Abilities.AbilityData::.ctor(Kingmaker.UnitLogic.Abilities.AbilityData, Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility) -> <constructor> ===
+IL_0000: ldarg.0
+IL_0001: ldarg.2
+IL_0002: ldnull
+IL_0003: call         UnityEngine.Object::op_Inequality
+IL_0008: brtrue.s     IL_0012
+IL_000a: ldarg.1
+IL_000b: ldfld        Kingmaker.UnitLogic.Abilities.AbilityData::Blueprint
+IL_0010: br.s         IL_0013
+IL_0012: ldarg.2
+IL_0013: ldarg.1
+IL_0014: ldfld        Kingmaker.UnitLogic.Abilities.AbilityData::Caster
+IL_0019: ldarg.1
+IL_001a: callvirt     Kingmaker.UnitLogic.Abilities.AbilityData::get_Fact
+IL_001f: ldarg.1
+IL_0020: ldfld        Kingmaker.UnitLogic.Abilities.AbilityData::m_SpellbookBlueprint
+IL_0025: call         Kingmaker.UnitLogic.Abilities.AbilityData::.ctor
+IL_002a: ldarg.0
+IL_002b: ldarg.1
+IL_002c: callvirt     Kingmaker.UnitLogic.Abilities.AbilityData::get_MetamagicData
+IL_0031: call         Kingmaker.UnitLogic.Abilities.AbilityData::set_MetamagicData
+IL_0036: ldarg.0
+IL_0037: ldarg.1
+IL_0038: ldfld        Kingmaker.UnitLogic.Abilities.AbilityData::m_ConvertedFrom
+IL_003d: stfld        Kingmaker.UnitLogic.Abilities.AbilityData::m_ConvertedFrom
+IL_0042: ldarg.0
+IL_0043: ldfld        Kingmaker.UnitLogic.Abilities.AbilityData::m_ConvertedFrom
+IL_0048: ldnull
+IL_0049: call         Kingmaker.UnitLogic.Abilities.AbilityData::op_Equality
+IL_004e: brfalse.s    IL_0060
+IL_0050: ldarg.2
+IL_0051: ldnull
+IL_0052: call         UnityEngine.Object::op_Inequality
+IL_0057: brfalse.s    IL_0060
+IL_0059: ldarg.0
+IL_005a: ldarg.1
+IL_005b: stfld        Kingmaker.UnitLogic.Abilities.AbilityData::m_ConvertedFrom
+IL_0060: ret
+
+=== Kingmaker.UnitLogic.Abilities.AbilityData::.ctor() -> <constructor> ===
+IL_0000: ldarg.0
+IL_0001: ldc.i4.m1
+IL_0002: stfld        Kingmaker.UnitLogic.Abilities.AbilityData::DecorationColorNumber
+IL_0007: ldarg.0
+IL_0008: ldc.i4.m1
+IL_0009: stfld        Kingmaker.UnitLogic.Abilities.AbilityData::DecorationBorderNumber
+IL_000e: ldarg.0
+IL_000f: call         System.Object::.ctor
+IL_0014: ret
+
+=== Kingmaker.UnitLogic.Abilities.AbilityData::get_SourceItem() -> Kingmaker.Items.ItemEntity ===
+IL_0000: ldarg.0
+IL_0001: call         Kingmaker.UnitLogic.Abilities.AbilityData::get_Fact
+IL_0006: dup
+IL_0007: brtrue.s     IL_000c
+IL_0009: pop
+IL_000a: ldnull
+IL_000b: ret
+IL_000c: call         Kingmaker.Blueprints.Facts.Fact::get_SourceItem
+IL_0011: ret
+
+=== Kingmaker.UnitLogic.Abilities.AbilityData::GetAvailableForCastCount() -> System.Int32 ===
+IL_0000: ldarg.0
+IL_0001: call         Kingmaker.UnitLogic.Abilities.AbilityData::get_StickyTouch
+IL_0006: ldnull
+IL_0007: call         Kingmaker.UnitLogic.Abilities.AbilityData::op_Inequality
+IL_000c: brfalse.s    IL_0010
+IL_000e: ldc.i4.1
+IL_000f: ret
+IL_0010: ldarg.0
+IL_0011: ldfld        Kingmaker.UnitLogic.Abilities.AbilityData::m_ConvertedFrom
+IL_0016: ldnull
+IL_0017: call         Kingmaker.UnitLogic.Abilities.AbilityData::op_Inequality
+IL_001c: brfalse.s    IL_002a
+IL_001e: ldarg.0
+IL_001f: ldfld        Kingmaker.UnitLogic.Abilities.AbilityData::m_ConvertedFrom
+IL_0024: callvirt     Kingmaker.UnitLogic.Abilities.AbilityData::GetAvailableForCastCount
+IL_0029: ret
+IL_002a: ldarg.0
+IL_002b: call         Kingmaker.UnitLogic.Abilities.AbilityData::get_Spellbook
+IL_0030: brfalse.s    IL_003f
+IL_0032: ldarg.0
+IL_0033: call         Kingmaker.UnitLogic.Abilities.AbilityData::get_Spellbook
+IL_0038: ldarg.0
+IL_0039: callvirt     Kingmaker.UnitLogic.Spellbook::GetAvailableForCastSpellCount
+IL_003e: ret
+IL_003f: ldarg.0
+IL_0040: call         Kingmaker.UnitLogic.Abilities.AbilityData::get_Fact
+IL_0045: brfalse.s    IL_00a0
+IL_0047: ldarg.0
+IL_0048: call         Kingmaker.UnitLogic.Abilities.AbilityData::get_Fact
+IL_004d: callvirt     Kingmaker.UnitLogic.Abilities.Ability::get_Blueprint
+IL_0052: call         Kingmaker.Blueprints.BlueprintExtenstions::GetComponents
+IL_0057: call         System.Linq.Enumerable::FirstOrDefault
+IL_005c: stloc.0
+IL_005d: ldloc.0
+IL_005e: ldnull
+IL_005f: call         UnityEngine.Object::op_Inequality
+IL_0064: brfalse.s    IL_006e
+IL_0066: ldloc.0
+IL_0067: ldfld        Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic::IsSpendResource
+IL_006c: brtrue.s     IL_0071
+IL_006e: ldnull
+IL_006f: br.s         IL_0077
+IL_0071: ldloc.0
+IL_0072: ldfld        Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic::RequiredResource
+IL_0077: stloc.1
+IL_0078: ldloc.1
+IL_0079: ldnull
+IL_007a: call         UnityEngine.Object::op_Inequality
+IL_007f: brfalse.s    IL_00a0
+IL_0081: ldarg.0
+IL_0082: call         Kingmaker.UnitLogic.Abilities.AbilityData::get_Fact
+IL_0087: callvirt     Kingmaker.Blueprints.Facts.OwnedFact`1[[Kingmaker.UnitLogic.UnitDescriptor, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]]::get_Owner
+IL_008c: ldfld        Kingmaker.UnitLogic.UnitDescriptor::Resources
+IL_0091: ldloc.1
+IL_0092: callvirt     Kingmaker.UnitLogic.UnitAbilityResourceCollection::GetResourceAmount
+IL_0097: ldloc.0
+IL_0098: ldarg.0
+IL_0099: callvirt     Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic::CalculateCost
+IL_009e: div
+IL_009f: ret
+IL_00a0: ldarg.0
+IL_00a1: call         Kingmaker.UnitLogic.Abilities.AbilityData::get_SourceItem
+IL_00a6: brfalse.s    IL_00b5
+IL_00a8: ldarg.0
+IL_00a9: call         Kingmaker.UnitLogic.Abilities.AbilityData::get_SourceItem
+IL_00ae: callvirt     Kingmaker.Items.ItemEntity::get_IsSpendCharges
+IL_00b3: brtrue.s     IL_00b7
+IL_00b5: ldc.i4.m1
+IL_00b6: ret
+IL_00b7: ldarg.0
+IL_00b8: call         Kingmaker.UnitLogic.Abilities.AbilityData::get_SourceItem
+IL_00bd: callvirt     Kingmaker.Items.ItemEntity::get_Charges
+IL_00c2: ret
+
+=== Kingmaker.UnitLogic.Abilities.AbilityData::Spend() -> System.Void ===
+IL_0000: ldarg.0
+IL_0001: call         Kingmaker.UnitLogic.Abilities.AbilityData::SpendMaterialComponent
+IL_0006: ldarg.0
+IL_0007: call         Kingmaker.UnitLogic.Abilities.AbilityData::get_SourceItem
+IL_000c: dup
+IL_000d: brtrue.s     IL_0012
+IL_000f: pop
+IL_0010: br.s         IL_001e
+IL_0012: ldarg.0
+IL_0013: ldfld        Kingmaker.UnitLogic.Abilities.AbilityData::Caster
+IL_0018: call         Kingmaker.Items.ItemEntity::SpendCharges
+IL_001d: pop
+IL_001e: ldarg.0
+IL_001f: call         Kingmaker.UnitLogic.Abilities.AbilityData::SpendFromSpellbook
+IL_0024: ldarg.0
+IL_0025: ldfld        Kingmaker.UnitLogic.Abilities.AbilityData::Blueprint
+IL_002a: call         Kingmaker.Blueprints.BlueprintExtenstions::GetComponent
+IL_002f: dup
+IL_0030: brtrue.s     IL_0034
+IL_0032: pop
+IL_0033: ret
+IL_0034: ldarg.0
+IL_0035: callvirt     Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic::Spend
+IL_003a: ret

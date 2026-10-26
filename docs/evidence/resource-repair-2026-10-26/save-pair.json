@@ -1,0 +1,23 @@
+{
+    "family":  "Automation",
+    "baseline":  {
+                     "name":  "KBP_AUTOMATION_BASELINE",
+                     "fileName":  "Manual_304_KBP_AUTOMATION_BASELINE.zks",
+                     "path":  "C:\\Users\\howar\\AppData\\LocalLow\\Owlcat Games\\Pathfinder Kingmaker\\Saved Games\\Manual_304_KBP_AUTOMATION_BASELINE.zks",
+                     "sha256":  "f13de02d7c59a70a34d335a413f0d90fc7e63cdcb327224ecf5885ed6e1f8300",
+                     "gameName":  "Hedwirg",
+                     "gameId":  "df33d1ff-4ec8-4707-bfa0-5e059bf9a049",
+                     "area":  "2849fdde28fe50f4d935bf2cf3405051",
+                     "length":  967228
+                 },
+    "working":  {
+                    "name":  "KBP_AUTOMATION_WORKING",
+                    "fileName":  "Manual_305_KBP_AUTOMATION_WORKING.zks",
+                    "path":  "C:\\Users\\howar\\AppData\\LocalLow\\Owlcat Games\\Pathfinder Kingmaker\\Saved Games\\Manual_305_KBP_AUTOMATION_WORKING.zks",
+                    "sha256":  "eded233c784fd658ddf2c46b2b54d5a310c39bff62506f0324b0f35c045bbec7",
+                    "gameName":  "Hedwirg",
+                    "gameId":  "df33d1ff-4ec8-4707-bfa0-5e059bf9a049",
+                    "area":  "2849fdde28fe50f4d935bf2cf3405051",
+                    "length":  967293
+                }
+}

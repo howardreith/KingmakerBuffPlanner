@@ -321,3 +321,17 @@ Instant execution must mirror the native ordering: final validation, one `RuleCa
 Live 0.0.5 evidence exposed an invalid unconditional `HasEnoughMaterialComponent` check for native Bless. The planner snapshot already creates a material reservation only when `RequireMaterialComponent` is true and the blueprint has a positive-count item. Execution now uses the same native short-circuit contract. Final live evidence records the exact Bless `RequireMaterialComponent`, item, count, standalone `HasEnoughMaterialComponent`, and derived consumable-required values before cast.
 
 Pure planning status at commit `5cbc9bb86fe9fcb79c16f8297c5a8754f34eda05`: deterministic provider order, bans/priorities/caps, prepared-before-flexible tie-break, shared pools, linked slots, domain eligibility, mass single-cost grouping, material reservation, target outcomes, and typed AllOf/conditional-AnyOf presence behavior are covered. Runtime rows remain deferred rather than inferred from these fixtures.
+
+## 2026-10-26 - limited-use fact contracts
+
+Installed 2.1.7b assembly hash remains
+`3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`.
+Native count can be finite without ordinary Resource: item charges are read
+through Fact.SourceItem. Native Spend first spends materials, then item charges,
+spellbook and concrete resource logic. Single-item ordinary cost is one charge;
+stack reset/conservation branches remain native. Cast counts are not quantities.
+Discovery/binding share the verified contract; stacked/combined/uncertain sources
+are contained. ItemEntity/Fact have no persistent item ID, so source tokens are
+stable only for that live object; saved intent is unresolved after reload.
+[Exact IL, fixture, supported bounds, tested HEAD and R1-R7](../docs/LIMITED-USE-REPAIR-CHECKPOINT.md).
+No native game acceptance is inferred from detached native-method execution.
