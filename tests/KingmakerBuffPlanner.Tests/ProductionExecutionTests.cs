@@ -25,6 +25,11 @@ namespace KingmakerBuffPlanner.Tests
     {
         private static void RunProductionExecutionTests(string root)
         {
+            Run("fact-resource-native-item-discovery-reservation-binding", TestNativeFactResources);
+            Run("fact-resource-five-cast-finite-unlimited-and-full-plan-shortage", TestNativeFactRoutine);
+            Run("fact-resource-saved-selection-refuses-replacement-and-survives-rescan", TestNativeFactSavedSelection);
+            Run("fact-resource-final-boundary-refuses-stale-counts", TestResourceFinalBoundary);
+            Run("fact-resource-unexpected-spend-report-retains-effect-and-failure", TestUnexpectedSpendReport);
             Run("existing-effect-sufficiency-rules", TestExistingEffectSufficiencyRules);
             Run("live-existing-effect-skip-in-compiler", TestLiveExistingEffectSkipInCompiler);
             Run("group-existing-effect-uses-intended-recipients",
@@ -2440,11 +2445,11 @@ namespace KingmakerBuffPlanner.Tests
                 new { Entry = new CastingOutcomeEntry("c", CastingOutcomeState.Skipped, false, false, false, "already-active:u"),
                     Text = "skipped: the effect was already active" },
                 new { Entry = new CastingOutcomeEntry("c", CastingOutcomeState.Failed, true, true, true, "effect-not-observed"),
-                    Text = "failed (effect-not-observed); its resource was spent" },
+                    Text = "failed (effect-not-observed); resource use observed" },
                 new { Entry = new CastingOutcomeEntry("c", CastingOutcomeState.Failed, true, false, false, "validation"),
                     Text = "failed (validation)" },
                 new { Entry = new CastingOutcomeEntry("c", CastingOutcomeState.Cancelled, true, true, true, "stopped"),
-                    Text = "interrupted when the run stopped; its resource was spent" },
+                    Text = "interrupted when the run stopped; resource use observed" },
                 new { Entry = new CastingOutcomeEntry("c", CastingOutcomeState.NotProcessed, true, false, false, "stopped-before-start"),
                     Text = "not attempted: the run stopped earlier" }
             };
@@ -2465,7 +2470,7 @@ namespace KingmakerBuffPlanner.Tests
                     entry("cast-3", CastingOutcomeState.Skipped, false, false, "already-active:unit-t3")
                 }, new string[0]);
             string text = CastingRunPresentation.Describe(success, "Long", id => "Label " + id);
-            if (text != "Long: 2 of 2 casts confirmed; 1 already active. Resources spent: 2.")
+            if (text != "Long: 2 of 2 casts confirmed; 1 already active. Casts with observed resource use: 2.")
                 throw new InvalidOperationException("Success text: " + text);
             var halted = new CastingRunReport("run-2", "long", CastingApplyMode.Ordinary, "p",
                 "halted:FailedSubmission:boom", false, true, new[]
@@ -2475,7 +2480,7 @@ namespace KingmakerBuffPlanner.Tests
                 }, new string[0]);
             string failed = CastingRunPresentation.Describe(halted, "Long", id => "Label " + id);
             if (failed != "Long stopped after a cast failed: 0 of 2 casts confirmed; failed: Label cast-1 " +
-                    "(FailedSubmission:boom); 1 not attempted. Resources spent: 1.")
+                    "(FailedSubmission:boom); 1 not attempted. Casts with observed resource use: 1.")
                 throw new InvalidOperationException("Halted text: " + failed);
             var cancelled = new CastingRunReport("run-3", "long", CastingApplyMode.Ordinary, "p",
                 "cancelled:player-stopped", true, false, new[]
@@ -2486,7 +2491,7 @@ namespace KingmakerBuffPlanner.Tests
             string stoppedText = CastingRunPresentation.Describe(cancelled, "Long", null);
             if (!stoppedText.StartsWith("Long stopped (you stopped it): 1 of 1 cast confirmed",
                     StringComparison.Ordinal) ||
-                !stoppedText.EndsWith("Resources spent: 0 (plus 1 free).", StringComparison.Ordinal))
+                !stoppedText.EndsWith("Casts with observed resource use: 0 (plus 1 free).", StringComparison.Ordinal))
                 throw new InvalidOperationException("Cancelled text: " + stoppedText);
             if (CastingRunPresentation.ToQuickResult(success, "Long", null).Disposition !=
                     QuickExecutionDisposition.Completed ||
@@ -6872,15 +6877,15 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("A cantrip's level-0 entry is not cast through its at-will ability first.");
             // Review A3: a fact casting is bound to its kind and reserved
             // pool, priced by the same rule discovery uses.
-            if (!resolve.Contains("string poolKey = KingmakerPartySnapshotBuilder.FactPoolKey(caster.UniqueId, selection, out kind);") ||
+            if (!resolve.Contains("KingmakerFactResources.ValidateBinding(caster.UniqueId,") ||
                 !resolve.Contains("FactSourceCandidate chosen = FactSourceChoice.Choose(candidates.Select(pair => pair.Key),\n                    provider.Ability.SourceKind == SourceKind.AbilityResource,\n                    reservation == null ? null : reservation.PoolKey, out equivalents, out refusal);") ||
-                !resolve.Contains("SafeSpellbookBound(fact.Data), kind == SourceKind.AbilityResource, poolKey,\n                            SafeCasterLevel(selection.Concrete))") ||
+                !resolve.Contains("SafeSpellbookBound(fact.Data), resource.Kind == SourceKind.AbilityResource, poolKey,\n                            SafeCasterLevel(selection.Concrete))") ||
                 !resolve.Contains(".OrderBy(value => value.Blueprint.AssetGuid, StringComparer.Ordinal))") ||
                 !resolve.Contains("(blueprint.Parent == null || blueprint.Parent.AssetGuid != provider.Ability.BaseAbilityGuid))") ||
                 !builder.Contains("existing.EffectiveCasterLevel != CasterLevel(data))") ||
                 !builder.Contains("_ambiguousFactKeys.Add(keyForProvider);") ||
-                !builder.Contains("string factPoolKey = FactPoolKey(unit.UniqueId, selection, out sourceKind);") ||
-                Occurrences(builder, "string key = factPoolKey;") != 2)
+                !builder.Contains("KingmakerFactResources.TryRead(unit.UniqueId,") ||
+                !builder.Contains("ResourcePoolSnapshot pool = nativeResource.Pool;"))
                 throw new InvalidOperationException("A fact casting is not bound to its kind and reserved pool.");
             // Review A7: an unread count is null, and the free check is the
             // Unity-free judgement in both paths.
@@ -6892,7 +6897,7 @@ namespace KingmakerBuffPlanner.Tests
                 !instantSource.Contains("string countViolation = AvailableCountJudgement.Violation(step.Reservation, availableBefore, availableAfter);") ||
                 !instantSource.Contains("\";effects-observed-at-submit:\" + observed, countViolation);"))
                 throw new InvalidOperationException("Unread cast counts can still pass as unlimited.");
-            string validate = SourceBlock(adapter, "internal CastRuntimeValidation ValidateSource(CastStep step,");
+            string validate = SourceBlock(adapter, "internal static CastRuntimeValidation ValidateResolvedSource(CastStep step,");
             if (validate == null || validate.Contains("resolved.Ability.IsAvailableForCast") ||
                 !validate.Contains("if (!resolved.Ability.IsAvailable) return CastRuntimeValidation.Fail(\"ability-unavailable\");"))
                 throw new InvalidOperationException("Validation is not the cast command's own availability guard.");

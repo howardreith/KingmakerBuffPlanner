@@ -148,6 +148,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (!KingmakerAnimatedCastAdapter.TryResolve(step, out resolved, out reason))
                 return new InstantCastResult(false, false, false, false, false,
                     "final-resolution:" + reason);
+            finalValidation = KingmakerAnimatedCastAdapter.ValidateResolvedSource(step, resolved, false);
+            if (!finalValidation.Valid)
+                return new InstantCastResult(false, false, false, false, false,
+                    "final-source-validation:" + finalValidation.Reason);
             // Final review A3: each expected recipient's instances of the
             // expected effects, read before anything is submitted; without
             // that read no confirmation is possible, so nothing is cast.
@@ -217,6 +221,15 @@ namespace KingmakerBuffPlanner.GameAdapters
 
             int? availableBefore = KingmakerAnimatedCastAdapter.SafeAvailableCount(
                 sourceAbility);
+            string countRefusal = AvailableCountJudgement.BeforeSubmission(step.Reservation, availableBefore);
+            if (countRefusal != null)
+            {
+                // A provider Begin lease may already exist. The executor's
+                // exception path invokes lifecycle cleanup before restoring
+                // enhancement state; no rule has been submitted.
+                if (providerDirect) throw new InvalidOperationException(countRefusal);
+                return new InstantCastResult(false, false, false, false, false, countRefusal);
+            }
             RuleCastSpell rule;
             try
             {
@@ -302,6 +315,10 @@ namespace KingmakerBuffPlanner.GameAdapters
                 ";resolution:" + (resolved.Resolution ?? "unrecorded") +
                 ";source-ability-data:" +
                 KingmakerStickyTouchCastAdapter.Identity(sourceAbility) +
+                ";reservation-pool:" + step.Reservation.PoolKey +
+                ";reservation-unlimited:" + step.Reservation.Unlimited +
+                ";reservation-native-units:" + step.Reservation.Units +
+                ";" + KingmakerFactResources.Describe(sourceAbility) +
                 ";execution-ability-data:" +
                 KingmakerStickyTouchCastAdapter.Identity(executionAbility) +
                 ";rule-cast-submitted:true;expected-effects:" +

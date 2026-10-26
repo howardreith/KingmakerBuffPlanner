@@ -155,6 +155,14 @@ namespace KingmakerBuffPlanner.Execution
                                 report.Add(index, step,
                                     CastExecutionStatus.CastStarted,
                                     "animated-command-started");
+                            bool resourceSpent = operation.ResourceSpent;
+                            if (resourceSpent)
+                                report.Add(index, step,
+                                    CastExecutionStatus.ResourceSpent,
+                                    "native-resource-delta-observed");
+                            if (operation.EffectsObserved)
+                                report.Add(index, step, CastExecutionStatus.EffectObserved,
+                                    "expected-effects-observed;" + operation.Detail);
                             if (operation.TimedOut)
                                 report.Add(index, step,
                                     CastExecutionStatus.TimedOutUnconfirmed,
@@ -173,12 +181,7 @@ namespace KingmakerBuffPlanner.Execution
                                     CastExecutionStatus.TimedOutUnconfirmed,
                                     "expected-effects-absent;" +
                                     operation.Detail);
-                            if (operation.Succeeded &&
-                                operation.ResourceSpent)
-                                report.Add(index, step,
-                                    CastExecutionStatus.ResourceSpent,
-                                    "native-command-spend-completed");
-                            if (operation.ResourceSpent && step.Reservation.Unlimited)
+                            if (resourceSpent && step.Reservation.Unlimited)
                                 report.Add(index, step,
                                     CastExecutionStatus.FailedExecution,
                                     "unexpected-resource-spent-on-unlimited-source;" +

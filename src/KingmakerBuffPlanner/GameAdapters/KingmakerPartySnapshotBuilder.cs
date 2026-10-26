@@ -348,10 +348,16 @@ namespace KingmakerBuffPlanner.GameAdapters
             HashSet<string> poolKeys)
         {
             AbilityData data = selection.Concrete;
-            AbilityData resourceContext = data.Resource != null ? data : selection.Source;
-            SourceKind sourceKind;
-            string factPoolKey = FactPoolKey(unit.UniqueId, selection, out sourceKind);
+            KingmakerFactResource nativeResource;
+            string resourceRefusal;
+            bool resourceKnown = KingmakerFactResources.TryRead(unit.UniqueId,
+                selection.Source, data, out nativeResource, out resourceRefusal);
+            SourceKind sourceKind = resourceKnown ? nativeResource.Kind :
+                data.SourceItem != null ? SourceKind.Item : SourceKind.Fact;
             AbilityKey ability = KingmakerAbilityVariants.ToAbilityKey(selection, sourceKind);
+            if (resourceKnown && sourceKind == SourceKind.Item)
+                ability = new AbilityKey(ability.BaseAbilityGuid, ability.VariantGuid,
+                    ability.MetamagicMask, sourceKind, nativeResource.InstanceId);
             _rawCandidateCount++;
             EffectExpression expression;
             string reason;
@@ -363,29 +369,18 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (!beneficial) return;
             _beneficialCandidateCount++;
             _effectsBySource[ability.Canonical] = expression;
-
-            ResourcePoolSnapshot pool;
-            int cost;
-            if (resourceContext.Resource != null)
+            if (!resourceKnown)
             {
-                string key = factPoolKey;
-                int remaining = Math.Max(0,
-                    unit.Descriptor.Resources.GetResourceAmount(resourceContext.Resource));
-                int capacity = Math.Max(remaining,
-                    resourceContext.Resource.GetMaxAmount(unit.Descriptor));
-                pool = new ResourcePoolSnapshot(key, ResourcePoolKind.AbilityResource,
-                    capacity, remaining, null);
-                cost = resourceContext.ResourceCost;
+                _sourceTraces.Add(new PartySourceDiscoveryTrace(
+                    ability.Canonical, data.Blueprint.AssetGuid, selection.DisplayName,
+                    unit.UniqueId, string.Empty, false, false, resourceRefusal));
+                return;
             }
-            else
-            {
-                string key = factPoolKey;
-                pool = new ResourcePoolSnapshot(key, ResourcePoolKind.Unlimited, 0, 0, null);
-                cost = 0;
-            }
+            ResourcePoolSnapshot pool = nativeResource.Pool;
+            int cost = nativeResource.Cost;
             if (poolKeys.Add(pool.PoolKey)) pools.Add(pool);
             var keyForProvider = new ProviderKey(
-                unit.UniqueId, string.Empty, ability, string.Empty);
+                unit.UniqueId, string.Empty, ability, nativeResource.InstanceId);
             if (_ambiguousFactKeys.Contains(keyForProvider)) return;
             ProviderSnapshot existing = providers.FirstOrDefault(provider => provider.Key.Equals(keyForProvider));
             if (existing != null)
@@ -409,23 +404,9 @@ namespace KingmakerBuffPlanner.GameAdapters
             providers.Add(new ProviderSnapshot(keyForProvider, selection.DisplayName, 0,
                 pool.PoolKey, cost, null, ToMaterialRequirement(selection),
                 CasterLevel(data), ExpectedDurationRounds(data, duration),
-                Description(selection), duration, selection.SourceDisplayName,
+                Description(selection), duration, data.SourceItem == null ? selection.SourceDisplayName :
+                    data.SourceItem.Name + " (select again after loading)",
                 selection.VariantOrder));
-        }
-
-        // The pool a fact-granted ability spends, as discovery prices it and
-        // execution binds it (review A3): the concrete or source ability's
-        // resource, else a free pool of the source blueprint.
-        internal static string FactPoolKey(string unitId, KingmakerAbilitySelection selection, out SourceKind kind)
-        {
-            AbilityData resourceContext = selection.Concrete.Resource != null ? selection.Concrete : selection.Source;
-            if (resourceContext.Resource != null)
-            {
-                kind = SourceKind.AbilityResource;
-                return unitId + "|resource|" + resourceContext.Resource.AssetGuid;
-            }
-            kind = SourceKind.Fact;
-            return unitId + "|free|" + selection.SourceBlueprint.AssetGuid;
         }
 
         private void AddSpellProvider(

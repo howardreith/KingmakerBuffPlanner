@@ -13,6 +13,18 @@ namespace KingmakerBuffPlanner.Execution
         public const string UncertainPrefix = "unlimited-source-count-uncertain:";
         public const string FiniteUncertainPrefix = "finite-source-count-uncertain:";
 
+        // The final source object, after preparation, before native submission.
+        // Availability counts are casts, not reservation cost units.
+        public static string BeforeSubmission(ResourceReservation reservation, int? available)
+        {
+            if (reservation == null) return "source-reservation-missing";
+            if (reservation.Unlimited)
+                return available == -1 ? null : "unlimited-reservation-source-mismatch:" + Format(available);
+            return !available.HasValue || available.Value < 0
+                ? "finite-reservation-source-count-uncertain:" + Format(available)
+                : available.Value == 0 ? "finite-source-exhausted" : null;
+        }
+
         public static bool Spent(int? before, int? after)
         {
             return before.HasValue && after.HasValue && before.Value >= 0 && after.Value >= 0 &&
@@ -24,7 +36,7 @@ namespace KingmakerBuffPlanner.Execution
         {
             if (!before.HasValue || !after.HasValue)
                 return "available-count-unread:" + Format(before) + ">" + Format(after);
-            if (before.Value >= 0 || after.Value != before.Value)
+            if (before.Value != -1 || after.Value != before.Value)
                 return "available-count-not-unlimited:" + Format(before) + ">" + Format(after);
             return null;
         }

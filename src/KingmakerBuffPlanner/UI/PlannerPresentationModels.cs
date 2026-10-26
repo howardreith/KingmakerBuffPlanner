@@ -691,6 +691,8 @@ namespace KingmakerBuffPlanner.UI
 
         private static string SourceDescription(ProviderSnapshot provider)
         {
+            if (provider.Key.Ability.SourceKind == SourceKind.Item)
+                return "Item: " + provider.SourceDisplayName;
             if (provider.Key.Ability.SourceKind == SourceKind.Spellbook)
             {
                 string book = provider.Key.SpellbookGuid;

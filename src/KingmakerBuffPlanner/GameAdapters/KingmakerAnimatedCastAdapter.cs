@@ -80,6 +80,15 @@ namespace KingmakerBuffPlanner.GameAdapters
             ResolvedCast resolved;
             string reason;
             if (!TryResolve(step, out resolved, out reason)) return CastRuntimeValidation.Fail(reason);
+            return ValidateResolvedSource(step, resolved, validateTarget);
+        }
+
+        internal static CastRuntimeValidation ValidateResolvedSource(CastStep step,
+            ResolvedCast resolved, bool validateTarget)
+        {
+            string countRefusal = AvailableCountJudgement.BeforeSubmission(step.Reservation,
+                SafeAvailableCount(resolved.Ability));
+            if (countRefusal != null) return CastRuntimeValidation.Fail(countRefusal);
             if (resolved.Caster.Descriptor == null || resolved.Caster.Descriptor.State == null ||
                 resolved.Caster.Descriptor.State.IsDead || !resolved.Caster.Descriptor.State.IsConscious)
                 return CastRuntimeValidation.Fail("caster-incapacitated");
@@ -108,6 +117,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             string reason;
             if (!TryResolve(step, out resolved, out reason))
                 throw new InvalidOperationException(reason);
+            CastRuntimeValidation finalValidation = ValidateResolvedSource(step, resolved, true);
+            if (!finalValidation.Valid) throw new InvalidOperationException(finalValidation.Reason);
             AbilityEffectStickyTouch sticky = resolved.Ability.Blueprint == null
                 ? null : resolved.Ability.Blueprint.StickyTouch;
             BlueprintAbility delivery = sticky == null
@@ -126,6 +137,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (baseline == null)
                 throw new InvalidOperationException("effect-baseline-unreadable:" + baselineFailure);
             int? availableBefore = SafeAvailableCount(resolved.Ability);
+            string countRefusal = AvailableCountJudgement.BeforeSubmission(step.Reservation, availableBefore);
+            if (countRefusal != null) throw new InvalidOperationException(countRefusal);
             UnitCommand previousCommand = resolved.Caster.Commands.PreviousCommand;
             resolved.Caster.Commands.AddToQueue(command);
             return new KingmakerAnimatedOperation(command, step,
@@ -281,7 +294,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 }
                 return null;
             }
-            if (provider.Ability.SourceKind == SourceKind.AbilityResource ||
+            if (provider.Ability.SourceKind == SourceKind.Item ||
+                provider.Ability.SourceKind == SourceKind.AbilityResource ||
                 provider.Ability.SourceKind == SourceKind.Fact)
             {
                 // Review A3: an owned ability of the provider's own kind (free
@@ -289,6 +303,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 // pool, priced as discovery prices it; never one of another
                 // cost. Equivalent sources are counted in the provenance.
                 var candidates = new List<KeyValuePair<FactSourceCandidate, AbilityData>>();
+                var bindingRefusals = new List<string>();
                 int index = 0;
                 // In discovery's own order (by blueprint, stable), so the
                 // first of equivalent sources is the one discovery priced.
@@ -307,11 +322,18 @@ namespace KingmakerBuffPlanner.GameAdapters
                     KingmakerAbilitySelection selection = KingmakerAbilityVariants.ResolveSelection(
                         fact.Data, provider.Ability);
                     if (selection == null) continue;
-                    SourceKind kind;
-                    string poolKey = KingmakerPartySnapshotBuilder.FactPoolKey(caster.UniqueId, selection, out kind);
+                    string bindingRefusal = KingmakerFactResources.ValidateBinding(caster.UniqueId,
+                        selection.Source, selection.Concrete, provider, reservation);
+                    if (bindingRefusal != null) { bindingRefusals.Add(bindingRefusal); continue; }
+                    KingmakerFactResource resource;
+                    string resourceRefusal;
+                    if (!KingmakerFactResources.TryRead(caster.UniqueId, selection.Source,
+                            selection.Concrete, out resource, out resourceRefusal))
+                    { bindingRefusals.Add(resourceRefusal); continue; }
+                    string poolKey = resource.Pool.PoolKey;
                     candidates.Add(new KeyValuePair<FactSourceCandidate, AbilityData>(
                         new FactSourceCandidate(blueprint.AssetGuid + "#" + index,
-                            SafeSpellbookBound(fact.Data), kind == SourceKind.AbilityResource, poolKey,
+                            SafeSpellbookBound(fact.Data), resource.Kind == SourceKind.AbilityResource, poolKey,
                             SafeCasterLevel(selection.Concrete)),
                         selection.Concrete));
                 }
@@ -319,7 +341,12 @@ namespace KingmakerBuffPlanner.GameAdapters
                 FactSourceCandidate chosen = FactSourceChoice.Choose(candidates.Select(pair => pair.Key),
                     provider.Ability.SourceKind == SourceKind.AbilityResource,
                     reservation == null ? null : reservation.PoolKey, out equivalents, out refusal);
-                if (chosen == null) return null;
+                if (chosen == null)
+                {
+                    if (bindingRefusals.Count != 0)
+                        refusal += ";binding-refusals=" + string.Join(",", bindingRefusals.Distinct().ToArray());
+                    return null;
+                }
                 resolution = "ability:" + provider.Ability.SourceKind + ";pool=" + chosen.PoolKey +
                     ";fact=" + chosen.Identity + ";cl=" + chosen.CasterLevel + ";equivalent-sources=" + equivalents;
                 return candidates.First(pair => ReferenceEquals(pair.Key, chosen)).Value;
@@ -622,6 +649,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                             ? "none" : _deliveryBlueprint.AssetGuid) +
                         ";expected-effects:" + ExpectedEffectIds(_step.ExpectedEffects) +
                         ";resolution:" + _resolution +
+                        ";source-ability-data:" + KingmakerStickyTouchCastAdapter.Identity(_sourceAbility) +
+                        ";reservation-pool:" + _step.Reservation.PoolKey +
+                        ";reservation-unlimited:" + _step.Reservation.Unlimited +
+                        ";reservation-native-units:" + _step.Reservation.Units +
+                        ";" + KingmakerFactResources.Describe(_sourceAbility) +
                         ";targets:" + string.Join(",",
                             _step.ExpectedRecipientUnitIds.ToArray()) +
                         ";effects-observed:" + EffectsObserved;

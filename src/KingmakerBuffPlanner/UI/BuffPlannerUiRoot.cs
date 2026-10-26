@@ -2555,6 +2555,10 @@ namespace KingmakerBuffPlanner.UI
                     (session == null ? entry.CastingId : session.CastingLabel(entry.CastingId)) +
                     ";state=" + entry.State + ";planned=" + entry.Planned +
                     ";submitted=" + entry.Submitted + ";spendReported=" + entry.SpendReported +
+                    ";nativeUnlimitedPlanned=" + entry.PlannedUnlimited +
+                    ";nativeCostPlanned=" + entry.PlannedNativeCost +
+                    ";spendInvoked=" + entry.SpendInvoked + ";resourceUseObserved=" + entry.ResourceSpentReported +
+                    ";effectObserved=" + entry.EffectObserved +
                     ";free=" + entry.FreeCast + ";detail=" + entry.Detail + ".");
         }
 

@@ -194,6 +194,9 @@ namespace KingmakerBuffPlanner.Execution
                                         completion.Detail +
                                         ";cleanup-complete:" + cleanup.Complete +
                                         ";cleanup-state:" + cleanup.Detail;
+                                    if (observed)
+                                        report.Add(index, step, CastExecutionStatus.EffectObserved,
+                                            "expected-effects-observed");
                                     if (!result.Submitted)
                                         report.Add(index, step,
                                             CastExecutionStatus.FailedSubmission,
