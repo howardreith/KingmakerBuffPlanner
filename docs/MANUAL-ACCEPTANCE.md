@@ -854,3 +854,15 @@ on the automation party. These checks address unobserved interactions and states
    line for the full result.
 8. At 1920x1200 (and any larger interface scale you use) the planner, HUD
    row and spellbook pair look as in the evidence captures.
+
+## Limited-use repair native acceptance (pending, 2026-10-26)
+
+For source `eafb950a886c7ede741f0541d37b2140d9d4b500`, all native rows are
+NOT_RUN. [Acceptance matrix, exact offline evidence and prerequisite reason](LIMITED-USE-REPAIR-CHECKPOINT.md).
+At a separately budgeted guarded qualification boundary, use only
+KBP_AUTOMATION_WORKING: matched legal five-cast Instant routines through physical
+controller Run Long and mouse, finite use/effects/reporting, normal Animated and
+mismatch refusal, known shortage with zero submissions, genuine unlimited with
+independent costs. Include a supported single-item source or clearly document its
+absence; distinguish session-only identity from persistence across reload. Keep
+baseline/all other saves protected and verify transactional exact restoration.

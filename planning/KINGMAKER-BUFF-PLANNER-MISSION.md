@@ -1,3 +1,9 @@
+> Current branch mission (2026-10-26): limited-use classification/casting report
+> repair at tested source `eafb950a886c7ede741f0541d37b2140d9d4b500`, version 0.6.6.
+> [Development checkpoint, commands, evidence, scope limits and exact next action](../docs/LIMITED-USE-REPAIR-CHECKPOINT.md).
+> Focused 17/0; native NOT_RUN behind a separately budgeted safety/purity boundary.
+> Older mission campaigns below are historical and do not select current checks.
+
 ## ACTIVE controller scope replacement - October 17/18, 2026
 
 Follow [the full controller mission](KBP-FULL-CONTROLLER-MISSION.md), not the

@@ -128,7 +128,14 @@ $contracts = [ordered]@{
         'CalculateParams', 'CanTarget',
         'get_IsAvailableForCast', 'IsVisible',
         'GetAvailableForCastCount', 'HasVariant', 'Spend', 'SpendFromSpellbook',
-        'SpendMaterialComponent')
+        'SpendMaterialComponent', 'get_Resource', 'get_ResourceCost', 'get_RequireMaterialComponent')
+    'Kingmaker.Items.ItemEntity' = @(
+        'get_IsSpendCharges', 'get_Charges', 'SpendCharges', 'get_Ability',
+        'ReapplyAbilities', 'ReapplyFactsForWielder', 'OnDidEquipped')
+    'Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment' = @('get_GainAbility')
+    'Kingmaker.Items.ItemEntityUsable' = @()
+    'Kingmaker.Blueprints.Facts.Fact' = @('get_SourceItem')
+    'Kingmaker.UnitLogic.Abilities.Ability' = @('get_StickyTouch', 'get_Spellbook')
     'Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility' = @(
         'get_Variants', 'get_HasVariants', 'HasVariant')
     'Kingmaker.UnitLogic.Abilities.Components.AbilityVariants' = @('Validate')
@@ -192,6 +199,12 @@ try {
         if ($ListMembers) {
             Write-Output ''
             Write-Output ('=== ' + $entry.Key + ' members ===')
+            for ($baseType = $type.BaseType; $null -ne $baseType; $baseType = $baseType.BaseType) {
+                Write-Output ('base ' + $baseType.FullName)
+                foreach ($baseField in @($baseType.GetFields($flags) | Sort-Object Name)) {
+                    Write-Output ('base field ' + (Format-TypeName $baseField.FieldType) + ' ' + $baseField.Name)
+                }
+            }
             foreach ($field in @($type.GetFields($flags) | Sort-Object Name)) {
                 $constant = if ($field.IsLiteral) {
                     ' = ' + $field.GetRawConstantValue()

@@ -69,9 +69,12 @@ namespace KingmakerBuffPlanner.UI
                 text.Append("; ").Append(report.CancelledCastings).Append(" interrupted");
             if (report.NotProcessed != 0)
                 text.Append("; ").Append(report.NotProcessed).Append(" not attempted");
-            int free = report.Entries.Count(entry => entry.SpendReported && entry.FreeCast);
-            text.Append(". Resources spent: ").Append(report.ResourcesSpent);
+            int free = report.Entries.Count(entry => entry.FreeCast);
+            text.Append(". Casts with observed resource use: ").Append(report.ResourcesSpent);
             if (free != 0) text.Append(" (plus ").Append(free).Append(" free)");
+            int failedEffects = report.Entries.Count(entry => entry.EffectObserved && !entry.EffectConfirmed);
+            if (failedEffects != 0)
+                text.Append("; effect observed on ").Append(failedEffects).Append(" unvalidated cast(s)");
             text.Append(".");
             if (report.CleanupFailures.Count != 0)
                 text.Append(" Cleanup uncertain: ")
@@ -116,7 +119,8 @@ namespace KingmakerBuffPlanner.UI
         internal static string DescribeEntry(CastingOutcomeEntry entry)
         {
             if (entry == null) return null;
-            string spent = entry.ResourceSpent ? "; its resource was spent" : string.Empty;
+            string spent = entry.ResourceSpent ? "; resource use observed" : string.Empty;
+            if (entry.EffectObserved && !entry.EffectConfirmed) spent += "; effect observed, cast unvalidated";
             switch (entry.State)
             {
                 case CastingOutcomeState.EffectConfirmed:

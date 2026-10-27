@@ -56,14 +56,21 @@ namespace KingmakerBuffPlanner.UI
     {
         internal CastingOutcomeEntry(string castingId, CastingOutcomeState state,
             bool planned, bool submitted, bool spendReported, string detail,
-            bool freeCast = false)
+            bool freeCast = false, bool? resourceSpentReported = null,
+            bool? spendInvoked = null, bool effectObserved = false,
+            bool? plannedUnlimited = null, int? plannedNativeCost = null)
         {
             CastingId = castingId ?? string.Empty;
             State = state;
             Planned = planned;
             Submitted = submitted;
             SpendReported = spendReported;
-            FreeCast = freeCast;
+            ResourceSpentReported = resourceSpentReported ?? (spendReported && !freeCast);
+            SpendInvoked = spendInvoked ?? spendReported;
+            PlannedUnlimited = plannedUnlimited ?? freeCast;
+            PlannedNativeCost = plannedNativeCost;
+            FreeCast = freeCast && !ResourceSpentReported && state == CastingOutcomeState.EffectConfirmed;
+            EffectObserved = effectObserved || state == CastingOutcomeState.EffectConfirmed;
             Detail = detail ?? string.Empty;
         }
 
@@ -73,17 +80,21 @@ namespace KingmakerBuffPlanner.UI
         public bool Planned { get; private set; }
         // The executor reported a native submission for this casting.
         public bool Submitted { get; private set; }
-        // The executor reported the native resource spent (or the spend
-        // invoked) for this casting.
+        // Legacy aggregate; use the separate observations below for reporting.
         public bool SpendReported { get; private set; }
-        // The planned cost was a verified free native source (no pool
-        // charge, no enhancement or material cost).
+        public bool ResourceSpentReported { get; private set; }
+        public bool SpendInvoked { get; private set; }
+        public bool PlannedUnlimited { get; private set; }
+        public int? PlannedNativeCost { get; private set; }
+        public bool EffectObserved { get; private set; }
+        // A fully validated casting whose entire forecast was free and
+        // whose resource observations did not contradict that forecast.
         public bool FreeCast { get; private set; }
-        // A charged resource was spent: a spend was reported for a casting
-        // whose planned cost is not free.
+        // A finite native availability decrease was observed. This counts
+        // attempts with use, never inferred charge or slot units.
         public bool ResourceSpent
         {
-            get { return SpendReported && !FreeCast; }
+            get { return ResourceSpentReported; }
         }
         public bool EffectConfirmed
         {
@@ -390,7 +401,11 @@ namespace KingmakerBuffPlanner.UI
                     entries.Add(new CastingOutcomeEntry(casting.CastingId, state, true,
                         entry.NativeSubmissionReported,
                         entry.ResourceSpentReported || entry.SpendInvoked,
-                        entry.FinalStatus + ":" + entry.Detail, IsFree(casting)));
+                        entry.FinalStatus + ":" + entry.Detail, IsFree(casting),
+                        entry.ResourceSpentReported, entry.SpendInvoked, entry.EffectObserved,
+                        casting.Cost.Any(line => line.Category == CastingCostCategory.NativePool && line.Unlimited),
+                        casting.Cost.Where(line => line.Category == CastingCostCategory.NativePool)
+                            .Select(line => (int?)line.Units).FirstOrDefault()));
                     continue;
                 }
                 CastingOmission disclosed;

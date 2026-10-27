@@ -1,0 +1,46 @@
+[
+    {
+        "file":  "ability-contract.txt",
+        "sha256":  "8500d8ee9ab2471da7c0373fc4d5b2f39370ce414f2f93726f2dc7b9a77466d7"
+    },
+    {
+        "file":  "artifact-identity.json",
+        "sha256":  "97795719f0797a231b2ecb7f715f624c5fa607422f94aa592c4ce35299f5c821"
+    },
+    {
+        "file":  "build-info.txt",
+        "sha256":  "e16b22e677a2440b6fb490a260cc584df806b05172a4aa3663310c87cb45655e"
+    },
+    {
+        "file":  "committed-focused.log",
+        "sha256":  "9025b702ae71a2e2e3ed5ee5603fac96f423f99c82d8f7b610d5c15c302ac345"
+    },
+    {
+        "file":  "equipped-contract.txt",
+        "sha256":  "b0378ae156b9ae0f05ada333520448d2a39a2d294548fb14c0ece4eb53101bb8"
+    },
+    {
+        "file":  "fact-members.txt",
+        "sha256":  "31c758871f3ffabd7f44e2a0cc4454608bdfc1b009577eaa66f0460232781a92"
+    },
+    {
+        "file":  "grant-contract.txt",
+        "sha256":  "c946556804875301394625b9ae98f90b3c979f0beb2007ce7c2a85b954775e16"
+    },
+    {
+        "file":  "item-members.txt",
+        "sha256":  "384ee203692759f72a3dac4675f2b6802cf9c62a5c2938c96974ad04cb0bf0e5"
+    },
+    {
+        "file":  "resource-contract.txt",
+        "sha256":  "373a17e0b5ec5feacd424cd7727c6e571a33a2f5a5c812b65a587e8ddaa85400"
+    },
+    {
+        "file":  "save-pair.json",
+        "sha256":  "588b4f5777c270175e421e83f59d63262b1a60ed586cbdb7fcb96bd92406dfd4"
+    },
+    {
+        "file":  "steam-prerequisites.log",
+        "sha256":  "1e73def408a244d3a962449ef8690ac9474866bed822d547c85a2214d5a33bfa"
+    }
+]

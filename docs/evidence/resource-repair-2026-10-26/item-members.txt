@@ -1,0 +1,230 @@
+Assembly-CSharp SHA-256: 3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb
+Assembly-CSharp MVID: 07fa1e4d-8618-41b3-9b8d-faa17d3b26f7
+TargetType values: Enemy=0, Ally=1, Any=2
+
+=== Kingmaker.Items.ItemEntity members ===
+base System.Object
+field Kingmaker.UnitLogic.Abilities.Ability <Ability>k__BackingField
+field Kingmaker.UnitLogic.ActivatableAbilities.ActivatableAbility <ActivatableAbility>k__BackingField
+field System.Int32 <Charges>k__BackingField
+field Kingmaker.Items.ItemsCollection <Collection>k__BackingField
+field Kingmaker.Items.Slots.ItemSlot <HoldingSlot>k__BackingField
+field System.Boolean <IsIdentified>k__BackingField
+field System.Boolean <IsNonRemovable>k__BackingField
+field Kingmaker.Blueprints.Area.BlueprintArea <OriginArea>k__BackingField
+field System.Nullable`1[[System.TimeSpan, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]] <SellTime>k__BackingField
+field System.TimeSpan <Time>k__BackingField
+field Kingmaker.EntitySystem.Entities.UnitEntityData <Vendor>k__BackingField
+field Kingmaker.Blueprints.BlueprintUnit <VendorBlueprint>k__BackingField
+field Kingmaker.UnitLogic.UnitDescriptor <Wielder>k__BackingField
+field Kingmaker.Blueprints.Items.BlueprintItem m_Blueprint
+field System.Collections.Generic.List`1[[Kingmaker.Blueprints.Items.Ecnchantments.ItemEnchantment, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] m_CachedEnchantments
+field System.Int32 m_Count
+field Kingmaker.Blueprints.Items.Ecnchantments.ItemEnchantmentCollection m_Enchantments
+field System.TimeSpan m_EnchantmentsLastUpdateTime
+field Kingmaker.Blueprints.Facts.Fact[] m_FactsAppliedToWielder
+field System.Collections.Generic.List`1[[Kingmaker.Items.ItemEntity+IdentifyRollData, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] m_IdentifyRolls
+field System.Int32 m_InventorySlotIndex
+field System.Boolean m_NotLootable
+field System.Boolean m_SkinningSuccessful
+field System.Collections.BitArray m_SortedIndices
+property Kingmaker.UnitLogic.Abilities.Ability Ability
+property Kingmaker.UnitLogic.ActivatableAbilities.ActivatableAbility ActivatableAbility
+property Kingmaker.Blueprints.Items.BlueprintItem Blueprint
+property System.Int32 Charges
+property Kingmaker.Items.ItemsCollection Collection
+property System.Int32 Cost
+property System.Int32 Count
+property System.String Description
+property System.Collections.Generic.List`1[[Kingmaker.Blueprints.Items.Ecnchantments.ItemEnchantment, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] Enchantments
+property Kingmaker.Blueprints.Items.Ecnchantments.ItemEnchantmentCollection EnchantmentsCollection
+property System.Int32 EnchantmentValue
+property System.String FlavorText
+property System.Boolean HasUniqueOriginArea
+property System.Boolean HasUniqueSourceDescription
+property System.Boolean HasUniqueVendor
+property Kingmaker.Items.Slots.ItemSlot HoldingSlot
+property UnityEngine.Sprite Icon
+property System.Boolean InstantiateEnchantments
+property System.Int32 InventorySlotIndex
+property System.Boolean IsIdentified
+property System.Boolean IsInStash
+property System.Boolean IsLootable
+property System.Boolean IsNonRemovable
+property System.Boolean IsSpendCharges
+property System.Boolean IsStackable
+property System.Boolean IsUsableFromInventory
+property System.String Name
+property System.Boolean NeedSkinningForCollect
+property Kingmaker.Blueprints.Area.BlueprintArea OriginArea
+property System.String OriginAreaDescription
+property Kingmaker.UnitLogic.UnitDescriptor Owner
+property System.Nullable`1[[System.TimeSpan, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]] SellTime
+property System.TimeSpan Time
+property System.Int32 TotalCost
+property System.Single TotalWeight
+property System.String UniqueSourceDescription
+property Kingmaker.EntitySystem.Entities.UnitEntityData Vendor
+property Kingmaker.Blueprints.BlueprintUnit VendorBlueprint
+property System.String VendorDescription
+property Kingmaker.UnitLogic.UnitDescriptor Wielder
+method System.Void <OnOpenDescription>b__134_0(Kingmaker.PubSubSystem.IPlayerOpenItemDescriptionFirstTimeHandler)
+method Kingmaker.Blueprints.Facts.Fact <ReapplyFactsForWielder>b__128_0(Kingmaker.Blueprints.Items.Components.AddFactToEquipmentWielder)
+method Kingmaker.Blueprints.Items.Ecnchantments.ItemEnchantment AddEnchantment(Kingmaker.Blueprints.Items.Ecnchantments.BlueprintItemEnchantment, Kingmaker.UnitLogic.Mechanics.MechanicsContext, System.Nullable`1[[Kingmaker.Utility.Rounds, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]])
+method Kingmaker.Blueprints.Items.Ecnchantments.ItemEnchantment AddEnchantmentInternal(Kingmaker.Blueprints.Items.Ecnchantments.BlueprintItemEnchantment, Kingmaker.UnitLogic.Mechanics.MechanicsContext, System.Nullable`1[[Kingmaker.Utility.Rounds, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]])
+method System.Void ApplyEnchantments()
+method System.Boolean CanBeEquippedBy(Kingmaker.UnitLogic.UnitDescriptor)
+method System.Boolean CanBeEquippedInternal(Kingmaker.UnitLogic.UnitDescriptor)
+method System.Boolean CanBeMerged(Kingmaker.Items.ItemEntity)
+method System.Boolean ContainsEnchantmentFromBlueprint(Kingmaker.Blueprints.Items.Ecnchantments.ItemEnchantmentCollection, Kingmaker.Blueprints.Items.Ecnchantments.BlueprintItemEnchantment)
+method System.Void DecrementCount(System.Int32, System.Boolean)
+method System.Void Dispose()
+method Kingmaker.UnitLogic.Abilities.Ability get_Ability()
+method Kingmaker.UnitLogic.ActivatableAbilities.ActivatableAbility get_ActivatableAbility()
+method Kingmaker.Blueprints.Items.BlueprintItem get_Blueprint()
+method System.Int32 get_Charges()
+method Kingmaker.Items.ItemsCollection get_Collection()
+method System.Int32 get_Cost()
+method System.Int32 get_Count()
+method System.String get_Description()
+method System.Collections.Generic.List`1[[Kingmaker.Blueprints.Items.Ecnchantments.ItemEnchantment, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] get_Enchantments()
+method Kingmaker.Blueprints.Items.Ecnchantments.ItemEnchantmentCollection get_EnchantmentsCollection()
+method System.Int32 get_EnchantmentValue()
+method System.String get_FlavorText()
+method System.Boolean get_HasUniqueOriginArea()
+method System.Boolean get_HasUniqueSourceDescription()
+method System.Boolean get_HasUniqueVendor()
+method Kingmaker.Items.Slots.ItemSlot get_HoldingSlot()
+method UnityEngine.Sprite get_Icon()
+method System.Boolean get_InstantiateEnchantments()
+method System.Int32 get_InventorySlotIndex()
+method System.Boolean get_IsIdentified()
+method System.Boolean get_IsInStash()
+method System.Boolean get_IsLootable()
+method System.Boolean get_IsNonRemovable()
+method System.Boolean get_IsSpendCharges()
+method System.Boolean get_IsStackable()
+method System.Boolean get_IsUsableFromInventory()
+method System.String get_Name()
+method System.Boolean get_NeedSkinningForCollect()
+method Kingmaker.Blueprints.Area.BlueprintArea get_OriginArea()
+method System.String get_OriginAreaDescription()
+method Kingmaker.UnitLogic.UnitDescriptor get_Owner()
+method System.Nullable`1[[System.TimeSpan, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]] get_SellTime()
+method System.TimeSpan get_Time()
+method System.Int32 get_TotalCost()
+method System.Single get_TotalWeight()
+method System.String get_UniqueSourceDescription()
+method Kingmaker.EntitySystem.Entities.UnitEntityData get_Vendor()
+method Kingmaker.Blueprints.BlueprintUnit get_VendorBlueprint()
+method System.String get_VendorDescription()
+method Kingmaker.UnitLogic.UnitDescriptor get_Wielder()
+method Kingmaker.EntitySystem.Entities.UnitEntityData GetBestAvailableUser()
+method Kingmaker.EntitySystem.Entities.UnitEntityData GetBestAvailableUser(Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, System.Boolean, Kingmaker.EntitySystem.Entities.UnitEntityData, System.Collections.Generic.List`1[[Kingmaker.EntitySystem.Entities.UnitEntityData, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]])
+method Kingmaker.Blueprints.Items.Ecnchantments.ItemEnchantment GetEnchantment(Kingmaker.Blueprints.Items.Ecnchantments.BlueprintItemEnchantment)
+method Kingmaker.Items.ItemEntity+IdentifyRollData GetIdentifyRollData(Kingmaker.EntitySystem.Entities.UnitEntityData)
+method System.Boolean HasEnchantment(Kingmaker.Blueprints.Items.Ecnchantments.BlueprintItemEnchantment)
+method System.Void Identify()
+method System.Void IncrementCount(System.Int32, System.Boolean)
+method System.Boolean IsSuitableUnitForUseAbility(Kingmaker.EntitySystem.Entities.UnitEntityData)
+method System.Void MakeNotLootable()
+method System.Void OnDidEquipped(Kingmaker.UnitLogic.UnitDescriptor)
+method System.Void OnOpenDescription()
+method System.Void OnWillUnequip()
+method System.Void PostLoad()
+method System.Void PreSave()
+method System.Void ReapplyAbilities()
+method System.Void ReapplyFactsForWielder()
+method System.Void RemoveEnchantment(Kingmaker.Blueprints.Items.Ecnchantments.ItemEnchantment)
+method System.Void RestoreCharges()
+method System.Void set_Ability(Kingmaker.UnitLogic.Abilities.Ability)
+method System.Void set_ActivatableAbility(Kingmaker.UnitLogic.ActivatableAbilities.ActivatableAbility)
+method System.Void set_Charges(System.Int32)
+method System.Void set_Collection(Kingmaker.Items.ItemsCollection)
+method System.Void set_HoldingSlot(Kingmaker.Items.Slots.ItemSlot)
+method System.Void set_IsIdentified(System.Boolean)
+method System.Void set_IsNonRemovable(System.Boolean)
+method System.Void set_OriginArea(Kingmaker.Blueprints.Area.BlueprintArea)
+method System.Void set_SellTime(System.Nullable`1[[System.TimeSpan, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]])
+method System.Void set_Time(System.TimeSpan)
+method System.Void set_Vendor(Kingmaker.EntitySystem.Entities.UnitEntityData)
+method System.Void set_VendorBlueprint(Kingmaker.Blueprints.BlueprintUnit)
+method System.Void set_Wielder(Kingmaker.UnitLogic.UnitDescriptor)
+method System.Void SetCount(System.Int32)
+method System.Void SetOriginAreaIfNull(Kingmaker.Blueprints.Area.BlueprintArea)
+method System.Int32 SetSlotIndex(System.Int32)
+method System.Void SetVendorIfNull(Kingmaker.EntitySystem.Entities.UnitEntityData)
+method System.Boolean SpendCharges(Kingmaker.UnitLogic.UnitDescriptor)
+method System.Boolean SpendCharges()
+method Kingmaker.Items.ItemEntity Split(System.Int32)
+method System.String ToString()
+method System.Void TryIdentify()
+method System.Void TryIdentify(Kingmaker.EntitySystem.Entities.UnitReference, System.Int32)
+method System.Boolean TryMerge(Kingmaker.Items.ItemEntity)
+method Kingmaker.Items.ItemEntity TryMergeInCollection()
+method System.Boolean TryUseFromInventory(Kingmaker.EntitySystem.Entities.UnitEntityData, Kingmaker.Utility.TargetWrapper)
+method System.Void TurnOff(System.Boolean)
+method System.Void TurnOn()
+method System.Void UpdateCachedEnchantments(System.Collections.Generic.List`1[[Kingmaker.Blueprints.Items.Ecnchantments.ItemEnchantment, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]])
+method System.Int32 UpdateSlotIndex(System.Boolean)
+method System.Int32 UpdateSlotIndexInternal(System.Nullable`1[[System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]])
+method System.Boolean UseSkinning()
+
+=== Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment members ===
+base Kingmaker.Blueprints.Items.BlueprintItem
+base field System.Collections.Generic.List`1[[Kingmaker.Blueprints.Items.Ecnchantments.BlueprintItemEnchantment, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] m_CachedEnchantments
+base field System.Int32 m_Cost
+base field Kingmaker.Localization.LocalizedString m_DescriptionText
+base field Kingmaker.Localization.LocalizedString m_DisplayNameText
+base field System.Boolean m_EnchantmentsCollected
+base field Kingmaker.Localization.LocalizedString m_FlavorText
+base field UnityEngine.Sprite m_Icon
+base field System.String m_InventoryPutSound
+base field System.String m_InventoryTakeSound
+base field System.Boolean m_IsNotable
+base field System.Boolean m_IsStackable
+base field Kingmaker.Blueprints.Items.BlueprintItem+MiscellaneousItemType m_MiscellaneousType
+base field Kingmaker.Localization.LocalizedString m_NonIdentifiedDescriptionText
+base field Kingmaker.Localization.LocalizedString m_NonIdentifiedNameText
+base field System.Single m_Weight
+base field System.Boolean NeedSkinningForCollect
+base field Kingmaker.Enums.TrashLootType[] TrashLootTypes
+base Kingmaker.Blueprints.BlueprintScriptableObject
+base field Kingmaker.Blueprints.BlueprintComponent[] Components
+base field System.String m_AssetGuid
+base Kingmaker.Blueprints.PrototypeableObjectBase
+base field Kingmaker.Blueprints.PrototypeableObjectBase PrototypeLink
+base Kingmaker.Blueprints.SerializedScriptableObject
+base UnityEngine.ScriptableObject
+base UnityEngine.Object
+base field System.String cloneDestroyedMessage
+base field System.IntPtr m_CachedPtr
+base field System.String objectIsNullMessage
+base field System.Int32 OffsetOfInstanceIDInCPlusPlusObject
+base System.Object
+field Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility Ability
+field Kingmaker.UnitLogic.ActivatableAbilities.BlueprintActivatableAbility ActivatableAbility
+field System.Int32 CasterLevel
+field System.Int32 Charges
+field System.Int32 CR
+field System.Int32 DC
+field System.Boolean IsNonRemovable
+field Kingmaker.Visual.CharacterSystem.KingmakerEquipmentEntity m_EquipmentEntity
+field Kingmaker.Visual.CharacterSystem.KingmakerEquipmentEntity[] m_EquipmentEntityAlternatives
+field System.Boolean RestoreChargesOnRest
+field System.Int32 SpellLevel
+field System.Boolean SpendCharges
+property Kingmaker.Visual.CharacterSystem.KingmakerEquipmentEntity EquipmentEntity
+property Kingmaker.Visual.CharacterSystem.KingmakerEquipmentEntity[] EquipmentEntityAlternatives
+property System.Boolean GainAbility
+property System.String InventoryEquipSound
+property Kingmaker.UI.Common.ItemsFilter+ItemType ItemType
+property System.Boolean ShowCharges
+method System.Boolean CanBeEquippedBy(Kingmaker.UnitLogic.UnitDescriptor)
+method Kingmaker.Visual.CharacterSystem.KingmakerEquipmentEntity get_EquipmentEntity()
+method Kingmaker.Visual.CharacterSystem.KingmakerEquipmentEntity[] get_EquipmentEntityAlternatives()
+method System.Boolean get_GainAbility()
+method System.String get_InventoryEquipSound()
+method Kingmaker.UI.Common.ItemsFilter+ItemType get_ItemType()
+method System.Boolean get_ShowCharges()
+method System.Void Validate(Kingmaker.Blueprints.Validation.ValidationContext)

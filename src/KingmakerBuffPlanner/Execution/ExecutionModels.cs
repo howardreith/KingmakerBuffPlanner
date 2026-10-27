@@ -24,7 +24,8 @@ namespace KingmakerBuffPlanner.Execution
         FailedExecution,
         TimedOutUnconfirmed,
         ResidualStateUnsettled,
-        ExecutorSelected
+        ExecutorSelected,
+        EffectObserved
     }
 
     public sealed class CastExecutionRecord

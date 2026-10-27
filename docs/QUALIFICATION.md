@@ -1,3 +1,11 @@
+> **2026-10-26 limited-use development checkpoint:** source/test
+> `eafb950a886c7ede741f0541d37b2140d9d4b500` (v0.6.6) passes focused 17/0,
+> source 47/0, build 1/0. Detached native-method fixtures are not game acceptance.
+> Controller/mouse/Animated live rows remain NOT_RUN behind the mandatory
+> whole-history purity prerequisite and the ordinary verification ceiling.
+> [Current evidence, exact hashes, limits and next action](LIMITED-USE-REPAIR-CHECKPOINT.md).
+> This branch's checkpoint does not inherit historical native or release PASS.
+
 > **0.6.0 release boundary:** owner authorizes default-branch merge and full
 > publication through the established pre-runtime route, not a human-acceptance
 > assertion. This exact release has not been run in the game; F01-F10 remain

@@ -576,3 +576,16 @@ its owned native mode and releases its plan lock on completion or shutdown. Thes
 are compiled into the product and change DLL identity; real-game evidence must
 bind to the changed bytes. Callback routes and numeric fit are distinct from
 physical input dispatch and visual acceptance.
+
+## Limited-use fact binding (2026-10-26 development checkpoint)
+
+`KingmakerFactResources` is the game-adapter contract shared by snapshot discovery
+and runtime binding. It yields native quantity/cost/pool semantics or a refusal;
+missing Resource never implies unlimited. Single-item charges use one existing
+ItemCharges pool per exact live item. A weak identity token is stored in existing
+ability/provider identity fields, retaining intent and refusing replacements;
+reload requires explicit item reselection because the game has no persistent
+item ID. The existing compiler/ledger/gate budget these pools without a new
+resource subsystem. Final source-object/count validation is shared by both
+submission routes. Outcome evidence separates forecast, Spend invocation,
+observed resource use, effects and validated success. [Contract and limits](LIMITED-USE-REPAIR-CHECKPOINT.md).

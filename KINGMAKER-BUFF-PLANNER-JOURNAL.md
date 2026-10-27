@@ -4385,3 +4385,24 @@ Receipt remains PARTIAL. Exact records and next separately budgeted guarded
   focused six-second Spells and text-only Inspector scroll sequence with this
   exact ZIP, retaining the matching UMM/Unity log. Full
   [record](docs/RELEASE-0.6.5-ALPHA.1-RECORD.md).
+
+## 2026-10-26 - limited-use source and casting-report development checkpoint
+
+Branch `codex/kingmaker-buff-planner/resource-classification-repair`; clean base
+`e7b544f6b86bdd552737a99539dd34eb228c89b0`, tested source/test HEAD
+`eafb950a886c7ede741f0541d37b2140d9d4b500`, version 0.6.6. Original controller
+checkout/worktrees preserved. Native item fixture proves Resource=null with
+finite count and exact native Spend; this does not identify the reporter's item.
+Discovery/binding now share native contracts; item charges share one live-object
+pool, exact source tokens survive rescans, and unsupported/unread contracts are
+refused. Tokens are saved but require explicit reselection after reload. Both
+submission boundaries refuse stale unlimited reservations before side effects;
+reports retain observed use/effects while preserving failure and protective halt.
+Final selector 17/0, source 47/0, build 1/0 in 5.8s; DLL SHA-256
+`7e8a75c8cc45b5e77c0c02d419d67d1bce8c4ec8a1d7da58b9bdce66de0f0370`.
+[Full commands, exact selected tests, rejected theories, iteration failures,
+raw contracts, acceptance matrix and next action](docs/LIMITED-USE-REPAIR-CHECKPOINT.md).
+Native acceptance NOT_RUN behind mandatory current-product purity's separate
+budget; read-only lab/Steam/protected-save checks passed. No merge/push/PR/tag,
+package/install/launch/release/tester contact. Next: freeze tested product for
+separately budgeted guarded native acceptance and obtain full reporter evidence.

@@ -1,0 +1,121 @@
+Assembly-CSharp SHA-256: 3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb
+Assembly-CSharp MVID: 07fa1e4d-8618-41b3-9b8d-faa17d3b26f7
+TargetType values: Enemy=0, Ally=1, Any=2
+
+=== Kingmaker.Items.ItemEntity::ReapplyAbilities() -> System.Void ===
+IL_0000: ldarg.0
+IL_0001: call         Kingmaker.Items.ItemEntity::get_Wielder
+IL_0006: brtrue.s     IL_0009
+IL_0008: ret
+IL_0009: ldarg.0
+IL_000a: call         Kingmaker.Items.ItemEntity::get_Blueprint
+IL_000f: isinst       token 0x0200162d
+IL_0014: dup
+IL_0015: dup
+IL_0016: brtrue.s     IL_001c
+IL_0018: pop
+IL_0019: ldnull
+IL_001a: br.s         IL_0021
+IL_001c: ldfld        Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment::Ability
+IL_0021: stloc.0
+IL_0022: dup
+IL_0023: brtrue.s     IL_0029
+IL_0025: pop
+IL_0026: ldnull
+IL_0027: br.s         IL_002e
+IL_0029: ldfld        Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment::ActivatableAbility
+IL_002e: stloc.1
+IL_002f: ldarg.0
+IL_0030: call         Kingmaker.Items.ItemEntity::get_Ability
+IL_0035: brfalse.s    IL_0062
+IL_0037: ldarg.0
+IL_0038: call         Kingmaker.Items.ItemEntity::get_Ability
+IL_003d: callvirt     Kingmaker.UnitLogic.Abilities.Ability::get_Blueprint
+IL_0042: ldloc.0
+IL_0043: call         UnityEngine.Object::op_Inequality
+IL_0048: brfalse.s    IL_0062
+IL_004a: ldarg.0
+IL_004b: call         Kingmaker.Items.ItemEntity::get_Wielder
+IL_0050: ldarg.0
+IL_0051: call         Kingmaker.Items.ItemEntity::get_Ability
+IL_0056: call         Kingmaker.UnitLogic.UnitHelper::RemoveFact
+IL_005b: ldarg.0
+IL_005c: ldnull
+IL_005d: call         Kingmaker.Items.ItemEntity::set_Ability
+IL_0062: ldarg.0
+IL_0063: call         Kingmaker.Items.ItemEntity::get_Ability
+IL_0068: brtrue.s     IL_0087
+IL_006a: ldloc.0
+IL_006b: ldnull
+IL_006c: call         UnityEngine.Object::op_Inequality
+IL_0071: brfalse.s    IL_0087
+IL_0073: ldarg.0
+IL_0074: ldarg.0
+IL_0075: call         Kingmaker.Items.ItemEntity::get_Wielder
+IL_007a: ldloc.0
+IL_007b: ldnull
+IL_007c: ldnull
+IL_007d: call         Kingmaker.UnitLogic.UnitHelper::AddFact
+IL_0082: call         Kingmaker.Items.ItemEntity::set_Ability
+IL_0087: ldarg.0
+IL_0088: call         Kingmaker.Items.ItemEntity::get_ActivatableAbility
+IL_008d: brfalse.s    IL_00ba
+IL_008f: ldarg.0
+IL_0090: call         Kingmaker.Items.ItemEntity::get_ActivatableAbility
+IL_0095: callvirt     Kingmaker.UnitLogic.ActivatableAbilities.ActivatableAbility::get_Blueprint
+IL_009a: ldloc.1
+IL_009b: call         UnityEngine.Object::op_Inequality
+IL_00a0: brfalse.s    IL_00ba
+IL_00a2: ldarg.0
+IL_00a3: call         Kingmaker.Items.ItemEntity::get_Wielder
+IL_00a8: ldarg.0
+IL_00a9: call         Kingmaker.Items.ItemEntity::get_ActivatableAbility
+IL_00ae: call         Kingmaker.UnitLogic.UnitHelper::RemoveFact
+IL_00b3: ldarg.0
+IL_00b4: ldnull
+IL_00b5: call         Kingmaker.Items.ItemEntity::set_ActivatableAbility
+IL_00ba: ldarg.0
+IL_00bb: call         Kingmaker.Items.ItemEntity::get_ActivatableAbility
+IL_00c0: brtrue.s     IL_00df
+IL_00c2: ldloc.1
+IL_00c3: ldnull
+IL_00c4: call         UnityEngine.Object::op_Inequality
+IL_00c9: brfalse.s    IL_00df
+IL_00cb: ldarg.0
+IL_00cc: ldarg.0
+IL_00cd: call         Kingmaker.Items.ItemEntity::get_Wielder
+IL_00d2: ldloc.1
+IL_00d3: ldnull
+IL_00d4: ldnull
+IL_00d5: call         Kingmaker.UnitLogic.UnitHelper::AddFact
+IL_00da: call         Kingmaker.Items.ItemEntity::set_ActivatableAbility
+IL_00df: ret
+
+=== Kingmaker.Items.ItemEntity::ReapplyFactsForWielder() -> System.Void ===
+IL_0000: ldarg.0
+IL_0001: call         Kingmaker.Items.ItemEntity::get_Wielder
+IL_0006: brtrue.s     IL_0009
+IL_0008: ret
+IL_0009: ldarg.0
+IL_000a: ldarg.0
+IL_000b: call         Kingmaker.Items.ItemEntity::get_Blueprint
+IL_0010: call         Kingmaker.Blueprints.BlueprintExtenstions::GetComponents
+IL_0015: ldarg.0
+IL_0016: ldftn        Kingmaker.Items.ItemEntity::<ReapplyFactsForWielder>b__128_0
+IL_001c: newobj       System.Func`2[[Kingmaker.Blueprints.Items.Components.AddFactToEquipmentWielder, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null],[Kingmaker.Blueprints.Facts.Fact, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]]::.ctor
+IL_0021: call         System.Linq.Enumerable::Select
+IL_0026: call         System.Linq.Enumerable::ToArray
+IL_002b: stfld        Kingmaker.Items.ItemEntity::m_FactsAppliedToWielder
+IL_0030: ret
+
+=== Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment::get_GainAbility() -> System.Boolean ===
+IL_0000: ldarg.0
+IL_0001: ldfld        Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment::Ability
+IL_0006: call         UnityEngine.Object::op_Implicit
+IL_000b: brtrue.s     IL_0019
+IL_000d: ldarg.0
+IL_000e: ldfld        Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment::ActivatableAbility
+IL_0013: call         UnityEngine.Object::op_Implicit
+IL_0018: ret
+IL_0019: ldc.i4.1
+IL_001a: ret

@@ -1,0 +1,68 @@
+Assembly-CSharp SHA-256: 3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb
+Assembly-CSharp MVID: 07fa1e4d-8618-41b3-9b8d-faa17d3b26f7
+TargetType values: Enemy=0, Ally=1, Any=2
+
+=== Kingmaker.Items.ItemEntity::OnDidEquipped(Kingmaker.UnitLogic.UnitDescriptor) -> System.Void ===
+IL_0000: ldarg.0
+IL_0001: ldarg.1
+IL_0002: call         Kingmaker.Items.ItemEntity::set_Wielder
+IL_0007: ldarg.0
+IL_0008: call         Kingmaker.Items.ItemEntity::ApplyEnchantments
+IL_000d: ldarg.0
+IL_000e: ldfld        Kingmaker.Items.ItemEntity::m_Enchantments
+IL_0013: dup
+IL_0014: brtrue.s     IL_0019
+IL_0016: pop
+IL_0017: br.s         IL_001f
+IL_0019: ldc.i4.1
+IL_001a: call         Kingmaker.Blueprints.FactCollection::SetActive
+IL_001f: ldarg.0
+IL_0020: call         Kingmaker.Items.ItemEntity::ReapplyFactsForWielder
+IL_0025: ldarg.0
+IL_0026: call         Kingmaker.Items.ItemEntity::get_Blueprint
+IL_002b: isinst       token 0x0200162d
+IL_0030: stloc.0
+IL_0031: ldarg.0
+IL_0032: call         Kingmaker.Items.ItemEntity::get_IsIdentified
+IL_0037: brfalse.s    IL_00a0
+IL_0039: ldloc.0
+IL_003a: call         UnityEngine.Object::op_Implicit
+IL_003f: brfalse.s    IL_00a0
+IL_0041: ldloc.0
+IL_0042: ldfld        Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment::Ability
+IL_0047: call         UnityEngine.Object::op_Implicit
+IL_004c: brfalse.s    IL_0071
+IL_004e: ldarg.0
+IL_004f: call         Kingmaker.Items.ItemEntity::get_Wielder
+IL_0054: ldloc.0
+IL_0055: ldfld        Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment::Ability
+IL_005a: ldnull
+IL_005b: ldnull
+IL_005c: call         Kingmaker.UnitLogic.UnitHelper::AddFact
+IL_0061: stloc.1
+IL_0062: ldloc.1
+IL_0063: ldarg.0
+IL_0064: callvirt     Kingmaker.Blueprints.Facts.Fact::set_SourceItem
+IL_0069: ldarg.0
+IL_006a: ldloc.1
+IL_006b: call         Kingmaker.Items.ItemEntity::set_Ability
+IL_0070: ret
+IL_0071: ldloc.0
+IL_0072: ldfld        Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment::ActivatableAbility
+IL_0077: call         UnityEngine.Object::op_Implicit
+IL_007c: brfalse.s    IL_00a0
+IL_007e: ldarg.0
+IL_007f: call         Kingmaker.Items.ItemEntity::get_Wielder
+IL_0084: ldloc.0
+IL_0085: ldfld        Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment::ActivatableAbility
+IL_008a: ldnull
+IL_008b: ldnull
+IL_008c: call         Kingmaker.UnitLogic.UnitHelper::AddFact
+IL_0091: stloc.2
+IL_0092: ldloc.2
+IL_0093: ldarg.0
+IL_0094: callvirt     Kingmaker.Blueprints.Facts.Fact::set_SourceItem
+IL_0099: ldarg.0
+IL_009a: ldloc.2
+IL_009b: call         Kingmaker.Items.ItemEntity::set_ActivatableAbility
+IL_00a0: ret

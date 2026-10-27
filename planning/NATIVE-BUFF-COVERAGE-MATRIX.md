@@ -241,3 +241,11 @@ The generated row-level matrix is `planning/NATIVE-BUFF-CATALOG.json`: 1,722 blu
 Every candidate has exactly one `include`, `exclude`, or `unsupported-with-reason` disposition. Counts reconcile to 413 included, 561 excluded, and 0 unsupported/unclassified. Each row records its structural evidence, support class, exact reason, override if any, and qualification status.
 
 The native classification gate is complete. The 413 included rows remain `DEFER-runtime-qualification` until an authorized project-owned `KBP_` save permits provider/resource, active-effect, animated/instant, and equivalence scenarios. This matrix does not convert no-save blueprint evidence into a save-backed runtime claim.
+
+## Limited-use repair evidence boundary - 2026-10-26
+
+[Source/test eafb950 checkpoint](../docs/LIMITED-USE-REPAIR-CHECKPOINT.md) passes
+17 focused tests, including installed-method charge-source fixtures. It adds no
+native buff coverage or identification of the reporter's Aspect of the Falcon
+source. All current-product native controller/mouse/Animated/resource acceptance
+rows remain NOT_RUN; preserve historical row attribution.

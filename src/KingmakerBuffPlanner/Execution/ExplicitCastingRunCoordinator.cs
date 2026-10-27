@@ -14,7 +14,7 @@ namespace KingmakerBuffPlanner.Execution
         internal ExplicitCastingRunEntry(string castingId, bool processed,
             bool nativeSubmissionReported, bool confirmed, string finalStatus,
             string detail, bool resourceSpentReported = false,
-            bool spendInvoked = false)
+            bool spendInvoked = false, bool effectObserved = false)
         {
             CastingId = castingId;
             Processed = processed;
@@ -24,6 +24,7 @@ namespace KingmakerBuffPlanner.Execution
             Detail = detail ?? string.Empty;
             ResourceSpentReported = resourceSpentReported;
             SpendInvoked = spendInvoked;
+            EffectObserved = effectObserved;
         }
 
         // Resource spending is reported separately from the effect: the
@@ -32,6 +33,7 @@ namespace KingmakerBuffPlanner.Execution
         // about whether the effect landed, and neither is ever reversed.
         public bool ResourceSpentReported { get; private set; }
         public bool SpendInvoked { get; private set; }
+        public bool EffectObserved { get; private set; }
 
         public string CastingId { get; private set; }
         // Review L2: the executor was invoked for this casting (validation
@@ -265,7 +267,7 @@ namespace KingmakerBuffPlanner.Execution
                             inFlight.NativeSubmissionReported, false,
                             "Cancelled", "cancelled-in-flight;last:" + inFlight.FinalStatus +
                             ":" + inFlight.Detail, inFlight.ResourceSpentReported,
-                            inFlight.SpendInvoked));
+                            inFlight.SpendInvoked, inFlight.EffectObserved));
                         haltedAfter = inFlight.CastingId;
                     }
                     string cancelReason = "cancelled" +
@@ -308,7 +310,9 @@ namespace KingmakerBuffPlanner.Execution
             return new ExplicitCastingRunEntry(castingId, true, submitted, confirmed,
                 status, detail,
                 report.Records.Any(record => record.Status == CastExecutionStatus.ResourceSpent),
-                report.Records.Any(record => record.Status == CastExecutionStatus.SpendInvoked));
+                report.Records.Any(record => record.Status == CastExecutionStatus.SpendInvoked),
+                report.Records.Any(record => record.Status == CastExecutionStatus.EffectObserved ||
+                    record.Status == CastExecutionStatus.EffectConfirmed));
         }
 
         private static string DisposeOnce(ref IEnumerator active)

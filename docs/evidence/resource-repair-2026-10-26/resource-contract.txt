@@ -1,0 +1,181 @@
+Assembly-CSharp SHA-256: 3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb
+Assembly-CSharp MVID: 07fa1e4d-8618-41b3-9b8d-faa17d3b26f7
+TargetType values: Enemy=0, Ally=1, Any=2
+
+=== Kingmaker.UnitLogic.Abilities.AbilityData::get_SourceItem() -> Kingmaker.Items.ItemEntity ===
+IL_0000: ldarg.0
+IL_0001: call         Kingmaker.UnitLogic.Abilities.AbilityData::get_Fact
+IL_0006: dup
+IL_0007: brtrue.s     IL_000c
+IL_0009: pop
+IL_000a: ldnull
+IL_000b: ret
+IL_000c: call         Kingmaker.Blueprints.Facts.Fact::get_SourceItem
+IL_0011: ret
+
+=== Kingmaker.UnitLogic.Abilities.AbilityData::get_Resource() -> Kingmaker.Blueprints.BlueprintAbilityResource ===
+IL_0000: ldarg.0
+IL_0001: ldfld        Kingmaker.UnitLogic.Abilities.AbilityData::Blueprint
+IL_0006: call         Kingmaker.Blueprints.BlueprintExtenstions::GetComponent
+IL_000b: dup
+IL_000c: brtrue.s     IL_0011
+IL_000e: pop
+IL_000f: ldnull
+IL_0010: ret
+IL_0011: ldfld        Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic::RequiredResource
+IL_0016: ret
+
+=== Kingmaker.UnitLogic.Abilities.AbilityData::get_ResourceCost() -> System.Int32 ===
+IL_0000: ldarg.0
+IL_0001: ldfld        Kingmaker.UnitLogic.Abilities.AbilityData::Blueprint
+IL_0006: call         Kingmaker.Blueprints.BlueprintExtenstions::GetComponent
+IL_000b: dup
+IL_000c: brtrue.s     IL_0011
+IL_000e: pop
+IL_000f: ldc.i4.0
+IL_0010: ret
+IL_0011: ldarg.0
+IL_0012: callvirt     Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic::CalculateCost
+IL_0017: ret
+
+=== Kingmaker.Items.ItemEntity::get_IsSpendCharges() -> System.Boolean ===
+IL_0000: ldarg.0
+IL_0001: call         Kingmaker.Items.ItemEntity::get_Blueprint
+IL_0006: isinst       token 0x0200162d
+IL_000b: dup
+IL_000c: brtrue.s     IL_0011
+IL_000e: pop
+IL_000f: ldc.i4.0
+IL_0010: ret
+IL_0011: ldfld        Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment::SpendCharges
+IL_0016: ret
+
+=== Kingmaker.Items.ItemEntity::get_Charges() -> System.Int32 ===
+IL_0000: ldarg.0
+IL_0001: ldfld        Kingmaker.Items.ItemEntity::<Charges>k__BackingField
+IL_0006: ret
+
+=== Kingmaker.Items.ItemEntity::SpendCharges() -> System.Boolean ===
+IL_0000: ldarg.0
+IL_0001: ldarg.0
+IL_0002: call         Kingmaker.Items.ItemEntity::get_Owner
+IL_0007: call         Kingmaker.Items.ItemEntity::SpendCharges
+IL_000c: ret
+
+=== Kingmaker.Items.ItemEntity::SpendCharges(Kingmaker.UnitLogic.UnitDescriptor) -> System.Boolean ===
+IL_0000: ldarg.0
+IL_0001: call         Kingmaker.Items.ItemEntity::get_Blueprint
+IL_0006: isinst       token 0x0200162d
+IL_000b: stloc.0
+IL_000c: ldloc.0
+IL_000d: call         UnityEngine.Object::op_Implicit
+IL_0012: brfalse.s    IL_001c
+IL_0014: ldloc.0
+IL_0015: callvirt     Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment::get_GainAbility
+IL_001a: brtrue.s     IL_003e
+IL_001c: ldarg.0
+IL_001d: call         Kingmaker.Items.ItemEntity::get_Blueprint
+IL_0022: ldstr        "Item {0} doesn't gain ability"
+IL_0027: ldarg.0
+IL_0028: call         Kingmaker.Items.ItemEntity::get_Blueprint
+IL_002d: call         System.String::Format
+IL_0032: call         System.Array::Empty
+IL_0037: call         UberDebug::LogError
+IL_003c: ldc.i4.0
+IL_003d: ret
+IL_003e: ldarg.0
+IL_003f: call         Kingmaker.Items.ItemEntity::get_IsSpendCharges
+IL_0044: brtrue.s     IL_0048
+IL_0046: ldc.i4.1
+IL_0047: ret
+IL_0048: ldc.i4.0
+IL_0049: stloc.1
+IL_004a: ldarg.0
+IL_004b: call         Kingmaker.Items.ItemEntity::get_Charges
+IL_0050: ldc.i4.0
+IL_0051: ble.s        IL_00bc
+IL_0053: ldarg.0
+IL_0054: isinst       token 0x02000fa7
+IL_0059: stloc.2
+IL_005a: ldarg.1
+IL_005b: ldfld        Kingmaker.UnitLogic.UnitDescriptor::State
+IL_0060: ldfld        Kingmaker.UnitLogic.UnitState::Features
+IL_0065: ldfld        Kingmaker.UnitLogic.UnitMechanicsFeatures::HandOfMagusDan
+IL_006a: call         Kingmaker.Utility.CountableFlag::op_Implicit
+IL_006f: brfalse.s    IL_00ac
+IL_0071: ldloc.2
+IL_0072: brfalse.s    IL_00ac
+IL_0074: ldloc.2
+IL_0075: call         Kingmaker.Items.ItemEntityUsable::get_Blueprint
+IL_007a: ldfld        Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipmentUsable::Type
+IL_007f: ldc.i4.2
+IL_0080: bne.un.s     IL_00ac
+IL_0082: ldarg.1
+IL_0083: callvirt     Kingmaker.UnitLogic.UnitDescriptor::get_Unit
+IL_0088: ldc.i4.1
+IL_0089: ldc.i4.s     100
+IL_008b: newobj       Kingmaker.RuleSystem.DiceFormula::.ctor
+IL_0090: newobj       Kingmaker.RuleSystem.Rules.RuleRollDice::.ctor
+IL_0095: dup
+IL_0096: call         Kingmaker.RuleSystem.Rulebook::Trigger
+IL_009b: pop
+IL_009c: callvirt     Kingmaker.RuleSystem.Rules.RuleRollDice::get_Result
+IL_00a1: call         Kingmaker.RuleSystem.RulebookEvent+RollEntry::op_Implicit
+IL_00a6: ldc.i4.s     25
+IL_00a8: bgt.s        IL_00ac
+IL_00aa: ldc.i4.1
+IL_00ab: ret
+IL_00ac: ldarg.0
+IL_00ad: ldarg.0
+IL_00ae: call         Kingmaker.Items.ItemEntity::get_Charges
+IL_00b3: ldc.i4.1
+IL_00b4: sub
+IL_00b5: call         Kingmaker.Items.ItemEntity::set_Charges
+IL_00ba: br.s         IL_00cd
+IL_00bc: ldc.i4.1
+IL_00bd: stloc.1
+IL_00be: ldstr        "Has no charges"
+IL_00c3: call         System.Array::Empty
+IL_00c8: call         UberDebug::LogError
+IL_00cd: ldarg.0
+IL_00ce: call         Kingmaker.Items.ItemEntity::get_Charges
+IL_00d3: ldc.i4.1
+IL_00d4: bge.s        IL_010b
+IL_00d6: ldloc.0
+IL_00d7: ldfld        Kingmaker.Blueprints.Items.Equipment.BlueprintItemEquipment::RestoreChargesOnRest
+IL_00dc: brtrue.s     IL_010b
+IL_00de: ldarg.0
+IL_00df: call         Kingmaker.Items.ItemEntity::get_Count
+IL_00e4: ldc.i4.1
+IL_00e5: ble.s        IL_00f8
+IL_00e7: ldarg.0
+IL_00e8: ldc.i4.1
+IL_00e9: ldc.i4.0
+IL_00ea: call         Kingmaker.Items.ItemEntity::DecrementCount
+IL_00ef: ldarg.0
+IL_00f0: ldc.i4.1
+IL_00f1: call         Kingmaker.Items.ItemEntity::set_Charges
+IL_00f6: br.s         IL_010b
+IL_00f8: ldarg.0
+IL_00f9: call         Kingmaker.Items.ItemEntity::get_Collection
+IL_00fe: dup
+IL_00ff: brtrue.s     IL_0104
+IL_0101: pop
+IL_0102: br.s         IL_010b
+IL_0104: ldarg.0
+IL_0105: call         Kingmaker.Items.ItemsCollection::Remove
+IL_010a: pop
+IL_010b: ldloc.1
+IL_010c: ldc.i4.0
+IL_010d: ceq
+IL_010f: ret
+
+=== Kingmaker.Items.ItemEntity::get_Ability() -> Kingmaker.UnitLogic.Abilities.Ability ===
+IL_0000: ldarg.0
+IL_0001: ldfld        Kingmaker.Items.ItemEntity::<Ability>k__BackingField
+IL_0006: ret
+
+=== Kingmaker.Blueprints.Facts.Fact::get_SourceItem() -> Kingmaker.Items.ItemEntity ===
+IL_0000: ldarg.0
+IL_0001: ldfld        Kingmaker.Blueprints.Facts.Fact::<SourceItem>k__BackingField
+IL_0006: ret

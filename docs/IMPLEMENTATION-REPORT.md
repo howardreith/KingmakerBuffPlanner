@@ -927,3 +927,15 @@ fullscreen.
 
 Native evidence: batch r15, 41/41 jobs done and verified on the delivered
 candidate (see `docs/QUALIFICATION.md` and `docs/E01-E27-ACCEPTANCE-MATRIX.md`).
+
+## Limited-use source/report repair - 2026-10-26
+
+Tested source/test HEAD `eafb950a886c7ede741f0541d37b2140d9d4b500`, v0.6.6;
+focused 17/0, source 47/0, build 1/0. Native-method fixtures establish the resource-less
+finite-item contradiction and exercise five-cast finite/unlimited runs through
+production planning/executors/reporting with simulated rule/command/effect edges.
+Exact live-item binding, shared charge budgets, stale-source refusal, cleanup and
+truthful observed-use reporting are implemented. Item selection after reload is
+safely unresolved, not persistent item tracking. Reporter identity and live native
+acceptance remain unverified. [Review, hashes, commands, counts, R1-R7, limitations
+and next action](LIMITED-USE-REPAIR-CHECKPOINT.md). No release or installation.
