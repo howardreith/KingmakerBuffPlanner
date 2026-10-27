@@ -1,3 +1,19 @@
+## Published 0.6.7 limited-use casting repair - 2026-10-27 UTC
+
+Owner-authorized merge/release completed: PR #15 merged; product/tag commit
+`e60917511232c20f57bc833b8216222d7b07b081`, v0.6.7 stable and GitHub Latest.
+Complete offline C# suite 602/0, source 47/0, publisher gate 8/0, guarded push
+6/0, two deterministic builds and strict package checks 6/0. Independently
+downloaded ZIP matches local, asset digest and checksum; DLL matches manifest.
+ZIP SHA-256 `76da15c0dfb7c5f23aa99b030225a7edf48c987011bab83e2275a4c80d69705f`.
+[Release identity, commands, gate corrections and native limits](docs/RELEASE-0.6.7-RECORD.md).
+Frozen product/artifacts: `private/release/067-stable`; documentation is separate.
+Item source choices require explicit reselection after save reload; original
+reporter source remains unknown. Native acceptance is NOT_RUN; no installation,
+game launch, save mutation or tester contact occurred. Next: focused disposable
+trial of the published ZIP or a separately budgeted guarded native qualification.
+Older development and publication entries below retain their original scope.
+
 ## Current branch checkpoint: limited-use repair, 2026-10-26
 
 Branch `codex/kingmaker-buff-planner/resource-classification-repair`, isolated

@@ -1,3 +1,9 @@
+> **0.6.7 stable release:** owner-authorized pre-runtime publication from
+> product `e60917511232c20f57bc833b8216222d7b07b081`; complete offline C# 602/0,
+> source 47/0, publisher 8/0, deterministic builds and package checks pass.
+> Published assets were independently downloaded and matched. All native
+> acceptance remains NOT_RUN. [Exact release evidence and limits](RELEASE-0.6.7-RECORD.md).
+
 > **2026-10-26 limited-use development checkpoint:** source/test
 > `eafb950a886c7ede741f0541d37b2140d9d4b500` (v0.6.6) passes focused 17/0,
 > source 47/0, build 1/0. Detached native-method fixtures are not game acceptance.

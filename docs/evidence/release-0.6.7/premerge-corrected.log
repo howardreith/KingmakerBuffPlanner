@@ -1,0 +1,23 @@
+Source validation: PASS=47 FAIL=0
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-RELEASE-067\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=d1d2226f407cf713b301e1f7d73de34d3b9040e37e7b921b26a67a3b8954fec3
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-RELEASE-067\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-RELEASE-067\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+HUMAN_FEEDBACK_PERF calculations-only catalog=77 castings=67 coldMs=1.707 warmMedianMs=0.827 warmSlowestMs=1.609 buffMedianMs=0.719 buffSlowestMs=0.859 toggleMedianMs=35.712 toggleSlowestMs=41.150
+Protocol tests: PASS=597 FAIL=5
+FAIL qualification-enhanced-direct-recipe: The enhanced qualification (animated) did not pass exactly: failed:enhanced-wait|enhanced-wait:step:route:native-command-spend-completed:EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-animated;polls=3|fired=qual-cast-1,qual-cast-2|options=before:metamagic-rod|unit-arcanist|rod-guid,before:class-feature|unit-arcanist|16c06d016437be9e9e6dac6211ff30a5,after:metamagic-rod|unit-arcanist|rod-guid,after:class-feature|unit-arcanist|16c06d016437be9e9e6dac6211ff30a5*|qual-cast-1:2>1,qual-cast-2:2>1|qual-cast-1:enhanced-before:qual-cast-1#3;available=2;clock=36001600000;effects=[strength-buff#i1@42000960000{Strength/Enhancement/4}],qual-cast-2:enhanced-before:qual-cast-2#4;available=2;clock=36001600000;effects=[],caster:enhanced-before:resource=4;activatables=3;on=,qual-cast-1:enhanced-after:qual-cast-1#5;available=1;clock=36002400000;effects=[strength-buff#i1@42000960000{Strength/Enhancement/4}],qual-cast-2:enhanced-after:qual-cast-2#6;available=1;clock=36002400000;effects=[strength-buff#i2@42002080000{Strength/Enhancement/6}],caster:enhanced-after:resource=3;activatables=3;on=
+FAIL qualification-rod-extend-recipe: The rod qualification (animated) did not pass exactly: failed:enhanced-wait|enhanced-wait:step:route:native-command-spend-completed:EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-animated;polls=3|599.968>1199.968|charges=2
+FAIL shared-recipes-select-cast-and-isolate-end-to-end: shared-personal/animated casting: violations=shared-wait:step:route:native-command-spend-completed:EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-animated;polls=3 failures=shared-wait:step:route:native-command-spend-completed:EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-animated;polls=3 terminal=failed:shared-wait
+FAIL sticky-qual-driver-passes-both-modes-and-pool-kinds: The touch qualification (prepared, animated) did not pass exactly: failed:use-wait|use-wait:step:route:native-command:EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-animated;polls=3|fired=qual-cast-1|routed=False|spent=False|no-exhausted|detail=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-animated;polls=3
+FAIL sticky-qual-judge-refuses-wrong-route-spend-effect-and-exhaustion: The judged runs are not clean:  / use-wait:step:route:native-command:EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-animated;polls=3
+Offline C# suite failed with exit code 1 (PASS=597 FAIL=5).
+At C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-RELEASE-067\scripts\PublishRelease.Co
+mmon.ps1:121 char:9
++         throw "Offline C# suite failed with exit code $testExit (PASS ...
++         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Offline C# suit...SS=597 FAIL=5).:String) [], RuntimeException
+    + FullyQualifiedErrorId : Offline C# suite failed with exit code 1 (PASS=597 FAIL=5).
+ 

@@ -939,3 +939,14 @@ truthful observed-use reporting are implemented. Item selection after reload is
 safely unresolved, not persistent item tracking. Reporter identity and live native
 acceptance remain unverified. [Review, hashes, commands, counts, R1-R7, limitations
 and next action](LIMITED-USE-REPAIR-CHECKPOINT.md). No release or installation.
+
+## 0.6.7 published release
+
+Owner-authorized PR #15 merge and stable publication completed from product
+`e60917511232c20f57bc833b8216222d7b07b081`. Complete release suite 602/0;
+source 47/0, publisher 8/0, deterministic builds and strict package checks pass.
+The release correction preserves Animated qualification evidence order/detail
+and observed spending when an effect reader fails; five previously failing
+qualification cases and their affected neighbors pass 19/0. The mission mirror
+is synchronized. Native acceptance remains NOT_RUN. [Exact commands, hashes,
+original failures, publication and next action](RELEASE-0.6.7-RECORD.md).

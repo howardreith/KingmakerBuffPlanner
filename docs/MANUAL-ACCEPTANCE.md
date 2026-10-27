@@ -866,3 +866,12 @@ mismatch refusal, known shortage with zero submissions, genuine unlimited with
 independent costs. Include a supported single-item source or clearly document its
 absence; distinguish session-only identity from persistence across reload. Keep
 baseline/all other saves protected and verify transactional exact restoration.
+
+## Published 0.6.7 trial boundary
+
+Use the exact [published 0.6.7 ZIP](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.7)
+for the pending limited-use acceptance rows. Product commit
+`e60917511232c20f57bc833b8216222d7b07b081`; all native rows remain NOT_RUN.
+[Release checks, hashes, source-selection limitations and trial scope](RELEASE-0.6.7-RECORD.md).
+Offline release qualification does not replace the guarded native safety/purity
+prerequisite or authorize changes to baseline/other saves.

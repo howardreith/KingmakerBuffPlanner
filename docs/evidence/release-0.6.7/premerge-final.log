@@ -1,0 +1,15 @@
+Source validation: PASS=47 FAIL=0
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-RELEASE-067\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=a5d075b53957857125748f52b4bdc45fcae39d88ec0822abeb17dd6dd52209d7
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-RELEASE-067\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-RELEASE-067\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+HUMAN_FEEDBACK_PERF calculations-only catalog=77 castings=67 coldMs=1.742 warmMedianMs=0.931 warmSlowestMs=1.327 buffMedianMs=1.039 buffSlowestMs=1.310 toggleMedianMs=47.675 toggleSlowestMs=79.772
+Protocol tests: PASS=602 FAIL=0
+Offline C# suite: PASS=602 FAIL=0
+Guarded publisher gate tests: PASS=8 FAIL=0
+Release validation (OwnerAuthorizedPreRuntime): Validate-Source.ps1, OfflineCSharpSuite, Test-PublishReleaseGate.ps1 PASS
+Guarded push helper: PASS=6 FAIL=0
+Premerge release qualification complete; seconds=34.8

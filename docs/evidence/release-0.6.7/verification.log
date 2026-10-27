@@ -1,0 +1,18 @@
+Package validation: PASS=6 FAIL=0 sha256=76da15c0dfb7c5f23aa99b030225a7edf48c987011bab83e2275a4c80d69705f
+{
+    "version":  "0.6.7",
+    "commit":  "e60917511232c20f57bc833b8216222d7b07b081",
+    "tagCommit":  "e60917511232c20f57bc833b8216222d7b07b081",
+    "publishedAtUtc":  "2026-10-27T01:19:39Z",
+    "releaseUrl":  "https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.7",
+    "stable":  true,
+    "latest":  true,
+    "packageSha256":  "76da15c0dfb7c5f23aa99b030225a7edf48c987011bab83e2275a4c80d69705f",
+    "dllSha256":  "5f31f6a3be49a2c29bdc5e3de699bcde7f1fe60892ad70febf7a87339626b275",
+    "dllMvid":  "9170f4a2-a403-4684-9802-5c5e86e3568f",
+    "checksumFileSha256":  "e363265e535633ce4184d233b9cd81771e4116c63fefea3aea4a0388b9ff470c",
+    "matchingZipHashes":  3,
+    "downloadedPackagePassed":  6,
+    "downloadedPackageFailed":  0,
+    "nativeAcceptance":  "NOT_RUN"
+}

@@ -4406,3 +4406,25 @@ Native acceptance NOT_RUN behind mandatory current-product purity's separate
 budget; read-only lab/Steam/protected-save checks passed. No merge/push/PR/tag,
 package/install/launch/release/tester contact. Next: freeze tested product for
 separately budgeted guarded native acceptance and obtain full reporter evidence.
+
+## 2026-10-27 UTC - 0.6.7 stable release published and verified
+
+Owner explicitly requested merge and release. PR #15 merged candidate
+`34b9e1e36053c40c8e63a804e36ec777a1740d71` into main/product
+`e60917511232c20f57bc833b8216222d7b07b081`; annotated v0.6.7 peels to product.
+Guarded publisher used OwnerAuthorizedPreRuntime; GitHub stable Latest at
+01:19:39 UTC. Complete offline suite 602/0, source 47/0, publisher 8/0,
+guarded push 6/0, deterministic release build 3/0 with two identical builds,
+package validation 6/0 per invocation and independent downloaded ZIP/DLL checks.
+ZIP SHA-256 `76da15c0dfb7c5f23aa99b030225a7edf48c987011bab83e2275a4c80d69705f`;
+DLL `5f31f6a3be49a2c29bdc5e3de699bcde7f1fe60892ad70febf7a87339626b275`.
+The first source gate caught the unsynchronized mission mirror; it was copied
+byte-identically without weakening the validator. A subsequent full-suite run
+failed 597/5 on Animated qualification evidence order/detail. The correction
+restores successful evidence compatibility while retaining observed use through
+failed commands/readers; affected neighbors pass 19/0. Original failures remain
+in the [release evidence and full record](docs/RELEASE-0.6.7-RECORD.md).
+No native game PASS, installation, save mutation or tester contact is claimed.
+Session-bound item selection/reselection and unidentified reporter source remain
+explicit release limits. Next: focused disposable published-ZIP trial, or a
+separately budgeted guarded native qualification; preserve frozen product clone.

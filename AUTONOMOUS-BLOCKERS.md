@@ -1,3 +1,16 @@
+## 0.6.7 release complete; native acceptance pending
+
+PR #15 merged and stable v0.6.7 is Latest from product
+`e60917511232c20f57bc833b8216222d7b07b081`. Offline release qualification passes
+602/0 C# tests, source 47/0, publisher 8/0, deterministic builds and package
+checks. [Full release record](docs/RELEASE-0.6.7-RECORD.md).
+Remaining limits: exact reporter source/configuration unknown; item selections
+are session-bound and retained unresolved after save reload until reselected;
+all native acceptance rows NOT_RUN. Public release was explicitly authorized
+without native acceptance. No publishing blocker remains. Next: disposable
+published-ZIP trial or separately budgeted guarded native qualification, with
+full casting log capture and protected save/installation restoration.
+
 ## Limited-use repair limits, 2026-10-26
 
 Local implementation checkpoint is complete on source `eafb950a886c7ede741f0541d37b2140d9d4b500`
