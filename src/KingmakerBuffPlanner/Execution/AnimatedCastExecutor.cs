@@ -156,31 +156,44 @@ namespace KingmakerBuffPlanner.Execution
                                     CastExecutionStatus.CastStarted,
                                     "animated-command-started");
                             bool resourceSpent = operation.ResourceSpent;
-                            if (resourceSpent)
-                                report.Add(index, step,
-                                    CastExecutionStatus.ResourceSpent,
-                                    "native-resource-delta-observed");
-                            if (operation.EffectsObserved)
-                                report.Add(index, step, CastExecutionStatus.EffectObserved,
-                                    "expected-effects-observed;" + operation.Detail);
-                            if (operation.TimedOut)
-                                report.Add(index, step,
-                                    CastExecutionStatus.TimedOutUnconfirmed,
-                                    operation.Detail);
-                            else if (!operation.Succeeded)
-                                report.Add(index, step,
-                                    CastExecutionStatus.FailedExecution,
-                                    operation.Detail);
-                            else if (operation.EffectsObserved)
-                                report.Add(index, step,
-                                    CastExecutionStatus.EffectConfirmed,
-                                    "expected-effects-observed;" +
-                                    operation.Detail);
-                            else
-                                report.Add(index, step,
-                                    CastExecutionStatus.TimedOutUnconfirmed,
-                                    "expected-effects-absent;" +
-                                    operation.Detail);
+                            bool operationSucceeded = false;
+                            try
+                            {
+                                operationSucceeded = operation.Succeeded;
+                                bool effectsObserved = operation.EffectsObserved;
+                                if (effectsObserved)
+                                    report.Add(index, step, CastExecutionStatus.EffectObserved,
+                                        "expected-effects-observed;" + operation.Detail);
+                                if (operation.TimedOut)
+                                    report.Add(index, step,
+                                        CastExecutionStatus.TimedOutUnconfirmed,
+                                        operation.Detail);
+                                else if (!operationSucceeded)
+                                    report.Add(index, step,
+                                        CastExecutionStatus.FailedExecution,
+                                        operation.Detail);
+                                else if (effectsObserved)
+                                    report.Add(index, step,
+                                        CastExecutionStatus.EffectConfirmed,
+                                        "expected-effects-observed;" +
+                                        operation.Detail);
+                                else
+                                    report.Add(index, step,
+                                        CastExecutionStatus.TimedOutUnconfirmed,
+                                        "expected-effects-absent;" +
+                                        operation.Detail);
+                            }
+                            finally
+                            {
+                                // Preserve the established successful command
+                                // evidence/order used by qualification readers.
+                                // A failed command or observer still retains
+                                // the resource decrease already read above.
+                                if (resourceSpent)
+                                    report.Add(index, step, CastExecutionStatus.ResourceSpent,
+                                        operationSucceeded ? "native-command-spend-completed"
+                                            : "native-resource-delta-observed");
+                            }
                             if (resourceSpent && step.Reservation.Unlimited)
                                 report.Add(index, step,
                                     CastExecutionStatus.FailedExecution,

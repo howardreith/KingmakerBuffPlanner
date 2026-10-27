@@ -322,6 +322,7 @@ namespace KingmakerBuffPlanner.Tests
             internal Action BeforeSubmit;
             internal Action AfterValidation;
             internal bool FailAfterSpend;
+            internal bool ThrowEffectRead;
             internal int Submissions;
             internal int LeasesAcquired;
             internal int LeasesDisposed;
@@ -357,7 +358,7 @@ namespace KingmakerBuffPlanner.Tests
             {
                 InstantCastResult result = Fire(step);
                 if (!result.Submitted) throw new InvalidOperationException(result.Detail);
-                return new FactFixtureOperation(result);
+                return new FactFixtureOperation(result, ThrowEffectRead);
             }
             public bool EffectsObserved(CastStep step) { return step.TargetUnitIds.All(Effects.Contains); }
             public InstantCastCompletion InspectCompletion(CastStep step) { return InstantCastCompletion.Settled("fixture"); }
@@ -374,12 +375,21 @@ namespace KingmakerBuffPlanner.Tests
         private sealed class FactFixtureOperation : IAnimatedCastOperation
         {
             private readonly InstantCastResult _result;
-            internal FactFixtureOperation(InstantCastResult result) { _result = result; }
+            private readonly bool _throwEffectRead;
+            internal FactFixtureOperation(InstantCastResult result, bool throwEffectRead)
+            { _result = result; _throwEffectRead = throwEffectRead; }
             public bool IsStarted { get { return true; } }
             public bool IsCompleted { get { return true; } }
             public bool TimedOut { get { return false; } }
             public bool Succeeded { get { return _result.Succeeded; } }
-            public bool EffectsObserved { get { return _result.EffectsObserved; } }
+            public bool EffectsObserved
+            {
+                get
+                {
+                    if (_throwEffectRead) throw new InvalidOperationException("effect-reader-unavailable");
+                    return _result.EffectsObserved;
+                }
+            }
             public bool ResourceSpent { get { return _result.ResourceSpent; } }
             public string ResourceCountViolation { get { return _result.ResourceCountViolation; } }
             public bool HasResidualDeliveryState { get { return false; } }
@@ -431,6 +441,23 @@ namespace KingmakerBuffPlanner.Tests
                 text.Contains("plus 1 free") || !text.Contains("observed resource use: 1") ||
                 !text.Contains("effect observed on 1 unvalidated"))
                 throw new InvalidOperationException("A free forecast hid observed spending: " + text);
+
+            ItemEntity observerItem;
+            AbilityData observerData = NativeItemAbility("observer-failure", 3, out observerItem);
+            ExplicitCastingPlan observerPlan;
+            CastingApplyDecision observerDecision;
+            CastingPlanDocument observerDocument;
+            ExplicitStepConversion observerProjection = NativeFactProjection(observerData, 2,
+                out observerDocument, out observerPlan, out observerDecision);
+            var observerRuntime = new NativeFactRuntime(observerData) { ThrowEffectRead = true };
+            var observerHost = NativeFactHost(observerRuntime, true);
+            new NativeCastingDispatchBoundary(observerHost, () => null)
+                .Submit(observerPlan, observerDecision, "long", observerProjection);
+            while (observerHost.IsRunning) observerHost.Pump();
+            if (!observerHost.LastReport.Halted || observerHost.LastReport.ResourcesSpent != 1 ||
+                observerHost.LastReport.Confirmed != 0 || observerHost.LastReport.Entries[0].EffectObserved ||
+                observerHost.LastReport.NotProcessed != 1 || observerItem.Charges != 2 || observerRuntime.Submissions != 1)
+                throw new InvalidOperationException("An Animated effect-reader failure hid observed spending or replayed.");
         }
 
     }
