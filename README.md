@@ -1,5 +1,13 @@
 # Mr. Bard's Kingmaker Buff Planner
 
+**Release: [0.6.7](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.7).**
+This owner-authorized update repairs limited-use source budgeting, validates the
+bound source before casting, and reports observed spending even when a forecast
+was wrong. Item-source choices require explicit reselection after loading a save.
+This exact release has not been run in the game. See the
+[release notes](docs/RELEASE-NOTES-0.6.7.md) and
+[repair evidence and limitations](docs/LIMITED-USE-REPAIR-CHECKPOINT.md).
+
 **Release: [0.6.6](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.6).**
 This owner-authorized release includes spatial controller navigation, a
 persistent focus border, and Inspector text scrolling without snap-back. The
@@ -92,7 +100,7 @@ available policy, responsiveness instrumentation and ordinary-cased Run labels.
 
 Mr. Bard's Kingmaker Buff Planner is a standalone Unity Mod Manager mod built
 against **Windows Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b**. The
-0.6.6 retains the native Linux 2.1.5d version gate but has not passed a
+0.6.7 retains the native Linux 2.1.5d version gate but has not passed a
 native Linux trial.
 
 It plans and applies party buffs while preserving Kingmaker targeting,
@@ -102,7 +110,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.6.6.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.6.7.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including
