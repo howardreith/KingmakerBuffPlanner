@@ -278,16 +278,20 @@ namespace KingmakerBuffPlanner.Execution
                 null, null, null, null, considered, rejections);
         }
 
-        // The discovered catalogue source for an ability: the production
-        // alias contract maps effects[ability.Canonical] and
-        // effects[sourceId] to the SAME instance; the ordinal-first such
-        // source id is used, else the canonical key itself.
+        // Prefer the published catalogue identity: independently scanned
+        // members can have different expression objects from its representative.
+        // Older callers without a normalized entry retain explicit expression
+        // aliases (ordinal-first), then the ability key itself.
         internal static string SourceIdFor(IReadOnlyDictionary<string, EffectExpression> effects,
             AbilityKey ability)
         {
             EffectExpression expected;
             if (!effects.TryGetValue(ability.Canonical, out expected) || expected == null)
                 return null;
+            string catalogueSource = CatalogSourceIdentity.For(ability, expected);
+            if (!string.Equals(catalogueSource, ability.Canonical, StringComparison.Ordinal) &&
+                effects.ContainsKey(catalogueSource))
+                return catalogueSource;
             string alias = effects
                 .Where(pair => !string.Equals(pair.Key, ability.Canonical, StringComparison.Ordinal) &&
                     ReferenceEquals(pair.Value, expected))

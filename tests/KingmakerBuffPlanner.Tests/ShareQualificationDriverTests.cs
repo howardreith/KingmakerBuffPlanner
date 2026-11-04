@@ -10,6 +10,7 @@ using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
 using KingmakerBuffPlanner.GameAdapters;
 using KingmakerBuffPlanner.Planning;
+using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.UI;
 using Newtonsoft.Json.Linq;
 
@@ -29,6 +30,10 @@ namespace KingmakerBuffPlanner.Tests
     {
         private static void RunShareQualificationDriverTests(string root)
         {
+            Run("shared-recipes-catalogue-nonrepresentative-spell-selects-through-driver",
+                () => TestSharedCatalogueSourceSelection(root));
+            Run("probe-source-id-preserves-legacy-alias-and-raw-fallback",
+                TestProbeSourceIdLegacyFallback);
             Run("shared-recipes-select-cast-and-isolate-end-to-end", () => TestSharedRecipesEndToEnd(root));
             Run("shared-recipes-fail-closed-on-leaks-and-mischarges", () => TestSharedRecipesFailClosed(root));
             Run("policy-route-refuses-strict-then-casts-affordable-authored-subset",
@@ -275,6 +280,92 @@ namespace KingmakerBuffPlanner.Tests
         {
             return record == null ? "no record" : "violations=" + string.Join(" | ", record.Violations().ToArray()) +
                 " failures=" + string.Join(" | ", record.Failures.ToArray()) + " terminal=" + record.TerminalReason;
+        }
+
+        private static void TestSharedCatalogueSourceSelection(string root)
+        {
+            var world = new SharedBuffWorld();
+            Func<CastingWorkspaceInputs> discover = () =>
+            {
+                CastingWorkspaceInputs original = world.Inputs();
+                var extended = new AbilityKey(SharedBuffWorld.Shape.BaseAbilityGuid, null,
+                    ExistingEffectSufficiency.ExtendMetamagicFlag, SourceKind.Spellbook, null);
+                var provider = new ProviderSnapshot(new ProviderKey("unit-ally",
+                    BrownFurPowerfulChangeProfile.CastingSpellbookGuid, extended, "level-5"),
+                    "A representative extended shape", 5, "pool-extended", 1, null, null, 9, 180,
+                    string.Empty, string.Empty);
+                var options = original.ProviderOptions.Concat(new[]
+                {
+                    new ProviderPlanningOption(provider, new[] { "unit-ally" }, new string[0], 9, 180)
+                }).ToList();
+                var snapshot = new PartyProviderSnapshot(original.Snapshot.Units,
+                    original.Snapshot.Providers.Concat(new[] { provider }),
+                    original.Snapshot.ResourcePools.Concat(new[]
+                    {
+                        new ResourcePoolSnapshot("pool-extended", ResourcePoolKind.SpontaneousLevel, 3, 3, null)
+                    }));
+                var effects = original.EffectsBySource.ToDictionary(pair => pair.Key,
+                    pair => pair.Value, StringComparer.Ordinal);
+                effects[extended.Canonical] = new EffectLeafExpression(EffectKind.Buff, "shape-buff",
+                    EffectTarget.CurrentTarget, "fixture", "fixture/extended-shape");
+                var catalogue = new PlannerSetupModel(BuffPlannerProfile.CreateDefault("fixture-campaign"),
+                    snapshot, new ActiveEffectSnapshot(null), effects, options, ignored => { });
+                SetupSourceRow source = catalogue.Sources.Single(value =>
+                    value.Abilities.Any(ability => ability.Equals(SharedBuffWorld.Shape)));
+                Expect(source.Ability.Equals(extended) && source.Providers.Count == 2 &&
+                    !ReferenceEquals(catalogue.EffectsBySource[source.SourceId],
+                        effects[SharedBuffWorld.Shape.Canonical]),
+                    "The plain spell must be a nonrepresentative catalogue member with its own expression.");
+                return new CastingWorkspaceInputs(snapshot, options, catalogue.EffectsBySource,
+                    original.Enhancements, original.TargetingModifiers, original.LiveEffects);
+            };
+            CastingWorkspaceInputs inputs = discover();
+            CastingQualificationSelection selected = CastingQualificationRecipe.SelectSharedPersonal(
+                inputs, "fixture-campaign");
+            Expect(selected.Selected, "The shared-spell selector did not select the eligible plain spell.");
+            long now = 0;
+            Func<long> clock = () => now;
+            var host = new CastingExecutionHost(settings => new InstantCastExecutor(world, true), clock);
+            var record = new CastingQualificationRecord { CastingScenario = false, AllowanceStatus = "not-required" };
+            string directory = Path.Combine(root, "shared-catalogue-nonrepresentative-select");
+            Directory.CreateDirectory(directory);
+            var driver = new CastingQualificationDriver(record, null, "fixture-campaign", discover,
+                boundary => new CastingWorkspaceSession(directory, "fixture-campaign", boundary),
+                host, world.Observe, clock, 240000, CastingQualificationRecipe.SharedPersonal,
+                null, false, null, null, () => "fixture-lifecycle=1", () => 0L, null, world.ObserveCaster);
+            for (int index = 0; index < 2000 && !driver.Completed; index++)
+            { now += 16; world.Now = now; driver.Update(); }
+            Expect(driver.Completed && record.TerminalReason == "completed" &&
+                record.Failures.Count == 0 && record.Violations().Count == 0,
+                "Catalogue -> shared-spell selector -> qualification authoring failed: " + Why(record));
+            string canonical = CatalogSourceIdentity.For(SharedBuffWorld.Shape,
+                inputs.EffectsBySource[SharedBuffWorld.Shape.Canonical]);
+            Expect(selected.Castings.Where(casting => casting.Ability.Equals(SharedBuffWorld.Shape))
+                    .All(casting => casting.SourceId == canonical) &&
+                record.SharePersisted == true && record.Forecast.Count == 2 &&
+                world.Fires == 0 && world.ShapeSlots == 3 && world.ReservoirPoints == 6,
+                "Selection must preserve canonical source identity and persisted intent without spending.");
+        }
+
+        private static void TestProbeSourceIdLegacyFallback()
+        {
+            AbilityKey ability = SharedBuffWorld.Shape;
+            var expression = new EffectLeafExpression(EffectKind.Buff, "shape-buff",
+                EffectTarget.CurrentTarget, "fixture", "fixture/shape");
+            var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal)
+            { { ability.Canonical, expression } };
+            Expect(SingleCastProbeSelector.SourceIdFor(effects, ability) == ability.Canonical,
+                "An ability without a published catalogue entry lost its raw-key fallback.");
+            effects["legacy-source"] = expression;
+            Expect(SingleCastProbeSelector.SourceIdFor(effects, ability) == "legacy-source",
+                "An explicit legacy expression alias was not preserved.");
+            effects[CatalogSourceIdentity.For(ability, expression)] = new EffectLeafExpression(
+                EffectKind.Buff, "shape-buff", EffectTarget.CurrentTarget, "fixture", "fixture/other");
+            Expect(SingleCastProbeSelector.SourceIdFor(effects, ability) == CatalogSourceIdentity.For(ability, expression),
+                "A published canonical entry must take priority over legacy aliases.");
+            effects.Remove(ability.Canonical);
+            Expect(SingleCastProbeSelector.SourceIdFor(effects, ability) == null,
+                "A missing discovered expression must remain unresolved.");
         }
 
         private static void TestSharedRecipesEndToEnd(string root)
