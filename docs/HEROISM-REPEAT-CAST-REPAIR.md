@@ -284,3 +284,8 @@ source/artifact attribution. The full PR diff is checked with
 changes and the final documentation edits.
 Changed documentation links/section targets passed 16/0. No native source or
 qualification contract was weakened, and no release or installation changed.
+Review publication checks: `scripts/Test-GuardedPush.ps1` passed 6/0 in
+1.620 seconds on documentation HEAD `37c66d14bdd24a421dc9cfb7ac3fb242b1ab8100`.
+Logs/time receipts: `artifacts/heroism-repeat/review-guarded-push-check*`.
+The correction and this documentation-only receipt use the same project-owned
+guarded helper to update the existing draft PR #18.
