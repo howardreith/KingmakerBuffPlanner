@@ -924,7 +924,8 @@ namespace KingmakerBuffPlanner.Tests
                 new ExecutionProfile
                 {
                     Mode = "instant", AllowAnimatedFallback = false,
-                    OutOfCombatOnly = true, RecastExisting = true
+                    OutOfCombatOnly = true, RecastExisting = true,
+                    AvailabilityPolicy = ExecutionProfile.CastAvailable
                 }));
             var session = new CastingWorkspaceSession(dir, "workspace-campaign");
             if (session.ExecutionMode != "instant" || session.ExecutionSettings.AllowAnimatedFallback ||
@@ -938,7 +939,7 @@ namespace KingmakerBuffPlanner.Tests
             if (saved.Castings.Count != 1 || saved.Execution.Mode != "instant" ||
                 saved.Execution.AllowAnimatedFallback || !saved.Execution.RecastExisting ||
                 !saved.Execution.OutOfCombatOnly || Math.Abs(saved.Ui.Scale - 1.25f) > 0.001f ||
-                saved.Ui.Hotkey != "Ctrl+Shift+P")
+                saved.Ui.Hotkey != "Ctrl+Shift+P" || saved.Execution.AvailabilityPolicy != ExecutionProfile.CastAvailable)
                 throw new InvalidOperationException("Save reset the player settings.");
             session.SetExecutionMode("animated");
             // v1.2: a settings change autosaves immediately (durable, not
@@ -1899,7 +1900,8 @@ namespace KingmakerBuffPlanner.Tests
                 new ExecutionProfile
                 {
                     Mode = "animated", AllowAnimatedFallback = true,
-                    OutOfCombatOnly = false, RecastExisting = true
+                    OutOfCombatOnly = false, RecastExisting = true,
+                    AvailabilityPolicy = ExecutionProfile.CastAvailable
                 }));
             var session = new CastingWorkspaceSession(dir, "workspace-campaign",
                 new DisabledCastingDispatchBoundary());
@@ -1913,7 +1915,8 @@ namespace KingmakerBuffPlanner.Tests
             session.SetExecutionMode("instant");
             CastingPlanProfile saved = repository.Load("workspace-campaign").Profile;
             if (!saved.Execution.OutOfCombatOnly || saved.Execution.AllowAnimatedFallback ||
-                saved.Execution.Mode != "instant" || !saved.Execution.RecastExisting)
+                saved.Execution.Mode != "instant" || !saved.Execution.RecastExisting ||
+                saved.Execution.AvailabilityPolicy != ExecutionProfile.CastAvailable)
                 throw new InvalidOperationException("The next save did not write the enforced policy.");
             if (new CastingWorkspaceSession(dir, "workspace-campaign").LegacyExecutionPreferencesOverridden)
                 throw new InvalidOperationException("The enforced file still reports a legacy preference.");
@@ -3798,7 +3801,7 @@ namespace KingmakerBuffPlanner.Tests
             {
                 { "caster-unresolved", "no caster chosen" },
                 { "import-review-unresolved:automatic-caster-pending-review", "imported: needs your review" },
-                { "prepared-slots-exhausted:pool-unit-wizard", "no prepared slot left" },
+                { "prepared-slots-exhausted:pool-unit-wizard", "no prepared uses remain" },
                 { "target-not-conscious:unit-t1", "the recipient is unconscious" },
                 { "present-effect-not-sufficient", "the active effect is weaker or about to expire" }
             };

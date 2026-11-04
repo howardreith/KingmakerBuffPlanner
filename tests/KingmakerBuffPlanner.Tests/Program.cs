@@ -13472,6 +13472,7 @@ namespace KingmakerBuffPlanner.Tests
             CastingWorkspaceInputs inputs =
                 WorkspaceInputs(out snapshot, remainingPerCaster: 1);
             var session = new CastingWorkspaceSession(modPath, "scoped-campaign");
+            session.SetAvailabilityPolicy(ExecutionProfile.RequireFullPlan);
             session.SelectRoutine("long");
             session.Draft.SourceId = "source-bulls";
             session.Draft.Ability = CastingBuffAbility;

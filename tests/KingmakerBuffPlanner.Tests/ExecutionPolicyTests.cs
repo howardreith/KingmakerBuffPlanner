@@ -274,6 +274,7 @@ namespace KingmakerBuffPlanner.Tests
             CastingWorkspaceInputs inputs = PolicyInputs(plain, false, "unit-wizard");
             var dispatch = new CountingDispatchBoundary();
             var session = new CastingWorkspaceSession(dir, "workspace-campaign", dispatch);
+            session.SetAvailabilityPolicy(ExecutionProfile.RequireFullPlan);
             Assert(AddDraftCasting(session, inputs, "unit-cleric", "unit-t1").Applied);
             Assert(AddDraftCasting(session, inputs, "unit-wizard", "unit-t2").Applied);
             string wizardCasting = session.Document.Castings
@@ -296,7 +297,7 @@ namespace KingmakerBuffPlanner.Tests
             if (refused.Allowed || dispatch.Submissions != 0 ||
                 !refused.BlockingCastings.Select(value => value.CastingId).SequenceEqual(new[] { wizardCasting }) ||
                 !session.ProblemNavigation.Active || session.EditingFocusCastingId != wizardCasting ||
-                !CastingRunPresentation.OpensPlanner(refused))
+                CastingRunPresentation.OpensPlanner(refused))
                 throw new InvalidOperationException("The strict Instant blocker was not casting specific: " +
                     refused.ReviewReason);
             // Explicit Animated runs the same casting through its normal route.
