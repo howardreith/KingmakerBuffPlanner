@@ -33,14 +33,17 @@ namespace KingmakerBuffPlanner.Tests
             public bool IsInCombat { get { return false; } }
 
             private IEnumerable<ObservedEffectInstance> Read(string target)
+            { return Read(target, false); }
+
+            private IEnumerable<ObservedEffectInstance> Read(string target, bool before)
             {
                 KeyValuePair<string, long> active;
-                if (Observation == "unreadable") return null;
+                if (!before && Observation == "unreadable") return null;
                 return State.Active.TryGetValue(target, out active) && active.Value > Round
                     ? new[] { new ObservedEffectInstance(
-                        Observation == "wrong-kind" ? EffectKind.AreaBuff : EffectKind.Buff,
+                        !before && Observation == "wrong-kind" ? EffectKind.AreaBuff : EffectKind.Buff,
                         target == "unit-t4" ? "sentinel-effect" : "buff-effect",
-                        active.Key, active.Value, Observation == "suppressed") }
+                        active.Key, active.Value, !before && Observation == "suppressed") }
                     : new ObservedEffectInstance[0];
             }
 
@@ -56,7 +59,7 @@ namespace KingmakerBuffPlanner.Tests
             public InstantCastResult Fire(CastStep step)
             {
                 _baselines[step] = new EffectBaseline(step.ExpectedRecipientUnitIds.ToDictionary(
-                    id => id, id => Read(id), StringComparer.Ordinal));
+                    id => id, id => Read(id, true), StringComparer.Ordinal));
                 int before = Available(step);
                 State.Fired.Add(step.AssignmentId);
                 foreach (string token in step.Reservation.TokenIds) State.Tokens[token] = false;
@@ -278,9 +281,7 @@ namespace KingmakerBuffPlanner.Tests
             Assert(report.Entries[0].State == (confirmed ? CastingOutcomeState.EffectConfirmed : CastingOutcomeState.Failed));
             Assert(run.World.EvidenceReads == (confirmed ? 4 : 3));
             // Presence, kind and readability are observations, not inferred from Fire's success.
-            string before = observation == "unreadable" ? "before:{unit-t1=unreadable" :
-                "before:{unit-t1=[" + (observation == "wrong-kind" ? "AreaBuff" : "Buff") +
-                ":buff-effect#instance-1@end=100";
+            string before = "before:{unit-t1=[Buff:buff-effect#instance-1@end=100";
             RepeatAssert(report.Entries[0].Detail.Contains(before), "lost terminal evidence: " + report.Entries[0].Detail);
             if (observation == "retain")
             {
