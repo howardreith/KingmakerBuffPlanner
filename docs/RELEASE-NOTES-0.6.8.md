@@ -1,8 +1,9 @@
 # Mr. Bard's Kingmaker Buff Planner 0.6.8
 
 Owner-authorized stable update for duplicate item sources and stale casting
-handling, following merged PR #16. This exact release has not been run in the
-game. Native rendering, mouse/controller navigation, scrolling and actual
+handling, following merged PR #16.
+This exact release has not been run in the game.
+Native rendering, mouse/controller navigation, scrolling and actual
 in-game charge spending remain unverified.
 
 ## Changes
