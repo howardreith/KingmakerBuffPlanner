@@ -307,8 +307,10 @@ namespace KingmakerBuffPlanner.UI
             ICastingDispatchBoundary dispatchBoundary = null,
             IDictionary<string, CastGroupingKind> legacyGroupings = null,
             Func<ClassicPlanInMemory> legacyProfile = null,
-            PendingSessionRecovery recovery = null)
+            PendingSessionRecovery recovery = null,
+            Func<bool> isRunActive = null)
         {
+            _isRunActive = isRunActive;
             if (string.IsNullOrWhiteSpace(modPath))
                 throw new ArgumentException("Absolute mod path is required.", "modPath");
             if (string.IsNullOrWhiteSpace(campaignId))

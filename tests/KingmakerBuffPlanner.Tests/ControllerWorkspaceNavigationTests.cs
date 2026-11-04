@@ -65,7 +65,7 @@ namespace KingmakerBuffPlanner.Tests
         private static void TestSpatialFooterOrder()
         {
             int actions = 0;
-            string[] order = { "resources", "policy", "mode", "undo", "run" };
+            string[] order = { "resources", "policy", "mode", "clear", "undo", "run" };
             var focus = new ControllerWorkspaceFocus();
             // Matches the real footer's reverse construction order.
             focus.Replace(order.Select((key, index) => SpatialControl(key, "Footer", index * 120, 50,

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using KingmakerBuffPlanner.Planning;
 
@@ -30,12 +31,14 @@ namespace KingmakerBuffPlanner.UI
     public sealed partial class CastingWorkspaceSession
     {
         private ClearPlanConfirmation _pendingClearPlan;
+        private readonly Func<bool> _isRunActive;
 
         public string ClearPlanUnavailableReason
         {
             get
             {
-                if (_submissionInFlight || (_lastInputs != null && _lastInputs.RunActive))
+                if (_submissionInFlight || (_isRunActive != null && _isRunActive()) ||
+                    (_lastInputs != null && _lastInputs.RunActive))
                     return "Stop the active routine before editing the plan.";
                 return Document.Castings.Count == 0 ? "The entire plan is already empty." : null;
             }

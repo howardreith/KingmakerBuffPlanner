@@ -26,7 +26,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("clear-plan-modal-neutral-edges-and-scoped-focus", TestClearPlanInput);
         }
 
-        private static CastingWorkspaceSession ClearFixture(string root, string name, out string dir)
+        private static CastingWorkspaceSession ClearFixture(string root, string name, out string dir, Func<bool> isRunActive = null)
         {
             dir = Path.Combine(root, "clear-plan-" + name);
             Directory.CreateDirectory(dir);
@@ -43,7 +43,7 @@ namespace KingmakerBuffPlanner.Tests
                     new AbilityKey("item-buff", null, 0, SourceKind.Item, "exact-item-token"), null, null, CastingAuthoringState.Disabled)
             }, new[] { "kept import metadata" }, new[] { "kept import metadata" });
             new CastingPlanRepository(dir).Save(CastingPlanProfile.FromDocument(document));
-            return new CastingWorkspaceSession(dir, "clear-campaign");
+            return new CastingWorkspaceSession(dir, "clear-campaign", isRunActive: isRunActive);
         }
 
         private static void TestClearPlanScope(string root)
@@ -143,9 +143,15 @@ namespace KingmakerBuffPlanner.Tests
         private static void TestClearPlanBusy(string root)
         {
             string dir;
-            var session = ClearFixture(root, "busy", out dir);
+            bool running = false;
+            var session = ClearFixture(root, "busy", out dir, () => running);
             var token = session.BeginClearPlan();
             var inputs = GraphInputs();
+            running = true;
+            Expect(!session.ClearPlan(token, inputs).Applied && !session.CanUndo && session.Document.Castings.Count == 3,
+                "live run state was ignored in favor of the cached display snapshot");
+            running = false;
+            token = session.BeginClearPlan(inputs);
             var busy = new CastingWorkspaceInputs(inputs.Snapshot, inputs.ProviderOptions, inputs.EffectsBySource,
                 inputs.Enhancements, runActive: true);
             Expect(!session.ClearPlan(token, busy).Applied && session.Document.Castings.Count == 3 &&

@@ -2364,7 +2364,8 @@ namespace KingmakerBuffPlanner.UI
                     _session.Model == null ? null : _session.Model.SourceGroupings(),
                     () => _session.Model == null ? null
                         : new ClassicPlanInMemory(_session.Model.Profile, _session.ClassicPrimarySha256,
-                            _session.Model.SourceGroupings()))
+                            _session.Model.SourceGroupings()),
+                    isRunActive: () => _castingHost != null && _castingHost.IsRunning)
                 : _castingSessions.Recovery.Adopt(_modPath, campaignId,
                     pending => new CastingWorkspaceSession(_modPath, campaignId,
                         CreateDispatchBoundary(),
@@ -2373,13 +2374,14 @@ namespace KingmakerBuffPlanner.UI
                             : new ClassicPlanInMemory(_session.Model.Profile,
                                 _session.ClassicPrimarySha256,
                                 _session.Model.SourceGroupings()),
-                        pending),
+                        pending, () => _castingHost != null && _castingHost.IsRunning),
                     () => new CastingWorkspaceSession(_modPath, campaignId, CreateDispatchBoundary(),
                         _session.Model == null ? null : _session.Model.SourceGroupings(),
                         () => _session.Model == null ? null
                             : new ClassicPlanInMemory(_session.Model.Profile,
                                 _session.ClassicPrimarySha256,
-                                _session.Model.SourceGroupings())));
+                                _session.Model.SourceGroupings()),
+                        isRunActive: () => _castingHost != null && _castingHost.IsRunning));
         }
 
         // Ordinary play submits through the production boundary; a
