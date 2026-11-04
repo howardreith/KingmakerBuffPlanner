@@ -7,7 +7,7 @@ Committed product and exact HEAD at verification:
 `3feceb5087bc7eeb5d85da095cec3841c622f883`.
 Assembly version remains **0.6.9**; this is unreleased feature source, not the
 published 0.6.9 binary. Later documentation/publication commits do not change
-the verified product source. Publication receipt follows below when available.
+the verified product source. Publication receipt is recorded below.
 
 ## Player behavior and migration
 
@@ -124,6 +124,28 @@ documentation pass, **285/0** after restoring the authoritative mission copy;
 Markdown link targets in all changed documentation plus this checkpoint, skips
 web/fragment targets, resolves each local path relative to its file and requires
 `Test-Path -LiteralPath` for every target. These are text/link checks only.
+
+## Guarded draft PR delivery
+
+Documentation/delivery snapshot: `1d04149254122aab7e450f88239513cc452126da`.
+[Draft PR #19](https://github.com/howardreith/KingmakerBuffPlanner/pull/19)
+is open against main `52f66c895fc98d7a05395d7402bcfbefa0cb7a57`, with the
+product unchanged at `3feceb5087bc7eeb5d85da095cec3841c622f883`.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GuardedPush.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Dev\KingmakerBuffPlannerLab\codex-policy\Push-KingmakerBuffPlanner.ps1 -RepositoryRoot C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner
+```
+
+Guarded helper tests: **6 PASS / 0 FAIL**, 1.8 seconds. Guarded push and exact
+remote-HEAD verification passed, 3.9 seconds. The first sandboxed read-only
+check could not reach GitHub; the authorized network-enabled retry passed.
+A prior push invocation stopped at PowerShell switch-argument binding before
+any Git mutation; invoking the helper with its ordinary defaults succeeded.
+PR creation used the connected GitHub plugin, explicitly with `draft: true`.
+Evidence: `artifacts/cast-available/guarded-push-tests-network.log` and
+`artifacts/cast-available/guarded-push.log`. The final receipt-only commit is
+published by the same clean-tree guarded route. No merge or release was made.
 
 ## Native acceptance and exact next action
 
