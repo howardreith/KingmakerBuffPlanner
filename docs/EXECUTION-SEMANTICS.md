@@ -22,6 +22,10 @@ refuses native work when that save fails; protected primary bytes stay protected
 No-run admissions and terminal reports share `CastingRunPresentation` and the
 root's fail-soft `KingmakerGameLog` writer. Typed omission readiness/reasons and
 snapshotted labels preserve every uncast entry in visible ordered detail lines.
+An accepted projection owns a separate immutable reporting snapshot until its
+terminal report. Reopening the mouse planner and attempting another routine
+cannot replace that run's labels or reservation explanations; each later no-op
+or refusal still logs its own admission result.
 Executor counters and raw diagnostic/spending records retain their meanings.
 Completion IDs prevent old callbacks replaying reports. Discovery, rendering,
 preview and controller handoff never emit attempt logs. Availability/projection

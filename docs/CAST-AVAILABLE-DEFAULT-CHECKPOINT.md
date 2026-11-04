@@ -1,5 +1,72 @@
 # Cast available default — development checkpoint
 
+## PR #19 review correction: active run reporting
+
+November 4, 2026. Branch `codex/kingmaker-buff-planner-cast-available-default`;
+reviewed HEAD `8da17f98c770c762b7034647e21e926ef59f45ee`;
+corrected product/exact validation HEAD
+`590a96faccb0492ed494faea24c6b4606bc79b4e`, version **0.6.9** (unreleased).
+[Draft PR #19](https://github.com/howardreith/KingmakerBuffPlanner/pull/19)
+remains the delivery destination; no merge or release is authorized here.
+
+The review's P2 is reproduced on Windows/.NET Framework 4.7: a partial Long run
+spends its first prepared use, the mouse planner's direct Apply boundary attempts
+empty Short, and Long's terminal log loses casting numbers and changes its
+admission reason to depleted uses. Both controls pass and both intervening
+attempts fail (**2 PASS / 2 FAIL**) before the correction. Evidence:
+`artifacts/cast-available/pr19-active-report-reproduction.log`, SHA-256
+`a0158b869e9c0a7dd3ba22c4960ff13dc6240716a60cabb93f50c9c6e8e99453`.
+
+Each accepted execution now owns an immutable reporting copy: projection
+identity, routine name, casting labels and translated omission reasons. It is
+installed only after submission succeeds and consumed at that projection's
+terminal report. Later no-op/refused attempts use their own admission data;
+completion never rereads their providers or the post-spend resource state.
+Report entries retain authored order. Admission, execution, spending, protective
+stopping and completion deduplication are unchanged. Blocking the new attempt
+was rejected as a workaround: empty Short must still log its own honest no-op.
+
+Four regressions use the real session/compiler/host/report flow and the existing
+simulated game fixture: control and intervening-empty-Short cases in Instant and
+Animated modes. They advance through Long's first native-adapter spend, refresh
+the workspace graph, attempt Short directly as mouse Run does, then complete
+Long. Assertions retain exact numbered labels and the original reservation
+explanation, independent no-op/terminal logging, cast subset/spending and no
+completion replay. Native UI itself is not exercised by these fixtures.
+
+Exact focused commands (repository root):
+
+```powershell
+# Reproduction before the fix: 2 PASS / 2 FAIL.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Development.ps1 -Only 'cast-available-active-report'
+# Corrected committed source: 48 PASS / 0 FAIL, 9.0 seconds.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Development.ps1 -Only 'cast-available,heroism-repeat,run-presentation-separates-effects-and-spending,refusal-feedback-rules,native-ui-game-log-lines,controller-results-include-omissions,execution-host-runs-reports-and-halts,execution-host-cancel-deadline-shutdown'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-GuardedPush.ps1
+```
+
+Windows source checks **47/0**, Release build **1/0**, selected behavior **48/0**,
+guarded push helper checks **6/0**. Current receipt:
+`artifacts/cast-available/pr19-active-report-committed.log`, SHA-256
+`1e905c8625570e19352fe6ef9924e42fec77899438aeda1e9c060b0ae1f6b7b0`.
+Corrected DLL SHA-256:
+`56eb4a8aba380ddd8c9bc43836a319b70df16c88477169630d2cf8fd26daa5bf`.
+The previous 88/0 receipt below stays attributed to its original source; it is
+not a full-suite rerun of this correction. The review's supplemental Linux/.NET 8
+file-lock failures do not establish native or Windows acceptance and were not
+used to weaken any persistence assertion.
+Documentation local links **231/0** and `git diff --check` passed; evidence:
+`artifacts/cast-available/pr19-active-report-documentation.txt`.
+
+Delivery uses the tested guarded helper to update the existing draft PR.
+Native rendering/input/gameplay acceptance remains **NOT RUN**. Next after
+delivery: PR review, then separately selected native acceptance including
+reopening the mouse planner during partial Long, attempting empty Short after
+the first spend, closing the planner and checking both independent log results.
+Existing safety, disposable-save, staging/restoration and Heroism qualification
+limits below remain in force. No live install, save mutation, merge or release.
+
+## Original implementation checkpoint (history)
+
 Prepared November 4, 2026. Branch:
 `codex/kingmaker-buff-planner-cast-available-default`.
 Inspected/current main: `52f66c895fc98d7a05395d7402bcfbefa0cb7a57`.
