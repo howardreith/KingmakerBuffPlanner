@@ -1,3 +1,16 @@
+## Heroism diagnostic development checkpoint — 2026-11-04
+
+Branch `codex/kingmaker-buff-planner-heroism-repeat-cast`; base
+`d444b1720fa10704f59bc07fdcd4367f9314856f`; tested HEAD
+`5b384efdf2ada02bfdce2ed43f2c67ad6d842620`, unchanged version 0.6.8.
+Source 47/0, build 1/0, focused tests 39/0 (24 new stateful cases).
+Corrected misleading effect-absence diagnostics and preserved Animated terminal
+confirmation evidence. **The reporter's gameplay repair remains open.** Native
+Heroism checks are NOT RUN: no current run-bound casting allowance or reporter
+evidence is available, confirmed by the owner. Next: review the draft diagnostic
+checkpoint, then obtain guarded native evidence and repair the demonstrated cause.
+[Exact commands, counts, artifact hashes, rejected theories and native rows](docs/HEROISM-REPEAT-CAST-REPAIR.md).
+
 ## PR #17 input review corrections — 2026-11-04
 
 Branch `codex/kingmaker-buff-planner-clear-plan`; reviewed HEAD
