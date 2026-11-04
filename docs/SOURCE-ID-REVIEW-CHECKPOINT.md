@@ -74,3 +74,8 @@ scrolling and gameplay spending remain NOT RUN; this correction adds no native
 qualification. The exact next action is review of the pushed correction and,
 when selected, the guarded native prerequisites/checks in the
 [original PR checkpoint](ITEM-SOURCE-PR-CHECKPOINT.md).
+
+
+## Selected ability expression review correction - 2026-11-04
+
+Canonical source identity is retained for authoring while exact discovered ability expressions drive structural checks/projection. Reproduction 0/2; Windows gate on d904c1e passes 151/0 plus converter neighbors 6/0. Foreign references still refuse; native acceptance remains NOT RUN. Full-PR baseline-log whitespace was corrected while preserving original bytes in the new evidence. [Current correction evidence and next action](ABILITY-EXPRESSION-REVIEW-CHECKPOINT.md).

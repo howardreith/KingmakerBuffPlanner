@@ -1,0 +1,23 @@
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-DUPLICATE-ITEMS-PR\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=5640488eee7276bd47ccb5c4a080c8ac1d25e25a3c0e524351db2ddbda137133
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-DUPLICATE-ITEMS-PR\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-DUPLICATE-ITEMS-PR\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+Protocol tests: PASS=0 FAIL=2
+FAIL probe-catalogue-distinct-spells-keep-own-expression: The selected spell's probe projection failed: probe-unsupported:effect-shape:probe-own-expression
+FAIL shared-recipes-distinct-blueprints-keep-own-expression: Shared qualification rejected the available spell's own wrapper: no-eligible-shared-recipe
+powershell.exe : Development tests failed with exit code 1 (PASS=0 FAIL=2).
+At line:2 char:100
++ ... | Out-Null; powershell.exe -NoProfile -ExecutionPolicy Bypass -File s ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Development tes...PASS=0 FAIL=2).:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+At C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-DUPLICATE-ITEMS-PR\scripts\Test-Devel
+opment.ps1:41 char:46
++ ... ed -ne 0) { throw "Development tests failed with exit code $testExit  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Development tes...PASS=0 FAIL=2).:String) [], RuntimeException
+    + FullyQualifiedErrorId : Development tests failed with exit code 1 (PASS=0 FAIL=2).

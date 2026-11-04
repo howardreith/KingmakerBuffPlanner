@@ -1,0 +1,258 @@
+[
+    {
+        "prefix":  "duplicate-items-",
+        "registrations":  6
+    },
+    {
+        "prefix":  "stale-item-casting-",
+        "registrations":  2
+    },
+    {
+        "prefix":  "graph-capacity-comes-from-the-plan-ledger",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-buff-caster-target-creates-one-casting",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-selection-and-focus-never-mutate",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-two-casters-three-targets-edit-one",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-multiple-sources-exact-counts",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-spontaneous-pool-propagates-across-buffs",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-shared-enhancement-pool-blocks-atomically",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-enhancement-edits-one-casting-and-budgets",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-parallel-castings-stay-distinct",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-group-casting-one-origin-derived-branches",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-target-legality-and-refusals",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-save-reload-reconstructs-connections",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-unresolved-casting-keeps-its-connection",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-party-shared-pool-disclosed-under-each-caster",
+        "registrations":  1
+    },
+    {
+        "prefix":  "graph-at-will-casting-shows-no-count",
+        "registrations":  1
+    },
+    {
+        "prefix":  "excluded-offensive-source-keeps-saved-castings-repairable",
+        "registrations":  1
+    },
+    {
+        "prefix":  "direct-manipulation-add-then-same-portrait-removes",
+        "registrations":  1
+    },
+    {
+        "prefix":  "direct-manipulation-existing-assignment-toggles-off",
+        "registrations":  1
+    },
+    {
+        "prefix":  "direct-manipulation-explicit-retarget-and-illegal-refusal",
+        "registrations":  1
+    },
+    {
+        "prefix":  "direct-manipulation-explicit-group-recentre-and-normal-remove",
+        "registrations":  1
+    },
+    {
+        "prefix":  "direct-manipulation-legacy-duplicates-require-disambiguation",
+        "registrations":  1
+    },
+    {
+        "prefix":  "direct-manipulation-explicit-provider-change-through-graph",
+        "registrations":  1
+    },
+    {
+        "prefix":  "direct-manipulation-share-shown-only-where-it-applies",
+        "registrations":  1
+    },
+    {
+        "prefix":  "direct-manipulation-legacy-disabled-loads-and-removes",
+        "registrations":  1
+    },
+    {
+        "prefix":  "direct-manipulation-retired-group-coverage-migrates",
+        "registrations":  1
+    },
+    {
+        "prefix":  "shadow-clone-",
+        "registrations":  6
+    },
+    {
+        "prefix":  "class-ability-identity-keeps-spells-aggregated",
+        "registrations":  1
+    },
+    {
+        "prefix":  "classic-mirror-image-never-plans-shadow-clone",
+        "registrations":  1
+    },
+    {
+        "prefix":  "classic-legacy-shadow-clone-",
+        "registrations":  2
+    },
+    {
+        "prefix":  "classic-legacy-mirror-image-stays-the-spell",
+        "registrations":  1
+    },
+    {
+        "prefix":  "classic-legacy-rebinding-saves-and-reopens-idempotently",
+        "registrations":  1
+    },
+    {
+        "prefix":  "ordinary-nonvariant-catalog-entry-remains-single",
+        "registrations":  1
+    },
+    {
+        "prefix":  "variant-entry-retains-parent-and-child-identities",
+        "registrations":  1
+    },
+    {
+        "prefix":  "variant-profile-roundtrip-preserves-child",
+        "registrations":  1
+    },
+    {
+        "prefix":  "variant-execution-plan-selects-requested-child",
+        "registrations":  1
+    },
+    {
+        "prefix":  "variant-execution-reserves-one-parent-resource",
+        "registrations":  1
+    },
+    {
+        "prefix":  "nonvariant-planning-remains-exact",
+        "registrations":  1
+    },
+    {
+        "prefix":  "casting-workspace-fresh-buff-capability",
+        "registrations":  1
+    },
+    {
+        "prefix":  "casting-workspace-draft-catalog-authoring",
+        "registrations":  1
+    },
+    {
+        "prefix":  "casting-workspace-persistence-round-trip",
+        "registrations":  1
+    },
+    {
+        "prefix":  "workspace-source-label-disambiguation",
+        "registrations":  1
+    },
+    {
+        "prefix":  "workspace-choose-draft-caster",
+        "registrations":  1
+    },
+    {
+        "prefix":  "fact-resource-",
+        "registrations":  5
+    },
+    {
+        "prefix":  "controller-",
+        "registrations":  52
+    },
+    {
+        "prefix":  "execution-host-",
+        "registrations":  2
+    },
+    {
+        "prefix":  "run-presentation-",
+        "registrations":  1
+    },
+    {
+        "prefix":  "animated-",
+        "registrations":  2
+    },
+    {
+        "prefix":  "instant-",
+        "registrations":  3
+    },
+    {
+        "prefix":  "host-stops-",
+        "registrations":  1
+    },
+    {
+        "prefix":  "production-apply-",
+        "registrations":  1
+    },
+    {
+        "prefix":  "production-execution-wiring-and-session-lock",
+        "registrations":  1
+    },
+    {
+        "prefix":  "fact-source-choice-",
+        "registrations":  1
+    },
+    {
+        "prefix":  "available-count-judgement-",
+        "registrations":  1
+    },
+    {
+        "prefix":  "cantrip-route-",
+        "registrations":  1
+    },
+    {
+        "prefix":  "shared-recipes-",
+        "registrations":  4
+    },
+    {
+        "prefix":  "probe-source-id-",
+        "registrations":  1
+    },
+    {
+        "prefix":  "single-cast-probe-",
+        "registrations":  2
+    },
+    {
+        "prefix":  "qualification-",
+        "registrations":  14
+    },
+    {
+        "prefix":  "policy-route-",
+        "registrations":  2
+    },
+    {
+        "prefix":  "probe-catalogue-distinct-",
+        "registrations":  1
+    },
+    {
+        "prefix":  "explicit-step-",
+        "registrations":  0
+    },
+    {
+        "prefix":  "explicit-projection-",
+        "registrations":  0
+    }
+]

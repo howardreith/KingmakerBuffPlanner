@@ -1,0 +1,38 @@
+[
+    {
+        "path":  "artifacts/build/Release/KingmakerBuffPlanner.dll",
+        "sha256":  "616b0269c61411e296e5308d22812e574582dd08534db221a7e62efc91833679"
+    },
+    {
+        "path":  "artifacts/tests/KingmakerBuffPlanner.Tests.exe",
+        "sha256":  "5d7b9e5591cf9615cf930a58133e463d7ad41720d0e7ba602062bc967efd9d8d"
+    },
+    {
+        "path":  "src/KingmakerBuffPlanner/Domain/Effects/DiscoveredEffectLookup.cs",
+        "sha256":  "7756dbab6aa05e5ef630ddfa5951b91ed55026c4521c9c7d15dae7920093bd11"
+    },
+    {
+        "path":  "src/KingmakerBuffPlanner/Execution/CastingQualification.cs",
+        "sha256":  "6043d7f9d3e58319834f3d3b01789f3c452ce2082c71ac8eccf649206ed119e0"
+    },
+    {
+        "path":  "src/KingmakerBuffPlanner/Execution/SingleCastProbe.cs",
+        "sha256":  "9530fd521fead6b5521472a3ccd64cf6d2c06944a5b369dabcf89a3b25db8f1d"
+    },
+    {
+        "path":  "src/KingmakerBuffPlanner/KingmakerBuffPlanner.csproj",
+        "sha256":  "3f622556fcef1a273397214bf0d4702050179f901e2910d22c96c415c935d522"
+    },
+    {
+        "path":  "src/KingmakerBuffPlanner/Planning/ExplicitCastingStepConverter.cs",
+        "sha256":  "d337dbb86ce42940496483e4e8cad51a70d3fb1bc4ae7b815371d432c6260448"
+    },
+    {
+        "path":  "tests/KingmakerBuffPlanner.Tests/KingmakerBuffPlanner.Tests.csproj",
+        "sha256":  "99c3f26b31d5d8d48a723466f22a76253906b7517ef318349a966d7759c7f0b1"
+    },
+    {
+        "path":  "tests/KingmakerBuffPlanner.Tests/ShareQualificationDriverTests.cs",
+        "sha256":  "cb7caf3ad56c3a19166b191e6e7c685de89276ec336994e284958567b9546e40"
+    }
+]

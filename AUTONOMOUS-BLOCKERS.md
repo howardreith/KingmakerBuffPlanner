@@ -1,3 +1,17 @@
+## PR #16 exact ability-expression correction - 2026-11-04
+
+Branch `codex/kingmaker-buff-planner-duplicate-items-stale-castings-pr`,
+tested product/test commit `d904c1e2974fe908806ab0be8938d819971ac42c`, version 0.6.7.
+Keep canonical catalogue IDs for authoring; validate/project the selected
+ability's own discovered graph, with explicit legacy fallback only if absent.
+Real scanner/catalogue/compiler/gate/probe and qualification regressions
+reproduced 0/2; official Windows gate now passes source 47/0, build 1/0,
+tests 151/0 plus converter/projection neighbors 6/0. Foreign references still
+refuse. Baseline log whitespace normalized with original bytes/hash preserved.
+Native rendering, physical input/scrolling and gameplay spending NOT RUN.
+Exact evidence, hashes, limitations and next action: [current correction
+checkpoint](docs/ABILITY-EXPRESSION-REVIEW-CHECKPOINT.md).
+
 ## PR #16 source-ID compatibility correction - 2026-11-04
 
 Branch `codex/kingmaker-buff-planner-duplicate-items-stale-castings-pr`;
