@@ -1,0 +1,3 @@
+Initial failure log: trailing whitespace and terminal empty lines normalized for Git text validation; diagnostic content unchanged.
+Pre-normalization SHA256: 16029c7b9d2f094943ad014cafc13ba73407f858dfc49272753cfd756521197c
+Original copy retained locally in ignored artifacts/clear-plan-evidence-originals/initial-test-build-failure.log

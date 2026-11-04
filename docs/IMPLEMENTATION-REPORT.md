@@ -1,3 +1,5 @@
+> **Clear plan, 2026-11-04:** current casting workspace now clears all authored routines through one undoable autosaved edit, with a scoped parchment confirmation and keyboard/controller input guards. Product 4aac21c; source 47/0, build 1/0, focused 69/0. Native acceptance NOT RUN. [Checkpoint and evidence](CLEAR-PLAN-CHECKPOINT.md).
+
 > **Current full-controller assignment:** readable workspace, real native card,
 > controller-only authoring/search/recovery are mandatory, not deferred. Local
 > product69a48a4/.4 implements these source paths, focused64/0 and deterministic

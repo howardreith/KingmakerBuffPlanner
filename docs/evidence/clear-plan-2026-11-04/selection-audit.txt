@@ -1,0 +1,12 @@
+clear-plan- 9 registrations
+casting-authoring- 1 registrations
+casting-workspace- 12 registrations
+autosave- 4 registrations
+undo-history- 1 registrations
+controller-workspace- 19 registrations
+controller-input- 2 registrations
+controller-editor-back- 2 registrations
+direct-manipulation- 11 registrations
+duplicate-items- 6 registrations
+stale-item-casting- 2 registrations
+Total: 69 registrations; each selected prefix is nonzero.

@@ -1,3 +1,5 @@
+> **Clear plan acceptance pending, 2026-11-04:** run the complete cancel/clear/empty/Undo interaction with mouse/keyboard and controller alone at normal 1920x1200 and compact 1280x720, including held Confirm, filtered/all-routine scope and focus restoration. Native observations NOT RUN. [Exact guarded prerequisites and remaining steps](CLEAR-PLAN-CHECKPOINT.md#pending-native-acceptance).
+
 > **Current full-controller acceptance:** [F01-F10](CONTROLLER-UI-ACCEPTANCE.md)
 > require readable workspace, actual native card and entirely controller-operated
 > authoring/search/autosave/recovery before completion. Mouse-only authoring is no

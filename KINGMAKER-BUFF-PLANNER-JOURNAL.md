@@ -1,3 +1,16 @@
+## Clear plan development checkpoint — 2026-11-04
+
+Branch `codex/kingmaker-buff-planner-clear-plan`; product/test commit
+`4aac21c759c3c6d505d25f7c7f4a0d961df500cd`, unchanged version 0.6.8, from
+current origin/main `38f777aac4b9946ef674a1fb316f07b2925268f4`.
+All-routine Clear plan uses a native parchment confirmation and one autosaved,
+undoable compound edit; semantic controller/keyboard scope and input-edge guards.
+Official Windows source 47/0, build 1/0, focused tests 69/0 (new cases 9/0).
+Native mouse/controller/normal+compact visual acceptance **NOT RUN**; the current
+launcher purity/package prerequisites remain a separate guarded boundary.
+[Exact commands, hashes, rejected approaches, evidence and remaining native steps](docs/CLEAR-PLAN-CHECKPOINT.md).
+Next: guarded push/draft PR, then review and the recorded guarded native flow.
+
 ## Stable 0.6.8 published and independently verified - 2026-11-04
 
 Owner-approved PR #16 merged at 2d591cd. Default-branch version increased from
