@@ -1,0 +1,13 @@
+﻿{
+    "schemaVersion":  1,
+    "generator":  "scripts/Build-Release.ps1",
+    "version":  "0.6.8",
+    "commit":  "30cda65691f65dea91e6c3eeca993e73e6e4cddf",
+    "packagePath":  "C:\\Dev\\KingmakerBuffPlannerLab\\repo\\KingmakerBuffPlanner\\private\\release\\068-stable\\artifacts\\release\\0.6.8\\KingmakerBuffPlanner-0.6.8.zip",
+    "packageSha256":  "c846b37bd4574607e580ab71889061c29ec1979ca9e02429d2b086334ac33205",
+    "dllSha256":  "28dbade47ceb7dc5040c6f1bb8491235611c18c84edff7fc627f1dfb128cd355",
+    "assemblyMvid":  "a57b530b-9269-4024-8a97-6a98f979b45b",
+    "deterministicBuilds":  2,
+    "validated":  true,
+    "publicationStatus":  "local-only"
+}

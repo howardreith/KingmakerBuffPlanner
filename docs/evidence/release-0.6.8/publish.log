@@ -1,0 +1,40 @@
+github.com
+  âœ“ Logged in to github.com account howardreith (keyring)
+  - Active account: true
+  - Git operations protocol: https
+  - Token: gho_************************************
+  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'
+From https://github.com/howardreith/KingmakerBuffPlanner
+ * branch            main       -> FETCH_HEAD
+Source validation: PASS=47 FAIL=0
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\068-stable\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=28dbade47ceb7dc5040c6f1bb8491235611c18c84edff7fc627f1dfb128cd355
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\068-stable\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\068-stable\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+HUMAN_FEEDBACK_PERF calculations-only catalog=77 castings=67 coldMs=2.394 warmMedianMs=2.199 warmSlowestMs=2.402 buffMedianMs=1.423 buffSlowestMs=2.252 toggleMedianMs=51.229 toggleSlowestMs=137.002
+Protocol tests: PASS=614 FAIL=0
+Offline C# suite: PASS=614 FAIL=0
+Guarded publisher gate tests: PASS=8 FAIL=0
+Release validation (OwnerAuthorizedPreRuntime): Validate-Source.ps1, OfflineCSharpSuite, Test-PublishReleaseGate.ps1 PASS
+Source validation: PASS=47 FAIL=0
+Build: PASS=1 FAIL=0 configuration=Release sha256=28dbade47ceb7dc5040c6f1bb8491235611c18c84edff7fc627f1dfb128cd355
+Package validation: PASS=6 FAIL=0 sha256=c846b37bd4574607e580ab71889061c29ec1979ca9e02429d2b086334ac33205
+Local package: PASS=1 FAIL=0 path=C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\068-stable\artifacts\local-runtime\0.6.8\KingmakerBuffPlanner-0.6.8-local-runtime.zip
+Source validation: PASS=47 FAIL=0
+Build: PASS=1 FAIL=0 configuration=Release sha256=28dbade47ceb7dc5040c6f1bb8491235611c18c84edff7fc627f1dfb128cd355
+Package validation: PASS=6 FAIL=0 sha256=c846b37bd4574607e580ab71889061c29ec1979ca9e02429d2b086334ac33205
+Local package: PASS=1 FAIL=0 path=C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\068-stable\artifacts\local-runtime\0.6.8\KingmakerBuffPlanner-0.6.8-local-runtime.zip
+Package validation: PASS=6 FAIL=0 sha256=c846b37bd4574607e580ab71889061c29ec1979ca9e02429d2b086334ac33205
+Release build: PASS=3 FAIL=0 deterministic=2 sha256=c846b37bd4574607e580ab71889061c29ec1979ca9e02429d2b086334ac33205
+Package validation: PASS=6 FAIL=0 sha256=c846b37bd4574607e580ab71889061c29ec1979ca9e02429d2b086334ac33205
+To https://github.com/howardreith/KingmakerBuffPlanner.git
+ * [new tag]         v0.6.8 -> v0.6.8
+https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.8
+Release: https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.8
+State: published
+Disposition: OwnerAuthorizedPreRuntime
+Asset: C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\068-stable\artifacts\release\0.6.8\KingmakerBuffPlanner-0.6.8.zip
+SHA-256: c846b37bd4574607e580ab71889061c29ec1979ca9e02429d2b086334ac33205

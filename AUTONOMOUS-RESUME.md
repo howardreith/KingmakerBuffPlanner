@@ -1,3 +1,18 @@
+## Stable 0.6.8 published and independently verified - 2026-11-04
+
+Owner-approved PR #16 merged at 2d591cd. Default-branch version increased from
+0.6.7 to 0.6.8; frozen published product `30cda65691f65dea91e6c3eeca993e73e6e4cddf`.
+Stable GitHub Latest v0.6.8 published 2026-11-04T14:31:33Z; annotated tag,
+downloaded ZIP/checksum, published digest and DLL identity verified.
+Existing OwnerAuthorizedPreRuntime route: complete offline C#614/0, source47/0,
+publisher8/0, two deterministic builds and package6/0; guarded push6/0.
+ZIP SHA256 `c846b37bd4574607e580ab71889061c29ec1979ca9e02429d2b086334ac33205`.
+Native rendering/mouse/controller/scrolling/gameplay spending NOT RUN. No game,
+installation, Mods or save mutation. Original evidence and worktrees preserved.
+This later documentation HEAD does not change the frozen product/source stamp.
+Exact release commands, hashes, refusal, evidence and next native action:
+[0.6.8 release record](docs/RELEASE-0.6.8-RECORD.md).
+
 ## PR #16 exact ability-expression correction - 2026-11-04
 
 Branch `codex/kingmaker-buff-planner-duplicate-items-stale-castings-pr`,

@@ -1,0 +1,17 @@
+github.com
+  âœ“ Logged in to github.com account howardreith (keyring)
+  - Active account: true
+  - Git operations protocol: https
+  - Token: gho_************************************
+  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'
+From https://github.com/howardreith/KingmakerBuffPlanner
+ * branch            main       -> FETCH_HEAD
+Owner-authorized pre-runtime release notes must state in the current release section that the release has not been run
+in the game.
+At C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\068-stable\scripts\PublishRelease.Common.ps
+1:71 char:9
++         throw 'Owner-authorized pre-runtime release notes must state  ...
++         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Owner-authorize...un in the game.:String) [], RuntimeException
+    + FullyQualifiedErrorId : Owner-authorized pre-runtime release notes must state in the current release section tha
+   t the release has not been run in the game.

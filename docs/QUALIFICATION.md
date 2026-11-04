@@ -1407,3 +1407,8 @@ Source-ID producers now prefer published canonical catalogue membership while re
 ## Selected ability expression review correction - 2026-11-04
 
 Canonical source identity is retained for authoring while exact discovered ability expressions drive structural checks/projection. Reproduction 0/2; Windows gate on d904c1e passes 151/0 plus converter neighbors 6/0. Foreign references still refuse; native acceptance remains NOT RUN. Full-PR baseline-log whitespace was corrected while preserving original bytes in the new evidence. [Current correction evidence and next action](ABILITY-EXPRESSION-REVIEW-CHECKPOINT.md).
+
+
+## Stable release 0.6.8 - 2026-11-04
+
+Published owner-authorized pre-runtime release from main product 30cda65691f65dea91e6c3eeca993e73e6e4cddf. Complete offline C#614/0, source47/0, publisher8/0, deterministic builds and package6/0; public ZIP, checksum, digest, DLL and annotated tag independently verified. Native rendering/input/gameplay NOT RUN. [Release identity, commands, evidence and next action](RELEASE-0.6.8-RECORD.md).

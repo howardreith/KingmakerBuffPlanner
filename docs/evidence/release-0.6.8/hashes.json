@@ -1,0 +1,30 @@
+[
+    {
+        "file":  "documentation-checks.txt",
+        "sha256":  "7be84f650cf9aa43026e56213e142e68c2616ce4a5763e22823afee7eeb28b97"
+    },
+    {
+        "file":  "latest.json",
+        "sha256":  "e220be4c7098deac82b43b01340d15b14af53c6ffd04ab1ed45f1de00ee40eb6"
+    },
+    {
+        "file":  "notes-preflight-refusal.log",
+        "sha256":  "aa649dcf7bbbacd5f419403f83041aa396d1ffe3cecf25349ee35877f46acbfe"
+    },
+    {
+        "file":  "publish.log",
+        "sha256":  "24cd578daef501214616a50d5f1634ca013e3688c0fae6fd901c5fbfa3427167"
+    },
+    {
+        "file":  "release-manifest.json",
+        "sha256":  "3ffd3367a338fede06b8d70eff2c9246b56bd8751104da0089bdcd4b44b3d0fc"
+    },
+    {
+        "file":  "release.json",
+        "sha256":  "e220be4c7098deac82b43b01340d15b14af53c6ffd04ab1ed45f1de00ee40eb6"
+    },
+    {
+        "file":  "verification.json",
+        "sha256":  "3e0c05a3f5c1662ee89cc7ce6b9ab5777464ad2b7c56ab6536e9ba87479b7585"
+    }
+]
