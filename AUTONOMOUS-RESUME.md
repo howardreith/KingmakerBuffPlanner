@@ -1,3 +1,16 @@
+## Duplicate-item PR preparation - 2026-11-04
+
+Current-main PR branch `codex/kingmaker-buff-planner-duplicate-items-stale-castings-pr`,
+base `76c030511f6d44bda5acb82f90fbe0167b4d060c`, tested product/test commit
+`e1f8c916613b4d015d8022b1195f403d9498307d`, unchanged version 0.6.7.
+Official Windows gate: source 47/0, build 1/0, focused tests 127/0.
+Duplicate item choices and stale inspectors are repaired; native rendering,
+mouse/controller interaction and gameplay spending remain NOT RUN.
+Next action: PR review, then the guarded native checks and prerequisites in
+[the current checkpoint](docs/ITEM-SOURCE-PR-CHECKPOINT.md).
+Earlier b8237a4-based development work and evidence remain on their original
+local branch; this current-main PR preserves newer controller/resource changes.
+
 ## Published 0.6.7 limited-use casting repair - 2026-10-27 UTC
 
 Owner-authorized merge/release completed: PR #15 merged; product/tag commit

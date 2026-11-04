@@ -950,3 +950,8 @@ and observed spending when an effect reader fails; five previously failing
 qualification cases and their affected neighbors pass 19/0. The mission mirror
 is synchronized. Native acceptance remains NOT_RUN. [Exact commands, hashes,
 original failures, publication and next action](RELEASE-0.6.7-RECORD.md).
+
+
+## Duplicate-item development checkpoint - 2026-11-04
+
+Canonical catalogue membership preserves every exact available item copy and its expression/pool. Stale nonspell inspection remains unresolved; numbered top removal and focus-change scroll reset preserve exact deletion/Undo semantics. Official Windows focused tests 127/0; native rendering, mouse/controller and live spending NOT RUN. [Current evidence and exact next native checks](ITEM-SOURCE-PR-CHECKPOINT.md).

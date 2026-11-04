@@ -1392,3 +1392,8 @@ No physical-input run: the checks press the same controls through their own
 handlers. The full ledger, including the superseded and failed runs, is in
 `planning/NATIVE-UI-FINISH-PROGRESS.md`; statuses per UI ID and runtime case
 are in `docs/NATIVE-UI-FINISH-0.5.0-DELIVERY.md`.
+
+
+## Duplicate-item development checkpoint - 2026-11-04
+
+Canonical catalogue membership preserves every exact available item copy and its expression/pool. Stale nonspell inspection remains unresolved; numbered top removal and focus-change scroll reset preserve exact deletion/Undo semantics. Official Windows focused tests 127/0; native rendering, mouse/controller and live spending NOT RUN. [Current evidence and exact next native checks](ITEM-SOURCE-PR-CHECKPOINT.md).
