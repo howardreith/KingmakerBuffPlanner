@@ -1,0 +1,23 @@
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=3f7a8c292f3e4b991489f98cc9e781392f575489c0a62fd66457c02f9dbba48e
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+Protocol tests: PASS=0 FAIL=3
+FAIL qualification-enhanced-direct-recipe: The enhanced qualification (animated) did not pass exactly: failed:enhanced-wait|enhanced-wait:step:route:native-command-spend-completed:EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-animated;polls=3|fired=qual-cast-1,qual-cast-2|options=before:metamagic-rod|unit-arcanist|rod-guid,before:class-feature|unit-arcanist|16c06d016437be9e9e6dac6211ff30a5,after:metamagic-rod|unit-arcanist|rod-guid,after:class-feature|unit-arcanist|16c06d016437be9e9e6dac6211ff30a5*|qual-cast-1:2>1,qual-cast-2:2>1|qual-cast-1:enhanced-before:qual-cast-1#3;available=2;clock=36001600000;effects=[strength-buff#i1@42000960000{Strength/Enhancement/4}],qual-cast-2:enhanced-before:qual-cast-2#4;available=2;clock=36001600000;effects=[],caster:enhanced-before:resource=4;activatables=3;on=,qual-cast-1:enhanced-after:qual-cast-1#5;available=1;clock=36002400000;effects=[strength-buff#i1@42000960000{Strength/Enhancement/4}],qual-cast-2:enhanced-after:qual-cast-2#6;available=1;clock=36002400000;effects=[strength-buff#i2@42002080000{Strength/Enhancement/6}],caster:enhanced-after:resource=3;activatables=3;on=
+FAIL qualification-rod-extend-recipe: The rod qualification (animated) did not pass exactly: failed:enhanced-wait|enhanced-wait:step:route:native-command-spend-completed:EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-animated;polls=3|599.968>1199.968|charges=2
+FAIL sticky-qual-driver-passes-both-modes-and-pool-kinds: The touch qualification (prepared, animated) did not pass exactly: failed:use-wait|use-wait:step:route:native-command:EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-animated;polls=3|fired=qual-cast-1|routed=False|spent=False|no-exhausted|detail=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-animated;polls=3
+powershell.exe : Development tests failed with exit code 1 (PASS=0 FAIL=3).
+At line:2 char:53
++ ... StartNew(); powershell.exe -NoProfile -ExecutionPolicy Bypass -File s ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Development tes...PASS=0 FAIL=3).:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+At C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\scripts\Test-Development.ps1:41 char:46
++ ... ed -ne 0) { throw "Development tests failed with exit code $testExit  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Development tes...PASS=0 FAIL=3).:String) [], RuntimeException
+    + FullyQualifiedErrorId : Development tests failed with exit code 1 (PASS=0 FAIL=3).

@@ -280,6 +280,12 @@ namespace KingmakerBuffPlanner.Tests
             Assert(run.World.State.Fired.Count == (confirmed ? 4 : 3));
             Assert(report.Entries[0].State == (confirmed ? CastingOutcomeState.EffectConfirmed : CastingOutcomeState.Failed));
             Assert(run.World.EvidenceReads == (confirmed ? 4 : 3));
+            if (confirmed && mode == "animated")
+                RepeatAssert(report.Entries.All(entry =>
+                    entry.Detail.Contains("expected-effects-observed") &&
+                    entry.Detail.Contains("effect-evidence:before:") &&
+                    entry.Detail.Contains("ResourceSpent:native-command-spend-completed")),
+                    "Animated reports must retain confirmation diagnostics AND actual command spending evidence.");
             // Presence, kind and readability are observations, not inferred from Fire's success.
             string before = "before:{unit-t1=[Buff:buff-effect#instance-1@end=100";
             RepeatAssert(report.Entries[0].Detail.Contains(before), "lost terminal evidence: " + report.Entries[0].Detail);

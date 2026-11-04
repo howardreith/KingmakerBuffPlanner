@@ -306,6 +306,19 @@ namespace KingmakerBuffPlanner.Execution
                 : confirmed ? last.Status.ToString() : "NotConfirmed";
             string detail = stop != null ? stop.Detail
                 : last == null ? "no-executor-record" : last.Status + ":" + last.Detail;
+            // Confirmation and native spending are independent evidence.
+            // In Animated mode the later ResourceSpent detail also proves
+            // that the native command route completed; retain its actual
+            // record alongside the confirmation, rather than inferring it
+            // from the spending boolean or losing it to record ordering.
+            if (confirmed)
+            {
+                string spending = string.Join(";", report.Records
+                    .Where(record => record.Status == CastExecutionStatus.ResourceSpent ||
+                        record.Status == CastExecutionStatus.SpendInvoked)
+                    .Select(record => record.Status + ":" + record.Detail).ToArray());
+                if (spending.Length != 0) detail += "|spending:" + spending;
+            }
             // Every later stopping record (e.g. uncertain cleanup after a
             // failure) is kept in the detail, never replacing the first.
             string later = string.Join(";", report.Records
