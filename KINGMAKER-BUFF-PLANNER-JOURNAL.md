@@ -1,3 +1,5 @@
+> **Active mission: Cast available default, 2026-11-04.** Branch `codex/kingmaker-buff-planner-cast-available-default`; product `3feceb5087bc7eeb5d85da095cec3841c622f883`, version 0.6.9 (unreleased changes). Format 6.5 migrates the old strict default once. Shared game-log feedback is noninterrupting. Focused 88/0, source 47/0, Release build 1/0; native acceptance NOT RUN. [Exact commands, evidence, limitations and next checks](docs/CAST-AVAILABLE-DEFAULT-CHECKPOINT.md). Next: documentation/guarded draft PR delivery, then review and separately selected native checks. No merge, release, live install or save change. Earlier campaigns below remain historical.
+
 ## Owner-authorized stable 0.6.9 release — 2026-11-04
 
 Merged base `07c31f2da0092d965e1e1649f807849b0a1f7b25`; preparation branch

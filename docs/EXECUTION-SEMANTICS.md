@@ -1,5 +1,40 @@
 # Execution Semantics
 
+## Cast available default (unreleased)
+
+Ordinary Run resolves the profile's availability policy. The default is
+`cast-available` / `ReadyCastsOnly`: fresh compilation and the existing atomic
+resource ledger admit the executable subset in authored order. Saved intent is
+unchanged. The native **Require full plan** checkbox in the execution footer is
+an unchecked opt-in to `require-full-plan` / `Ordinary`. A needed unavailable
+entry blocks every submission in strict mode; already-satisfied and disabled
+entries do not block. Explicit one-shot requests retain their requested mode.
+
+Schema 6 revision 5 marks the one-time reset of older availability preferences.
+Historical strict values lack choice provenance and reset to Cast available,
+including during Classic import. Current valid choices survive subsequent
+loads/Undo; missing, null or unknown optional strings normalize to available.
+Adoption carries a pending, non-durable migration until the canonical save
+succeeds. Loading and previewing write nothing. The existing durability barrier
+refuses native work when that save fails; protected primary bytes stay protected.
+
+`CastingWorkspaceSession` owns deliberate-attempt logging on every entry route.
+No-run admissions and terminal reports share `CastingRunPresentation` and the
+root's fail-soft `KingmakerGameLog` writer. Typed omission readiness/reasons and
+snapshotted labels preserve every uncast entry in visible ordered detail lines.
+Executor counters and raw diagnostic/spending records retain their meanings.
+Completion IDs prevent old callbacks replaying reports. Discovery, rendering,
+preview and controller handoff never emit attempt logs. Availability/projection
+refusals do not open the planner; unrelated recovery/import workflows retain
+their opening policy.
+
+This policy only skips known preflight omissions. Late validation/submission
+failure, unconfirmed application, observed spending without confirmation or
+uncertain cleanup still halt subsequent casts. Strict admission offers no
+rollback once native execution starts. The 0.6.9 Heroism and prepared-slot reuse
+qualification limits remain open. See the
+[checkpoint](CAST-AVAILABLE-DEFAULT-CHECKPOINT.md) for the exact validation scope.
+
 ## 0.4.0 execution policy (current contract)
 
 Two rules are enforced policy, no longer player settings. They supersede the

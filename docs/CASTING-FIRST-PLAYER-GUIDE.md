@@ -40,8 +40,8 @@ or global input-mode switch. A failed save remains Not saved and blocks executio
 Create/edit plans with mouse and keyboard; run saved routines and request Stop
 with a controller in native controller mode. This is NOT full gamepad graph editing.
 
-Configure is the first row and default for an empty plan. Empty Run actions are
-unavailable. Use D-pad Up/Down and the displayed native Confirm/Back icons;
+Configure is the first row and default for an empty plan. Running an empty
+routine reports that nothing is configured to cast. Use D-pad Up/Down and the displayed native Confirm/Back icons;
 Confirm says Open planner, Run Long, Stop, etc. Explicit View results opens a
 scrollable view; D-pad scrolls and Back returns to routines. Basic instructions
 and the latest outcome no longer require explanation pages. Stop remains separate.
@@ -279,14 +279,24 @@ earlier look for that part.
 - Every route uses the same checks: the latest saved plan, the party as it
   is at that moment, and every casting re-checked before it is cast.
   Nothing runs on a stale plan and no routine needs an acceptance step.
-- **Unavailable castings (0.5.2).** The footer policy starts at
-  **Require full plan** for old and new profiles: one blocked in-scope casting
-  refuses the whole routine and names the reason. Choose **Cast available**
-  to run the valid, affordable subset in authored order and list every
-  omission. The choice is remembered for this profile and is used by both
-  planner Run and the HUD routine buttons. It never deletes assignments,
-  waives a required enhancement or bypasses combat, save, import, identity,
-  session-lock or dispatch safeguards.
+- **Unavailable castings (upcoming update).** **Cast available** is the default:
+  run the affordable castings in your authored order, and explain every uncast
+  entry in the normal game log. Your exact caster, source, targets, enhancements
+  and assignments stay saved for later. Nothing substitutes another source or
+  weakens an enhancement. Already-active and disabled entries keep their meaning.
+- **Require full plan** is an unchecked checkbox beside Resources and Mode in
+  the execution footer. Check it to prevent starting when a needed casting is
+  unavailable; otherwise-ready castings are then withheld without spending.
+  The saved choice applies to HUD, mouse and controller Run, previews and Resources.
+  This checks readiness before execution; a native failure after starting can
+  still stop the routine after earlier casts have spent resources.
+- **One-time upgrade.** Supported profiles older than format 6.5 switch to
+  Cast available once, including files that serialized Require full plan.
+  Old files did not record whether strict mode was deliberately chosen, so
+  strict users must enable it once after upgrading. Later saves and updates
+  preserve your choice. The upgrade changes no assignments or other preferences,
+  writes through normal autosave/Run persistence, and must save before casting.
+  Combat, save, import, identity, session-lock and dispatch safeguards still apply.
 - **Never during combat (0.4.0).** A routine pressed while the party is in
   combat is refused with "Buff routines cannot run during combat." Nothing
   is spent and no casting is singled out; press again once combat is over.
@@ -305,13 +315,15 @@ earlier look for that part.
 - **Stopping.** Press the running routine's HUD button again: the cast in
   progress finishes and nothing after it starts. Changing area, disabling
   the mod or closing the game stop a run at once.
-- **Results (0.5.0).** Each run adds one line to the game's own log, for
-  example "Buff Planner: Long done - 3 of 3 cast, 1 already active.";
-  hover the line for the full result. A HUD press that is refused while the
-  planner is closed is logged the same way; a refusal you resolve in the
-  planner opens it on that routine with the reason. The game still logs
-  each cast itself. The full per-casting record is in the Unity Mod Manager
-  log (`[KBP-CF-RUN]`).
+- **Results (upcoming update).** A started run logs its terminal summary once,
+  followed by visible named lines for every uncast entry, including its caster,
+  recipient/group and reason. A no-op or refusal logs once even if the planner
+  is already open. Availability refusals never force the planner open or steal
+  input; an open planner retains its footer/card feedback. Explicitly opening
+  the planner still works. Confirmed, already-active, disabled, unavailable,
+  withheld, failed/unconfirmed, interrupted and not-attempted outcomes stay
+  distinct. The game still logs successful spells itself. Diagnostic evidence
+  remains in the Unity Mod Manager log (`[KBP-CF-RUN]`).
 - **The footer (0.5.2)** shows the save state, one line saying what **Run**
   will do now or exactly why it cannot (for example "Long cannot run: 1
   casting is not ready (marked in red)."), and **Resources**, the availability
