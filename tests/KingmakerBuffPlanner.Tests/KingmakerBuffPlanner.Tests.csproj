@@ -42,6 +42,7 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="ProductionExecutionTests.cs" />
+    <Compile Include="HeroismRepeatTests.cs" />
     <Compile Include="FactResourceTests.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\KingmakerFactResources.cs"><Link>GameAdapters\KingmakerFactResources.cs</Link></Compile>
     <Compile Include="CastingGraphTests.cs" />
