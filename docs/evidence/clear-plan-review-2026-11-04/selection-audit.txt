@@ -1,0 +1,6 @@
+clear-plan- 15 registrations
+controller-workspace- 19 registrations
+controller-input- 2 registrations
+controller-editor-back- 2 registrations
+planner-escape- 1 registrations
+Total 39 registrations, all prefixes nonzero. Six clear-plan-view- cases included in clear-plan-.

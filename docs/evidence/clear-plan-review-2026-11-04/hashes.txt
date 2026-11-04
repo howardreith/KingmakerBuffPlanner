@@ -1,0 +1,4 @@
+Product/test commit: 8de9e8ec0894e3bcce51329d9b541fdd660b250a
+Version: 0.6.8
+09fc0fe3e2491578a007e2e7f30500ec1c46d0bb1a97f39faaca4db92f888e51  artifacts/build/Release/KingmakerBuffPlanner.dll
+55cc1c9bdd235790861471bc7ebef19eba017487bce94d05367d6369fdf1c077  artifacts/tests/KingmakerBuffPlanner.Tests.exe

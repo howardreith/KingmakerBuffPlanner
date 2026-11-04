@@ -1,3 +1,7 @@
+> **PR #17 input corrections pending native acceptance:** verify alt-tab teardown with Clear plan open and during release wait restores native navigation; verify a native spell description blocks underlying semantic keyboard input and consumes its closing edge. Offline production-path regressions pass; these game interactions remain NOT RUN. [Exact steps](CLEAR-PLAN-REVIEW-CHECKPOINT.md).
+
+> **Clear plan acceptance pending, 2026-11-04:** run the complete cancel/clear/empty/Undo interaction with mouse/keyboard and controller alone at normal 1920x1200 and compact 1280x720, including held Confirm, filtered/all-routine scope and focus restoration. Native observations NOT RUN. [Exact guarded prerequisites and remaining steps](CLEAR-PLAN-CHECKPOINT.md#pending-native-acceptance).
+
 > **Current full-controller acceptance:** [F01-F10](CONTROLLER-UI-ACCEPTANCE.md)
 > require readable workspace, actual native card and entirely controller-operated
 > authoring/search/autosave/recovery before completion. Mouse-only authoring is no

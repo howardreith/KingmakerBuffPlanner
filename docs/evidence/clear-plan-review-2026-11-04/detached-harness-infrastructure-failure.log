@@ -1,0 +1,25 @@
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=eaf06066f7fe4a0ae4174c808a7c76b2970dc21078560064e3664b7e96f0bb7b
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+Protocol tests: PASS=0 FAIL=5
+FAIL clear-plan-view-focus-loss-with-confirmation-open: ECall methods must be packaged into a system module.
+FAIL clear-plan-view-focus-loss-during-release-wait: ECall methods must be packaged into a system module.
+FAIL clear-plan-view-description-blocks-enter-and-closing-edge: ECall methods must be packaged into a system module.
+FAIL clear-plan-view-description-blocks-space-and-closing-edge: ECall methods must be packaged into a system module.
+FAIL clear-plan-view-description-blocks-semantic-navigation: ECall methods must be packaged into a system module.
+powershell.exe : Development tests failed with exit code 1 (PASS=0 FAIL=5).
+At line:3 char:1
++ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Tes ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Development tes...PASS=0 FAIL=5).:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+At C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\scripts\Test-Development.ps1:41 char:46
++ ... ed -ne 0) { throw "Development tests failed with exit code $testExit  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Development tes...PASS=0 FAIL=5).:String) [], RuntimeException
+    + FullyQualifiedErrorId : Development tests failed with exit code 1 (PASS=0 FAIL=5).

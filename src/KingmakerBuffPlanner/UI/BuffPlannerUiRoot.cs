@@ -388,6 +388,7 @@ namespace KingmakerBuffPlanner.UI
             // reconstruct the candidate session (review R2).
             if (_instance._castingWorkspace != null)
             {
+                if (_instance._castingWorkspace.ClearPlanBlocksBackground) return;
                 _instance.CloseCastingWorkspace();
                 _instance._log.Info("[KBP-BOOT] casting workspace close requested;source=PlannerHotkey.");
                 return;
@@ -2363,7 +2364,8 @@ namespace KingmakerBuffPlanner.UI
                     _session.Model == null ? null : _session.Model.SourceGroupings(),
                     () => _session.Model == null ? null
                         : new ClassicPlanInMemory(_session.Model.Profile, _session.ClassicPrimarySha256,
-                            _session.Model.SourceGroupings()))
+                            _session.Model.SourceGroupings()),
+                    isRunActive: () => _castingHost != null && _castingHost.IsRunning)
                 : _castingSessions.Recovery.Adopt(_modPath, campaignId,
                     pending => new CastingWorkspaceSession(_modPath, campaignId,
                         CreateDispatchBoundary(),
@@ -2372,13 +2374,14 @@ namespace KingmakerBuffPlanner.UI
                             : new ClassicPlanInMemory(_session.Model.Profile,
                                 _session.ClassicPrimarySha256,
                                 _session.Model.SourceGroupings()),
-                        pending),
+                        pending, () => _castingHost != null && _castingHost.IsRunning),
                     () => new CastingWorkspaceSession(_modPath, campaignId, CreateDispatchBoundary(),
                         _session.Model == null ? null : _session.Model.SourceGroupings(),
                         () => _session.Model == null ? null
                             : new ClassicPlanInMemory(_session.Model.Profile,
                                 _session.ClassicPrimarySha256,
-                                _session.Model.SourceGroupings())));
+                                _session.Model.SourceGroupings()),
+                        isRunActive: () => _castingHost != null && _castingHost.IsRunning));
         }
 
         // Ordinary play submits through the production boundary; a

@@ -440,6 +440,8 @@ namespace KingmakerBuffPlanner.Tests
                 RunStaleItemCastingTests(root);
                 RunBlockedNavigationTests(root);
                 RunAutosaveLifecycleTests(root);
+                RunClearPlanTests(root);
+                RunClearPlanViewInputTests(root);
                 RunSharePlanningTests(root);
                 RunUndoHistoryTests(root);
                 RunEverydayUseWordingTests(root);

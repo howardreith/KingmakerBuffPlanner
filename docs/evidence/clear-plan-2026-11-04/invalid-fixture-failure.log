@@ -1,0 +1,15 @@
+Protocol tests: PASS=62 FAIL=7
+FAIL clear-plan-authoritative-scope-and-isolation: Value cannot be null.
+Parameter name: ability
+FAIL clear-plan-open-cancel-empty-and-repeat-are-read-only: Value cannot be null.
+Parameter name: ability
+FAIL clear-plan-one-announcement-save-and-exact-undo: Value cannot be null.
+Parameter name: ability
+FAIL clear-plan-stale-edit-reload-settings-and-owner: Value cannot be null.
+Parameter name: ability
+FAIL clear-plan-busy-at-confirmation-refuses: Value cannot be null.
+Parameter name: ability
+FAIL clear-plan-save-failure-and-retry: Value cannot be null.
+Parameter name: ability
+FAIL clear-plan-recovered-primary-remains-protected: Value cannot be null.
+Parameter name: ability

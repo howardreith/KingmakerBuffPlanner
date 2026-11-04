@@ -148,6 +148,13 @@ namespace KingmakerBuffPlanner.UI
 
         internal bool Allows(BindDescription binding) { return _ownership == null || _ownership.Allows(binding); }
 
+        internal void ResetWorkspaceActivation()
+        {
+            _pendingCommand = null;
+            _latch.Reset();
+            _repeat.Reset();
+        }
+
         private void AddCommand(List<object> bindings, int action, ControllerWorkspaceCommand command)
         {
             bindings.AddRange(_layer.AddButton(_ =>
@@ -234,8 +241,7 @@ namespace KingmakerBuffPlanner.UI
                     {
                 if (current)
                 {
-                    if (Cursor.lockState == CursorLockMode.None) Cursor.lockState = _cursorLock;
-                    if (Cursor.visible) Cursor.visible = _cursorVisible;
+                    RestoreCursor();
                 }
                     }
                     finally { ReleaseOwnedMode(current); }
@@ -279,6 +285,12 @@ namespace KingmakerBuffPlanner.UI
                                 GamePad.HasInstance && ReferenceEquals(GamePad.Instance.CurrentInputLayer, below));
                     }
                 }
+        }
+
+        private void RestoreCursor()
+        {
+            if (Cursor.lockState == CursorLockMode.None) Cursor.lockState = _cursorLock;
+            if (Cursor.visible) Cursor.visible = _cursorVisible;
         }
     }
 }

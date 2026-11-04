@@ -1,0 +1,9 @@
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=aab6d22417cd78a5ae444eb07e4403fffb9ba9b78ecc2d1ac16a1ec79818ec52
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+Protocol tests: PASS=38 FAIL=0
+DEVELOPMENT PASS=38 FAIL=0 prefixes=clear-plan-,controller-workspace-,controller-input-,controller-editor-back- seconds=8.7; native/purity/release coverage deferred.

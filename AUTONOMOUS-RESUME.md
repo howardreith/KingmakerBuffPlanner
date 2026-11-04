@@ -1,3 +1,29 @@
+## PR #17 input review corrections — 2026-11-04
+
+Branch `codex/kingmaker-buff-planner-clear-plan`; reviewed HEAD
+`502df08c3a8a765f0663de7fb65b99cf1efe2a34`; corrected product/test
+`8de9e8ec0894e3bcce51329d9b541fdd660b250a`, unchanged version 0.6.8.
+Removed the confirmation's redundant navigation-state restoration and blocked
+workspace input through native descriptions and their closing release edge.
+Production-path regressions reproduce both findings; final Windows source 47/0,
+build 1/0 and focused tests 39/0, including six new compiled-view/lifecycle cases.
+Native rendering, mouse and physical-controller acceptance remain **NOT RUN**.
+[Exact reproduction limits, commands, counts, hashes and remaining native steps](docs/CLEAR-PLAN-REVIEW-CHECKPOINT.md).
+Guarded push checks 6/0 and remote verification passed; draft PR #17 and its description are updated. Next: review and the recorded native boundary.
+
+## Clear plan development checkpoint — 2026-11-04
+
+Branch `codex/kingmaker-buff-planner-clear-plan`; product/test commit
+`4aac21c759c3c6d505d25f7c7f4a0d961df500cd`, unchanged version 0.6.8, from
+current origin/main `38f777aac4b9946ef674a1fb316f07b2925268f4`.
+All-routine Clear plan uses a native parchment confirmation and one autosaved,
+undoable compound edit; semantic controller/keyboard scope and input-edge guards.
+Official Windows source 47/0, build 1/0, focused tests 69/0 (new cases 9/0).
+Native mouse/controller/normal+compact visual acceptance **NOT RUN**; the current
+launcher purity/package prerequisites remain a separate guarded boundary.
+[Exact commands, hashes, rejected approaches, evidence and remaining native steps](docs/CLEAR-PLAN-CHECKPOINT.md).
+Guarded push tests 6/0; [draft PR #17](https://github.com/howardreith/KingmakerBuffPlanner/pull/17) is open. Next: PR review and the recorded guarded native flow.
+
 ## Stable 0.6.8 published and independently verified - 2026-11-04
 
 Owner-approved PR #16 merged at 2d591cd. Default-branch version increased from

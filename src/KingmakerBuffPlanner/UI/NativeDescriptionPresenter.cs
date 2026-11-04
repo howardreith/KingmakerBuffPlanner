@@ -32,14 +32,16 @@ namespace KingmakerBuffPlanner.UI
         internal const string TooltipLayerPath = "Tooltips";
         private readonly Action<string> _log;
         private readonly Canvas _plannerCanvas;
+        private readonly Action _opened;
         private GameObject _triggerObject;
         private TooltipTrigger _trigger;
         private Canvas _liftCanvas;
         private GraphicRaycaster _liftRaycaster;
         private bool _disposed;
 
-        internal NativeDescriptionPresenter(Canvas plannerCanvas, Transform owner, Action<string> log)
+        internal NativeDescriptionPresenter(Canvas plannerCanvas, Transform owner, Action<string> log, Action opened = null)
         {
+            _opened = opened;
             _plannerCanvas = plannerCanvas ?? throw new ArgumentNullException("plannerCanvas");
             _log = log ?? (value => { });
             // The trigger the native window is opened through: owned, hidden
@@ -181,6 +183,7 @@ namespace KingmakerBuffPlanner.UI
             LastAbilityGuid = blueprint == null ? null : blueprint.AssetGuid;
             LastCasterUnitId = data == null || data.Caster == null || data.Caster.Unit == null
                 ? null : data.Caster.Unit.UniqueId;
+            if (_opened != null) _opened();
             return true;
         }
 
@@ -220,7 +223,9 @@ namespace KingmakerBuffPlanner.UI
                 return false;
             }
             LastSubject = "text:" + (title ?? string.Empty);
-            return IsOpen;
+            bool shown = IsOpen;
+            if (shown && _opened != null) _opened();
+            return shown;
         }
 
         // Escape closes the description first (the innermost window).

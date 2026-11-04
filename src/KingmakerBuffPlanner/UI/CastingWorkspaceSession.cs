@@ -307,8 +307,10 @@ namespace KingmakerBuffPlanner.UI
             ICastingDispatchBoundary dispatchBoundary = null,
             IDictionary<string, CastGroupingKind> legacyGroupings = null,
             Func<ClassicPlanInMemory> legacyProfile = null,
-            PendingSessionRecovery recovery = null)
+            PendingSessionRecovery recovery = null,
+            Func<bool> isRunActive = null)
         {
+            _isRunActive = isRunActive;
             if (string.IsNullOrWhiteSpace(modPath))
                 throw new ArgumentException("Absolute mod path is required.", "modPath");
             if (string.IsNullOrWhiteSpace(campaignId))
@@ -440,6 +442,7 @@ namespace KingmakerBuffPlanner.UI
         // unsaved, and no instance ever carries two subscriptions.
         private void ReplaceAuthoring(CastingAuthoringService replacement)
         {
+            CancelClearPlan();
             if (replacement == null) throw new ArgumentNullException("replacement");
             // 0.4.2: every adopted document (load, reload, import, recovery)
             // carries class/fact abilities under their own catalogue
@@ -468,11 +471,13 @@ namespace KingmakerBuffPlanner.UI
 
         private void OnDocumentChangedForAutosave(CastingPlanDocument document, int revision)
         {
+            CancelClearPlan();
             PersistNow("document");
         }
 
         private void AutosaveSettingsNow()
         {
+            CancelClearPlan();
             PersistNow("settings");
         }
 
@@ -2584,6 +2589,7 @@ namespace KingmakerBuffPlanner.UI
 
         public CastingPlanLoadStatus Reload()
         {
+            CancelClearPlan();
             LeaveProblemNavigation();
             CastingPlanLoadResult loaded = _repository.Load(CampaignId);
             LastReloadNote = null;

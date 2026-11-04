@@ -28,7 +28,7 @@ namespace KingmakerBuffPlanner.UI
     // counter, no targeting or budget rule, no persisted geometry. Lines and
     // chips are recomputed only on a refresh (a command, a selection, a
     // resize), never per frame.
-    internal sealed class CastingWorkspaceScreenView : IDisposable
+    internal sealed partial class CastingWorkspaceScreenView : IDisposable
     {
         internal const string RootName = "KingmakerBuffPlanner.CastingWorkspaceRoot";
 
@@ -124,7 +124,6 @@ namespace KingmakerBuffPlanner.UI
         private TMP_Text _footerResult;
         private TMP_Text _footerSave;
         private Image _footerLedger;
-        private float _footerButtonsRight;
         private Button _footerRecovery;
         private string _shownSaveState;
         // True while the footer line shows a command's feedback (until the
@@ -238,12 +237,13 @@ namespace KingmakerBuffPlanner.UI
             try
             {
                 Build(nativeCanvas);
-                if (controllerAuthoring) _controllerNavigation = new ControllerWorkspaceNavigator(this, _kit);
+                _controllerNavigation = new ControllerWorkspaceNavigator(this, _kit, !controllerAuthoring);
             }
             catch { Dispose(); throw; }
         }
 
-        internal Transform ControllerFocusScope { get { return ControllerResourcesOpen ? _resources : _root; } }
+        internal Transform ControllerFocusScope { get { return ClearPlanOpen ? _clearOverlay : ControllerResourcesOpen ? _resources : _root; } }
+        internal bool ControllerBlockingOverlayOpen { get { return ClearPlanOpen || ControllerResourcesOpen; } }
         internal bool ControllerResourcesOpen { get { return _resources != null && _resources.gameObject.activeSelf; } }
         internal ScrollRect ControllerResourcesScroll { get { return _resourcesScroll; } }
         internal string ControllerEditingKey { get { return _session.EditingFocusCastingId ?? "draft"; } }
@@ -251,6 +251,7 @@ namespace KingmakerBuffPlanner.UI
         internal void ControllerCommand(ControllerWorkspaceCommand command) { if (_controllerNavigation != null) _controllerNavigation.Execute(command); }
         internal void ControllerCycleRoutine(int direction)
         {
+            if (ClearPlanOpen || _clearInput.BlocksBackground) return;
             string[] ids = _session.Document.Routines.Select(r => r.RoutineId).ToArray();
             int index = Array.IndexOf(ids, _session.SelectedRoutineId);
             if (ids.Length > 0) Command(() => _session.SelectRoutine(ids[(index + (direction < 0 ? ids.Length - 1 : 1)) % ids.Length]), "controller-routine");
@@ -466,14 +467,22 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed) return;
             _disposed = true;
+            _session.CancelClearPlan();
+            RestoreClearInputOwnership();
             if (_frameEndProbe != null)
                 _frameEndProbe.Cancel("workspace-disposed-before-frame-end");
             if (_description != null) _description.Dispose();
             if (_controllerNavigation != null) _controllerNavigation.Dispose();
             _description = null;
-            if (_root != null) { _root.gameObject.SetActive(false); UnityEngine.Object.Destroy(_root.gameObject); }
+            if (_root != null) DestroyRoot();
             if (_controllerAuthoring && _kit != null) _kit.Dispose();
             _root = null;
+        }
+
+        private void DestroyRoot()
+        {
+            _root.gameObject.SetActive(false);
+            UnityEngine.Object.Destroy(_root.gameObject);
         }
 
         // Escape leaves the focused casting (its inspector) first; returns
@@ -481,6 +490,8 @@ namespace KingmakerBuffPlanner.UI
         internal bool HandleEscape()
         {
             if (_disposed) return false;
+            if (ClearPlanOpen) { CloseClearPlan(false); return true; }
+            if (_clearInput.BlocksBackground) return true;
             if (_controllerNavigation != null && _controllerNavigation.CloseOwnedModal()) return true;
             // The native description is the innermost window: Escape closes
             // it first, leaving the planner exactly as it was. Shown at the
@@ -489,7 +500,12 @@ namespace KingmakerBuffPlanner.UI
             // press never closes both it and the planner.
             bool described = NativeDescriptionPresenter.CloseIfOpen() || _descriptionShownLastFrame;
             _descriptionShownLastFrame = false;
-            if (described) return true;
+            if (described)
+            {
+                _descriptionInput.Close(_workspaceKeyboardInput.Frame());
+                return true;
+            }
+            if (NativeDescriptionBlocksWorkspace) return true;
             // Then the Resources details, if shown.
             if (_resources != null && _resources.gameObject.activeSelf)
             {
@@ -505,6 +521,8 @@ namespace KingmakerBuffPlanner.UI
         // Called once at the end of every frame's planner tick.
         internal void NoteFrameEnd()
         {
+            TickWorkspaceKeyboard();
+            TickClearPlan();
             _descriptionShownLastFrame = NativeDescriptionPresenter.IsOpen;
             FitSourceTabs();
             if (_controllerNavigation != null) _controllerNavigation.NoteFrameEnd();
@@ -1105,7 +1123,7 @@ namespace KingmakerBuffPlanner.UI
             _root.gameObject.AddComponent<GraphicRaycaster>();
             _frameEndProbe = _root.gameObject.AddComponent<ExpectedStateFrameProbe>();
             if (_controllerAuthoring) _controllerTextProbe = _root.gameObject.AddComponent<PlannerWorkspaceTextFrameProbe>();
-            _description = new NativeDescriptionPresenter(canvas, _root, _log);
+            _description = new NativeDescriptionPresenter(canvas, _root, _log, NoteNativeDescriptionOpened);
             CanvasGroup group = _root.gameObject.AddComponent<CanvasGroup>();
             group.alpha = 1f;
             group.interactable = true;
@@ -1198,13 +1216,13 @@ namespace KingmakerBuffPlanner.UI
                 PlannerParchmentPalette.SheetLedgerWashAlpha);
             // Between the header row (its controls end 41 units down) and
             // the routine bar; and in the gap between the lanes (8.5% of the
-            // frame up) and the footer (7.8%).
+            // frame up) and the two-row footer (15%).
             ParchmentRule header = ParchmentRule.Create("HeaderRule", _frame, _frameParchment, false);
             KingmakerUiFactory.SetAnchors(header.Rect, 0.028f, 1f, 0.972f, 1f);
             _headerRule = header;
             PlaceHeaderRule();
             ParchmentRule footer = ParchmentRule.Create("FooterRule", _frame, _frameParchment, false);
-            KingmakerUiFactory.SetAnchors(footer.Rect, 0.028f, 0.0815f, 0.972f, 0.0815f);
+            KingmakerUiFactory.SetAnchors(footer.Rect, 0.028f, 0.155f, 0.972f, 0.155f);
             // The rules are part of the sheet: drawn right above the paper
             // and beneath every control, so a crowded small screen covers
             // them instead of striking through its routine tabs.
@@ -1406,7 +1424,7 @@ namespace KingmakerBuffPlanner.UI
         private void BuildCatalogue(RectTransform frame)
         {
             RectTransform lane = KingmakerUiFactory.CreateRect("Catalogue", frame);
-            KingmakerUiFactory.SetAnchors(lane, 0.028f, _controllerAuthoring ? .16f : .085f, _controllerAuthoring ? .23f : .163f, .895f);
+            KingmakerUiFactory.SetAnchors(lane, 0.028f, .16f, _controllerAuthoring ? .23f : .163f, .895f);
             TextMeshProUGUI title = _kit.Text(lane, "LaneTitle", "Buffs", PlannerTextRole.Heading, 19f,
                 TextAlignmentOptions.MidlineLeft);
             KingmakerUiFactory.SetAnchors(title.rectTransform, 0f, 1f, 1f, 1f);
@@ -1488,7 +1506,7 @@ namespace KingmakerBuffPlanner.UI
         private void BuildGraphArea(RectTransform frame)
         {
             RectTransform area = KingmakerUiFactory.CreateRect("Graph", frame);
-            KingmakerUiFactory.SetAnchors(area, _controllerAuthoring ? .24f : .172f, _controllerAuthoring ? .16f : .085f, .742f, .895f);
+            KingmakerUiFactory.SetAnchors(area, _controllerAuthoring ? .24f : .172f, .16f, .742f, .895f);
             // Banner: the selected buff, prominently, and the next step.
             RectTransform banner = KingmakerUiFactory.CreateRect("Banner", area);
             KingmakerUiFactory.SetAnchors(banner, 0f, 1f, 1f, 1f);
@@ -1560,7 +1578,7 @@ namespace KingmakerBuffPlanner.UI
         private void BuildInspector(RectTransform frame)
         {
             RectTransform lane = KingmakerUiFactory.CreateRect("Inspector", frame);
-            KingmakerUiFactory.SetAnchors(lane, .752f, _controllerAuthoring ? .16f : .085f, .972f, .895f);
+            KingmakerUiFactory.SetAnchors(lane, .752f, .16f, .972f, .895f);
             _inspectorTitle = _kit.Text(lane, "LaneTitle", "New casting", PlannerTextRole.Heading, 19f,
                 TextAlignmentOptions.MidlineLeft);
             KingmakerUiFactory.SetAnchors(_inspectorTitle.rectTransform, 0f, 1f, 1f, 1f);
@@ -1580,14 +1598,12 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
-        // Native UI finish (UI-08): a compact execution footer - the save
-        // state, one line beside Run (what a run does now or exactly why it
-        // cannot, or the last command's feedback), and Resources, Mode, Undo
-        // and Run. The budgets moved into the Resources details.
+        // Keep save/feedback above the plan actions in both input modes.
+        // The second row leaves readable labels at the compact layout.
         private void BuildFooter(RectTransform frame)
         {
             RectTransform footer = KingmakerUiFactory.CreateRect("Footer", frame);
-            KingmakerUiFactory.SetAnchors(footer, 0f, 0f, 1f, _controllerAuthoring ? .15f : .078f, 52f, 44f, 6f, 0f);
+            KingmakerUiFactory.SetAnchors(footer, 0f, 0f, 1f, .15f, 52f, 44f, 6f, 0f);
             // Everyday-use v1.2 §2/§4/§5: autosave replaced Save (a passive
             // status shows it, refreshed with the view), the Run click
             // authorizes the current revision, and Reload appears - with
@@ -1602,20 +1618,20 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(RectOf(_footerRecovery), 0f, 0.04f, 0f, 0.5f);
             RectOf(_footerRecovery).offsetMax = new Vector2(SaveColumn - 8f, RectOf(_footerRecovery).offsetMax.y);
             _footerRecovery.gameObject.SetActive(false);
-            string[] names = { "Resources", "AvailabilityPolicy", "ExecutionMode", "Undo", "Run" };
-            string[] captions = { "Resources", PolicyCaption(), ModeCaption(), "Undo",
+            string[] names = { "Resources", "AvailabilityPolicy", "ExecutionMode", "ClearPlan", "Undo", "Run" };
+            string[] captions = { "Resources", PolicyCaption(), ModeCaption(), "Clear plan", "Undo",
                 WorkspaceFooterText.RunCaption(_session.RoutineDisplayName(_session.SelectedRoutineId)) };
             Action[] actions =
             {
-                ToggleResources, ToggleAvailabilityPolicyCommand, ToggleModeCommand, UndoCommand,
+                ToggleResources, ToggleAvailabilityPolicyCommand, ToggleModeCommand, OpenClearPlan, UndoCommand,
                 RunApply
             };
-            float[] widths = { 128f, 168f, 154f, 88f, 176f };
+            float[] widths = { 128f, 168f, 154f, 128f, 88f, 176f };
             float right = 0f;
             for (int index = names.Length - 1; index >= 0; index--)
             {
                 Action action = actions[index];
-                Action invoke = names[index] == "Resources"
+                Action invoke = names[index] == "Resources" || names[index] == "ClearPlan"
                     ? action : (Action)(() => Command(action));
                 Button button = _kit.Button(footer, names[index], captions[index], invoke,
                     PlannerTextRole.Button,
@@ -1625,38 +1641,35 @@ namespace KingmakerBuffPlanner.UI
                 rect.pivot = new Vector2(1f, 0.5f);
                 rect.sizeDelta = new Vector2(widths[index], 0f);
                 rect.anchoredPosition = new Vector2(-right, 0f);
-                if (_controllerAuthoring) { rect.anchorMin = new Vector2(1, .04f); rect.anchorMax = new Vector2(1, .48f); }
+                rect.anchorMin = new Vector2(1, .04f); rect.anchorMax = new Vector2(1, .48f);
                 right += widths[index] + 8f;
                 if (names[index] == "Resources") _resourcesButton = button;
                 if (names[index] == "AvailabilityPolicy") _policyButton = button;
                 if (names[index] == "ExecutionMode") _modeButton = button;
                 if (names[index] == "Undo") _undoButton = button;
+                if (names[index] == "ClearPlan")
+                {
+                    _clearPlanButton = button;
+                    ControllerControlIdentity.Set(button, "plan/clear", "Footer");
+                    button.GetComponent<ControllerControlIdentity>().Explanation = () => _session.ClearPlanUnavailableReason ??
+                        "Remove every planned casting from every routine in one undoable edit.";
+                    button.gameObject.AddComponent<RightClickProxy>().OnRightClick = () => ShowNotice(
+                        _session.ClearPlanUnavailableReason ?? "Remove every planned casting from every routine in one undoable edit.");
+                }
+                if (names[index] == "Undo") ControllerControlIdentity.Set(button, "plan/undo", "Footer");
                 if (names[index] == "Run") _runButton = button;
             }
-            // The one line starts after the save column and ends where the
-            // buttons (and Ready Casts Only, when offered) begin.
-            _footerButtonsRight = right;
-            float textRight = right;
-            _footerResult = _kit.Text(footer, "Result", string.Empty, PlannerTextRole.Body, 16f,
+            _footerResult = _kit.Text(footer, "Result", string.Empty, PlannerTextRole.Body, 18f,
                 TextAlignmentOptions.MidlineLeft);
-            _footerResult.enableAutoSizing = true;
-            _footerResult.fontSizeMin = 12f;
-            _footerResult.fontSizeMax = 16f;
             _footerResult.overflowMode = TextOverflowModes.Ellipsis;
-            KingmakerUiFactory.SetAnchors(_footerResult.rectTransform, 0f, 0f, 1f, 1f, SaveColumn, textRight, 0f, 0f);
+            KingmakerUiFactory.SetAnchors(_footerResult.rectTransform, 0, .55f, 1, 1, SaveColumn, 0, 0, 0);
             // The footer line's paper ground (washed onto the sheet).
             RectTransform ledger = KingmakerUiFactory.CreateRect("FooterLedger", footer);
-            KingmakerUiFactory.SetAnchors(ledger, 0f, 0f, 1f, 1f, -8f, textRight - 8f, -2f, -2f);
+            KingmakerUiFactory.SetAnchors(ledger, 0, .55f, 1, 1, -8, -8, 0, 0);
             Image ground = KingmakerUiFactory.AddFramedPanel(ledger, _theme.ParchmentRaised, _theme.GoldAccent);
             ground.raycastTarget = false;
             ledger.SetAsFirstSibling();
             _footerLedger = ground;
-            if (_controllerAuthoring)
-            {
-                KingmakerUiFactory.SetAnchors(_footerResult.rectTransform, 0, .55f, 1, 1, SaveColumn, 0, 0, 0);
-                KingmakerUiFactory.SetAnchors(ledger, 0, .55f, 1, 1, -8, -8, 0, 0);
-                _footerResult.enableAutoSizing = false; _footerResult.fontSize = 18;
-            }
             BuildResources(frame);
             ShowSaveState();
         }
@@ -1756,6 +1769,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void ToggleResources()
         {
+            if (ClearPlanOpen || _clearInput.BlocksBackground) return;
             if (_resources == null) return;
             if (_resources.gameObject.activeSelf)
             {
@@ -2947,7 +2961,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void Command(Action action, string refreshCause = "command")
         {
-            if (_disposed) return;
+            if (_disposed || ClearPlanOpen || _clearInput.BlocksBackground || NativeDescriptionBlocksWorkspace) return;
             long commandStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             _nextInteractionStartedAt = commandStarted;
             // A command's feedback lasts until the next command; without one
@@ -3186,13 +3200,6 @@ namespace KingmakerBuffPlanner.UI
                     Feedback(_session.LastAttemptMessage, true);
             }
             _showedProblems = problems;
-            float textRight = _controllerAuthoring ? 0 : _footerButtonsRight;
-            if (_footerResult != null)
-                _footerResult.rectTransform.offsetMax = new Vector2(-textRight,
-                    _footerResult.rectTransform.offsetMax.y);
-            if (_footerLedger != null)
-                _footerLedger.rectTransform.offsetMax = new Vector2(-(textRight - 8f),
-                    _footerLedger.rectTransform.offsetMax.y);
             if (!_feedbackShown && _footerResult != null)
             {
                 bool problem;
@@ -3202,6 +3209,7 @@ namespace KingmakerBuffPlanner.UI
             if (_resources != null && _resources.gameObject.activeSelf)
                 RebuildResources();
             if (_undoButton != null) PlannerNativeKit.SetEnabled(_undoButton, _session.CanUndo);
+            if (_clearPlanButton != null) PlannerNativeKit.SetEnabled(_clearPlanButton, _session.CanClearPlan);
             // Run runs the SELECTED routine, so it says which one.
             if (_runButton != null)
                 PlannerNativeKit.SetCaption(_runButton, WorkspaceFooterText.RunCaption(
