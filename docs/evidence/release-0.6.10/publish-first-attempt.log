@@ -1,0 +1,61 @@
+github.com
+  ✓ Logged in to github.com account howardreith (keyring)
+  - Active account: true
+  - Git operations protocol: https
+  - Token: gho_************************************
+  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'
+From https://github.com/howardreith/KingmakerBuffPlanner
+ * branch            main       -> FETCH_HEAD
+Source validation: PASS=47 FAIL=0
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\0610-stable\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=b0185b8a937404abe387ef9b47cf7c4638d29c93f37cba64bfd140cd022bb5b4
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\0610-stable\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\0610-stable\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+[CAST-AVAILABLE-STRICT] Buff Planner: Long — 0 cast, 1 unavailable, 1 disabled, 1 withheld by Require full plan.
+[CAST-AVAILABLE-STRICT] Not cast: Buff (Linzi -> Valerie) [casting 1] — ready, withheld by Require full plan.
+[CAST-AVAILABLE-STRICT] Not cast: Buff (Linzi -> Valerie) [casting 2] — not enough level 2 spell slots; earlier planned castings have first claim on this pool.
+[CAST-AVAILABLE-STRICT] Not cast: Buff (Linzi -> Valerie) [casting 3] — explicitly disabled.
+[CAST-AVAILABLE-ZERO] Buff Planner: Long — 0 cast, 2 unavailable, 1 disabled.
+[CAST-AVAILABLE-ZERO] Not cast: Buff (Linzi -> Valerie) [casting 1] — no level 2 spell slots remain.
+[CAST-AVAILABLE-ZERO] Not cast: Buff (Linzi -> Valerie) [casting 2] — no level 2 spell slots remain.
+[CAST-AVAILABLE-ZERO] Not cast: Buff (Linzi -> Valerie) [casting 3] — explicitly disabled.
+[CAST-AVAILABLE-PARTIAL] Buff Planner: Long finished with omissions - 2 cast, 2 unavailable.
+[CAST-AVAILABLE-PARTIAL] Not cast: Heroism-like fixture (unit-wizard -> unit-t2) [casting 2] — not enough prepared uses; earlier planned castings have first claim on this pool.
+[CAST-AVAILABLE-PARTIAL] Not cast: Heroism-like fixture (unit-wizard -> unit-t3) [casting 3] — not enough prepared uses; earlier planned castings have first claim on this pool.
+[HEROISM-REPEAT-FIXTURE] mode=instant;fresh=4-confirmed/4-spent;covered-exhausted=no-active-run/0-spent;mixed=3-skipped/1-confirmed/1-spent;expired-replenished=4-confirmed/4-spent
+[HEROISM-REPEAT-FIXTURE] mode=instant;observation=replace;confirmed=2;spent=2;failed=0;unprocessed=0;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-native:replace;transaction-complete:True;transaction-state:simulated-settled;cleanup-complete:True;cleanup-state:simulated-settled;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[Buff:buff-effect#instance-3@end=110:suppressed=False:]}|spending:SpendInvoked:ability-data-spend-invoked;ResourceSpent:native-resource-delta-observed
+[HEROISM-REPEAT-FIXTURE] mode=instant;observation=refresh;confirmed=2;spent=2;failed=0;unprocessed=0;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-native:refresh;transaction-complete:True;transaction-state:simulated-settled;cleanup-complete:True;cleanup-state:simulated-settled;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[Buff:buff-effect#instance-1@end=110:suppressed=False:]}|spending:SpendInvoked:ability-data-spend-invoked;ResourceSpent:native-resource-delta-observed
+[HEROISM-REPEAT-FIXTURE] mode=instant;observation=retain;confirmed=0;spent=1;failed=1;unprocessed=1;first=TimedOutUnconfirmed:expected-application-unconfirmed-after-confirmation-window;simulated-native:retain;transaction-complete:True;transaction-state:simulated-settled;cleanup-complete:True;cleanup-state:simulated-settled;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]}
+[HEROISM-REPEAT-FIXTURE] mode=instant;observation=native-failure;confirmed=0;spent=1;failed=1;unprocessed=1;first=FailedExecution:simulated-native:native-failure;transaction-complete:True;transaction-state:simulated-settled;cleanup-complete:True;cleanup-state:simulated-settled;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]}
+[HEROISM-REPEAT-FIXTURE] mode=instant;observation=wrong-recipient;confirmed=0;spent=1;failed=1;unprocessed=1;first=TimedOutUnconfirmed:expected-application-unconfirmed-after-confirmation-window;simulated-native:wrong-recipient;transaction-complete:True;transaction-state:simulated-settled;cleanup-complete:True;cleanup-state:simulated-settled;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]}
+[HEROISM-REPEAT-FIXTURE] mode=instant;observation=wrong-kind;confirmed=0;spent=1;failed=1;unprocessed=1;first=TimedOutUnconfirmed:expected-application-unconfirmed-after-confirmation-window;simulated-native:wrong-kind;transaction-complete:True;transaction-state:simulated-settled;cleanup-complete:True;cleanup-state:simulated-settled;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[AreaBuff:buff-effect#instance-3@end=110:suppressed=False:]}
+[HEROISM-REPEAT-FIXTURE] mode=instant;observation=suppressed;confirmed=0;spent=1;failed=1;unprocessed=1;first=TimedOutUnconfirmed:expected-application-unconfirmed-after-confirmation-window;simulated-native:suppressed;transaction-complete:True;transaction-state:simulated-settled;cleanup-complete:True;cleanup-state:simulated-settled;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[Buff:buff-effect#instance-3@end=110:suppressed=True:]}
+[HEROISM-REPEAT-FIXTURE] mode=instant;observation=unreadable;confirmed=0;spent=1;failed=1;unprocessed=1;first=TimedOutUnconfirmed:expected-application-unconfirmed-after-confirmation-window;simulated-native:unreadable;transaction-complete:True;transaction-state:simulated-settled;cleanup-complete:True;cleanup-state:simulated-settled;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=unreadable}
+[HEROISM-REPEAT-FIXTURE] mode=instant;observation=missing;confirmed=0;spent=1;failed=1;unprocessed=1;first=TimedOutUnconfirmed:expected-application-unconfirmed-after-confirmation-window;simulated-native:missing;transaction-complete:True;transaction-state:simulated-settled;cleanup-complete:True;cleanup-state:simulated-settled;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[]}
+[HEROISM-REPEAT-FIXTURE] mode=animated;fresh=4-confirmed/4-spent;covered-exhausted=no-active-run/0-spent;mixed=3-skipped/1-confirmed/1-spent;expired-replenished=4-confirmed/4-spent
+[HEROISM-REPEAT-FIXTURE] mode=animated;observation=replace;confirmed=2;spent=2;failed=0;unprocessed=0;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-native:replace;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[Buff:buff-effect#instance-3@end=110:suppressed=False:]}|spending:ResourceSpent:native-command-spend-completed
+[HEROISM-REPEAT-FIXTURE] mode=animated;observation=refresh;confirmed=2;spent=2;failed=0;unprocessed=0;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-native:refresh;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[Buff:buff-effect#instance-1@end=110:suppressed=False:]}|spending:ResourceSpent:native-command-spend-completed
+[HEROISM-REPEAT-FIXTURE] mode=animated;observation=retain;confirmed=0;spent=1;failed=1;unprocessed=1;first=TimedOutUnconfirmed:expected-application-unconfirmed;simulated-native:retain;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]}
+[HEROISM-REPEAT-FIXTURE] mode=animated;observation=native-failure;confirmed=0;spent=1;failed=1;unprocessed=1;first=FailedExecution:simulated-native:native-failure;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]}
+[HEROISM-REPEAT-FIXTURE] mode=animated;observation=wrong-recipient;confirmed=0;spent=1;failed=1;unprocessed=1;first=TimedOutUnconfirmed:expected-application-unconfirmed;simulated-native:wrong-recipient;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]}
+[HEROISM-REPEAT-FIXTURE] mode=animated;observation=wrong-kind;confirmed=0;spent=1;failed=1;unprocessed=1;first=TimedOutUnconfirmed:expected-application-unconfirmed;simulated-native:wrong-kind;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[AreaBuff:buff-effect#instance-3@end=110:suppressed=False:]}
+[HEROISM-REPEAT-FIXTURE] mode=animated;observation=suppressed;confirmed=0;spent=1;failed=1;unprocessed=1;first=TimedOutUnconfirmed:expected-application-unconfirmed;simulated-native:suppressed;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[Buff:buff-effect#instance-3@end=110:suppressed=True:]}
+[HEROISM-REPEAT-FIXTURE] mode=animated;observation=unreadable;confirmed=0;spent=1;failed=1;unprocessed=1;first=TimedOutUnconfirmed:expected-application-unconfirmed;simulated-native:unreadable;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=unreadable}
+[HEROISM-REPEAT-FIXTURE] mode=animated;observation=missing;confirmed=0;spent=1;failed=1;unprocessed=1;first=TimedOutUnconfirmed:expected-application-unconfirmed;simulated-native:missing;effect-evidence:before:{unit-t1=[Buff:buff-effect#instance-1@end=100:suppressed=False:]};after:{unit-t1=[]}
+HUMAN_FEEDBACK_PERF calculations-only catalog=77 castings=67 coldMs=3.593 warmMedianMs=2.185 warmSlowestMs=3.383 buffMedianMs=1.309 buffSlowestMs=1.556 toggleMedianMs=46.622 toggleSlowestMs=77.991
+Protocol tests: PASS=666 FAIL=5
+FAIL casting-workspace-routine-scoped-apply: The one-pass forecast hid the real one-charge conflict.
+FAIL session-save-preserves-player-settings: Loaded execution settings were not adopted.
+FAIL legacy-out-of-combat-preference-is-enforced: A stored 0.3.0 combat/fallback preference stayed active.
+FAIL card-reasons-and-review-items-in-words: Reason text for prepared-slots-exhausted:pool-unit-wizard is no prepared uses remain
+FAIL execution-policy-strict-instant-blocker-is-casting-specific: The strict Instant blocker was not casting specific: apply-refused:blocked-casting:cast-2:instant-route-unavailable:AnimatedFallback:sticky-delivery-hostile-targeting-ambiguous
+Offline C# suite failed with exit code 1 (PASS=666 FAIL=5).
+At C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\0610-stable\scripts\PublishRelease.Common.p
+s1:121 char:9
++         throw "Offline C# suite failed with exit code $testExit (PASS ...
++         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Offline C# suit...SS=666 FAIL=5).:String) [], RuntimeException
+    + FullyQualifiedErrorId : Offline C# suite failed with exit code 1 (PASS=666 FAIL=5).

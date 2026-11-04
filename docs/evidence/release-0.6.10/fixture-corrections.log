@@ -1,0 +1,20 @@
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\0610-stable\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=b0185b8a937404abe387ef9b47cf7c4638d29c93f37cba64bfd140cd022bb5b4
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\0610-stable\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\release\0610-stable\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+[CAST-AVAILABLE-STRICT] Buff Planner: Long — 0 cast, 1 unavailable, 1 disabled, 1 withheld by Require full plan.
+[CAST-AVAILABLE-STRICT] Not cast: Buff (Linzi -> Valerie) [casting 1] — ready, withheld by Require full plan.
+[CAST-AVAILABLE-STRICT] Not cast: Buff (Linzi -> Valerie) [casting 2] — not enough level 2 spell slots; earlier planned castings have first claim on this pool.
+[CAST-AVAILABLE-STRICT] Not cast: Buff (Linzi -> Valerie) [casting 3] — explicitly disabled.
+[CAST-AVAILABLE-ZERO] Buff Planner: Long — 0 cast, 2 unavailable, 1 disabled.
+[CAST-AVAILABLE-ZERO] Not cast: Buff (Linzi -> Valerie) [casting 1] — no level 2 spell slots remain.
+[CAST-AVAILABLE-ZERO] Not cast: Buff (Linzi -> Valerie) [casting 2] — no level 2 spell slots remain.
+[CAST-AVAILABLE-ZERO] Not cast: Buff (Linzi -> Valerie) [casting 3] — explicitly disabled.
+[CAST-AVAILABLE-PARTIAL] Buff Planner: Long finished with omissions - 2 cast, 2 unavailable.
+[CAST-AVAILABLE-PARTIAL] Not cast: Heroism-like fixture (unit-wizard -> unit-t2) [casting 2] — not enough prepared uses; earlier planned castings have first claim on this pool.
+[CAST-AVAILABLE-PARTIAL] Not cast: Heroism-like fixture (unit-wizard -> unit-t3) [casting 3] — not enough prepared uses; earlier planned castings have first claim on this pool.
+Protocol tests: PASS=23 FAIL=0
+DEVELOPMENT PASS=23 FAIL=0 prefixes=casting-workspace-routine-scoped-apply,session-save-preserves-player-settings,legacy-out-of-combat-preference-is-enforced,card-reasons-and-review-items-in-words,execution-policy-strict-instant-blocker-is-casting-specific,cast-available seconds=8; native/purity/release coverage deferred.

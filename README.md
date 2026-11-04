@@ -5,7 +5,7 @@ Routines cast available buffs by default and explain every uncast entry in the
 normal game log. **Require full plan** is an unchecked execution-footer opt-in.
 Upgrading old profiles resets this policy once; strict users must enable it once.
 This owner-authorized release has not been run in the game. See the
-[release notes](docs/RELEASE-NOTES-0.6.10.md) for migration and verification limits.
+[release notes](docs/RELEASE-NOTES-0.6.10.md) for migration and verification limits, and the [release receipt](docs/RELEASE-0.6.10-RECORD.md) for published hashes and checks.
 
 **Release: [0.6.9](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.9).**
 This owner-authorized update adds undoable Clear plan confirmation and clearer

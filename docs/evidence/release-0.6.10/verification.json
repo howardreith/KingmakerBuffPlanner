@@ -1,0 +1,19 @@
+{
+    "version":  "0.6.10",
+    "assemblyVersion":  "0.6.10.0",
+    "commit":  "6c754257b25ebe456a760bc1d413352ac7844de4",
+    "releaseId":  434442186,
+    "publishedAt":  "2026-11-04T20:53:51Z",
+    "url":  "https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.10",
+    "draft":  false,
+    "prerelease":  false,
+    "latest":  true,
+    "packageSha256":  "4a931b5079ba06bc4d44f2fc38f0eb86f12b25a37f60a299d2f984c284840b0d",
+    "dllSha256":  "b02802a923149741a5c7e14288cc8c0822343d1ea4367fd055b2e48e374a20d5",
+    "assemblyMvid":  "d0fae283-59c1-4513-8568-4d7a1c18cd55",
+    "checksumSha256":  "0f35f11dc0ec03120372b32f30ffddc4a2afc08654e6774d65962bf38040cc6c",
+    "annotatedTagObject":  "b4174b7ee353390b73ac5fe611e4524dd32187b6",
+    "assetDigest":  "sha256:4a931b5079ba06bc4d44f2fc38f0eb86f12b25a37f60a299d2f984c284840b0d",
+    "independentPackageValidation":  "PASS=6 FAIL=0",
+    "nativeAcceptance":  "NOT RUN"
+}
