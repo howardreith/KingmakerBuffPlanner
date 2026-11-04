@@ -1,0 +1,22 @@
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=a35b33961ac11308b1dc1e4942375ed300a45c9a5c1b13549e444079fde58ddd
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+Protocol tests: PASS=0 FAIL=2
+FAIL clear-plan-view-focus-loss-with-confirmation-open: focus-loss teardown overwrote original EventSystem navigation (release-wait=False)
+FAIL clear-plan-view-focus-loss-during-release-wait: focus-loss teardown overwrote original EventSystem navigation (release-wait=True)
+powershell.exe : Development tests failed with exit code 1 (PASS=0 FAIL=2).
+At line:2 char:1
++ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Tes ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Development tes...PASS=0 FAIL=2).:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+At C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\scripts\Test-Development.ps1:41 char:46
++ ... ed -ne 0) { throw "Development tests failed with exit code $testExit  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Development tes...PASS=0 FAIL=2).:String) [], RuntimeException
+    + FullyQualifiedErrorId : Development tests failed with exit code 1 (PASS=0 FAIL=2).

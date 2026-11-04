@@ -1,3 +1,5 @@
+> **Input review correction, 2026-11-04:** the reviewed 502df08 input paths had two defects. Corrected product 8de9e8e passes 39 focused tests, including six compiled-view/lifecycle regressions. Native acceptance remains NOT RUN. [Current correction and evidence](CLEAR-PLAN-REVIEW-CHECKPOINT.md). Historical artifact identities below are unchanged.
+
 # Clear plan development checkpoint — 2026-11-04
 
 Implemented on `codex/kingmaker-buff-planner-clear-plan`, from freshly fetched

@@ -1,0 +1,37 @@
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=e2427480c5584f3da5a36dfab87228d2e8443bf629f3c9c8b5d79a4e98d920e0
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+Protocol tests: PASS=0 FAIL=5
+FAIL clear-plan-view-focus-loss-with-confirmation-open: BuffPlannerUiRoot.OnApplicationFocus: System.Security.SecurityException: ECall methods must be packaged into a system module.
+   at KingmakerBuffPlanner.UI.CastingWorkspaceScreenView.RestoreClearInputOwnership()
+   at KingmakerBuffPlanner.UI.CastingWorkspaceScreenView.Dispose() in /_/src/KingmakerBuffPlanner/UI/CastingWorkspaceScreenView.cs:line 471
+   at KingmakerBuffPlanner.UI.BuffPlannerUiRoot.CloseCastingWorkspace() in /_/src/KingmakerBuffPlanner/UI/BuffPlannerUiRoot.cs:line 2156
+   at KingmakerBuffPlanner.UI.BuffPlannerUiRoot.OnApplicationFocus(Boolean focused) in /_/src/KingmakerBuffPlanner/UI/BuffPlannerUiRoot.cs:line 2924
+The Zone of the assembly that failed was:
+MyComputer
+FAIL clear-plan-view-focus-loss-during-release-wait: BuffPlannerUiRoot.OnApplicationFocus: System.Security.SecurityException: ECall methods must be packaged into a system module.
+   at KingmakerBuffPlanner.UI.CastingWorkspaceScreenView.RestoreClearInputOwnership()
+   at KingmakerBuffPlanner.UI.CastingWorkspaceScreenView.Dispose() in /_/src/KingmakerBuffPlanner/UI/CastingWorkspaceScreenView.cs:line 471
+   at KingmakerBuffPlanner.UI.BuffPlannerUiRoot.CloseCastingWorkspace() in /_/src/KingmakerBuffPlanner/UI/BuffPlannerUiRoot.cs:line 2156
+   at KingmakerBuffPlanner.UI.BuffPlannerUiRoot.OnApplicationFocus(Boolean focused) in /_/src/KingmakerBuffPlanner/UI/BuffPlannerUiRoot.cs:line 2924
+The Zone of the assembly that failed was:
+MyComputer
+FAIL clear-plan-view-description-blocks-enter-and-closing-edge: description allowed underlying Undo/Run activation
+FAIL clear-plan-view-description-blocks-space-and-closing-edge: description allowed underlying Undo/Run activation
+FAIL clear-plan-view-description-blocks-semantic-navigation: description allowed underlying semantic focus to move
+powershell.exe : Development tests failed with exit code 1 (PASS=0 FAIL=5).
+At line:3 char:1
++ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Tes ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Development tes...PASS=0 FAIL=5).:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+At C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\scripts\Test-Development.ps1:41 char:46
++ ... ed -ne 0) { throw "Development tests failed with exit code $testExit  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Development tes...PASS=0 FAIL=5).:String) [], RuntimeException
+    + FullyQualifiedErrorId : Development tests failed with exit code 1 (PASS=0 FAIL=5).

@@ -1,3 +1,5 @@
+> **PR #17 input review:** product 8de9e8e removes the confirmation navigation-restore conflict and suppresses workspace keyboard input through native description closure. Source 47/0, build 1/0, focused 39/0; native acceptance NOT RUN. [Review checkpoint](CLEAR-PLAN-REVIEW-CHECKPOINT.md).
+
 > **Clear plan, 2026-11-04:** current casting workspace now clears all authored routines through one undoable autosaved edit, with a scoped parchment confirmation and keyboard/controller input guards. Product 4aac21c; source 47/0, build 1/0, focused 69/0. Native acceptance NOT RUN. [Checkpoint and evidence](CLEAR-PLAN-CHECKPOINT.md).
 
 > **Current full-controller assignment:** readable workspace, real native card,
