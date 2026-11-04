@@ -128,4 +128,24 @@ After clearing, add a casting and verify normal authoring. Reopen a cleared
 campaign to verify the durable empty plan. Retain captures/input observations
 and exact restoration receipts; leave unresolved native criteria NOT RUN.
 
-Guarded push and draft PR receipt will be recorded after the clean checkpoint.
+## Draft PR and guarded push
+
+Draft [PR #17](https://github.com/howardreith/KingmakerBuffPlanner/pull/17) is open
+against main. The unchanged project-owned helper passed
+`scripts/Test-GuardedPush.ps1`: **6 PASS / 0 FAIL** on clean checkpoint
+`4f9a2de5d79694fb924457942a6ea8be8b9a537d`, then pushed and verified that exact
+branch HEAD. See [helper result](evidence/clear-plan-2026-11-04/guarded-push-test.log).
+The final receipt commit changes documentation/evidence only; it does not change
+the product/test commit or DLL hash above. Merging, version changes and release
+publication remain outside this mission.
+
+The first `powershell.exe -File` helper invocation refused its string-valued
+`-Confirm` switch before execution. A `-Command` invocation pushed the branch,
+but PowerShell's serialized Git informational stderr interrupted its receipt.
+Remote read-only verification found the intended exact HEAD. An ignored local
+PowerShell wrapper then invoked the same unchanged guarded helper with a typed
+`-Confirm:$false`; it completed **Guarded push PASS**, including remote
+verification. No force push or alternative publication path was used.
+
+Next action: review PR #17 and perform the guarded native steps above. Native
+mouse/keyboard/controller and compact-layout acceptance remain NOT RUN.

@@ -9,7 +9,7 @@ Official Windows source 47/0, build 1/0, focused tests 69/0 (new cases 9/0).
 Native mouse/controller/normal+compact visual acceptance **NOT RUN**; the current
 launcher purity/package prerequisites remain a separate guarded boundary.
 [Exact commands, hashes, rejected approaches, evidence and remaining native steps](docs/CLEAR-PLAN-CHECKPOINT.md).
-Next: guarded push/draft PR, then review and the recorded guarded native flow.
+Guarded push tests 6/0; [draft PR #17](https://github.com/howardreith/KingmakerBuffPlanner/pull/17) is open. Next: PR review and the recorded guarded native flow.
 
 ## Stable 0.6.8 published and independently verified - 2026-11-04
 

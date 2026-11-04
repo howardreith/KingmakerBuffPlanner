@@ -1,1 +1,1 @@
-Clear plan checkpoint relative links: PASS=6 FAIL=0
+Clear plan checkpoint relative links: PASS=7 FAIL=0
