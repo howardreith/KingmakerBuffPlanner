@@ -295,7 +295,12 @@ namespace KingmakerBuffPlanner.Execution
                 record => record.Status == CastExecutionStatus.EffectConfirmed);
             bool submitted = report.Records.Any(
                 record => SubmissionEvidence.Contains(record.Status));
-            CastExecutionRecord last = report.Records.LastOrDefault();
+            // Animated records resource use after confirmation. Preserve the
+            // confirmation's effect evidence in the run report instead of
+            // replacing it with the final resource bookkeeping record.
+            CastExecutionRecord last = confirmed
+                ? report.Records.Last(record => record.Status == CastExecutionStatus.EffectConfirmed)
+                : report.Records.LastOrDefault();
             string status = stop != null ? stop.Status.ToString()
                 : last == null ? "NoRecord"
                 : confirmed ? last.Status.ToString() : "NotConfirmed";

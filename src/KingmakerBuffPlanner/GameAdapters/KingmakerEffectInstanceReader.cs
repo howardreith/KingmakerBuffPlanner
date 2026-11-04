@@ -85,6 +85,17 @@ namespace KingmakerBuffPlanner.GameAdapters
             catch (Exception) { return false; }
         }
 
+        internal static string Describe(CastStep step, EffectBaseline before)
+        {
+            if (step == null) return "step-missing";
+            string failure;
+            EffectBaseline after = ReadBaseline(step, out failure);
+            return "before:{" + (before == null ? "unreadable" :
+                before.Describe(step.ExpectedRecipientUnitIds)) + "};after:{" +
+                (after == null ? "unreadable:" + failure :
+                    after.Describe(step.ExpectedRecipientUnitIds)) + "}";
+        }
+
         private static HashSet<string> ExpectedIds(EffectExpression expected)
         {
             return new HashSet<string>(KingmakerAnimatedCastAdapter.ExpectedEffectIds(expected)
@@ -98,10 +109,13 @@ namespace KingmakerBuffPlanner.GameAdapters
             {
                 if (buff == null || buff.Blueprint == null ||
                     !ids.Contains(buff.Blueprint.AssetGuid)) continue;
+                bool suppressionReadable;
+                bool suppressed = Suppressed(buff, out suppressionReadable);
                 instances.Add(new ObservedEffectInstance(
                     string.IsNullOrWhiteSpace(buff.SourceAreaEffectId)
                         ? EffectKind.Buff : EffectKind.AreaBuff,
-                    buff.Blueprint.AssetGuid, Key(buff), buff.EndTime.Ticks, Suppressed(buff)));
+                    buff.Blueprint.AssetGuid, Key(buff), buff.EndTime.Ticks, suppressed,
+                    "suppression-readable=" + suppressionReadable + ":" + ContextDetail(buff)));
             }
             foreach (ItemSlot slot in unit.Descriptor.Body.CurrentEquipmentSlots)
             {
@@ -121,15 +135,35 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         // An unreadable suppression flag counts as suppressed: such an
         // instance never confirms.
-        private static bool Suppressed(Buff buff)
+        private static bool Suppressed(Buff buff, out bool readable)
         {
-            try { return buff.IsSuppressed; }
+            readable = false;
+            try
+            {
+                bool suppressed = buff.IsSuppressed;
+                readable = true;
+                return suppressed;
+            }
             catch (Exception) { return true; }
         }
 
         private static string Key(object instance)
         {
             return RuntimeHelpers.GetHashCode(instance).ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string ContextDetail(Buff buff)
+        {
+            try
+            {
+                var parameters = buff.Context == null ? null : buff.Context.Params;
+                return "stacking=" + buff.Blueprint.Stacking + ":remaining-ticks=" +
+                    buff.TimeLeft.Ticks.ToString(CultureInfo.InvariantCulture) + ":cl=" +
+                    (parameters == null ? "unreadable" : parameters.CasterLevel.ToString(CultureInfo.InvariantCulture)) +
+                    ":metamagic=" + (parameters == null ? "unreadable" :
+                        ((int)parameters.Metamagic).ToString(CultureInfo.InvariantCulture));
+            }
+            catch (Exception) { return "native-context-unreadable"; }
         }
     }
 }

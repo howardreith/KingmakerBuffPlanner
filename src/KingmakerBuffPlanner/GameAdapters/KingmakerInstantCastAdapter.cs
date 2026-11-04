@@ -21,7 +21,8 @@ using KingmakerBuffPlanner.Planning;
 
 namespace KingmakerBuffPlanner.GameAdapters
 {
-    internal sealed class KingmakerInstantCastAdapter : IInstantCastRuntimeAdapter, ICastEnhancementRuntimeAdapter
+    internal sealed class KingmakerInstantCastAdapter : IInstantCastRuntimeAdapter,
+        ICastEnhancementRuntimeAdapter, ICastEffectEvidence
     {
         private readonly Dictionary<CastStep, StickyTouchTransaction> _transactions =
             new Dictionary<CastStep, StickyTouchTransaction>();
@@ -340,6 +341,13 @@ namespace KingmakerBuffPlanner.GameAdapters
             EffectBaseline baseline;
             if (step == null || !_baselines.TryGetValue(step, out baseline)) return false;
             return KingmakerEffectInstanceReader.AppliedByThisAttempt(step, baseline);
+        }
+
+        public string DescribeEffectEvidence(CastStep step)
+        {
+            EffectBaseline baseline;
+            _baselines.TryGetValue(step, out baseline);
+            return KingmakerEffectInstanceReader.Describe(step, baseline);
         }
 
         public InstantCastCompletion InspectCompletion(CastStep step)

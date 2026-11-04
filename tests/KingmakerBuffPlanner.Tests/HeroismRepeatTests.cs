@@ -4,7 +4,9 @@ using System.IO;
 using System.Linq;
 using KingmakerBuffPlanner.Domain.Authoring;
 using KingmakerBuffPlanner.Domain.Effects;
+using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Planning;
+using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
 using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.UI;
@@ -15,12 +17,16 @@ namespace KingmakerBuffPlanner.Tests
     {
         // Simulated native observations, not a reproduction of native Heroism.
         // The session/compiler/gate/converter/executors/coordinator/report are real.
-        private sealed class RepeatBuffWorld : IInstantCastRuntimeAdapter, ICastRuntimeAdapter
+        private sealed class RepeatBuffWorld : IInstantCastRuntimeAdapter, ICastRuntimeAdapter, ICastEffectEvidence
         {
             internal readonly FiniteBuffWorld State = new FiniteBuffWorld();
             internal string Observation = "replace";
             internal long Round;
+            internal int EvidenceReads;
+            internal bool ThrowEvidence;
             private int _instance;
+            private static readonly AbilityKey Sentinel = new AbilityKey("sentinel-spell", null, 0,
+                SourceKind.Spellbook, null);
             private readonly Dictionary<CastStep, EffectBaseline> _baselines =
                 new Dictionary<CastStep, EffectBaseline>();
 
@@ -33,7 +39,8 @@ namespace KingmakerBuffPlanner.Tests
                 return State.Active.TryGetValue(target, out active) && active.Value > Round
                     ? new[] { new ObservedEffectInstance(
                         Observation == "wrong-kind" ? EffectKind.AreaBuff : EffectKind.Buff,
-                        "buff-effect", active.Key, active.Value, Observation == "suppressed") }
+                        target == "unit-t4" ? "sentinel-effect" : "buff-effect",
+                        active.Key, active.Value, Observation == "suppressed") }
                     : new ObservedEffectInstance[0];
             }
 
@@ -63,7 +70,8 @@ namespace KingmakerBuffPlanner.Tests
                 else if (Observation == "refresh")
                     State.Active[target] = new KeyValuePair<string, long>(prior.Key, Round + 100);
                 else if (Observation == "wrong-recipient")
-                    State.Active["unit-t4"] = new KeyValuePair<string, long>("instance-" + (++_instance), Round + 100);
+                    State.Active["unit-sorcerer"] = new KeyValuePair<string, long>("instance-" + (++_instance), Round + 100);
+                else if (Observation == "missing") State.Active.Remove(target);
                 bool succeeded = Observation != "native-failure";
                 return new InstantCastResult(true, succeeded, false, Available(step) < before,
                     true, "simulated-native:" + Observation,
@@ -90,10 +98,22 @@ namespace KingmakerBuffPlanner.Tests
             public InstantCastCompletion Cleanup(CastStep step)
             { return InstantCastCompletion.Settled("simulated-clean"); }
 
+            public string DescribeEffectEvidence(CastStep step)
+            {
+                EvidenceReads++;
+                if (ThrowEvidence) throw new InvalidOperationException("simulated diagnostic failure");
+                EffectBaseline before;
+                _baselines.TryGetValue(step, out before);
+                var after = new EffectBaseline(step.ExpectedRecipientUnitIds.ToDictionary(
+                    id => id, id => Read(id), StringComparer.Ordinal));
+                return "before:{" + before.Describe(step.ExpectedRecipientUnitIds) +
+                    "};after:{" + after.Describe(step.ExpectedRecipientUnitIds) + "}";
+            }
+
             public IAnimatedCastOperation StartAnimated(CastStep step)
             { return new RepeatOperation(this, step, Fire(step)); }
 
-            private sealed class RepeatOperation : IAnimatedCastOperation
+            private sealed class RepeatOperation : IAnimatedCastOperation, ICastEffectEvidence
             {
                 private readonly RepeatBuffWorld _world;
                 private readonly CastStep _step;
@@ -109,6 +129,8 @@ namespace KingmakerBuffPlanner.Tests
                 public string ResourceCountViolation { get { return _result.ResourceCountViolation; } }
                 public bool HasResidualDeliveryState { get { return false; } }
                 public string Detail { get { return _result.Detail; } }
+                public string DescribeEffectEvidence(CastStep step)
+                { return _world.DescribeEffectEvidence(step); }
                 public void Dispose() { }
             }
 
@@ -116,9 +138,30 @@ namespace KingmakerBuffPlanner.Tests
             {
                 CastingWorkspaceInputs current = State.Inputs();
                 var live = LiveEffects(State.Active.Where(pair => pair.Value.Value > Round)
-                    .Select(pair => On(pair.Key, "buff-effect", pair.Value.Value - Round, 1, 0)).ToArray());
-                return new CastingWorkspaceInputs(current.Snapshot, current.ProviderOptions,
-                    current.EffectsBySource, current.Enhancements, null, live);
+                    .Select(pair => On(pair.Key, pair.Key == "unit-t4" ? "sentinel-effect" : "buff-effect",
+                        pair.Value.Value - Round, 1, 0)).ToArray());
+                ProviderSnapshot prepared = current.Snapshot.Providers.Single(value =>
+                    value.Key.CasterUnitId == "unit-wizard");
+                var wizard = new ProviderSnapshot(prepared.Key, "Heroism-like fixture", 2,
+                    prepared.ResourcePoolKey, 1, prepared.EligibleTokenIds, null, 1, 100, "", "10 minutes/level");
+                var sentinel = new ProviderSnapshot(new ProviderKey("unit-sorcerer", "book-sorcerer",
+                    Sentinel, "level-2"), "Sentinel fixture", 2, "pool-unit-sorcerer", 1,
+                    null, null, 1, 100, "", "10 minutes/level");
+                var providers = new[] { wizard, sentinel };
+                var options = providers.Select(provider => new ProviderPlanningOption(provider,
+                    current.Snapshot.Units.Select(unit => unit.UnitId), new[] { provider.Key.CasterUnitId },
+                    10, 100, CastExecutionStrategy.DirectRuleCast, "simulated-direct",
+                    new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)));
+                var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal)
+                {
+                    { "source-bulls", Leaf("buff-effect") },
+                    { "source-sentinel", Leaf("sentinel-effect") }
+                };
+                // Catalogue aliases share the selected ability's expression instance.
+                effects[State.Ability.Canonical] = effects["source-bulls"];
+                effects[Sentinel.Canonical] = effects["source-sentinel"];
+                return new CastingWorkspaceInputs(new PartyProviderSnapshot(current.Snapshot.Units,
+                    providers, current.Snapshot.ResourcePools), options, effects, current.Enhancements, null, live);
             }
 
             internal void Replenish()
@@ -153,7 +196,14 @@ namespace KingmakerBuffPlanner.Tests
                     Assert(AddDraftCasting(Session, inputs, "unit-wizard", "unit-t3").Applied);
                 }
                 // Ordinary supported direct sentinel, from a different native pool.
-                Assert(AddDraftCasting(Session, inputs, "unit-sorcerer", "unit-t4").Applied);
+                Session.SelectBuff("source-sentinel");
+                Session.BuildView(inputs);
+                Session.Draft.SourceId = "source-sentinel";
+                Session.Draft.TargetMode = CastingTargetMode.DirectTarget;
+                Session.ChooseDraftCaster("unit-sorcerer");
+                Session.Draft.DirectTargetUnitId = "unit-t4";
+                Session.Draft.State = CastingAuthoringState.Ready;
+                Assert(Session.AddCastingFromDraft(inputs).Applied);
             }
 
             internal WorkspaceApplyResult Apply(bool recast = false)
@@ -174,10 +224,16 @@ namespace KingmakerBuffPlanner.Tests
             }
         }
 
+        private static void RepeatAssert(bool condition, string message)
+        {
+            if (!condition) throw new InvalidOperationException(message);
+        }
+
         private static void TestHeroismRepeatStateful(string root, string mode)
         {
             var run = new RepeatSession(root, mode, "stateful", true);
-            Assert(run.Apply().Allowed);
+            WorkspaceApplyResult first = run.Apply();
+            RepeatAssert(first.Allowed, "first: " + first.ReviewReason);
             Assert(run.Host.LastReport.Confirmed == 4 && run.Host.LastReport.ResourcesSpent == 4);
             Assert(run.Steps.Take(3).SelectMany(step => step.Reservation.TokenIds).Distinct().Count() == 3);
             Assert(run.World.State.Tokens.Values.All(value => !value) && run.World.State.SpontaneousRemaining == 0);
@@ -185,12 +241,24 @@ namespace KingmakerBuffPlanner.Tests
             WorkspaceApplyResult covered = run.Apply();
             Assert(!covered.Allowed && covered.ReviewReason.StartsWith("nothing-to-cast:", StringComparison.Ordinal));
             Assert(run.Host.StartedRuns == 1 && run.World.State.Fired.Count == 4);
+            // Covered prepared castings must not block a remaining runnable sentinel.
+            run.World.State.Active.Remove("unit-t4");
+            run.World.State.SpontaneousRemaining = 1;
+            WorkspaceApplyResult mixed = run.Apply();
+            RepeatAssert(mixed.Allowed, "mixed: " + mixed.ReviewReason);
+            Assert(run.Host.LastReport.Skipped == 3 && run.Host.LastReport.Confirmed == 1 &&
+                run.Host.LastReport.ResourcesSpent == 1 && run.World.State.Fired.Count == 5);
             // Expiry plus replenishment uses the SAME routine and world.
-            run.World.Round = 101;
+            run.World.Round = 111; // The sentinel was refreshed at round 10 and expires at 110.
             run.World.Replenish();
-            Assert(run.Apply().Allowed);
+            WorkspaceApplyResult expired = run.Apply();
+            RepeatAssert(expired.Allowed, "expired: " + expired.ReviewReason);
             Assert(run.Host.LastReport.Confirmed == 4 && run.Host.LastReport.ResourcesSpent == 4);
-            Assert(run.World.State.Fired.Count == 8 && run.Host.StartedRuns == 2);
+            Assert(run.World.State.Fired.Count == 9 && run.Host.StartedRuns == 3);
+            Assert(run.World.EvidenceReads == 9);
+            Console.WriteLine("[HEROISM-REPEAT-FIXTURE] mode=" + mode +
+                ";fresh=4-confirmed/4-spent;covered-exhausted=no-active-run/0-spent;" +
+                "mixed=3-skipped/1-confirmed/1-spent;expired-replenished=4-confirmed/4-spent");
         }
 
         private static void TestHeroismRepeatObservation(string root, string mode, string observation)
@@ -208,13 +276,50 @@ namespace KingmakerBuffPlanner.Tests
             Assert(report.Failed == (confirmed ? 0 : 1) && report.NotProcessed == (confirmed ? 0 : 1));
             Assert(run.World.State.Fired.Count == (confirmed ? 4 : 3));
             Assert(report.Entries[0].State == (confirmed ? CastingOutcomeState.EffectConfirmed : CastingOutcomeState.Failed));
+            Assert(run.World.EvidenceReads == (confirmed ? 4 : 3));
+            // Presence, kind and readability are observations, not inferred from Fire's success.
+            string before = observation == "unreadable" ? "before:{unit-t1=unreadable" :
+                "before:{unit-t1=[" + (observation == "wrong-kind" ? "AreaBuff" : "Buff") +
+                ":buff-effect#instance-1@end=100";
+            RepeatAssert(report.Entries[0].Detail.Contains(before), "lost terminal evidence: " + report.Entries[0].Detail);
             if (observation == "retain")
             {
                 // Old coverage passes the 50% skip threshold but does not fulfill a 100-round refresh.
                 // It must not be called absent, freshly applied, free, or sufficient to continue.
-                Assert(report.Entries[0].Detail.Contains("expected-application-unconfirmed"));
+                if (!report.Entries[0].Detail.Contains("expected-application-unconfirmed"))
+                    throw new InvalidOperationException("Unchanged old coverage was described as absent: " +
+                        report.Entries[0].Detail);
                 Assert(!report.Entries[0].FreeCast);
             }
+            Console.WriteLine("[HEROISM-REPEAT-FIXTURE] mode=" + mode + ";observation=" + observation +
+                ";confirmed=" + report.Confirmed + ";spent=" + report.ResourcesSpent + ";failed=" +
+                report.Failed + ";unprocessed=" + report.NotProcessed + ";first=" + report.Entries[0].Detail);
+        }
+
+        private static void TestHeroismRepeatManual(string root, string mode)
+        {
+            var run = new RepeatSession(root, mode, "manual");
+            run.World.State.Active["unit-t1"] = new KeyValuePair<string, long>("manual-instance", 100);
+            foreach (string token in run.World.State.Tokens.Keys.ToArray()) run.World.State.Tokens[token] = false;
+            Assert(run.Apply().Allowed);
+            Assert(run.Host.LastReport.Skipped == 1 && run.Host.LastReport.Confirmed == 1 &&
+                run.Host.LastReport.ResourcesSpent == 1 && run.World.State.Fired.Count == 1);
+            run.World.Round = 10;
+            run.World.Replenish();
+            Assert(run.Apply(true).Allowed);
+            Assert(run.Host.LastReport.Confirmed == 2 && run.Host.LastReport.ResourcesSpent == 2);
+            Assert(run.World.State.Fired.Count == 3 && run.World.State.Active["unit-t1"].Key != "manual-instance");
+        }
+
+        private static void TestHeroismRepeatDiagnosticFailure(string root, string mode)
+        {
+            var run = new RepeatSession(root, mode, "diagnostic-failure");
+            run.World.ThrowEvidence = true;
+            Assert(run.Apply().Allowed);
+            Assert(run.Host.LastReport.Confirmed == 2 && run.Host.LastReport.ResourcesSpent == 2 &&
+                run.Host.LastReport.NotProcessed == 0 && run.World.EvidenceReads == 2);
+            Assert(run.Host.LastReport.Entries.All(entry =>
+                entry.Detail.Contains("effect-evidence:unreadable:InvalidOperationException")));
         }
     }
 }

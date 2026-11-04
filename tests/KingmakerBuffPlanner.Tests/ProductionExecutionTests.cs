@@ -29,8 +29,11 @@ namespace KingmakerBuffPlanner.Tests
             {
                 string mode = executionMode;
                 Run("heroism-repeat-stateful-" + mode, () => TestHeroismRepeatStateful(root, mode));
+                Run("heroism-repeat-manual-" + mode, () => TestHeroismRepeatManual(root, mode));
+                Run("heroism-repeat-diagnostic-failure-" + mode,
+                    () => TestHeroismRepeatDiagnosticFailure(root, mode));
                 foreach (string observed in new[] { "replace", "refresh", "retain", "native-failure",
-                    "wrong-recipient", "wrong-kind", "suppressed", "unreadable" })
+                    "wrong-recipient", "wrong-kind", "suppressed", "unreadable", "missing" })
                 {
                     string observation = observed;
                     Run("heroism-repeat-" + observation + "-" + mode,

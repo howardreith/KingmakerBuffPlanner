@@ -170,6 +170,25 @@ namespace KingmakerBuffPlanner.Execution
         IAnimatedCastOperation StartAnimated(CastStep step);
     }
 
+    // Optional, read-only terminal evidence. Executors request it once per
+    // terminal attempt; a diagnostic read must never change the cast verdict.
+    public interface ICastEffectEvidence
+    {
+        string DescribeEffectEvidence(CastStep step);
+    }
+
+    internal static class CastEffectEvidence
+    {
+        internal static string Describe(object source, CastStep step)
+        {
+            var evidence = source as ICastEffectEvidence;
+            if (evidence == null) return string.Empty;
+            try { return ";effect-evidence:" + evidence.DescribeEffectEvidence(step); }
+            catch (Exception exception)
+            { return ";effect-evidence:unreadable:" + exception.GetType().Name; }
+        }
+    }
+
     // R579-2: what a native enhancement lease reports after its cleanup ran:
     // empty when every owned native state was verified restored to its
     // policy-expected value. Reading it AFTER Dispose is the contract.

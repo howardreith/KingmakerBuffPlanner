@@ -487,7 +487,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             internal string Resolution;
         }
 
-        private sealed class KingmakerAnimatedOperation : IAnimatedCastOperation
+        private sealed class KingmakerAnimatedOperation : IAnimatedCastOperation, ICastEffectEvidence
         {
             private readonly UnitCommand _carrierCommand;
             private readonly CastStep _step;
@@ -611,6 +611,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                             !_deliveryCommand.IsFinished);
                 }
             }
+            public string DescribeEffectEvidence(CastStep step)
+            {
+                return KingmakerEffectInstanceReader.Describe(_step, _baseline);
+            }
+
             public string Detail
             {
                 get

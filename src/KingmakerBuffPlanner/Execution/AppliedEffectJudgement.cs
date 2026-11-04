@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Globalization;
 using KingmakerBuffPlanner.Domain.Effects;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Planning;
@@ -14,7 +15,7 @@ namespace KingmakerBuffPlanner.Execution
     public sealed class ObservedEffectInstance
     {
         public ObservedEffectInstance(EffectKind kind, string effectId, string instanceKey,
-            long endTimeTicks, bool suppressed)
+            long endTimeTicks, bool suppressed, string diagnosticContext = null)
         {
             if (string.IsNullOrWhiteSpace(effectId))
                 throw new ArgumentException("Effect ID is required.", "effectId");
@@ -23,6 +24,7 @@ namespace KingmakerBuffPlanner.Execution
             InstanceKey = instanceKey ?? string.Empty;
             EndTimeTicks = endTimeTicks;
             Suppressed = suppressed;
+            DiagnosticContext = diagnosticContext ?? string.Empty;
         }
 
         public EffectKind Kind { get; private set; }
@@ -30,6 +32,8 @@ namespace KingmakerBuffPlanner.Execution
         public string InstanceKey { get; private set; }
         public long EndTimeTicks { get; private set; }
         public bool Suppressed { get; private set; }
+        // Native context is diagnostic only; never proof of application or equivalence.
+        public string DiagnosticContext { get; private set; }
 
         internal string Identity
         {
@@ -59,6 +63,20 @@ namespace KingmakerBuffPlanner.Execution
         {
             instances = null;
             return unitId != null && _byUnit.TryGetValue(unitId, out instances);
+        }
+
+        public string Describe(IEnumerable<string> recipients)
+        {
+            var units = (recipients ?? new string[0]).ToList();
+            return string.Join("|", units.Take(12).Select(id =>
+            {
+                IReadOnlyList<ObservedEffectInstance> instances;
+                if (!TryGet(id, out instances)) return id + "=unreadable";
+                return id + "=[" + string.Join(",", instances.Take(4).Select(value =>
+                    value.Identity + "@end=" + value.EndTimeTicks.ToString(CultureInfo.InvariantCulture) +
+                    ":suppressed=" + value.Suppressed + ":" + value.DiagnosticContext).ToArray()) +
+                    (instances.Count > 4 ? ",truncated" : string.Empty) + "]";
+            }).ToArray()) + (units.Count > 12 ? "|recipients-truncated" : string.Empty);
         }
     }
 

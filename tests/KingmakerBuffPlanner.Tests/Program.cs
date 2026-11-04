@@ -4274,7 +4274,7 @@ namespace KingmakerBuffPlanner.Tests
             if (report.Submitted != 1 || report.CastStarted != 1 || report.Confirmed != 0 ||
                 report.Failed != 1 || !report.Records.Any(record =>
                     record.Status == CastExecutionStatus.TimedOutUnconfirmed &&
-                    record.Detail.Contains("expected-effects-absent")))
+                    record.Detail.Contains("expected-application-unconfirmed")))
                 throw new InvalidOperationException("A submitted cast without its expected fact was counted as success.");
         }
 
