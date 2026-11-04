@@ -1864,11 +1864,14 @@ namespace KingmakerBuffPlanner.UI
                 return new WorkspaceApplyResult(false,
                     "execution-projection-refused:" + projection.Refusal,
                     decision, null, projection);
+            var reporting = new AcceptedRunReporting(projection.ProjectionId,
+                RoutineDisplayName(scope), _runLabels, _runReasons);
             try
             {
                 _submissionInFlight = true;
                 CastingDispatchOutcome dispatch = _dispatch.Submit(
                     plan, decision, scope, projection);
+                if (dispatch.Submitted) _acceptedRunReporting = reporting;
                 return new WorkspaceApplyResult(
                     dispatch.Submitted, dispatch.Submitted
                         ? string.Empty : dispatch.Reason,
@@ -1924,11 +1927,44 @@ namespace KingmakerBuffPlanner.UI
         // Deliberate attempts only. Rendering, discovery and controller handoff
         // never emit. The native writer is supplied at the composition root.
         public Action<IReadOnlyList<string>, bool> RunLog { get; set; }
+        // These dictionaries belong only to the latest admission attempt.
+        // A submitted run owns a separate frozen copy until its terminal.
         private Dictionary<string, string> _runLabels = new Dictionary<string, string>(StringComparer.Ordinal);
         private List<string> _runOrder = new List<string>();
         private Dictionary<string, string> _runReasons = new Dictionary<string, string>(StringComparer.Ordinal);
         private readonly Dictionary<string, ProviderKey> _runProviders = new Dictionary<string, ProviderKey>(StringComparer.Ordinal);
         private readonly HashSet<string> _reportedRuns = new HashSet<string>(StringComparer.Ordinal);
+        private AcceptedRunReporting _acceptedRunReporting;
+
+        private sealed class AcceptedRunReporting
+        {
+            internal readonly string ProjectionId;
+            internal readonly string RoutineName;
+            private readonly Dictionary<string, string> _labels;
+            private readonly Dictionary<string, string> _reasons;
+
+            internal AcceptedRunReporting(string projectionId, string routineName,
+                IDictionary<string, string> labels, IDictionary<string, string> reasons)
+            {
+                ProjectionId = projectionId;
+                RoutineName = routineName;
+                _labels = new Dictionary<string, string>(labels, StringComparer.Ordinal);
+                _reasons = new Dictionary<string, string>(reasons, StringComparer.Ordinal);
+            }
+
+            internal string Label(string id)
+            {
+                string label;
+                return _labels.TryGetValue(id, out label) ? label : id;
+            }
+
+            internal string Reason(string castingId, string code)
+            {
+                string reason;
+                return _reasons.TryGetValue(castingId + "\0" + code, out reason)
+                    ? reason : WorkspaceReasonText.Describe(code);
+            }
+        }
 
         private void SnapshotRunLabels(string scope)
         {
@@ -2016,6 +2052,15 @@ namespace KingmakerBuffPlanner.UI
             if (!_reportedRuns.Add(report.RunId)) return;
             LastRunReport = report;
             LastAttemptMessage = null;
+            AcceptedRunReporting reporting = _acceptedRunReporting;
+            if (reporting != null && reporting.ProjectionId == report.ProjectionId)
+            {
+                _acceptedRunReporting = null;
+                EmitRunLog(CastingRunPresentation.GameLogLines(report,
+                    reporting.RoutineName, reporting.Label, reporting.Reason),
+                    report.Cancelled || report.Halted || report.Failed != 0 || report.Omitted != 0);
+                return;
+            }
             EmitRunLog(CastingRunPresentation.GameLogLines(report,
                 RoutineDisplayName(report.ScopeRoutineId), RunCastingLabel, DescribeRunReason),
                 report.Cancelled || report.Halted || report.Failed != 0 || report.Omitted != 0);

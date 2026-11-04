@@ -30,6 +30,10 @@ namespace KingmakerBuffPlanner.Tests
                 Run("cast-available-evolving-repeat-" + mode, () => TestAvailableRepeat(root, mode));
                 Run("cast-available-partial-unconfirmed-halts-" + mode, () => TestAvailableFailure(root, mode));
                 Run("cast-available-late-shortage-still-halts-" + mode, () => TestAvailableLateShortage(root, mode));
+                Run("cast-available-active-report-control-" + mode,
+                    () => TestAvailableActiveReport(root, mode, false));
+                Run("cast-available-active-report-after-noop-" + mode,
+                    () => TestAvailableActiveReport(root, mode, true));
             }
         }
 
@@ -288,6 +292,49 @@ namespace KingmakerBuffPlanner.Tests
                 logs.Count == 4 && logs[0].Contains("1 unavailable") && logs[0].Contains("1 failed") &&
                 report.Entries[1].Detail.Contains("simulated-late-resource-shortage"),
                 "a late resource shortage was reclassified as a harmless omission or continued");
+        }
+
+        private static void TestAvailableActiveReport(string root, string mode, bool interveningAttempt)
+        {
+            var run = new RepeatSession(root, mode, "active-report-" + interveningAttempt, true);
+            foreach (string token in run.World.State.Tokens.Keys.ToArray()) run.World.State.Tokens[token] = false;
+            run.World.State.Tokens[run.World.State.Primaries.First()] = true;
+            var logs = new List<string>(); run.Session.RunLog = (lines, warning) => logs.AddRange(lines);
+            var started = run.Session.Apply(run.Session.ApplyMode, "long", run.World.Inputs());
+            Expect(started.Allowed && run.Host.IsRunning && logs.Count == 0, "partial Long did not start quietly");
+            string[] expected = started.GateDecision.Omissions.Select(omission =>
+                "Not cast: " + run.Session.RunCastingLabel(omission.CastingId) +
+                " — not enough prepared uses; earlier planned castings have first claim on this pool.").ToArray();
+            int frames = 0;
+            while (run.World.State.Fired.Count == 0 && run.Host.IsRunning && frames++ < 100) run.Host.Pump();
+            Expect(run.Host.IsRunning && run.World.State.Fired.Count == 1 &&
+                run.World.State.Tokens.Values.All(available => !available), "first resource spend was not observed");
+            // Reopening/refreshing uses the actual workspace read model. The
+            // subsequent direct Apply is the mouse planner's Run boundary.
+            run.Session.BuildGraph(run.World.Inputs());
+            if (interveningAttempt)
+            {
+                run.Session.SelectRoutine("short");
+                run.Session.BuildGraph(run.World.Inputs());
+                var empty = run.Session.Apply(run.Session.ApplyMode, "short", run.World.Inputs());
+                Expect(!empty.Allowed && empty.ReviewReason == "nothing-to-cast:0" &&
+                    logs.Count == 1 && logs[0].Contains("Short") && logs[0].Contains("nothing configured to cast") &&
+                    run.Host.StartedRuns == 1 && run.Host.ActiveScopeRoutineId == "long",
+                    "empty Short did not log exactly one independent no-op");
+                run.Session.BuildGraph(run.World.Inputs());
+            }
+            frames = 0;
+            while (run.Host.IsRunning && frames++ < 100) run.Host.Pump();
+            Expect(!run.Host.IsRunning && run.Host.LastReport.Confirmed == 2 && run.Host.LastReport.Omitted == 2 &&
+                run.Host.LastReport.ResourcesSpent == 2 && run.World.State.Fired.Count == 2,
+                "intervening attempt changed Long's cast subset or spending");
+            string[] actual = logs.Where(line => line.StartsWith("Not cast:", StringComparison.Ordinal)).ToArray();
+            Expect(actual.SequenceEqual(expected), "active run's admission identity/reasons changed: " +
+                string.Join(" | ", actual));
+            Expect(logs.Count == (interveningAttempt ? 4 : 3) && logs.Count(line => line.Contains("2 cast, 2 unavailable")) == 1,
+                "Long's terminal report was missing or duplicated");
+            run.Session.RecordRunReport(run.Host.LastReport);
+            Expect(logs.Count == (interveningAttempt ? 4 : 3), "completion replay duplicated Long's report");
         }
 
         private static void TestAvailablePreparedCause(string root)
