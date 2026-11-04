@@ -17,6 +17,7 @@ namespace KingmakerBuffPlanner.UI
         private bool _clearPriorInteractable, _clearPriorNavigation;
         private EventSystem _clearEvents;
         private bool _clearRestoreToUndo;
+        private readonly WorkspaceKeyboardInput _workspaceKeyboardInput = new WorkspaceKeyboardInput();
         internal bool ClearPlanOpen { get { return _clearOverlay != null; } }
         internal bool ClearPlanBlocksBackground { get { return _clearInput.BlocksBackground; } }
         internal bool ClearPlanAllowsCommand(ControllerWorkspaceCommand command) { return _clearInput.AllowsCommand(command); }
@@ -146,10 +147,16 @@ namespace KingmakerBuffPlanner.UI
 
         private void RestoreClearInputOwnership()
         {
-            if (_clearBackground != null) _clearBackground.interactable = _clearPriorInteractable;
+            if (_clearBackground != null) RestoreClearBackground();
             _clearBackground = null;
             if (_clearEvents != null) _clearEvents.sendNavigationEvents = _clearPriorNavigation;
             _clearEvents = null;
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private void RestoreClearBackground()
+        {
+            _clearBackground.interactable = _clearPriorInteractable;
         }
 
         private void TickClearPlan()
@@ -188,19 +195,19 @@ namespace KingmakerBuffPlanner.UI
             if (_disposed || _controllerAuthoring || _clearInput.BlocksBackground || _controllerNavigation == null) return;
             TMP_InputField field = EventSystem.current == null || EventSystem.current.currentSelectedGameObject == null ? null :
                 EventSystem.current.currentSelectedGameObject.GetComponent<TMP_InputField>();
-            bool tab = Input.GetKeyDown(KeyCode.Tab);
+            bool tab = _workspaceKeyboardInput.KeyDown(KeyCode.Tab);
             if (field != null && field.isFocused)
             {
                 if (!tab) return;
                 field.DeactivateInputField();
             }
-            if (tab) _controllerNavigation.CycleKeyboardFocus(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ? -1 : 1);
+            if (tab) _controllerNavigation.CycleKeyboardFocus(_workspaceKeyboardInput.KeyHeld(KeyCode.LeftShift) || _workspaceKeyboardInput.KeyHeld(KeyCode.RightShift) ? -1 : 1);
             if (!_controllerNavigation.KeyboardFocusActive) return;
-            if (Input.GetKeyDown(KeyCode.LeftArrow)) _controllerNavigation.Execute(ControllerWorkspaceCommand.Left);
-            if (Input.GetKeyDown(KeyCode.RightArrow)) _controllerNavigation.Execute(ControllerWorkspaceCommand.Right);
-            if (Input.GetKeyDown(KeyCode.UpArrow)) _controllerNavigation.Execute(ControllerWorkspaceCommand.Up);
-            if (Input.GetKeyDown(KeyCode.DownArrow)) _controllerNavigation.Execute(ControllerWorkspaceCommand.Down);
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (_workspaceKeyboardInput.KeyDown(KeyCode.LeftArrow)) _controllerNavigation.Execute(ControllerWorkspaceCommand.Left);
+            if (_workspaceKeyboardInput.KeyDown(KeyCode.RightArrow)) _controllerNavigation.Execute(ControllerWorkspaceCommand.Right);
+            if (_workspaceKeyboardInput.KeyDown(KeyCode.UpArrow)) _controllerNavigation.Execute(ControllerWorkspaceCommand.Up);
+            if (_workspaceKeyboardInput.KeyDown(KeyCode.DownArrow)) _controllerNavigation.Execute(ControllerWorkspaceCommand.Down);
+            if (_workspaceKeyboardInput.KeyDown(KeyCode.Return) || _workspaceKeyboardInput.KeyDown(KeyCode.KeypadEnter) || _workspaceKeyboardInput.KeyDown(KeyCode.Space))
                 _controllerNavigation.Execute(ControllerWorkspaceCommand.Confirm);
         }
     }

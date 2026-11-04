@@ -27,6 +27,8 @@ namespace KingmakerBuffPlanner.UI
         private readonly Transform _root;
         private readonly ControllerWorkspaceFocus _focus = new ControllerWorkspaceFocus();
         private readonly Dictionary<string, RectTransform> _rects = new Dictionary<string, RectTransform>();
+        private readonly Action _refreshLayout, _rebuild;
+        private readonly Action<bool> _drawFocus;
         private readonly Vector3[] _corners = new Vector3[4];
         private RectTransform _outline;
         private ScrollRect _readingScroll;
@@ -49,6 +51,7 @@ namespace KingmakerBuffPlanner.UI
         internal ControllerWorkspaceNavigator(CastingWorkspaceScreenView workspace, PlannerNativeKit kit, bool keyboardPresentation = false)
         {
             _keyboardPresentation = keyboardPresentation;
+            _refreshLayout = RefreshLayout; _rebuild = Rebuild; _drawFocus = DrawFocus;
             _workspace = workspace; _kit = kit; _root = workspace.RootObject.transform;
             _hint = kit.Text(_root, "ControllerHints", "", PlannerTextRole.Body, 18, TextAlignmentOptions.MidlineLeft);
             KingmakerUiFactory.SetAnchors(_hint.rectTransform, 0, 0, 1, 0, 28, 28, 0, 0);
@@ -117,7 +120,7 @@ namespace KingmakerBuffPlanner.UI
             if (items.Count == 0) return;
             int index = items.FindIndex(i => i.Key == _focus.Key);
             _focus.Restore(items[(index + items.Count + direction) % items.Count].Key);
-            DrawFocus(true);
+            _drawFocus(true);
         }
         internal bool KeyboardFocusActive { get { return _keyboardFocusActive; } }
         internal void BeforeRebuild()
@@ -290,7 +293,7 @@ namespace KingmakerBuffPlanner.UI
                 if (!_workspace.ControllerBlockingOverlayOpen) _workspace.ControllerCycleRoutine(command == ControllerWorkspaceCommand.PreviousRoutine ? -1 : 1);
                 return;
             }
-            RefreshLayout();
+            _refreshLayout();
             if (command == ControllerWorkspaceCommand.Up || command == ControllerWorkspaceCommand.Down ||
                 command == ControllerWorkspaceCommand.Left || command == ControllerWorkspaceCommand.Right)
             { _readingScroll = null; _focus.Move(command); }
@@ -299,7 +302,7 @@ namespace KingmakerBuffPlanner.UI
                 string unavailable = _focus.Confirm();
                 if (_focus.ReadingScrollKey != null) return;
                 if (unavailable != null) ShowText("Unavailable", unavailable);
-                Rebuild(); return;
+                _rebuild(); return;
             }
             if (command == ControllerWorkspaceCommand.Inspect)
             {
@@ -310,8 +313,16 @@ namespace KingmakerBuffPlanner.UI
             }
             if (command == ControllerWorkspaceCommand.ScrollUp || command == ControllerWorkspaceCommand.ScrollDown)
             {
+                ScrollWorkspace(command == ControllerWorkspaceCommand.ScrollUp ? -1 : 1);
+                return;
+            }
+            _drawFocus(true);
+        }
+
+        private void ScrollWorkspace(int direction)
+        {
                 ScrollRect scroll = _workspace.ControllerResourcesOpen ? _workspace.ControllerResourcesScroll : FocusedScroll();
-                Scroll(scroll, command == ControllerWorkspaceCommand.ScrollUp ? -1 : 1);
+                Scroll(scroll, direction);
                 RefreshLayout();
                 string scrollKey = scroll == null ? null : Path(scroll.transform, _root);
                 bool visible = scrollKey != null && _focus.KeepVisible(scrollKey);
@@ -321,9 +332,6 @@ namespace KingmakerBuffPlanner.UI
                 _readingScroll = visible ? null : scroll;
                 if (_readingScroll != null) DrawPaneFocus(_readingScroll);
                 else DrawFocus(false);
-                return;
-            }
-            DrawFocus(true);
         }
 
         private ScrollRect FocusedScroll()

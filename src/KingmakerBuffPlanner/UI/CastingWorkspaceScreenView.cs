@@ -474,9 +474,15 @@ namespace KingmakerBuffPlanner.UI
             if (_description != null) _description.Dispose();
             if (_controllerNavigation != null) _controllerNavigation.Dispose();
             _description = null;
-            if (_root != null) { _root.gameObject.SetActive(false); UnityEngine.Object.Destroy(_root.gameObject); }
+            if (_root != null) DestroyRoot();
             if (_controllerAuthoring && _kit != null) _kit.Dispose();
             _root = null;
+        }
+
+        private void DestroyRoot()
+        {
+            _root.gameObject.SetActive(false);
+            UnityEngine.Object.Destroy(_root.gameObject);
         }
 
         // Escape leaves the focused casting (its inspector) first; returns

@@ -241,8 +241,7 @@ namespace KingmakerBuffPlanner.UI
                     {
                 if (current)
                 {
-                    if (Cursor.lockState == CursorLockMode.None) Cursor.lockState = _cursorLock;
-                    if (Cursor.visible) Cursor.visible = _cursorVisible;
+                    RestoreCursor();
                 }
                     }
                     finally { ReleaseOwnedMode(current); }
@@ -286,6 +285,12 @@ namespace KingmakerBuffPlanner.UI
                                 GamePad.HasInstance && ReferenceEquals(GamePad.Instance.CurrentInputLayer, below));
                     }
                 }
+        }
+
+        private void RestoreCursor()
+        {
+            if (Cursor.lockState == CursorLockMode.None) Cursor.lockState = _cursorLock;
+            if (Cursor.visible) Cursor.visible = _cursorVisible;
         }
     }
 }
