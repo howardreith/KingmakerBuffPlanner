@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.8 - 2026-11-04 - duplicate item sources and stale casting repair
+
+- Exposes every genuinely available identical item copy and capable owner under
+  one buff entry. Multiple copies on one caster require an exact choice and
+  retain their independent charge pools and execution bindings.
+- Keeps stale Item and legacy free-Fact selections visibly unresolved. The
+  unresolved inspector offers a numbered Remove action near the top; changing
+  casting focus resets scroll while same-casting refresh preserves position.
+  Exact removal, autosave, Undo and recipient ambiguity protection are retained.
+- Keeps canonical catalogue identity separate from each ability's own discovered
+  expression, preserving probe and qualification selection across equivalent
+  spell forms and distinct spells without weakening foreign-reference refusal.
+- Owner-authorized pre-runtime release. This exact release has not been run in
+  the game; native rendering, physical input and gameplay spending are unverified.
+
 ## 0.5.3 - 2026-10-15 - Mr. Bard branding and MIT license
 
 - Owner-authorized stable release. Unity Mod Manager now shows the mod as
