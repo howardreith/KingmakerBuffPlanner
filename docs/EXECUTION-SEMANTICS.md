@@ -1,6 +1,6 @@
 # Execution Semantics
 
-## Cast available default (unreleased)
+## Cast available default (0.6.10)
 
 Ordinary Run resolves the profile's availability policy. The default is
 `cast-available` / `ReadyCastsOnly`: fresh compilation and the existing atomic

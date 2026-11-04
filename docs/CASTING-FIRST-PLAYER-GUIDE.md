@@ -279,7 +279,7 @@ earlier look for that part.
 - Every route uses the same checks: the latest saved plan, the party as it
   is at that moment, and every casting re-checked before it is cast.
   Nothing runs on a stale plan and no routine needs an acceptance step.
-- **Unavailable castings (upcoming update).** **Cast available** is the default:
+- **Unavailable castings (0.6.10).** **Cast available** is the default:
   run the affordable castings in your authored order, and explain every uncast
   entry in the normal game log. Your exact caster, source, targets, enhancements
   and assignments stay saved for later. Nothing substitutes another source or
@@ -315,7 +315,7 @@ earlier look for that part.
 - **Stopping.** Press the running routine's HUD button again: the cast in
   progress finishes and nothing after it starts. Changing area, disabling
   the mod or closing the game stop a run at once.
-- **Results (upcoming update).** A started run logs its terminal summary once,
+- **Results (0.6.10).** A started run logs its terminal summary once,
   followed by visible named lines for every uncast entry, including its caster,
   recipient/group and reason. A no-op or refusal logs once even if the planner
   is already open. Availability refusals never force the planner open or steal

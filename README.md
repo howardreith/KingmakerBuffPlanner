@@ -1,5 +1,12 @@
 # Mr. Bard's Kingmaker Buff Planner
 
+**Release: [0.6.10](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.10).**
+Routines cast available buffs by default and explain every uncast entry in the
+normal game log. **Require full plan** is an unchecked execution-footer opt-in.
+Upgrading old profiles resets this policy once; strict users must enable it once.
+This owner-authorized release has not been run in the game. See the
+[release notes](docs/RELEASE-NOTES-0.6.10.md) for migration and verification limits.
+
 **Release: [0.6.9](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.9).**
 This owner-authorized update adds undoable Clear plan confirmation and clearer
 casting diagnostics, preserving actual native spending evidence alongside effect
@@ -112,7 +119,7 @@ HUD that never run in combat. See the
 [player guide](docs/CASTING-FIRST-PLAYER-GUIDE.md). 0.5.2 keeps the approved
 native window and HUD while adding continuous assignment, explicit one-shot
 editing, readable Resources accounting, responsiveness instrumentation and
-ordinary-cased Run labels. The unreleased branch defaults to **Cast available**,
+ordinary-cased Run labels. 0.6.10 defaults to **Cast available**,
 with **Require full plan** as an unchecked execution-footer checkbox. It logs
 every uncast entry without forcing the planner open. Upgrading old profiles
 resets this policy once; strict users must re-enable it once because old files
@@ -121,7 +128,7 @@ did not distinguish a deliberate choice from the old default. See the
 
 Mr. Bard's Kingmaker Buff Planner is a standalone Unity Mod Manager mod built
 against **Windows Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b**. The
-0.6.9 retains the native Linux 2.1.5d version gate but has not passed a
+0.6.10 retains the native Linux 2.1.5d version gate but has not passed a
 native Linux trial.
 
 It plans and applies party buffs while preserving Kingmaker targeting,
@@ -131,7 +138,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.6.9.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.6.10.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including
