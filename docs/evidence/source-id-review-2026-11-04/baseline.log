@@ -1,0 +1,24 @@
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-DUPLICATE-ITEMS-PR\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=d69a5b916e15e4c3b68d536066dc7366f29582267c62ffd504510c173a4abae3
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-DUPLICATE-ITEMS-PR\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-DUPLICATE-ITEMS-PR\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+Protocol tests: PASS=0 FAIL=2
+FAIL shared-recipes-catalogue-nonrepresentative-spell-selects-through-driver: Catalogue -> shared-spell selector -> qualification authoring failed: violations=author:graph-source-row-missing:unit-arcanist|0c21cfcab6ce4395bd4df330ab3cf715|0|shape-spell||0||level-4 | forecast-incomplete | share-preview:caster:unread:resource=6;activatables=3;on=unrelated-toggle>none | share-intent-not-persisted:unread failures=author:graph-source-row-missing:unit-arcanist|0c21cfcab6ce4395bd4df330ab3cf715|0|shape-spell||0||level-4 terminal=failed:author
+FAIL probe-source-id-preserves-legacy-alias-and-raw-fallback: A published canonical entry must take priority over legacy aliases.
+powershell.exe : Development tests failed with exit code 1 (PASS=0 FAIL=2).
+At line:2 char:91
++ ... | Out-Null; powershell.exe -NoProfile -ExecutionPolicy Bypass -File s ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Development tes...PASS=0 FAIL=2).:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+At C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\private\worktrees\KBP-DUPLICATE-ITEMS-PR\scripts\Test-Devel
+opment.ps1:41 char:46
++ ... ed -ne 0) { throw "Development tests failed with exit code $testExit  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Development tes...PASS=0 FAIL=2).:String) [], RuntimeException
+    + FullyQualifiedErrorId : Development tests failed with exit code 1 (PASS=0 FAIL=2).
+ 

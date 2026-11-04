@@ -86,3 +86,8 @@ available copies/owners and their independent budgets; perform actual spending
 only through the guarded run-bound casting allowance workflow. No native gate
 is weakened and no full-suite, layout, compatibility or release campaign is
 selected by this PR preparation.
+
+
+## PR #16 review correction - 2026-11-04
+
+Source-ID producers now prefer published canonical catalogue membership while retaining legacy fallback. Reproduced 0/2; official Windows gate on 8ff524d passed source 47/0, build 1/0 and tests 149/0. Historical counts above retain their original provenance. Native rendering/input/gameplay remain NOT RUN. [Current review checkpoint and evidence](SOURCE-ID-REVIEW-CHECKPOINT.md).

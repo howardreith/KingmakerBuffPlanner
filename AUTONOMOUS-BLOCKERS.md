@@ -1,3 +1,16 @@
+## PR #16 source-ID compatibility correction - 2026-11-04
+
+Branch `codex/kingmaker-buff-planner-duplicate-items-stale-castings-pr`;
+tested product/test commit `8ff524d81c79fc393a6082338497a70fd6b82244`,
+version unchanged at 0.6.7. Reproduced review regression: 0 PASS / 2 FAIL.
+The shared probe source-ID helper now prefers a published canonical catalogue
+identity and retains legacy aliases/raw fallback without a normalized entry.
+Real catalogue -> shared selector -> selection-only driver regression passes.
+Official Windows gate: source 47/0, build 1/0, focused tests 149/0.
+Native rendering, physical input/scrolling and live spending remain NOT RUN.
+Exact commands, hashes, evidence, limitations and next review/native actions:
+[source-ID correction checkpoint](docs/SOURCE-ID-REVIEW-CHECKPOINT.md).
+
 ## Duplicate-item PR preparation - 2026-11-04
 
 Current-main PR branch `codex/kingmaker-buff-planner-duplicate-items-stale-castings-pr`,

@@ -955,3 +955,8 @@ original failures, publication and next action](RELEASE-0.6.7-RECORD.md).
 ## Duplicate-item development checkpoint - 2026-11-04
 
 Canonical catalogue membership preserves every exact available item copy and its expression/pool. Stale nonspell inspection remains unresolved; numbered top removal and focus-change scroll reset preserve exact deletion/Undo semantics. Official Windows focused tests 127/0; native rendering, mouse/controller and live spending NOT RUN. [Current evidence and exact next native checks](ITEM-SOURCE-PR-CHECKPOINT.md).
+
+
+## PR #16 review correction - 2026-11-04
+
+Source-ID producers now prefer published canonical catalogue membership while retaining legacy fallback. Reproduced 0/2; official Windows gate on 8ff524d passed source 47/0, build 1/0 and tests 149/0. Historical counts above retain their original provenance. Native rendering/input/gameplay remain NOT RUN. [Current review checkpoint and evidence](SOURCE-ID-REVIEW-CHECKPOINT.md).

@@ -1,0 +1,18 @@
+[
+    {
+        "path":  "artifacts/build/Release/KingmakerBuffPlanner.dll",
+        "sha256":  "e68918aa9fb8a9cc1b0b117b149962f9b305dae9b34a763e533f51a2c96c69c8"
+    },
+    {
+        "path":  "artifacts/tests/KingmakerBuffPlanner.Tests.exe",
+        "sha256":  "526c114081caae1142518782680afab4a9d24e12a5cb468e711331c2b03b3213"
+    },
+    {
+        "path":  "src/KingmakerBuffPlanner/Execution/SingleCastProbe.cs",
+        "sha256":  "fe8e74ff22dad4cf3a5f3ebeb33b4e01e0aa9acd9f35c6331f279f7120e7d266"
+    },
+    {
+        "path":  "tests/KingmakerBuffPlanner.Tests/ShareQualificationDriverTests.cs",
+        "sha256":  "6caad146dcca9630bc98e3abc5ed746c153ab5a1edb77fd85f586df80bbcc0b1"
+    }
+]

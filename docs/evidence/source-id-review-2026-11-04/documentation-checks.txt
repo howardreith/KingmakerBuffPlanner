@@ -1,0 +1,1 @@
+Current checkpoint links: PASS=11 FAIL=0; nonzero selectors: PASS=61 FAIL=0
