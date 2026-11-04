@@ -640,6 +640,8 @@ namespace KingmakerBuffPlanner.UI
             double displaySnapshotMilliseconds = ElapsedMilliseconds(stageStarted);
             stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             CastingGraphView view = _session.BuildGraph(inputs);
+            bool inspectorFocusChanged = !string.Equals(_lastView == null ? null
+                : _lastView.FocusedCastingId, view.FocusedCastingId, StringComparison.Ordinal);
             double calculationMilliseconds = ElapsedMilliseconds(stageStarted);
             stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             _session.PresentForReview(inputs);
@@ -673,7 +675,14 @@ namespace KingmakerBuffPlanner.UI
             Canvas.ForceUpdateCanvases();
             if (_controllerAuthoring && _refreshSequence <= 2) PlannerWorkspaceTextProbe.Sample(_root, "after-layout", _log);
             if (CatalogueScroll() != null) CatalogueScroll().verticalNormalizedPosition = cataloguePosition;
-            if (_inspectorScroll != null) _inspectorScroll.verticalNormalizedPosition = inspectorPosition;
+            if (_inspectorScroll != null)
+            {
+                // A newly selected casting starts with its identity and
+                // actions visible. Refreshing that same casting keeps the
+                // player's reading position.
+                if (inspectorFocusChanged) _inspectorScroll.StopMovement();
+                _inspectorScroll.verticalNormalizedPosition = inspectorFocusChanged ? 1f : inspectorPosition;
+            }
             RevealPendingProblem();
             double layoutMilliseconds = ElapsedMilliseconds(stageStarted);
             _log("[KBP-WORKSPACE-PERF] sequence=" + sequence + ";cause=" + cause +
@@ -2601,8 +2610,10 @@ namespace KingmakerBuffPlanner.UI
         // Native UI finish (UI-05), editing one casting, in the owner's
         // order: Done; caster -> recipient and the source; the one outcome
         // line; Recast if active; Enhancements; the resource summary; then,
-        // set apart, Remove casting. Order stays available compactly; the
-        // routine reassignment section is gone (routines are chosen above).
+        // set apart, Remove casting. An unresolved source offers removal at
+        // the top, where a stale duplicate can be removed without hunting
+        // through its unavailable options. Order stays available compactly;
+        // routines are chosen above.
         private void RebuildCastingInspector(CastingGraphView view, CastingGraphInspector inspector)
         {
             _inspectorTitle.text = "Casting options";
@@ -2610,6 +2621,7 @@ namespace KingmakerBuffPlanner.UI
             bool problem = problems.Active && string.Equals(problems.Current.CastingId,
                 inspector.CastingId, StringComparison.Ordinal);
             CastingGraphCasting chip = inspector.Chip;
+            bool unresolvedSource = chip != null && string.IsNullOrEmpty(chip.SourceProviderKey);
             if (problem)
             {
                 Line("ProblemPosition", inspector.RoutineName + " · Problem " + problems.Position +
@@ -2621,6 +2633,8 @@ namespace KingmakerBuffPlanner.UI
             Line("Headline", RelationLine(view, inspector), PlannerTextRole.Strong, 18f, null);
             string source = SourceCaption(view, chip);
             if (source.Length != 0) Line("Source", source, PlannerTextRole.Secondary, 15f, null);
+            if (unresolvedSource)
+                ActionButton("Remove", "Remove casting " + chip.OrderLabel, RemoveCastingCommand);
             RectTransform change = Row("ExplicitChange", 32f);
             RowButton(change, "ChangeRecipient",
                 _session.GraphEditIntent == CastingGraphEditIntent.ChangeRecipient
@@ -2774,14 +2788,19 @@ namespace KingmakerBuffPlanner.UI
             if (inspector.Casting.State == CastingAuthoringState.Disabled)
                 Line("LegacyDisabled", "Disabled in an earlier version: it is not cast and blocks nothing. " +
                     "Remove it if you no longer want it.", PlannerTextRole.Small, 14f, null);
-            // 7. Set apart: removal.
-            Divider();
-            ActionButton("Remove", "Remove casting", () =>
+            // 7. Set apart: removal (unresolved sources offered it above).
+            if (!unresolvedSource)
             {
-                AuthoringEditResult result = _session.RemoveFocusedCasting();
-                if (!result.Applied) Surface(result, "remove");
-                else Feedback("Casting removed (Undo restores it).");
-            });
+                Divider();
+                ActionButton("Remove", "Remove casting", RemoveCastingCommand);
+            }
+        }
+
+        private void RemoveCastingCommand()
+        {
+            AuthoringEditResult result = _session.RemoveFocusedCasting();
+            if (!result.Applied) Surface(result, "remove");
+            else Feedback("Casting removed (Undo restores it).");
         }
 
         // "Linzi » Hedwirg" (the native face has no arrow glyph), or the

@@ -1072,14 +1072,13 @@ namespace KingmakerBuffPlanner.UI
         private static List<ProviderPlanningOption> SourceOptionsFor(CastingWorkspaceInputs inputs,
             string sourceId, string casterUnitId)
         {
-            EffectExpression expression;
             if (inputs == null || inputs.ProviderOptions == null || inputs.EffectsBySource == null ||
                 string.IsNullOrEmpty(sourceId) || string.IsNullOrEmpty(casterUnitId) ||
-                !inputs.EffectsBySource.TryGetValue(sourceId, out expression))
+                !inputs.EffectsBySource.ContainsKey(sourceId))
                 return new List<ProviderPlanningOption>();
             return inputs.ProviderOptions.Where(option => option != null && option.Provider != null &&
                     string.Equals(option.Provider.Key.CasterUnitId, casterUnitId, StringComparison.Ordinal) &&
-                    OptionServesExpression(inputs, option, expression))
+                    OptionServesSource(inputs, option, sourceId))
                 .OrderBy(option => option.Provider.SourceBookName, StringComparer.InvariantCultureIgnoreCase)
                 .ThenBy(option => option.Provider.SpellLevel)
                 .ThenBy(option => option.Provider.Key.Canonical, StringComparer.Ordinal)
