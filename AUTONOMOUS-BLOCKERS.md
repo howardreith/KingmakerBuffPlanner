@@ -1,3 +1,14 @@
+## Published 0.6.9: native verification remains open — 2026-11-04
+
+Stable Latest `v0.6.9` is published from frozen product
+`c206b78aa36255d569cd90cf574ec20c8c4eaaa6` using the owner-authorized pre-runtime
+route. Complete offline 653/0, deterministic build 3/0 and public asset identity
+checks passed. Native Heroism/UI/input and Linux acceptance remain NOT RUN;
+publication does not close the player report. Next: executable Heroism plus
+distinct sentinel recipe, freeze, completed guarded selection, bound allowance,
+then guarded native casts with existing protections.
+[Release identity, commands, evidence and limits](docs/RELEASE-0.6.9-RECORD.md).
+
 ## Heroism gameplay repair remains unverified — 2026-11-04
 
 At review-corrected `e1e35c9edbc6fe853a5e45dde66aa5cf05c1e523` on

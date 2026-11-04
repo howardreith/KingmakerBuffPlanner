@@ -1,3 +1,18 @@
+## Owner-authorized stable 0.6.9 release — 2026-11-04
+
+Merged base `07c31f2da0092d965e1e1649f807849b0a1f7b25`; preparation branch
+`codex/kingmaker-buff-planner-release-0.6.9`; version commit
+`11dc48aa1f7276dacf95198ace99a06b3d36a087`; final product
+`c206b78aa36255d569cd90cf574ec20c8c4eaaa6`, version 0.6.9.
+First publisher stopped at 652/1 on the cleanup-detail source-contract assertion;
+kept it intact and appended diagnostics separately. Focused correction 29/0;
+final complete offline 653/0, source 47/0, gate 8/0, guarded push 6/0,
+deterministic build 3/0 and packages 6/0. Stable Latest v0.6.9 published
+18:10:06 UTC; downloaded ZIP/digest/checksum/DLL/version/tag verified.
+Native Heroism and UI acceptance NOT RUN; player report remains open. Next:
+guarded recipe/selection preparation if native work is selected.
+[Commands, durations, hashes, evidence and limits](docs/RELEASE-0.6.9-RECORD.md).
+
 ## PR #18 reporting review correction — 2026-11-04
 
 Branch `codex/kingmaker-buff-planner-heroism-repeat-cast`; reviewed HEAD

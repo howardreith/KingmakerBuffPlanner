@@ -1,3 +1,16 @@
+## Stable 0.6.9 published and verified — 2026-11-04
+
+Owner-requested version increment/release completed after merged PR #18.
+Frozen main/product `c206b78aa36255d569cd90cf574ec20c8c4eaaa6`; stable Latest
+`v0.6.9`, published 18:10:06 UTC. Complete official offline C# suite 653/0,
+source 47/0, publisher gate 8/0, guarded push 6/0, deterministic build 3/0,
+package 6/0 and independently downloaded package 6/0. ZIP, API digest,
+checksum, DLL, UMM version and annotated tag agree. Native acceptance NOT RUN;
+the Heroism gameplay report remains open. No installation or saves changed.
+Next native work begins with the executable Heroism/sentinel recipe, followed
+by frozen-build selection evidence, a bound allowance and guarded casting.
+[Exact source, hashes, initial gate failure, commands and release receipt](docs/RELEASE-0.6.9-RECORD.md).
+
 ## PR #18 reporting review correction — 2026-11-04
 
 Branch `codex/kingmaker-buff-planner-heroism-repeat-cast`; reviewed HEAD
