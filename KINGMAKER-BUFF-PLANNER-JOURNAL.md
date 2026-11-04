@@ -1,3 +1,43 @@
+## PR #16 exact ability-expression correction - 2026-11-04
+
+Branch `codex/kingmaker-buff-planner-duplicate-items-stale-castings-pr`,
+tested product/test commit `d904c1e2974fe908806ab0be8938d819971ac42c`, version 0.6.7.
+Keep canonical catalogue IDs for authoring; validate/project the selected
+ability's own discovered graph, with explicit legacy fallback only if absent.
+Real scanner/catalogue/compiler/gate/probe and qualification regressions
+reproduced 0/2; official Windows gate now passes source 47/0, build 1/0,
+tests 151/0 plus converter/projection neighbors 6/0. Foreign references still
+refuse. Baseline log whitespace normalized with original bytes/hash preserved.
+Native rendering, physical input/scrolling and gameplay spending NOT RUN.
+Exact evidence, hashes, limitations and next action: [current correction
+checkpoint](docs/ABILITY-EXPRESSION-REVIEW-CHECKPOINT.md).
+
+## PR #16 source-ID compatibility correction - 2026-11-04
+
+Branch `codex/kingmaker-buff-planner-duplicate-items-stale-castings-pr`;
+tested product/test commit `8ff524d81c79fc393a6082338497a70fd6b82244`,
+version unchanged at 0.6.7. Reproduced review regression: 0 PASS / 2 FAIL.
+The shared probe source-ID helper now prefers a published canonical catalogue
+identity and retains legacy aliases/raw fallback without a normalized entry.
+Real catalogue -> shared selector -> selection-only driver regression passes.
+Official Windows gate: source 47/0, build 1/0, focused tests 149/0.
+Native rendering, physical input/scrolling and live spending remain NOT RUN.
+Exact commands, hashes, evidence, limitations and next review/native actions:
+[source-ID correction checkpoint](docs/SOURCE-ID-REVIEW-CHECKPOINT.md).
+
+## Duplicate-item PR preparation - 2026-11-04
+
+Current-main PR branch `codex/kingmaker-buff-planner-duplicate-items-stale-castings-pr`,
+base `76c030511f6d44bda5acb82f90fbe0167b4d060c`, tested product/test commit
+`e1f8c916613b4d015d8022b1195f403d9498307d`, unchanged version 0.6.7.
+Official Windows gate: source 47/0, build 1/0, focused tests 127/0.
+Duplicate item choices and stale inspectors are repaired; native rendering,
+mouse/controller interaction and gameplay spending remain NOT RUN.
+Next action: PR review, then the guarded native checks and prerequisites in
+[the current checkpoint](docs/ITEM-SOURCE-PR-CHECKPOINT.md).
+Earlier b8237a4-based development work and evidence remain on their original
+local branch; this current-main PR preserves newer controller/resource changes.
+
 # Kingmaker Buff Planner Journal
 
 ## 2026-10-20 — 0.6.6 stable publication

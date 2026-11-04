@@ -20,6 +20,9 @@ namespace KingmakerBuffPlanner.UI
     // boundaries, not substitutes for planner business services.
     public sealed class CastingWorkspaceInputs
     {
+        private readonly Dictionary<string, string> _catalogSourceByAbility =
+            new Dictionary<string, string>(StringComparer.Ordinal);
+
         public CastingWorkspaceInputs(
             PartyProviderSnapshot snapshot,
             IEnumerable<ProviderPlanningOption> providerOptions,
@@ -40,6 +43,21 @@ namespace KingmakerBuffPlanner.UI
                 .Where(value => value != null).ToList();
             EffectsBySource = effectsBySource ??
                 throw new ArgumentNullException("effectsBySource");
+            // Catalogue membership is semantic, while each provider keeps
+            // its own expression and exact item identity. Discovery scans
+            // identical item copies separately, so their expression objects
+            // need not be the representative catalogue expression instance.
+            foreach (ProviderPlanningOption option in ProviderOptions)
+            {
+                AbilityKey ability = option.Provider == null ? null : option.Provider.Key.Ability;
+                if (ability == null || _catalogSourceByAbility.ContainsKey(ability.Canonical)) continue;
+                EffectExpression expression;
+                string sourceId = EffectsBySource.TryGetValue(ability.Canonical, out expression)
+                    ? CatalogSourceIdentity.For(ability, expression) : null;
+                _catalogSourceByAbility.Add(ability.Canonical,
+                    sourceId != null && sourceId != ability.Canonical && EffectsBySource.ContainsKey(sourceId)
+                        ? sourceId : null);
+            }
             Enhancements = (enhancements ?? new CastEnhancementSnapshot[0])
                 .Where(value => value != null).ToList();
             TargetingModifiers = (targetingModifiers ?? new ICastingTargetingModifier[0])
@@ -49,6 +67,14 @@ namespace KingmakerBuffPlanner.UI
         public PartyProviderSnapshot Snapshot { get; private set; }
         public IReadOnlyList<ProviderPlanningOption> ProviderOptions { get; private set; }
         public IReadOnlyDictionary<string, EffectExpression> EffectsBySource { get; private set; }
+        internal string CatalogSourceFor(AbilityKey ability)
+        {
+            string sourceId;
+            return ability != null && _catalogSourceByAbility.TryGetValue(ability.Canonical, out sourceId)
+                ? sourceId : null;
+        }
+
+        internal bool IsAbilityKey(string key) { return _catalogSourceByAbility.ContainsKey(key); }
         public IReadOnlyList<CastEnhancementSnapshot> Enhancements { get; private set; }
         public IReadOnlyList<ICastingTargetingModifier> TargetingModifiers
         { get; private set; }
@@ -1271,18 +1297,8 @@ namespace KingmakerBuffPlanner.UI
                 foreach (ProviderPlanningOption option in inputs.ProviderOptions)
                 {
                     if (option == null || option.Provider == null) continue;
-                    AbilityKey ability = option.Provider.Key.Ability;
-                    EffectExpression abilityExpression = null;
-                    if (ability != null && inputs.EffectsBySource.TryGetValue(
-                            ability.Canonical, out abilityExpression))
-                    {
-                        foreach (KeyValuePair<string, EffectExpression> pair in
-                            inputs.EffectsBySource)
-                            if (!string.Equals(pair.Key, ability.Canonical,
-                                    StringComparison.Ordinal) &&
-                                ReferenceEquals(pair.Value, abilityExpression))
-                                sourceIds.Add(pair.Key);
-                    }
+                    foreach (string sourceId in SourceIdsForAbility(inputs, option.Provider.Key.Ability))
+                        sourceIds.Add(sourceId);
                 }
                 var descriptors = new List<WorkspaceSourceDescriptor>();
                 var displays = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -1302,8 +1318,7 @@ namespace KingmakerBuffPlanner.UI
                         ? inputs.ProviderOptions
                             .Where(value => value != null &&
                                 value.Provider != null &&
-                                OptionServesExpression(inputs, value,
-                                    labelExpression))
+                                OptionServesSource(inputs, value, sourceId))
                             .Select(value => value.Provider.SourceDisplayName)
                             .FirstOrDefault(name =>
                                 !string.IsNullOrWhiteSpace(name))
@@ -1312,7 +1327,7 @@ namespace KingmakerBuffPlanner.UI
                         ? new List<ProviderPlanningOption>()
                         : inputs.ProviderOptions.Where(value => value != null &&
                             value.Provider != null &&
-                            OptionServesExpression(inputs, value, labelExpression))
+                            OptionServesSource(inputs, value, sourceId))
                             .ToList();
                     displays[sourceId] = display;
                     kinds[sourceId] = serving
@@ -1464,16 +1479,14 @@ namespace KingmakerBuffPlanner.UI
             if (inputs.ProviderOptions == null ||
                 inputs.EffectsBySource == null ||
                 string.IsNullOrEmpty(draftCaster)) return null;
-            EffectExpression sourceExpression;
-            if (!inputs.EffectsBySource.TryGetValue(
-                    draftSource, out sourceExpression)) return null;
+            if (string.IsNullOrEmpty(draftSource) || !inputs.EffectsBySource.ContainsKey(draftSource)) return null;
             ProviderPlanningOption match = null;
             foreach (ProviderPlanningOption option in inputs.ProviderOptions)
             {
                 if (option == null || option.Provider == null ||
                     !string.Equals(option.Provider.Key.CasterUnitId,
                         draftCaster, StringComparison.Ordinal) ||
-                    !OptionServesExpression(inputs, option, sourceExpression))
+                    !OptionServesSource(inputs, option, draftSource))
                     continue;
                 candidateCount++;
                 if (match == null ||
@@ -1494,7 +1507,7 @@ namespace KingmakerBuffPlanner.UI
             int candidates;
             ProviderPlanningOption fallback = FindDraftOption(
                 inputs, record.SourceId, record.CasterUnitId, out candidates);
-            if (candidates <= 1 || record.Ability == null) return fallback;
+            if (record.Ability == null) return fallback;
             ProviderPlanningOption exact = inputs.ProviderOptions.FirstOrDefault(option =>
                 option != null && option.Provider != null &&
                 string.Equals(option.Provider.Key.CasterUnitId, record.CasterUnitId,
@@ -1503,7 +1516,12 @@ namespace KingmakerBuffPlanner.UI
                     StringComparison.Ordinal) &&
                 (record.SpellbookGuid == null || string.Equals(option.Provider.Key.SpellbookGuid,
                     record.SpellbookGuid, StringComparison.Ordinal)));
-            return exact ?? fallback;
+            // A saved fact/item selection names its exact source. A replacement
+            // may be offered for explicit reselection, but must not appear
+            // to be the unresolved casting's current source in its inspector.
+            // This also keeps legacy free-Fact item records visibly unresolved.
+            if (record.Ability.SourceKind != SourceKind.Spellbook) return exact;
+            return candidates <= 1 ? fallback : exact ?? fallback;
         }
 
         // Final review B2/B3: every exact provider that can cast the given
@@ -1515,16 +1533,15 @@ namespace KingmakerBuffPlanner.UI
             string selectedSpellbook)
         {
             var choices = new List<WorkspaceProviderChoice>();
-            EffectExpression expression;
             if (inputs == null || inputs.ProviderOptions == null || inputs.EffectsBySource == null ||
                 string.IsNullOrEmpty(sourceId) ||
-                !inputs.EffectsBySource.TryGetValue(sourceId, out expression))
+                !inputs.EffectsBySource.ContainsKey(sourceId))
                 return choices;
             List<ProviderPlanningOption> options = inputs.ProviderOptions
                 .Where(value => value != null && value.Provider != null &&
                     (onlyCaster == null || string.Equals(value.Provider.Key.CasterUnitId,
                         onlyCaster, StringComparison.Ordinal)) &&
-                    OptionServesExpression(inputs, value, expression))
+                    OptionServesSource(inputs, value, sourceId))
                 .OrderBy(value => UnitDisplayName(inputs, value.Provider.Key.CasterUnitId),
                     StringComparer.InvariantCultureIgnoreCase)
                 .ThenBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal)
@@ -1577,27 +1594,50 @@ namespace KingmakerBuffPlanner.UI
         private static ProviderPlanningOption FindProviderOption(CastingWorkspaceInputs inputs,
             string sourceId, string providerKey)
         {
-            EffectExpression expression;
             if (inputs == null || inputs.ProviderOptions == null || inputs.EffectsBySource == null ||
                 string.IsNullOrEmpty(sourceId) || string.IsNullOrEmpty(providerKey) ||
-                !inputs.EffectsBySource.TryGetValue(sourceId, out expression))
+                !inputs.EffectsBySource.ContainsKey(sourceId))
                 return null;
             return inputs.ProviderOptions.FirstOrDefault(option => option != null &&
                 option.Provider != null && string.Equals(option.Provider.Key.Canonical,
                     providerKey, StringComparison.Ordinal) &&
-                OptionServesExpression(inputs, option, expression));
+                OptionServesSource(inputs, option, sourceId));
         }
 
-        private static bool OptionServesExpression(
+        private static bool OptionServesSource(
             CastingWorkspaceInputs inputs,
             ProviderPlanningOption option,
-            EffectExpression sourceExpression)
+            string sourceId)
         {
+            AbilityKey ability = option.Provider.Key.Ability;
+            string catalogSource = inputs.CatalogSourceFor(ability);
+            if (catalogSource != null)
+                return string.Equals(catalogSource, sourceId, StringComparison.Ordinal);
+            // Older callers can supply explicit aliases without a normalized
+            // catalogue ID. Retain that contract, but never treat another
+            // provider's raw ability key as a catalogue alias.
+            EffectExpression sourceExpression;
             EffectExpression abilityExpression;
-            return option.Provider.Key.Ability != null &&
-                inputs.EffectsBySource.TryGetValue(
-                    option.Provider.Key.Ability.Canonical, out abilityExpression) &&
+            return ability != null && (!inputs.IsAbilityKey(sourceId) || sourceId == ability.Canonical) &&
+                inputs.EffectsBySource.TryGetValue(sourceId, out sourceExpression) &&
+                inputs.EffectsBySource.TryGetValue(ability.Canonical, out abilityExpression) &&
                 ReferenceEquals(abilityExpression, sourceExpression);
+        }
+
+        private static IEnumerable<string> SourceIdsForAbility(CastingWorkspaceInputs inputs, AbilityKey ability)
+        {
+            string catalogSource = inputs.CatalogSourceFor(ability);
+            if (catalogSource != null)
+            {
+                yield return catalogSource;
+                yield break;
+            }
+            EffectExpression expression;
+            if (ability == null || !inputs.EffectsBySource.TryGetValue(ability.Canonical, out expression))
+                yield break;
+            foreach (KeyValuePair<string, EffectExpression> pair in inputs.EffectsBySource)
+                if (!inputs.IsAbilityKey(pair.Key) && ReferenceEquals(pair.Value, expression))
+                    yield return pair.Key;
         }
 
         // ------------------------------------------------------------------
@@ -2718,50 +2758,28 @@ namespace KingmakerBuffPlanner.UI
                 .Where(value => value != null && value.Provider != null)
                 .OrderBy(value => value.Provider.Key.Canonical, StringComparer.Ordinal)
                 .First();
-            AbilityKey ability = firstOption.Provider.Key.Ability;
-            EffectExpression abilityExpression;
-            if (ability == null ||
-                !inputs.EffectsBySource.TryGetValue(
-                    ability.Canonical, out abilityExpression))
-                return string.Empty;
-            foreach (KeyValuePair<string, EffectExpression> pair in
-                inputs.EffectsBySource.OrderBy(
-                    value => value.Key, StringComparer.Ordinal))
-                if (!string.Equals(pair.Key, ability.Canonical,
-                        StringComparison.Ordinal) &&
-                    ReferenceEquals(pair.Value, abilityExpression))
-                    return pair.Key;
-            return string.Empty;
+            return SourceIdsForAbility(inputs, firstOption.Provider.Key.Ability)
+                .OrderBy(value => value, StringComparer.Ordinal).FirstOrDefault() ?? string.Empty;
         }
 
         // Eligible casters for a source derive from the DISCOVERED provider
         // options, so a fresh buff shows its casters before anything is
-        // authored (review C1). The source/ability linkage uses the same
-        // alias-instance contract the legacy catalogue model establishes
-        // (PlannerSetupModel aliases effects[sourceId] = effects[ability]):
-        // a provider serves a source when its ability's expression IS the
-        // source's expression instance. Plan-derived readiness stays
-        // separate and untouched.
+        // authored (review C1). Every exact provider in the catalogue source
+        // is eligible, including independently scanned identical item copies.
+        // Plan-derived readiness stays separate and untouched.
         private static HashSet<string> CapableCasterUnitIdsForSource(
             CastingWorkspaceInputs inputs, string selectedSource)
         {
             var capable = new HashSet<string>(StringComparer.Ordinal);
-            EffectExpression sourceExpression;
             if (inputs == null || inputs.ProviderOptions == null ||
                 inputs.EffectsBySource == null ||
                 string.IsNullOrEmpty(selectedSource) ||
-                !inputs.EffectsBySource.TryGetValue(
-                    selectedSource, out sourceExpression))
+                !inputs.EffectsBySource.ContainsKey(selectedSource))
                 return capable;
             foreach (ProviderPlanningOption option in inputs.ProviderOptions)
             {
                 if (option == null || option.Provider == null) continue;
-                AbilityKey ability = option.Provider.Key.Ability;
-                EffectExpression abilityExpression;
-                if (ability == null ||
-                    !inputs.EffectsBySource.TryGetValue(
-                        ability.Canonical, out abilityExpression) ||
-                    !ReferenceEquals(abilityExpression, sourceExpression)) continue;
+                if (!OptionServesSource(inputs, option, selectedSource)) continue;
                 capable.Add(option.Provider.Key.CasterUnitId);
             }
             return capable;

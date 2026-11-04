@@ -950,3 +950,18 @@ and observed spending when an effect reader fails; five previously failing
 qualification cases and their affected neighbors pass 19/0. The mission mirror
 is synchronized. Native acceptance remains NOT_RUN. [Exact commands, hashes,
 original failures, publication and next action](RELEASE-0.6.7-RECORD.md).
+
+
+## Duplicate-item development checkpoint - 2026-11-04
+
+Canonical catalogue membership preserves every exact available item copy and its expression/pool. Stale nonspell inspection remains unresolved; numbered top removal and focus-change scroll reset preserve exact deletion/Undo semantics. Official Windows focused tests 127/0; native rendering, mouse/controller and live spending NOT RUN. [Current evidence and exact next native checks](ITEM-SOURCE-PR-CHECKPOINT.md).
+
+
+## PR #16 review correction - 2026-11-04
+
+Source-ID producers now prefer published canonical catalogue membership while retaining legacy fallback. Reproduced 0/2; official Windows gate on 8ff524d passed source 47/0, build 1/0 and tests 149/0. Historical counts above retain their original provenance. Native rendering/input/gameplay remain NOT RUN. [Current review checkpoint and evidence](SOURCE-ID-REVIEW-CHECKPOINT.md).
+
+
+## Selected ability expression review correction - 2026-11-04
+
+Canonical source identity is retained for authoring while exact discovered ability expressions drive structural checks/projection. Reproduction 0/2; Windows gate on d904c1e passes 151/0 plus converter neighbors 6/0. Foreign references still refuse; native acceptance remains NOT RUN. Full-PR baseline-log whitespace was corrected while preserving original bytes in the new evidence. [Current correction evidence and next action](ABILITY-EXPRESSION-REVIEW-CHECKPOINT.md).

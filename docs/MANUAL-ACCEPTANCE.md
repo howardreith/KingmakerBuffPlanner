@@ -875,3 +875,8 @@ for the pending limited-use acceptance rows. Product commit
 [Release checks, hashes, source-selection limitations and trial scope](RELEASE-0.6.7-RECORD.md).
 Offline release qualification does not replace the guarded native safety/purity
 prerequisite or authorize changes to baseline/other saves.
+
+
+## Duplicate-item development checkpoint - 2026-11-04
+
+Canonical catalogue membership preserves every exact available item copy and its expression/pool. Stale nonspell inspection remains unresolved; numbered top removal and focus-change scroll reset preserve exact deletion/Undo semantics. Official Windows focused tests 127/0; native rendering, mouse/controller and live spending NOT RUN. [Current evidence and exact next native checks](ITEM-SOURCE-PR-CHECKPOINT.md).

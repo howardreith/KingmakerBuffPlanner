@@ -589,3 +589,8 @@ item ID. The existing compiler/ledger/gate budget these pools without a new
 resource subsystem. Final source-object/count validation is shared by both
 submission routes. Outcome evidence separates forecast, Spend invocation,
 observed resource use, effects and validated success. [Contract and limits](LIMITED-USE-REPAIR-CHECKPOINT.md).
+
+
+## Duplicate-item development checkpoint - 2026-11-04
+
+Canonical catalogue membership preserves every exact available item copy and its expression/pool. Stale nonspell inspection remains unresolved; numbered top removal and focus-change scroll reset preserve exact deletion/Undo semantics. Official Windows focused tests 127/0; native rendering, mouse/controller and live spending NOT RUN. [Current evidence and exact next native checks](ITEM-SOURCE-PR-CHECKPOINT.md).

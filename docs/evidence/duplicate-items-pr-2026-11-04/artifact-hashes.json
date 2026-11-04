@@ -1,0 +1,10 @@
+[
+    {
+        "path":  "artifacts/build/Release/KingmakerBuffPlanner.dll",
+        "sha256":  "a6ca7fb8a2d0d04b603ae7d5a30f67a582a7b6f7f75beaed545d78b2e58c0256"
+    },
+    {
+        "path":  "artifacts/tests/KingmakerBuffPlanner.Tests.exe",
+        "sha256":  "692602e3cf9e0211bd1c504367adf43961d9412152396051eab170fc7054cd40"
+    }
+]

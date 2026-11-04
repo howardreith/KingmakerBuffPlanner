@@ -164,9 +164,8 @@ namespace KingmakerBuffPlanner.Planning
                     .Where(line => line.Category == CastingCostCategory.Material).ToList();
                 if (materials.Count > 1)
                     return ExplicitStepConversion.Refuse("material-cost-count:" + castingId);
-                EffectExpression expected = null;
-                if (effectsBySource != null)
-                    effectsBySource.TryGetValue(casting.SourceId, out expected);
+                EffectExpression expected = DiscoveredEffectLookup.ForAbility(
+                    effectsBySource, casting.Ability, casting.SourceId);
                 if (expected == null)
                     return ExplicitStepConversion.Refuse("expected-effects-missing:" + castingId);
                 if (scope == ExplicitProjectionScope.SingleCastProbe)

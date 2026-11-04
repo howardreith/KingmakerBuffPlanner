@@ -449,10 +449,10 @@ namespace KingmakerBuffPlanner.Execution
                     if (sourceId == null)
                     { reject(provider.Key.Canonical + "|effect-shape:no-source"); continue; }
                     if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(
-                            inputs.EffectsBySource[sourceId], provider.Key.Ability))
+                            DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, provider.Key.Ability, sourceId), provider.Key.Ability))
                     { reject(provider.Key.Canonical + "|effect-shape:" +
                         CastingCapabilityInventory.Structure(
-                            inputs.EffectsBySource[sourceId])); continue; }
+                            DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, provider.Key.Ability, sourceId))); continue; }
                     // The shared spell's own native source: a verified free
                     // pool, or a finite spellbook pool (a spontaneous level
                     // or prepared slots) with a cast available now; the
@@ -472,7 +472,7 @@ namespace KingmakerBuffPlanner.Execution
                         ? provider.Key.Ability.BaseAbilityGuid
                         : provider.Key.Ability.VariantGuid;
                     // A legal ally without the effect.
-                    EffectExpression expected = inputs.EffectsBySource[sourceId];
+                    EffectExpression expected = DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, provider.Key.Ability, sourceId);
                     string ally = targetable
                         .Where(unitId => !string.Equals(unitId, caster, StringComparison.Ordinal) &&
                             !EffectActive(inputs.LiveEffects, unitId, expected))
@@ -492,7 +492,7 @@ namespace KingmakerBuffPlanner.Execution
                         string candidateSource = SingleCastProbeSelector.SourceIdFor(
                             inputs.EffectsBySource, candidate.Provider.Key.Ability);
                         if (candidateSource == null) continue;
-                        EffectExpression candidateEffect = inputs.EffectsBySource[candidateSource];
+                        EffectExpression candidateEffect = DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, candidate.Provider.Key.Ability, candidateSource);
                         var witnessReach = new HashSet<string>(candidate.ReachableTargetIds ??
                             new string[0], StringComparer.Ordinal);
                         string plainTarget = targetable
@@ -597,9 +597,9 @@ namespace KingmakerBuffPlanner.Execution
                 else if (sourceId == null)
                     reject(provider.Key.Canonical + "|witness:effect-shape:no-source");
                 else if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(
-                        inputs.EffectsBySource[sourceId], ability))
+                        DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, ability, sourceId), ability))
                     reject(provider.Key.Canonical + "|witness:effect-shape:" +
-                        CastingCapabilityInventory.Structure(inputs.EffectsBySource[sourceId]));
+                        CastingCapabilityInventory.Structure(DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, ability, sourceId)));
                 else if (!pools.TryGetValue(provider.ResourcePoolKey, out pool))
                     reject(provider.Key.Canonical + "|witness:pool-unknown");
                 else if (pool.Kind == ResourcePoolKind.Unlimited)
@@ -646,9 +646,9 @@ namespace KingmakerBuffPlanner.Execution
                 else if (sourceId == null)
                     reject(provider.Key.Canonical + "|effect-shape:no-source");
                 else if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(
-                        inputs.EffectsBySource[sourceId], ability))
+                        DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, ability, sourceId), ability))
                     reject(provider.Key.Canonical + "|effect-shape:" +
-                        CastingCapabilityInventory.Structure(inputs.EffectsBySource[sourceId]));
+                        CastingCapabilityInventory.Structure(DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, ability, sourceId)));
                 else
                     eligible.Add(option);
             }
@@ -698,7 +698,7 @@ namespace KingmakerBuffPlanner.Execution
                 ProviderPlanningOption second = byCaster[1];
                 AbilityKey ability = first.Provider.Key.Ability;
                 string sourceId = SingleCastProbeSelector.SourceIdFor(inputs.EffectsBySource, ability);
-                EffectExpression expected = inputs.EffectsBySource[sourceId];
+                EffectExpression expected = DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, ability, sourceId);
                 List<string> targets = RecipientsPerCasting(inputs, targetable, expected,
                     new[] { first, second, first });
                 if (targets.Count < 2) { reject(group.Key + "|fewer-than-two-fresh-recipients"); continue; }
@@ -769,9 +769,9 @@ namespace KingmakerBuffPlanner.Execution
                 else if (sourceId == null)
                     reject(provider.Key.Canonical + "|effect-shape:no-source");
                 else if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(
-                        inputs.EffectsBySource[sourceId], ability))
+                        DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, ability, sourceId), ability))
                     reject(provider.Key.Canonical + "|effect-shape:" +
-                        CastingCapabilityInventory.Structure(inputs.EffectsBySource[sourceId]));
+                        CastingCapabilityInventory.Structure(DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, ability, sourceId)));
                 else
                     eligible.Add(new KeyValuePair<string, ProviderPlanningOption>(sourceId, option));
             }
@@ -782,7 +782,6 @@ namespace KingmakerBuffPlanner.Execution
             {
                 considered++;
                 string sourceId = group.Key;
-                EffectExpression expected = inputs.EffectsBySource[sourceId];
                 // Per caster: the option (canonical order) with the most
                 // casts available, up to two.
                 List<KeyValuePair<ProviderPlanningOption, int>> byCaster = group
@@ -811,6 +810,8 @@ namespace KingmakerBuffPlanner.Execution
                         second = other.Key;
                     }
                 if (first == null) { reject(sourceId + "|no-caster-pair-with-casts:2+1"); continue; }
+                EffectExpression expected = DiscoveredEffectLookup.ForAbility(
+                    inputs.EffectsBySource, first.Provider.Key.Ability, sourceId);
                 List<string> targets = RecipientsPerCasting(inputs, targetable, expected,
                     new[] { first, second });
                 if (targets.Count < 2) { reject(sourceId + "|fewer-than-two-fresh-recipients"); continue; }
@@ -939,7 +940,7 @@ namespace KingmakerBuffPlanner.Execution
                 else if (CastsAvailable(inputs, provider, 1) < 1)
                     reject(provider.Key.Canonical + "|no-cast");
                 else
-                    sources.Add(new GroupSource(option, sourceId, inputs.EffectsBySource[sourceId]));
+                    sources.Add(new GroupSource(option, sourceId, DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, ability, sourceId)));
             }
             var casters = new HashSet<string>(sources.Select(value => value.Caster), StringComparer.Ordinal);
             int considered = 0;
@@ -1121,7 +1122,7 @@ namespace KingmakerBuffPlanner.Execution
                     if (!pools.TryGetValue(provider.ResourcePoolKey, out pool))
                     { reject(key + "|pool-unread"); continue; }
                     if (sourceId == null) { reject(key + "|no-source"); continue; }
-                    EffectExpression expected = inputs.EffectsBySource[sourceId];
+                    EffectExpression expected = DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, ability, sourceId);
                     if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(expected, ability))
                     {
                         reject(key + "|effect-shape:" + CastingCapabilityInventory.Structure(expected));
@@ -1212,7 +1213,7 @@ namespace KingmakerBuffPlanner.Execution
                 if (option.ExecutionStrategy != CastExecutionStrategy.DirectRuleCast)
                 { reject(key + "|strategy:" + option.ExecutionStrategy); continue; }
                 if (sourceId == null) { reject(key + "|no-source"); continue; }
-                EffectExpression expected = inputs.EffectsBySource[sourceId];
+                EffectExpression expected = DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, ability, sourceId);
                 if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(expected, ability))
                 {
                     reject(key + "|effect-shape:" + CastingCapabilityInventory.Structure(expected));
@@ -1308,7 +1309,7 @@ namespace KingmakerBuffPlanner.Execution
                 { reject(key + "|not-finite-spellbook-pool"); continue; }
                 string sourceId = SingleCastProbeSelector.SourceIdFor(inputs.EffectsBySource, ability);
                 if (sourceId == null) { reject(key + "|effect-shape:no-source"); continue; }
-                EffectExpression expected = inputs.EffectsBySource[sourceId];
+                EffectExpression expected = DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, ability, sourceId);
                 string shape = StickyTouchShapeRefusal(expected);
                 if (shape != null)
                 {
@@ -1540,7 +1541,7 @@ namespace KingmakerBuffPlanner.Execution
                     if (!pools.TryGetValue(provider.ResourcePoolKey, out pool))
                     { reject(key + "|pool-unread"); continue; }
                     if (sourceId == null) { reject(key + "|no-source"); continue; }
-                    EffectExpression expected = inputs.EffectsBySource[sourceId];
+                    EffectExpression expected = DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, ability, sourceId);
                     if (!ExplicitCastingStepConverter.IsPlainCurrentTargetBuff(expected, ability))
                     {
                         reject(key + "|effect-shape:" + CastingCapabilityInventory.Structure(expected));
@@ -1825,7 +1826,7 @@ namespace KingmakerBuffPlanner.Execution
                     Project(Use, BuildDocument(campaignId, selection.Castings), inputs, inputs.LiveEffects)
                 });
             CastingPlanDocument document = BuildDocument(campaignId, selection.Castings);
-            EffectExpression expected = inputs.EffectsBySource[selection.SourceId];
+            EffectExpression expected = DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, selection.Castings[0].Ability, selection.SourceId);
             PlannedCasting firstCasting = selection.Castings[0];
             // Each casting grants the effect at ITS provider's caster level
             // and with ITS metamagic, as the real instance will carry them.
@@ -1909,7 +1910,7 @@ namespace KingmakerBuffPlanner.Execution
                     .Concat(selection.Castings.Skip(1))
                 : selection.Castings;
             steps.Add(Project(secondName, BuildDocument(campaignId, second), afterPrime,
-                WithGranted(afterPrime, inputs.EffectsBySource[direct.SourceId], new[]
+                WithGranted(afterPrime, DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, direct.Ability, direct.SourceId), new[]
                 {
                     new EffectGrant(direct.DirectTargetUnitId,
                         provider == null ? 0 : provider.EffectiveCasterLevel, direct.Ability.MetamagicMask)
@@ -1929,8 +1930,8 @@ namespace KingmakerBuffPlanner.Execution
         {
             PlannedCasting shared = selection.Castings[0];
             PlannedCasting witness = selection.Castings[1];
-            EffectExpression sharedEffect = inputs.EffectsBySource[shared.SourceId];
-            EffectExpression witnessEffect = inputs.EffectsBySource[witness.SourceId];
+            EffectExpression sharedEffect = DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, shared.Ability, shared.SourceId);
+            EffectExpression witnessEffect = DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource, witness.Ability, witness.SourceId);
             ProviderSnapshot sharedProvider = inputs.Snapshot.Providers.First(value =>
                 value.Key.CasterUnitId == shared.CasterUnitId &&
                 value.Key.Ability.Canonical == shared.Ability.Canonical);
