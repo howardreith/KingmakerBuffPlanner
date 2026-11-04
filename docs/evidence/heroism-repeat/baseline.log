@@ -1,0 +1,22 @@
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=da88dd4da0a0085e105a356523869e34e4ba360e2762f9b24cb0cd04dc03dc9b
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+Protocol tests: PASS=16 FAIL=2
+FAIL heroism-repeat-retain-instant: fixture assertion failed
+FAIL heroism-repeat-retain-animated: fixture assertion failed
+powershell.exe : Development tests failed with exit code 1 (PASS=16 FAIL=2).
+At line:2 char:1
++ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test- ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Development tes...ASS=16 FAIL=2).:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+At C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner\scripts\Test-Development.ps1:41 char:46
++ ... ed -ne 0) { throw "Development tests failed with exit code $testExit  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Development tes...ASS=16 FAIL=2).:String) [], RuntimeException
+    + FullyQualifiedErrorId : Development tests failed with exit code 1 (PASS=16 FAIL=2).

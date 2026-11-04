@@ -161,27 +161,29 @@ namespace KingmakerBuffPlanner.Execution
                             {
                                 operationSucceeded = operation.Succeeded;
                                 bool effectsObserved = operation.EffectsObserved;
+                                string terminalDetail = operation.Detail +
+                                    CastEffectEvidence.Describe(operation, step);
                                 if (effectsObserved)
                                     report.Add(index, step, CastExecutionStatus.EffectObserved,
-                                        "expected-effects-observed;" + operation.Detail);
+                                        "expected-effects-observed;" + terminalDetail);
                                 if (operation.TimedOut)
                                     report.Add(index, step,
                                         CastExecutionStatus.TimedOutUnconfirmed,
-                                        operation.Detail);
+                                        terminalDetail);
                                 else if (!operationSucceeded)
                                     report.Add(index, step,
                                         CastExecutionStatus.FailedExecution,
-                                        operation.Detail);
+                                        terminalDetail);
                                 else if (effectsObserved)
                                     report.Add(index, step,
                                         CastExecutionStatus.EffectConfirmed,
                                         "expected-effects-observed;" +
-                                        operation.Detail);
+                                        terminalDetail);
                                 else
                                     report.Add(index, step,
                                         CastExecutionStatus.TimedOutUnconfirmed,
-                                        "expected-effects-absent;" +
-                                        operation.Detail);
+                                        "expected-application-unconfirmed;" +
+                                        terminalDetail);
                             }
                             finally
                             {

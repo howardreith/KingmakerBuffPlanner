@@ -193,7 +193,8 @@ namespace KingmakerBuffPlanner.Execution
                                         ";transaction-state:" +
                                         completion.Detail +
                                         ";cleanup-complete:" + cleanup.Complete +
-                                        ";cleanup-state:" + cleanup.Detail;
+                                        ";cleanup-state:" + cleanup.Detail +
+                                        CastEffectEvidence.Describe(_runtime, step);
                                     if (observed)
                                         report.Add(index, step, CastExecutionStatus.EffectObserved,
                                             "expected-effects-observed");
@@ -213,7 +214,7 @@ namespace KingmakerBuffPlanner.Execution
                                                 : CastExecutionStatus.TimedOutUnconfirmed,
                                             (observed
                                                 ? "expected-effects-observed;"
-                                                : "expected-effects-absent-after-confirmation-window;") +
+                                                : "expected-application-unconfirmed-after-confirmation-window;") +
                                             terminalDetail);
                                     if (result.ResourceSpent && step.Reservation.Unlimited)
                                         // Review M1: a verified free source must

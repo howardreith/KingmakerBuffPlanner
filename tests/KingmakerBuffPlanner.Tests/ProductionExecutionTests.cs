@@ -25,6 +25,21 @@ namespace KingmakerBuffPlanner.Tests
     {
         private static void RunProductionExecutionTests(string root)
         {
+            foreach (string executionMode in new[] { "instant", "animated" })
+            {
+                string mode = executionMode;
+                Run("heroism-repeat-stateful-" + mode, () => TestHeroismRepeatStateful(root, mode));
+                Run("heroism-repeat-manual-" + mode, () => TestHeroismRepeatManual(root, mode));
+                Run("heroism-repeat-diagnostic-failure-" + mode,
+                    () => TestHeroismRepeatDiagnosticFailure(root, mode));
+                foreach (string observed in new[] { "replace", "refresh", "retain", "native-failure",
+                    "wrong-recipient", "wrong-kind", "suppressed", "unreadable", "missing" })
+                {
+                    string observation = observed;
+                    Run("heroism-repeat-" + observation + "-" + mode,
+                        () => TestHeroismRepeatObservation(root, mode, observation));
+                }
+            }
             Run("fact-resource-native-item-discovery-reservation-binding", TestNativeFactResources);
             Run("fact-resource-five-cast-finite-unlimited-and-full-plan-shortage", TestNativeFactRoutine);
             Run("fact-resource-saved-selection-refuses-replacement-and-survives-rescan", TestNativeFactSavedSelection);

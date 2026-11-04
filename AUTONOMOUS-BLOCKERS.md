@@ -1,3 +1,18 @@
+## Heroism gameplay repair remains unverified — 2026-11-04
+
+At review-corrected `e1e35c9edbc6fe853a5e45dde66aa5cf05c1e523` on
+`codex/kingmaker-buff-planner-heroism-repeat-cast` (version 0.6.8), source 47/0,
+build 1/0 and focused tests 42/0 qualify the diagnostic development checkpoint.
+The player report's cause is not established. The owner confirmed no current
+native casting allowance or reporter log/save exists. Old allowances bind older
+artifacts. No native Heroism row ran and no benign-retention continuation policy
+was introduced. Next: prepare an executable Heroism-plus-distinct-sentinel
+recipe, freeze/package it, run guarded selection, create the selection-bound
+allowance, then observe guarded native casts before selecting a gameplay repair.
+[Evidence, limits and exact next native rows](docs/HEROISM-REPEAT-CAST-REPAIR.md).
+Published through the tested guarded helper; [draft PR #18](https://github.com/howardreith/KingmakerBuffPlanner/pull/18)
+is an investigation checkpoint, not closure of the player report.
+
 ## PR #17 input review corrections — 2026-11-04
 
 Branch `codex/kingmaker-buff-planner-clear-plan`; reviewed HEAD

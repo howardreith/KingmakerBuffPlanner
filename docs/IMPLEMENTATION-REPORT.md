@@ -1,3 +1,7 @@
+> **PR #18 reporting review, 2026-11-04:** tested HEAD e1e35c9 (0.6.8) retains actual native spending/route evidence alongside confirmation diagnostics. Official baseline 0/3; corrected focused 42/0, source 47/0, build 1/0. Heroism gameplay repair remains open; native work first needs an executable Heroism/sentinel recipe and passing frozen-build selection before an allowance. [Correction evidence and handoff](HEROISM-REPEAT-CAST-REPAIR.md#pr-18-review-correction-preserve-spending-route-evidence).
+
+> **Heroism investigation, 2026-11-04:** tested HEAD 5b384ef (0.6.8) corrects misleading absence diagnostics and preserves Animated confirmation detail. Stateful production-path coverage and neighbors pass 39/0; source 47/0, build 1/0. The reporter's gameplay repair remains open; native Heroism rows NOT RUN, exact-candidate allowance absent. [Checkpoint, evidence and next action](HEROISM-REPEAT-CAST-REPAIR.md).
+
 > **PR #17 input review:** product 8de9e8e removes the confirmation navigation-restore conflict and suppresses workspace keyboard input through native description closure. Source 47/0, build 1/0, focused 39/0; native acceptance NOT RUN. [Review checkpoint](CLEAR-PLAN-REVIEW-CHECKPOINT.md).
 
 > **Clear plan, 2026-11-04:** current casting workspace now clears all authored routines through one undoable autosaved edit, with a scoped parchment confirmation and keyboard/controller input guards. Product 4aac21c; source 47/0, build 1/0, focused 69/0. Native acceptance NOT RUN. [Checkpoint and evidence](CLEAR-PLAN-CHECKPOINT.md).
