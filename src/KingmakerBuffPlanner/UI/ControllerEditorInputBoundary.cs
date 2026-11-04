@@ -148,6 +148,13 @@ namespace KingmakerBuffPlanner.UI
 
         internal bool Allows(BindDescription binding) { return _ownership == null || _ownership.Allows(binding); }
 
+        internal void ResetWorkspaceActivation()
+        {
+            _pendingCommand = null;
+            _latch.Reset();
+            _repeat.Reset();
+        }
+
         private void AddCommand(List<object> bindings, int action, ControllerWorkspaceCommand command)
         {
             bindings.AddRange(_layer.AddButton(_ =>

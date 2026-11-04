@@ -440,6 +440,7 @@ namespace KingmakerBuffPlanner.UI
         // unsaved, and no instance ever carries two subscriptions.
         private void ReplaceAuthoring(CastingAuthoringService replacement)
         {
+            CancelClearPlan();
             if (replacement == null) throw new ArgumentNullException("replacement");
             // 0.4.2: every adopted document (load, reload, import, recovery)
             // carries class/fact abilities under their own catalogue
@@ -468,11 +469,13 @@ namespace KingmakerBuffPlanner.UI
 
         private void OnDocumentChangedForAutosave(CastingPlanDocument document, int revision)
         {
+            CancelClearPlan();
             PersistNow("document");
         }
 
         private void AutosaveSettingsNow()
         {
+            CancelClearPlan();
             PersistNow("settings");
         }
 
@@ -2584,6 +2587,7 @@ namespace KingmakerBuffPlanner.UI
 
         public CastingPlanLoadStatus Reload()
         {
+            CancelClearPlan();
             LeaveProblemNavigation();
             CastingPlanLoadResult loaded = _repository.Load(CampaignId);
             LastReloadNote = null;

@@ -10,6 +10,7 @@ namespace KingmakerBuffPlanner.UI
     internal sealed class ControllerControlIdentity : MonoBehaviour
     {
         internal string Key, Region;
+        internal Func<string> Explanation;
         internal static void Set(Component control, string key, string region)
         {
             var identity = control.gameObject.AddComponent<ControllerControlIdentity>();
@@ -39,10 +40,15 @@ namespace KingmakerBuffPlanner.UI
         private readonly List<Image> _keys = new List<Image>();
         private string _returnKey, _scope, _resourcesOrigin;
         private bool _disposed, _initialFocusPending = true;
-        private static readonly string[] Regions = { "Header", "Routines", "Catalogue", "Casters", "Castings", "Recipients", "Inspector", "Footer", "Resources" };
+        private readonly bool _keyboardPresentation;
+        private bool _keyboardFocusActive;
+        private readonly UnityEngine.EventSystems.EventSystem _keyboardEvents;
+        private readonly bool _priorKeyboardNavigation;
+        private static readonly string[] Regions = { "Header", "Routines", "Catalogue", "Casters", "Castings", "Recipients", "Inspector", "Footer", "Resources", "ClearPlan" };
 
-        internal ControllerWorkspaceNavigator(CastingWorkspaceScreenView workspace, PlannerNativeKit kit)
+        internal ControllerWorkspaceNavigator(CastingWorkspaceScreenView workspace, PlannerNativeKit kit, bool keyboardPresentation = false)
         {
+            _keyboardPresentation = keyboardPresentation;
             _workspace = workspace; _kit = kit; _root = workspace.RootObject.transform;
             _hint = kit.Text(_root, "ControllerHints", "", PlannerTextRole.Body, 18, TextAlignmentOptions.MidlineLeft);
             KingmakerUiFactory.SetAnchors(_hint.rectTransform, 0, 0, 1, 0, 28, 28, 0, 0);
@@ -57,6 +63,7 @@ namespace KingmakerBuffPlanner.UI
             ControllerRoutineView.Hint(glyphs, _hint, RewiredConsts.Action.Func01, "Inspect", 400, 4, 150);
             ControllerRoutineView.Hint(glyphs, _hint, RewiredConsts.Action.LeftUp, "Routine", 590, 4, 150);
             ControllerRoutineView.Hint(glyphs, _hint, RewiredConsts.Action.RightUp, "Routine", 780, 4, 150);
+            if (_keyboardPresentation) { glyphs.gameObject.SetActive(false); _hint.gameObject.SetActive(false); }
             _outline = KingmakerUiFactory.CreateRect("ControllerFocus", _root);
             Image fill = _outline.gameObject.AddComponent<Image>();
             fill.color = new Color(.1f, .8f, 1f, .06f); fill.raycastTarget = false;
@@ -68,6 +75,17 @@ namespace KingmakerBuffPlanner.UI
             AddFocusBorder("Left", Vector2.zero, new Vector2(0, 1), Vector2.zero, new Vector2(3, 0));
             AddFocusBorder("Right", new Vector2(1, 0), Vector2.one, new Vector2(-3, 0), Vector2.zero);
             Rebuild();
+            if (_keyboardPresentation)
+            {
+                // The owned workspace uses semantic navigation. Native Submit
+                // must not also activate the pointer's last selected button.
+                _keyboardEvents = UnityEngine.EventSystems.EventSystem.current;
+                if (_keyboardEvents != null)
+                {
+                    _priorKeyboardNavigation = _keyboardEvents.sendNavigationEvents;
+                    _keyboardEvents.sendNavigationEvents = false;
+                }
+            }
         }
 
         private void AddFocusBorder(string name, Vector2 min, Vector2 max, Vector2 offsetMin, Vector2 offsetMax)
@@ -82,6 +100,26 @@ namespace KingmakerBuffPlanner.UI
 
         internal string FocusKey { get { return _focus.Key; } }
         internal bool ModalOpen { get { return _modal != null; } }
+        internal void RestoreFocus(string key)
+        {
+            if (key == null)
+            {
+                ControllerFocusItem fallback = _focus.Items.FirstOrDefault(i => i.Enabled && i.Region == "Footer") ??
+                    _focus.Items.FirstOrDefault(i => i.Enabled);
+                key = fallback == null ? null : fallback.Key;
+            }
+            _focus.Restore(key); DrawFocus(true);
+        }
+        internal void CycleKeyboardFocus(int direction)
+        {
+            _keyboardFocusActive = true;
+            var items = _focus.Items.ToList();
+            if (items.Count == 0) return;
+            int index = items.FindIndex(i => i.Key == _focus.Key);
+            _focus.Restore(items[(index + items.Count + direction) % items.Count].Key);
+            DrawFocus(true);
+        }
+        internal bool KeyboardFocusActive { get { return _keyboardFocusActive; } }
         internal void BeforeRebuild()
         {
             if (_outline != null) _outline.gameObject.SetActive(false);
@@ -89,7 +127,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal void NoteFrameEnd()
         {
-            if (_disposed || _modal != null) return;
+            if (_disposed || _modal != null || (_keyboardPresentation && !_keyboardFocusActive && !_workspace.ClearPlanOpen)) return;
             // Layout and scroll inertia can move a control without a new input.
             if (_focus.ReadingScrollKey != null)
             {
@@ -118,7 +156,8 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed || _keyboard != null || _reader != null) return;
             Transform scope = _workspace.ControllerFocusScope;
-            string scopeId = _workspace.ControllerResourcesOpen ? "Resources" : "Workspace";
+            string scopeId = _workspace.ClearPlanOpen ? "ClearPlan" : _workspace.ControllerResourcesOpen ? "Resources" : "Workspace";
+            bool enteringClear = scopeId == "ClearPlan" && _scope != scopeId;
             if (_scope != scopeId)
             {
                 if (scopeId == "Resources") _resourcesOrigin = _focus.Key;
@@ -132,7 +171,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 if (!button.gameObject.activeInHierarchy || button.name == "Blocker") continue;
                 ControllerControlIdentity identity = button.GetComponent<ControllerControlIdentity>();
-                string region = scopeId == "Resources" ? "Resources" : identity != null ? identity.Region : Region(button.transform);
+                string region = scopeId != "Workspace" ? scopeId : identity != null ? identity.Region : Region(button.transform);
                 if (region == null) continue;
                 string key = identity == null ? Path(button.transform, _root) : identity.Key;
                 if (region == "Inspector") key = "inspection/" + _workspace.ControllerEditingKey + "/" + key;
@@ -163,6 +202,7 @@ namespace KingmakerBuffPlanner.UI
                     null, null, BoundsOf(rect), IsVisible(rect), ScrollKey(rect)));
             }
             _focus.Replace(targets.OrderBy(t => Array.IndexOf(Regions, t.Region)));
+            if (enteringClear) _focus.Restore("clear/cancel");
             if (scopeId == "Workspace" && _initialFocusPending && _workspace.ControllerInitialFocusKey != null)
             {
                 _focus.Restore(_workspace.ControllerInitialFocusKey);
@@ -207,6 +247,8 @@ namespace KingmakerBuffPlanner.UI
         private static string Details(Button button)
         {
             var lines = button.GetComponentsInChildren<TMP_Text>(false).Select(t => t.text).Where(t => !string.IsNullOrEmpty(t)).ToList();
+            ControllerControlIdentity identity = button.GetComponent<ControllerControlIdentity>();
+            if (identity != null && identity.Explanation != null) lines.Add(identity.Explanation());
             // Options' explanatory siblings remain available on disabled controls.
             Transform parent = button.transform.parent;
             if (parent != null && parent.name == "Content")
@@ -224,6 +266,7 @@ namespace KingmakerBuffPlanner.UI
         internal void Execute(ControllerWorkspaceCommand command)
         {
             if (_disposed) return;
+            if (!_workspace.ClearPlanAllowsCommand(command)) return;
             if (_keyboard != null)
             {
                 if (command == ControllerWorkspaceCommand.Up) _keyboard.Move(0, -1);
@@ -244,7 +287,7 @@ namespace KingmakerBuffPlanner.UI
             if (command == ControllerWorkspaceCommand.PreviousRoutine || command == ControllerWorkspaceCommand.NextRoutine)
             {
                 _focus.ClearReading(); _readingScroll = null;
-                if (!_workspace.ControllerResourcesOpen) _workspace.ControllerCycleRoutine(command == ControllerWorkspaceCommand.PreviousRoutine ? -1 : 1);
+                if (!_workspace.ControllerBlockingOverlayOpen) _workspace.ControllerCycleRoutine(command == ControllerWorkspaceCommand.PreviousRoutine ? -1 : 1);
                 return;
             }
             RefreshLayout();
@@ -365,6 +408,7 @@ namespace KingmakerBuffPlanner.UI
         private void DrawFocus(bool reveal)
         {
             if (_disposed || _outline == null || _modal != null) return;
+            if (_keyboardPresentation && !_keyboardFocusActive && !_workspace.ClearPlanOpen) { _outline.gameObject.SetActive(false); return; }
             if (_focus.ReadingScrollKey != null && _readingScroll != null)
             { DrawPaneFocus(_readingScroll); return; }
             RectTransform rect;
@@ -510,6 +554,11 @@ namespace KingmakerBuffPlanner.UI
         }
 
         public void Dispose()
-        { _disposed = true; if (_modal != null) UnityEngine.Object.Destroy(_modal.gameObject); if (_outline != null) UnityEngine.Object.Destroy(_outline.gameObject); }
+        {
+            _disposed = true;
+            if (_keyboardEvents != null) _keyboardEvents.sendNavigationEvents = _priorKeyboardNavigation;
+            if (_modal != null) UnityEngine.Object.Destroy(_modal.gameObject);
+            if (_outline != null) UnityEngine.Object.Destroy(_outline.gameObject);
+        }
     }
 }

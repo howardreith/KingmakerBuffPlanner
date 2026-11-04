@@ -388,6 +388,7 @@ namespace KingmakerBuffPlanner.UI
             // reconstruct the candidate session (review R2).
             if (_instance._castingWorkspace != null)
             {
+                if (_instance._castingWorkspace.ClearPlanBlocksBackground) return;
                 _instance.CloseCastingWorkspace();
                 _instance._log.Info("[KBP-BOOT] casting workspace close requested;source=PlannerHotkey.");
                 return;
