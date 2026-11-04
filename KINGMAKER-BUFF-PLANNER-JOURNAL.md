@@ -10,6 +10,8 @@ The reporter's gameplay defect remains open; native Heroism rows NOT RUN because
 the exact-candidate casting allowance/reporter evidence is absent. No installation
 or saves changed. Next: draft review, then guarded native classification.
 [Commands, logs, hashes, investigation and verification limits](docs/HEROISM-REPEAT-CAST-REPAIR.md).
+Guarded push checks 6/0 (1.665 s), remote HEAD verification passed;
+[draft PR #18](https://github.com/howardreith/KingmakerBuffPlanner/pull/18) created.
 
 ## PR #17 input review corrections — 2026-11-04
 

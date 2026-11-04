@@ -113,7 +113,7 @@ Selector duration 7.6 seconds; [supervised child duration](evidence/heroism-repe
 and .NET Framework 4.7. `git diff --check` passed.
 Changed documentation local-link checks passed 10/0 (the complete focused
 record and new checkpoint entries); recorded artifact hashes were re-read from
-the files. Guarded publication is recorded below when completed.
+the files. Guarded publication is recorded below.
 
 Intermediate local fixture work is not hidden as qualification: `artifacts/heroism-repeat/`
 retains `development.log` 12/8 (9.879 s), `development-2.log` 18/2 (8.048 s),
@@ -179,3 +179,24 @@ Next action: review this diagnostic checkpoint; obtain guarded native evidence
 for the rows above, classify the actual failure, then implement and validate the
 smallest demonstrated gameplay repair. A draft PR does not close the player
 report. Merging, release, tagging and permanent installation remain out of scope.
+
+## Draft publication
+
+[Draft PR #18](https://github.com/howardreith/KingmakerBuffPlanner/pull/18) is open
+against main `d444b1720fa10704f59bc07fdcd4367f9314856f`; initially published
+documentation HEAD `0f3d0c5dc2d8a80ed5c3c788a013fcb0edb0a14b`.
+`scripts/Test-GuardedPush.ps1` passed **6/0**, supervised duration 1.665 seconds.
+The initial sandboxed invocation could not reach GitHub and claimed no pass;
+the authorized network retry succeeded. Both local logs/time receipts remain
+under `artifacts/heroism-repeat/guarded-push-check*`.
+
+Publication used the existing tested helper:
+
+```powershell
+& C:/Dev/KingmakerBuffPlannerLab/codex-policy/Push-KingmakerBuffPlanner.ps1 -RepositoryRoot C:/Dev/KingmakerBuffPlannerLab/repo/KingmakerBuffPlanner -Confirm:$false
+```
+
+The helper verified the remote branch HEAD. The final documentation-only
+publication receipt is pushed through the same helper; tested product/artifact
+identity remains `5b384efdf2ada02bfdce2ed43f2c67ad6d842620`. The PR explicitly
+leaves the gameplay repair open. No merge or release occurred.

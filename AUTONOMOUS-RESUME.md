@@ -10,6 +10,8 @@ Heroism checks are NOT RUN: no current run-bound casting allowance or reporter
 evidence is available, confirmed by the owner. Next: review the draft diagnostic
 checkpoint, then obtain guarded native evidence and repair the demonstrated cause.
 [Exact commands, counts, artifact hashes, rejected theories and native rows](docs/HEROISM-REPEAT-CAST-REPAIR.md).
+Guarded push checks 6/0 and remote verification passed;
+[draft PR #18](https://github.com/howardreith/KingmakerBuffPlanner/pull/18) is open.
 
 ## PR #17 input review corrections — 2026-11-04
 

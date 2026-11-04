@@ -9,6 +9,8 @@ artifacts. No native Heroism row ran and no benign-retention continuation policy
 was introduced. Next: obtain exact-candidate guarded Heroism projections/allowance
 and observe the native result before selecting a gameplay repair.
 [Evidence, limits and exact next native rows](docs/HEROISM-REPEAT-CAST-REPAIR.md).
+Published through the tested guarded helper; [draft PR #18](https://github.com/howardreith/KingmakerBuffPlanner/pull/18)
+is an investigation checkpoint, not closure of the player report.
 
 ## PR #17 input review corrections — 2026-11-04
 
