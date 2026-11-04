@@ -20,8 +20,9 @@ namespace KingmakerBuffPlanner.UI
         internal PendingSessionRecovery(string modPath, string campaignId,
             CastingPlanDocument document, UiProfile uiSettings,
             ExecutionProfile executionSettings, string autosaveStatus,
-            IEnumerable<string> archiveObligations = null)
+            IEnumerable<string> archiveObligations = null, bool availabilityPolicyChosen = false)
         {
+            AvailabilityPolicyChosen = availabilityPolicyChosen;
             if (string.IsNullOrWhiteSpace(modPath))
                 throw new ArgumentException("Absolute mod path is required.", "modPath");
             if (string.IsNullOrWhiteSpace(campaignId))
@@ -37,6 +38,7 @@ namespace KingmakerBuffPlanner.UI
         }
 
         public string ModPath { get; private set; }
+        public bool AvailabilityPolicyChosen { get; private set; }
         public string CampaignId { get; private set; }
         public CastingPlanDocument Document { get; private set; }
         public UiProfile UiSettings { get; private set; }

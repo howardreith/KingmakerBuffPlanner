@@ -173,7 +173,8 @@ namespace KingmakerBuffPlanner.Persistence
             CastingPlanProfile candidate = CastingPlanProfile.FromDocument(
                 imported.Document,
                 mergedIntoUnsaved && unsavedUi != null ? unsavedUi : legacy.Ui,
-                mergedIntoUnsaved && unsavedExecution != null ? unsavedExecution : legacy.Execution);
+                unsavedExecution != null ? unsavedExecution
+                    : legacy.Execution.WithLegacyAvailabilityUpgrade());
             try
             {
                 _candidateRepository.Save(candidate);

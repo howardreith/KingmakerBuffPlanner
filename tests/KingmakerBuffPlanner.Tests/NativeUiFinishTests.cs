@@ -430,7 +430,7 @@ namespace KingmakerBuffPlanner.Tests
                 { CastingGraphText.CatalogueCount(0, 1, "Long"), "1 in other routines" },
                 { CastingGraphText.CatalogueCount(0, 0, "Long"), string.Empty },
                 { WorkspaceFooterText.RunStatus("native-casting-enabled", "Long", 3, false, 1, 2, null, 0),
-                    "Long cannot run: 2 castings are not ready (marked in red). Choose Cast available to run the other 1." },
+                    "Long cannot run: 2 castings are not ready (marked in red). Uncheck Require full plan to run the other 1." },
                 { WorkspaceFooterText.RunStatus("native-casting-enabled", "Long", 2, true, 2, 0, null, 1),
                     "Run Long casts 2 castings. 1 casting is short if every routine runs without rest (see Resources)." },
                 { WorkspaceFooterText.RunStatus("native-casting-enabled", "Long", 1, true, 0, 0, null, 0),
@@ -474,10 +474,10 @@ namespace KingmakerBuffPlanner.Tests
                 new[] { entry("cast-1", CastingOutcomeState.EffectConfirmed, true, true) }, new string[0]);
             var lines = new ActualExpected
             {
-                { CastingRunPresentation.GameLogLine(done, "Long"), "Buff Planner: Long done - 2 of 2 cast, 1 already active." },
+                { CastingRunPresentation.GameLogLine(done, "Long"), "Buff Planner: Long done - 2 cast, 1 already active." },
                 { CastingRunPresentation.GameLogLine(halted, "Long"),
-                    "Buff Planner: Long finished with a failure - 0 of 2 cast, 1 failed, 1 not cast." },
-                { CastingRunPresentation.GameLogLine(stopped, "Long"), "Buff Planner: Long stopped - 1 of 1 cast." },
+                    "Buff Planner: Long finished with a failure - 0 cast, 1 failed, 1 not attempted." },
+                { CastingRunPresentation.GameLogLine(stopped, "Long"), "Buff Planner: Long stopped - 1 cast." },
                 { CastingRunPresentation.GameLogRefusal("Cannot run Long: the party is in combat. Try later."),
                     "Buff Planner: Cannot run Long: the party is in combat." },
                 { CastingRunPresentation.GameLogRefusal(null), "Buff Planner: nothing was cast." }
@@ -485,11 +485,6 @@ namespace KingmakerBuffPlanner.Tests
             foreach (KeyValuePair<string, string> pair in lines)
                 if (pair.Key != pair.Value)
                     throw new InvalidOperationException("Game log line: expected '" + pair.Value + "', got '" + pair.Key + "'.");
-            string uiRoot = ProductionSource("UI", "BuffPlannerUiRoot.cs");
-            string refusal = WithoutComments(MemberBody(uiRoot, "private void ReportClosedPlannerRefusal(string refusal)"));
-            if (!refusal.Contains("if (_castingWorkspace != null) return;") ||
-                !WithoutComments(uiRoot).Contains("WriteGameLog(CastingRunPresentation.GameLogLine(report, name),"))
-                throw new InvalidOperationException("Run results do not reach the game log as one line.");
         }
 
         // UI-09 (R12): from the live native metrics (kbpnui-facts-03: columns

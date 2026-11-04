@@ -56,7 +56,9 @@ namespace KingmakerBuffPlanner.Tests
                 new RoutineDefinition("long", "Long"),
                 new RoutineDefinition("important", "Important"),
                 new RoutineDefinition("short", "Short") }, castings);
-            new CastingPlanRepository(dir).Save(CastingPlanProfile.FromDocument(document));
+            ExecutionProfile strict = ExecutionProfile.Default();
+            strict.AvailabilityPolicy = ExecutionProfile.RequireFullPlan;
+            new CastingPlanRepository(dir).Save(CastingPlanProfile.FromDocument(document, execution: strict));
             return new CastingWorkspaceSession(dir, document.CampaignId, dispatch);
         }
 
@@ -109,9 +111,9 @@ namespace KingmakerBuffPlanner.Tests
             Expect(result.BlockingCastings.SequenceEqual(result.GateDecision.BlockingCastings),
                 "workspace result lost structured identities");
             Expect(result.GateDecision.BlockingReasons.Count == 3, "text diagnostic contract changed");
-            Expect(CastingRunPresentation.OpensPlanner(new WorkspaceApplyResult(false,
+            Expect(!CastingRunPresentation.OpensPlanner(new WorkspaceApplyResult(false,
                 "unclassified-presentation", ordinary, null)),
-                "structured HUD opening depended on refusal text");
+                "a casting blocker auto-opened the planner");
             Expect(!CastingRunPresentation.OpensPlanner(new WorkspaceApplyResult(false,
                 "party-state-unavailable", null, null)), "an unknown global refusal opened the planner");
         }
@@ -208,7 +210,8 @@ namespace KingmakerBuffPlanner.Tests
                     "replacement authoring failed");
                 Expect(authoring.AddCasting(ProblemCasting("another", 1, source: GraphSourceD)).Applied,
                     "second replacement authoring failed");
-                new CastingPlanRepository(dir).Save(CastingPlanProfile.FromDocument(authoring.Document));
+                new CastingPlanRepository(dir).Save(CastingPlanProfile.FromDocument(authoring.Document,
+                    execution: session.ExecutionSettings));
             }
             string storedIntent = new CastingWorkspaceSession(dir, session.CampaignId).DocumentIntentSignature();
             string files = ProblemFiles(dir);
@@ -468,7 +471,7 @@ namespace KingmakerBuffPlanner.Tests
                 planner.Apply(CastingApplyMode.Ordinary, planner.SelectedRoutineId, GraphInputs());
                 WorkspaceApplyResult hudResult = hud.Apply(CastingApplyMode.Ordinary, routine, GraphInputs());
                 CastingGraphView opened = hud.BuildGraph(GraphInputs());
-                Expect(CastingRunPresentation.OpensPlanner(hudResult) &&
+                Expect(!CastingRunPresentation.OpensPlanner(hudResult) &&
                     opened.SelectedRoutineId == routine && opened.FocusedCastingId == planner.EditingFocusCastingId &&
                     opened.SelectedSourceId == planner.SelectedSourceId &&
                     hud.ProblemNavigation.PendingRevealCastingId == planner.ProblemNavigation.PendingRevealCastingId &&

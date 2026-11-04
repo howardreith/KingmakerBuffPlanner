@@ -24,6 +24,7 @@ namespace KingmakerBuffPlanner.Tests
             internal long Round;
             internal int EvidenceReads;
             internal bool ThrowEvidence;
+            internal string ValidationFailureId;
             private int _instance;
             private static readonly AbilityKey Sentinel = new AbilityKey("sentinel-spell", null, 0,
                 SourceKind.Spellbook, null);
@@ -49,6 +50,8 @@ namespace KingmakerBuffPlanner.Tests
 
             public CastRuntimeValidation Validate(CastStep step)
             {
+                if (step.AssignmentId == ValidationFailureId)
+                    return CastRuntimeValidation.Fail("simulated-late-resource-shortage");
                 bool available = step.Reservation.TokenIds.Count != 0
                     ? step.Reservation.TokenIds.All(id => State.Tokens[id])
                     : State.SpontaneousRemaining >= step.Reservation.Units;
@@ -209,7 +212,7 @@ namespace KingmakerBuffPlanner.Tests
                 Assert(Session.AddCastingFromDraft(inputs).Applied);
             }
 
-            internal WorkspaceApplyResult Apply(bool recast = false)
+            internal WorkspaceApplyResult Apply(bool recast = false, bool useSavedPolicy = false)
             {
                 foreach (PlannedCasting casting in Session.Document.Castings.ToArray())
                 {
@@ -218,7 +221,8 @@ namespace KingmakerBuffPlanner.Tests
                         : ExistingEffectPolicy.SkipAlreadyActive);
                 }
                 // Rebuild from current buffs, clock, remaining slots and replenishment EACH run.
-                WorkspaceApplyResult result = Session.Apply(CastingApplyMode.Ordinary, "long", World.Inputs());
+                WorkspaceApplyResult result = CastingRunPolicy.Apply(Session,
+                    useSavedPolicy ? (CastingApplyMode?)null : CastingApplyMode.Ordinary, "long", World.Inputs());
                 if (result.Projection != null) Steps.AddRange(result.Projection.Plan.Steps);
                 int frames = 0;
                 while (Host.IsRunning && frames++ < 100) Host.Pump();

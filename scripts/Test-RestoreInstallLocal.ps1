@@ -65,6 +65,7 @@ $candidates = [ordered]@{
     'kingmaker-buff-planner-casting-rev3.json' = '{' + $candidateBase + ',"importNotices":["n"],"acknowledgedImportNotices":["n"],"formatRevision":3}'
     'kingmaker-buff-planner-casting-unknown-member.json' = '{' + $candidateBase + ',"futureField":1}'
     'kingmaker-buff-planner-casting-rev4.json' = '{' + $candidateBase + ',"formatRevision":4}'
+    'kingmaker-buff-planner-casting-rev5.json' = '{' + $candidateBase + ',"formatRevision":5}'
     'kingmaker-buff-planner-casting-malformed.json' = '{not json'
 }
 
@@ -217,7 +218,8 @@ try {
     Assert-True (($active -join ',') -ceq ($expected -join ',')) `
         "A 6.3 reader kept the wrong set: $($active -join ',')"
     foreach ($name in @('kingmaker-buff-planner-casting-unknown-member.json',
-            'kingmaker-buff-planner-casting-rev4.json', 'kingmaker-buff-planner-casting-malformed.json')) {
+            'kingmaker-buff-planner-casting-rev4.json', 'kingmaker-buff-planner-casting-rev5.json',
+            'kingmaker-buff-planner-casting-malformed.json')) {
         Assert-True (Test-Path -LiteralPath (Join-Path $f.evidence ('rollback-test-install\deactivated-candidate-profiles\installed\' + $name))) `
             "Unreadable candidate $name was not archived."
     }

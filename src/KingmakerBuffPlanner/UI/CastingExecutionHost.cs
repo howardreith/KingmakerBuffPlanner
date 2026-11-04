@@ -58,8 +58,11 @@ namespace KingmakerBuffPlanner.UI
             bool planned, bool submitted, bool spendReported, string detail,
             bool freeCast = false, bool? resourceSpentReported = null,
             bool? spendInvoked = null, bool effectObserved = false,
-            bool? plannedUnlimited = null, int? plannedNativeCost = null)
+            bool? plannedUnlimited = null, int? plannedNativeCost = null,
+            ResolvedCastingReadiness? omissionReadiness = null, IEnumerable<string> omissionReasons = null)
         {
+            OmissionReadiness = omissionReadiness;
+            OmissionReasons = new ReadOnlyCollection<string>((omissionReasons ?? new string[0]).ToList());
             CastingId = castingId ?? string.Empty;
             State = state;
             Planned = planned;
@@ -101,6 +104,8 @@ namespace KingmakerBuffPlanner.UI
             get { return State == CastingOutcomeState.EffectConfirmed; }
         }
         public string Detail { get; private set; }
+        public ResolvedCastingReadiness? OmissionReadiness { get; private set; }
+        public IReadOnlyList<string> OmissionReasons { get; private set; }
     }
 
     public sealed class CastingRunReport
@@ -416,7 +421,8 @@ namespace KingmakerBuffPlanner.UI
                     casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied
                         ? CastingOutcomeState.Skipped
                         : CastingOutcomeState.Omitted,
-                    false, false, false, detail));
+                    false, false, false, detail, omissionReadiness: casting.Readiness,
+                    omissionReasons: disclosed == null ? casting.ReadinessReasons : disclosed.Reasons));
             }
             // A run stopped before its first step never touched the game; a
             // started run without an outcome is uncertain and says so.

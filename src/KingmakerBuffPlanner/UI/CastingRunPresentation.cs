@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using KingmakerBuffPlanner.Domain.Planning;
@@ -54,12 +55,14 @@ namespace KingmakerBuffPlanner.UI
                 text.Append(" stopped after a cast failed: ");
             else
                 text.Append(": ");
-            text.Append(report.Confirmed).Append(" of ").Append(report.Planned)
-                .Append(report.Planned == 1 ? " cast" : " casts").Append(" confirmed");
+            text.Append(report.Confirmed).Append(" confirmed of ").Append(report.Entries.Count)
+                .Append(report.Entries.Count == 1 ? " saved casting" : " saved castings");
             if (report.Skipped != 0)
                 text.Append("; ").Append(report.Skipped).Append(" already active");
-            if (report.Omitted != 0)
-                text.Append("; ").Append(report.Omitted).Append(" omitted");
+            int disabled = report.Entries.Count(IsDisabled);
+            if (report.Omitted - disabled != 0)
+                text.Append("; ").Append(report.Omitted - disabled).Append(" unavailable");
+            if (disabled != 0) text.Append("; ").Append(disabled).Append(" disabled");
             CastingOutcomeEntry failed = report.Entries.FirstOrDefault(
                 entry => entry.State == CastingOutcomeState.Failed);
             if (failed != null)
@@ -83,27 +86,96 @@ namespace KingmakerBuffPlanner.UI
         }
 
 
-        // Native UI finish (UI-08): the one line a run adds to the game's own
-        // log. The game already logs every cast, so this is the run's
-        // summary only; the full description is the line's hover text.
+        // The visible summary counts the full scoped outcome. Named detail
+        // lines follow for every uncast entry; native successes are not replayed.
         internal static string GameLogLine(CastingRunReport report, string routineName)
         {
             if (report == null) throw new ArgumentNullException("report");
             var text = new StringBuilder("Buff Planner: ").Append(routineName);
             if (report.Cancelled) text.Append(" stopped");
             else if (report.Halted || report.Failed != 0) text.Append(" finished with a failure");
+            else if (report.Omitted > report.Entries.Count(IsDisabled)) text.Append(" finished with omissions");
             else text.Append(" done");
-            text.Append(" - ").Append(report.Confirmed).Append(" of ").Append(report.Planned)
-                .Append(" cast");
+            text.Append(" - ").Append(report.Confirmed).Append(" cast");
             if (report.Skipped != 0) text.Append(", ").Append(report.Skipped).Append(" already active");
+            int disabled = report.Entries.Count(IsDisabled);
+            if (report.Omitted - disabled != 0)
+                text.Append(", ").Append(report.Omitted - disabled).Append(" unavailable");
+            if (disabled != 0) text.Append(", ").Append(disabled).Append(" disabled");
             if (report.Failed != 0) text.Append(", ").Append(report.Failed).Append(" failed");
-            int unfinished = report.CancelledCastings + report.NotProcessed;
-            if (unfinished != 0) text.Append(", ").Append(unfinished).Append(" not cast");
+            if (report.CancelledCastings != 0) text.Append(", ").Append(report.CancelledCastings).Append(" interrupted");
+            if (report.NotProcessed != 0) text.Append(", ").Append(report.NotProcessed).Append(" not attempted");
             return text.Append(".").ToString();
         }
 
-        // A routine press the game log reports because no planner window is
-        // open to show it: the refusal's own first sentence.
+        private static bool IsDisabled(CastingOutcomeEntry entry)
+        {
+            return entry.State == CastingOutcomeState.Omitted &&
+                entry.OmissionReadiness == ResolvedCastingReadiness.Disabled;
+        }
+
+        // Visible details are separate native log entries, never tooltip-only.
+        // No cap: diagnostic evidence limits must not hide planned omissions.
+        internal static IReadOnlyList<string> GameLogLines(CastingRunReport report, string name,
+            Func<string, string> label, Func<string, string, string> reason = null)
+        {
+            reason = reason ?? ((id, code) => WorkspaceReasonText.Describe(code));
+            var lines = new List<string> { GameLogLine(report, name) };
+            foreach (CastingOutcomeEntry entry in report.Entries)
+            {
+                if (entry.State == CastingOutcomeState.EffectConfirmed) continue;
+                string why = entry.State == CastingOutcomeState.Skipped ? "already active"
+                    : IsDisabled(entry) ? "explicitly disabled"
+                    : entry.State == CastingOutcomeState.Omitted
+                        ? string.Join("; ", entry.OmissionReasons.Select(code => reason(entry.CastingId, code)).ToArray())
+                        : DescribeEntry(entry);
+                if (string.IsNullOrEmpty(why)) why = WorkspaceReasonText.Describe(entry.Detail);
+                lines.Add("Not cast: " + label(entry.CastingId) + " — " + why + ".");
+            }
+            return lines.AsReadOnly();
+        }
+
+        internal static IReadOnlyList<string> AdmissionLogLines(string name, WorkspaceApplyResult result,
+            IEnumerable<string> orderedIds, Func<string, string> label, Func<string, string, string> reason = null)
+        {
+            reason = reason ?? ((id, code) => WorkspaceReasonText.Describe(code));
+            CastingApplyDecision gate = result == null ? null : result.GateDecision;
+            if (gate == null) return new[] { GameLogRefusal(DescribeRefusal(name, result)) };
+            int active = gate.Omissions.Count(o => o.Readiness == ResolvedCastingReadiness.AlreadySatisfied);
+            int disabled = gate.Omissions.Count(o => o.Readiness == ResolvedCastingReadiness.Disabled);
+            int unavailable = gate.Omissions.Count - active - disabled;
+            bool strict = !gate.Allowed && gate.BlockingCastings.Count != 0;
+            bool empty = gate.ExecutableCastingIds.Count + gate.Omissions.Count == 0;
+            string summary = "Buff Planner: " + name + " — 0 cast";
+            if (unavailable != 0) summary += ", " + unavailable + " unavailable";
+            if (active != 0) summary += ", " + active + " already active";
+            if (disabled != 0) summary += ", " + disabled + " disabled";
+            if (strict) summary += ", " + gate.ExecutableCastingIds.Count + " withheld by Require full plan";
+            else if (gate.ExecutableCastingIds.Count != 0)
+                summary += ". " + DescribeRefusal(name, result);
+            else if (empty) summary += ": nothing configured to cast";
+            else if (active != 0 && unavailable == 0 && disabled == 0)
+                summary += ": the needed effects are already present";
+            var lines = new List<string> { summary.TrimEnd('.') + "." };
+            var omissions = gate.Omissions.ToDictionary(o => o.CastingId, StringComparer.Ordinal);
+            foreach (string id in orderedIds)
+            {
+                CastingOmission omission;
+                string why;
+                if (omissions.TryGetValue(id, out omission))
+                    why = omission.Readiness == ResolvedCastingReadiness.Disabled ? "explicitly disabled"
+                        : omission.Readiness == ResolvedCastingReadiness.AlreadySatisfied ? "already active"
+                        : string.Join("; ", omission.Reasons.Select(code => reason(id, code)).ToArray());
+                else if (gate.ExecutableCastingIds.Contains(id))
+                    why = strict ? "ready, withheld by Require full plan"
+                        : "not attempted: " + DescribeRefusal(name, result);
+                else continue;
+                lines.Add("Not cast: " + label(id) + " — " + why + ".");
+            }
+            return lines.AsReadOnly();
+        }
+
+        // A global refusal's concise visible sentence.
         internal static string GameLogRefusal(string refusal)
         {
             string value = (refusal ?? string.Empty).Trim();
@@ -181,7 +253,7 @@ namespace KingmakerBuffPlanner.UI
             else if (reason.StartsWith("apply-refused", StringComparison.Ordinal))
                 text = "some castings are blocked (" + (result.GateDecision == null ? 0
                     : result.GateDecision.BlockingReasons.Count) +
-                    ") - fix them or choose Cast available in the planner";
+                    ") - fix them or uncheck Require full plan in the planner";
             else if (reason.StartsWith("import-notices-pending", StringComparison.Ordinal) ||
                 reason.StartsWith("legacy-import-unresolved", StringComparison.Ordinal))
                 text = "the imported plan still needs your review in the planner";
@@ -211,8 +283,8 @@ namespace KingmakerBuffPlanner.UI
                 : "Cast " + routineName + ": " + castings.Value +
                     (castings.Value == 1 ? " casting" : " castings") + ", " + executionMode +
                     " mode. One click runs " + (castings.Value == 1 ? "it" : "them") + " now";
-            text += " (the party is checked first; if a casting is blocked, nothing is cast and the " +
-                "reason is shown).";
+            text += " (the party is checked first; available castings run in authored order unless " +
+                "Require full plan is enabled; omissions are explained in the game log).";
             if (string.IsNullOrEmpty(lastPress)) return text;
             return text + " Last: " + (lastPress.Length <= 180 ? lastPress
                 : lastPress.Substring(0, 177) + "...");
@@ -294,16 +366,11 @@ namespace KingmakerBuffPlanner.UI
             return split < 0 ? rest : rest.Substring(0, split);
         }
 
-        // Refusals the player resolves in the planner (review, blocked or
-        // unsupported castings, import review): the planner opens on that
-        // routine. Informational refusals (nothing to cast, a run already in
-        // progress, casting unavailable in this session) do not.
-        // Casting-owned refusals open from structured state. Global results
-        // retain the product's established opening policy.
+        // Availability refusals are noninterrupting. The unrelated recovery
+        // and import workflows retain their existing opening policy.
         internal static bool OpensPlanner(WorkspaceApplyResult result)
         {
-            return result != null && (result.BlockingCastings.Count != 0 ||
-                OpensPlanner(result.ReviewReason));
+            return result != null && OpensPlanner(result.ReviewReason);
         }
 
         internal static bool OpensPlanner(string reason)
@@ -311,10 +378,8 @@ namespace KingmakerBuffPlanner.UI
             string value = reason ?? string.Empty;
             return value == "nothing-presented" || value == "not-accepted" ||
                 value == "material-change-requires-review" ||
-                value.StartsWith("apply-refused", StringComparison.Ordinal) ||
                 value.StartsWith("import-notices-pending", StringComparison.Ordinal) ||
-                value.StartsWith("legacy-import-unresolved", StringComparison.Ordinal) ||
-                value.StartsWith("execution-projection-refused", StringComparison.Ordinal);
+                value.StartsWith("legacy-import-unresolved", StringComparison.Ordinal);
         }
 
         private static string StopReason(string terminal)

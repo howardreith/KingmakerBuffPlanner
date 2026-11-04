@@ -1409,9 +1409,9 @@ namespace KingmakerBuffPlanner.UI
                     routineId + ".", exception);
                 string refusal = name + " was not cast: the party state could not be refreshed (" +
                     exception.Message + ").";
-                if (CastingSession != null) CastingSession.RecordGlobalRefusal(refusal);
+                if (CastingSession != null) CastingSession.ReportRunRefusal(refusal);
                 if (_castingWorkspace != null) _castingWorkspace.ShowNotice(refusal);
-                ReportClosedPlannerRefusal(refusal);
+                if (CastingSession == null) ReportClosedPlannerRefusal(refusal);
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Refused,
                     name + " was not cast: the party state could not be refreshed (" +
@@ -1467,11 +1467,8 @@ namespace KingmakerBuffPlanner.UI
                     0, 0));
                 if (!openEditorOnRefusal && _controllerRoutines != null)
                     _controllerRoutines.ShowResult(ControllerRoutineDetails.Refusal(refusal, result, session));
-                // No floating result (the accepted HUD boundary): a refusal
-                // the player resolves in the planner opens it on that
-                // routine, with the reason in the footer; any other refusal
-                // of a press with no planner open reaches the game log.
-                if (!openEditorOnRefusal || !CastingRunPresentation.OpensPlanner(result)) ReportClosedPlannerRefusal(refusal);
+                // The session already logged this attempt, even with an open
+                // editor. Only unrelated recovery/import workflows may open it.
                 if (openEditorOnRefusal && CastingRunPresentation.OpensPlanner(result) &&
                     _castingWorkspace == null)
                 {
@@ -2359,7 +2356,7 @@ namespace KingmakerBuffPlanner.UI
             // entry leaves the store only after construction succeeds, so a
             // construction failure leaves the only recoverable copy exactly
             // where the next attempt can find it.
-            return _castingSessions == null
+            CastingWorkspaceSession created = _castingSessions == null
                 ? new CastingWorkspaceSession(_modPath, campaignId, CreateDispatchBoundary(),
                     _session.Model == null ? null : _session.Model.SourceGroupings(),
                     () => _session.Model == null ? null
@@ -2382,6 +2379,13 @@ namespace KingmakerBuffPlanner.UI
                                 _session.ClassicPrimarySha256,
                                 _session.Model.SourceGroupings()),
                         isRunActive: () => _castingHost != null && _castingHost.IsRunning));
+            created.RunLog = WriteCastingRunLog;
+            return created;
+        }
+
+        private void WriteCastingRunLog(IReadOnlyList<string> lines, bool warning)
+        {
+            foreach (string line in lines) WriteGameLog(line, warning, line);
         }
 
         // Ordinary play submits through the production boundary; a
@@ -2460,20 +2464,15 @@ namespace KingmakerBuffPlanner.UI
             }
             if (_controllerRoutines != null)
                 _controllerRoutines.ShowResult(ControllerRoutineDetails.Report(report, session));
-            // Native UI finish (UI-08): one summary line in the game's own log
-            // (the game already logs each cast); the full description is its
-            // hover text, and stays in the UMM log and on the session for the
-            // next planner open. Never a floating HUD object.
-            WriteGameLog(CastingRunPresentation.GameLogLine(report, name),
-                report.Cancelled || report.Halted || report.Failed != 0,
-                CastingRunPresentation.Describe(report, name, label));
+            // The session emitted the terminal result and named uncast entries.
+            // With no session, retain the same fail-soft game-log path.
+            if (session == null)
+                WriteCastingRunLog(CastingRunPresentation.GameLogLines(report, name, id => id), true);
         }
 
-        // A routine press whose outcome no open planner window shows: one
-        // line in the game's own log.
+        // A pre-session failure still reaches the game log with an open editor.
         private void ReportClosedPlannerRefusal(string refusal)
         {
-            if (_castingWorkspace != null) return;
             WriteGameLog(CastingRunPresentation.GameLogRefusal(refusal), true, refusal);
         }
 
