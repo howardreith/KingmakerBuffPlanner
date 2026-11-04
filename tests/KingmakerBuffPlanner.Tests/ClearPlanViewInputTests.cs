@@ -18,6 +18,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("clear-plan-view-description-blocks-enter-and-closing-edge", () => TestDescriptionKeyboard(root, KeyCode.Return));
             Run("clear-plan-view-description-blocks-space-and-closing-edge", () => TestDescriptionKeyboard(root, KeyCode.Space));
             Run("clear-plan-view-description-blocks-semantic-navigation", () => TestDescriptionNavigation(root));
+            Run("clear-plan-view-description-open-close-before-poll", () => TestDescriptionBetweenPolls(root));
         }
 
         private static Assembly ViewInputProduct()
@@ -174,6 +175,9 @@ namespace KingmakerBuffPlanner.Tests
             fixture.Tick(confirm, false);
             Expect(fixture.Activations == 0 && fixture.Signature == before, "description allowed underlying Undo/Run activation");
             fixture.DescriptionOpen = false; // native close happens before planner polling
+            Type command = fixture.Product.GetType("KingmakerBuffPlanner.UI.ControllerWorkspaceCommand", true);
+            ViewInputCall(fixture.Navigator, "Execute", Enum.Parse(command, "Confirm"));
+            Expect(fixture.Activations == 0, "queued confirmation bypassed description closing transition");
             fixture.Tick(confirm, false);
             fixture.Tick(confirm, false);
             Expect(fixture.Activations == 0 && fixture.Signature == before, "closing/repeated confirm activated underlying action");
@@ -191,6 +195,31 @@ namespace KingmakerBuffPlanner.Tests
                 fixture.Tick(key, false);
                 Expect(fixture.FocusKey == "plan/undo" && fixture.Activations == 0, "description allowed underlying semantic focus to move");
             }
+            Type command = fixture.Product.GetType("KingmakerBuffPlanner.UI.ControllerWorkspaceCommand", true);
+            ViewInputCall(fixture.Navigator, "Execute", Enum.Parse(command, "Right"));
+            ViewInputCall(fixture.Navigator, "Execute", Enum.Parse(command, "Confirm"));
+            Expect(fixture.FocusKey == "plan/undo" && fixture.Activations == 0, "direct navigator delivery bypassed native description ownership");
+            fixture.DescriptionOpen = false;
+            fixture.Tick(KeyCode.RightArrow, false);
+            Expect(fixture.FocusKey == "plan/undo", "description closing edge moved underlying focus");
+            fixture.Tick(null, true);
+            fixture.Tick(KeyCode.RightArrow, false);
+            Expect(fixture.FocusKey == "plan/run", "fresh navigation did not resume after description release");
+        }
+
+        private static void TestDescriptionBetweenPolls(string root)
+        {
+            var fixture = new DescriptionViewFixture(root, "description-between-polls");
+            string before = fixture.Signature;
+            // The presenter's successful-open callback records ownership even
+            // if the native window closes before the next planner poll.
+            ViewInputCall(fixture.View, "NoteNativeDescriptionOpened");
+            fixture.Tick(KeyCode.Return, false);
+            fixture.Tick(KeyCode.Space, false);
+            Expect(fixture.Activations == 0 && fixture.Signature == before, "between-poll description close leaked activation");
+            fixture.Tick(null, true);
+            fixture.Tick(KeyCode.Return, false);
+            Expect(fixture.Activations == 1, "between-poll close never returned input");
         }
     }
 }

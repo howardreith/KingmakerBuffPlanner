@@ -115,6 +115,7 @@ namespace KingmakerBuffPlanner.UI
         }
         internal void CycleKeyboardFocus(int direction)
         {
+            if (_workspace.NativeDescriptionBlocksWorkspace) return;
             _keyboardFocusActive = true;
             var items = _focus.Items.ToList();
             if (items.Count == 0) return;
@@ -268,7 +269,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal void Execute(ControllerWorkspaceCommand command)
         {
-            if (_disposed) return;
+            if (_disposed || _workspace.NativeDescriptionBlocksWorkspace) return;
             if (!_workspace.ClearPlanAllowsCommand(command)) return;
             if (_keyboard != null)
             {
@@ -321,17 +322,17 @@ namespace KingmakerBuffPlanner.UI
 
         private void ScrollWorkspace(int direction)
         {
-                ScrollRect scroll = _workspace.ControllerResourcesOpen ? _workspace.ControllerResourcesScroll : FocusedScroll();
-                Scroll(scroll, direction);
-                RefreshLayout();
-                string scrollKey = scroll == null ? null : Path(scroll.transform, _root);
-                bool visible = scrollKey != null && _focus.KeepVisible(scrollKey);
-                // Keep the requested scroll position while text fills the pane.
-                // A pane border replaces the hidden button border until a
-                // control returns to view; Confirm remains non-actionable.
-                _readingScroll = visible ? null : scroll;
-                if (_readingScroll != null) DrawPaneFocus(_readingScroll);
-                else DrawFocus(false);
+            ScrollRect scroll = _workspace.ControllerResourcesOpen ? _workspace.ControllerResourcesScroll : FocusedScroll();
+            Scroll(scroll, direction);
+            RefreshLayout();
+            string scrollKey = scroll == null ? null : Path(scroll.transform, _root);
+            bool visible = scrollKey != null && _focus.KeepVisible(scrollKey);
+            // Keep the requested scroll position while text fills the pane.
+            // A pane border replaces the hidden button border until a
+            // control returns to view; Confirm remains non-actionable.
+            _readingScroll = visible ? null : scroll;
+            if (_readingScroll != null) DrawPaneFocus(_readingScroll);
+            else DrawFocus(false);
         }
 
         private ScrollRect FocusedScroll()

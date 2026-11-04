@@ -14,17 +14,36 @@ namespace KingmakerBuffPlanner.UI
         private ClearPlanConfirmation _clearConfirmation;
         private readonly WorkspaceModalInputGate _clearInput = new WorkspaceModalInputGate();
         private CanvasGroup _clearBackground;
-        private bool _clearPriorInteractable, _clearPriorNavigation;
+        private bool _clearPriorInteractable;
         private EventSystem _clearEvents;
         private bool _clearRestoreToUndo;
         private readonly WorkspaceKeyboardInput _workspaceKeyboardInput = new WorkspaceKeyboardInput();
+        private readonly WorkspaceModalInputGate _descriptionInput = new WorkspaceModalInputGate();
+
+        internal bool NativeDescriptionBlocksWorkspace
+        {
+            get
+            {
+                int frame = _workspaceKeyboardInput.Frame();
+                bool open = _workspaceKeyboardInput.DescriptionOpen();
+                if (open && !_descriptionInput.IsOpen) _descriptionInput.Open(frame);
+                if (!open && _descriptionInput.IsOpen) _descriptionInput.Close(frame);
+                _descriptionInput.Observe(_workspaceKeyboardInput.Neutral(), frame);
+                return _descriptionInput.BlocksBackground;
+            }
+        }
+
+        private void NoteNativeDescriptionOpened()
+        {
+            _descriptionInput.Open(_workspaceKeyboardInput.Frame());
+        }
         internal bool ClearPlanOpen { get { return _clearOverlay != null; } }
         internal bool ClearPlanBlocksBackground { get { return _clearInput.BlocksBackground; } }
         internal bool ClearPlanAllowsCommand(ControllerWorkspaceCommand command) { return _clearInput.AllowsCommand(command); }
 
         private void OpenClearPlan()
         {
-            if (_disposed || ClearPlanOpen || _clearInput.BlocksBackground) return;
+            if (_disposed || ClearPlanOpen || _clearInput.BlocksBackground || NativeDescriptionBlocksWorkspace) return;
             _clearConfirmation = _session.BeginClearPlan(_inputs());
             if (_clearConfirmation == null)
             { Feedback(_session.ClearPlanUnavailableReason, true); return; }
@@ -38,8 +57,9 @@ namespace KingmakerBuffPlanner.UI
             _clearEvents = EventSystem.current;
             if (_clearEvents != null)
             {
-                _clearPriorNavigation = _clearEvents.sendNavigationEvents;
-                _clearEvents.sendNavigationEvents = false;
+                // ControllerEditorInputBoundary or the keyboard navigator
+                // owns navigation for this workspace's entire lifetime.
+                // The modal borrows selection only, never that owner's state.
                 TMP_InputField field = _clearEvents.currentSelectedGameObject == null ? null :
                     _clearEvents.currentSelectedGameObject.GetComponent<TMP_InputField>();
                 if (field != null) field.DeactivateInputField();
@@ -106,7 +126,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void ConfirmClearPlan()
         {
-            if (_disposed || !ClearPlanOpen || !_clearInput.Take(Time.frameCount)) return;
+            if (_disposed || !ClearPlanOpen || NativeDescriptionBlocksWorkspace || !_clearInput.Take(Time.frameCount)) return;
             AuthoringEditResult result = _session.ClearPlan(_clearConfirmation, _inputs());
             CloseClearPlan(result.Applied);
             Feedback(result.Applied ? "Plan cleared. Undo restores it." : result.Reason, !result.Applied);
@@ -149,13 +169,13 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_clearBackground != null) RestoreClearBackground();
             _clearBackground = null;
-            if (_clearEvents != null) _clearEvents.sendNavigationEvents = _clearPriorNavigation;
             _clearEvents = null;
         }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private void RestoreClearBackground()
         {
+            // Keep this Unity-native call out of managed lifecycle cleanup.
             _clearBackground.interactable = _clearPriorInteractable;
         }
 
@@ -180,6 +200,7 @@ namespace KingmakerBuffPlanner.UI
                 }
                 return;
             }
+            if (NativeDescriptionBlocksWorkspace) return;
             if (Input.GetKeyDown(KeyCode.Tab))
                 _controllerNavigation.CycleKeyboardFocus(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ? -1 : 1);
             if (Input.GetKeyDown(KeyCode.LeftArrow)) _controllerNavigation.Execute(ControllerWorkspaceCommand.Left);
@@ -192,7 +213,8 @@ namespace KingmakerBuffPlanner.UI
 
         private void TickWorkspaceKeyboard()
         {
-            if (_disposed || _controllerAuthoring || _clearInput.BlocksBackground || _controllerNavigation == null) return;
+            if (_disposed || _controllerAuthoring || _clearInput.BlocksBackground || _controllerNavigation == null ||
+                NativeDescriptionBlocksWorkspace) return;
             TMP_InputField field = EventSystem.current == null || EventSystem.current.currentSelectedGameObject == null ? null :
                 EventSystem.current.currentSelectedGameObject.GetComponent<TMP_InputField>();
             bool tab = _workspaceKeyboardInput.KeyDown(KeyCode.Tab);

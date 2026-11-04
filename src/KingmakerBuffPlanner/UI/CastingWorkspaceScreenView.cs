@@ -500,7 +500,12 @@ namespace KingmakerBuffPlanner.UI
             // press never closes both it and the planner.
             bool described = NativeDescriptionPresenter.CloseIfOpen() || _descriptionShownLastFrame;
             _descriptionShownLastFrame = false;
-            if (described) return true;
+            if (described)
+            {
+                _descriptionInput.Close(_workspaceKeyboardInput.Frame());
+                return true;
+            }
+            if (NativeDescriptionBlocksWorkspace) return true;
             // Then the Resources details, if shown.
             if (_resources != null && _resources.gameObject.activeSelf)
             {
@@ -1118,7 +1123,7 @@ namespace KingmakerBuffPlanner.UI
             _root.gameObject.AddComponent<GraphicRaycaster>();
             _frameEndProbe = _root.gameObject.AddComponent<ExpectedStateFrameProbe>();
             if (_controllerAuthoring) _controllerTextProbe = _root.gameObject.AddComponent<PlannerWorkspaceTextFrameProbe>();
-            _description = new NativeDescriptionPresenter(canvas, _root, _log);
+            _description = new NativeDescriptionPresenter(canvas, _root, _log, NoteNativeDescriptionOpened);
             CanvasGroup group = _root.gameObject.AddComponent<CanvasGroup>();
             group.alpha = 1f;
             group.interactable = true;
@@ -2956,7 +2961,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void Command(Action action, string refreshCause = "command")
         {
-            if (_disposed || ClearPlanOpen || _clearInput.BlocksBackground) return;
+            if (_disposed || ClearPlanOpen || _clearInput.BlocksBackground || NativeDescriptionBlocksWorkspace) return;
             long commandStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             _nextInteractionStartedAt = commandStarted;
             // A command's feedback lasts until the next command; without one
