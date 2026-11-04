@@ -1,5 +1,13 @@
 # Mr. Bard's Kingmaker Buff Planner
 
+**Release: [0.6.9](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.9).**
+This owner-authorized update adds undoable Clear plan confirmation and clearer
+casting diagnostics, preserving actual native spending evidence alongside effect
+confirmation. The reported Heroism gameplay failure remains unresolved.
+This exact release has not been run in the game. See the
+[release notes](docs/RELEASE-NOTES-0.6.9.md) and
+[Heroism investigation and verification limits](docs/HEROISM-REPEAT-CAST-REPAIR.md).
+
 **Release: [0.6.8](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.8).**
 This owner-authorized update exposes every genuinely available identical item
 copy and its capable owner, keeps stale item castings visibly unresolved, and
@@ -108,7 +116,7 @@ available policy, responsiveness instrumentation and ordinary-cased Run labels.
 
 Mr. Bard's Kingmaker Buff Planner is a standalone Unity Mod Manager mod built
 against **Windows Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b**. The
-0.6.8 retains the native Linux 2.1.5d version gate but has not passed a
+0.6.9 retains the native Linux 2.1.5d version gate but has not passed a
 native Linux trial.
 
 It plans and applies party buffs while preserving Kingmaker targeting,
@@ -118,7 +126,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.6.8.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.6.9.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including
