@@ -225,7 +225,8 @@ namespace KingmakerBuffPlanner.Execution
                 if (!option.ReachableTargetIds.Any(value => units.Contains(value) &&
                         !string.Equals(value, caster, StringComparison.Ordinal)))
                     reject(provider + "|no-other-reachable-target");
-                EffectExpression expectedEffects = inputs.EffectsBySource[sourceId];
+                EffectExpression expectedEffects = DiscoveredEffectLookup.ForAbility(
+                    inputs.EffectsBySource, ability, sourceId);
                 Func<string, int> presenceRank = target =>
                 {
                     if (effectPresentOnTarget == null) return 1;

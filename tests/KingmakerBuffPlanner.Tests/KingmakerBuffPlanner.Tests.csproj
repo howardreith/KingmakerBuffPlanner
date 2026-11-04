@@ -94,6 +94,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\CastEnhancementNaming.cs"><Link>GameAdapters\CastEnhancementNaming.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\EffectExpression.cs"><Link>Domain\Effects\EffectExpression.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\EffectAggregateIdentity.cs"><Link>Domain\Effects\EffectAggregateIdentity.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\DiscoveredEffectLookup.cs"><Link>Domain\Effects\DiscoveredEffectLookup.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\CatalogSourceIdentity.cs"><Link>Domain\Effects\CatalogSourceIdentity.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Identity\StableKeys.cs"><Link>Domain\Identity\StableKeys.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Authoring\CastingIntentModels.cs"><Link>Domain\Authoring\CastingIntentModels.cs</Link></Compile>

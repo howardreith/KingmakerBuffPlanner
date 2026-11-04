@@ -123,6 +123,7 @@
     <Compile Include="Discovery\SelectableAbilityVariants.cs" />
     <Compile Include="Domain\Effects\EffectExpression.cs" />
     <Compile Include="Domain\Effects\EffectAggregateIdentity.cs" />
+    <Compile Include="Domain\Effects\DiscoveredEffectLookup.cs" />
     <Compile Include="Domain\Effects\CatalogSourceIdentity.cs" />
     <Compile Include="Domain\Identity\StableKeys.cs" />
     <Compile Include="Domain\Authoring\CastingIntentModels.cs" />
