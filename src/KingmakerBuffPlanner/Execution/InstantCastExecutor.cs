@@ -193,8 +193,8 @@ namespace KingmakerBuffPlanner.Execution
                                         ";transaction-state:" +
                                         completion.Detail +
                                         ";cleanup-complete:" + cleanup.Complete +
-                                        ";cleanup-state:" + cleanup.Detail +
-                                        CastEffectEvidence.Describe(_runtime, step);
+                                        ";cleanup-state:" + cleanup.Detail;
+                                    terminalDetail += CastEffectEvidence.Describe(_runtime, step);
                                     if (observed)
                                         report.Add(index, step, CastExecutionStatus.EffectObserved,
                                             "expected-effects-observed");
