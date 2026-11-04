@@ -148,6 +148,7 @@ namespace KingmakerBuffPlanner.Tests
                     "Classic import inherited strict or lost a current explicit choice");
                 Expect(new CastingPlanRepository(dir).Load(legacy.CampaignId).Profile.FormatRevision == 5,
                     "Classic import did not stamp the migration");
+                Expect(session.ExecutionMode == "animated", "a policy-only choice overwrote the inherited mode");
             }
         }
 

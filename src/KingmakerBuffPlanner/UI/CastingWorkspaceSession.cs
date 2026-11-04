@@ -355,7 +355,7 @@ namespace KingmakerBuffPlanner.UI
                     Hotkey = recovery.UiSettings.Hotkey
                 };
                 _executionSettings = EnforcedSettings(recovery.ExecutionSettings);
-                _executionSettingsChosen = false;
+                _executionModeChosen = recovery.ExecutionModeChosen;
                 _availabilityPolicyChosen = recovery.AvailabilityPolicyChosen;
                 RaiseCastingIdMark(_authoring.Document.Castings.Select(
                     value => value.CastingId));
@@ -595,7 +595,8 @@ namespace KingmakerBuffPlanner.UI
         {
             return new PendingSessionRecovery(_modPath, CampaignId,
                 _authoring.Document, _uiSettings, _executionSettings,
-                _autosaveStatus ?? AutosaveStatus, PendingArchiveObligations, _availabilityPolicyChosen);
+                _autosaveStatus ?? AutosaveStatus, PendingArchiveObligations,
+                _availabilityPolicyChosen, _executionModeChosen);
         }
 
         // The mandatory pre-write archives this session still owes, in the
@@ -662,12 +663,12 @@ namespace KingmakerBuffPlanner.UI
         // Last review: whether the player changed the execution settings in
         // this session since they were last read from a plan (a merge into
         // castings added in the session writes them only then).
-        private bool _executionSettingsChosen;
+        private bool _executionModeChosen;
 
         private void AdoptSettings(CastingPlanProfile profile)
         {
             string chosenPolicy = _availabilityPolicyChosen ? AvailabilityPolicy : null;
-            _executionSettingsChosen = false;
+            _executionModeChosen = false;
             _uiSettings = profile == null || profile.Ui == null
                 ? UiProfile.Default()
                 : new UiProfile { Scale = profile.Ui.Scale, Hotkey = profile.Ui.Hotkey };
@@ -753,7 +754,7 @@ namespace KingmakerBuffPlanner.UI
             ExecutionProfile next = CopyOf(_executionSettings);
             next.Mode = mode;
             _executionSettings = next;
-            _executionSettingsChosen = true;
+            _executionModeChosen = true;
             AutosaveSettingsNow();
         }
 
@@ -767,7 +768,6 @@ namespace KingmakerBuffPlanner.UI
             ExecutionProfile next = CopyOf(_executionSettings);
             next.AvailabilityPolicy = policy;
             _executionSettings = next;
-            _executionSettingsChosen = true;
             AutosaveSettingsNow();
         }
 
@@ -1014,8 +1014,9 @@ namespace KingmakerBuffPlanner.UI
                 IDictionary<string, CastGroupingKind> effectiveGroupings =
                     inMemory != null && inMemory.Groupings != null ? inMemory.Groupings : groupings;
                 CastingMigrationResult migration = new CastingPlanMigrationService(modPath)
-                    .Migrate(campaignId, effectiveGroupings, inMemory, unsaved, null,
-                        !_executionSettingsChosen && !_availabilityPolicyChosen ? null : _executionSettings);
+                    .Migrate(campaignId, effectiveGroupings, inMemory, unsaved,
+                        executionModeOverride: _executionModeChosen ? ExecutionMode : null,
+                        availabilityPolicyOverride: _availabilityPolicyChosen ? AvailabilityPolicy : null);
                 MigrationStatus = migration.Status;
                 MigrationWarning = migration.Warning;
                 switch (migration.Status)
