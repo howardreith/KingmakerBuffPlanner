@@ -213,7 +213,7 @@ namespace KingmakerBuffPlanner.UI
             if (index == 4) return !Running;
             if (index == 5) return true;
             if (index == 3) return Running;
-            return !Running && _session != null && _session.Document.Castings.Any(c => c.RoutineId == RoutineIds[index]);
+            return !Running && _session != null;
         }
 
         internal bool CloseResults()
@@ -267,12 +267,6 @@ namespace KingmakerBuffPlanner.UI
             if (_session == null)
             {
                 Message = _unavailable ?? "Configure and save a plan with mouse and keyboard first.";
-                return;
-            }
-            if (!_session.PersistenceBlocked && !_session.LegacyImportBlocked &&
-                !_session.Document.Castings.Any(c => c.RoutineId == RoutineIds[Focus]))
-            {
-                Message = "This routine has no configured castings. Choose Configure plans to add buffs in the editor.";
                 return;
             }
             if (!_run(RoutineIds[Focus]))

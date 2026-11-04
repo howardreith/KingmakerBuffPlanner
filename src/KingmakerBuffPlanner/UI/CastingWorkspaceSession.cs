@@ -299,6 +299,9 @@ namespace KingmakerBuffPlanner.UI
         // profile; loaded with it and written back by Save (never reset).
         private UiProfile _uiSettings = UiProfile.Default();
         private ExecutionProfile _executionSettings = ExecutionProfile.Default();
+        private bool _availabilityMigrationPending;
+        private bool _availabilityPolicyChosen;
+        public string AvailabilityMigrationNotice { get; private set; }
         // Mutable only through InitializeReviewStore (ctor paths).
         private CastingReviewStore _reviewStore;
 
@@ -352,7 +355,8 @@ namespace KingmakerBuffPlanner.UI
                     Hotkey = recovery.UiSettings.Hotkey
                 };
                 _executionSettings = EnforcedSettings(recovery.ExecutionSettings);
-                _executionSettingsChosen = false;
+                _executionModeChosen = recovery.ExecutionModeChosen;
+                _availabilityPolicyChosen = recovery.AvailabilityPolicyChosen;
                 RaiseCastingIdMark(_authoring.Document.Castings.Select(
                     value => value.CastingId));
                 SelectedRoutineId = "long";
@@ -546,6 +550,7 @@ namespace KingmakerBuffPlanner.UI
             ArchiveBeforeSpellbookReconciliation();
             _repository.Save(CastingPlanProfile.FromDocument(
                 _authoring.Document, _uiSettings, _executionSettings));
+            _availabilityMigrationPending = false;
         }
 
         private void PersistNow(string cause)
@@ -590,7 +595,8 @@ namespace KingmakerBuffPlanner.UI
         {
             return new PendingSessionRecovery(_modPath, CampaignId,
                 _authoring.Document, _uiSettings, _executionSettings,
-                _autosaveStatus ?? AutosaveStatus, PendingArchiveObligations);
+                _autosaveStatus ?? AutosaveStatus, PendingArchiveObligations,
+                _availabilityPolicyChosen, _executionModeChosen);
         }
 
         // The mandatory pre-write archives this session still owes, in the
@@ -628,6 +634,7 @@ namespace KingmakerBuffPlanner.UI
         {
             get
             {
+                if (_availabilityMigrationPending && !SaveFailed && !SaveRefused) return "migration-pending";
                 if (_autosaveStatus == "saved" && IsDirty) return "saving";
                 return _autosaveStatus ?? (IsDirty ? "saving" : "saved");
             }
@@ -656,17 +663,30 @@ namespace KingmakerBuffPlanner.UI
         // Last review: whether the player changed the execution settings in
         // this session since they were last read from a plan (a merge into
         // castings added in the session writes them only then).
-        private bool _executionSettingsChosen;
+        private bool _executionModeChosen;
 
         private void AdoptSettings(CastingPlanProfile profile)
         {
-            _executionSettingsChosen = false;
+            string chosenPolicy = _availabilityPolicyChosen ? AvailabilityPolicy : null;
+            _executionModeChosen = false;
             _uiSettings = profile == null || profile.Ui == null
                 ? UiProfile.Default()
                 : new UiProfile { Scale = profile.Ui.Scale, Hotkey = profile.Ui.Hotkey };
             _executionSettings = profile == null || profile.Execution == null
                 ? ExecutionProfile.Default()
                 : EnforcedSettings(profile.Execution);
+            bool legacy = profile != null &&
+                (profile.FormatRevision ?? 0) < CastingPlanProfile.AvailabilityPolicyRevision;
+            _availabilityMigrationPending = profile != null &&
+                (legacy || (profile.Execution.AvailabilityPolicy != ExecutionProfile.CastAvailable &&
+                            profile.Execution.AvailabilityPolicy != ExecutionProfile.RequireFullPlan));
+            if (legacy)
+            {
+                _executionSettings.AvailabilityPolicy = chosenPolicy ?? ExecutionProfile.CastAvailable;
+                AvailabilityMigrationNotice = "Upgraded: Cast available is now the default. Old profiles " +
+                    "did not record whether Require full plan was chosen. Enable it once if you want it.";
+            }
+            else AvailabilityMigrationNotice = null;
         }
 
         // WP4: a stored 0.3.0 out-of-combat or animated-fallback choice is
@@ -734,7 +754,7 @@ namespace KingmakerBuffPlanner.UI
             ExecutionProfile next = CopyOf(_executionSettings);
             next.Mode = mode;
             _executionSettings = next;
-            _executionSettingsChosen = true;
+            _executionModeChosen = true;
             AutosaveSettingsNow();
         }
 
@@ -744,10 +764,10 @@ namespace KingmakerBuffPlanner.UI
                 policy != ExecutionProfile.CastAvailable)
                 throw new ArgumentException("Unknown availability policy.", "policy");
             if (AvailabilityPolicy == policy) return;
+            _availabilityPolicyChosen = true;
             ExecutionProfile next = CopyOf(_executionSettings);
             next.AvailabilityPolicy = policy;
             _executionSettings = next;
-            _executionSettingsChosen = true;
             AutosaveSettingsNow();
         }
 
@@ -994,8 +1014,9 @@ namespace KingmakerBuffPlanner.UI
                 IDictionary<string, CastGroupingKind> effectiveGroupings =
                     inMemory != null && inMemory.Groupings != null ? inMemory.Groupings : groupings;
                 CastingMigrationResult migration = new CastingPlanMigrationService(modPath)
-                    .Migrate(campaignId, effectiveGroupings, inMemory, unsaved, null,
-                        unsaved == null || !_executionSettingsChosen ? null : _executionSettings);
+                    .Migrate(campaignId, effectiveGroupings, inMemory, unsaved,
+                        executionModeOverride: _executionModeChosen ? ExecutionMode : null,
+                        availabilityPolicyOverride: _availabilityPolicyChosen ? AvailabilityPolicy : null);
                 MigrationStatus = migration.Status;
                 MigrationWarning = migration.Warning;
                 switch (migration.Status)
@@ -1714,6 +1735,8 @@ namespace KingmakerBuffPlanner.UI
             string scopeRoutineId,
             CastingWorkspaceInputs inputs)
         {
+            _lastInputs = inputs;
+            SnapshotRunLabels(scopeRoutineId ?? SelectedRoutineId);
             // Every route enters through this boundary. A new attempt clears
             // stale reveal state, then an ordinary casting-specific refusal
             // focuses the first current blocker without authoring anything.
@@ -1736,6 +1759,14 @@ namespace KingmakerBuffPlanner.UI
             {
                 ProblemNavigation.Begin(result.GateDecision);
                 FocusCurrentProblem();
+            }
+            if (!result.Allowed)
+            {
+                var lines = CastingRunPresentation.AdmissionLogLines(
+                    RoutineDisplayName(scopeRoutineId ?? SelectedRoutineId), result,
+                    _runOrder, RunCastingLabel, DescribeRunReason);
+                if (!ProblemNavigation.Active) RecordAttempt(string.Join("\n", lines.ToArray()));
+                EmitRunLog(lines, true);
             }
             return result;
         }
@@ -1776,6 +1807,13 @@ namespace KingmakerBuffPlanner.UI
             // cross-routine reservations the scope filter cannot undo.
             ExplicitCastingPlan plan = Compile(inputs, scope, false);
             CastingApplyDecision decision = _gate.Evaluate(plan, mode, scope);
+            // Freeze reason wording with the same fresh input as admission.
+            // Later previews or native spending must not rewrite that cause.
+            foreach (CastingOmission omission in decision.Omissions)
+            {
+                _runProviders[omission.CastingId] = plan.CastingById(omission.CastingId).Provider;
+                foreach (string reason in omission.Reasons) DescribeRunReason(omission.CastingId, reason);
+            }
             // A refused decision never reaches the boundary in any mode.
             if (!decision.Allowed)
                 return new WorkspaceApplyResult(false,
@@ -1826,11 +1864,14 @@ namespace KingmakerBuffPlanner.UI
                 return new WorkspaceApplyResult(false,
                     "execution-projection-refused:" + projection.Refusal,
                     decision, null, projection);
+            var reporting = new AcceptedRunReporting(projection.ProjectionId,
+                RoutineDisplayName(scope), _runLabels, _runReasons);
             try
             {
                 _submissionInFlight = true;
                 CastingDispatchOutcome dispatch = _dispatch.Submit(
                     plan, decision, scope, projection);
+                if (dispatch.Submitted) _acceptedRunReporting = reporting;
                 return new WorkspaceApplyResult(
                     dispatch.Submitted, dispatch.Submitted
                         ? string.Empty : dispatch.Reason,
@@ -1883,11 +1924,146 @@ namespace KingmakerBuffPlanner.UI
 
         public CastingRunReport LastRunReport { get; private set; }
 
+        // Deliberate attempts only. Rendering, discovery and controller handoff
+        // never emit. The native writer is supplied at the composition root.
+        public Action<IReadOnlyList<string>, bool> RunLog { get; set; }
+        // These dictionaries belong only to the latest admission attempt.
+        // A submitted run owns a separate frozen copy until its terminal.
+        private Dictionary<string, string> _runLabels = new Dictionary<string, string>(StringComparer.Ordinal);
+        private List<string> _runOrder = new List<string>();
+        private Dictionary<string, string> _runReasons = new Dictionary<string, string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, ProviderKey> _runProviders = new Dictionary<string, ProviderKey>(StringComparer.Ordinal);
+        private readonly HashSet<string> _reportedRuns = new HashSet<string>(StringComparer.Ordinal);
+        private AcceptedRunReporting _acceptedRunReporting;
+
+        private sealed class AcceptedRunReporting
+        {
+            internal readonly string ProjectionId;
+            internal readonly string RoutineName;
+            private readonly Dictionary<string, string> _labels;
+            private readonly Dictionary<string, string> _reasons;
+
+            internal AcceptedRunReporting(string projectionId, string routineName,
+                IDictionary<string, string> labels, IDictionary<string, string> reasons)
+            {
+                ProjectionId = projectionId;
+                RoutineName = routineName;
+                _labels = new Dictionary<string, string>(labels, StringComparer.Ordinal);
+                _reasons = new Dictionary<string, string>(reasons, StringComparer.Ordinal);
+            }
+
+            internal string Label(string id)
+            {
+                string label;
+                return _labels.TryGetValue(id, out label) ? label : id;
+            }
+
+            internal string Reason(string castingId, string code)
+            {
+                string reason;
+                return _reasons.TryGetValue(castingId + "\0" + code, out reason)
+                    ? reason : WorkspaceReasonText.Describe(code);
+            }
+        }
+
+        private void SnapshotRunLabels(string scope)
+        {
+            _runLabels = new Dictionary<string, string>(StringComparer.Ordinal);
+            _runOrder = new List<string>();
+            _runReasons = new Dictionary<string, string>(StringComparer.Ordinal);
+            _runProviders.Clear();
+            foreach (PlannedCasting casting in Document.Castings.Where(c => c.RoutineId == scope).OrderBy(c => c.Order))
+            {
+                _runOrder.Add(casting.CastingId);
+                _runLabels[casting.CastingId] = CastingLabel(casting.CastingId) +
+                    " [casting " + (casting.Order + 1) +
+                    (casting.TargetMode == CastingTargetMode.DirectTarget || casting.Origin == null
+                        ? string.Empty : "; group centered on " + UnitDisplayName(_lastInputs,
+                            casting.Origin.IsCasterCentered ? casting.CasterUnitId : casting.Origin.AnchorUnitId)) + "]";
+            }
+        }
+
+        public string RunCastingLabel(string id)
+        {
+            string label;
+            return _runLabels.TryGetValue(id, out label) ? label : CastingLabel(id);
+        }
+
+        private string DescribeRunReason(string castingId, string code)
+        {
+            string text;
+            string key = castingId + "\0" + code;
+            if (_runReasons.TryGetValue(key, out text)) return text;
+            text = WorkspaceReasonText.Describe(code);
+            if (_lastInputs != null && _lastInputs.Snapshot != null)
+            {
+                var pool = _lastInputs.Snapshot.ResourcePools.FirstOrDefault(p =>
+                    code.StartsWith("resource-pool-exhausted:" + p.PoolKey + ":", StringComparison.Ordinal) ||
+                    code == "prepared-slots-exhausted:" + p.PoolKey);
+                if (pool != null)
+                {
+                    ProviderKey providerKey;
+                    _runProviders.TryGetValue(castingId, out providerKey);
+                    var provider = _lastInputs.Snapshot.Providers.FirstOrDefault(p => p.Key.Equals(providerKey));
+                    string resource = pool.Kind == ResourcePoolKind.PreparedSlots ? "prepared uses"
+                        : pool.Kind == ResourcePoolKind.SpontaneousLevel && provider != null
+                            ? "level " + provider.SpellLevel + " spell slots"
+                            : pool.Kind == ResourcePoolKind.ItemCharges ? "item charges" : "uses in the shared pool";
+                    bool depleted = pool.Remaining == 0;
+                    if (pool.Kind == ResourcePoolKind.PreparedSlots && provider != null)
+                    {
+                        var available = new HashSet<string>(pool.Tokens.Where(t => t.Available).Select(t => t.TokenId));
+                        depleted = !pool.Tokens.Any(t => provider.EligibleTokenIds.Contains(t.TokenId) &&
+                            available.Contains(t.TokenId) && t.LinkedTokenIds.All(available.Contains));
+                    }
+                    text = depleted ? "no " + resource + " remain"
+                        : provider != null && pool.Kind != ResourcePoolKind.PreparedSlots && pool.Remaining < provider.UnitsPerCast
+                            ? "not enough " + resource + " remain for this casting"
+                            : "not enough " + resource + "; earlier planned castings have first claim on this pool";
+                }
+                var enhancement = _lastInputs.Enhancements.FirstOrDefault(e =>
+                    code == "enhancement-exhausted:" + e.EnhancementId ||
+                    code.StartsWith("enhancement-pool-exhausted:" + e.UsagePoolId + ":", StringComparison.Ordinal));
+                if (enhancement != null)
+                    text = enhancement.RemainingUses == 0
+                        ? "no uses remain for required " + enhancement.DisplayName
+                        : "not enough uses for required " + enhancement.DisplayName +
+                            "; earlier planned castings have first claim on this pool";
+            }
+            _runReasons[key] = text;
+            return text;
+        }
+
+        private void EmitRunLog(IReadOnlyList<string> lines, bool warning)
+        {
+            try { if (RunLog != null) RunLog(lines, warning); }
+            catch (Exception) { /* Feedback cannot change a casting verdict. */ }
+        }
+
+        public void ReportRunRefusal(string message)
+        {
+            RecordGlobalRefusal(message);
+            EmitRunLog(new[] { CastingRunPresentation.GameLogRefusal(message) }, true);
+        }
+
         public void RecordRunReport(CastingRunReport report)
         {
             if (report == null) return;
+            if (!_reportedRuns.Add(report.RunId)) return;
             LastRunReport = report;
             LastAttemptMessage = null;
+            AcceptedRunReporting reporting = _acceptedRunReporting;
+            if (reporting != null && reporting.ProjectionId == report.ProjectionId)
+            {
+                _acceptedRunReporting = null;
+                EmitRunLog(CastingRunPresentation.GameLogLines(report,
+                    reporting.RoutineName, reporting.Label, reporting.Reason),
+                    report.Cancelled || report.Halted || report.Failed != 0 || report.Omitted != 0);
+                return;
+            }
+            EmitRunLog(CastingRunPresentation.GameLogLines(report,
+                RoutineDisplayName(report.ScopeRoutineId), RunCastingLabel, DescribeRunReason),
+                report.Cancelled || report.Halted || report.Failed != 0 || report.Omitted != 0);
         }
 
         // The last refused attempt from any route (HUD or planner), shown in
@@ -1907,7 +2083,7 @@ namespace KingmakerBuffPlanner.UI
                 value => value != null && string.Equals(value.CastingId, castingId,
                     StringComparison.Ordinal));
             if (casting == null) return castingId ?? string.Empty;
-            string spell = casting.SourceId;
+            string spell = "Casting " + (casting.Order + 1);
             if (_lastInputs != null && casting.Ability != null)
             {
                 ProviderPlanningOption option = _lastInputs.ProviderOptions.FirstOrDefault(
@@ -2582,7 +2758,7 @@ namespace KingmakerBuffPlanner.UI
         // preservation (review F6).
         public bool IsDirty
         {
-            get { return !string.Equals(DocumentIntentSignature(),
+            get { return _availabilityMigrationPending || !string.Equals(DocumentIntentSignature(),
                 _savedIntentSignature ?? string.Empty,
                 StringComparison.Ordinal); }
         }

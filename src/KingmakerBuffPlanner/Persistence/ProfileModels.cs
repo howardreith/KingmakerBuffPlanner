@@ -237,9 +237,7 @@ namespace KingmakerBuffPlanner.Persistence
         [JsonProperty("allowAnimatedFallback", Required = Required.Always, Order = 2)] public bool AllowAnimatedFallback { get; set; }
         [JsonProperty("outOfCombatOnly", Required = Required.Always, Order = 3)] public bool OutOfCombatOnly { get; set; }
         [JsonProperty("recastExisting", Required = Required.Always, Order = 4)] public bool RecastExisting { get; set; }
-        // Optional in candidate format revisions 1-3. Missing or malformed
-        // values normalize to strict, so an existing profile never begins
-        // omitting unavailable castings without an explicit player choice.
+        // Optional in older files. Strict admission is an explicit opt-in.
         [JsonProperty("availabilityPolicy", Order = 5,
             NullValueHandling = NullValueHandling.Ignore)]
         public string AvailabilityPolicy { get; set; }
@@ -249,8 +247,8 @@ namespace KingmakerBuffPlanner.Persistence
 
         internal static string NormalizeAvailabilityPolicy(string value)
         {
-            return string.Equals(value, CastAvailable, StringComparison.Ordinal)
-                ? CastAvailable : RequireFullPlan;
+            return string.Equals(value, RequireFullPlan, StringComparison.Ordinal)
+                ? RequireFullPlan : CastAvailable;
         }
 
         internal static ExecutionProfile Default()
@@ -266,7 +264,7 @@ namespace KingmakerBuffPlanner.Persistence
                 AllowAnimatedFallback = CastingExecutionPolicy.AllowAnimatedFallback,
                 OutOfCombatOnly = CastingExecutionPolicy.OutOfCombatOnly,
                 RecastExisting = false,
-                AvailabilityPolicy = RequireFullPlan
+                AvailabilityPolicy = CastAvailable
             };
         }
 
@@ -286,6 +284,15 @@ namespace KingmakerBuffPlanner.Persistence
                 RecastExisting = RecastExisting,
                 AvailabilityPolicy = NormalizeAvailabilityPolicy(AvailabilityPolicy)
             };
+        }
+
+        // Old files did not distinguish an untouched default from a choice.
+        // Normalize BEFORE a caller stamps the new candidate revision.
+        internal ExecutionProfile WithLegacyAvailabilityUpgrade()
+        {
+            ExecutionProfile upgraded = WithEnforcedPolicy();
+            upgraded.AvailabilityPolicy = CastAvailable;
+            return upgraded;
         }
 
         internal bool DiffersFromEnforcedPolicy

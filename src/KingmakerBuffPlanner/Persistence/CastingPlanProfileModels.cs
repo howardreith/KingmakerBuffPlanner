@@ -29,8 +29,10 @@ namespace KingmakerBuffPlanner.Persistence
         // an AssemblyMetadata attribute ("KingmakerBuffPlanner.
         // CandidateProfileFormat" = "<schema>.<revision>"), which install
         // rollback reads from the restored binary itself.
-        internal const int CurrentFormatRevision = 4;
-        internal const string CandidateFormatToken = "6.4";
+        //   5 = cast-available default and one-time legacy policy reset
+        internal const int CurrentFormatRevision = 5;
+        internal const int AvailabilityPolicyRevision = 5;
+        internal const string CandidateFormatToken = "6.5";
         internal const string CandidateFormatAttributeKey =
             "KingmakerBuffPlanner.CandidateProfileFormat";
 

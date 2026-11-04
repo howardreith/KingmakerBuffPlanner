@@ -91,7 +91,8 @@ namespace KingmakerBuffPlanner.Persistence
             ClassicPlanInMemory legacyInMemory = null,
             CastingPlanDocument unsavedDocument = null,
             UiProfile unsavedUi = null,
-            ExecutionProfile unsavedExecution = null)
+            ExecutionProfile unsavedExecution = null,
+            string executionModeOverride = null, string availabilityPolicyOverride = null)
         {
             if (string.IsNullOrWhiteSpace(campaignId))
                 throw new ArgumentException("Exact campaign ID is required.", "campaignId");
@@ -170,10 +171,15 @@ namespace KingmakerBuffPlanner.Persistence
             // Merged into castings added in the session: the session's own
             // settings are kept (focused re-review).
             bool mergedIntoUnsaved = existingDocument != null && ReferenceEquals(existingDocument, unsavedDocument);
+            ExecutionProfile execution = unsavedExecution == null
+                ? legacy.Execution.WithLegacyAvailabilityUpgrade() : unsavedExecution.WithEnforcedPolicy();
+            if (executionModeOverride != null) execution.Mode = executionModeOverride;
+            if (availabilityPolicyOverride != null)
+                execution.AvailabilityPolicy = ExecutionProfile.NormalizeAvailabilityPolicy(availabilityPolicyOverride);
             CastingPlanProfile candidate = CastingPlanProfile.FromDocument(
                 imported.Document,
                 mergedIntoUnsaved && unsavedUi != null ? unsavedUi : legacy.Ui,
-                mergedIntoUnsaved && unsavedExecution != null ? unsavedExecution : legacy.Execution);
+                execution);
             try
             {
                 _candidateRepository.Save(candidate);

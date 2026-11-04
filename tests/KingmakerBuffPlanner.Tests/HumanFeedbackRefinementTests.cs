@@ -476,10 +476,10 @@ namespace KingmakerBuffPlanner.Tests
             string dir = Path.Combine(root, "human-feedback-policy");
             Directory.CreateDirectory(dir);
             var session = new CastingWorkspaceSession(dir, "policy-campaign");
-            Expect(session.ApplyMode == CastingApplyMode.Ordinary &&
-                session.AvailabilityPolicy == ExecutionProfile.RequireFullPlan,
-                "a new profile did not default to Require full plan");
-            session.SetAvailabilityPolicy(ExecutionProfile.CastAvailable);
+            Expect(session.ApplyMode == CastingApplyMode.ReadyCastsOnly &&
+                session.AvailabilityPolicy == ExecutionProfile.CastAvailable,
+                "a new profile did not default to Cast available");
+            session.Save();
             var reopened = new CastingWorkspaceSession(dir, "policy-campaign");
             Expect(reopened.ApplyMode == CastingApplyMode.ReadyCastsOnly &&
                 reopened.AvailabilityPolicy == ExecutionProfile.CastAvailable,
@@ -490,8 +490,8 @@ namespace KingmakerBuffPlanner.Tests
             malformed["execution"]["availabilityPolicy"] = "surprising-new-value";
             File.WriteAllText(path, malformed.ToString());
             var failedClosed = new CastingWorkspaceSession(dir, "policy-campaign");
-            Expect(failedClosed.ApplyMode == CastingApplyMode.Ordinary,
-                "a malformed availability policy did not fail closed to strict");
+            Expect(failedClosed.ApplyMode == CastingApplyMode.ReadyCastsOnly && failedClosed.IsDirty,
+                "an invalid optional policy enabled strict or claimed durability");
 
             string oldDir = Path.Combine(root, "human-feedback-policy-old");
             Directory.CreateDirectory(oldDir);
@@ -502,8 +502,8 @@ namespace KingmakerBuffPlanner.Tests
             old["formatRevision"] = 3;
             File.WriteAllText(oldSession.PlanPathForRuntime, old.ToString());
             Expect(new CastingWorkspaceSession(oldDir, "old-policy").ApplyMode ==
-                CastingApplyMode.Ordinary,
-                "an older profile silently opted into Cast available");
+                CastingApplyMode.ReadyCastsOnly,
+                "an older profile did not migrate to Cast available");
 
             CastingWorkspaceInputs inputs = GraphInputs(bardLevel2: 1);
             var gated = new CastingWorkspaceSession(
@@ -512,6 +512,7 @@ namespace KingmakerBuffPlanner.Tests
                 GraphProviderKey("unit-bard", "book-bard", GraphAbilityA, "level-2"), "unit-t1");
             GraphAdd(gated, inputs, GraphSourceA, "unit-bard",
                 GraphProviderKey("unit-bard", "book-bard", GraphAbilityA, "level-2"), "unit-t2");
+            gated.SetAvailabilityPolicy(ExecutionProfile.RequireFullPlan);
             CastingGraphView strict = gated.BuildGraph(inputs);
             Expect(!strict.SelectedRoutineGate.Allowed &&
                 strict.SelectedRoutineGate.BlockingCastings.Count == 1,
@@ -549,6 +550,7 @@ namespace KingmakerBuffPlanner.Tests
             string provider = GraphProviderKey("unit-bard", "book-bard", GraphAbilityA, "level-2");
             GraphAdd(session, inputs, GraphSourceA, "unit-bard", provider, "unit-t1");
             GraphAdd(session, inputs, GraphSourceA, "unit-bard", provider, "unit-t2");
+            session.SetAvailabilityPolicy(ExecutionProfile.RequireFullPlan);
             WorkspaceResourceReport strict = session.BuildResourceReport(inputs,
                 WorkspaceResourceScope.SelectedRoutine);
             WorkspaceResourceRow pool = strict.Groups.SelectMany(value => value.Rows)

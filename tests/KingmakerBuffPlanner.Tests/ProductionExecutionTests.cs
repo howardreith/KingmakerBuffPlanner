@@ -25,6 +25,7 @@ namespace KingmakerBuffPlanner.Tests
     {
         private static void RunProductionExecutionTests(string root)
         {
+            RunCastAvailableTests(root);
             foreach (string executionMode in new[] { "instant", "animated" })
             {
                 string mode = executionMode;
@@ -2485,7 +2486,7 @@ namespace KingmakerBuffPlanner.Tests
                     entry("cast-3", CastingOutcomeState.Skipped, false, false, "already-active:unit-t3")
                 }, new string[0]);
             string text = CastingRunPresentation.Describe(success, "Long", id => "Label " + id);
-            if (text != "Long: 2 of 2 casts confirmed; 1 already active. Casts with observed resource use: 2.")
+            if (text != "Long: 2 confirmed of 3 saved castings; 1 already active. Casts with observed resource use: 2.")
                 throw new InvalidOperationException("Success text: " + text);
             var halted = new CastingRunReport("run-2", "long", CastingApplyMode.Ordinary, "p",
                 "halted:FailedSubmission:boom", false, true, new[]
@@ -2494,7 +2495,7 @@ namespace KingmakerBuffPlanner.Tests
                     entry("cast-2", CastingOutcomeState.NotProcessed, true, false, "halted")
                 }, new string[0]);
             string failed = CastingRunPresentation.Describe(halted, "Long", id => "Label " + id);
-            if (failed != "Long stopped after a cast failed: 0 of 2 casts confirmed; failed: Label cast-1 " +
+            if (failed != "Long stopped after a cast failed: 0 confirmed of 2 saved castings; failed: Label cast-1 " +
                     "(FailedSubmission:boom); 1 not attempted. Casts with observed resource use: 1.")
                 throw new InvalidOperationException("Halted text: " + failed);
             var cancelled = new CastingRunReport("run-3", "long", CastingApplyMode.Ordinary, "p",
@@ -2504,7 +2505,7 @@ namespace KingmakerBuffPlanner.Tests
                         true, true, "ok", true)
                 }, new string[0]);
             string stoppedText = CastingRunPresentation.Describe(cancelled, "Long", null);
-            if (!stoppedText.StartsWith("Long stopped (you stopped it): 1 of 1 cast confirmed",
+            if (!stoppedText.StartsWith("Long stopped (you stopped it): 1 confirmed of 1 saved casting",
                     StringComparison.Ordinal) ||
                 !stoppedText.EndsWith("Casts with observed resource use: 0 (plus 1 free).", StringComparison.Ordinal))
                 throw new InvalidOperationException("Cancelled text: " + stoppedText);
@@ -3107,9 +3108,10 @@ namespace KingmakerBuffPlanner.Tests
         private static void TestRefusalFeedbackRules(string root)
         {
             string[] opens = { "nothing-presented", "not-accepted", "material-change-requires-review",
-                "apply-refused:blocked-casting:cast-1:x", "import-notices-pending:1",
-                "legacy-import-unresolved:x", "execution-projection-refused:unsupported-contract:x" };
-            string[] quiet = { "nothing-to-cast:2", "execution-in-progress:run-3",
+                "import-notices-pending:1",
+                "legacy-import-unresolved:x" };
+            string[] quiet = { "apply-refused:blocked-casting:cast-1:x", "execution-projection-refused:unsupported-contract:x",
+                "nothing-to-cast:2", "execution-in-progress:run-3",
                 "native-submission-disabled:runtime-test-session:x", "native-casting-unavailable:mod-disabled",
                 "submission-already-in-flight", string.Empty };
             if (opens.Any(reason => !CastingRunPresentation.OpensPlanner(reason)) ||

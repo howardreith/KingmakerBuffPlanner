@@ -1,4 +1,27 @@
-# Mr. Bard's Kingmaker Buff Planner 0.6.9
+# Unreleased: Cast available by default
+
+- Routines cast the available subset in your saved order and explain every
+  uncast entry in the game's normal log, including no-op attempts. Availability
+  refusals no longer force the planner open, including in strict mode.
+- **Require full plan** is an unchecked opt-in checkbox in the execution footer,
+  beside Resources and Mode. It refuses admission when a needed casting is
+  unavailable and explains which otherwise-ready casts were withheld.
+- Format 6.5 migrates supported older profiles to Cast available once. Old files
+  serialized Require full plan for both the default and deliberate choices,
+  without provenance; players who want strict mode must enable it once after
+  upgrading. Later valid choices persist through edits, Undo, reload and saves.
+  Assignments, exact sources, targets, enhancements and other settings stay intact.
+- Existing recast rules and protective stopping after native failures remain.
+  This does not establish a native Heroism repair or prepared-slot reuse proof.
+
+Development verification only; native rendering/input/gameplay acceptance
+**NOT RUN**. No release or installation was performed for this checkpoint.
+See [commands, evidence and remaining checks](CAST-AVAILABLE-DEFAULT-CHECKPOINT.md).
+
+The published 0.6.9 notes remain below as history and in
+[RELEASE-NOTES-0.6.9.md](RELEASE-NOTES-0.6.9.md).
+
+# Mr. Bard's Kingmaker Buff Planner 0.6.9 (published history)
 
 Owner-authorized stable update for Clear plan and casting diagnostics, following
 merged PRs #17 and #18.

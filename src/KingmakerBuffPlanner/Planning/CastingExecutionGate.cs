@@ -27,8 +27,9 @@ namespace KingmakerBuffPlanner.Planning
     public sealed class CastingOmission
     {
         internal CastingOmission(string castingId, string routineId,
-            IEnumerable<string> reasons)
+            IEnumerable<string> reasons, ResolvedCastingReadiness readiness = ResolvedCastingReadiness.Blocked)
         {
+            Readiness = readiness;
             CastingId = castingId;
             RoutineId = routineId ?? string.Empty;
             Reasons = new ReadOnlyCollection<string>((reasons ?? new string[0])
@@ -39,6 +40,7 @@ namespace KingmakerBuffPlanner.Planning
         public string CastingId { get; private set; }
         public string RoutineId { get; private set; }
         public IReadOnlyList<string> Reasons { get; private set; }
+        public ResolvedCastingReadiness Readiness { get; private set; }
     }
 
     public sealed class CastingApplyDecision
@@ -153,7 +155,7 @@ namespace KingmakerBuffPlanner.Planning
                 var reasons = casting.ReadinessReasons.ToList();
                 if (reasons.Count == 0) reasons.Add(fallback);
                 omissions.Add(new CastingOmission(
-                    casting.CastingId, casting.RoutineId, reasons));
+                    casting.CastingId, casting.RoutineId, reasons, casting.Readiness));
                 if (blocks && mode == CastingApplyMode.Ordinary)
                 {
                     blockingCastings.Add(new CastingBlocker(

@@ -593,7 +593,7 @@ namespace KingmakerBuffPlanner.UI
             if (notReady > 0)
                 return routineName + " cannot run: " + (notReady == 1 ? "1 casting is" : notReady + " castings are") +
                     " not ready (marked in red)." +
-                    (executable > 0 ? " Choose Cast available to run the other " + executable + "." : string.Empty);
+                    (executable > 0 ? " Uncheck Require full plan to run the other " + executable + "." : string.Empty);
             if (!allowed)
                 return routineName + " cannot run: " + (string.IsNullOrEmpty(otherBlock) ? "see the marked castings" : otherBlock) + ".";
             string shortage = shortInOnePass <= 0 ? string.Empty
@@ -622,7 +622,7 @@ namespace KingmakerBuffPlanner.UI
         {
             return routineName + " was not cast: " +
                 (notReady == 1 ? "1 casting is" : notReady + " castings are") +
-                " not ready (red lines and cards). Fix them, or choose Cast available to run the ready ones.";
+                " not ready (red lines and cards). Fix them, or uncheck Require full plan to run the ready ones.";
         }
 
         // The mode change is an edit like any other: it saves itself, and
@@ -658,6 +658,8 @@ namespace KingmakerBuffPlanner.UI
         {
             string value = saveState ?? string.Empty;
             if (value == "saved" || value == "saving") return null;
+            if (value == "migration-pending")
+                return "Policy upgrade not saved yet. The next edit, Retry save or Run will save it before casting.";
             if (value.StartsWith("save-failed:", StringComparison.Ordinal))
                 return "Edit not saved (" + value.Substring("save-failed:".Length) +
                     "). Edit kept; file unchanged. Retry save before casting.";
@@ -675,6 +677,7 @@ namespace KingmakerBuffPlanner.UI
         public static string RecoveryAction(string saveState)
         {
             string value = saveState ?? string.Empty;
+            if (value == "migration-pending") return RetrySaveAction;
             if (value.StartsWith("save-failed:", StringComparison.Ordinal)) return RetrySaveAction;
             if (value.StartsWith("save-refused", StringComparison.Ordinal)) return ReloadAction;
             return null;
@@ -772,7 +775,14 @@ namespace KingmakerBuffPlanner.UI
                 case "spellbook-constraint-unsatisfied": return "not in the chosen spellbook";
                 case "resource-pool-unknown": return "its resource was not found";
                 case "resource-pool-exhausted": return "no casts left";
-                case "prepared-slots-exhausted": return "no prepared slot left";
+                case "prepared-slots-exhausted": return "no prepared uses remain";
+                case "no-eligible-prepared-token": return "the selected prepared uses are required by earlier planned castings";
+                case "insufficient-shared-resource": return "remaining shared uses are required by earlier planned castings";
+                case "enhancement-exhausted": return "a required enhancement has no uses remaining";
+                case "enhancement-pool-exhausted": return "not enough required enhancement uses after earlier planned castings";
+                case "enhancement-pool-unknown": return "the required enhancement's resource pool is unavailable";
+                case "enhancement-balance-unknown": return "the required enhancement's remaining uses could not be read";
+                case "material-unavailable": return "not enough material components after earlier planned castings";
                 case "target-not-in-party": return "the recipient is not in the party";
                 case "target-not-friendly": return "the recipient is not an ally";
                 case "target-not-conscious": return "the recipient is unconscious";

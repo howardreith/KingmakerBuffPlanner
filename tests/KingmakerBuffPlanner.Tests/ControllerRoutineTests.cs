@@ -432,6 +432,7 @@ namespace KingmakerBuffPlanner.Tests
             foreach (string mode in new[] { "instant", "animated" })
             {
                 var fixture = new ControllerFixture(root, "policy-" + mode, mode, count: 2);
+                fixture.Session.SetAvailabilityPolicy(ExecutionProfile.RequireFullPlan);
                 PartyProviderSnapshot snapshot;
                 fixture.Inputs = WorkspaceInputs(out snapshot, remainingPerCaster: 1);
                 fixture.Menu.Confirm();
@@ -455,7 +456,8 @@ namespace KingmakerBuffPlanner.Tests
             Assert(empty.Menu.ConfigureRequested && empty.LastApply == null && empty.Host.StartedRuns == 0);
             FocusController(empty.Menu, 0);
             empty.Menu.Confirm();
-            Assert(empty.LastApply == null && empty.Menu.Message.Contains("no configured castings"));
+            Assert(empty.LastApply != null && empty.LastApply.ReviewReason.StartsWith("nothing-to-cast:") &&
+                empty.Host.StartedRuns == 0);
         }
 
         private static void TestControllerStop(string root)
@@ -483,6 +485,7 @@ namespace KingmakerBuffPlanner.Tests
         private static void TestControllerDetails(string root)
         {
             var fixture = new ControllerFixture(root, "details", count: 2);
+            fixture.Session.SetAvailabilityPolicy(ExecutionProfile.RequireFullPlan);
             PartyProviderSnapshot snapshot;
             fixture.Inputs = WorkspaceInputs(out snapshot, remainingPerCaster: 1);
             fixture.Menu.Confirm();
@@ -676,7 +679,7 @@ namespace KingmakerBuffPlanner.Tests
                 return true;
             }, () => { }, () => fixture.Host.IsRunning, () => fixture.Host.ActiveScopeRoutineId);
             Assert(returned.Row(0).Contains("1 castings") && returned.Settings.EndsWith("Saved"));
-            Assert(!returned.Available(1) && !returned.Available(2));
+            Assert(returned.Available(1) && returned.Available(2));
             returned.Confirm(); fixture.Pump();
             Assert(fixture.LastApply.Allowed && fixture.Host.LastReport.Confirmed == 1 && fixture.Host.LastReport.ResourcesSpent == 1);
             var loaded = new CastingWorkspaceSession(fixture.Path, fixture.Session.CampaignId);

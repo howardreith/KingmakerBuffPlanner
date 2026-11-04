@@ -1626,16 +1626,18 @@ namespace KingmakerBuffPlanner.UI
                 ToggleResources, ToggleAvailabilityPolicyCommand, ToggleModeCommand, OpenClearPlan, UndoCommand,
                 RunApply
             };
-            float[] widths = { 128f, 168f, 154f, 128f, 88f, 176f };
+            float[] widths = { 128f, 196f, 154f, 128f, 88f, 176f };
             float right = 0f;
             for (int index = names.Length - 1; index >= 0; index--)
             {
                 Action action = actions[index];
                 Action invoke = names[index] == "Resources" || names[index] == "ClearPlan"
                     ? action : (Action)(() => Command(action));
-                Button button = _kit.Button(footer, names[index], captions[index], invoke,
-                    PlannerTextRole.Button,
-                    names[index] == "Run" ? 19f : 16f);
+                Button button = names[index] == "AvailabilityPolicy"
+                    ? _kit.Checkbox(footer, names[index], "Require full plan",
+                        _session.AvailabilityPolicy == ExecutionProfile.RequireFullPlan, invoke, size: 16f)
+                    : _kit.Button(footer, names[index], captions[index], invoke,
+                        PlannerTextRole.Button, names[index] == "Run" ? 19f : 16f);
                 RectTransform rect = RectOf(button);
                 KingmakerUiFactory.SetAnchors(rect, 1f, 0.12f, 1f, 0.88f);
                 rect.pivot = new Vector2(1f, 0.5f);
@@ -1644,7 +1646,16 @@ namespace KingmakerBuffPlanner.UI
                 rect.anchorMin = new Vector2(1, .04f); rect.anchorMax = new Vector2(1, .48f);
                 right += widths[index] + 8f;
                 if (names[index] == "Resources") _resourcesButton = button;
-                if (names[index] == "AvailabilityPolicy") _policyButton = button;
+                if (names[index] == "AvailabilityPolicy")
+                {
+                    _policyButton = button;
+                    ControllerControlIdentity.Set(button, "plan/availability-policy", "Footer");
+                    button.GetComponent<ControllerControlIdentity>().Explanation = () =>
+                        "Do not start this routine if a needed planned casting is unavailable. " +
+                        "Checks readiness before execution; native failures can still stop a started run.";
+                    button.gameObject.AddComponent<RightClickProxy>().OnRightClick = () => ShowNotice(
+                        button.GetComponent<ControllerControlIdentity>().Explanation());
+                }
                 if (names[index] == "ExecutionMode") _modeButton = button;
                 if (names[index] == "Undo") _undoButton = button;
                 if (names[index] == "ClearPlan")
@@ -3080,7 +3091,6 @@ namespace KingmakerBuffPlanner.UI
             string next = _session.AvailabilityPolicy == ExecutionProfile.RequireFullPlan
                 ? ExecutionProfile.CastAvailable : ExecutionProfile.RequireFullPlan;
             _session.SetAvailabilityPolicy(next);
-            PlannerNativeKit.SetCaption(_policyButton, PolicyCaption());
             Feedback(next == ExecutionProfile.CastAvailable
                 ? "Cast available: ready castings run in authored order; every omission is reported."
                 : "Require full plan: any unavailable requested casting refuses the run.");
@@ -3168,7 +3178,7 @@ namespace KingmakerBuffPlanner.UI
                 // Without fresh discovery nothing is submitted.
                 string refreshRefusal = name + " was not cast: the party state could not be refreshed (" +
                     exception.Message + ").";
-                _session.RecordGlobalRefusal(refreshRefusal);
+                _session.ReportRunRefusal(refreshRefusal);
                 Feedback(refreshRefusal, true);
                 return;
             }
@@ -3215,12 +3225,18 @@ namespace KingmakerBuffPlanner.UI
                 PlannerNativeKit.SetCaption(_runButton, WorkspaceFooterText.RunCaption(
                     _session.RoutineDisplayName(_session.SelectedRoutineId)));
             if (_policyButton != null)
-                PlannerNativeKit.SetCaption(_policyButton, PolicyCaption());
+            {
+                Transform check = _policyButton.transform.Find("Box/Check");
+                if (check != null) check.gameObject.SetActive(
+                    _session.AvailabilityPolicy == ExecutionProfile.RequireFullPlan);
+            }
             ShowSaveState();
         }
 
         private static string DescribeImport(CastingWorkspaceSession session)
         {
+            if (!string.IsNullOrEmpty(session.AvailabilityMigrationNotice))
+                return session.AvailabilityMigrationNotice;
             if (session.LegacyImportBlocked)
                 return "Your previous plan could not be imported (" + session.LegacyImportBlockReason +
                     "). It was NOT replaced: saving and runs are blocked. Repair or restore that file, then press " +

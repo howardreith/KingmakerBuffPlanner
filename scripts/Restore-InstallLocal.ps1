@@ -211,6 +211,8 @@ $candidateMembersRev1 = @('schemaVersion', 'campaignId', 'routines', 'castings',
 $candidateMembersRev2 = @('importNotices', 'legacyRecipientKey', 'reviewItems')
 $candidateMembersRev3 = @('acknowledgedImportNotices', 'resolvedReviewItems', 'formatRevision')
 $candidateMembersRev4 = @('availabilityPolicy', 'formatRevision')
+# Revision 5 changes availability semantics, with no new JSON members.
+$candidateMembersRev5 = @('formatRevision')
 
 function Get-KbpJsonMemberNames($Node) {
     $names = New-Object System.Collections.Generic.List[string]
