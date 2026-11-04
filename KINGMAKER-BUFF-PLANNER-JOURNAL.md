@@ -1,3 +1,17 @@
+## PR #18 reporting review correction — 2026-11-04
+
+Branch `codex/kingmaker-buff-planner-heroism-repeat-cast`; reviewed HEAD
+`f694878a5552fb31abdb6b060f0bb7e2f34fc09f`; corrected tested HEAD
+`e1e35c9edbc6fe853a5e45dde66aa5cf05c1e523`, version 0.6.8 unchanged.
+Reproduced three lost Animated route-evidence failures officially (0/3, 7.911 s).
+Preserved actual spending records alongside confirmation detail and added the
+combined-evidence assertion; official focused 42/0 (9.317 s), source 47/0,
+build 1/0. Qualification checks unchanged. Normalized evidence whitespace while
+preserving original identity/result, and corrected the native handoff order.
+Native Heroism and native spent-slot-to-available-slot reuse remain NOT RUN.
+Next: review; native work begins with executable recipe preparation.
+[Review evidence, exact command, hashes and limits](docs/HEROISM-REPEAT-CAST-REPAIR.md#pr-18-review-correction-preserve-spending-route-evidence).
+
 ## Heroism investigation and diagnostic checkpoint — 2026-11-04
 
 Dedicated branch `codex/kingmaker-buff-planner-heroism-repeat-cast`, base

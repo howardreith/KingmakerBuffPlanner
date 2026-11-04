@@ -1,3 +1,15 @@
+## PR #18 reporting review correction — 2026-11-04
+
+Branch `codex/kingmaker-buff-planner-heroism-repeat-cast`; reviewed HEAD
+`f694878a5552fb31abdb6b060f0bb7e2f34fc09f`; corrected tested HEAD
+`e1e35c9edbc6fe853a5e45dde66aa5cf05c1e523`, unchanged version 0.6.8.
+Retain actual native spending/route records alongside confirmation diagnostics.
+Official baseline 0/3; corrected focused 42/0, source 47/0, build 1/0.
+The Heroism gameplay defect remains open; native rows NOT RUN. Next native
+action is to prepare the executable Heroism-plus-distinct-sentinel recipe,
+then freeze/package, guarded selection, bound allowance and guarded casts.
+[Exact commands, hashes, evidence and ordered handoff](docs/HEROISM-REPEAT-CAST-REPAIR.md#pr-18-review-correction-preserve-spending-route-evidence).
+
 ## Heroism diagnostic development checkpoint — 2026-11-04
 
 Branch `codex/kingmaker-buff-planner-heroism-repeat-cast`; base
