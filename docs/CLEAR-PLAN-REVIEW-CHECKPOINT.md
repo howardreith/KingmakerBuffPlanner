@@ -108,6 +108,9 @@ it with held/repeated input. Verify no underlying action or focus movement until
 release and a fresh press, then verify ordinary editing and run behavior. Keep
 normal/compact rendering and physical-controller criteria NOT RUN until observed.
 
-Next delivery action: guarded helper tests/push and update draft
-[PR #17](https://github.com/howardreith/KingmakerBuffPlanner/pull/17), retaining its
-native acceptance caveat. Merging/version changes/publication are outside scope.
+Guarded helper tests passed **6 PASS / 0 FAIL** on clean checkpoint
+db4fe57ed9e3b8b693e3e9b5404dcfa7429a3d7f, and the unchanged project-owned
+helper pushed and verified that HEAD. [Helper result](evidence/clear-plan-review-2026-11-04/guarded-push-test.log).
+The description of draft
+[PR #17](https://github.com/howardreith/KingmakerBuffPlanner/pull/17) was updated, retaining its
+native acceptance caveat. The final receipt is documentation-only; no product rebuild or artifact relabeling. Next: review the corrections and perform the guarded native steps above. Merging/version changes/publication are outside scope.

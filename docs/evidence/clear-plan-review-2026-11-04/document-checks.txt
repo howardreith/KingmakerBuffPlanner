@@ -1,1 +1,1 @@
-Review checkpoint relative links: PASS=7 FAIL=0
+Review checkpoint relative links: PASS=8 FAIL=0

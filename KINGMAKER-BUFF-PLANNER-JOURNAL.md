@@ -9,7 +9,7 @@ Production-path regressions reproduce both findings; final Windows source 47/0,
 build 1/0 and focused tests 39/0, including six new compiled-view/lifecycle cases.
 Native rendering, mouse and physical-controller acceptance remain **NOT RUN**.
 [Exact reproduction limits, commands, counts, hashes and remaining native steps](docs/CLEAR-PLAN-REVIEW-CHECKPOINT.md).
-Next: guarded push/update PR #17, review and the recorded native boundary.
+Guarded push checks 6/0 and remote verification passed; draft PR #17 and its description are updated. Next: review and the recorded native boundary.
 
 ## Clear plan development checkpoint — 2026-11-04
 
