@@ -1,3 +1,5 @@
+> Superseded by the [owner-preflight and fixture-setup checkpoint](PLAYTEST-REPAIR-OWNER-PREFLIGHT-CHECKPOINT.md). These cee1060 receipts remain historical and unchanged.
+
 # PR #20 review correction checkpoint
 
 Status recorded at **2026-11-05 04:19 UTC**, with continuation below.
