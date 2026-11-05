@@ -30,6 +30,8 @@ namespace KingmakerBuffPlanner.Tests
             internal bool CapturedHeroism;
             internal bool InfectiousCharms;
             internal bool NearbyRecipients;
+            internal bool NearbySelectionUnresolved;
+            internal string NearbyOwner;
             private readonly Dictionary<string, List<ObservedEffectInstance>> _additional =
                 new Dictionary<string, List<ObservedEffectInstance>>(StringComparer.Ordinal);
             private string BuffId { get { return CapturedHeroism ? "87ab2fed7feaaff47b62a3320a57ad8d" : "buff-effect"; } }
@@ -191,7 +193,7 @@ namespace KingmakerBuffPlanner.Tests
                 var facts = CapturedHeroism ? new Dictionary<string, bool> { { "infectious-charms-feature", InfectiousCharms } } : null;
                 var bound = current.Snapshot.Units.ToDictionary(unit => unit.UnitId, unit =>
                     EffectRecipientBinding.Bind(EffectConditionBinding.Bind(heroism, facts), rule =>
-                        new[] { unit.UnitId == "unit-t2" ? "unit-t3" : "unit-t2" }), StringComparer.Ordinal);
+                        NearbySelectionUnresolved ? null : new[] { NearbyOwner ?? (unit.UnitId == "unit-t2" ? "unit-t3" : "unit-t2") }), StringComparer.Ordinal);
                 var options = providers.Select(provider => new ProviderPlanningOption(provider,
                     provider == sentinel ? new[] { "unit-t4" } : current.Snapshot.Units.Select(unit => unit.UnitId), new[] { provider.Key.CasterUnitId },
                     10, 100, CastExecutionStrategy.DirectRuleCast, "simulated-direct",
@@ -406,6 +408,42 @@ namespace KingmakerBuffPlanner.Tests
                     negative.Host.LastReport.ResourcesSpent == 1 && negative.World.State.Fired.Count == 1,
                     observation + ": confirmed=" + negative.Host.LastReport.Confirmed + ";notProcessed=" + negative.Host.LastReport.NotProcessed + ";spent=" + negative.Host.LastReport.ResourcesSpent + ";" + negative.Host.LastReport.Entries[0].Detail);
             }
+        }
+
+        private static void TestUnobservableHeroismAdmission(string root, string mode)
+        {
+            foreach (bool unresolved in new[] { true, false })
+                foreach (bool strict in new[] { false, true })
+                {
+                    var run = new RepeatSession(root, mode, "owners-" + unresolved + "-" + strict,
+                        capturedHeroism: true, infectiousCharms: true, nearbyRecipients: true);
+                    run.World.NearbySelectionUnresolved = unresolved;
+                    run.World.NearbyOwner = unresolved ? null : "nearby-npc-outside-party";
+                    run.Session.SetAvailabilityPolicy(strict ? KingmakerBuffPlanner.Persistence.ExecutionProfile.RequireFullPlan
+                        : KingmakerBuffPlanner.Persistence.ExecutionProfile.CastAvailable);
+                    var logs = new List<string>();
+                    run.Session.RunLog = (lines, warning) => logs.AddRange(lines);
+                    string intent = run.Session.DocumentIntentSignature();
+                    string heroism = run.Session.Document.Castings[0].CastingId;
+                    string successor = run.Session.Document.Castings[1].CastingId;
+                    var beforeTokens = run.World.State.Tokens.ToDictionary(pair => pair.Key, pair => pair.Value);
+                    WorkspaceApplyResult result = run.Apply(useSavedPolicy: true);
+                    string reason = unresolved ? "effect-owner-unresolved" : "effect-owner-not-readable:nearby-npc-outside-party";
+                    RepeatAssert(result.GateDecision.Omissions.Any(item => item.CastingId == heroism && item.Reasons.Contains(reason)),
+                        "Known unobservable owner was not omitted at preflight: " + reason);
+                    if (strict)
+                        RepeatAssert(!result.Allowed && run.World.State.Fired.Count == 0 && run.Host.LastReport == null,
+                            "Require full plan started before refusing an unobservable owner.");
+                    else
+                        RepeatAssert(result.Allowed && run.World.State.Fired.SequenceEqual(new[] { successor }) &&
+                            run.Host.LastReport.Confirmed == 1 && run.Host.LastReport.Omitted == 1 && run.Host.LastReport.NotProcessed == 0 &&
+                            run.World.State.SpontaneousRemaining == 2,
+                            "Cast available did not omit unobservable Heroism and execute the distinct affordable successor.");
+                    RepeatAssert(beforeTokens.All(pair => run.World.State.Tokens[pair.Key] == pair.Value),
+                        "Blocked Heroism consumed a prepared slot.");
+                    RepeatAssert(logs.Any(line => line.Contains("effect owner") || line.Contains(reason)) &&
+                        run.Session.DocumentIntentSignature() == intent, "Omission explanation or saved intent was lost.");
+                }
         }
 
         private static void TestMixedOwnerHeroism(string root, string mode, bool nearby = false)

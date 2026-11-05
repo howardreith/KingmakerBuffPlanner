@@ -784,6 +784,8 @@ namespace KingmakerBuffPlanner.UI
                 case "enhancement-balance-unknown": return "the required enhancement's remaining uses could not be read";
                 case "material-unavailable": return "not enough material components after earlier planned castings";
                 case "target-not-in-party": return "the recipient is not in the party";
+                case "effect-owner-unresolved": return "a required effect owner could not be determined; refresh after nearby units move";
+                case "effect-owner-not-readable": return "a required effect owner is outside the readable party and pets; this casting cannot be confirmed";
                 case "target-not-friendly": return "the recipient is not an ally";
                 case "target-not-conscious": return "the recipient is unconscious";
                 case "target-not-alive": return "the recipient is dead";

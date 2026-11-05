@@ -439,6 +439,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("playtest-heroism-captured-instant", () => TestCapturedHeroism(root, "instant"));
             Run("playtest-heroism-recipe-instant", () => TestHeroismNativeRecipe(root, "instant"));
             Run("playtest-heroism-nearby-contract", TestNativeNearbyRecipientContract);
+            Run("playtest-heroism-unobservable-admission-instant", () => TestUnobservableHeroismAdmission(root, "instant"));
+            Run("playtest-heroism-unobservable-admission-animated", () => TestUnobservableHeroismAdmission(root, "animated"));
             Run("playtest-heroism-nearby-instant", () => TestMixedOwnerHeroism(root, "instant", true));
             Run("playtest-heroism-nearby-animated", () => TestMixedOwnerHeroism(root, "animated", true));
             Run("playtest-heroism-recipe-animated", () => TestHeroismNativeRecipe(root, "animated"));

@@ -20,6 +20,7 @@ namespace KingmakerBuffPlanner.Domain.Effects
 
     public static class EffectRecipientBinding
     {
+        public const string UnresolvedSecondaryRecipient = "unresolved-secondary-recipient";
         public static bool ContainsNearby(EffectExpression expression)
         {
             var sequence = expression as SequenceEffectExpression;
@@ -45,7 +46,7 @@ namespace KingmakerBuffPlanner.Domain.Effects
                 {
                     IReadOnlyList<string> owners = select(sequence.NearbyRecipients);
                     // Unknown ownership must never be accepted as primary-target coverage.
-                    if (owners == null) owners = new[] { "unresolved-secondary-recipient" };
+                    if (owners == null) owners = new[] { UnresolvedSecondaryRecipient };
                     return new SequenceEffectExpression(owners.SelectMany(owner => sequence.Children.Select(child => Bind(child, select, owner))));
                 }
                 var children = sequence.Children.Select(child => Bind(child, select, currentOwner)).ToList();

@@ -519,6 +519,23 @@ namespace KingmakerBuffPlanner.Planning
                 foreach (AuthoredEnhancementSelection selection in casting.Enhancements)
                     if (selection.Required)
                         reasons.Add("enhancements-unvalidated:source-unresolved");
+            // The execution reader can observe party members and their pets.
+            // Preserve native secondary selection, including uncertainty, but
+            // make known unsupported owners a per-casting admission blocker.
+            // This precedes active-effect skipping and the budget pass: neither
+            // can turn an unobservable required effect into executable intent.
+            if (option != null)
+            {
+                EffectExpression expected = option.BindEffects(DiscoveredEffectLookup.ForAbility(
+                    effectsBySource, casting.Ability, casting.SourceId), casting.DirectTargetUnitId);
+                var readableOwners = new HashSet<string>(snapshot.Units.Select(unit => unit.UnitId), StringComparer.Ordinal);
+                foreach (string owner in predicted.SelectMany(primary =>
+                    new EffectRecipientScope(expected, casting.CasterUnitId, primary).UnitIds).Distinct(StringComparer.Ordinal))
+                    if (owner == EffectRecipientBinding.UnresolvedSecondaryRecipient)
+                        reasons.Add("effect-owner-unresolved");
+                    else if (!readableOwners.Contains(owner))
+                        reasons.Add("effect-owner-not-readable:" + owner);
+            }
             // Only a structurally valid, authored-Ready casting may be
             // satisfied by live effects; a structural block (caster, target,
             // enhancement, modifier, import review) stays a block that the
