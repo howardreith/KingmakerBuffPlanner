@@ -77,3 +77,37 @@ No validator or mission requirement was relaxed. Next: commit the batch and
 profile location correction, build/freeze once, complete launch prerequisites,
 then run selection, allowance-authorized gameplay in both modes, and native UI
 acceptance. Do not merge or release.
+
+## Profile drift resolution checkpoint
+
+Product source: `892ada6` (full SHA recorded by the subsequent freeze receipt).
+The full-user ZFavoredClass seal remains
+`75f4ad7cc401cfe3a7672a69faf66b2682ab08f3fcadc770425bc089368275b8`
+(24 files, 1,419,177 bytes). The verified historical archive is
+`runtime-backups/kbp041-rel-catalog-full/Mods.staged/ZFavoredClass` in the lab.
+The live directory is 24 files, 1,419,640 bytes, digest
+`110347bd03e7442144ead8a15bdc7caf91235101d6fdea347783fe63c9459835`.
+Exactly one path differs: generated `loaded_blueprints.txt`, sealed SHA-256
+`8d4e3fbd00315631ef63ad559c855e6a33521bab13946f4dd9f05d9db9e1cadd`,
+live SHA-256
+`590ca0e2f5400097d215aeb3764072e4f4da56058a5820588d510751d3a64123`.
+
+The full-user and advanced profiles now point to the exact external copy
+`examples/ZFavoredClass-sealed-75f4ad7cc401`, using their existing
+`fixtureRelativePath` contract. Every expected content/primary-file hash,
+count, version and the compatibility identity digest remains unchanged.
+No live file, dependency version, mod enablement or profile seal was changed.
+
+`Copy-KbpSealedCompatibilityFixture.ps1` verifies archive containment and the
+unchanged seal before copying, refuses an existing mismatched destination,
+and verifies the result. Real WhatIf passed; wrong archived source and live
+source both refused before copy. The real copy then verified. Receipts:
+`artifacts/playtest-profile-copy-whatif.log`, `playtest-profile-copy-wrong-source.log`,
+`playtest-profile-copy-live-refusal.log`, `playtest-profile-copy.log`.
+Full-user identity checks passed **1/0** for all 15 mods with both old and new
+manifest readers (`artifacts/playtest-profile-corrected.log`,
+`artifacts/playtest-profile-fast-reader.log`). The live drift inventory is
+retained privately in `artifacts/playtest-profile-drift.json`.
+
+Next: freeze the clean candidate including these source-location changes,
+complete launcher safety/source and WhatIf purity, then native acceptance.
