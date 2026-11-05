@@ -1,0 +1,4 @@
+Launcher argument selection: PASS=28 FAIL=0; bounded offline checks, no live qualification.
+Source validation: PASS=47 FAIL=0
+Protocol tests: PASS=675 FAIL=1
+FAIL probe-catalogue-distinct-spells-keep-own-expression: The available spell must retain its catalogue ID and exact projected expression.

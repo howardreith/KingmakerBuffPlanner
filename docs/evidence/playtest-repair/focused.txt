@@ -1,0 +1,4 @@
+Source validation: PASS=47 FAIL=0
+Build: PASS=1 FAIL=0 configuration=Release sha256=c9e6af303161d2efa64fcc3e89626cb76b81dc6d3475fe5c088da66d94454b93
+Protocol tests: PASS=79 FAIL=0
+DEVELOPMENT PASS=79 FAIL=0 prefixes=playtest,heroism-repeat,clear-plan,cast-available,duplicate-items,stale-item,graph-group-casting,controller-workspace-spatial-modal,native-text-material,group-mixed-coverage-keeps-adequate-recipients,direct-manipulation-group-confirmation-needs-one-reached,confirmation-needs-an-instance-this-attempt-applied,existing-effect-sufficiency-rules,probe-catalogue-distinct-spells-keep-own-expression seconds=15.3; native/purity/release coverage deferred.

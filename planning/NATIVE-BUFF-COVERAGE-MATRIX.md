@@ -1,3 +1,5 @@
+> **2026-11-04 playtest repairs:** frozen product `78ae896f3de28eed57a8ecf8efe70679986158d2`, final test source `a384ba827fc14037b51f8536a4574ea86fae47b4`, version 0.6.10 unreleased. Source repairs and focused 79/0; earlier full offline 676/0. Native H/T/M/W acceptance remains open; no game was launched. [Current checkpoint, guarded draft PR, exact evidence and remaining actions](../docs/PLAYTEST-REPAIR-CHECKPOINT.md). Historical qualification below is not candidate acceptance.
+
 # Native Buff Coverage Matrix
 
 ## 0.5.1-rc3 preparation

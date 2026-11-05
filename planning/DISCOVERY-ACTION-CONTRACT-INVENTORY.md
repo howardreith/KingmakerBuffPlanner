@@ -1,3 +1,5 @@
+> **2026-11-04 conditional contract:** the exact installed `ContextConditionCasterHasFact.Fact` (`BlueprintUnitFact`), inherited `Condition.Not`, and `ConditionsChecker.Operation` (And/Or) are captured as optional discovery metadata. Selected-provider snapshots read the caster through the native `UnitHelper.HasFact` contract, without calling a condition in a fabricated MechanicsContext. Missing/unreadable/other predicate types stay unknown. Active-effect assessment and execution projection bind only proven branches; catalogue/saved identity and mandatory effect requirements remain stable. Installed-assembly and both-mode regression evidence: [playtest repair checkpoint](../docs/PLAYTEST-REPAIR-CHECKPOINT.md). Native reported-environment acceptance is still open.
+
 # Discovery Action Contract Inventory
 
 ## 0.5.1-rc3 preparation

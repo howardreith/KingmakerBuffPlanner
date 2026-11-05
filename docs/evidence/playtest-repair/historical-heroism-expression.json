@@ -1,0 +1,94 @@
+{
+  "provenance": {
+    "dataset": "kbp041-rel-catalog-full/native-buff-catalog.json",
+    "profile": "full-user",
+    "generatorCommit": "85e7410c816cf02271436523ad82b0777c4e443c",
+    "sourceSha256": "d9c7e5bb2eb666d45ef5f18c4068d3a3631b02cffd77624315a1165e0921954d",
+    "scope": "Historical post-initialization graph, not this repair candidate or a current owner-caster fact snapshot. The historical export does not record the condition Fact ID."
+  },
+  "abilityGuid": "5ab0d42fb68c9e34abae4921822b9d63",
+  "effects": [
+    {
+      "kind": "Buff",
+      "effectGuid": "87ab2fed7feaaff47b62a3320a57ad8d",
+      "effectName": "HeroismBuff",
+      "target": "CurrentTarget",
+      "actionPath": "5ab0d42fb68c9e34abae4921822b9d63/0:ActionList/0:ContextActionApplyBuff"
+    },
+    {
+      "kind": "Buff",
+      "effectGuid": "6d949ebb548bd6c31e8d5bd45f96a7b6",
+      "effectName": "InfectiousCharmsHeroismBuff",
+      "target": "Caster",
+      "actionPath": "5ab0d42fb68c9e34abae4921822b9d63/0:ActionList/1:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:ContextActionApplyBuff"
+    },
+    {
+      "kind": "Buff",
+      "effectGuid": "c20c575b6352d1692b3074a25232e699",
+      "effectName": "InfectiousCharmsHeroismTargetBuff",
+      "target": "CurrentTarget",
+      "actionPath": "5ab0d42fb68c9e34abae4921822b9d63/0:ActionList/1:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/1:reflected:CallOfTheWild.AoeMechanics.ApplyActionToTargetsInRange, CallOfTheWild, Version=1.0.0.0/0:ActionList/0:ContextActionApplyBuff"
+    }
+  ],
+  "expression": {
+    "expressionType": "ability-reference",
+    "abilityId": "5ab0d42fb68c9e34abae4921822b9d63",
+    "child": {
+      "expressionType": "sequence",
+      "children": [
+        {
+          "expressionType": "sequence",
+          "children": [
+            {
+              "expressionType": "leaf",
+              "kind": "Buff",
+              "effectId": "87ab2fed7feaaff47b62a3320a57ad8d",
+              "target": "CurrentTarget",
+              "sourceContract": "ContextActionApplyBuff",
+              "actionPath": "5ab0d42fb68c9e34abae4921822b9d63/0:ActionList/0:ContextActionApplyBuff"
+            },
+            {
+              "expressionType": "conditional",
+              "conditionContract": "And:Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionCasterHasFact",
+              "whenTrue": {
+                "expressionType": "sequence",
+                "children": [
+                  {
+                    "expressionType": "leaf",
+                    "kind": "Buff",
+                    "effectId": "6d949ebb548bd6c31e8d5bd45f96a7b6",
+                    "target": "Caster",
+                    "sourceContract": "ContextActionApplyBuff",
+                    "actionPath": "5ab0d42fb68c9e34abae4921822b9d63/0:ActionList/1:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:ContextActionApplyBuff"
+                  },
+                  {
+                    "expressionType": "sequence",
+                    "children": [
+                      {
+                        "expressionType": "sequence",
+                        "children": [
+                          {
+                            "expressionType": "leaf",
+                            "kind": "Buff",
+                            "effectId": "c20c575b6352d1692b3074a25232e699",
+                            "target": "CurrentTarget",
+                            "sourceContract": "ContextActionApplyBuff",
+                            "actionPath": "5ab0d42fb68c9e34abae4921822b9d63/0:ActionList/1:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/1:reflected:CallOfTheWild.AoeMechanics.ApplyActionToTargetsInRange, CallOfTheWild, Version=1.0.0.0/0:ActionList/0:ContextActionApplyBuff"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "whenFalse": {
+                "expressionType": "sequence",
+                "children": []
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

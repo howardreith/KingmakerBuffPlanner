@@ -1,0 +1,5 @@
+Source validation: PASS=47 FAIL=0
+Build: PASS=1 FAIL=0 configuration=Release sha256=cbfe9e423b6e6aa8c29719cf255c323c78d1627fcc0f0907fa84aaf299ff0650
+Protocol tests: PASS=0 FAIL=2
+FAIL playtest-heroism-captured-instant: Captured conditional Heroism stopped its distinct sentinel: TimedOutUnconfirmed:expected-application-unconfirmed-after-confirmation-window;simulated-native:replace;transaction-complete:True;transaction-state:simulated-settled;cleanup-complete:True;cleanup-state:simulated-settled;effect-evidence:before:{unit-t1=[]};after:{unit-t1=[Buff:87ab2fed7feaaff47b62a3320a57ad8d#instance-1@end=100:suppressed=False:]}
+FAIL playtest-heroism-captured-animated: Captured conditional Heroism stopped its distinct sentinel: TimedOutUnconfirmed:expected-application-unconfirmed;simulated-native:replace;effect-evidence:before:{unit-t1=[]};after:{unit-t1=[Buff:87ab2fed7feaaff47b62a3320a57ad8d#instance-1@end=100:suppressed=False:]}

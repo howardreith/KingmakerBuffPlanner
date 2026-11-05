@@ -1,0 +1,7 @@
+Launcher argument selection: PASS=28 FAIL=0; bounded offline checks, no live qualification.
+Source validation: PASS=47 FAIL=0
+Protocol tests: PASS=676 FAIL=0
+Runtime harness filesystem tests: PASS=38 FAIL=0
+Physical search evidence: PASS=20 FAIL=0
+Problem navigation evidence: PASS=35 FAIL=0
+Spellbook entry evidence: PASS=50 FAIL=0
