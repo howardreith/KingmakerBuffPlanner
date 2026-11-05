@@ -454,14 +454,17 @@ function Get-KbpDirectoryManifest([string]$Path) {
         Sort-Object FullName | ForEach-Object {
             [ordered]@{ path = Get-KbpRelativePath $root $_.FullName; kind = 'directory' }
         })
-    $files = @(Get-ChildItem -LiteralPath $root -File -Recurse -Force |
-        Sort-Object FullName | ForEach-Object {
+    $enumerated = @(Get-ChildItem -LiteralPath $root -File -Recurse -Force | Sort-Object FullName)
+    if (-not ('KbpRuntimeHarness.RuntimeManifestReader' -as [type])) {
+        Add-Type -Path (Join-Path $PSScriptRoot 'RuntimeManifestReader.cs') -ErrorAction Stop
+    }
+    $files = @([KbpRuntimeHarness.RuntimeManifestReader]::Read($root, [IO.FileInfo[]]$enumerated) | ForEach-Object {
             [ordered]@{
-                path = Get-KbpRelativePath $root $_.FullName
+                path = $_.Path
                 kind = 'file'
                 length = $_.Length
-                lastWriteTimeUtc = $_.LastWriteTimeUtc.ToString('o')
-                sha256 = Get-KbpSha256 $_.FullName
+                lastWriteTimeUtc = $_.LastWriteTimeUtc
+                sha256 = $_.Sha256
             }
         })
     return @([ordered]@{ path = '.'; kind = 'directory' }) + $directories + $files
