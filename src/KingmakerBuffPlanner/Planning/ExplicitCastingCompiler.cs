@@ -529,7 +529,7 @@ namespace KingmakerBuffPlanner.Planning
             var preCovered = new List<string>();
             bool alreadyActive = liveEffects != null && option != null &&
                 reasons.Count == 0 && casting.State == CastingAuthoringState.Ready &&
-                AssessExistingEffects(casting, option.Provider,
+                AssessExistingEffects(casting, option,
                     matched.Concat(requiredExhausted).ToList(), predicted,
                     effectsBySource, liveEffects, existingNotes, satisfiedUnits, preCovered);
             if (alreadyActive)
@@ -962,7 +962,7 @@ namespace KingmakerBuffPlanner.Planning
         // recipient's verdict either way.
         private static bool AssessExistingEffects(
             PlannedCasting casting,
-            ProviderSnapshot provider,
+            ProviderPlanningOption option,
             IReadOnlyList<CastEnhancementSnapshot> matched,
             IReadOnlyList<string> predicted,
             IReadOnlyDictionary<string, EffectExpression> effectsBySource,
@@ -971,10 +971,9 @@ namespace KingmakerBuffPlanner.Planning
             List<string> satisfiedUnitIds,
             List<string> preCoveredUnitIds)
         {
-            EffectExpression expression;
-            if (!effectsBySource.TryGetValue(casting.SourceId, out expression) &&
-                !effectsBySource.TryGetValue(casting.Ability.Canonical, out expression))
-                return false;
+            EffectExpression expression = EffectConditionBinding.Bind(DiscoveredEffectLookup.ForAbility(
+                effectsBySource, casting.Ability, casting.SourceId), option.CasterFacts);
+            if (expression == null) return false;
             IReadOnlyList<string> recipients =
                 casting.TargetMode == CastingTargetMode.DirectTarget
                     ? new ReadOnlyCollection<string>(new[] { casting.DirectTargetUnitId })
@@ -982,7 +981,7 @@ namespace KingmakerBuffPlanner.Planning
             if (recipients == null || recipients.Count == 0 ||
                 recipients.Any(string.IsNullOrEmpty))
                 return false;
-            ExistingEffectRequirement requirement = RequirementFor(provider, matched);
+            ExistingEffectRequirement requirement = RequirementFor(option.Provider, matched);
             var ignored = new HashSet<string>(
                 casting.IgnoredPresenceMarkers ?? new string[0], StringComparer.Ordinal);
             bool skip = casting.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive;

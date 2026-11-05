@@ -102,7 +102,8 @@ namespace KingmakerBuffPlanner.Discovery
                         return new ConditionalEffectExpression(
                             node.ConditionContract,
                             Visit(node.WhenTrue, depth + 1, active, diagnostics, targetOverride, path + "/true"),
-                            Visit(node.WhenFalse, depth + 1, active, diagnostics, targetOverride, path + "/false"));
+                            Visit(node.WhenFalse, depth + 1, active, diagnostics, targetOverride, path + "/false"),
+                            node.CasterFactGate);
                     case DiscoveryNodeKind.TargetTransform:
                         EffectTarget transformedTarget = ComposeTarget(
                             targetOverride, node.Target);

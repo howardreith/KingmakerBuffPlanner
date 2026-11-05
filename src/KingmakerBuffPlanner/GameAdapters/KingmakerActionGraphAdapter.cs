@@ -100,7 +100,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (conditional != null)
                 return new DiscoveryNode(DiscoveryNodeKind.Conditional, action.GetType().FullName,
                     whenTrue: AdaptList(conditional.IfTrue), whenFalse: AdaptList(conditional.IfFalse),
-                    conditionContract: DescribeConditions(conditional), sourceContract: "Conditional");
+                    conditionContract: DescribeConditions(conditional), sourceContract: "Conditional",
+                    casterFactGate: CasterGate(conditional));
             var cast = action as ContextActionCastSpell;
             if (cast != null && cast.Spell != null) return Reference(cast.Spell, "ContextActionCastSpell");
             var pet = action as ContextActionsOnPet;
@@ -324,6 +325,24 @@ namespace KingmakerBuffPlanner.GameAdapters
                 // Call of the Wild's Treat Deadly Wounds (rc4): heals hit points
                 // and ability damage at once (HealingMechanics source).
                 name == "CallOfTheWild.HealingMechanics.ContextActionTreatDeadlyWounds";
+        }
+
+        private static CasterFactGate CasterGate(Conditional conditional)
+        {
+            var checker = conditional.ConditionsChecker;
+            if (checker == null || checker.Conditions == null || checker.Conditions.Length == 0) return null;
+            var facts = new List<KeyValuePair<string, bool>>();
+            foreach (Condition condition in checker.Conditions)
+            {
+                var fact = condition as ContextConditionCasterHasFact;
+                // A subclass can implement another predicate. Unknown contracts
+                // stay unresolved; absent effects never decide a condition.
+                if (fact == null || fact.GetType() != typeof(ContextConditionCasterHasFact) || fact.Fact == null ||
+                    string.IsNullOrWhiteSpace(fact.Fact.AssetGuid)) return null;
+                facts.Add(new KeyValuePair<string, bool>(fact.Fact.AssetGuid, fact.Not));
+            }
+            string operation = checker.Operation.ToString();
+            return operation == "And" || operation == "Or" ? new CasterFactGate(operation == "Or", facts) : null;
         }
 
         private static string DescribeConditions(Conditional conditional)

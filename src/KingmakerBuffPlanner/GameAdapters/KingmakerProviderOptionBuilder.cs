@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Kingmaker.Blueprints;
+using Kingmaker.Blueprints.Facts;
+using Kingmaker.UnitLogic;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.UnitLogic.Abilities;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
@@ -146,7 +148,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     provider.EffectiveCasterLevel, provider.ExpectedDurationRounds,
                     executionCapability.Strategy,
                     executionCapability.Reason,
-                    recipientIdsByAnchor));
+                    recipientIdsByAnchor, ReadCasterFacts(expression, caster)));
                 string targetClass = party ? "Party" : areaRecipients
                     ? "AlliedAreaRecipients" : unsafeArea
                         ? "UnsafeArea" : infusedPersonal
@@ -207,6 +209,22 @@ namespace KingmakerBuffPlanner.GameAdapters
                             areaResolver.LastFailureReason : string.Empty));
             }
             return options.OrderBy(o => o.Provider.Key.Canonical, StringComparer.Ordinal).ToArray();
+        }
+
+        private static IReadOnlyDictionary<string, bool> ReadCasterFacts(EffectExpression expression, UnitEntityData caster)
+        {
+            var facts = new Dictionary<string, bool>(StringComparer.Ordinal);
+            foreach (string id in EffectConditionBinding.FactIds(expression))
+            {
+                try
+                {
+                    var fact = ResourcesLibrary.TryGetBlueprint<BlueprintUnitFact>(id);
+                    if (fact != null && caster != null && caster.Descriptor != null)
+                        facts[id] = caster.Descriptor.HasFact(fact);
+                }
+                catch (Exception) { /* Unreadable is unknown, never false. */ }
+            }
+            return facts;
         }
 
         private static string[] LegalAnchorIds(

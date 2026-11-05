@@ -166,6 +166,7 @@ namespace KingmakerBuffPlanner.Planning
                     return ExplicitStepConversion.Refuse("material-cost-count:" + castingId);
                 EffectExpression expected = DiscoveredEffectLookup.ForAbility(
                     effectsBySource, casting.Ability, casting.SourceId);
+                expected = EffectConditionBinding.Bind(expected, option.CasterFacts);
                 if (expected == null)
                     return ExplicitStepConversion.Refuse("expected-effects-missing:" + castingId);
                 if (scope == ExplicitProjectionScope.SingleCastProbe)

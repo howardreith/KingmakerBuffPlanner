@@ -8,6 +8,7 @@ using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
+using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.UI;
 
@@ -25,6 +26,8 @@ namespace KingmakerBuffPlanner.Tests
             internal int EvidenceReads;
             internal bool ThrowEvidence;
             internal string ValidationFailureId;
+            internal bool CapturedHeroism;
+            private string BuffId { get { return CapturedHeroism ? "87ab2fed7feaaff47b62a3320a57ad8d" : "buff-effect"; } }
             private int _instance;
             private static readonly AbilityKey Sentinel = new AbilityKey("sentinel-spell", null, 0,
                 SourceKind.Spellbook, null);
@@ -43,7 +46,7 @@ namespace KingmakerBuffPlanner.Tests
                 return State.Active.TryGetValue(target, out active) && active.Value > Round
                     ? new[] { new ObservedEffectInstance(
                         !before && Observation == "wrong-kind" ? EffectKind.AreaBuff : EffectKind.Buff,
-                        target == "unit-t4" ? "sentinel-effect" : "buff-effect",
+                        target == "unit-t4" ? "sentinel-effect" : BuffId,
                         active.Key, active.Value, !before && Observation == "suppressed") }
                     : new ObservedEffectInstance[0];
             }
@@ -144,11 +147,11 @@ namespace KingmakerBuffPlanner.Tests
             {
                 CastingWorkspaceInputs current = State.Inputs();
                 var live = LiveEffects(State.Active.Where(pair => pair.Value.Value > Round)
-                    .Select(pair => On(pair.Key, pair.Key == "unit-t4" ? "sentinel-effect" : "buff-effect",
+                    .Select(pair => On(pair.Key, pair.Key == "unit-t4" ? "sentinel-effect" : BuffId,
                         pair.Value.Value - Round, 1, 0)).ToArray());
                 ProviderSnapshot prepared = current.Snapshot.Providers.Single(value =>
                     value.Key.CasterUnitId == "unit-wizard");
-                var wizard = new ProviderSnapshot(prepared.Key, "Heroism-like fixture", 2,
+                var wizard = new ProviderSnapshot(prepared.Key, CapturedHeroism ? "Heroism (captured graph)" : "Heroism-like fixture", 2,
                     prepared.ResourcePoolKey, 1, prepared.EligibleTokenIds, null, 1, 100, "", "10 minutes/level");
                 var sentinel = new ProviderSnapshot(new ProviderKey("unit-sorcerer", "book-sorcerer",
                     Sentinel, "level-2"), "Sentinel fixture", 2, "pool-unit-sorcerer", 1,
@@ -157,10 +160,11 @@ namespace KingmakerBuffPlanner.Tests
                 var options = providers.Select(provider => new ProviderPlanningOption(provider,
                     current.Snapshot.Units.Select(unit => unit.UnitId), new[] { provider.Key.CasterUnitId },
                     10, 100, CastExecutionStrategy.DirectRuleCast, "simulated-direct",
-                    new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal)));
+                    new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal),
+                    CapturedHeroism ? new Dictionary<string, bool> { { "infectious-charms-feature", false } } : null));
                 var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal)
                 {
-                    { "source-bulls", Leaf("buff-effect") },
+                    { "source-bulls", CapturedHeroism ? CapturedHeroismExpression() : Leaf("buff-effect") },
                     { "source-sentinel", Leaf("sentinel-effect") }
                 };
                 // Catalogue aliases share the selected ability's expression instance.
@@ -184,8 +188,14 @@ namespace KingmakerBuffPlanner.Tests
             internal readonly CastingWorkspaceSession Session;
             internal readonly List<CastStep> Steps = new List<CastStep>();
 
-            internal RepeatSession(string root, string mode, string name, bool party = false)
+            internal RepeatSession(string root, string mode, string name, bool party = false, bool capturedHeroism = false)
             {
+                World.CapturedHeroism = capturedHeroism;
+                if (capturedHeroism)
+                {
+                    World.State.Ability = new AbilityKey("5ab0d42fb68c9e34abae4921822b9d63", null, 0, SourceKind.Spellbook, null);
+                    World.State.SpontaneousRemaining = 3;
+                }
                 Host = new CastingExecutionHost(settings => mode == "instant"
                     ? (ICastExecutor)new InstantCastExecutor(World, true)
                     : new AnimatedCastExecutor(World, true), () => World.Round * 6000);
@@ -226,7 +236,7 @@ namespace KingmakerBuffPlanner.Tests
                 if (result.Projection != null) Steps.AddRange(result.Projection.Plan.Steps);
                 int frames = 0;
                 while (Host.IsRunning && frames++ < 100) Host.Pump();
-                Assert(!Host.IsRunning);
+                RepeatAssert(!Host.IsRunning, "fixture run did not settle");
                 return result;
             }
         }
@@ -234,6 +244,94 @@ namespace KingmakerBuffPlanner.Tests
         private static void RepeatAssert(bool condition, string message)
         {
             if (!condition) throw new InvalidOperationException(message);
+        }
+
+        // Faithful node/target/condition structure from the full-user native
+        // catalogue at 85e7410 (kbp041-rel-catalog-full), not inferred from the
+        // handoff's flat GUID list. The feature identity is symbolic here;
+        // the live adapter supplies the actual condition Fact.AssetGuid.
+        private static EffectExpression CapturedHeroismExpression()
+        {
+            Func<DiscoveryNode[], DiscoveryNode> sequence = children => new DiscoveryNode(DiscoveryNodeKind.Sequence, "ActionList", children);
+            Func<string, EffectTarget, DiscoveryNode> buff = (id, target) => new DiscoveryNode(DiscoveryNodeKind.Effect,
+                "ContextActionApplyBuff", effectId: id, target: target, sourceContract: "ContextActionApplyBuff");
+            return new ActionGraphScanner().Scan(new DiscoveryNode(DiscoveryNodeKind.AbilityReference,
+                "5ab0d42fb68c9e34abae4921822b9d63", new[] { sequence(new[] {
+                    buff("87ab2fed7feaaff47b62a3320a57ad8d", EffectTarget.CurrentTarget),
+                    new DiscoveryNode(DiscoveryNodeKind.Conditional,
+                        "Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional",
+                        whenTrue: sequence(new[] {
+                            buff("6d949ebb548bd6c31e8d5bd45f96a7b6", EffectTarget.Caster),
+                            sequence(new[] { sequence(new[] { buff("c20c575b6352d1692b3074a25232e699", EffectTarget.CurrentTarget) }) }) }),
+                        whenFalse: sequence(new DiscoveryNode[0]),
+                        conditionContract: "And:Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionCasterHasFact",
+                        casterFactGate: new CasterFactGate(false, new[] { new KeyValuePair<string, bool>("infectious-charms-feature", false) })) }) },
+                referencedAbilityId: "5ab0d42fb68c9e34abae4921822b9d63")).Expression;
+        }
+
+        private static void TestCapturedHeroism(string root, string mode)
+        {
+            var run = new RepeatSession(root, mode, "captured-expression", capturedHeroism: true);
+            WorkspaceApplyResult accepted = run.Apply();
+            RepeatAssert(accepted.Allowed, "initial captured admission: " + accepted.ReviewReason);
+            RepeatAssert(run.Host.LastReport.Confirmed == 2 && run.Host.LastReport.NotProcessed == 0,
+                "Captured conditional Heroism stopped its distinct sentinel: " + run.Host.LastReport.Entries[0].Detail);
+            string first = run.World.State.Active["unit-t1"].Key;
+            run.World.Round = 10;
+            // Another genuinely remaining prepared slot and a still-affordable
+            // distinct sentinel; no pool is refilled between these attempts.
+            accepted = run.Apply(true);
+            RepeatAssert(accepted.Allowed, "repeat captured admission: " + accepted.ReviewReason);
+            RepeatAssert(run.Host.LastReport.Confirmed == 2 && run.World.State.Active["unit-t1"].Key != first, "repeat=" + run.Host.LastReport.Entries[0].Detail);
+            Assert(run.World.State.Tokens.Values.Count(v => v) == 1 && run.World.State.Fired.Count == 4);
+            run.World.State.Active.Remove("unit-t4");
+            accepted = run.Apply();
+            RepeatAssert(accepted.Allowed, "skip captured admission: " + accepted.ReviewReason);
+            RepeatAssert(run.Host.LastReport.Skipped == 1 && run.Host.LastReport.Confirmed == 1 && run.Host.LastReport.ResourcesSpent == 1,
+                "skip: skipped=" + run.Host.LastReport.Skipped + ";confirmed=" + run.Host.LastReport.Confirmed + ";spent=" + run.Host.LastReport.ResourcesSpent);
+            foreach (string observation in new[] { "retain", "missing", "suppressed", "unreadable", "wrong-kind", "wrong-recipient" })
+            {
+                var negative = new RepeatSession(root, mode, "cg-" + observation.Substring(observation.Length - 3), capturedHeroism: true);
+                if (observation == "retain") negative.World.State.Active["unit-t1"] = new KeyValuePair<string, long>("old", 1);
+                negative.World.Observation = observation;
+                accepted = negative.Apply(true);
+                RepeatAssert(accepted.Allowed, observation + " admission: " + accepted.ReviewReason);
+                RepeatAssert(negative.Host.LastReport.Confirmed == 0 && negative.Host.LastReport.NotProcessed == 1 &&
+                    negative.Host.LastReport.ResourcesSpent == 1 && negative.World.State.Fired.Count == 1,
+                    observation + ": confirmed=" + negative.Host.LastReport.Confirmed + ";notProcessed=" + negative.Host.LastReport.NotProcessed + ";spent=" + negative.Host.LastReport.ResourcesSpent + ";" + negative.Host.LastReport.Entries[0].Detail);
+            }
+        }
+
+        private static void TestCapturedHeroismCondition()
+        {
+            EffectExpression raw = CapturedHeroismExpression();
+            var observed = new[] { new ObservedEffectInstance(EffectKind.Buff, "87ab2fed7feaaff47b62a3320a57ad8d", "new", 100, false) };
+            Assert(!AppliedEffectJudgement.Reached(raw, new ObservedEffectInstance[0], observed));
+            var facts = new Dictionary<string, bool> { { "infectious-charms-feature", false } };
+            EffectExpression bound = EffectConditionBinding.Bind(raw, facts);
+            Assert(AppliedEffectJudgement.Reached(bound, new ObservedEffectInstance[0], observed));
+            Assert(!AppliedEffectJudgement.Reached(bound, new ObservedEffectInstance[0], new ObservedEffectInstance[0]));
+            facts["infectious-charms-feature"] = true;
+            Assert(!AppliedEffectJudgement.Reached(EffectConditionBinding.Bind(raw, facts), new ObservedEffectInstance[0], observed));
+            Assert(!AppliedEffectJudgement.Reached(EffectConditionBinding.Bind(raw, new Dictionary<string, bool>()), new ObservedEffectInstance[0], observed));
+            Assert(!AppliedEffectJudgement.Reached(new SequenceEffectExpression(new[] { bound, Leaf("mandatory-enhancement") }),
+                new ObservedEffectInstance[0], observed));
+            Assert(!AppliedEffectJudgement.Reached(bound, observed, observed.Concat(new[] {
+                new ObservedEffectInstance(EffectKind.Buff, "unrelated", "fresh", 200, false) })));
+            var optionalOnly = new ConditionalEffectExpression("known false", Leaf("other"), EmptyEffectExpression.NoAction(),
+                new CasterFactGate(false, new[] { new KeyValuePair<string, bool>("absent", false) }));
+            Assert(!AppliedEffectJudgement.Reached(EffectConditionBinding.Bind(optionalOnly,
+                new Dictionary<string, bool> { { "absent", false } }), new ObservedEffectInstance[0], observed));
+            // Metadata must not rewrite the persisted catalogue identity.
+            var gated = new ConditionalEffectExpression("same-contract", Leaf("a"), Leaf("b"),
+                new CasterFactGate(true, new[] { new KeyValuePair<string, bool>("one", false),
+                    new KeyValuePair<string, bool>("two", true) }));
+            var withoutMetadata = new ConditionalEffectExpression("same-contract", gated.WhenTrue, gated.WhenFalse);
+            Assert(EffectAggregateIdentity.For(gated, "") == EffectAggregateIdentity.For(withoutMetadata, ""));
+            var state = new Dictionary<string, bool> { { "one", false }, { "two", true } };
+            Assert(ReferenceEquals(EffectConditionBinding.Bind(gated, state), gated.WhenFalse));
+            state["two"] = false; // Not is applied before Or.
+            Assert(ReferenceEquals(EffectConditionBinding.Bind(gated, state), gated.WhenTrue));
         }
 
         private static void TestHeroismRepeatStateful(string root, string mode)

@@ -276,7 +276,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             int expectedDurationRounds,
             CastExecutionStrategy executionStrategy,
             string executionStrategyReason,
-            IDictionary<string, IEnumerable<string>> recipientIdsByAnchor = null)
+            IDictionary<string, IEnumerable<string>> recipientIdsByAnchor = null,
+            IReadOnlyDictionary<string, bool> casterFacts = null)
         {
             Provider = provider ?? throw new ArgumentNullException("provider");
             if (effectiveCasterLevel < 0) throw new ArgumentOutOfRangeException("effectiveCasterLevel");
@@ -306,6 +307,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             ExpectedDurationRounds = expectedDurationRounds;
             ExecutionStrategy = executionStrategy;
             ExecutionStrategyReason = executionStrategyReason ?? string.Empty;
+            CasterFacts = new ReadOnlyDictionary<string, bool>((casterFacts ?? new Dictionary<string, bool>())
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
         }
 
         public ProviderSnapshot Provider { get; private set; }
@@ -319,6 +322,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public int ExpectedDurationRounds { get; private set; }
         public CastExecutionStrategy ExecutionStrategy { get; private set; }
         public string ExecutionStrategyReason { get; private set; }
+        public IReadOnlyDictionary<string, bool> CasterFacts { get; private set; }
         public bool RequiresAnimatedExecution
         {
             get

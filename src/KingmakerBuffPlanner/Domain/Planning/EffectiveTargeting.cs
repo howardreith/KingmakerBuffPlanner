@@ -203,7 +203,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 strategy, reason, option.RecipientIdsByAnchor.ToDictionary(
                     pair => pair.Key,
                     pair => (IEnumerable<string>)pair.Value,
-                    StringComparer.Ordinal));
+                    StringComparer.Ordinal), option.CasterFacts);
         }
     }
 }

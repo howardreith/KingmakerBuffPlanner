@@ -434,6 +434,9 @@ namespace KingmakerBuffPlanner.Tests
                 Run("probe-requires-frozen-artifact-identity", TestProbeRequiresFrozenArtifactIdentity);
                 Run("probe-shutdown-before-selection-is-terminal", TestProbeShutdownBeforeSelectionIsTerminal);
                 Run("prepared-slot-observation-reads-exact-source", TestPreparedSlotObservationReadsExactSource);
+                Run("playtest-heroism-captured-condition-and-positive-evidence", TestCapturedHeroismCondition);
+                Run("playtest-heroism-captured-instant", () => TestCapturedHeroism(root, "instant"));
+                Run("playtest-heroism-captured-animated", () => TestCapturedHeroism(root, "animated"));
                 RunProductionExecutionTests(root);
                 RunCastingGraphTests(root);
                 RunDuplicateItemSourceTests(root);
