@@ -26,8 +26,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
     // description gestures - WP3's direct manipulation through the OS
     // pointer: a caster and its exact source row, a portrait (adds and
     // focuses one casting), the same portrait (removes it), the portrait
-    // again, another portrait (retargets), optionally another caster
-    // (provider change), Undo, a card click (focus), Escape (leaves the
+    // again, Change recipient then another portrait (retargets), optionally
+    // Change caster/source then another caster (provider change), Undo, a card click (focus), Escape (leaves the
     // focus, the planner stays open) and Escape (closes the planner).
     internal sealed partial class RuntimeTestHost
     {
@@ -316,9 +316,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.AuthoringReadded = created != null &&
                     string.Equals(created.DirectTargetUnitId, _authoringTargetA, StringComparison.Ordinal) &&
                     string.Equals(session.EditingFocusCastingId, created.CastingId, StringComparison.Ordinal);
-                Vector2? target = OnScreen(view, "target:" + _authoringTargetB);
-                if (target == null) return FinishPhysical("authoring:target-b-not-on-screen");
-                return RequestPhysical("auth-retarget", "click", target.Value, null, AuthoringStartStep + 7);
+                Vector2? arm = OnScreen(view, "change-recipient");
+                if (arm == null) return FinishPhysical("authoring:change-recipient-not-on-screen");
+                return RequestPhysical("auth-arm-retarget", "click", arm.Value, null, AuthoringStartStep + 15);
             }
             if (step == 7)
             {
@@ -334,7 +334,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 Vector2? other = _authoringOtherCaster == null ? null
                     : OnScreen(view, "caster:" + _authoringOtherCaster);
                 if (other != null)
-                    return RequestPhysical("auth-provider-caster", "click", other.Value, null, AuthoringStartStep + 8);
+                {
+                    Vector2? arm = OnScreen(view, "change-provider");
+                    if (arm == null) return FinishPhysical("authoring:change-provider-not-on-screen");
+                    return RequestPhysical("auth-arm-provider", "click", arm.Value, null, AuthoringStartStep + 16);
+                }
                 _physicalRecord.AddNote("authoring:provider-change:no-second-caster-on-screen");
                 _physicalStep = AuthoringStartStep + 10;
                 return false;
@@ -416,6 +420,24 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 _physicalRecord.AuthoringCountAfter = session.Document.Castings.Count;
                 // The closing Escape and the shared close judgement (step 7).
                 return RequestPhysical("cf-escape-close", "key-escape", Vector2.zero, null, 7);
+            }
+            if (step == 15)
+            {
+                if (session.GraphEditIntent != CastingGraphEditIntent.ChangeRecipient ||
+                    session.EditingFocusCastingId != _authoringSecondId)
+                    return FinishPhysical("authoring:change-recipient-not-armed");
+                Vector2? target = OnScreen(view, "target:" + _authoringTargetB);
+                if (target == null) return FinishPhysical("authoring:target-b-not-on-screen");
+                return RequestPhysical("auth-retarget", "click", target.Value, null, AuthoringStartStep + 7);
+            }
+            if (step == 16)
+            {
+                if (session.GraphEditIntent != CastingGraphEditIntent.ChangeProvider ||
+                    session.EditingFocusCastingId != _authoringSecondId)
+                    return FinishPhysical("authoring:change-provider-not-armed");
+                Vector2? other = OnScreen(view, "caster:" + _authoringOtherCaster);
+                if (other == null) return FinishPhysical("authoring:other-caster-not-on-screen");
+                return RequestPhysical("auth-provider-caster", "click", other.Value, null, AuthoringStartStep + 8);
             }
             return false;
         }

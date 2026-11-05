@@ -47,7 +47,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // second caster of the buff is on screen) are conditional.
         public static readonly string[] AuthoringActions =
         {
-            "cf-moon", "auth-caster", "auth-source", "auth-add", "auth-remove", "auth-readd", "auth-retarget",
+            "cf-moon", "auth-caster", "auth-source", "auth-add", "auth-remove", "auth-readd", "auth-arm-retarget", "auth-retarget",
             "auth-undo", "auth-focus", "auth-escape-focus", "cf-escape-close"
         };
 
@@ -531,6 +531,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (AuthoringRemoved != true) violations.Add("authoring:same-portrait-remove");
             if (AuthoringReadded != true) violations.Add("authoring:readd");
             if (AuthoringRetargeted != true) violations.Add("authoring:retarget");
+            if (AuthoringProviderChanged.HasValue && !Acknowledged.Contains("auth-arm-provider"))
+                violations.Add("unacknowledged:auth-arm-provider");
             if (AuthoringProviderChanged.HasValue &&
                 (AuthoringProviderChanged != true || AuthoringProviderKeptTarget != true ||
                  AuthoringProviderUndone != true))

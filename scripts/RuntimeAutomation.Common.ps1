@@ -1729,9 +1729,9 @@ function Assert-KbpScenarioOutcome {
         if ($expectation -ceq 'combat') { $expected = @('cf-moon-combat') + $expected }
         if ($expectation -ceq 'authoring') {
             $expected = @('cf-moon', 'auth-caster', 'auth-source', 'auth-add', 'auth-remove', 'auth-readd',
-                'auth-retarget', 'auth-undo', 'auth-focus', 'auth-escape-focus', 'cf-escape-close')
+                'auth-arm-retarget', 'auth-retarget', 'auth-undo', 'auth-focus', 'auth-escape-focus', 'cf-escape-close')
             $conditional = @('cf-menu-close-1', 'cf-menu-close-2', 'cf-menu-close-3', 'auth-tile',
-                'auth-provider-caster', 'auth-provider-source', 'auth-undo-retarget')
+                'auth-arm-provider', 'auth-provider-caster', 'auth-provider-source', 'auth-undo-retarget')
         }
         $acknowledged = @($record.acknowledged | ForEach-Object { [string]$_ })
         if ([string]$record.runId -cne [string]$Request.runId -or @($record.violations).Count -ne 0 -or

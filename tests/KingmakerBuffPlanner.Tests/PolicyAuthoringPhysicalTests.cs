@@ -274,14 +274,19 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("A clean authoring run was refused: " +
                     string.Join("|", good().Violations().ToArray()));
             PhysicalWorkspaceRecord withProvider = good();
+            withProvider.Acknowledged.Add("auth-arm-provider");
             withProvider.AuthoringProviderChanged = true;
             withProvider.AuthoringProviderKeptTarget = true;
             withProvider.AuthoringProviderUndone = true;
             if (withProvider.Violations().Count != 0)
                 throw new InvalidOperationException("A clean provider change was refused.");
+            withProvider.Acknowledged.Remove("auth-arm-provider");
+            if (!withProvider.Violations().Contains("unacknowledged:auth-arm-provider"))
+                throw new InvalidOperationException("A provider change without its physical arm gesture was accepted.");
             var shapes = new Dictionary<string, Action<PhysicalWorkspaceRecord>>
             {
                 { "unacknowledged:auth-retarget", r => r.Acknowledged.Remove("auth-retarget") },
+                { "unacknowledged:auth-arm-retarget", r => r.Acknowledged.Remove("auth-arm-retarget") },
                 { "unacknowledged:auth-escape-focus", r => r.Acknowledged.Remove("auth-escape-focus") },
                 { "authoring:not-chosen", r => r.AuthoringTargets = "unit-hedwirg" },
                 { "authoring:buff-not-selected", r => r.AuthoringBuffSelected = false },

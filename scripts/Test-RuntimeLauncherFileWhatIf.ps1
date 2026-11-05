@@ -507,10 +507,10 @@ try {
         'cf-right-click' = 'rightclick'; 'cf-inspect-wheel' = 'wheel'; 'cf-long-wheel' = 'wheel'
         'cf-escape-inspect' = 'key-escape'; 'cf-escape-close' = 'key-escape'; 'cf-moon-combat' = 'click'
         'auth-caster' = 'click'; 'auth-source' = 'click'; 'auth-add' = 'click'; 'auth-remove' = 'click'
-        'auth-readd' = 'click'; 'auth-retarget' = 'click'; 'auth-undo' = 'click'; 'auth-focus' = 'click'
+        'auth-readd' = 'click'; 'auth-arm-retarget' = 'click'; 'auth-arm-provider' = 'click'; 'auth-retarget' = 'click'; 'auth-undo' = 'click'; 'auth-focus' = 'click'
         'auth-escape-focus' = 'key-escape' }
     $authoringActions = @('cf-moon', 'auth-caster', 'auth-source', 'auth-add', 'auth-remove', 'auth-readd',
-        'auth-retarget', 'auth-undo', 'auth-focus', 'auth-escape-focus', 'cf-escape-close')
+        'auth-arm-retarget', 'auth-retarget', 'auth-undo', 'auth-focus', 'auth-escape-focus', 'cf-escape-close')
     # The removal evidence of a clean run (the physical "removal" expectation
     # and live-workspace-removal share it).
     $setRemovalGood = {
@@ -630,6 +630,9 @@ try {
             $r.classicCombatRefreshes = 1; $r.classicCombatPreviews = 1; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'authoring-retarget-failed' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
             $r.authoringRetargeted = $false; Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
+        'authoring-retarget-arm-missing' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
+            $r.acknowledged = @($r.acknowledged | Where-Object { $_ -cne 'auth-arm-retarget' })
+            Write-KbpJsonAtomic (Join-Path $d 'physical-workspace.json') $r })
         'authoring-provider-not-undone' = @('authoring', { param($d) $r = Read-KbpJson (Join-Path $d 'physical-workspace.json')
             $r.authoringProviderChanged = $true; $r | Add-Member -NotePropertyName authoringProviderKeptTarget -NotePropertyValue $true -Force
             $r | Add-Member -NotePropertyName authoringProviderUndone -NotePropertyValue $false -Force
