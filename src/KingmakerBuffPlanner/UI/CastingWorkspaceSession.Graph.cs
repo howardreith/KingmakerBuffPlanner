@@ -379,6 +379,10 @@ namespace KingmakerBuffPlanner.UI
                 : FindProviderOption(inputs, source, chosenRow.ProviderKey);
             view.SelectedSourceAbility = chosenOption == null || chosenOption.Provider == null
                 ? view.SelectedSourceIcon : chosenOption.Provider.Key.Ability;
+            EffectExpression selectedExpression = DiscoveredEffectLookup.ForAbility(inputs.EffectsBySource,
+                view.SelectedSourceAbility, source);
+            view.SelectedSourceIsArea = selectedExpression != null && EffectExpressionTargetAnalysis.Contains(
+                selectedExpression, EffectTarget.AlliedAreaRecipients);
             // §4: the target lane shows the SAME eligibility the Add path
             // and the compiler judge — the draft's selected targeting
             // modifiers applied to the chosen option, with the complete
@@ -670,10 +674,10 @@ namespace KingmakerBuffPlanner.UI
             switch (focused.TargetMode)
             {
                 case CastingTargetMode.CasterCenteredOrigin:
-                    targetLabel = "Group, centred on " + casterName;
+                    targetLabel = "Centred on " + casterName;
                     break;
                 case CastingTargetMode.AnchoredOrigin:
-                    targetLabel = "Group, centred on " + nameOf(focused.Origin.AnchorUnitId);
+                    targetLabel = "Centred on " + nameOf(focused.Origin.AnchorUnitId);
                     break;
                 default:
                     targetLabel = nameOf(focused.DirectTargetUnitId);

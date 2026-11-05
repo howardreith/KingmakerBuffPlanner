@@ -71,6 +71,41 @@ namespace KingmakerBuffPlanner.Tests
             Run("native-hud-cell-art-composition", TestHudCellArt);
             Run("native-source-tabs-share-one-caption-size", TestSourceTabLayout);
             Run("native-text-material-matches-selected-font-atlas", TestNativeTextMaterialSelection);
+            Run("playtest-text-owned-material-lifecycle", TestWorkspaceTextMaterialOwnership);
+        }
+
+        private sealed class TextMaterialFixture
+        {
+            internal bool Alive = true;
+            internal int DestroyCalls;
+        }
+
+        private static void TestWorkspaceTextMaterialOwnership()
+        {
+            var donor = new TextMaterialFixture();
+            var created = new List<TextMaterialFixture>();
+            Func<TextMaterialFixture> clone = () => { var material = new TextMaterialFixture(); created.Add(material); return material; };
+            Func<WorkspaceTextMaterials<TextMaterialFixture>> open = () => new WorkspaceTextMaterials<TextMaterialFixture>(
+                m => m != null && m.Alive, m => { m.Alive = false; m.DestroyCalls++; });
+            var first = open();
+            TextMaterialFixture body = first.Get("Body", clone);
+            for (int refresh = 0; refresh < 100; refresh++) Assert(ReferenceEquals(body, first.Get("Body", clone)));
+            TextMaterialFixture caption = first.Get("Button", clone);
+            Assert(created.Count == 2 && !ReferenceEquals(body, caption));
+            // Borrowed donor teardown cannot invalidate the owned labels.
+            donor.Alive = false;
+            Assert(first.Get("Body", clone).Alive && created.Count == 2);
+            body.Alive = false; // Unity destroyed-object semantics, CLR ref survives.
+            TextMaterialFixture replacement = first.Get("Body", clone);
+            Assert(!ReferenceEquals(body, replacement) && created.Count == 3);
+            first.Dispose(); first.Dispose();
+            Assert(replacement.DestroyCalls == 1 && caption.DestroyCalls == 1 && donor.DestroyCalls == 0 && body.DestroyCalls == 0);
+            bool refused = false;
+            try { first.Get("Body", clone); } catch (ObjectDisposedException) { refused = true; }
+            Assert(refused);
+            using (var reopened = open())
+                Assert(!ReferenceEquals(replacement, reopened.Get("Body", clone)) && created.Count == 4);
+            Assert(created.Last().DestroyCalls == 1);
         }
 
         private static void TestNativeTextMaterialSelection()

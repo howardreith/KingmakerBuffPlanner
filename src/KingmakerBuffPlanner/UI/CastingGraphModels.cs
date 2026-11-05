@@ -452,6 +452,7 @@ namespace KingmakerBuffPlanner.UI
         public AbilityKey SelectedSourceAbility { get; internal set; }
         // True for a group buff, false for single target, null unknown.
         public bool? SelectedSourceIsGroup { get; internal set; }
+        public bool SelectedSourceIsArea { get; internal set; }
         public string SelectedRoutineId { get; internal set; }
         public string SelectedRoutineName { get; internal set; }
         public IReadOnlyList<CastingGraphRoutineTab> Routines { get; internal set; }
@@ -525,6 +526,11 @@ namespace KingmakerBuffPlanner.UI
     // Player-facing words for the graph (pure; tested).
     public static class CastingGraphText
     {
+        public static string TargetingLabel(bool? group, bool area)
+        {
+            return area ? "Area buff" : group == true ? "Group buff"
+                : group == false ? "Single target" : "Targeting not understood";
+        }
         // What a source can still fund after the whole plan, as the caster
         // lane shows it.
         public static string Capacity(CastingCapacityEstimate estimate, ResourcePoolKind? kind,

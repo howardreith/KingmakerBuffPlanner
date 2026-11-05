@@ -131,7 +131,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal void NoteFrameEnd()
         {
-            if (_disposed || _modal != null || (_keyboardPresentation && !_keyboardFocusActive && !_workspace.ClearPlanOpen)) return;
+            if (_disposed || _modal != null || (_keyboardPresentation && !_keyboardFocusActive)) return;
             // Layout and scroll inertia can move a control without a new input.
             if (_focus.ReadingScrollKey != null)
             {
@@ -271,6 +271,7 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed || _workspace.NativeDescriptionBlocksWorkspace) return;
             if (!_workspace.ClearPlanAllowsCommand(command)) return;
+            if (_keyboardPresentation) _keyboardFocusActive = true;
             if (_keyboard != null)
             {
                 if (command == ControllerWorkspaceCommand.Up) _keyboard.Move(0, -1);
@@ -417,7 +418,7 @@ namespace KingmakerBuffPlanner.UI
         private void DrawFocus(bool reveal)
         {
             if (_disposed || _outline == null || _modal != null) return;
-            if (_keyboardPresentation && !_keyboardFocusActive && !_workspace.ClearPlanOpen) { _outline.gameObject.SetActive(false); return; }
+            if (_keyboardPresentation && !_keyboardFocusActive) { _outline.gameObject.SetActive(false); return; }
             if (_focus.ReadingScrollKey != null && _readingScroll != null)
             { DrawPaneFocus(_readingScroll); return; }
             RectTransform rect;

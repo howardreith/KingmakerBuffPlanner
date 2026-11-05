@@ -106,14 +106,6 @@ namespace KingmakerBuffPlanner.UI
                 RectOf(button).sizeDelta = new Vector2(RectOf(button).sizeDelta.x, 44);
                 RectOf(button).anchoredPosition = new Vector2(0, 22);
             }
-            // A strong caption and explicit action distinguish the destructive choice.
-            TMP_Text destructive = clear.GetComponentInChildren<TMP_Text>();
-            if (destructive != null) { destructive.fontStyle |= FontStyles.Bold; destructive.color = Burgundy; }
-            TMP_Text warning = _kit.Text(clear.transform, "WarningMark", "!", PlannerTextRole.Strong, 24, TextAlignmentOptions.Center);
-            KingmakerUiFactory.SetAnchors(warning.rectTransform, 0, 0, 0, 1);
-            warning.rectTransform.pivot = new Vector2(0, .5f);
-            warning.rectTransform.sizeDelta = new Vector2(32, 0);
-            warning.rectTransform.anchoredPosition = new Vector2(8, 0);
             if (_nativeTheme != null) _nativeTheme.ApplyTo(_clearOverlay);
             KingmakerUiFactory.OwnPointerHighlights(_clearOverlay);
             PropagateUiLayer();
@@ -121,7 +113,9 @@ namespace KingmakerBuffPlanner.UI
             if (_controllerNavigation == null) _controllerNavigation = new ControllerWorkspaceNavigator(this, _kit, true);
             _controllerNavigation.Rebuild();
             _controllerNavigation.RestoreFocus("clear/cancel");
-            if (_clearEvents != null) _clearEvents.SetSelectedGameObject(cancel.gameObject);
+            // Semantic navigation retains Cancel as its safe destination.
+            // Unity selection also forces Highlighted after pointer exit.
+            // These pointer controls must stay unselected.
         }
 
         private void ConfirmClearPlan()
@@ -162,7 +156,7 @@ namespace KingmakerBuffPlanner.UI
             if (target == null || !target.interactable) target = _undoButton != null && _session.CanUndo ? _undoButton : _resourcesButton;
             string key = target == _undoButton ? "plan/undo" : target == _clearPlanButton ? "plan/clear" : null;
             if (_controllerNavigation != null) _controllerNavigation.RestoreFocus(key);
-            if (_clearEvents != null && target != null) _clearEvents.SetSelectedGameObject(target.gameObject);
+            if (_clearEvents != null) _clearEvents.SetSelectedGameObject(null);
         }
 
         private void RestoreClearInputOwnership()

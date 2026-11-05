@@ -13,8 +13,8 @@ namespace KingmakerBuffPlanner.UI
     // kbpnui-facts-03): TextMeshPro "NexusSerif-Regular SDF" (Book Antiqua)
     // with its role materials, the "Saber_Dist32" ornamental initial, and
     // the sprites the spellbook, its spell description and the service
-    // windows draw with. Assets are only referenced (never copied, cloned
-    // or modified); one resolution serves one StaticCanvas instance.
+    // windows draw with. Fonts/sprites are borrowed; role materials are
+    // owned per workspace so native donor teardown cannot invalidate labels.
     internal enum PlannerTextRole
     {
         // The window title: bold, with the native ornamental initial.
@@ -75,12 +75,10 @@ namespace KingmakerBuffPlanner.UI
         internal const string PortraitFrame = "save_framemini";
         internal static readonly Color Burgundy = new Color(0.502f, 0.106f, 0.094f, 1f);
 
-        private static PlannerNativeKit _cached;
-        private static int _cachedCanvas;
-
         private readonly Dictionary<string, Sprite> _sprites = new Dictionary<string, Sprite>(StringComparer.Ordinal);
         private readonly Dictionary<string, Material> _materials = new Dictionary<string, Material>(StringComparer.Ordinal);
-        private readonly Dictionary<PlannerTextRole, Material> _controllerMaterials = new Dictionary<PlannerTextRole, Material>();
+        private readonly WorkspaceTextMaterials<Material> _ownedMaterials =
+            new WorkspaceTextMaterials<Material>(material => material != null, material => UnityEngine.Object.Destroy(material));
         private readonly bool _controller;
         private readonly HashSet<string> _initializationSamples = new HashSet<string>();
 
@@ -102,12 +100,8 @@ namespace KingmakerBuffPlanner.UI
 
         internal static PlannerNativeKit Resolve(Component canvas)
         {
-            int id = canvas == null ? 0 : canvas.GetInstanceID();
-            if (_cached != null && _cachedCanvas == id && _cached.BodyFont != null) return _cached;
             var kit = new PlannerNativeKit();
             kit.Load(canvas);
-            _cached = kit;
-            _cachedCanvas = id;
             return kit;
         }
 
@@ -116,10 +110,17 @@ namespace KingmakerBuffPlanner.UI
             foreach (TMP_FontAsset font in Resources.FindObjectsOfTypeAll<TMP_FontAsset>())
             {
                 if (font == null) continue;
-                if (BodyFont == null && string.Equals(font.name, BodyFontName, StringComparison.Ordinal))
+                if (BodyFont == null && font.material != null && font.material.shader != null &&
+                    MaterialAtlasInstanceId(font.material) != 0 && string.Equals(font.name, BodyFontName, StringComparison.Ordinal))
                     BodyFont = font;
                 if (string.Equals(font.name, InitialFontName, StringComparison.Ordinal)) HasInitialFont = true;
             }
+            // A native UI donor is the deliberate fallback when the preferred
+            // body asset is absent. Never introduce TMP's bundled default face.
+            if (BodyFont == null && canvas != null)
+                BodyFont = canvas.GetComponentsInChildren<TMP_Text>(true).Where(label => label != null && label.font != null)
+                    .Select(label => label.font).FirstOrDefault(font => font.material != null &&
+                        font.material.shader != null && MaterialAtlasInstanceId(font.material) != 0);
             int bodyAtlas = MaterialAtlasInstanceId(BodyFont == null ? null : BodyFont.material);
             foreach (Material material in Resources.FindObjectsOfTypeAll<Material>())
             {
@@ -223,32 +224,36 @@ namespace KingmakerBuffPlanner.UI
 
         private Material MaterialFor(PlannerTextRole role)
         {
-            if (_controller && BodyFont != null && BodyFont.material != null)
+            if (BodyFont != null && BodyFont.material != null)
             {
-                Material owned;
-                if (_controllerMaterials.TryGetValue(role, out owned) && owned != null) return owned;
-                // A mouse-window role material can carry a live clipping or
-                // stencil context. Start from the verified font atlas, retain
-                // native role ink/weight in Style, and let EACH owned label's
-                // MaskableGraphic apply its actual local masks normally.
-                owned = new Material(BodyFont.material) { name = "KBP.ControllerText." + role };
-                owned.DisableKeyword("UNITY_UI_CLIP_RECT");
-                owned.DisableKeyword("UNITY_UI_ALPHACLIP");
-                owned.DisableKeyword("MASK_HARD");
-                owned.DisableKeyword("MASK_SOFT");
-                if (owned.HasProperty("_StencilComp")) owned.SetFloat("_StencilComp", 8);
-                if (owned.HasProperty("_Stencil")) owned.SetFloat("_Stencil", 0);
-                if (owned.HasProperty("_StencilOp")) owned.SetFloat("_StencilOp", 0);
-                if (owned.HasProperty("_StencilReadMask")) owned.SetFloat("_StencilReadMask", 255);
-                if (owned.HasProperty("_StencilWriteMask")) owned.SetFloat("_StencilWriteMask", 255);
-                if (owned.HasProperty("_ColorMask")) owned.SetFloat("_ColorMask", 15);
-                _controllerMaterials[role] = owned;
-                return owned;
+                return _ownedMaterials.Get(role.ToString(), () => CreateTextMaterial(role));
             }
-            Material material;
-            string name = role == PlannerTextRole.Button ? ButtonMaterialName
+            return null;
+        }
+
+        private Material CreateTextMaterial(PlannerTextRole role)
+        {
+            string roleName = role == PlannerTextRole.Button ? ButtonMaterialName
                 : role == PlannerTextRole.Action ? ActionMaterialName : BodyMaterialName;
-            return _materials.TryGetValue(name, out material) ? material : null;
+            Material donor;
+            if (_controller || !_materials.TryGetValue(roleName, out donor) || donor == null ||
+                donor.shader == null || !NativeTextMaterialSelection.Matches(roleName, donor.name,
+                    MaterialAtlasInstanceId(BodyFont.material), MaterialAtlasInstanceId(donor)))
+                donor = BodyFont.material;
+            // Clone a live atlas-compatible donor once per role. Never
+            // borrow TMP's transient stencil/fallback material lifetime.
+            var owned = new Material(donor) { name = (_controller ? "KBP.ControllerText." : "KBP.WorkspaceText.") + role };
+            owned.DisableKeyword("UNITY_UI_CLIP_RECT");
+            owned.DisableKeyword("UNITY_UI_ALPHACLIP");
+            owned.DisableKeyword("MASK_HARD");
+            owned.DisableKeyword("MASK_SOFT");
+            if (owned.HasProperty("_StencilComp")) owned.SetFloat("_StencilComp", 8);
+            if (owned.HasProperty("_Stencil")) owned.SetFloat("_Stencil", 0);
+            if (owned.HasProperty("_StencilOp")) owned.SetFloat("_StencilOp", 0);
+            if (owned.HasProperty("_StencilReadMask")) owned.SetFloat("_StencilReadMask", 255);
+            if (owned.HasProperty("_StencilWriteMask")) owned.SetFloat("_StencilWriteMask", 255);
+            if (owned.HasProperty("_ColorMask")) owned.SetFloat("_ColorMask", 15);
+            return owned;
         }
 
         internal static float DefaultSize(PlannerTextRole role)
@@ -465,9 +470,7 @@ namespace KingmakerBuffPlanner.UI
 
         public void Dispose()
         {
-            foreach (Material material in _controllerMaterials.Values)
-                if (material != null) UnityEngine.Object.Destroy(material);
-            _controllerMaterials.Clear();
+            _ownedMaterials.Dispose();
         }
 
         // The native ornamental rule (Separator_left / middle / right), as

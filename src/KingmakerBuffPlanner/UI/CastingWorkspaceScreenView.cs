@@ -475,7 +475,7 @@ namespace KingmakerBuffPlanner.UI
             if (_controllerNavigation != null) _controllerNavigation.Dispose();
             _description = null;
             if (_root != null) DestroyRoot();
-            if (_controllerAuthoring && _kit != null) _kit.Dispose();
+            if (_kit != null) _kit.Dispose();
             _root = null;
         }
 
@@ -684,14 +684,14 @@ namespace KingmakerBuffPlanner.UI
             // Borrowed native artwork, fonts and the click sound reach the
             // rebuilt controls; every control is pointer-highlighted only.
             stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
-            if (_controllerAuthoring && _refreshSequence <= 2) PlannerWorkspaceTextProbe.Sample(_root, "before-theme", _log);
+            if (_refreshSequence <= 2) PlannerWorkspaceTextProbe.Sample(_root, "before-theme", _log);
             if (_nativeTheme != null) _nativeTheme.ApplyTo(_root);
             KingmakerUiFactory.OwnPointerHighlights(_root);
             PropagateUiLayer();
             double themeMilliseconds = ElapsedMilliseconds(stageStarted);
             stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             Canvas.ForceUpdateCanvases();
-            if (_controllerAuthoring && _refreshSequence <= 2) PlannerWorkspaceTextProbe.Sample(_root, "after-layout", _log);
+            if (_refreshSequence <= 2) PlannerWorkspaceTextProbe.Sample(_root, "after-layout", _log);
             if (CatalogueScroll() != null) CatalogueScroll().verticalNormalizedPosition = cataloguePosition;
             if (_inspectorScroll != null)
             {
@@ -2120,8 +2120,7 @@ namespace KingmakerBuffPlanner.UI
             _bannerIcon.sprite = icon;
             _bannerIcon.color = icon == null ? new Color(0f, 0f, 0f, 0f) : Color.white;
             _bannerTitle.text = view.SelectedSourceCaption;
-            string kind = view.SelectedSourceIsGroup == true ? "Group buff"
-                : view.SelectedSourceIsGroup == false ? "Single target" : "Targeting not understood";
+            string kind = CastingGraphText.TargetingLabel(view.SelectedSourceIsGroup, view.SelectedSourceIsArea);
             _bannerDetail.text = kind + " · " + view.Castings.Count + " in " + view.SelectedRoutineName +
                 (view.OtherRoutineCastings == 0 ? string.Empty
                     : " · " + view.OtherRoutineCastings + " in other routines");
@@ -2315,7 +2314,7 @@ namespace KingmakerBuffPlanner.UI
                 ControllerControlIdentity.Set(button, "provider/" + caster.UnitId + "/" + key, "Casters");
                 button.onClick.AddListener(() => Command(() =>
                     SurfaceClick(_session.ClickGraphSource(key, _inputs())), "provider-switch"));
-                TextMeshProUGUI label = _kit.Text(rect, "Label", row.Label + (row.IsGroup ? " · group" : string.Empty),
+                TextMeshProUGUI label = _kit.Text(rect, "Label", row.Label,
                     PlannerTextRole.Strong, 15f, TextAlignmentOptions.TopLeft);
                 if (row.Selected) label.color = PlannerNativeKit.Burgundy;
                 label.enableWordWrapping = false;
@@ -2411,7 +2410,7 @@ namespace KingmakerBuffPlanner.UI
             first.enableWordWrapping = false;
             first.overflowMode = TextOverflowModes.Ellipsis;
             var details = new List<string>();
-            if (casting.IsGroup) details.Add("Group · reaches " + casting.Beneficiaries.Count);
+            if (casting.IsGroup) details.Add("Predicted reach: " + casting.Beneficiaries.Count);
             details.AddRange(casting.EnhancementBadges.Where(value => !string.IsNullOrEmpty(value)));
             if (details.Count == 0)
             {
@@ -2841,7 +2840,7 @@ namespace KingmakerBuffPlanner.UI
                 CastingGraphTargetNode target = view.TargetById(casting.DirectTargetUnitId);
                 return casterName + " » " + (target == null ? inspector.TargetLabel : target.DisplayName);
             }
-            return casterName + " » group: " + inspector.TargetLabel;
+            return inspector.TargetLabel;
         }
 
         // The casting's source as its caster's row names it ("Wizard ·

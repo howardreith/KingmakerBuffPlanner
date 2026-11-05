@@ -12,15 +12,20 @@ namespace KingmakerBuffPlanner.UI
         internal static void Sample(Transform root, string phase, Action<string> log)
         {
             if (root == null) return;
-            string[] names = { "Title", "BuffName", "Name", "LaneTitle", "Headline", "SaveStatus", "Result", "SourceDetail", "ResourcesTitle", "Text", "Label", "Capacity" };
+            string[] names = { "Title", "BuffName", "Name", "LaneTitle", "Headline", "SaveStatus", "Result", "SourceDetail", "ResourcesTitle", "Text", "Label", "Capacity", "Placeholder" };
             foreach (TMP_Text label in root.GetComponentsInChildren<TMP_Text>(true)
-                .Where(t => names.Contains(t.name)).GroupBy(t => t.name).Select(g => g.First()))
+                .Where(t => names.Contains(t.name)).GroupBy(t => t.name + "/" + t.transform.parent.name).Select(g => g.First()).Take(24))
             {
                 try
                 {
                     RectTransform r = label.rectTransform;
                     Material m = label.fontSharedMaterial;
                     Canvas canvas = label.canvas;
+                    log("[KBP-WORKSPACE-TEXT-MATERIAL] phase=" + phase + ";label=" + label.transform.parent.name + "/" + label.name +
+                        ";fontId=" + (label.font == null ? 0 : label.font.GetInstanceID()) +
+                        ";sharedId=" + (m == null ? 0 : m.GetInstanceID()) + ";shared=" + (m == null ? "none" : m.name) +
+                        ";shader=" + (m == null || m.shader == null ? "none" : m.shader.name) +
+                        ";atlas=" + (m == null || m.mainTexture == null ? 0 : m.mainTexture.GetInstanceID()));
                     if (label.gameObject.activeInHierarchy) label.ForceMeshUpdate();
                     log("[KBP-WORKSPACE-TEXT] phase=" + phase + ";name=" + label.name + ";text=" + label.text +
                         ";active=" + label.gameObject.activeInHierarchy + ";enabled=" + label.enabled + ";alpha=" + label.alpha +
@@ -39,7 +44,7 @@ namespace KingmakerBuffPlanner.UI
                         ";canvas=" + (canvas == null ? "none" : canvas.renderMode + "/" + canvas.scaleFactor + "/" + canvas.sortingOrder) +
                         ";screen=" + Screen.width + "x" + Screen.height);
                 }
-                catch (Exception exception) { log("[KBP-WORKSPACE-TEXT] phase=" + phase + ";unavailable=" + exception.GetType().Name); }
+                catch (Exception exception) { log("[KBP-WORKSPACE-TEXT] phase=" + phase + ";label=" + label.name + ";unavailable=" + exception.GetType().Name); }
             }
         }
     }

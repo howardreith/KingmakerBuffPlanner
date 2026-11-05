@@ -25,6 +25,7 @@ namespace KingmakerBuffPlanner.Tests
 
         private static void RunDuplicateItemSourceTests(string root)
         {
+            Run("playtest-area-wording-two-item-owners", () => TestAreaItemWording(root));
             Run("duplicate-items-across-casters-keep-every-exact-source",
                 () => TestDuplicateItemsAcrossCasters(root));
             Run("duplicate-items-on-one-caster-require-exact-selection",
@@ -37,6 +38,36 @@ namespace KingmakerBuffPlanner.Tests
                 () => TestDuplicateItemCatalogueMembership(root));
             Run("duplicate-items-legacy-aliases-never-create-ghost-buffs",
                 () => TestDuplicateItemLegacyAliases(root));
+        }
+
+        private static void TestAreaItemWording(string root)
+        {
+            DuplicateItemParty party = DuplicateItemFixture(false);
+            foreach (ProviderSnapshot provider in party.Providers)
+                party.Effects[provider.Key.Ability.Canonical] = new TargetedEffectExpression(EffectTarget.AlliedAreaRecipients,
+                    new EffectLeafExpression(EffectKind.AreaBuff, "area-item-buff", EffectTarget.AlliedAreaRecipients,
+                        "AbilityAreaEffectBuff", "area/item"));
+            party.Effects[DuplicateItemSourceId] = party.Effects[party.Providers[0].Key.Ability.Canonical];
+            var inputs = new CastingWorkspaceInputs(party.Snapshot, party.Options, party.Effects, null);
+            var session = new CastingWorkspaceSession(Path.Combine(root, "area-copy"), DuplicateItemCampaign);
+            foreach (ProviderSnapshot provider in party.Providers.Take(2))
+            {
+                session.SelectGraphBuff(CatalogSourceIdentity.For(provider.Key.Ability,
+                    party.Effects[provider.Key.Ability.Canonical]), inputs);
+                session.SelectGraphCaster(provider.Key.CasterUnitId, inputs);
+                Expect(session.SelectGraphSource(provider.Key.Canonical, inputs).Applied, "select area source");
+                var added = session.AddGraphCasting(provider.Key.CasterUnitId, inputs);
+                Expect(added.Applied, "add area casting: " + added.Edit.Reason);
+            }
+            string signature = session.DocumentIntentSignature();
+            CastingGraphView view = session.BuildGraph(inputs);
+            Expect(view.SelectedSourceIsArea && CastingGraphText.TargetingLabel(view.SelectedSourceIsGroup, view.SelectedSourceIsArea) == "Area buff", "area targeting label");
+            Expect(view.Inspector.TargetLabel == "Centred on item-caster-2" && view.Inspector.CoverageText.Contains("whoever is in the area"), "origin/coverage: " + view.Inspector.TargetLabel + ";" + view.Inspector.CoverageText);
+            Expect(view.Casters.SelectMany(c => c.Sources).All(row => row.Label == "Item charge"), "resource labels: " + string.Join("|", view.Casters.SelectMany(c => c.Sources).Select(r => r.Label)));
+            Expect(view.Castings.Count == 2 && view.Castings.Select(c => c.SourceProviderKey).Distinct().Count() == 2 &&
+                view.Casters.Take(2).SelectMany(c => c.Sources).All(row => row.CapacityText.StartsWith("1 of 2", StringComparison.Ordinal)), "item counts: " + string.Join("|", view.Casters.SelectMany(c => c.Sources).Select(r => r.CapacityText)));
+            Assert(session.DocumentIntentSignature() == signature);
+            Assert(CastingGraphText.TargetingLabel(true, false) == "Group buff" && CastingGraphText.TargetingLabel(false, false) == "Single target");
         }
 
         private sealed class DuplicateItemParty
