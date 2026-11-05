@@ -334,6 +334,42 @@ namespace KingmakerBuffPlanner.Tests
             Assert(ReferenceEquals(EffectConditionBinding.Bind(gated, state), gated.WhenTrue));
         }
 
+        private static void TestNativeCasterFactGate()
+        {
+            // Exact installed native types and the compiled production adapter;
+            // only Unity object construction/liveness is detached. Never invoke
+            // Condition.Check or enter a live MechanicsContext.
+            var product = ViewInputProduct();
+            var native = typeof(Kingmaker.Blueprints.BlueprintScriptableObject).Assembly;
+            Type conditionalType = native.GetType("Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional", true);
+            object conditional = DetachedViewObject(conditionalType);
+            var checkerField = conditionalType.GetField("ConditionsChecker", ViewInputMembers);
+            object checker = DetachedViewObject(checkerField.FieldType);
+            checkerField.SetValue(conditional, checker);
+            var conditionsField = checker.GetType().GetField("Conditions", ViewInputMembers);
+            Type conditionType = native.GetType("Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionCasterHasFact", true);
+            object condition = DetachedViewObject(conditionType);
+            object fact = DetachedViewObject(native.GetType("Kingmaker.Blueprints.Classes.BlueprintFeature", true));
+            SetNative(fact, "m_AssetGuid", "12345678901234567890123456789012");
+            SetNative(condition, "Fact", fact);
+            SetNative(condition, "Not", true);
+            Array conditions = Array.CreateInstance(conditionsField.FieldType.GetElementType(), 1);
+            conditions.SetValue(condition, 0); conditionsField.SetValue(checker, conditions);
+            var operation = checker.GetType().GetField("Operation", ViewInputMembers);
+            operation.SetValue(checker, Enum.Parse(operation.FieldType, "Or"));
+            var extract = product.GetType("KingmakerBuffPlanner.GameAdapters.KingmakerActionGraphAdapter", true)
+                .GetMethod("CasterGate", ViewInputMembers | System.Reflection.BindingFlags.Static);
+            Func<object> read = () => extract.Invoke(null, new[] { conditional });
+            object gate = read();
+            Assert(gate != null && (bool)gate.GetType().GetProperty("Any").GetValue(gate, null));
+            var facts = (IEnumerable<KeyValuePair<string, bool>>)gate.GetType().GetProperty("Facts").GetValue(gate, null);
+            Assert(facts.Single().Key == "12345678901234567890123456789012" && facts.Single().Value);
+            conditions.SetValue(DetachedViewObject(native.GetType("Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionIsAlly", true)), 0);
+            Assert(read() == null);
+            conditions.SetValue(condition, 0); SetNative(fact, "m_CachedPtr", IntPtr.Zero);
+            Assert(read() == null); // A destroyed native fact is unknown.
+        }
+
         private static void TestHeroismRepeatStateful(string root, string mode)
         {
             var run = new RepeatSession(root, mode, "stateful", true);
