@@ -38,6 +38,18 @@ $common = @{ Kind = 'qualification'; SelectionRunId = 'selection'; ExpectedCommi
     ApprovedBy = 'Howie'; Authority = 'bounded synthetic writer test, never a live authorization'
     ApprovalsRoot = $approvals; EvidenceRoot = $evidence; BackupRoot = $backups }
 $passed = 0
+Assert-KbpHeroismQualificationSelection ($original | ConvertFrom-Json)
+$passed++
+# Exercise the exact metadata shape emitted by the native dictionary writer,
+# for both conditional branches, through the existing allowance writer below.
+$metadataOutcome = $original | ConvertFrom-Json
+foreach ($factPresent in @($false, $true)) {
+    $metadataOutcome.selection.effectContext.casterFacts = [pscustomobject]@{
+        '$id' = '1'; '1a4bd53d5b8848d9a717084d7f9dfa0c' = $factPresent }
+    Assert-KbpHeroismQualificationSelection $metadataOutcome
+    $passed++
+}
+Save-Fixture $outcomePath $metadataOutcome
 foreach ($mode in @('instant', 'animated')) {
     $path = & (Join-Path $PSScriptRoot 'New-KbpRunAllowance.ps1') @common -RunId "good-$mode" -ExecutionMode $mode | Select-Object -Last 1
     $json = [IO.File]::ReadAllText($path)
@@ -53,6 +65,11 @@ $changes = @(
     { param($o) $o.selection.effectContext.successorAbilityGuid = $o.selection.effectContext.heroismAbilityGuid },
     { param($o) $o.selection.effectContext.primaryRecipientUnitId = 'caster' },
     { param($o) $o.selection.effectContext.casterFacts = [pscustomobject]@{} },
+    { param($o) $o.selection.effectContext.casterFacts = [pscustomobject]@{ '$id' = '1' } },
+    { param($o) $o.selection.effectContext.casterFacts = [pscustomobject]@{ '$id' = 'bad'; '1a4bd53d5b8848d9a717084d7f9dfa0c' = $true } },
+    { param($o) $o.selection.effectContext.casterFacts = [pscustomobject]@{ '$id' = 1; '1a4bd53d5b8848d9a717084d7f9dfa0c' = $true } },
+    { param($o) $o.selection.effectContext.casterFacts = [pscustomobject]@{ '$ref' = '1'; '1a4bd53d5b8848d9a717084d7f9dfa0c' = $true } },
+    { param($o) $o.selection.effectContext.casterFacts = [pscustomobject]@{ '1a4bd53d5b8848d9a717084d7f9dfa0c' = 'false' } },
     { param($o) $o.forecast[2].castingIds = @('qual-cast-1', 'qual-cast-2') },
     { param($o) $o.forecast[1].name = 'other' },
     { param($o) $o.selection.effectContext.observationUnitIds = @('caster') })

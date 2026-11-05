@@ -4,6 +4,13 @@ function Assert-KbpHeroismQualificationSelection($Outcome) {
     $selection = $Outcome.selection
     $context = $selection.effectContext
     $forecast = @($Outcome.forecast)
+    # The native Newtonsoft serializer preserves dictionary reference IDs.
+    # Accept its numeric string metadata, while still requiring actual
+    # GUID-to-boolean facts and rejecting references or other properties.
+    $facts = @($context.casterFacts.PSObject.Properties | Where-Object { $_.Name -cne '$id' })
+    $referenceId = $context.casterFacts.PSObject.Properties['$id']
+    $referenceIdValid = $null -eq $referenceId -or
+        ($referenceId.Value -is [string] -and $referenceId.Value -cmatch '^[1-9][0-9]*$')
     if ([string]$selection.recipe -cne 'heroism-successor' -or -not [bool]$selection.selected -or
         @($selection.castings).Count -ne 2 -or $null -eq $context -or
         [string]$context.heroismAbilityGuid -cne '5ab0d42fb68c9e34abae4921822b9d63' -or
@@ -15,8 +22,8 @@ function Assert-KbpHeroismQualificationSelection($Outcome) {
         [string]::IsNullOrWhiteSpace([string]$context.primaryRecipientUnitId) -or
         [string]$context.casterUnitId -ceq [string]$context.primaryRecipientUnitId -or
         $null -eq $context.discoveredExpression -or $null -eq $context.boundExpression -or
-        @($context.casterFacts.PSObject.Properties).Count -lt 1 -or
-        @($context.casterFacts.PSObject.Properties | Where-Object {
+        -not $referenceIdValid -or $facts.Count -lt 1 -or
+        @($facts | Where-Object {
             $_.Name -cnotmatch '^[0-9a-f]{32}$' -or $_.Value -isnot [bool] }).Count -ne 0 -or
         @($context.observationUnitIds) -cnotcontains [string]$context.primaryRecipientUnitId) {
         throw 'Heroism selection lacks real distinct sources, readable condition facts or explicit recipient evidence.'
