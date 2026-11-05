@@ -1081,7 +1081,7 @@ $recordAuthoring = @([regex]::Matches($authoringBlock, '"([^"]+)"') | ForEach-Ob
 $launcherAuthoringBlock = [regex]::Match((Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1') -Raw),
     'if \(\$expectation -ceq ''authoring''\) \{\s*\$expected = @\(([^)]*)\)').Groups[1].Value
 $launcherAuthoring = @([regex]::Matches($launcherAuthoringBlock, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
-if ($recordAuthoring.Count -ne 11 -or ($recordAuthoring -join ',') -cne ($launcherAuthoring -join ',')) {
+if ($recordAuthoring.Count -ne 12 -or ($recordAuthoring -join ',') -cne ($launcherAuthoring -join ',')) {
     throw "The launcher's judged authoring gestures differ from the record's: $($launcherAuthoring -join ',')"
 }
 # The allowance writer (review C5): what it writes from recorded selection
