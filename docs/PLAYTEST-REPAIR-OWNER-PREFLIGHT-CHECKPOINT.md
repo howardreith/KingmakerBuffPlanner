@@ -1,5 +1,111 @@
 # PR #20: observation-owner admission and disposable fixture setup
 
+## Current checkpoint: 2026-11-05 19:15 UTC
+
+PR branch remains `codex/kingmaker-buff-planner-playtest-repairs`.
+The original checkout is clean on
+`codex/kingmaker-buff-planner-playtest-repairs-frozen-1e1a312` at
+**1e1a31200628ade5f19eed1d839624ce5ecb33ea**, version 0.6.10 unreleased.
+The separate records worktree remains `artifacts/pr20-continuation`.
+This section supersedes the historical next actions and in-progress statements below.
+No merge or release is authorized or performed.
+
+### Completed launch boundary and actual native evidence on 9716c5d
+
+The supervised `powershell.exe -NoProfile -ExecutionPolicy Bypass -File
+scripts/Test-SourceOnly.ps1` completed with exit 0 and aggregate **1/0**.
+It ran 14:37:58–18:42:02 UTC (about 4h4m). The original four-hour budget
+was explicitly extended by 30 minutes after an actual other-lab overlap
+discarded/repeated the File-refused comparison. No history or assertions were
+excluded. Full C# **688/0**, source **47/0**, harness **38/0**, physical-reader
+**20/0**, problem-reader **35/0**, spellbook-reader **50/0**, deployment purity
+**5/0**, File purity **13/0**, File arguments **14/0**, fixture inventory **3/0**,
+isolated restore **16/0**, publisher refusal tests **8/0**. Evidence:
+`artifacts/playtest-9716c5d-launch-prerequisites.log`.
+
+| Run ID under lab runtime-evidence | Actual result |
+| --- | --- |
+| pr20-9716c5d-prepare-absent | PASS, complete:true; Linzi bard book CL1→10; real Heroism/Mirror Image; five native level-two uses; Infectious Charms absent; native save committed; zero casts |
+| pr20-9716c5d-select-absent | Game PASS, launcher FAIL, complete:false; real sources selected, Linzi→Hedwirg, fact false and first/recast/skip forecasts captured; reader rejected dictionary metadata; no allowance or cast |
+| pr20-9716c5d-ui-1080 | PASS **85/0**, schema 9, complete:true; both actual policy states/captures and modal/lifecycle checks |
+| pr20-9716c5d-physical-authoring | FAIL **82/1**, complete:false; OS add/remove/re-add/Undo/focus/Escape succeeded, retarget/provider expectations failed |
+
+All four runs exited and verified Mods and protected saves restored cleanly.
+UI/display runs also restored registry and physical display. Only the approved
+working save changed during preparation. Its SHA changed from
+`eded233c784fd658ddf2c46b2b54d5a310c39bff62506f0324b0f35c045bbec7` to
+`c567fd46c79482df5c45fc4ef79173ce47a1e448912a307f13b867e0359af0af`.
+The immutable baseline and all other saves remained protected. This is Linzi's
+explicitly prepared spellbook fixture, with class levels unchanged, not Leinna's
+build. No gameplay casts have yet been submitted in this revision.
+
+The policy captures and modal idle/Clear-hover PNGs were visually inspected:
+legible captions, ordinary button treatment, both visible policy states. Native
+modal pointer callbacks/semantic commands remain distinct from physical input.
+The physical authoring aggregate remains FAIL; its successful subchecks do not
+qualify the failed retarget/provider gestures. The actual display is 1920x1080;
+1920x1200 and rendered Blessed Signet/item-area coverage remain open.
+
+### Batched native test corrections
+
+Reader commit **74339d448aa4341b3f20356fa1d991a4619d6782** accepts only the native
+numeric-string `$id` metadata field while still requiring real GUID-to-boolean
+facts. Empty dictionaries, invalid metadata, references, string booleans, wrong
+sources/owners/forecasts remain rejected. Focused writer/reader tests **16/0**:
+`playtest-heroism-native-metadata-reader-final.log`. The immutable raw selection
+recheck passed **1/0**, with SHA
+`cd486433d08849edfa885c021c72e15a9537d31ff687ab339a36830b7d48e2c3`;
+`playtest-heroism-native-selection-recheck.log`. The original failed completion
+was not changed and creates no spending authority. An initial recheck command
+used the wrong working directory and failed; the corrected invocation completed.
+
+Observer commit **1e1a31200628ade5f19eed1d839624ce5ecb33ea** fixes the physical
+setup exposed by the capture: a different portrait in ordinary add mode added
+another casting. The observer now physically clicks Change recipient or Change
+caster/source, verifies the actual armed intent and focused casting, then clicks
+the recipient or provider. Read-only screen-point seams expose those existing
+controls. Required acknowledgments and negative controls remain enforced; product
+authoring behavior and spending controls are unchanged.
+
+`scripts/Test-Development.ps1 -Only
+'physical-,native-ui-,playtest-heroism-,cast-available-,explicit-run-stops-after-failure-both-modes'`
+passed **53/0**, source **47/0**, Release compile **1/0**, in 17.8 seconds.
+Evidence: `playtest-physical-observer-explicit-edits.log`. Changes to the compiled
+observer require a new artifact and corresponding native runs; none of the old
+native receipts is relabelled as execution on new bytes.
+
+### Frozen combined candidate and exact next actions
+
+| Identity | 1e1a312 |
+| --- | --- |
+| DLL SHA-256 | 66af19c93ab4feb1719af57e4a88749cdf64efe7151d924e4fee9723035d68a6 |
+| ZIP SHA-256 | 5f2098872cfe43d6cc7e4dc6d150f3bdb6d1a9841bedd9effa5c1bfa006451c8 |
+| MVID | 97207552-2cfe-449b-b038-50c5bdfab6f5 |
+
+Built once with Build-Local: source47/build1/package6/local1. Immutable package,
+manifest and FREEZE.json are under lab
+`runtime-backups/qualification-frozen/1e1a31200628ade5f19eed1d839624ce5ecb33ea/`.
+The previous archive and all previous FAIL/PASS receipts are retained.
+
+The new selected launch aggregate started **19:12:57 UTC**, with an explicit
+four-hour budget through **23:13 UTC**, log
+`artifacts/playtest-1e1a312-launch-prerequisites.log`, supervisor PID30980,
+tool session43688. Full offline C# **688/0** has passed, but the launch aggregate
+is still active and **not yet PASS**. The unchanged invocation must finish;
+do not start another aggregate or modify this frozen checkout.
+
+1. Inspect its final log and actual exit status; require all launch guards.
+2. Fresh Heroism selection on the already prepared absent-feat working copy,
+   with new 1e1a312 run IDs. Old failed selection is not allowance authority.
+3. Existing allowance writer binds the new frozen package, working SHA, forecasts
+   and five native submissions per mode; run instant and animated separately.
+4. Guarded present-feat preparation, fresh selection, new allowances and both
+   modes. Record actual owners/effects, spending, continuation, repeat and skip.
+5. Repeat matching native UI/physical authoring on the combined candidate.
+   Gameplay/native work has a separately selected 90-minute budget after guards;
+   safe completion/restoration cannot be interrupted for a deadline.
+
+
 Recorded 2026-11-05 14:24 UTC. Branch
 `codex/kingmaker-buff-planner-playtest-repairs`; version 0.6.10 unreleased.
 Admission fix: `2bfb09c` (ancestor of source below).
@@ -109,7 +215,7 @@ both real policy captions/states and their captures, plus exact intent restorati
 Its JSON read uses UTF-8 explicitly; legacy schema-8 verdicts are unchanged.
 The original native 84/1 FAIL remains a FAIL. No new native UI PASS is claimed.
 
-Exact next actions:
+Historical next actions at 14:24 UTC (superseded above):
 
 1. Build and archive the combined candidate once. Preserve the earlier cee1060
    immutable archive and receipts; do not attribute them to this new assembly.
@@ -152,7 +258,7 @@ package is rebuilt. The final clean package identity will be in its FREEZE.json.
 Documentation text/link checks passed 26/0 on the initial checkpoint (12 files,
 13 new links, authoritative mission byte identity). No merge or release.
 
-## 14:42 UTC: final frozen candidate and required checks in progress
+## Historical 14:42 UTC: previous frozen candidate and then-active checks
 
 Frozen HEAD **9716c5da0fb550a001a54714717435ae62c9acdc**, version 0.6.10,
 original checkout on `codex/kingmaker-buff-planner-playtest-repairs-frozen-9716c5d`.
