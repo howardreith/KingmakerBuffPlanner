@@ -77,8 +77,17 @@ namespace KingmakerBuffPlanner.Execution
                         { "successorAbilityGuid", successor.Provider.Key.Ability.BaseAbilityGuid },
                         { "successorName", successor.Provider.DisplayName },
                         { "casterUnitId", heroism.Provider.Key.CasterUnitId },
+                        { "casterName", inputs.Snapshot.Units.First(unit => unit.UnitId == heroism.Provider.Key.CasterUnitId).DisplayName },
                         { "primaryRecipientUnitId", target },
                         { "casterFacts", JObject.FromObject(heroism.CasterFacts ?? new Dictionary<string, bool>()) },
+                        { "heroismProviders", new JArray(options.Where(value => value.Provider.Key.Ability.BaseAbilityGuid == HeroismGuid)
+                            .Select(value => new JObject
+                            {
+                                { "provider", value.Provider.Key.Canonical },
+                                { "casterUnitId", value.Provider.Key.CasterUnitId },
+                                { "casterName", inputs.Snapshot.Units.First(unit => unit.UnitId == value.Provider.Key.CasterUnitId).DisplayName },
+                                { "casterFacts", JObject.FromObject(value.CasterFacts ?? new Dictionary<string, bool>()) }
+                            })) },
                         { "discoveredExpression", JObject.FromObject(raw) },
                         { "boundExpression", JObject.FromObject(heroism.BindEffects(raw, target)) },
                         { "observationUnitIds", new JArray(forecast[0].Projection.Plan.Steps[0].EffectObservationUnitIds) }

@@ -79,15 +79,21 @@ namespace KingmakerBuffPlanner.GameAdapters
                 }
                 Func<string, IEnumerable<ObservedEffectInstance>> readAfter = unitId =>
                     observed.ContainsKey(unitId) ? observed[unitId] : null;
-                bool confirmed = step.MassCast
-                    ? AppliedEffectJudgement.AnyReached(step.ExpectedRecipientUnitIds,
-                        step.ExpectedEffects, baseline, readAfter, step.Provider.CasterUnitId)
-                    : AppliedEffectJudgement.AllReached(step.ExpectedRecipientUnitIds,
-                        step.ExpectedEffects, baseline, readAfter, step.PreCoveredRecipientUnitIds, step.Provider.CasterUnitId);
+                bool confirmed = Judge(step, baseline, readAfter);
                 baseline.RecordConfirmationPoll(confirmed, new EffectBaseline(observed), step.EffectObservationUnitIds);
                 return confirmed;
             }
             catch (Exception) { return false; }
+        }
+
+        private static bool Judge(CastStep step, EffectBaseline baseline,
+            Func<string, IEnumerable<ObservedEffectInstance>> readAfter)
+        {
+            if (step.MassCast)
+                return AppliedEffectJudgement.AnyReached(step.ExpectedRecipientUnitIds,
+                    step.ExpectedEffects, baseline, readAfter, step.Provider.CasterUnitId);
+            return AppliedEffectJudgement.AllReached(step.ExpectedRecipientUnitIds,
+                step.ExpectedEffects, baseline, readAfter, step.PreCoveredRecipientUnitIds, step.Provider.CasterUnitId);
         }
 
         internal static string Describe(CastStep step, EffectBaseline before)

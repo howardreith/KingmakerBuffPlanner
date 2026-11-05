@@ -111,3 +111,31 @@ retained privately in `artifacts/playtest-profile-drift.json`.
 
 Next: freeze the clean candidate including these source-location changes,
 complete launcher safety/source and WhatIf purity, then native acceptance.
+
+## First frozen prerequisite attempt
+
+Candidate `813a69f6a48d0eafc2628ffac5096674a8f80c42` was cleanly built and frozen.
+DLL `f19e3614df735e257f6ffea89cf9e4fa458ae6a0688cd32642ff8a444db70bf1`,
+package `530dc41bd7c40181f65a55bbe9b92214ebc9f1ebeade55bf2a12191ac440cbf2`,
+MVID `e99aeb88-57d9-40b4-a036-faa0b7254691`. The prior candidate was preserved
+under `artifacts/playtest-candidate-78ae896`; each freeze retains its own ZIP.
+
+`Test-SourceOnly.ps1` stopped with **683/1** in C# before filesystem/purity
+windows: the existing confirmation source guard requires a direct
+`return AppliedEffectJudgement.AllReached(...)` path. The poll observer had
+changed its spelling to a local conditional expression. The direct judgment
+is now retained in a separate pure helper; no assertion was changed. There
+was no native transaction, launch, or interrupted cleanup.
+
+The correction also completes the batched native observer: all loaded Heroism
+providers' names and caster facts are recorded (so the selected caster is not
+silently substituted for Leinna); modal Cancel, both hover/exits, same-frame
+opening-edge refusal, semantic Confirm on the default Cancel, actual Clear,
+and production Undo restoring exact authored intent are observed separately.
+Semantic command automation is not physical keyboard/controller input evidence.
+
+`Test-Development.ps1 -Only 'confirmation,playtest-heroism,heroism-repeat,clear-plan,qualification,native-boundary'`
+passed **66/0**, source **47/0**, build **1/0** (15.0 seconds), receipt
+`artifacts/playtest-observer-correction.log`. Next: commit and freeze the
+replacement candidate, complete the previously unstarted purity windows, then
+native selection, authorized gameplay and rendered UI acceptance.

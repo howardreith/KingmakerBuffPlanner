@@ -16,10 +16,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private readonly JObject _playtestClearPlan = new JObject();
 
         // Native pointer transitions on the actual modal, with rendered captures.
-        // Cancel is the only activated action; the authored plan must survive.
+        // Clear is followed by the production Undo; the authored plan must survive.
         private bool UpdatePlaytestClearPlanProbe(CastingWorkspaceScreenView view)
         {
-            if (_playtestClearStep >= 7) return true;
+            if (_playtestClearStep >= 14) return true;
             if (view == null) throw new InvalidOperationException("Clear plan probe has no workspace.");
             if (_playtestClearStep == 0)
             {
@@ -35,9 +35,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 bool kept = !view.ClearPlanOpen && _playtestClearBefore == BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
                 _playtestClearPlan["cancelKeptPlan"] = kept;
                 if (!kept) _nativeUi.Failures.Add("playtest-clear-cancel-changed-plan");
-                view.FocusSearchForRuntime(true);
                 _playtestClearStep++; _nativeUiClock.Restart(); return false;
             }
+            if (_playtestClearStep >= 7) return UpdatePlaytestClearActions(view);
             Button[] buttons = view.ControllerFocusScope.GetComponentsInChildren<Button>(false);
             Button cancel = buttons.Single(button => button.name == "Cancel"), clear = buttons.Single(button => button.name == "Clear");
             float[] cancelTint = HighlightTint(cancel), clearTint = HighlightTint(clear);
@@ -73,6 +73,54 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 cancel.onClick.Invoke();
             }
             _playtestClearCaptured = false;
+            _playtestClearStep++; _nativeUiClock.Restart(); return false;
+        }
+
+        private bool UpdatePlaytestClearActions(CastingWorkspaceScreenView view)
+        {
+            if (_playtestClearStep == 7 || _playtestClearStep == 9)
+            {
+                if (_playtestClearStep == 9)
+                {
+                    bool safe = !view.ClearPlanOpen && _playtestClearBefore == BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                    _playtestClearPlan["semanticConfirmCancelled"] = safe;
+                    if (!safe) throw new InvalidOperationException("Semantic Cancel changed the plan.");
+                }
+                string opened = BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("ClearPlan");
+                if (opened != "invoked" || !view.ClearPlanOpen) throw new InvalidOperationException("Clear plan reopen refused: " + opened);
+                if (_playtestClearStep == 7)
+                {
+                    view.ControllerFocusScope.GetComponentsInChildren<Button>(false).Single(button => button.name == "Clear").onClick.Invoke();
+                    bool blocked = view.ClearPlanOpen && _playtestClearBefore == BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                    _playtestClearPlan["openingEdgeRejected"] = blocked;
+                    if (!blocked) throw new InvalidOperationException("Clear accepted its opening input edge.");
+                }
+            }
+            else if (_playtestClearStep == 8)
+                view.ControllerCommand(ControllerWorkspaceCommand.Confirm);
+            else if (_playtestClearStep == 10)
+                view.ControllerFocusScope.GetComponentsInChildren<Button>(false).Single(button => button.name == "Clear").onClick.Invoke();
+            else if (_playtestClearStep == 11)
+            {
+                var session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                bool cleared = !view.ClearPlanOpen && session.Document.Castings.Count == 0 && session.CanUndo;
+                _playtestClearPlan["clearAppliedOnceUndoAvailable"] = cleared;
+                if (!cleared) throw new InvalidOperationException("Clear plan did not clear with Undo available.");
+                NativeUiCapture("nui-playtest-clear-applied.png");
+            }
+            else if (_playtestClearStep == 12)
+            {
+                string undone = BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("Undo");
+                if (undone != "invoked") throw new InvalidOperationException("Clear plan Undo refused: " + undone);
+            }
+            else
+            {
+                bool restored = _playtestClearBefore == BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+                _playtestClearPlan["undoRestoredIntent"] = restored;
+                if (!restored) throw new InvalidOperationException("Clear plan Undo changed authored intent.");
+                view.FocusSearchForRuntime(true);
+                NativeUiCapture("nui-playtest-clear-undone.png");
+            }
             _playtestClearStep++; _nativeUiClock.Restart(); return false;
         }
 
