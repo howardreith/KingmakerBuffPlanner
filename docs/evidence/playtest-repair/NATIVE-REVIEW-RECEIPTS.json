@@ -1,0 +1,16 @@
+{
+  "sourceCommit": "87d15b12ff1d57e876b970ae5201c5ffa301fc53",
+  "frozenProductCommit": "cee1060fffb824a6d4838d5925727cbaff1833f4",
+  "status": "NATIVE_ACCEPTANCE_INCOMPLETE",
+  "sha256": {
+    "pr20-cee1060-heroism-select/runtime-result.json": "a93fe46568f94313b4cdcf5035cbcfbfeda09f86c6c23a207a5c0bb231c300ab",
+    "pr20-cee1060-heroism-select/run-completion.json": "7e7a9397396bccc0fa3febf3e94bde5844b36a36c22b3f0a40667373e0703c88",
+    "pr20-cee1060-heroism-select/qual-outcome.json": "91191b49789186eaa7dcadcde0f1494ea4b9ef360db7dca7507fbeb5954b2ab9",
+    "pr20-cee1060-heroism-select/capability-inventory.json": "c3f4f85d94bc0a5fb8abb2df3819a76730e9278c8fdfacb8303356e8c6afed76",
+    "pr20-cee1060-ui-1080/runtime-result.json": "68e9c914cd8e775fe2274cdf12633ac166e6dd30ebd2f988721476dc2ce88eae",
+    "pr20-cee1060-ui-1080/run-completion.json": "b4fb7e8cdd14e4c7acfbe12d30e2783c468a730f1ab69064b5538a1739f5d933",
+    "pr20-cee1060-ui-1080/native-ui.json": "12e1d5ed04a2b7b00006b4c18caf4e6f2c85e3564a0516ca95405726d3cae129",
+    "pr20-cee1060-ui-1080/protected-saves.json": "4b9f388a97654c95192092fe6125d0ae8a075c5528a12dbf35966b27ce889e92",
+    "pr20-cee1060-ui-1080/display-mode.json": "30e21e3e62303eb66e4c4488ec3bb868fcf221a4b77410ce579b9b703e668270"
+  }
+}

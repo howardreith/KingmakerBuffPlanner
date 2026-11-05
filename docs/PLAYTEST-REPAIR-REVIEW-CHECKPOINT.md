@@ -127,31 +127,30 @@ A read-only serialized inventory found Heroism and Mirror Image references. This
 does **not** establish loaded affordability or Leinna's native fact state. Only
 `KBP_AUTOMATION_WORKING` is mutable; baseline and all other saves remain protected.
 
-## Exact next actions
+## Exact next actions (supersedes the earlier campaign sequence)
 
-1. Continue the existing prerequisite supervisor. Retain completed receipts and
-   inspect every remaining verdict. Do not start gameplay before the required
-   safety/source and WhatIf purity checks pass; do not restart the old campaign.
-2. From the clean frozen checkout, run `live-cast-qual-select` with recipe
-   `heroism-successor`, profile `full-user`, fixture `Automation`, timeout 900,
-   run ID `pr20-cee1060-heroism-select`. Qualification uses the owner's display
-   mode because explicit window sizes are admitted only for the designated UI routes.
-3. After a PASS and complete restored selection lifecycle, use the existing
-   `New-KbpRunAllowance.ps1` writer for `pr20-cee1060-heroism-instant` and
-   `pr20-cee1060-heroism-animated`, bound to that selection and this exact freeze.
-   Record mechanical authority from the owner's PR #20 review instruction; never
-   imply individual approval-file inspection or fabricate an allowance.
-4. Execute both modes through the guarded `live-cast-qual` launcher. Check real
-   effects on their owners, first/recast/successor/skip outcomes, actual resource
-   deltas, cleanup, owned process exit, exact Mods restoration and protected saves.
-5. Run guarded `live-workspace-native-ui -NativeUiStage qualify` at explicit
-   `windowed-1920x1200` on the same candidate. Inspect rendered lifecycle text,
-   Require full plan in both states, modal transitions and safe actions, and
-   available item/area wording. Report missing fixture coverage explicitly.
-6. Update this checkpoint with actual native outcomes, publish records through the
-   guarded helper, and keep PR #20 draft. **Do not merge or release.**
+1. Obtain the answer to the pending fixture choice: prepare the existing
+   Automation working copy, or use an owner-designated higher-level disposable
+   fixture through the approved workflow. The native selection below proves the
+   current fixture cannot run this recipe. Do not retry it unchanged, infer
+   usable spells from serialized references, or load a real campaign save.
+2. Prepare only the authorized disposable working save with real learned,
+   affordable Heroism and its successor. Preserve baseline and protected saves.
+   The guarded recipe and allowance writer are implemented; no duplicate recipe
+   is needed. Leinna and the applicable feat branch still need native coverage.
+3. Freeze the combined source/observer candidate after fixture setup is ready.
+   The schema-9 changes below alter the product assembly: they require a new
+   candidate and affected native UI observation. Do not attribute cee1060 receipts
+   to that later binary or rebuild cee1060 just to stamp documentation.
+4. Complete the required checks for that candidate, select non-casting first,
+   then require PASS plus complete restored selection before writing allowances
+   using `New-KbpRunAllowance.ps1`. Execute the guarded `heroism-successor` recipe
+   in both modes and verify owners, spending, distinct successor and restoration.
+5. Repeat affected native UI checks, inspect both policy states and lifecycle
+   captions, and obtain the outstanding 1920x1200, physical-input and item/area
+   coverage when its environment and fixture are available. Keep PR #20 draft;
+   **do not merge or release**.
 
-Native gameplay and rendered UI acceptance remain **NOT RUN** at this checkpoint.
 The owner's uploaded 6c75425 log remains original-failure evidence only.
 
 ## 06:35 UTC: prerequisites complete, native selection started
@@ -190,3 +189,87 @@ The guarded **non-casting** `pr20-cee1060-heroism-select` run was started at
 restored lifecycle before any spending allowance is written. Gameplay and
 rendered UI acceptance remain pending. Continue this run; do not restart the
 completed history scans or rebuild the candidate for this reader correction.
+
+## 06:56 UTC: actual native outcomes and bounded observer correction
+
+Source is now `87d15b12ff1d57e876b970ae5201c5ffa301fc53` on the PR branch,
+version 0.6.10 unreleased. Both runs below used **frozen cee1060**, its exact DLL,
+ZIP, MVID and unchanged launcher. All 15 full-user mod identity assertions passed,
+including ZFavoredClass. The compatibility identity was
+`c9a1664ca57e1bbe8b7b9f193a4f4633bd80498bdfcb2a636aa6a37ea110ca43`.
+
+| Native run | Result | Spending | Safe completion |
+| --- | --- | --- | --- |
+| `pr20-cee1060-heroism-select` | FAIL: `no-affordable-real-heroism-successor` | 0 submissions; no allowance written | exited, Mods restored, protected saves clean |
+| `pr20-cee1060-ui-qualify` | pre-mutation refusal: physical 1920x1080 cannot fit windowed 1920x1200 | none | no transaction or game started |
+| `pr20-cee1060-ui-1080` | FAIL: 84 assertions pass / 1 fails (`game-log-planner-lines:2`) | 0 runs started; casting disabled | exited, Mods/display restored, protected saves clean |
+
+The selection roster was Hedwirg, Linzi and Tartuccio. Loaded inventory contained
+14 providers, **zero Heroism and zero Mirror Image providers**, with caster level
+1 and only level-one spell pools. Leinna was absent. This disproves the theory
+that the existing serialized spell references establish a usable native fixture.
+It does not establish Leinna's feat state or invalidate the offline positive
+mixed-owner regression. The pending owner fixture question is necessary because
+the mission protects the baseline and every other save; no alternate real save,
+fake effect, free spell injection or weakened allowance is substituted.
+
+The UI captures were visually inspected: Casting options labels, Change
+recipient, Require full plan, resources including a reopened resources panel,
+and the Clear modal were legible. Idle modal had neither selected button nor red
+warning treatment; hover appeared on the corresponding button, and exit
+captures returned to idle. The five modal checks were true: Cancel preserves
+intent, opening-edge activation is rejected, semantic Confirm cancels, Clear
+applies with Undo available, and Undo restores exact authored intent.
+The observer uses native pointer callbacks and semantic controller commands;
+this is **not physical mouse, keyboard or controller dispatch acceptance**.
+Only the unchecked policy state was captured; 1200-height and Blessed Signet
+content were not covered. No overall visual/gameplay qualification is claimed.
+
+The aggregate UI FAIL is an observer contract mismatch: current product emits
+one zero-cast summary plus one per-casting refusal detail, while schema 8 demanded
+exactly one line. The two actual lines state native submission is disabled by
+the absent grant; no cast was attempted. The original FAIL and raw evidence
+remain unchanged. Source schema 9 requires that zero-cast summary, the exact
+native refusal code, one correctly ordered/labelled detail per planned casting,
+and the existing refused-run / zero-start controls. Negative controls reject
+missing/duplicate lines, wrong owners/reasons, a nonzero cast summary and started
+runs. Historical schema 8 retains its original verdict.
+
+The batched new observer toggles the actual AvailabilityPolicy control twice,
+holds each state for a completed rendered capture, records its real policy and
+caption, and requires both states plus exact intent restoration. These changes
+are **not present in frozen cee1060**, so no old UI receipt qualifies them.
+They require the next affected native observation after fixture preparation.
+
+Focused command in the continuation worktree:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Development.ps1 -Only 'native-ui-,playtest-text-,human-feedback-native-ui-'
+```
+
+Final result **14/0**, source **47/0**, Release compile **1/0**, 7.3 seconds.
+The first run was **13/1** because the old unknown-schema negative fixture used
+newly valid schema 9; that negative was moved to still-unknown schema 10 and the
+focused suite reran. Both logs remain in continuation `artifacts/`:
+`playtest-ui-observer-schema9.log`, `playtest-ui-observer-schema9-corrected.log`.
+The development DLL SHA was
+`9d2036f569f650f7ee2177f3492374033a7e29c42606144c53685b3212c1150d`,
+compiled from precommit b1da33 plus these observer changes; it is not a frozen
+or deployable qualification artifact. No new broad campaign was started.
+
+Native commands used `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command`
+and the repository's guarded `Invoke-KingmakerRuntimeTest.ps1`, `-Confirm:$false`,
+profile `full-user`, fixture `Automation`, timeout 900, and the exact run IDs above.
+Selection used `-Scenario live-cast-qual-select -QualificationRecipe heroism-successor
+-ExecutionMode instant` with owner display. UI used `-Scenario live-workspace-native-ui
+-NativeUiStage qualify -DisplayMode windowed-1920x1080` (1200 for the refused attempt).
+
+Raw evidence: lab `runtime-evidence/<run-id>/` containing `runtime-result.json`,
+`run-completion.json`, `qual-outcome.json`/`capability-inventory.json` for selection,
+and `native-ui.json`, protected-save/display receipts and rendered PNGs for UI.
+Launcher logs are in the original checkout's `artifacts/playtest-native-heroism-select.log`,
+`playtest-native-ui-qualify.log` and `playtest-native-ui-1080.log`.
+Both run-completion receipts say `complete:false` because their scenario failed;
+neither was relabelled complete because restoration succeeded.
+
+[Immutable raw-receipt hashes](evidence/playtest-repair/NATIVE-REVIEW-RECEIPTS.json).
