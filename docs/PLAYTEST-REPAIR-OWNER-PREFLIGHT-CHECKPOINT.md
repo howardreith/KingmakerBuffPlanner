@@ -3,7 +3,7 @@
 Recorded 2026-11-05 14:24 UTC. Branch
 `codex/kingmaker-buff-planner-playtest-repairs`; version 0.6.10 unreleased.
 Admission fix: `2bfb09c` (ancestor of source below).
-Combined source: `0f0242fe69592ccd8042e4687520ca51c96c143c`.
+Combined source: `74e9d40390fb75a160d2bc1d18a716e811a65d68`.
 [PR #20](https://github.com/howardreith/KingmakerBuffPlanner/pull/20) stays draft;
 no merge or release. This checkpoint supersedes the earlier pending fixture
 choice. The owner requested preparation of the existing disposable Automation
@@ -129,3 +129,25 @@ The earlier ZFavoredClass sealed-fixture repair remains unchanged. New gameplay,
 rendered and physical acceptance are **NOT RUN for this revision** at this
 source checkpoint. Native selection of the unchanged level-one fixture will not
 be retried. No owner permission question remains for preparing its working copy.
+
+## Final setup audit before launch
+
+Source 74e9d40390fb75a160d2bc1d18a716e811a65d68 additionally defers host
+termination while its native save coroutine or commit is pending. A deadline,
+abort or disable cannot make the host quit Unity during that write. A stuck
+save leaves the game and restoration blocked. The focused fixture scope/save
+terminal check passed 1/0, source47/0 and compile1/0, log
+artifacts/playtest-fixture-save-terminal-guard.log (7.1 seconds).
+
+The first archive, 341b95ead6ad20bfb38c7e23828162c39def3a09, is superseded
+before any native attempt or expensive gate. Its DLL SHA is
+c2db9b40670f9be05af7c965971ed8b3094f0db9df960581adc542a912aabd29; ZIP
+a843bc49ed89aa1ef26a926290d72f27b656330ebcbe4f7765387bd9dff68184;
+MVID 28864e13-7661-4f5d-bc78-9dbd4dc165a0. It passed source47/build1/
+package6/local1, but has no native qualification. Its immutable archive remains
+in lab runtime-backups/qualification-frozen/341b95ead6ad20bfb38c7e23828162c39def3a09.
+The replacement is justified by the save-terminal source change; no unchanged
+package is rebuilt. The final clean package identity will be in its FREEZE.json.
+
+Documentation text/link checks passed 26/0 on the initial checkpoint (12 files,
+13 new links, authoritative mission byte identity). No merge or release.
