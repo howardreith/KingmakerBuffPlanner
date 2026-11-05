@@ -137,7 +137,7 @@ namespace KingmakerBuffPlanner.Domain.Effects
         public static EffectExpression Bind(EffectExpression expression,
             IReadOnlyDictionary<string, bool> casterFacts)
         {
-            if (expression == null || casterFacts == null) return expression;
+            if (expression == null || casterFacts == null || casterFacts.Count == 0) return expression;
             var conditional = expression as ConditionalEffectExpression;
             if (conditional != null)
             {
@@ -146,18 +146,34 @@ namespace KingmakerBuffPlanner.Domain.Effects
                 {
                     bool result = gate.Any ? gate.Facts.Any(f => casterFacts[f.Key] != f.Value)
                         : gate.Facts.All(f => casterFacts[f.Key] != f.Value);
-                    return Bind(result ? conditional.WhenTrue : conditional.WhenFalse, casterFacts);
+                    EffectExpression selected = Bind(result ? conditional.WhenTrue : conditional.WhenFalse, casterFacts);
+                    var emptySequence = selected as SequenceEffectExpression;
+                    return emptySequence != null && emptySequence.Children.Count == 0
+                        ? EmptyEffectExpression.NoAction() : selected;
                 }
-                return new ConditionalEffectExpression(conditional.ConditionContract,
-                    Bind(conditional.WhenTrue, casterFacts), Bind(conditional.WhenFalse, casterFacts), gate);
+                EffectExpression whenTrue = Bind(conditional.WhenTrue, casterFacts);
+                EffectExpression whenFalse = Bind(conditional.WhenFalse, casterFacts);
+                return ReferenceEquals(whenTrue, conditional.WhenTrue) && ReferenceEquals(whenFalse, conditional.WhenFalse)
+                    ? expression : new ConditionalEffectExpression(conditional.ConditionContract, whenTrue, whenFalse, gate);
             }
             var sequence = expression as SequenceEffectExpression;
-            if (sequence != null) return sequence.Children.Count == 0 ? (EffectExpression)EmptyEffectExpression.NoAction()
-                : new SequenceEffectExpression(sequence.Children.Select(c => Bind(c, casterFacts)));
+            if (sequence != null)
+            {
+                var children = sequence.Children.Select(c => Bind(c, casterFacts)).ToList();
+                return children.SequenceEqual(sequence.Children) ? expression : new SequenceEffectExpression(children);
+            }
             var reference = expression as ReferencedAbilityExpression;
-            if (reference != null) return new ReferencedAbilityExpression(reference.AbilityId, Bind(reference.Child, casterFacts));
+            if (reference != null)
+            {
+                EffectExpression child = Bind(reference.Child, casterFacts);
+                return ReferenceEquals(child, reference.Child) ? expression : new ReferencedAbilityExpression(reference.AbilityId, child);
+            }
             var targeted = expression as TargetedEffectExpression;
-            if (targeted != null) return new TargetedEffectExpression(targeted.Target, Bind(targeted.Child, casterFacts));
+            if (targeted != null)
+            {
+                EffectExpression child = Bind(targeted.Child, casterFacts);
+                return ReferenceEquals(child, targeted.Child) ? expression : new TargetedEffectExpression(targeted.Target, child);
+            }
             return expression;
         }
 
