@@ -102,6 +102,17 @@ its filter was corrected without restarting or changing validation. Only the
 owned read-only watcher was replaced; supervisor PID30980 is unchanged. Synthetic
 foreign-once/foreign-always/game-running harness cases are not real-lab retries.
 
+By **22:05 UTC**, the first File-WhatIf window also had two actual other-lab
+overlaps. It is on its final allowed attempt; the guard keeps all three actual
+overlaps (including Deployment) inconclusive. Foreign runtime entries through
+22:02 confirm ongoing lab activity; no foreign game or lease was active at the
+22:06 read-only inspection, which is not assurance of future quiet. An optional
+owner coordination question asks whether the shared game can stay idle; no answer
+is assumed. The existing invocation received a final bounded extension to
+**00:13 UTC on November 6** (five hours total). No new aggregate is started if
+this window exhausts its existing retries. Native spending remains unauthorized
+until a successful new selection lifecycle and the existing allowance writer.
+
 1. Inspect its final log and actual exit status; require all launch guards.
 2. Fresh Heroism selection on the already prepared absent-feat working copy,
    with new 1e1a312 run IDs. Old failed selection is not allowance authority.
