@@ -151,3 +151,36 @@ package is rebuilt. The final clean package identity will be in its FREEZE.json.
 
 Documentation text/link checks passed 26/0 on the initial checkpoint (12 files,
 13 new links, authoritative mission byte identity). No merge or release.
+
+## 14:42 UTC: final frozen candidate and required checks in progress
+
+Frozen HEAD **9716c5da0fb550a001a54714717435ae62c9acdc**, version 0.6.10,
+original checkout on `codex/kingmaker-buff-planner-playtest-repairs-frozen-9716c5d`.
+The PR branch/records worktree is `artifacts/pr20-continuation`. Both retain
+separate purposes: do not restamp the unchanged native package for records.
+
+| Frozen identity | Value |
+| --- | --- |
+| DLL SHA-256 | a1a340dbb9d7f517734f5be0d1494594a0557cbf7931066c9ca56bb0c2351f57 |
+| ZIP SHA-256 | 4370a8c295463244198ba7153f95ea2eca3cf5c51c46ac0f2515d524e573a7fd |
+| MVID | 16c4ae05-7481-4293-bbd3-4f98a7301c95 |
+
+Build-Local passed source47/build1/package6/local1. Its package and manifest
+were copied byte-verified into lab `runtime-backups/qualification-frozen/<HEAD>/`
+with FREEZE.json. Logs `playtest-9716c5d-build-local.log` and
+`playtest-9716c5d-freeze.log` are in the original artifacts directory.
+The guarded push helper published this HEAD; PR #20 was verified draft/unmerged.
+
+The explicitly selected `powershell.exe -NoProfile -ExecutionPolicy Bypass
+-File scripts/Test-SourceOnly.ps1` started **14:37:58 UTC**, supervised in
+`artifacts/playtest-9716c5d-launch-prerequisites.log`. Budget: four hours to
+18:38 UTC, with native preparation/acceptance a separate 90-minute boundary
+after the required gates pass. All assertions/history are retained. The
+unchanged current invocation must continue; do not start another aggregate.
+
+Completed components so far: **688/0 full offline C#**, source **47/0**,
+launcher arguments **35/0**, runtime harness **38/0**, physical search
+reader **20/0**, problem navigation **35/0**, spellbook reader **50/0**.
+Deployment WhatIf and subsequent full-history launcher windows remain in
+progress; **the aggregate is not yet PASS**. There is no live game yet.
+No old 684/0 or cee1060 native result has been relabelled for this candidate.
