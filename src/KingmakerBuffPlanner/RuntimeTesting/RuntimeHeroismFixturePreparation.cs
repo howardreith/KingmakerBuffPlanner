@@ -26,6 +26,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _heroismFixtureFailure;
         private string _heroismFixturePath;
         private readonly JObject _heroismFixtureEvidence = new JObject();
+        private bool HeroismFixtureSavePending
+        {
+            get
+            {
+                return HeroismFixturePreparationPolicy.SaveMustFinishBeforeTermination(
+                    _heroismFixtureSave != null, _heroismFixtureSave != null && _heroismFixtureSave.Completed,
+                    Game.Instance != null && Game.Instance.SaveManager != null && Game.Instance.SaveManager.CommitInProgress);
+            }
+        }
 
         private bool UpdateHeroismFixturePreparation()
         {

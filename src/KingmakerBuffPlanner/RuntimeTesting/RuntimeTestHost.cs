@@ -388,6 +388,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         internal bool Update()
         {
+            // A deadline/abort/disable must not publish a terminal result and
+            // quit Unity in the middle of the owned native save transaction.
+            // A stuck save leaves the game and launcher restoration blocked.
+            if (HeroismFixtureSavePending) return false;
             if (_completed) return true;
             // Review N2: after Shutdown (disable/unload/host failure) no later
             // update or re-enable can resume this request: it completes once,

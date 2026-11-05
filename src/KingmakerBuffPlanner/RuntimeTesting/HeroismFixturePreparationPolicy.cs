@@ -5,6 +5,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 {
     internal static class HeroismFixturePreparationPolicy
     {
+        internal static bool SaveMustFinishBeforeTermination(bool started, bool completed, bool committing)
+        {
+            return started && (!completed || committing);
+        }
+
         internal static string Refusal(string scenario, string profile, string condition, string name, string file,
             string saveCampaign, string loadedCampaign, string expectedCampaign, string path, string saveRoot)
         {

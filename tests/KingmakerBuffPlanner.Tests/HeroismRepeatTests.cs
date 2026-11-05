@@ -413,6 +413,10 @@ namespace KingmakerBuffPlanner.Tests
 
         private static void TestHeroismFixtureScope(string root)
         {
+            Assert(HeroismFixturePreparationPolicy.SaveMustFinishBeforeTermination(true, false, false));
+            Assert(HeroismFixturePreparationPolicy.SaveMustFinishBeforeTermination(true, true, true));
+            Assert(!HeroismFixturePreparationPolicy.SaveMustFinishBeforeTermination(true, true, false));
+            Assert(!HeroismFixturePreparationPolicy.SaveMustFinishBeforeTermination(false, false, true));
             string saveRoot = Path.GetFullPath(Path.Combine(root, "fixture-policy-saves"));
             string file = "Manual_305_KBP_AUTOMATION_WORKING.zks";
             string[] good = { "live-heroism-fixture-prepare", "full-user", "present", "KBP_AUTOMATION_WORKING", file,
