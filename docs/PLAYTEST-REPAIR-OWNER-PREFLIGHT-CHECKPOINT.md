@@ -94,6 +94,14 @@ tool session43688. Full offline C# **688/0** has passed, but the launch aggregat
 is still active and **not yet PASS**. The unchanged invocation must finish;
 do not start another aggregate or modify this frozen checkout.
 
+At **20:14 UTC**, the raw log recorded an actual Deployment WhatIf overlap
+with the other lab. The guard discarded that comparison and repeats it when
+quiet. The existing invocation received an explicit 30-minute extension through
+**23:43 UTC**. The progress watcher initially filtered only launcher retry labels;
+its filter was corrected without restarting or changing validation. Only the
+owned read-only watcher was replaced; supervisor PID30980 is unchanged. Synthetic
+foreign-once/foreign-always/game-running harness cases are not real-lab retries.
+
 1. Inspect its final log and actual exit status; require all launch guards.
 2. Fresh Heroism selection on the already prepared absent-feat working copy,
    with new 1e1a312 run IDs. Old failed selection is not allowance authority.
