@@ -63,6 +63,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("native-ui-scenario-admission", TestNativeUiScenarioAdmission);
             Run("native-ui-record-facts-judgement", TestNativeUiFactsJudgement);
             Run("native-ui-record-qualify-judgement", TestNativeUiQualifyJudgement);
+            Run("native-ui-current-refusal-and-policy-states", TestNativeUiCurrentRefusal);
             Run("native-ui-planning-seed-reserves-two-recipients", TestNativeUiPlanningSeed);
             Run("native-window-takes-over-from-the-planner", TestNativeWindowTakeover);
             Run("native-ui-planner-copy", TestNativeUiPlannerCopy);
@@ -726,6 +727,7 @@ namespace KingmakerBuffPlanner.Tests
         private static NativeUiRecord QualifiedNativeUiRecord()
         {
             NativeUiRecord record = CapturedNativeUiRecord(NativeUiRecord.QualifyStage);
+            record.SchemaVersion = 8;
             record.PlannerHudButtons = 4;
             record.PlannerHudCell = new[] { 48f, 48f };
             record.PlannerColumnOffsets = new[] { 0f, 0.5f, -0.5f, 0f };
@@ -880,6 +882,52 @@ namespace KingmakerBuffPlanner.Tests
             return record;
         }
 
+        private static NativeUiRecord CurrentRefusalRecord()
+        {
+            NativeUiRecord record = QualifiedNativeUiRecord();
+            record.SchemaVersion = 9;
+            record.RefusalCastingLabels.Add("Resistance (Linzi -> Hedwirg) [casting 1]");
+            const string reason = "Long was not cast: native casting is not available in this session. (native-submission-disabled:runtime-test-session:live-workspace-native-ui:cf-grant-absent).";
+            record.GameLogPlannerLines.Clear();
+            record.GameLogPlannerLines.Add("Buff Planner: Long — 0 cast. " + reason);
+            record.GameLogPlannerLines.Add("Not cast: " + record.RefusalCastingLabels[0] + " — not attempted: " + reason);
+            record.AvailabilityStates.AddRange(new[] { "cast-available|Require full plan", "require-full-plan|Require full plan" });
+            record.AvailabilityIntentRestored = true;
+            return record;
+        }
+
+        private static void TestNativeUiCurrentRefusal()
+        {
+            Expect(CurrentRefusalRecord().Violations().Count == 0,
+                "The real refused run has one zero-cast summary and one explanation per planned casting.");
+            foreach (Action<NativeUiRecord> mutate in new Action<NativeUiRecord>[]
+            {
+                r => r.GameLogPlannerLines.Clear(),
+                r => r.GameLogPlannerLines.RemoveAt(1),
+                r => r.GameLogPlannerLines.Add(r.GameLogPlannerLines[1]),
+                r => r.GameLogPlannerLines[0] = r.GameLogPlannerLines[0].Replace("0 cast", "1 cast"),
+                r => r.GameLogPlannerLines[1] = r.GameLogPlannerLines[1].Replace("Hedwirg", "Linzi"),
+                r => r.GameLogPlannerLines[1] = r.GameLogPlannerLines[1].Replace("cf-grant-absent", "another-reason"),
+                r => r.RefusalCastingLabels.Clear(),
+                r => r.RefusalCastingLabels.Add(r.RefusalCastingLabels[0]),
+                r => r.RoutinePressRefused = false,
+                r => r.RunsStarted = 1,
+                r => r.AvailabilityStates.RemoveAt(1),
+                r => r.AvailabilityStates[1] = r.AvailabilityStates[0],
+                r => r.AvailabilityStates[1] = "require-full-plan|",
+                r => r.AvailabilityIntentRestored = false
+            })
+            {
+                NativeUiRecord bad = CurrentRefusalRecord();
+                mutate(bad);
+                Expect(bad.Violations().Count != 0, "A missing, duplicate, wrong-owner or non-refused observation must fail.");
+            }
+            NativeUiRecord historical = CurrentRefusalRecord();
+            historical.SchemaVersion = 8;
+            Expect(historical.Violations().Contains("game-log-planner-lines:2"),
+                "The original schema-8 FAIL must remain a FAIL; new observation requirements do not relabel it.");
+        }
+
         private const string ResistanceTitle =
             "<font=\"Saber_Dist32\"><color=#983F1D><size=140%>R</size></color></font>esistance";
         private const string EarPiercingScreamTitle =
@@ -973,7 +1021,7 @@ namespace KingmakerBuffPlanner.Tests
                 { "spellbook-pair-height-or-baseline:Linzi", r => r.Spellbooks[0].PlannerRect = new[] { 1600f, 100f, 150f, 30f } },
                 { "spellbook-top-right-entry-present", r => r.SpellbookTopRightEntryAbsent = false },
                 { "popup-presenter:planner-scroll", r => r.PlannerPopupPresenter = "planner-scroll" },
-                { "schema:9", r => r.SchemaVersion = 9 },
+                { "schema:10", r => r.SchemaVersion = 10 },
                 { "pause:inventory:not-paused-before", r => r.Switches[4].PausedBefore = false },
                 { "pause:not-restored", r => r.OwnedPauseRestored = false },
                 { "unavailable-metamagic:no-view", r => r.Spellbooks.RemoveAt(1) },

@@ -865,6 +865,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 case 12:
                 {
+                    if (!UpdatePlaytestAvailabilityProbe(view)) return false;
                     if (!UpdatePlaytestClearPlanProbe(view)) return false;
                     if (!NativeUiWaited(600)) return false;
                     bool focused = view != null && view.SearchFocusedForRuntime;
@@ -1191,6 +1192,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     _nativeUiRunsBefore = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
                     _nativeUi.AddNote("log-press:BuffPlannerUiRoot.PressRoutineForRuntime(long);no-os-input");
                     BuffPlannerUiRoot.PressRoutineForRuntime("long");
+                    CastingWorkspaceSession refused = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                    if (refused != null)
+                        foreach (var planned in refused.Document.Castings.Where(item => item.RoutineId == "long").OrderBy(item => item.Order))
+                            _nativeUi.RefusalCastingLabels.Add(refused.RunCastingLabel(planned.CastingId));
                     NativeUiNext(11);
                     return false;
                 }

@@ -146,7 +146,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // Schema 8 proves the reorder gesture selected a casting whose real
         // inspector made Cast later available after the independent adds.
         // Historical records prove only what they observed.
-        public int SchemaVersion { get; set; } = 8;
+        public int SchemaVersion { get; set; } = 9;
         public string RunId { get; set; }
         public string Stage { get; set; }
         public int ScreenWidth { get; set; }
@@ -259,6 +259,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public int GameLogLinesAfter { get; set; }
         public List<string> GameLogPlannerLines { get; } = new List<string>();
         public bool RoutinePressRefused { get; set; }
+        public List<string> RefusalCastingLabels { get; } = new List<string>();
+        public List<string> AvailabilityStates { get; } = new List<string>();
+        public bool AvailabilityIntentRestored { get; set; }
         // Case E: an autosave that fails while the plan file is held is
         // shown ("Not saved" with Retry save), Retry save heals it once
         // the file is free, and Undo restores the plan.
@@ -303,7 +306,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             var violations = new List<string>();
             if (SchemaVersion != 1 && SchemaVersion != 2 && SchemaVersion != 3 &&
                 SchemaVersion != 4 && SchemaVersion != 5 && SchemaVersion != 6 &&
-                SchemaVersion != 7 && SchemaVersion != 8)
+                SchemaVersion != 7 && SchemaVersion != 8 && SchemaVersion != 9)
                 violations.Add("schema:" + SchemaVersion);
             if (Stage != FactsStage && Stage != QualifyStage) violations.Add("stage:" + (Stage ?? "null"));
             violations.AddRange(Failures.Select(value => "failure:" + value));
@@ -434,8 +437,31 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!LeaseReleasedAtEnd || FullScreenModeAtEnd) yield return "end-state";
             // UI-08: one concise refusal line in the native game log.
             if (!RoutinePressRefused) yield return "routine-press-not-refused";
-            if (GameLogPlannerLines.Count != 1)
-                yield return "game-log-planner-lines:" + GameLogPlannerLines.Count;
+            if (SchemaVersion < 9)
+            {
+                if (GameLogPlannerLines.Count != 1)
+                    yield return "game-log-planner-lines:" + GameLogPlannerLines.Count;
+            }
+            else
+            {
+                const string refusal = "(native-submission-disabled:runtime-test-session:live-workspace-native-ui:cf-grant-absent).";
+                if (RefusalCastingLabels.Count == 0 || RefusalCastingLabels.Distinct().Count() != RefusalCastingLabels.Count ||
+                    GameLogPlannerLines.Count != RefusalCastingLabels.Count + 1)
+                    yield return "game-log-refusal-count";
+                if (GameLogPlannerLines.Count == 0 ||
+                    !GameLogPlannerLines[0].StartsWith("Buff Planner: Long — 0 cast.", StringComparison.Ordinal) ||
+                    !GameLogPlannerLines[0].EndsWith(refusal, StringComparison.Ordinal))
+                    yield return "game-log-refusal-summary";
+                for (int index = 0; index < RefusalCastingLabels.Count; index++)
+                    if (index + 1 >= GameLogPlannerLines.Count ||
+                        !GameLogPlannerLines[index + 1].StartsWith("Not cast: " + RefusalCastingLabels[index] + " — not attempted: ", StringComparison.Ordinal) ||
+                        !GameLogPlannerLines[index + 1].EndsWith(refusal, StringComparison.Ordinal))
+                        yield return "game-log-refusal-detail:" + index;
+                if (AvailabilityStates.Count != 2 ||
+                    !AvailabilityStates.Contains("cast-available|Require full plan") ||
+                    !AvailabilityStates.Contains("require-full-plan|Require full plan") || !AvailabilityIntentRestored)
+                    yield return "availability-states-or-restoration";
+            }
         }
 
         private IEnumerable<string> HumanFeedbackViolations()

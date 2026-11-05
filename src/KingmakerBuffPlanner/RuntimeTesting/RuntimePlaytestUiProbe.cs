@@ -14,6 +14,37 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private string _playtestClearBefore;
         private float[] _playtestCancelIdle, _playtestClearIdle;
         private readonly JObject _playtestClearPlan = new JObject();
+        private int _playtestAvailabilityStep;
+        private string _playtestAvailabilityBefore;
+
+        private bool UpdatePlaytestAvailabilityProbe(CastingWorkspaceScreenView view)
+        {
+            if (_playtestAvailabilityStep >= 5) return true;
+            if (view == null) throw new InvalidOperationException("Availability probe has no workspace.");
+            if (_playtestAvailabilityStep == 0)
+                _playtestAvailabilityBefore = BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+            else if (!NativeUiWaited(600)) return false;
+            if (_playtestAvailabilityStep == 0 || _playtestAvailabilityStep == 2)
+            {
+                var session = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
+                string policy = session.AvailabilityPolicy;
+                _nativeUi.AvailabilityStates.Add(policy + "|" + view.AvailabilityPolicyCaptionForRuntime);
+                NativeUiCapture("nui-playtest-policy-" + policy + ".png");
+                _playtestAvailabilityStep++;
+                _nativeUiClock.Restart();
+                return false;
+            }
+            if (_playtestAvailabilityStep == 1 || _playtestAvailabilityStep == 3)
+            {
+                string result = BuffPlannerUiRoot.CastingWorkspaceInvokeControlForRuntime("AvailabilityPolicy");
+                if (result != "invoked") throw new InvalidOperationException("Availability toggle refused: " + result);
+                _playtestAvailabilityStep++; _nativeUiClock.Restart(); return false;
+            }
+            _nativeUi.AvailabilityIntentRestored =
+                _playtestAvailabilityBefore == BuffPlannerUiRoot.CastingSessionDocumentSignatureForRuntime;
+            _playtestAvailabilityStep++;
+            return true;
+        }
 
         // Native pointer transitions on the actual modal, with rendered captures.
         // Clear is followed by the production Undo; the authored plan must survive.
