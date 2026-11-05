@@ -113,12 +113,12 @@ active restoration is never interrupted for a budget.
 | ZIP SHA-256 | 8e51f0d9aee3268fcd1bbf2559d70c0329ac463a1e5efca0c93bbb1e7df81f0e |
 | MVID | a4249a79-8da2-4342-a0b8-ac94877819f8 |
 
-The candidate checkout remains at
+At the freeze and during both native runs, the candidate checkout was at
 `C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner`, on
 `codex/kingmaker-buff-planner-playtest-repairs-frozen-cee1060` with exact HEAD above.
 Its original package and generated manifest remain untouched. The immutable ZIP
 and FREEZE.json are under the lab's `runtime-backups/qualification-frozen/<HEAD>`.
-Documentation continuation uses the PR branch worktree at
+Source/records continuation uses the PR branch worktree at
 `artifacts/pr20-continuation`; documentation commits must not restamp the candidate.
 
 The approved Automation working save has SHA-256
@@ -273,3 +273,11 @@ Both run-completion receipts say `complete:false` because their scenario failed;
 neither was relabelled complete because restoration succeeded.
 
 [Immutable raw-receipt hashes](evidence/playtest-repair/NATIVE-REVIEW-RECEIPTS.json).
+
+Documentation checks passed **13/0** (11 Markdown files, one new local link,
+and authoritative mission byte identity); `git diff --check` was clean.
+The guarded helper pushed records HEAD
+`2c2181c30e722ff1be1772d007e04111787c3d6c`; PR #20 was verified draft/unmerged.
+After clean native restoration, the original workspace returns to the PR branch;
+the frozen cee1060 branch, immutable archive and receipts remain preserved.
+Its old package must not be presented as a build of the newer observer source.
