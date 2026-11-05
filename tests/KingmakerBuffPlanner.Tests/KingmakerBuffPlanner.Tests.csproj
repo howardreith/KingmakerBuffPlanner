@@ -84,6 +84,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\ShareCastingModifierAdapter.cs"><Link>GameAdapters\ShareCastingModifierAdapter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\EnhancementLeaseCleanup.cs"><Link>GameAdapters\EnhancementLeaseCleanup.cs</Link></Compile>
     <Compile Include="TestBuildInfo.cs" />
+    <Compile Include="..\..\src\KingmakerBuffPlanner\RuntimeTesting\HeroismFixturePreparationPolicy.cs"><Link>RuntimeTesting\HeroismFixturePreparationPolicy.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\ActionGraphScanner.cs"><Link>Discovery\ActionGraphScanner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\AreaRecipientSemantics.cs"><Link>Discovery\AreaRecipientSemantics.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\BlueprintOwnershipIndex.cs"><Link>Discovery\BlueprintOwnershipIndex.cs</Link></Compile>

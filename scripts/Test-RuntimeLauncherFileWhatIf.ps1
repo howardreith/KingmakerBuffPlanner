@@ -88,6 +88,15 @@ Invoke-KbpLivePurityWindow -Label 'Runtime launcher -File -WhatIf' -Targets $tar
     if (-not (@($output | Where-Object { "$_" -like '*Runtime WhatIf preflight PASS*' }).Count -ge 1)) {
         throw "Runtime launcher -File -WhatIf did not report the purity message.: $($output -join ' ')"
     }
+    $ErrorActionPreference = 'Continue'
+    $prepareOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher `
+        -Scenario live-heroism-fixture-prepare -CompatibilityProfileId full-user -HeroismCondition present `
+        -TimeoutSeconds 900 -WhatIf 2>&1)
+    $prepareExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($prepareExit -ne 0 -or -not (@($prepareOutput | Where-Object { "$_" -like '*Runtime WhatIf preflight PASS*' }).Count -ge 1)) {
+        throw "Heroism preparation WhatIf did not remain a successful no-op: $($prepareOutput -join ' ')"
+    }
 }
 
 # Layer 4 (decision-evaluation failure sentinel): a REAL run under -File

@@ -1246,6 +1246,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         result.Stage = "classic-validation";
                     }
                 }
+                else if (RuntimeTestProtocol.IsHeroismFixtureScenario(_request.Scenario))
+                {
+                    bool prepared = _heroismFixturePrepared && UI.NativeCastingSessionPolicy.Locked &&
+                        BuffPlannerUiRoot.CastingRunsStartedForRuntime == 0;
+                    result.Assertions.Add(prepared
+                        ? RuntimeTestAssertion.Pass("heroism-fixture-prepared", "native book APIs;exact working save;zero casts", "prepared")
+                        : RuntimeTestAssertion.Fail("heroism-fixture-prepared", "native book APIs;exact working save;zero casts", _heroismFixtureFailure ?? "not completed"));
+                    if (!prepared) { result.Status = "FAIL"; result.Stage = "heroism-fixture-preparation"; }
+                }
                 else if (RuntimeTestProtocol.IsQualificationScenario(_request.Scenario))
                 {
                     // Qualification acceptance (Unity-free rules in
@@ -2611,6 +2620,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _liveUiPhase = 120;
                         return false;
                     }
+                    if (RuntimeTestProtocol.IsHeroismFixtureScenario(_request.Scenario))
+                    {
+                        _liveUiPhase = 56;
+                        return false;
+                    }
                     if (RuntimeTestProtocol.IsQualificationScenario(_request.Scenario))
                     {
                         // Qualification: the production-path driver.
@@ -2665,6 +2679,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             {
                 return UpdateQualification();
             }
+            if (_liveUiPhase == 56) return UpdateHeroismFixturePreparation();
             if (_liveUiPhase == 110)
             {
                 return UpdateClassicCast();

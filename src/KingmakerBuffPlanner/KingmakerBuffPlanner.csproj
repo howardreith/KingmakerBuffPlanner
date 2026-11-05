@@ -172,6 +172,8 @@
     <Compile Include="RuntimeTesting\NativeUiFacts.cs" />
     <Compile Include="RuntimeTesting\RuntimeNativeUiHost.cs" />
     <Compile Include="RuntimeTesting\RuntimePlaytestUiProbe.cs" />
+    <Compile Include="RuntimeTesting\RuntimeHeroismFixturePreparation.cs" />
+    <Compile Include="RuntimeTesting\HeroismFixturePreparationPolicy.cs" />
     <Compile Include="Execution\CastingCapabilityInventory.cs" />
     <Compile Include="Execution\CastingQualification.cs" />
     <Compile Include="Execution\HeroismQualification.cs" />

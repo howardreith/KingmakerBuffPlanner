@@ -2,6 +2,7 @@ Set-StrictMode -Version Latest
 
 . (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1')
 . (Join-Path $PSScriptRoot 'HeroismQualificationEvidence.Common.ps1')
+. (Join-Path $PSScriptRoot 'HeroismFixturePreparation.Common.ps1')
 
 function Read-KbpBuildManifest([string]$PackagePath) {
     $manifestPath = $PackagePath + '.build-local.json'
@@ -144,7 +145,7 @@ function New-KbpRuntimeRequest {
         [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
         [hashtable]$Parameters = @{},
-        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal', 'live-workspace-native-ui')][string]$Scenario = 'mod-load-smoke')
+        [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal', 'live-workspace-native-ui', 'live-heroism-fixture-prepare')][string]$Scenario = 'mod-load-smoke')
     # This ValidateSet must equal the launcher's -Scenario set exactly
     # (Test-RuntimeHarness builds a request for every launcher scenario).
     return [ordered]@{
@@ -1600,10 +1601,14 @@ function Assert-KbpScenarioOutcome {
     # host, nothing cast, nothing left open, and the native and planner
     # frames it names present. The qualify stage also re-reads the window
     # switches, the native popup presenter and the game-log line.
+    if ($scenario -ceq 'live-heroism-fixture-prepare') {
+        Assert-KbpHeroismPreparationOutcome -Request $Request
+        return
+    }
     if ($scenario -ceq 'live-workspace-native-ui') {
         $path = Join-Path $directory 'native-ui.json'
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Native UI scenario evidence is missing.' }
-        $record = Read-KbpJson $path
+        $record = [IO.File]::ReadAllText($path) | ConvertFrom-Json
         $stage = [string]$Request.parameters.nativeUiStage
         if ([string]$record.RunId -cne [string]$Request.runId -or [string]$record.Stage -cne $stage -or
             @($record.violations).Count -ne 0 -or @($record.Failures).Count -ne 0 -or
@@ -1620,6 +1625,27 @@ function Assert-KbpScenarioOutcome {
         if ([int]$record.SchemaVersion -ge 6) {
             $requiredCaptures += @('nui-resources-selected-again.png', 'nui-resources-reopened.png')
         }
+        if ([int]$record.SchemaVersion -ge 9 -and $stage -ceq 'qualify') {
+            $requiredCaptures += @('nui-playtest-policy-cast-available.png', 'nui-playtest-policy-require-full-plan.png')
+            $labels = @($record.RefusalCastingLabels)
+            $lines = @($record.GameLogPlannerLines)
+            $reason = '(native-submission-disabled:runtime-test-session:live-workspace-native-ui:cf-grant-absent).'
+            if ($labels.Count -eq 0 -or @($labels | Select-Object -Unique).Count -ne $labels.Count -or
+                $lines.Count -ne $labels.Count + 1 -or
+                -not $lines[0].StartsWith(('Buff Planner: Long ' + [char]0x2014 + ' 0 cast.'), [StringComparison]::Ordinal) -or
+                -not $lines[0].EndsWith($reason, [StringComparison]::Ordinal) -or
+                @($record.AvailabilityStates).Count -ne 2 -or -not [bool]$record.AvailabilityIntentRestored -or
+                @($record.AvailabilityStates) -cnotcontains 'cast-available|Require full plan' -or
+                @($record.AvailabilityStates) -cnotcontains 'require-full-plan|Require full plan') {
+                throw 'Native UI schema-9 refusal summary or policy observations are incomplete.'
+            }
+            for ($index = 0; $index -lt $labels.Count; $index++) {
+                if (-not $lines[$index + 1].StartsWith(('Not cast: ' + $labels[$index] + ' ' + [char]0x2014 + ' not attempted: '), [StringComparison]::Ordinal) -or
+                    -not $lines[$index + 1].EndsWith($reason, [StringComparison]::Ordinal)) {
+                    throw 'Native UI schema-9 refusal detail is missing or belongs to a different casting.'
+                }
+            }
+        }
         foreach ($capture in $requiredCaptures) {
             if (@($record.Captures) -cnotcontains $capture -or
                 -not (Test-Path -LiteralPath (Join-Path $directory $capture) -PathType Leaf)) {
@@ -1633,7 +1659,8 @@ function Assert-KbpScenarioOutcome {
                     -not [bool]$_.PlannerReopened -or
                     [string]$_.SelectedSourceBefore -cne [string]$_.SelectedSourceAfterReopen }).Count -ne 0 -or
                 [string]$record.PlannerPopupPresenter -cne 'native-description-window' -or
-                @($record.GameLogPlannerLines).Count -ne 1 -or -not [bool]$record.RoutinePressRefused) {
+                @($record.GameLogPlannerLines).Count -ne $(if ([int]$record.SchemaVersion -ge 9) { @($record.RefusalCastingLabels).Count + 1 } else { 1 }) -or
+                -not [bool]$record.RoutinePressRefused) {
                 throw "The native UI qualification did not show the native window switching, popup and game log: $path"
             }
         }
@@ -2317,7 +2344,7 @@ function Get-KbpProtectedSavePolicy {
         newFilesBlocking = $FixtureFamily -ceq 'Advanced' -or
             @('live-cast-qual', 'live-cast-probe', 'live-workspace-reload', 'live-workspace-import',
                 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal',
-                'live-workspace-native-ui') -ccontains $Scenario
+                'live-workspace-native-ui', 'live-heroism-fixture-prepare') -ccontains $Scenario
     }
 }
 

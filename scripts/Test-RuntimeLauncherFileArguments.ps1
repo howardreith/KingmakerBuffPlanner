@@ -9,6 +9,11 @@ $native = @($cases | Where-Object { $_.Name -ceq 'advanced-native-ui' })
 if ($native.Count -ne 1 -or $cases.Count -ne 7) { throw 'Missing or ambiguous Advanced family cases.' }
 $native = $native[0]
 $passed = 0
+foreach ($case in @(Get-KbpRuntimeLauncherHeroismPreparationCases)) {
+    $result = Invoke-KbpRuntimeLauncherFileRefusal -Launcher $launcher -Case $case
+    Write-Host "PASS $($result.Name): child exit $($result.ExitCode)"
+    $passed++
+}
 # The broad gate's exact case, process invocation and assertion, without its
 # earlier live-purity windows. This guard returns before any external import.
 $result = Invoke-KbpRuntimeLauncherFileRefusal -Launcher $launcher -Case $native

@@ -1,5 +1,16 @@
 ﻿# Shared by the broad -File/WhatIf gate and its focused child-process checks.
 # This file imports no runtime harness and cannot stage or launch the game.
+function Get-KbpRuntimeLauncherHeroismPreparationCases {
+    @(
+        @{ Name='heroism-preparation-missing-condition'; Expect='*KBP_HEROISM_FIXTURE_SCOPE*'
+           Args=@('-Scenario','live-heroism-fixture-prepare','-CompatibilityProfileId','full-user','-TimeoutSeconds','900','-WhatIf') },
+        @{ Name='heroism-preparation-advanced'; Expect='*KBP_HEROISM_FIXTURE_SCOPE*'
+           Args=@('-Scenario','live-heroism-fixture-prepare','-CompatibilityProfileId','full-user','-FixtureFamily','Advanced','-HeroismCondition','present','-TimeoutSeconds','900','-WhatIf') },
+        @{ Name='heroism-condition-other-scenario'; Expect='*KBP_HEROISM_FIXTURE_SCENARIO*'
+           Args=@('-Scenario','live-workspace-import','-HeroismCondition','present','-WhatIf') }
+    )
+}
+
 function Get-KbpRuntimeLauncherNativeUiParameterCases {
     @(
         @{ Name = 'native-ui-without-stage'; Expect = '*KBP_NATIVE_UI_STAGE_REQUIRED*'

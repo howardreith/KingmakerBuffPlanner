@@ -40,6 +40,13 @@ try {
         @{ Name = 'native-facts-short-timeout'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'facts'; TimeoutSeconds = 599 }; ErrorId = 'KBP_NATIVE_UI_TIMEOUT' },
         @{ Name = 'native-qualify-default-timeout'; Args = @{ Scenario = 'live-workspace-native-ui'; NativeUiStage = 'qualify' }; ErrorId = 'KBP_NATIVE_UI_TIMEOUT' },
         @{ Name = 'policy-qualification-recipe'; Args = @{ Scenario = 'live-cast-qual-select'; QualificationRecipe = 'policy-shared-powerful'; TimeoutSeconds = 900 }; ErrorId = $null },
+        @{ Name = 'heroism-preparation-missing-condition'; Args = @{ Scenario = 'live-heroism-fixture-prepare'; CompatibilityProfileId = 'full-user'; TimeoutSeconds = 900 }; ErrorId = 'KBP_HEROISM_FIXTURE_SCOPE' },
+        @{ Name = 'heroism-preparation-advanced'; Args = @{ Scenario = 'live-heroism-fixture-prepare'; CompatibilityProfileId = 'full-user'; FixtureFamily = 'Advanced'; HeroismCondition = 'present'; TimeoutSeconds = 900 }; ErrorId = 'KBP_HEROISM_FIXTURE_SCOPE' },
+        @{ Name = 'heroism-preparation-short'; Args = @{ Scenario = 'live-heroism-fixture-prepare'; CompatibilityProfileId = 'full-user'; HeroismCondition = 'present'; TimeoutSeconds = 899 }; ErrorId = 'KBP_HEROISM_FIXTURE_SCOPE' },
+        @{ Name = 'heroism-preparation-other-profile'; Args = @{ Scenario = 'live-heroism-fixture-prepare'; HeroismCondition = 'present'; TimeoutSeconds = 900 }; ErrorId = 'KBP_HEROISM_FIXTURE_SCOPE' },
+        @{ Name = 'heroism-condition-other-scenario'; Args = @{ Scenario = 'live-workspace-import'; HeroismCondition = 'present' }; ErrorId = 'KBP_HEROISM_FIXTURE_SCENARIO' },
+        @{ Name = 'heroism-preparation-absent'; Args = @{ Scenario = 'live-heroism-fixture-prepare'; CompatibilityProfileId = 'full-user'; HeroismCondition = 'absent'; TimeoutSeconds = 900 }; ErrorId = $null },
+        @{ Name = 'heroism-preparation-present'; Args = @{ Scenario = 'LIVE-HEROISM-FIXTURE-PREPARE'; CompatibilityProfileId = 'FULL-USER'; HeroismCondition = 'PRESENT'; TimeoutSeconds = 900 }; ErrorId = $null },
         @{ Name = 'unknown-qualification-recipe'; Args = @{ Scenario = 'live-cast-qual-select'; QualificationRecipe = 'policy-unknown'; TimeoutSeconds = 900 }; ErrorId = 'ParameterArgumentValidationError' }
     )) {
         $observed = $null

@@ -1,6 +1,6 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal', 'live-workspace-native-ui')][string]$Scenario = 'mod-load-smoke',
+    [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal', 'live-workspace-native-ui', 'live-heroism-fixture-prepare')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136')][string]$CompatibilityProfileId = 'native-only',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
@@ -87,11 +87,20 @@ param(
     # records the native contracts and the frames; 'qualify' also judges the
     # planner's native integration. Neither takes a casting allowance and
     # neither sends OS input.
-    [ValidateSet('facts', 'qualify')][string]$NativeUiStage
+    [ValidateSet('facts', 'qualify')][string]$NativeUiStage,
+    [ValidateSet('absent', 'present')][string]$HeroismCondition
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ($Scenario -ieq 'live-heroism-fixture-prepare') {
+    if ($FixtureFamily -ine 'Automation' -or $CompatibilityProfileId -ine 'full-user' -or
+        [string]::IsNullOrWhiteSpace($HeroismCondition) -or $TimeoutSeconds -lt 900) {
+        throw 'KBP_HEROISM_FIXTURE_SCOPE: preparation requires Automation, full-user, an explicit HeroismCondition, and timeout >=900.'
+    }
+} elseif (-not [string]::IsNullOrWhiteSpace($HeroismCondition)) {
+    throw 'KBP_HEROISM_FIXTURE_SCENARIO: HeroismCondition is only valid for live-heroism-fixture-prepare.'
+}
 if ($DisplayMode -ine 'owner' -and $Scenario -ine 'live-workspace-physical' -and
     $Scenario -ine 'live-workspace-qual' -and $Scenario -ine 'live-workspace-native-ui') {
     $PSCmdlet.ThrowTerminatingError([System.Management.Automation.ErrorRecord]::new(
@@ -131,7 +140,7 @@ $WhatIfPreference = $false
 # Review of f7726c9..1332ed8, P3-J: ValidateSet binds case-insensitively,
 # but every later comparison is case-sensitive; continue with the
 # canonical spelling of each value (for example -Scenario LIVE-CAST-QUAL).
-foreach ($canonicalName in @('Scenario', 'CompatibilityProfileId', 'ExecutionMode', 'FixtureFamily', 'QualificationRecipe', 'DisplayMode', 'NativeUiStage')) {
+foreach ($canonicalName in @('Scenario', 'CompatibilityProfileId', 'ExecutionMode', 'FixtureFamily', 'QualificationRecipe', 'DisplayMode', 'NativeUiStage', 'HeroismCondition')) {
     $bound = Get-Variable -Name $canonicalName -ValueOnly -ErrorAction SilentlyContinue
     if ([string]::IsNullOrEmpty([string]$bound)) { continue }
     $validSet = @((Get-Command -Name $PSCommandPath).Parameters[$canonicalName].Attributes |
@@ -328,7 +337,8 @@ $savePair = if ($Scenario -ceq 'live-ui-bootstrap' -or $Scenario -ceq 'live-work
     $Scenario -ceq 'live-advanced-inspect' -or $Scenario -ceq 'live-cast-qual-select' -or
     $Scenario -ceq 'live-cast-qual' -or $Scenario -ceq 'live-classic-select' -or
     $Scenario -ceq 'live-classic-cast' -or $Scenario -ceq 'live-workspace-physical' -or
-    $Scenario -ceq 'live-workspace-removal' -or $Scenario -ceq 'live-workspace-native-ui') {
+    $Scenario -ceq 'live-workspace-removal' -or $Scenario -ceq 'live-workspace-native-ui' -or
+    $Scenario -ceq 'live-heroism-fixture-prepare') {
     Get-KbpDisposableSavePair -Family $FixtureFamily } else { $null }
 $advancedBinding = if ($FixtureFamily -ceq 'Advanced') { Assert-KbpAdvancedFixtureBinding -Pair $savePair } else { $null }
 $advancedInspectionRunId = if ($FixtureFamily -ceq 'Advanced' -and $Scenario -ceq 'live-cast-qual') {
@@ -464,6 +474,10 @@ try {
         if ($null -eq $workingBefore -or [string]$workingBefore.sha256 -cne [string]$savePair.working.sha256) {
             throw "The WORKING save changed after it was bound: $($savePair.working.fileName)"
         }
+        if ($Scenario -ceq 'live-heroism-fixture-prepare') {
+            Save-KbpHeroismWorkingBackup -WorkingPath $savePair.working.path -EvidenceDirectory $evidence `
+                -ExpectedSha256 $savePair.working.sha256 -RunId $runId
+        }
     }
     if ($null -ne $displaySize) {
         # Re-read only after the runtime lock is held. This is the physical
@@ -530,6 +544,7 @@ try {
         # Which native UI stage the host records and judges.
         $scenarioParameters.nativeUiStage = $NativeUiStage
     }
+    if ($Scenario -ceq 'live-heroism-fixture-prepare') { $scenarioParameters.heroismCondition = $HeroismCondition }
     if ($null -ne $qualificationAllowanceJson) {
         $scenarioParameters.qualificationAllowance = $qualificationAllowanceJson
     }
@@ -1078,6 +1093,17 @@ public static class KbpPhysicalInput {
     if ($null -ne $screenEvidenceFailure) { throw $screenEvidenceFailure }
     # Review C6: the launcher reads the scenario's own evidence itself.
     Assert-KbpScenarioOutcome -Request $request
+    if ($Scenario -ceq 'live-heroism-fixture-prepare') {
+        $prepared = Read-KbpJson (Join-Path $evidence 'heroism-fixture-preparation.json')
+        if ((Get-KbpSha256 $savePair.working.path) -cne [string]$prepared.workingSha256After) {
+            throw 'Prepared working save does not match the native preparation receipt.'
+        }
+        $preparationRecordPath = Join-Path $evidence 'heroism-preparation-transaction.json'
+        $preparationRecord = Read-KbpJson $preparationRecordPath
+        $preparationRecord.status = 'Prepared'
+        $preparationRecord | Add-Member -NotePropertyName preparedSha256 -NotePropertyValue $prepared.workingSha256After
+        Write-KbpJsonAtomic $preparationRecordPath $preparationRecord
+    }
     if ($Scenario -ceq 'live-ui-bootstrap') {
         $afterPair = Get-KbpDisposableSavePair
         if ($afterPair.baseline.sha256 -cne $savePair.baseline.sha256) {
@@ -1162,6 +1188,11 @@ finally {
         }
         else {
             try {
+                if ($Scenario -ceq 'live-heroism-fixture-prepare' -and -not $runSucceeded -and
+                    (Test-Path -LiteralPath (Join-Path $evidence 'heroism-preparation-transaction.json'))) {
+                    Restore-KbpHeroismWorkingBackup -WorkingPath $savePair.working.path -EvidenceDirectory $evidence `
+                        -ExpectedSha256 $savePair.working.sha256 -RunId $runId -BeforeSnapshot $protectedBefore
+                }
                 $comparison = if ($null -ne $protectedBaselinePath) {
                     Complete-KbpProtectedSaveComparison -BaselinePath $protectedBaselinePath -EvidenceDirectory $evidence
                 } else {

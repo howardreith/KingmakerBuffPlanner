@@ -220,7 +220,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 IsClassicCastScenario(scenario) ||
                 IsPhysicalWorkspaceScenario(scenario) ||
                 IsRemovalScenario(scenario) ||
-                IsNativeUiScenario(scenario);
+                IsNativeUiScenario(scenario) || IsHeroismFixtureScenario(scenario);
         }
 
         // Physical input in the casting-first workspace (mission batch 3,
@@ -272,6 +272,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         internal static bool IsCastingQualificationScenario(string scenario)
         {
             return string.Equals(scenario, "live-cast-qual", StringComparison.Ordinal);
+        }
+
+        internal static bool IsHeroismFixtureScenario(string scenario)
+        {
+            return string.Equals(scenario, "live-heroism-fixture-prepare", StringComparison.Ordinal);
         }
 
         internal const int QualificationRunDeadlineSeconds = 240;
@@ -366,7 +371,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return IsManualWorkspaceScenario(scenario) || IsProbeScenario(scenario) ||
                 IsInspectionScenario(scenario) || IsQualificationScenario(scenario) ||
                 IsImportScenario(scenario) || IsClassicCastScenario(scenario) ||
-                IsRemovalScenario(scenario) || IsNativeUiScenario(scenario);
+                IsRemovalScenario(scenario) || IsNativeUiScenario(scenario) || IsHeroismFixtureScenario(scenario);
         }
 
         // Native UI finish (KBP_NATIVE_UI_FINISH_2026-10-10): the HUD panel,
@@ -486,6 +491,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private static void ValidateParameters(RuntimeTestRequest request)
         {
             if (request.Parameters == null) throw new InvalidDataException("parameters");
+            bool hasHeroismCondition = request.Parameters.ContainsKey("heroismCondition");
+            if (IsHeroismFixtureScenario(request.Scenario))
+            {
+                ValidateLiveSaveParameters(request, 10);
+                if (request.ProfileId != "full-user" || (string)request.Parameters["workingSaveName"] != "KBP_AUTOMATION_WORKING")
+                    throw new InvalidDataException("heroism-fixture-automation-full-user-only");
+                string condition = hasHeroismCondition ? request.Parameters["heroismCondition"] as string : null;
+                if (condition != "absent" && condition != "present")
+                    throw new InvalidDataException("heroism-fixture-condition");
+                return;
+            }
+            if (hasHeroismCondition) throw new InvalidDataException("heroism-condition-only-with-fixture-preparation");
             if (IsManualWorkspaceScenario(request.Scenario))
             {
                 // The manual scenario carries the EXACT live-save contract

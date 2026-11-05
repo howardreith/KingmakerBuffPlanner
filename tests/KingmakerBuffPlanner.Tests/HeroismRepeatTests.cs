@@ -10,6 +10,7 @@ using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
 using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Planning;
+using KingmakerBuffPlanner.RuntimeTesting;
 using KingmakerBuffPlanner.UI;
 using Newtonsoft.Json.Linq;
 
@@ -408,6 +409,59 @@ namespace KingmakerBuffPlanner.Tests
                     negative.Host.LastReport.ResourcesSpent == 1 && negative.World.State.Fired.Count == 1,
                     observation + ": confirmed=" + negative.Host.LastReport.Confirmed + ";notProcessed=" + negative.Host.LastReport.NotProcessed + ";spent=" + negative.Host.LastReport.ResourcesSpent + ";" + negative.Host.LastReport.Entries[0].Detail);
             }
+        }
+
+        private static void TestHeroismFixtureScope(string root)
+        {
+            string saveRoot = Path.GetFullPath(Path.Combine(root, "fixture-policy-saves"));
+            string file = "Manual_305_KBP_AUTOMATION_WORKING.zks";
+            string[] good = { "live-heroism-fixture-prepare", "full-user", "present", "KBP_AUTOMATION_WORKING", file,
+                "campaign", "campaign", "campaign", Path.Combine(saveRoot, file), saveRoot };
+            Func<string[], string> check = a => HeroismFixturePreparationPolicy.Refusal(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]);
+            Assert(check(good) == null);
+            foreach (var change in new[] {
+                Tuple.Create(0, "live-cast-qual"), Tuple.Create(1, "advanced-gunslinger-0136"), Tuple.Create(2, "unknown"),
+                Tuple.Create(3, "KBP_AUTOMATION_BASELINE"), Tuple.Create(3, "Real campaign"),
+                Tuple.Create(4, "Manual_304_KBP_AUTOMATION_BASELINE.zks"), Tuple.Create(4, "../" + file),
+                Tuple.Create(5, "another-campaign"), Tuple.Create(6, "another-campaign"), Tuple.Create(7, ""),
+                Tuple.Create(8, Path.Combine(saveRoot, "nested", file)),
+                Tuple.Create(8, Path.Combine(saveRoot + "-outside", file)),
+                Tuple.Create(8, Path.Combine(saveRoot, "Manual_304_KBP_AUTOMATION_BASELINE.zks")) })
+            {
+                var bad = (string[])good.Clone(); bad[change.Item1] = change.Item2;
+                Assert(check(bad) != null);
+            }
+            const string scenario = "live-heroism-fixture-prepare";
+            Assert(RuntimeTestProtocol.IsWorkspaceScenario(scenario) && RuntimeTestProtocol.IsNoInputWorkspaceScenario(scenario) &&
+                !RuntimeTestProtocol.IsCastingQualificationScenario(scenario) && !RuntimeTestProtocol.IsAdvancedFamilyScenario(scenario));
+            JObject template = JObject.Parse(File.ReadAllText(Path.Combine(FindRepositoryRoot(), "tests", "KingmakerBuffPlanner.Tests",
+                "Fixtures", "kbp042-removal-01-runtime-request.json")));
+            int serial = 0;
+            Func<string, Action<JObject>, string> admit = (requestScenario, mutate) =>
+            {
+                string id = "heroism-preparation-admission-" + (++serial);
+                string directory = Path.Combine(_protocolEvidenceRoot, id);
+                Directory.CreateDirectory(directory);
+                var request = (JObject)template.DeepClone();
+                request["runId"] = id; request["scenario"] = requestScenario; request["evidenceDirectory"] = directory;
+                request["expectedCommit"] = BuildInfo.Commit; request["expectedModVersion"] = BuildInfo.Version;
+                ((JObject)request["parameters"]).Remove("physicalExpectation");
+                request["parameters"]["heroismCondition"] = "absent";
+                if (mutate != null) mutate(request);
+                string path = Path.Combine(directory, "runtime-request.json"); File.WriteAllText(path, request.ToString());
+                string rejection;
+                return ReadProtocol(new[] { "Kingmaker.exe", RuntimeTestProtocol.ActivationFlag, path }, out rejection) == null ? rejection : "";
+            };
+            Assert(admit(scenario, null) == "" && admit(scenario, r => r["parameters"]["heroismCondition"] = "present") == "");
+            foreach (Action<JObject> mutate in new Action<JObject>[] {
+                r => ((JObject)r["parameters"]).Remove("heroismCondition"),
+                r => r["parameters"]["heroismCondition"] = true,
+                r => r["parameters"]["heroismCondition"] = "unknown",
+                r => r["parameters"]["workingSaveName"] = "KBP_AUTOMATION_BASELINE",
+                r => r["parameters"]["workingSha256"] = "bad",
+                r => r["parameters"]["unexpected"] = "extra",
+                r => r["profileId"] = "native-only" }) Assert(admit(scenario, mutate) != "");
+            Assert(admit("live-cast-qual-select", null) != "");
         }
 
         private static void TestUnobservableHeroismAdmission(string root, string mode)
