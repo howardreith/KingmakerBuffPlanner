@@ -1,5 +1,14 @@
 ﻿# Shared by the broad -File/WhatIf gate and its focused child-process checks.
 # This file imports no runtime harness and cannot stage or launch the game.
+function Get-KbpRuntimeLauncherNativeUiParameterCases {
+    @(
+        @{ Name = 'native-ui-without-stage'; Expect = '*KBP_NATIVE_UI_STAGE_REQUIRED*'
+           Args = @('-Scenario', 'live-workspace-native-ui', '-WhatIf') },
+        @{ Name = 'native-ui-stage-other-scenario'; Expect = '*KBP_NATIVE_UI_STAGE_SCENARIO*'
+           Args = @('-Scenario', 'live-workspace-import', '-NativeUiStage', 'facts', '-WhatIf') }
+    )
+}
+
 function Get-KbpRuntimeLauncherAdvancedFamilyCases {
     $legacyRefusal = '*may only be loaded by the non-casting scenarios*'
     @(

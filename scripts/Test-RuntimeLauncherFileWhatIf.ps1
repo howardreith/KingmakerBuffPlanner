@@ -236,22 +236,12 @@ try {
            Args = @('-Scenario', 'live-classic-select', '-ClassicAllowancePath', $outsideQualification, '-TimeoutSeconds', '900', '-WhatIf') },
         @{ Name = 'classic-select-short-timeout'; Expect = '*at least 900*'
            Args = @('-Scenario', 'live-classic-select', '-WhatIf') },
-        @{ Name = 'native-ui-without-stage'; Expect = '*requires an explicit -NativeUiStage (facts or qualify).*'
-           Args = @('-Scenario', 'live-workspace-native-ui', '-WhatIf') },
-        @{ Name = 'native-ui-stage-other-scenario'; Expect = '*-NativeUiStage is only valid with -Scenario live-workspace-native-ui.*'
-           Args = @('-Scenario', 'live-workspace-import', '-NativeUiStage', 'facts', '-WhatIf') },
         @{ Name = 'physical-short-timeout'; Expect = '*at least 900*'
            Args = @('-Scenario', 'live-workspace-physical', '-WhatIf') }
     )
+    $qualificationCases += @(Get-KbpRuntimeLauncherNativeUiParameterCases)
     foreach ($case in $qualificationCases) {
-        $ErrorActionPreference = 'Continue'
-        $caseArgs = $case.Args
-        $caseOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher @caseArgs 2>&1)
-        $caseExit = $LASTEXITCODE
-        $ErrorActionPreference = 'Stop'
-        if ($caseExit -eq 0 -or -not (@($caseOutput | Where-Object { "$_" -like $case.Expect }).Count -ge 1)) {
-            throw "Qualification gate case $($case.Name) was not refused as expected.: $($caseOutput -join ' ')"
-        }
+        Invoke-KbpRuntimeLauncherFileRefusal -Launcher $launcher -Case $case | Out-Null
     }
 }
 finally { Remove-Item -LiteralPath $outsideQualification -Force -ErrorAction SilentlyContinue }

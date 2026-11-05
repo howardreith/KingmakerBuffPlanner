@@ -24,6 +24,23 @@ foreach ($case in @(
     $passed++
 }
 # A different real refusal must not satisfy the fixture assertion.
+foreach ($case in @(Get-KbpRuntimeLauncherNativeUiParameterCases)) {
+    $result = Invoke-KbpRuntimeLauncherFileRefusal -Launcher $launcher -Case $case
+    Write-Host "PASS $($result.Name): child exit $($result.ExitCode)"
+    $passed++
+}
+$wrongStageId = @{ Name = 'native-ui-other-scenario-wrong-id'; Expect = '*KBP_NATIVE_UI_STAGE_REQUIRED*'
+    Args = @('-Scenario', 'live-workspace-import', '-NativeUiStage', 'facts', '-WhatIf') }
+$wrongStageRejected = $false
+try { Invoke-KbpRuntimeLauncherFileRefusal -Launcher $launcher -Case $wrongStageId | Out-Null }
+catch {
+    if ($_.Exception.Message -notlike '*was not refused as expected*' -or
+        $_.Exception.Message -notlike '*KBP_NATIVE_UI_STAGE_SCENARIO*') { throw }
+    $wrongStageRejected = $true
+}
+if (-not $wrongStageRejected) { throw 'Another Native UI refusal satisfied the stage assertion.' }
+Write-Host "PASS $($wrongStageId.Name)"; $passed++
+
 $missingStage = @{ Name = 'native-missing-stage-is-not-fixture-refusal'; Expect = $native.Expect
     Args = @('-Scenario', 'live-workspace-native-ui', '-FixtureFamily', 'Advanced', '-TimeoutSeconds', '600', '-WhatIf') }
 $rejected = $false

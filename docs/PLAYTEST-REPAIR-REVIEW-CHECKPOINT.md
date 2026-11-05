@@ -1,6 +1,7 @@
 # PR #20 review correction checkpoint
 
-Status recorded at **2026-11-05 04:19 UTC**. Version **0.6.10**, unreleased.
+Status recorded at **2026-11-05 04:19 UTC**, with continuation below.
+Version **0.6.10**, unreleased.
 PR branch: `codex/kingmaker-buff-planner-playtest-repairs`.
 Frozen product HEAD: `cee1060fffb824a6d4838d5925727cbaff1833f4`.
 [Draft PR #20](https://github.com/howardreith/KingmakerBuffPlanner/pull/20) remains unmerged.
@@ -60,12 +61,12 @@ from offline checks.
 | Full-user sealed profile, 15 mods | 1/0 | playtest-profile-fast-reader.log |
 | Guarded push helper, remote access enabled | 6/0 | playtest-cee1060-guarded-push-tests-network.log |
 
-Focused command:
-
 Documentation-only continuation: changed-text/link checks passed **25/0**
 across 12 Markdown files and 12 new links, including byte identity of the mission
 copies. Command: `node artifacts/Check-Pr20ReviewDocs.cjs`; receipt:
 `artifacts/playtest-review-doc-checks.log`. No candidate rebuild was selected.
+
+Focused command:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Development.ps1 -Only 'confirmation,playtest-heroism,heroism-repeat,clear-plan,qualification,native-boundary'
@@ -152,3 +153,40 @@ does **not** establish loaded affordability or Leinna's native fact state. Only
 
 Native gameplay and rendered UI acceptance remain **NOT RUN** at this checkpoint.
 The owner's uploaded 6c75425 log remains original-failure evidence only.
+
+## 06:35 UTC: prerequisites complete, native selection started
+
+All four required global history windows completed on the frozen candidate.
+The full launcher test then failed at a **later reader assertion**, after
+8,081.50 seconds: Native UI stage-on-another-scenario was correctly refused
+with `KBP_NATIVE_UI_STAGE_SCENARIO`, but formatted stderr inserted whitespace
+into its prose and the old message matcher rejected that correct refusal.
+The original full-script FAIL is retained, not relabeled as PASS.
+
+The two Native UI parameter cases now use the shared real `-File` child-process
+assertion and exact typed error markers. Nonzero exit remains mandatory; legacy
+refusal and wrong-marker/success-exit controls remain intact. Focused checks
+passed **11/0**, including a new wrong-Native-UI-code rejection. Only the test
+consumer changed; the frozen launcher, product, package and manifest did not.
+
+The unchanged bounded remainder (Layer 6 onward, with no history windows)
+was resumed using its original script-directory context and the corrected
+reader. Every assertion was preserved; only the final footer was relabeled
+to identify a composed result. It completed in **71.85 seconds**. The three
+remaining scripts passed: fixture inventory **3/0**, isolated restore **16/0**,
+publisher guard **8/0**. Prerequisites are complete **across these retained and
+resumed components**, not from a new uninterrupted aggregate.
+
+Receipts under the original checkout's artifacts:
+`playtest-native-refusal-reader-corrected.log`, `playtest-bounded-launcher-resume.log`,
+`playtest-cee1060-fixture-inventory.log`, `playtest-cee1060-restore-tests.log`,
+`playtest-cee1060-publisher-guard.log`, and
+`playtest-cee1060-prerequisite-completion.json`.
+The executed reader source SHA-256 was
+`72912ce0b1f67d965b99f462855e5a15c72b1ad507e5cfa4250a8a583cd60ed8`.
+
+The guarded **non-casting** `pr20-cee1060-heroism-select` run was started at
+06:35 UTC from the unchanged frozen checkout. It must complete its whole
+restored lifecycle before any spending allowance is written. Gameplay and
+rendered UI acceptance remain pending. Continue this run; do not restart the
+completed history scans or rebuild the candidate for this reader correction.
