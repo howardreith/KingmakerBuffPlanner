@@ -32,7 +32,8 @@ namespace KingmakerBuffPlanner.Discovery
             EffectTarget target = EffectTarget.CurrentTarget,
             string sourceContract = null,
             string referencedAbilityId = null,
-            CasterFactGate casterFactGate = null)
+            CasterFactGate casterFactGate = null,
+            NearbyRecipientRule nearbyRecipients = null)
         {
             Kind = kind;
             Identity = identity ?? string.Empty;
@@ -47,6 +48,7 @@ namespace KingmakerBuffPlanner.Discovery
             SourceContract = sourceContract ?? string.Empty;
             ReferencedAbilityId = referencedAbilityId ?? string.Empty;
             CasterFactGate = casterFactGate;
+            NearbyRecipients = nearbyRecipients;
         }
 
         public DiscoveryNodeKind Kind { get; private set; }
@@ -61,5 +63,6 @@ namespace KingmakerBuffPlanner.Discovery
         public string SourceContract { get; private set; }
         public string ReferencedAbilityId { get; private set; }
         public CasterFactGate CasterFactGate { get; private set; }
+        public NearbyRecipientRule NearbyRecipients { get; private set; }
     }
 }

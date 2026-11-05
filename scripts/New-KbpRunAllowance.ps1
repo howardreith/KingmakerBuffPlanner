@@ -32,6 +32,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1')
+. (Join-Path $PSScriptRoot 'HeroismQualificationEvidence.Common.ps1')
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if ([string]::IsNullOrEmpty($ApprovalsRoot)) { $ApprovalsRoot = Join-Path $repoRoot '..\..\approvals' }
 if ([string]::IsNullOrEmpty($EvidenceRoot)) { $EvidenceRoot = $script:KbpRuntimeEvidenceRoot }
@@ -159,9 +160,11 @@ else {
     # each recipe has its own purpose, and the budget below is the sum of
     # the forecast castings, exactly as the host's boundary counts them.
     $recipe = [string]$outcome.selection.recipe
+    if ($recipe -ceq 'heroism-successor') { Assert-KbpHeroismQualificationSelection $outcome }
     $purposes = @{
         'zero-cost-mixed' = "zero-cost-mixed casting-first qualification in $ExecutionMode mode (stop, complete, repeat, recast, held disable, recover)"
         'finite-direct-mixed' = "finite-direct-mixed casting-first qualification in $ExecutionMode mode (paid spell slots: stop, complete, repeat, recast)"
+        'heroism-successor' = "Heroism and a distinct affordable successor in $ExecutionMode mode: first, recast, then skip active Heroism while the successor executes; at most five native submissions from the sealed Automation working save"
         'group-mixed' = "group-mixed casting-first qualification in $ExecutionMode mode (a direct casting primes one recipient; the caster-centred group casting then covers the others in one invocation with that recipient pre-covered, with a target-anchored group casting where one exists)"
         'ability-pool-direct' = "ability-pool-direct casting-first qualification in $ExecutionMode mode (one plain buff from an ability whose pool holds a single use: cast once, a repeat casts nothing, and Always recast is refused for want of the resource)"
         'rod-extend-direct' = "rod-extend-direct casting-first qualification in $ExecutionMode mode (one direct buff cast plain, then again on another recipient with an Extend metamagic rod chosen through the workspace; the rod's charges, the buff's duration and the caster's toggles are read natively)"

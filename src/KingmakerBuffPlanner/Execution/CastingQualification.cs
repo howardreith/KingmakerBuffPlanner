@@ -205,6 +205,7 @@ namespace KingmakerBuffPlanner.Execution
         public IReadOnlyList<string> Rejections { get; private set; }
         // The enhanced recipe's enhancement (null for the other recipes).
         public CastingQualificationEnhancement Enhancement { get; private set; }
+        public JObject EffectContext { get; internal set; }
     }
 
     // The per-casting enhancement the enhanced recipe exercises: its id and
@@ -252,7 +253,7 @@ namespace KingmakerBuffPlanner.Execution
     // Deterministic authoring recipes for guarded qualification runs. The
     // recipe only chooses; every rule about what may execute is enforced by
     // the ordinary compiler, gate and Standard converter.
-    public static class CastingQualificationRecipe
+    public static partial class CastingQualificationRecipe
     {
         public const string ZeroCostMixed = "zero-cost-mixed";
         public const string FiniteDirectMixed = "finite-direct-mixed";
@@ -287,7 +288,7 @@ namespace KingmakerBuffPlanner.Execution
         {
             return recipe == ZeroCostMixed || recipe == FiniteDirectMixed || recipe == GroupMixed ||
                 recipe == EnhancedDirect || recipe == AbilityPoolDirect || recipe == RodExtendDirect ||
-                recipe == StickyTouchDirect || IsSharedRecipe(recipe);
+                recipe == StickyTouchDirect || recipe == HeroismSuccessor || IsSharedRecipe(recipe);
         }
 
         // The recipes that cast ONE casting whose source holds a single use
@@ -362,6 +363,7 @@ namespace KingmakerBuffPlanner.Execution
         public static CastingQualificationSelection Select(string recipe,
             CastingWorkspaceInputs inputs, string campaignId)
         {
+            if (recipe == HeroismSuccessor) return SelectHeroismSuccessor(inputs, campaignId);
             if (recipe == FiniteDirectMixed) return SelectFiniteDirectMixed(inputs, campaignId);
             if (recipe == ZeroCostMixed) return SelectZeroCostMixed(inputs, campaignId);
             if (recipe == GroupMixed) return SelectGroupMixed(inputs, campaignId);
@@ -1778,7 +1780,7 @@ namespace KingmakerBuffPlanner.Execution
     //              run, and a fresh press is accepted and completes.
     // The repeat step (everything active) submits nothing. A later step
     // whose real projection differs from its forecast is refused.
-    public static class CastingQualificationForecast
+    public static partial class CastingQualificationForecast
     {
         public const string Stop = "stop";
         public const string Complete = "complete";
@@ -1809,6 +1811,8 @@ namespace KingmakerBuffPlanner.Execution
         {
             if (selection == null || !selection.Selected)
                 throw new ArgumentException("A selected recipe is required.", "selection");
+            if (selection.Recipe == CastingQualificationRecipe.HeroismSuccessor)
+                return ForecastHeroism(selection, inputs, campaignId);
             if (CastingQualificationRecipe.IsGroupRecipe(selection.Recipe))
                 return ForecastTwoPhase(selection, inputs, campaignId, Prime, Mixed);
             if (CastingQualificationRecipe.IsEnhancedRecipe(selection.Recipe))

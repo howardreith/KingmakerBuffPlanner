@@ -45,10 +45,17 @@ namespace KingmakerBuffPlanner.Planning
             ISet<ActiveEffectMarker> activeEffects,
             ISet<string> ignoredEffectIds)
         {
+            var active = activeEffects ?? new HashSet<ActiveEffectMarker>();
+            return EvaluateScoped(expression, (leaf, role) => active.Contains(new ActiveEffectMarker(leaf.Kind, leaf.EffectId)), ignoredEffectIds);
+        }
+
+        public EffectPresenceResult EvaluateScoped(EffectExpression expression,
+            Func<EffectLeafExpression, EffectTarget, bool> present, ISet<string> ignoredEffectIds)
+        {
             if (expression == null) throw new ArgumentNullException("expression");
-            NodePresence node = Visit(expression,
-                activeEffects ?? new HashSet<ActiveEffectMarker>(),
-                ignoredEffectIds ?? new HashSet<string>(StringComparer.Ordinal));
+            if (present == null) throw new ArgumentNullException("present");
+            NodePresence node = Visit(expression, present,
+                ignoredEffectIds ?? new HashSet<string>(StringComparer.Ordinal), null);
             EffectPresenceKind kind = node.Relevant == 0
                 ? EffectPresenceKind.Absent
                 : node.Complete ? EffectPresenceKind.Complete
@@ -59,29 +66,29 @@ namespace KingmakerBuffPlanner.Planning
 
         private static NodePresence Visit(
             EffectExpression expression,
-            ISet<ActiveEffectMarker> active,
-            ISet<string> ignored)
+            Func<EffectLeafExpression, EffectTarget, bool> active,
+            ISet<string> ignored, EffectTarget? outer)
         {
             var leaf = expression as EffectLeafExpression;
             if (leaf != null)
             {
                 if (ignored.Contains(leaf.EffectId)) return NodePresence.Irrelevant();
-                bool present = active.Contains(new ActiveEffectMarker(leaf.Kind, leaf.EffectId));
+                bool present = active(leaf, EffectRecipientScope.Resolve(leaf.Target, outer));
                 return new NodePresence(1, present, present,
                     present ? new[] { leaf.EffectId } : new string[0]);
             }
             var sequence = expression as SequenceEffectExpression;
-            if (sequence != null) return AllOf(sequence.Children.Select(e => Visit(e, active, ignored)));
+            if (sequence != null) return AllOf(sequence.Children.Select(e => Visit(e, active, ignored, outer)));
             var conditional = expression as ConditionalEffectExpression;
             if (conditional != null) return AnyOf(new[]
             {
-                Visit(conditional.WhenTrue, active, ignored),
-                Visit(conditional.WhenFalse, active, ignored)
+                Visit(conditional.WhenTrue, active, ignored, outer),
+                Visit(conditional.WhenFalse, active, ignored, outer)
             });
             var targeted = expression as TargetedEffectExpression;
-            if (targeted != null) return Visit(targeted.Child, active, ignored);
+            if (targeted != null) return Visit(targeted.Child, active, ignored, EffectRecipientScope.Resolve(targeted.Target, outer));
             var referenced = expression as ReferencedAbilityExpression;
-            if (referenced != null) return Visit(referenced.Child, active, ignored);
+            if (referenced != null) return Visit(referenced.Child, active, ignored, outer);
             return NodePresence.Irrelevant();
         }
 

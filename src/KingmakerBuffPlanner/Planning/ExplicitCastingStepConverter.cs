@@ -166,7 +166,7 @@ namespace KingmakerBuffPlanner.Planning
                     return ExplicitStepConversion.Refuse("material-cost-count:" + castingId);
                 EffectExpression expected = DiscoveredEffectLookup.ForAbility(
                     effectsBySource, casting.Ability, casting.SourceId);
-                expected = EffectConditionBinding.Bind(expected, option.CasterFacts);
+                expected = option.BindEffects(expected, casting.DirectTargetUnitId);
                 if (expected == null)
                     return ExplicitStepConversion.Refuse("expected-effects-missing:" + castingId);
                 if (scope == ExplicitProjectionScope.SingleCastProbe)
@@ -487,6 +487,8 @@ namespace KingmakerBuffPlanner.Planning
                 // unchanged.
                 if (step.PreCoveredRecipientUnitIds.Count != 0)
                     stepObject.Add("preCoveredRecipientUnitIds", Sorted(step.PreCoveredRecipientUnitIds));
+                if (!step.EffectObservationUnitIds.SequenceEqual(step.ExpectedRecipientUnitIds))
+                    stepObject.Add("effectObservationUnitIds", Sorted(step.EffectObservationUnitIds));
                 stepArray.Add(stepObject);
             }
             var root = new JObject
@@ -545,7 +547,8 @@ namespace KingmakerBuffPlanner.Planning
                 return new JObject { { "type", "empty" } };
             var leaf = expression as EffectLeafExpression;
             if (leaf != null)
-                return new JObject
+            {
+                var value = new JObject
                 {
                     { "type", "leaf" },
                     { "kind", leaf.Kind.ToString() },
@@ -554,6 +557,9 @@ namespace KingmakerBuffPlanner.Planning
                     { "sourceContract", leaf.SourceContract },
                     { "actionPath", leaf.ActionPath }
                 };
+                if (leaf.RecipientUnitId != null) value.Add("recipientUnitId", leaf.RecipientUnitId);
+                return value;
+            }
             var sequence = expression as SequenceEffectExpression;
             if (sequence != null)
                 return new JObject

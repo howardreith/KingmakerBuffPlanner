@@ -865,6 +865,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 }
                 case 12:
                 {
+                    if (!UpdatePlaytestClearPlanProbe(view)) return false;
                     if (!NativeUiWaited(600)) return false;
                     bool focused = view != null && view.SearchFocusedForRuntime;
                     bool standsDown = NativeKeyboardStandsDown();
@@ -1378,6 +1379,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             _nativeUi.RunsStarted = BuffPlannerUiRoot.CastingRunsStartedForRuntime;
             var settings = new JsonSerializerSettings { Formatting = Formatting.Indented };
             JObject record = JObject.FromObject(_nativeUi, JsonSerializer.Create(settings));
+            record["playtestClearPlan"] = _playtestClearPlan;
             record["violations"] = new JArray(_nativeUi.Violations().Cast<object>().ToArray());
             AtomicFile.WriteUtf8(Path.Combine(_request.EvidenceDirectory, "native-ui.json"),
                 record.ToString(Formatting.Indented) + Environment.NewLine);

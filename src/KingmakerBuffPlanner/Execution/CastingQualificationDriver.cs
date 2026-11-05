@@ -102,7 +102,7 @@ namespace KingmakerBuffPlanner.Execution
     }
 
     // What one guarded qualification run did, judged by Unity-free rules.
-    public sealed class CastingQualificationRecord
+    public sealed partial class CastingQualificationRecord
     {
         public bool CastingScenario { get; set; }
         public string AllowanceStatus { get; set; } = "not-read";
@@ -255,6 +255,8 @@ namespace KingmakerBuffPlanner.Execution
         {
             get
             {
+                if (Selection != null && Selection.Recipe == CastingQualificationRecipe.HeroismSuccessor)
+                    return HeroismStepNames;
                 if (IsGroup) return GroupStepNames;
                 if (IsEnhanced) return EnhancedStepNames;
                 if (IsSingleUse) return SingleUseStepNames;
@@ -316,7 +318,8 @@ namespace KingmakerBuffPlanner.Execution
             // so there the press must land while the first cast is in
             // progress (the stop waits for it to complete). The two-phase
             // recipes have no stop step.
-            if (!IsGroup && !IsEnhanced && !IsSingleUse && !IsShared)
+            if (!IsGroup && !IsEnhanced && !IsSingleUse && !IsShared &&
+                Selection.Recipe != CastingQualificationRecipe.HeroismSuccessor)
             {
                 if (StopPress == null) violations.Add("stop-press:none");
                 else if (!StopPressHandled) violations.Add("stop-press:not-handled:" + StopPress);
@@ -484,6 +487,8 @@ namespace KingmakerBuffPlanner.Execution
             if (step == null) return "missing";
             if (Selection == null || !Selection.Selected) return "no-selection";
             IReadOnlyList<PlannedCasting> castings = Selection.Castings;
+            if (Selection.Recipe == CastingQualificationRecipe.HeroismSuccessor)
+                return HeroismStepFailure(step, castings);
             string first = castings[0].CastingId;
             List<string> rest = castings.Skip(1).Select(value => value.CastingId).ToList();
             if (name == "repeat")
@@ -1206,7 +1211,7 @@ namespace KingmakerBuffPlanner.Execution
     // repeat (nothing to cast) -> recast (Always recast on the first
     // casting, accepted, then the session is REOPENED from disk and the
     // restored acceptance authorizes the run).
-    public sealed class CastingQualificationDriver
+    public sealed partial class CastingQualificationDriver
     {
         // The reason the planner's own disable ends a run with (the root's
         // SetEnabled(false), which unchecking the mod calls).
@@ -1383,6 +1388,14 @@ namespace KingmakerBuffPlanner.Execution
             {
                 case "select": Select(); return;
                 case "author": Author(); return;
+                case "heroism-first": Begin("heroism-first"); return;
+                case "heroism-first-wait": Wait(false, "heroism-recast-edit"); return;
+                case "heroism-recast-edit": HeroismEdit(false); return;
+                case "heroism-recast": Begin("heroism-recast"); return;
+                case "heroism-recast-wait": Wait(false, "heroism-skip-edit"); return;
+                case "heroism-skip-edit": HeroismEdit(true); return;
+                case "heroism-skip": Begin("heroism-skip"); return;
+                case "heroism-skip-wait": Wait(false, "done"); return;
                 case "stop": Begin(CastingQualificationForecast.Stop); return;
                 case "stop-wait": Wait(true, "complete"); return;
                 case "complete": Begin(CastingQualificationForecast.Complete); return;
@@ -1527,7 +1540,8 @@ namespace KingmakerBuffPlanner.Execution
             _session.PresentForReview(inputs);
             if (!_session.AcceptPresentedPlan(inputs)) { Fail("accept-refused"); return; }
             _startedMillis = _clock();
-            _phase = group ? "prime" : twoPhase ? "plain"
+            _phase = Recipe == CastingQualificationRecipe.HeroismSuccessor ? "heroism-first"
+                : group ? "prime" : twoPhase ? "plain"
                 : CastingQualificationRecipe.IsSingleUseRecipe(Recipe) ? "use" : "stop";
         }
 

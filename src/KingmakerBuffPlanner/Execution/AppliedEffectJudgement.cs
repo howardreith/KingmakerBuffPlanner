@@ -47,6 +47,20 @@ namespace KingmakerBuffPlanner.Execution
     {
         private readonly Dictionary<string, IReadOnlyList<ObservedEffectInstance>> _byUnit =
             new Dictionary<string, IReadOnlyList<ObservedEffectInstance>>(StringComparer.Ordinal);
+        private readonly List<string> _confirmationPolls = new List<string>();
+        private int _confirmationPollCount;
+
+        public void RecordConfirmationPoll(bool confirmed, EffectBaseline after, IEnumerable<string> units)
+        {
+            string value = (++_confirmationPollCount).ToString(CultureInfo.InvariantCulture) + "@" +
+                DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture) + ":confirmed=" + confirmed + ":" +
+                (after == null ? "unreadable" : after.Describe(units));
+            if (_confirmationPolls.Count < 8) _confirmationPolls.Add(value);
+            else _confirmationPolls[7] = value;
+        }
+
+        public string DescribeConfirmationPolls()
+        { return "role-scoped-complete+fresh-primary;poll-count=" + _confirmationPollCount + ";polls={" + string.Join("|", _confirmationPolls.ToArray()) + "}"; }
 
         public EffectBaseline(IDictionary<string, IEnumerable<ObservedEffectInstance>> byUnit)
         {
@@ -92,6 +106,47 @@ namespace KingmakerBuffPlanner.Execution
     // recipient set confirms nothing (final review A2).
     public static class AppliedEffectJudgement
     {
+        public static bool ReachedScoped(EffectExpression expected, string caster, string recipient,
+            EffectBaseline baseline, Func<string, IEnumerable<ObservedEffectInstance>> readAfter, bool requireFresh = true)
+        {
+            if (expected == null || baseline == null || readAfter == null) return false;
+            var scope = new EffectRecipientScope(expected, caster, recipient);
+            var before = new Dictionary<string, IReadOnlyList<ObservedEffectInstance>>(StringComparer.Ordinal);
+            var after = new Dictionary<string, List<ObservedEffectInstance>>(StringComparer.Ordinal);
+            foreach (string owner in scope.UnitIds)
+            {
+                IReadOnlyList<ObservedEffectInstance> prior;
+                if (!baseline.TryGet(owner, out prior)) return false;
+                IEnumerable<ObservedEffectInstance> current = readAfter(owner);
+                if (current == null) return false;
+                before[owner] = prior;
+                after[owner] = current.Where(value => value != null && !value.Suppressed).ToList();
+            }
+            bool freshPrimary = false;
+            var evaluator = new EffectPresenceEvaluator();
+            EffectPresenceResult complete = evaluator.EvaluateScoped(expected, (leaf, role) =>
+            {
+                string owner = scope.Owner(leaf, role);
+                List<ObservedEffectInstance> instances;
+                if (owner == null || !after.TryGetValue(owner, out instances)) return false;
+                var matching = instances.Where(value => value.Kind == leaf.Kind && value.EffectId == leaf.EffectId).ToList();
+                if (owner == recipient && matching.Any(value => !before[owner].Any(old => old.Identity == value.Identity &&
+                    old.EndTimeTicks >= value.EndTimeTicks))) freshPrimary = true;
+                return matching.Count != 0;
+            }, null);
+            if (complete.Kind != EffectPresenceKind.Complete) return false;
+            if (requireFresh) return freshPrimary;
+            // Kept group coverage must have been complete on the same owners
+            // before submission too; it cannot be inferred from an after-read.
+            return evaluator.EvaluateScoped(expected, (leaf, role) =>
+            {
+                IReadOnlyList<ObservedEffectInstance> prior;
+                string owner = scope.Owner(leaf, role);
+                return owner != null && before.TryGetValue(owner, out prior) && prior.Any(value =>
+                    !value.Suppressed && value.Kind == leaf.Kind && value.EffectId == leaf.EffectId);
+            }, null).Kind == EffectPresenceKind.Complete;
+        }
+
         public static bool Reached(EffectExpression expected,
             IEnumerable<ObservedEffectInstance> before,
             IEnumerable<ObservedEffectInstance> after)
@@ -156,7 +211,7 @@ namespace KingmakerBuffPlanner.Execution
         // refreshed instance, and at least one such recipient must exist.
         public static bool AllReached(IReadOnlyList<string> recipients, EffectExpression expected,
             EffectBaseline baseline, Func<string, IEnumerable<ObservedEffectInstance>> readAfter,
-            IEnumerable<string> preCovered = null)
+            IEnumerable<string> preCovered = null, string casterUnitId = null)
         {
             if (recipients == null || recipients.Count == 0 || baseline == null || readAfter == null)
                 return false;
@@ -164,6 +219,16 @@ namespace KingmakerBuffPlanner.Execution
             bool delivered = false;
             foreach (string unitId in recipients)
             {
+                if (casterUnitId != null)
+                {
+                    bool reached = ReachedScoped(expected, casterUnitId, unitId, baseline, readAfter);
+                    if (kept.Contains(unitId))
+                    {
+                        if (!reached && !ReachedScoped(expected, casterUnitId, unitId, baseline, readAfter, false)) return false;
+                    }
+                    else { if (!reached) return false; delivered = true; }
+                    continue;
+                }
                 IReadOnlyList<ObservedEffectInstance> before;
                 if (!baseline.TryGet(unitId, out before)) return false;
                 IEnumerable<ObservedEffectInstance> after = readAfter(unitId);
@@ -187,19 +252,24 @@ namespace KingmakerBuffPlanner.Execution
         // already covered for longer - is not a failure. An empty recipient
         // set confirms nothing.
         public static bool AnyReached(IReadOnlyList<string> recipients, EffectExpression expected,
-            EffectBaseline baseline, Func<string, IEnumerable<ObservedEffectInstance>> readAfter)
+            EffectBaseline baseline, Func<string, IEnumerable<ObservedEffectInstance>> readAfter, string casterUnitId = null)
         {
-            return ReachedRecipients(recipients, expected, baseline, readAfter).Count != 0;
+            return ReachedRecipients(recipients, expected, baseline, readAfter, casterUnitId).Count != 0;
         }
 
         public static IReadOnlyList<string> ReachedRecipients(IReadOnlyList<string> recipients,
             EffectExpression expected, EffectBaseline baseline,
-            Func<string, IEnumerable<ObservedEffectInstance>> readAfter)
+            Func<string, IEnumerable<ObservedEffectInstance>> readAfter, string casterUnitId = null)
         {
             var reached = new List<string>();
             if (recipients == null || baseline == null || readAfter == null) return reached;
             foreach (string unitId in recipients)
             {
+                if (casterUnitId != null)
+                {
+                    if (ReachedScoped(expected, casterUnitId, unitId, baseline, readAfter)) reached.Add(unitId);
+                    continue;
+                }
                 IReadOnlyList<ObservedEffectInstance> before;
                 if (!baseline.TryGet(unitId, out before)) continue;
                 IEnumerable<ObservedEffectInstance> after = readAfter(unitId);

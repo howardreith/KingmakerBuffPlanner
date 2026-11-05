@@ -89,6 +89,43 @@ namespace KingmakerBuffPlanner.Planning
     // by presence alone: it casts, and the reason is disclosed.
     public static class ExistingEffectSufficiency
     {
+        public static ExistingEffectRecipientAssessment AssessScoped(string caster, string recipient,
+            EffectExpression expression, Func<string, IEnumerable<ActiveEffectInstance>> read,
+            ISet<string> ignored, ExistingEffectRequirement requirement)
+        {
+            var scope = new EffectRecipientScope(expression, caster, recipient);
+            if (scope.UnitIds.Count == 1 && scope.UnitIds[0] == recipient)
+                return Assess(recipient, expression, read(recipient), ignored, requirement);
+            var instances = scope.UnitIds.ToDictionary(id => id,
+                id => (read(id) ?? new ActiveEffectInstance[0]).Where(value => value != null && !value.Suppressed).ToList(),
+                StringComparer.Ordinal);
+            var evaluator = new EffectPresenceEvaluator();
+            var failures = new HashSet<string>(StringComparer.Ordinal);
+            Func<bool, EffectPresenceResult> evaluate = strength => evaluator.EvaluateScoped(expression, (leaf, role) =>
+            {
+                string owner = scope.Owner(leaf, role);
+                List<ActiveEffectInstance> values;
+                if (owner == null || !instances.TryGetValue(owner, out values)) return false;
+                bool found = false;
+                foreach (ActiveEffectInstance instance in values.Where(value => value.Marker.Equals(new ActiveEffectMarker(leaf.Kind, leaf.EffectId))))
+                {
+                    string failure = strength ? Failure(instance, requirement) : null;
+                    if (failure == null) found = true;
+                    else failures.Add(failure + ":" + owner + ":" + leaf.EffectId);
+                }
+                return found;
+            }, ignored);
+            EffectPresenceResult present = evaluate(false);
+            if (present.Kind != EffectPresenceKind.Complete)
+                return new ExistingEffectRecipientAssessment(recipient, ExistingEffectVerdict.NotPresent,
+                    present.Kind == EffectPresenceKind.Partial ? new[] { "partial:" + string.Join(",", present.PresentMarkers) } : new string[0]);
+            if (evaluate(true).Kind == EffectPresenceKind.Complete)
+                return new ExistingEffectRecipientAssessment(recipient, ExistingEffectVerdict.Sufficient,
+                    requirement.DurationComparable ? new string[0] : new[] { "remaining-duration-not-compared" });
+            return new ExistingEffectRecipientAssessment(recipient, ExistingEffectVerdict.Insufficient,
+                failures.Count == 0 ? new[] { "present-effect-not-sufficient" } : failures.ToArray());
+        }
+
         public const double MinimumRemainingFraction = 0.5;
 
         // Whatever the duration comparability: an instance with less than

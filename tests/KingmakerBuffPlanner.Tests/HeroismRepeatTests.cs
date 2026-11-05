@@ -11,6 +11,7 @@ using KingmakerBuffPlanner.Execution;
 using KingmakerBuffPlanner.Discovery;
 using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.UI;
+using Newtonsoft.Json.Linq;
 
 namespace KingmakerBuffPlanner.Tests
 {
@@ -27,9 +28,13 @@ namespace KingmakerBuffPlanner.Tests
             internal bool ThrowEvidence;
             internal string ValidationFailureId;
             internal bool CapturedHeroism;
+            internal bool InfectiousCharms;
+            internal bool NearbyRecipients;
+            private readonly Dictionary<string, List<ObservedEffectInstance>> _additional =
+                new Dictionary<string, List<ObservedEffectInstance>>(StringComparer.Ordinal);
             private string BuffId { get { return CapturedHeroism ? "87ab2fed7feaaff47b62a3320a57ad8d" : "buff-effect"; } }
             private int _instance;
-            private static readonly AbilityKey Sentinel = new AbilityKey("sentinel-spell", null, 0,
+            internal AbilityKey Sentinel = new AbilityKey("sentinel-spell", null, 0,
                 SourceKind.Spellbook, null);
             private readonly Dictionary<CastStep, EffectBaseline> _baselines =
                 new Dictionary<CastStep, EffectBaseline>();
@@ -42,13 +47,17 @@ namespace KingmakerBuffPlanner.Tests
             private IEnumerable<ObservedEffectInstance> Read(string target, bool before)
             {
                 KeyValuePair<string, long> active;
-                if (!before && Observation == "unreadable") return null;
-                return State.Active.TryGetValue(target, out active) && active.Value > Round
+                if (!before && (Observation == "unreadable" ||
+                    (Observation == "caster-unreadable" && target == "unit-wizard"))) return null;
+                var result = State.Active.TryGetValue(target, out active) && active.Value > Round
                     ? new[] { new ObservedEffectInstance(
                         !before && Observation == "wrong-kind" ? EffectKind.AreaBuff : EffectKind.Buff,
                         target == "unit-t4" ? "sentinel-effect" : BuffId,
                         active.Key, active.Value, !before && Observation == "suppressed") }
                     : new ObservedEffectInstance[0];
+                List<ObservedEffectInstance> additional;
+                return _additional.TryGetValue(target, out additional)
+                    ? result.Concat(additional.Where(value => value.EndTimeTicks > Round)).ToArray() : result;
             }
 
             public CastRuntimeValidation Validate(CastStep step)
@@ -64,7 +73,7 @@ namespace KingmakerBuffPlanner.Tests
 
             public InstantCastResult Fire(CastStep step)
             {
-                _baselines[step] = new EffectBaseline(step.ExpectedRecipientUnitIds.ToDictionary(
+                _baselines[step] = new EffectBaseline(step.EffectObservationUnitIds.ToDictionary(
                     id => id, id => Read(id, true), StringComparer.Ordinal));
                 int before = Available(step);
                 State.Fired.Add(step.AssignmentId);
@@ -74,17 +83,36 @@ namespace KingmakerBuffPlanner.Tests
                 string target = step.TargetUnitIds[0];
                 KeyValuePair<string, long> prior;
                 State.Active.TryGetValue(target, out prior);
-                if (Observation == "replace" || Observation == "suppressed" || Observation == "wrong-kind")
+                if (Observation == "replace" || Observation == "suppressed" || Observation == "wrong-kind" ||
+                    Observation.StartsWith("caster-", StringComparison.Ordinal) || Observation.StartsWith("marker-", StringComparison.Ordinal))
                     State.Active[target] = new KeyValuePair<string, long>("instance-" + (++_instance), Round + 100);
                 else if (Observation == "refresh")
                     State.Active[target] = new KeyValuePair<string, long>(prior.Key, Round + 100);
                 else if (Observation == "wrong-recipient")
                     State.Active["unit-sorcerer"] = new KeyValuePair<string, long>("instance-" + (++_instance), Round + 100);
                 else if (Observation == "missing") State.Active.Remove(target);
+                if (CapturedHeroism && InfectiousCharms && target != "unit-t4")
+                {
+                    if (Observation != "caster-missing")
+                        PutAdditional(Observation == "caster-wrong-owner" ? target : step.Provider.CasterUnitId,
+                            "6d949ebb548bd6c31e8d5bd45f96a7b6");
+                    if (Observation != "marker-missing")
+                        PutAdditional(Observation == "marker-wrong-owner" ? (NearbyRecipients ? target : step.Provider.CasterUnitId) :
+                            NearbyRecipients ? "unit-t2" : target,
+                            "c20c575b6352d1692b3074a25232e699");
+                }
                 bool succeeded = Observation != "native-failure";
                 return new InstantCastResult(true, succeeded, false, Available(step) < before,
                     true, "simulated-native:" + Observation,
                     AvailableCountJudgement.Violation(step.Reservation, before, Available(step)));
+            }
+
+            private void PutAdditional(string owner, string effect)
+            {
+                List<ObservedEffectInstance> values;
+                if (!_additional.TryGetValue(owner, out values)) _additional[owner] = values = new List<ObservedEffectInstance>();
+                values.RemoveAll(value => value.EffectId == effect);
+                values.Add(new ObservedEffectInstance(EffectKind.Buff, effect, "aux-" + (++_instance), Round + 100, false));
             }
 
             private int Available(CastStep step)
@@ -99,7 +127,7 @@ namespace KingmakerBuffPlanner.Tests
                 EffectBaseline baseline;
                 return _baselines.TryGetValue(step, out baseline) &&
                     AppliedEffectJudgement.AllReached(step.ExpectedRecipientUnitIds,
-                        step.ExpectedEffects, baseline, Read, step.PreCoveredRecipientUnitIds);
+                        step.ExpectedEffects, baseline, Read, step.PreCoveredRecipientUnitIds, step.Provider.CasterUnitId);
             }
 
             public InstantCastCompletion InspectCompletion(CastStep step)
@@ -148,7 +176,9 @@ namespace KingmakerBuffPlanner.Tests
                 CastingWorkspaceInputs current = State.Inputs();
                 var live = LiveEffects(State.Active.Where(pair => pair.Value.Value > Round)
                     .Select(pair => On(pair.Key, pair.Key == "unit-t4" ? "sentinel-effect" : BuffId,
-                        pair.Value.Value - Round, 1, 0)).ToArray());
+                        pair.Value.Value - Round, 1, 0)).Concat(_additional.SelectMany(pair => pair.Value
+                        .Where(value => value.EndTimeTicks > Round).Select(value => On(pair.Key, value.EffectId,
+                            value.EndTimeTicks - Round, 1, 0)))).ToArray());
                 ProviderSnapshot prepared = current.Snapshot.Providers.Single(value =>
                     value.Key.CasterUnitId == "unit-wizard");
                 var wizard = new ProviderSnapshot(prepared.Key, CapturedHeroism ? "Heroism (captured graph)" : "Heroism-like fixture", 2,
@@ -157,14 +187,19 @@ namespace KingmakerBuffPlanner.Tests
                     Sentinel, "level-2"), "Sentinel fixture", 2, "pool-unit-sorcerer", 1,
                     null, null, 1, 100, "", "10 minutes/level");
                 var providers = new[] { wizard, sentinel };
+                EffectExpression heroism = CapturedHeroism ? CapturedHeroismExpression(NearbyRecipients) : Leaf("buff-effect");
+                var facts = CapturedHeroism ? new Dictionary<string, bool> { { "infectious-charms-feature", InfectiousCharms } } : null;
+                var bound = current.Snapshot.Units.ToDictionary(unit => unit.UnitId, unit =>
+                    EffectRecipientBinding.Bind(EffectConditionBinding.Bind(heroism, facts), rule =>
+                        new[] { unit.UnitId == "unit-t2" ? "unit-t3" : "unit-t2" }), StringComparer.Ordinal);
                 var options = providers.Select(provider => new ProviderPlanningOption(provider,
-                    current.Snapshot.Units.Select(unit => unit.UnitId), new[] { provider.Key.CasterUnitId },
+                    provider == sentinel ? new[] { "unit-t4" } : current.Snapshot.Units.Select(unit => unit.UnitId), new[] { provider.Key.CasterUnitId },
                     10, 100, CastExecutionStrategy.DirectRuleCast, "simulated-direct",
                     new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal),
-                    CapturedHeroism ? new Dictionary<string, bool> { { "infectious-charms-feature", false } } : null));
+                    facts, provider == wizard && NearbyRecipients ? bound : null));
                 var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal)
                 {
-                    { "source-bulls", CapturedHeroism ? CapturedHeroismExpression() : Leaf("buff-effect") },
+                    { "source-bulls", heroism },
                     { "source-sentinel", Leaf("sentinel-effect") }
                 };
                 // Catalogue aliases share the selected ability's expression instance.
@@ -179,6 +214,72 @@ namespace KingmakerBuffPlanner.Tests
                 foreach (string id in State.Tokens.Keys.ToArray()) State.Tokens[id] = true;
                 State.SpontaneousRemaining = 1;
             }
+
+            internal ProbeObservation Observe(CastStep step, string label)
+            {
+                string target = step.TargetUnitIds[0];
+                var instances = Read(target).Where(value => !value.Suppressed)
+                    .Select(value => new ProbeEffectInstance(value.EffectId, value.InstanceKey, value.EndTimeTicks));
+                return ProbeObservation.Read(label, ++EvidenceReads, DateTime.UtcNow, target, Available(step),
+                    instances, step.Reservation.TokenIds.Count == 0 ? null : step.Reservation.TokenIds
+                        .ToDictionary(id => id, id => State.Tokens[id], StringComparer.Ordinal));
+            }
+        }
+
+        private static void TestHeroismNativeRecipe(string root, string mode)
+        {
+            var world = new RepeatBuffWorld { CapturedHeroism = true, InfectiousCharms = true, NearbyRecipients = true };
+            world.State.Ability = new AbilityKey("5ab0d42fb68c9e34abae4921822b9d63", null, 0, SourceKind.Spellbook, null);
+            world.Sentinel = new AbilityKey("3e4ab69ada402d145a5e0ad3ad4b8564", null, 0, SourceKind.Spellbook, null);
+            world.State.SpontaneousRemaining = 3;
+            var inputs = world.Inputs();
+            var selection = CastingQualificationRecipe.Select(CastingQualificationRecipe.HeroismSuccessor, inputs, "fixture-campaign");
+            if (!selection.Selected) throw new InvalidOperationException(string.Join("|", selection.Rejections));
+            Assert(selection.Castings[0].CasterUnitId != selection.Castings[0].DirectTargetUnitId);
+            Assert(selection.Castings[0].Ability.BaseAbilityGuid != selection.Castings[1].Ability.BaseAbilityGuid);
+            Assert((bool)selection.EffectContext["casterFacts"]["infectious-charms-feature"]);
+            var forecast = CastingQualificationForecast.Forecast(selection, inputs, "fixture-campaign");
+            Assert(forecast.Select(value => value.CastingIds.Count).SequenceEqual(new[] { 2, 2, 1 }));
+            Assert(forecast.SelectMany(value => value.Projection.Plan.Steps).Sum(value => value.Reservation.Units) == 5);
+            CastStep original = forecast[0].Projection.Plan.Steps[0];
+            Func<bool, CastStep> ownerSwap = swap => new CastStep(original.SourceId, original.AssignmentId,
+                original.Provider, original.AnchorUnitId, original.TargetUnitIds, original.ExpectedRecipientUnitIds,
+                original.Reservation, original.MaterialReservation, new SequenceEffectExpression(new[]
+                {
+                    new EffectLeafExpression(EffectKind.Buff, "first-marker", EffectTarget.CurrentTarget, "fixture", "first", swap ? "unit-t3" : "unit-t2"),
+                    new EffectLeafExpression(EffectKind.Buff, "second-marker", EffectTarget.CurrentTarget, "fixture", "second", swap ? "unit-t2" : "unit-t3")
+                }), false, original.ExecutionStrategy, original.ExecutionStrategyReason, exactEnhancements: true);
+            CastStep firstOwners = ownerSwap(false), swappedOwners = ownerSwap(true);
+            Assert(firstOwners.EffectObservationUnitIds.SequenceEqual(swappedOwners.EffectObservationUnitIds));
+            Assert(ExplicitCastingStepConverter.Identity(new[] { firstOwners }, ExplicitProjectionScope.Standard) !=
+                ExplicitCastingStepConverter.Identity(new[] { swappedOwners }, ExplicitProjectionScope.Standard));
+            string refusal;
+            var allowance = CastingQualificationAllowance.Parse(QualificationAllowanceJson(o =>
+            {
+                o["fixtureGameId"] = "fixture-campaign";
+                o["recipe"] = CastingQualificationRecipe.HeroismSuccessor;
+                o["executionMode"] = mode;
+                o["approvedProjectionIds"] = new JArray(forecast.Select(value => value.ProjectionId));
+                o["maximumNativeSubmissions"] = 5;
+            }), "qual-run-1", out refusal);
+            if (allowance == null) throw new InvalidOperationException(refusal);
+            long now = 0;
+            var host = new CastingExecutionHost(settings => mode == "instant" ?
+                (ICastExecutor)new InstantCastExecutor(world, true) : new AnimatedCastExecutor(world, true), () => now);
+            var record = new CastingQualificationRecord { CastingScenario = true };
+            var driver = new CastingQualificationDriver(record, allowance, "fixture-campaign", world.Inputs,
+                boundary => new CastingWorkspaceSession(Path.Combine(root, "heroism-recipe-" + mode), "fixture-campaign", boundary),
+                host, world.Observe, () => now, 240000, CastingQualificationRecipe.HeroismSuccessor);
+            for (int count = 0; !driver.Completed && count < 2000; count++) { now += 10; driver.Update(); }
+            Assert(driver.Completed);
+            if (record.Violations().Count != 0) throw new InvalidOperationException(string.Join("|", record.Violations()));
+            Assert(world.State.Fired.SequenceEqual(new[] { "qual-cast-1", "qual-cast-2", "qual-cast-1", "qual-cast-2", "qual-cast-2" }));
+            Assert(world.State.Primaries.Count(id => world.State.Tokens[id]) == 1 && world.State.SpontaneousRemaining == 0);
+            world.State.SpontaneousRemaining = 2;
+            Assert(!CastingQualificationRecipe.Select(CastingQualificationRecipe.HeroismSuccessor, world.Inputs(), "fixture-campaign").Selected);
+            world.State.Ability = new AbilityKey("lookalike-heroism", null, 0, SourceKind.Spellbook, null);
+            world.Replenish(); world.State.SpontaneousRemaining = 3;
+            Assert(!CastingQualificationRecipe.Select(CastingQualificationRecipe.HeroismSuccessor, world.Inputs(), "fixture-campaign").Selected);
         }
 
         private sealed class RepeatSession
@@ -188,9 +289,12 @@ namespace KingmakerBuffPlanner.Tests
             internal readonly CastingWorkspaceSession Session;
             internal readonly List<CastStep> Steps = new List<CastStep>();
 
-            internal RepeatSession(string root, string mode, string name, bool party = false, bool capturedHeroism = false)
+            internal RepeatSession(string root, string mode, string name, bool party = false, bool capturedHeroism = false,
+                bool infectiousCharms = false, bool nearbyRecipients = false)
             {
                 World.CapturedHeroism = capturedHeroism;
+                World.InfectiousCharms = infectiousCharms;
+                World.NearbyRecipients = nearbyRecipients;
                 if (capturedHeroism)
                 {
                     World.State.Ability = new AbilityKey("5ab0d42fb68c9e34abae4921822b9d63", null, 0, SourceKind.Spellbook, null);
@@ -250,7 +354,7 @@ namespace KingmakerBuffPlanner.Tests
         // catalogue at 85e7410 (kbp041-rel-catalog-full), not inferred from the
         // handoff's flat GUID list. The feature identity is symbolic here;
         // the live adapter supplies the actual condition Fact.AssetGuid.
-        private static EffectExpression CapturedHeroismExpression()
+        private static EffectExpression CapturedHeroismExpression(bool nearby = false)
         {
             Func<DiscoveryNode[], DiscoveryNode> sequence = children => new DiscoveryNode(DiscoveryNodeKind.Sequence, "ActionList", children);
             Func<string, EffectTarget, DiscoveryNode> buff = (id, target) => new DiscoveryNode(DiscoveryNodeKind.Effect,
@@ -262,7 +366,9 @@ namespace KingmakerBuffPlanner.Tests
                         "Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional",
                         whenTrue: sequence(new[] {
                             buff("6d949ebb548bd6c31e8d5bd45f96a7b6", EffectTarget.Caster),
-                            sequence(new[] { sequence(new[] { buff("c20c575b6352d1692b3074a25232e699", EffectTarget.CurrentTarget) }) }) }),
+                            new DiscoveryNode(DiscoveryNodeKind.Sequence, "nearby-wrapper",
+                                new[] { sequence(new[] { buff("c20c575b6352d1692b3074a25232e699", EffectTarget.CurrentTarget) }) },
+                                nearbyRecipients: nearby ? new NearbyRecipientRule(9.144f, 1, true, true, false) : null) }),
                         whenFalse: sequence(new DiscoveryNode[0]),
                         conditionContract: "And:Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionCasterHasFact",
                         casterFactGate: new CasterFactGate(false, new[] { new KeyValuePair<string, bool>("infectious-charms-feature", false) })) }) },
@@ -300,6 +406,62 @@ namespace KingmakerBuffPlanner.Tests
                     negative.Host.LastReport.ResourcesSpent == 1 && negative.World.State.Fired.Count == 1,
                     observation + ": confirmed=" + negative.Host.LastReport.Confirmed + ";notProcessed=" + negative.Host.LastReport.NotProcessed + ";spent=" + negative.Host.LastReport.ResourcesSpent + ";" + negative.Host.LastReport.Entries[0].Detail);
             }
+        }
+
+        private static void TestMixedOwnerHeroism(string root, string mode, bool nearby = false)
+        {
+            var run = new RepeatSession(root, mode, nearby ? "near" : "mix", capturedHeroism: true, infectiousCharms: true, nearbyRecipients: nearby);
+            RepeatAssert(run.Apply().Allowed, "Mixed-owner admission failed.");
+            RepeatAssert(run.Host.LastReport.Confirmed == 2 && run.Host.LastReport.NotProcessed == 0,
+                "Correct caster-side and recipient-side effects stopped the distinct successor: " + run.Host.LastReport.Entries[0].Detail);
+            Assert(run.Steps[0].Provider.CasterUnitId != run.Steps[0].TargetUnitIds[0]);
+            if (nearby) Assert(run.Steps[0].EffectObservationUnitIds.Contains("unit-t2"));
+            run.World.Round = 10;
+            Assert(run.Apply(true).Allowed && run.Host.LastReport.Confirmed == 2 && run.Host.LastReport.ResourcesSpent == 2);
+            Assert(run.World.State.Tokens.Values.Count(value => value) == 1);
+            run.World.State.Active.Remove("unit-t4");
+            Assert(run.Apply().Allowed && run.Host.LastReport.Skipped == 1 && run.Host.LastReport.Confirmed == 1);
+            int index = 0;
+            foreach (string observation in new[] { "caster-missing", "caster-wrong-owner", "marker-missing", "marker-wrong-owner", "caster-unreadable" })
+            {
+                var negative = new RepeatSession(root, mode, (nearby ? "nr" : "mx") + (++index), capturedHeroism: true, infectiousCharms: true, nearbyRecipients: nearby);
+                negative.World.Observation = observation;
+                Assert(negative.Apply(true).Allowed);
+                RepeatAssert(negative.Host.LastReport.Confirmed == 0 && negative.Host.LastReport.NotProcessed == 1 &&
+                    negative.Host.LastReport.ResourcesSpent == 1 && negative.World.State.Fired.Count == 1, observation + " falsely confirmed.");
+                if (observation != "caster-unreadable")
+                {
+                    negative.World.Observation = "replace";
+                    Assert(negative.Apply().Allowed);
+                    RepeatAssert(negative.Host.LastReport.Confirmed == 2 && negative.Host.LastReport.Skipped == 0,
+                        observation + " incorrectly satisfied already-active assessment.");
+                }
+            }
+        }
+
+        private static void TestNativeNearbyRecipientContract()
+        {
+            string game = Environment.GetEnvironmentVariable("KBP_TEST_GAME_PATH");
+            var optional = System.Reflection.Assembly.LoadFrom(Path.Combine(game, "Mods", "CallOfTheWild", "CallOfTheWild.dll"));
+            object wrapper = DetachedViewObject(optional.GetType("CallOfTheWild.AoeMechanics.ApplyActionToTargetsInRange", true));
+            SetNative(wrapper, "Radius", 9.144f); SetNative(wrapper, "max_num_units", 1);
+            SetNative(wrapper, "CanTargetSelf", true); SetNative(wrapper, "CanTargetFriends", true); SetNative(wrapper, "CanTargetEnemies", false);
+            var extract = ViewInputProduct().GetType("KingmakerBuffPlanner.GameAdapters.KingmakerActionGraphAdapter", true)
+                .GetMethod("ReadNearbyRecipientRule", ViewInputMembers | System.Reflection.BindingFlags.Static);
+            object rule = extract.Invoke(null, new[] { wrapper });
+            Assert(rule != null && (int)rule.GetType().GetProperty("Maximum").GetValue(rule, null) == 1);
+            Assert((bool)rule.GetType().GetProperty("Friends").GetValue(rule, null) && !(bool)rule.GetType().GetProperty("Enemies").GetValue(rule, null));
+            SetNative(wrapper, "Radius", float.NaN);
+            Assert(extract.Invoke(null, new[] { wrapper }) == null);
+            Assert(extract.Invoke(null, new[] { new object() }) == null);
+            Assert(EffectAggregateIdentity.For(CapturedHeroismExpression(), "") ==
+                EffectAggregateIdentity.For(CapturedHeroismExpression(true), ""));
+            var applicable = EffectConditionBinding.Bind(CapturedHeroismExpression(true),
+                new Dictionary<string, bool> { { "infectious-charms-feature", true } });
+            Assert(new EffectRecipientScope(EffectRecipientBinding.Bind(applicable, value => null), "caster", "recipient")
+                .UnitIds.Contains("unresolved-secondary-recipient"));
+            var noSecondary = EffectRecipientBinding.Bind(applicable, value => new string[0]);
+            Assert(new EffectRecipientScope(noSecondary, "caster", "recipient").UnitIds.Count == 2);
         }
 
         private static void TestCapturedHeroismCondition()

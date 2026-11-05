@@ -90,7 +90,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                         CastExecutionStrategy.NativeCommandRequired,
                     direct ? "share-transmutation-provider-direct-cast-v1" :
                         "share-transmutation-legacy-native-command:" +
-                            directReason, casterFacts: option.CasterFacts);
+                            directReason, casterFacts: option.CasterFacts, effectsByTarget: option.EffectsByTarget);
             }
             catch (Exception exception)
             {

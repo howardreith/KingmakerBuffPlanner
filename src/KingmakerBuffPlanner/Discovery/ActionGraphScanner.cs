@@ -135,7 +135,7 @@ namespace KingmakerBuffPlanner.Discovery
             for (int i = 0; i < node.Children.Count; i++)
                 children.Add(Visit(node.Children[i], depth + 1, active, diagnostics, targetOverride,
                     path + "/" + i + ":" + node.Children[i].Identity));
-            return new SequenceEffectExpression(children);
+            return new SequenceEffectExpression(children, node.NearbyRecipients);
         }
 
         private static EffectTarget ResolveLeafTarget(

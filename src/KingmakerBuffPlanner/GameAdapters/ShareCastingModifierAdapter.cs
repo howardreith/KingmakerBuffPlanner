@@ -144,7 +144,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     : option.RecipientIdsByAnchor.ToDictionary(
                         pair => pair.Key,
                         pair => (IEnumerable<string>)pair.Value,
-                        StringComparer.Ordinal), option.CasterFacts));
+                        StringComparer.Ordinal), option.CasterFacts, option.EffectsByTarget));
         }
 
         // R579-1: the VERIFIED native execution identity — the executor

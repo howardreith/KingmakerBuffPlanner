@@ -277,7 +277,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             CastExecutionStrategy executionStrategy,
             string executionStrategyReason,
             IDictionary<string, IEnumerable<string>> recipientIdsByAnchor = null,
-            IReadOnlyDictionary<string, bool> casterFacts = null)
+            IReadOnlyDictionary<string, bool> casterFacts = null,
+            IReadOnlyDictionary<string, EffectExpression> effectsByTarget = null)
         {
             Provider = provider ?? throw new ArgumentNullException("provider");
             if (effectiveCasterLevel < 0) throw new ArgumentOutOfRangeException("effectiveCasterLevel");
@@ -309,6 +310,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             ExecutionStrategyReason = executionStrategyReason ?? string.Empty;
             CasterFacts = new ReadOnlyDictionary<string, bool>((casterFacts ?? new Dictionary<string, bool>())
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+            EffectsByTarget = new ReadOnlyDictionary<string, EffectExpression>((effectsByTarget ?? new Dictionary<string, EffectExpression>())
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
         }
 
         public ProviderSnapshot Provider { get; private set; }
@@ -323,6 +326,13 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public CastExecutionStrategy ExecutionStrategy { get; private set; }
         public string ExecutionStrategyReason { get; private set; }
         public IReadOnlyDictionary<string, bool> CasterFacts { get; private set; }
+        public IReadOnlyDictionary<string, EffectExpression> EffectsByTarget { get; private set; }
+        public EffectExpression BindEffects(EffectExpression expression, string target)
+        {
+            EffectExpression bound;
+            return target != null && EffectsByTarget.TryGetValue(target, out bound) ? bound :
+                EffectRecipientBinding.Bind(EffectConditionBinding.Bind(expression, CasterFacts), rule => null);
+        }
         public bool RequiresAnimatedExecution
         {
             get
@@ -584,6 +594,9 @@ namespace KingmakerBuffPlanner.Domain.Planning
             Reservation = reservation;
             MaterialReservation = materialReservation;
             ExpectedEffects = expectedEffects;
+            EffectObservationUnitIds = new ReadOnlyCollection<string>(ExpectedRecipientUnitIds.SelectMany(id =>
+                new EffectRecipientScope(expectedEffects, provider == null ? null : provider.CasterUnitId, id).UnitIds)
+                .Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal).ToList());
             MassCast = massCast;
             ExecutionStrategy = executionStrategy;
             ExecutionStrategyReason = executionStrategyReason ?? string.Empty;
@@ -614,6 +627,9 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public ResourceReservation Reservation { get; private set; }
         public MaterialReservation MaterialReservation { get; private set; }
         public EffectExpression ExpectedEffects { get; private set; }
+        // Observation owners include mixed-payload caster effects, without
+        // turning the caster into another primary area beneficiary/cast target.
+        public IReadOnlyList<string> EffectObservationUnitIds { get; private set; }
         public bool MassCast { get; private set; }
         public CastExecutionStrategy ExecutionStrategy { get; private set; }
         public string ExecutionStrategyReason { get; private set; }

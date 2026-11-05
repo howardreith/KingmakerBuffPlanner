@@ -97,6 +97,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Compatibility\BrownFurPowerfulChangeProfile.cs"><Link>Compatibility\BrownFurPowerfulChangeProfile.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\CastEnhancementNaming.cs"><Link>GameAdapters\CastEnhancementNaming.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\EffectExpression.cs"><Link>Domain\Effects\EffectExpression.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\EffectRecipientBinding.cs"><Link>Domain\Effects\EffectRecipientBinding.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\EffectAggregateIdentity.cs"><Link>Domain\Effects\EffectAggregateIdentity.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\DiscoveredEffectLookup.cs"><Link>Domain\Effects\DiscoveredEffectLookup.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Effects\CatalogSourceIdentity.cs"><Link>Domain\Effects\CatalogSourceIdentity.cs</Link></Compile>
@@ -115,6 +116,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\ExplicitCastingRunCoordinator.cs"><Link>Execution\ExplicitCastingRunCoordinator.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\SingleCastProbe.cs"><Link>Execution\SingleCastProbe.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingQualification.cs"><Link>Execution\CastingQualification.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\HeroismQualification.cs"><Link>Execution\HeroismQualification.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingCapabilityInventory.cs"><Link>Execution\CastingCapabilityInventory.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AtWillCantripChoice.cs"><Link>Execution\AtWillCantripChoice.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\ClassicCastQualification.cs"><Link>Execution\ClassicCastQualification.cs</Link></Compile>

@@ -66,7 +66,8 @@ namespace KingmakerBuffPlanner.Domain.Effects
             string effectId,
             EffectTarget target,
             string sourceContract,
-            string actionPath)
+            string actionPath,
+            string recipientUnitId = null)
             : base("leaf")
         {
             if (string.IsNullOrWhiteSpace(effectId)) throw new ArgumentException("Effect ID is required.", "effectId");
@@ -75,6 +76,7 @@ namespace KingmakerBuffPlanner.Domain.Effects
             Target = target;
             SourceContract = sourceContract ?? string.Empty;
             ActionPath = actionPath ?? string.Empty;
+            RecipientUnitId = recipientUnitId;
         }
 
         [JsonProperty("kind", Order = 2)] public EffectKind Kind { get; private set; }
@@ -82,19 +84,24 @@ namespace KingmakerBuffPlanner.Domain.Effects
         [JsonProperty("target", Order = 4)] public EffectTarget Target { get; private set; }
         [JsonProperty("sourceContract", Order = 5)] public string SourceContract { get; private set; }
         [JsonProperty("actionPath", Order = 6)] public string ActionPath { get; private set; }
+        [JsonProperty("recipientUnitId", Order = 7, NullValueHandling = NullValueHandling.Ignore)]
+        public string RecipientUnitId { get; private set; }
     }
 
     public sealed class SequenceEffectExpression : EffectExpression
     {
-        public SequenceEffectExpression(IEnumerable<EffectExpression> children)
+        public SequenceEffectExpression(IEnumerable<EffectExpression> children, NearbyRecipientRule nearbyRecipients = null)
             : base("sequence")
         {
             Children = new ReadOnlyCollection<EffectExpression>(
                 new List<EffectExpression>(children ?? throw new ArgumentNullException("children")));
+            NearbyRecipients = nearbyRecipients;
         }
 
         [JsonProperty("children", Order = 2)]
         public IReadOnlyList<EffectExpression> Children { get; private set; }
+        [JsonProperty("nearbyRecipients", Order = 3, NullValueHandling = NullValueHandling.Ignore)]
+        public NearbyRecipientRule NearbyRecipients { get; private set; }
     }
 
     public sealed class ConditionalEffectExpression : EffectExpression
@@ -160,7 +167,7 @@ namespace KingmakerBuffPlanner.Domain.Effects
             if (sequence != null)
             {
                 var children = sequence.Children.Select(c => Bind(c, casterFacts)).ToList();
-                return children.SequenceEqual(sequence.Children) ? expression : new SequenceEffectExpression(children);
+                return children.SequenceEqual(sequence.Children) ? expression : new SequenceEffectExpression(children, sequence.NearbyRecipients);
             }
             var reference = expression as ReferencedAbilityExpression;
             if (reference != null)
@@ -232,6 +239,60 @@ namespace KingmakerBuffPlanner.Domain.Effects
             if (targeted != null) return ContainsLeaf(targeted.Child);
             var referenced = expression as ReferencedAbilityExpression;
             return referenced != null && ContainsLeaf(referenced.Child);
+        }
+    }
+
+    // A primary recipient is a spell target or one predicted group member.
+    // Mixed payloads can additionally require effects on the caster. A wholly
+    // personal payload follows its effective recipient (native infusion/Share).
+    public sealed class EffectRecipientScope
+    {
+        private readonly string _caster, _recipient;
+        private readonly bool _personal;
+        public EffectRecipientScope(EffectExpression expression, string caster, string recipient)
+        {
+            _caster = caster; _recipient = recipient;
+            var roles = Roles(expression, null).Distinct().ToList();
+            _personal = roles.Count != 0 && roles.All(role => role == EffectTarget.Caster);
+            UnitIds = new ReadOnlyCollection<string>(roles.Select(Owner).Concat(ExplicitOwners(expression)).Concat(new[] { recipient })
+                .Where(id => !string.IsNullOrEmpty(id)).Distinct(StringComparer.Ordinal)
+                .OrderBy(id => id, StringComparer.Ordinal).ToList());
+        }
+        public IReadOnlyList<string> UnitIds { get; private set; }
+        public string Owner(EffectTarget role)
+        { return role == EffectTarget.Caster && !_personal ? _caster : _recipient; }
+        public string Owner(EffectLeafExpression leaf, EffectTarget role)
+        { return leaf.RecipientUnitId ?? Owner(role); }
+
+        private static IEnumerable<string> ExplicitOwners(EffectExpression expression)
+        {
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null) return leaf.RecipientUnitId == null ? new string[0] : new[] { leaf.RecipientUnitId };
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null) return sequence.Children.SelectMany(ExplicitOwners);
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null) return ExplicitOwners(conditional.WhenTrue).Concat(ExplicitOwners(conditional.WhenFalse));
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null) return ExplicitOwners(targeted.Child);
+            var reference = expression as ReferencedAbilityExpression;
+            return reference == null ? new string[0] : ExplicitOwners(reference.Child);
+        }
+
+        public static EffectTarget Resolve(EffectTarget role, EffectTarget? outer)
+        { return role == EffectTarget.CurrentTarget && outer.HasValue ? outer.Value : role; }
+
+        private static IEnumerable<EffectTarget> Roles(EffectExpression expression, EffectTarget? outer)
+        {
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null) return new[] { Resolve(leaf.Target, outer) };
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null) return sequence.Children.SelectMany(child => Roles(child, outer));
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null) return Roles(conditional.WhenTrue, outer).Concat(Roles(conditional.WhenFalse, outer));
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null) return Roles(targeted.Child, Resolve(targeted.Target, outer));
+            var reference = expression as ReferencedAbilityExpression;
+            return reference == null ? new EffectTarget[0] : Roles(reference.Child, outer);
         }
     }
 }

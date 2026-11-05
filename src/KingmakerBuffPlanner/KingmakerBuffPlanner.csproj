@@ -122,6 +122,7 @@
     <Compile Include="Discovery\NativeCatalogExporter.cs" />
     <Compile Include="Discovery\SelectableAbilityVariants.cs" />
     <Compile Include="Domain\Effects\EffectExpression.cs" />
+    <Compile Include="Domain\Effects\EffectRecipientBinding.cs" />
     <Compile Include="Domain\Effects\EffectAggregateIdentity.cs" />
     <Compile Include="Domain\Effects\DiscoveredEffectLookup.cs" />
     <Compile Include="Domain\Effects\CatalogSourceIdentity.cs" />
@@ -170,8 +171,10 @@
     <Compile Include="RuntimeTesting\NativeUiPauseRestoration.cs" />
     <Compile Include="RuntimeTesting\NativeUiFacts.cs" />
     <Compile Include="RuntimeTesting\RuntimeNativeUiHost.cs" />
+    <Compile Include="RuntimeTesting\RuntimePlaytestUiProbe.cs" />
     <Compile Include="Execution\CastingCapabilityInventory.cs" />
     <Compile Include="Execution\CastingQualification.cs" />
+    <Compile Include="Execution\HeroismQualification.cs" />
     <Compile Include="Execution\CastingQualificationDriver.cs" />
     <Compile Include="Execution\SingleCastProbeObservation.cs" />
     <Compile Include="GameAdapters\KingmakerProbeObserver.cs" />

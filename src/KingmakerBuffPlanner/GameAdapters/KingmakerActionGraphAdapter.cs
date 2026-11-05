@@ -154,8 +154,33 @@ namespace KingmakerBuffPlanner.GameAdapters
                         "ContextActionSpawnAreaEffect+AbilityAreaEffectBuff");
             }
             DiscoveryNode reflected = AdaptProvenActionLists(action);
+            NearbyRecipientRule nearby = ReadNearbyRecipientRule(action);
+            if (action.GetType().FullName == "CallOfTheWild.AoeMechanics.ApplyActionToTargetsInRange" && nearby == null)
+                return new DiscoveryNode(DiscoveryNodeKind.Unknown, DescribeType(action.GetType()),
+                    sourceContract: "nearby-recipient-contract-unverified");
+            if (reflected != null && nearby != null)
+                return new DiscoveryNode(reflected.Kind, reflected.Identity, reflected.Children,
+                    sourceContract: reflected.SourceContract, nearbyRecipients: nearby);
             return reflected ?? new DiscoveryNode(DiscoveryNodeKind.Unknown,
                 DescribeType(action.GetType()), sourceContract: "unsupported-action");
+        }
+
+        // Optional CotW wrapper: excludes the primary target, filters native
+        // allegiance flags and applies the child list to nearest other units.
+        // A generic ActionList walk alone loses that recipient transformation.
+        private static NearbyRecipientRule ReadNearbyRecipientRule(object action)
+        {
+            Type type = action == null ? null : action.GetType();
+            if (type == null || type.FullName != "CallOfTheWild.AoeMechanics.ApplyActionToTargetsInRange") return null;
+            var names = new[] { "Radius", "max_num_units", "CanTargetSelf", "CanTargetFriends", "CanTargetEnemies", "actions" };
+            var types = new[] { typeof(float), typeof(int), typeof(bool), typeof(bool), typeof(bool), typeof(ActionList) };
+            FieldInfo[] fields = names.Select(name => type.GetField(name, BindingFlags.Public | BindingFlags.Instance)).ToArray();
+            if (fields.Where((field, index) => field == null || field.FieldType != types[index]).Any()) return null;
+            float radius = (float)fields[0].GetValue(action);
+            int maximum = (int)fields[1].GetValue(action);
+            if (float.IsNaN(radius) || float.IsInfinity(radius) || radius <= 0 || maximum < 0) return null;
+            return new NearbyRecipientRule(radius, maximum, (bool)fields[2].GetValue(action),
+                (bool)fields[3].GetValue(action), (bool)fields[4].GetValue(action));
         }
 
         private DiscoveryNode AdaptExactActionListAlternatives(

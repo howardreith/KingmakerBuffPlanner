@@ -144,11 +144,22 @@ namespace KingmakerBuffPlanner.GameAdapters
                 }
                 string[] reachableIds = reachable.Select(u => u.UnitId)
                     .Distinct(StringComparer.Ordinal).ToArray();
+                IReadOnlyDictionary<string, bool> facts = ReadCasterFacts(expression, caster);
+                var effectsByTarget = new Dictionary<string, EffectExpression>(StringComparer.Ordinal);
+                EffectExpression applicable = EffectConditionBinding.Bind(expression, facts);
+                if (EffectRecipientBinding.ContainsNearby(applicable))
+                    foreach (string targetId in reachableIds)
+                    {
+                        UnitEntityData target;
+                        liveUnits.TryGetValue(targetId, out target);
+                        effectsByTarget[targetId] = EffectRecipientBinding.Bind(applicable,
+                            rule => SelectNearbyRecipients(rule, caster, target));
+                    }
                 options.Add(new ProviderPlanningOption(provider, reachableIds, anchors,
                     provider.EffectiveCasterLevel, provider.ExpectedDurationRounds,
                     executionCapability.Strategy,
                     executionCapability.Reason,
-                    recipientIdsByAnchor, ReadCasterFacts(expression, caster)));
+                    recipientIdsByAnchor, facts, effectsByTarget));
                 string targetClass = party ? "Party" : areaRecipients
                     ? "AlliedAreaRecipients" : unsafeArea
                         ? "UnsafeArea" : infusedPersonal
@@ -225,6 +236,26 @@ namespace KingmakerBuffPlanner.GameAdapters
                 catch (Exception) { /* Unreadable is unknown, never false. */ }
             }
             return facts;
+        }
+
+        private static IReadOnlyList<string> SelectNearbyRecipients(NearbyRecipientRule rule,
+            UnitEntityData caster, UnitEntityData target)
+        {
+            if (caster == null || target == null) return null;
+            try
+            {
+                var units = Kingmaker.Designers.GameHelper.GetTargetsAround(target.Position, rule.Radius, false, false)
+                    .Where(unit => unit != null && unit != target &&
+                        (rule.Self || unit != caster) &&
+                        (caster.IsAlly(unit) ? rule.Friends : rule.Enemies))
+                    .Select(unit => new { Unit = unit, Distance = target.DistanceTo(unit) })
+                    .OrderBy(value => value.Distance).ToList();
+                // The native SortedDictionary also refuses equal-distance keys.
+                if (units.GroupBy(value => value.Distance).Any(group => group.Count() > 1)) return null;
+                return units.Take(rule.Maximum == 0 ? units.Count : rule.Maximum)
+                    .Select(value => value.Unit.UniqueId).ToArray();
+            }
+            catch (Exception) { return null; }
         }
 
         private static string[] LegalAnchorIds(

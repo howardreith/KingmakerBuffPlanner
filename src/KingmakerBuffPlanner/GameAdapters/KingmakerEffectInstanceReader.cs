@@ -40,7 +40,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 HashSet<string> ids = ExpectedIds(step.ExpectedEffects);
                 var read = new Dictionary<string, IEnumerable<ObservedEffectInstance>>(
                     StringComparer.Ordinal);
-                foreach (string unitId in step.ExpectedRecipientUnitIds)
+                foreach (string unitId in step.EffectObservationUnitIds)
                 {
                     UnitEntityData unit;
                     if (!units.TryGetValue(unitId, out unit) || unit.Descriptor == null)
@@ -70,17 +70,22 @@ namespace KingmakerBuffPlanner.GameAdapters
                 if (step == null || baseline == null || step.ExpectedEffects == null) return false;
                 Dictionary<string, UnitEntityData> units = KingmakerAnimatedCastAdapter.CollectUnits();
                 HashSet<string> ids = ExpectedIds(step.ExpectedEffects);
-                Func<string, IEnumerable<ObservedEffectInstance>> readAfter = unitId =>
+                var observed = new Dictionary<string, IEnumerable<ObservedEffectInstance>>(StringComparer.Ordinal);
+                foreach (string unitId in step.EffectObservationUnitIds)
                 {
                     UnitEntityData unit;
-                    return units.TryGetValue(unitId, out unit) && unit.Descriptor != null
+                    observed[unitId] = units.TryGetValue(unitId, out unit) && unit.Descriptor != null
                         ? Instances(unit, ids) : null;
-                };
-                if (step.MassCast)
-                    return AppliedEffectJudgement.AnyReached(step.ExpectedRecipientUnitIds,
-                        step.ExpectedEffects, baseline, readAfter);
-                return AppliedEffectJudgement.AllReached(step.ExpectedRecipientUnitIds,
-                    step.ExpectedEffects, baseline, readAfter, step.PreCoveredRecipientUnitIds);
+                }
+                Func<string, IEnumerable<ObservedEffectInstance>> readAfter = unitId =>
+                    observed.ContainsKey(unitId) ? observed[unitId] : null;
+                bool confirmed = step.MassCast
+                    ? AppliedEffectJudgement.AnyReached(step.ExpectedRecipientUnitIds,
+                        step.ExpectedEffects, baseline, readAfter, step.Provider.CasterUnitId)
+                    : AppliedEffectJudgement.AllReached(step.ExpectedRecipientUnitIds,
+                        step.ExpectedEffects, baseline, readAfter, step.PreCoveredRecipientUnitIds, step.Provider.CasterUnitId);
+                baseline.RecordConfirmationPoll(confirmed, new EffectBaseline(observed), step.EffectObservationUnitIds);
+                return confirmed;
             }
             catch (Exception) { return false; }
         }
@@ -91,9 +96,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             string failure;
             EffectBaseline after = ReadBaseline(step, out failure);
             return "before:{" + (before == null ? "unreadable" :
-                before.Describe(step.ExpectedRecipientUnitIds)) + "};after:{" +
+                before.Describe(step.EffectObservationUnitIds)) + "};after:{" +
                 (after == null ? "unreadable:" + failure :
-                    after.Describe(step.ExpectedRecipientUnitIds)) + "}";
+                    after.Describe(step.EffectObservationUnitIds)) + "};confirmation:" +
+                (before == null ? "baseline-unreadable" : before.DescribeConfirmationPolls());
         }
 
         private static HashSet<string> ExpectedIds(EffectExpression expected)

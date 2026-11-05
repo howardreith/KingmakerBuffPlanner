@@ -988,8 +988,8 @@ namespace KingmakerBuffPlanner.Planning
             bool allSufficient = true;
             foreach (string unitId in recipients)
             {
-                ExistingEffectRecipientAssessment assessment = ExistingEffectSufficiency.Assess(
-                    unitId, expression, InstancesFor(liveEffects, unitId), ignored, requirement);
+                ExistingEffectRecipientAssessment assessment = ExistingEffectSufficiency.AssessScoped(
+                    casting.CasterUnitId, unitId, option.BindEffects(expression, unitId), owner => InstancesFor(liveEffects, owner), ignored, requirement);
                 string detail = assessment.Reasons.Count == 0 ? string.Empty
                     : ":" + string.Join("|", assessment.Reasons.ToArray());
                 switch (assessment.Verdict)
@@ -1040,8 +1040,8 @@ namespace KingmakerBuffPlanner.Planning
                         continue;
                     }
                     if (recipients.Contains(unitId)) continue;
-                    ExistingEffectRecipientAssessment extra = ExistingEffectSufficiency.Assess(
-                        unitId, expression, InstancesFor(liveEffects, unitId), ignored, requirement);
+                    ExistingEffectRecipientAssessment extra = ExistingEffectSufficiency.AssessScoped(
+                        casting.CasterUnitId, unitId, option.BindEffects(expression, unitId), owner => InstancesFor(liveEffects, owner), ignored, requirement);
                     if (extra.Verdict != ExistingEffectVerdict.Sufficient) continue;
                     preCoveredUnitIds.Add(unitId);
                     notes.Add(CoveredNotePrefix(InstancesFor(liveEffects, unitId), expression, requirement) +

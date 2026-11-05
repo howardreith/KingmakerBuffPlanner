@@ -437,6 +437,13 @@ namespace KingmakerBuffPlanner.Tests
                 Run("playtest-heroism-captured-condition-and-positive-evidence", TestCapturedHeroismCondition);
                 Run("playtest-heroism-native-caster-fact-contract", TestNativeCasterFactGate);
                 Run("playtest-heroism-captured-instant", () => TestCapturedHeroism(root, "instant"));
+            Run("playtest-heroism-recipe-instant", () => TestHeroismNativeRecipe(root, "instant"));
+            Run("playtest-heroism-nearby-contract", TestNativeNearbyRecipientContract);
+            Run("playtest-heroism-nearby-instant", () => TestMixedOwnerHeroism(root, "instant", true));
+            Run("playtest-heroism-nearby-animated", () => TestMixedOwnerHeroism(root, "animated", true));
+            Run("playtest-heroism-recipe-animated", () => TestHeroismNativeRecipe(root, "animated"));
+            Run("playtest-heroism-mixed-owner-instant", () => TestMixedOwnerHeroism(root, "instant"));
+                Run("playtest-heroism-mixed-owner-animated", () => TestMixedOwnerHeroism(root, "animated"));
                 Run("playtest-heroism-captured-animated", () => TestCapturedHeroism(root, "animated"));
                 RunProductionExecutionTests(root);
                 RunCastingGraphTests(root);

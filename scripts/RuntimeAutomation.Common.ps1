@@ -1,6 +1,7 @@
 Set-StrictMode -Version Latest
 
 . (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1')
+. (Join-Path $PSScriptRoot 'HeroismQualificationEvidence.Common.ps1')
 
 function Read-KbpBuildManifest([string]$PackagePath) {
     $manifestPath = $PackagePath + '.build-local.json'
@@ -895,7 +896,7 @@ function Get-KbpQualificationAllowanceBuildRefusal {
     if ([string]$allowance.dllSha256 -cne [string]$BuildManifest.dllSha256) { return 'dll' }
     if ([string]$allowance.assemblyMvid -cne [string]$BuildManifest.assemblyMvid) { return 'mvid' }
     if (@('zero-cost-mixed', 'finite-direct-mixed', 'group-mixed', 'enhanced-direct', 'ability-pool-direct', 'rod-extend-direct',
-            'shared-personal', 'shared-powerful', 'policy-shared-powerful', 'sticky-touch-direct') -cnotcontains [string]$allowance.recipe) { return 'recipe' }
+            'shared-personal', 'shared-powerful', 'policy-shared-powerful', 'sticky-touch-direct', 'heroism-successor') -cnotcontains [string]$allowance.recipe) { return 'recipe' }
     if (-not [string]::IsNullOrEmpty($Recipe) -and [string]$allowance.recipe -cne $Recipe) { return 'recipe-differs' }
     if (@('instant', 'animated') -cnotcontains [string]$allowance.executionMode) { return 'execution-mode' }
     if (-not [string]::IsNullOrEmpty($ExecutionMode) -and [string]$allowance.executionMode -cne $ExecutionMode) {
@@ -1426,6 +1427,13 @@ function Assert-KbpScenarioOutcome {
         # Share evidence itself rather than trusting the host's verdict
         # alone.
         $policyRecipe = [string]$outcome.selection.recipe -ceq 'policy-shared-powerful'
+        if ([string]$outcome.selection.recipe -ceq 'heroism-successor') {
+            Assert-KbpHeroismQualificationSelection $outcome
+            if ($cast -and ((@($outcome.steps.name) -join ',') -cne 'heroism-first,heroism-recast,heroism-skip' -or
+                [int]$outcome.plannedSubmissions -ne 5)) {
+                throw 'Heroism casting evidence does not show all three approved phases and five submissions.'
+            }
+        }
         $sharedRecipe = @('shared-personal', 'shared-powerful', 'policy-shared-powerful') -ccontains [string]$outcome.selection.recipe
         if ($sharedRecipe -and -not $cast -and ($null -eq $outcome.share -or -not [bool]$outcome.share.persisted)) {
             throw "Share qualification evidence does not show the per-casting Share intent persisted: $path"

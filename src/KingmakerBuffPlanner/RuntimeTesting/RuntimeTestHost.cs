@@ -5563,6 +5563,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                                         unit.TargetValidation.Friendly && unit.TargetValidation.Targetable }
                                 }).ToArray()) },
                             { "coverage", new JArray(selection.Coverage.Cast<object>().ToArray()) },
+                            { "effectContext", selection.EffectContext },
                             { "refusal", selection.Refusal },
                             { "sourceId", selection.SourceId },
                             { "castings", new JArray(selection.Castings.Select(casting => (object)(
