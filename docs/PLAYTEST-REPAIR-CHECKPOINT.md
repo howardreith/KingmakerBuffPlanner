@@ -1,3 +1,5 @@
+> This is the original pre-review checkpoint at `6ca595e`. Its pending-work list is historical. The [PR #20 review correction checkpoint](PLAYTEST-REPAIR-REVIEW-CHECKPOINT.md) supersedes its candidate, blockers and next actions.
+
 # Playtest repair checkpoint
 
 Branch: `codex/kingmaker-buff-planner-playtest-repairs`.

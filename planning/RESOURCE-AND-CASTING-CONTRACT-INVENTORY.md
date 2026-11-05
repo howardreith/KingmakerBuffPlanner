@@ -1,3 +1,5 @@
+> **PR #20 review correction, 2026-11-05 UTC:** frozen product `cee1060fffb824a6d4838d5925727cbaff1833f4`, version 0.6.10 (unreleased). Mixed-recipient confirmation and already-active assessment, the real Heroism-plus-successor guarded recipe, and batched native observers are implemented. Focused 66/0 and complete offline C# 684/0 pass. ZFavoredClass drift is resolved through an exact sealed fixture without changing its seal or the live installation. Deployment WhatIf purity passed 5/0; launcher purity remains in progress and native gameplay/UI acceptance is NOT RUN. Continue the owned prerequisite supervisor; do not implement a duplicate recipe or resume the old campaign. [Exact candidate, commands, receipts, limits and next actions](../docs/PLAYTEST-REPAIR-REVIEW-CHECKPOINT.md). Earlier records below retain their original identities.
+
 # Resource and Casting Contract Inventory
 
 ## 0.5.1-rc3 preparation
