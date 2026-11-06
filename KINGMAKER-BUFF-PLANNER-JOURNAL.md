@@ -4563,3 +4563,22 @@ No native game PASS, installation, save mutation or tester contact is claimed.
 Session-bound item selection/reselection and unidentified reporter source remain
 explicit release limits. Next: focused disposable published-ZIP trial, or a
 separately budgeted guarded native qualification; preserve frozen product clone.
+
+## 2026-11-06 UTC - final refinement after 0.6.11 (0.6.12 unreleased)
+
+Branch `codex/kingmaker-buff-planner-final-refinement` from main `fe7e2d0`.
+Candidate `433d98be3f6c1da0b5fad911cb8ad25edb6dca16`; DLL
+`a903cdddaf06c63a32a3c4b9c36d9e4986945f6664f5561e348882779a3408c2`, local ZIP
+`e190307935805b272f863e735d4e99b2ba82850f261bccd6a04c7d47e8990e18`.
+Owner requests: policy button, tooltips, removed idle footer/Saved, native scroll
+Clear dialog, post-Clear refresh. The Clear wording was a misattribution of
+genuinely spent sources, not a stale view. H1 (3 s Infectious Charms markers
+deciding lasting coverage) and H2 (frozen nearby owners) reproduced on unpatched
+source 0/4 and fixed structurally from the installed ContextActionApplyBuff and
+Call of the Wild contracts. Rejected: hardcoded Heroism GUIDs, ignoring
+conditional additions, re-resolving the nearby owner once before queueing.
+Baseline 79/0; merged focused 154/0; full offline 701/0; source 47/0; package
+6/0. No native run (launcher purity prerequisites exceed this refinement's
+budget; automation fixture lacks a Heroism provider). Next: owner review of the
+draft PR, then a separately budgeted guarded native UI and Heroism check of the
+frozen candidate. [Checkpoint](docs/FINAL-REFINEMENT-0.6.12-CHECKPOINT.md).
