@@ -684,7 +684,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 _executionSettings.AvailabilityPolicy = chosenPolicy ?? ExecutionProfile.CastAvailable;
                 AvailabilityMigrationNotice = "Upgraded: Cast available is now the default. Old profiles " +
-                    "did not record whether Require full plan was chosen. Enable it once if you want it.";
+                    "did not record whether Require full plan was chosen. Switch to Plan: Require full once if you want it.";
             }
             else AvailabilityMigrationNotice = null;
         }

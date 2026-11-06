@@ -248,12 +248,12 @@ namespace KingmakerBuffPlanner.UI
                 text = "the plan changed while the run was starting - nothing was cast; press again " +
                     "to run the current plan";
             else if (reason.StartsWith("persistence-failed", StringComparison.Ordinal))
-                text = "your latest edit is not saved yet, so nothing was cast - the planner footer " +
+                text = "your latest edit is not saved yet, so nothing was cast - the planner " +
                     "shows why and offers Retry save";
             else if (reason.StartsWith("apply-refused", StringComparison.Ordinal))
                 text = "some castings are blocked (" + (result.GateDecision == null ? 0
                     : result.GateDecision.BlockingReasons.Count) +
-                    ") - fix them or uncheck Require full plan in the planner";
+                    ") - fix them or switch the planner to Plan: Cast available";
             else if (reason.StartsWith("import-notices-pending", StringComparison.Ordinal) ||
                 reason.StartsWith("legacy-import-unresolved", StringComparison.Ordinal))
                 text = "the imported plan still needs your review in the planner";

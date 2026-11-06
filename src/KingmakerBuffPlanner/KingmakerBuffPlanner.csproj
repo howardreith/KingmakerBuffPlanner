@@ -259,6 +259,8 @@
     <Compile Include="RuntimeTesting\GuardedReadOnlySaver.cs" />
     <Compile Include="UI\PlannerSetupModel.cs" />
     <Compile Include="UI\CastingWorkspaceModels.cs" />
+    <Compile Include="UI\WorkspaceFooterModels.cs" />
+    <Compile Include="UI\CastingWorkspaceScreenView.Tooltips.cs" />
     <Compile Include="UI\CastingWorkspaceSession.cs" />
     <Compile Include="UI\CastingWorkspaceSession.ClearPlan.cs" />
     <Compile Include="UI\CastingWorkspaceSession.Graph.cs" />

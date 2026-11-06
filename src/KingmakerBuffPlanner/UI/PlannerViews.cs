@@ -2012,13 +2012,27 @@ namespace KingmakerBuffPlanner.UI
     {
         internal string Text;
         internal Action<string> Show;
+        // The casting workspace's anchored presentation: the owner key goes
+        // to the workspace's single tooltip presenter, which reads the live
+        // text and places it at this control (hover only; it never selects,
+        // authors or executes anything).
+        internal string Key;
+        internal Action<string, bool> Hover;
         public void OnPointerEnter(UnityEngine.EventSystems.PointerEventData eventData)
         {
+            if (Hover != null) { Hover(Key, true); return; }
             if (Show != null) Show(Text ?? string.Empty);
         }
         public void OnPointerExit(UnityEngine.EventSystems.PointerEventData eventData)
         {
+            if (Hover != null) { Hover(Key, false); return; }
             if (Show != null) Show(string.Empty);
+        }
+        // A control hidden or destroyed under the pointer never leaves its
+        // tooltip floating.
+        private void OnDisable()
+        {
+            if (Hover != null) Hover(Key, false);
         }
     }
 }

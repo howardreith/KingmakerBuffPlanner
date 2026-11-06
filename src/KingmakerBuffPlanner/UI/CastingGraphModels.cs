@@ -568,7 +568,18 @@ namespace KingmakerBuffPlanner.UI
 
         // Why a new casting cannot come from this source now; empty when it
         // can. The plan's own capacity decides, never a view count.
-        public static string BlockedReason(CastingCapacityEstimate estimate, bool pinnable)
+        // withoutPlan is the same source asked against the native resources
+        // with NO plan reservations (owner playtest after 0.6.11: a cleared
+        // plan still read "None left after the plan" for a caster whose
+        // prepared slots were genuinely spent). Only a shortage the plan's
+        // own reservations cause is attributed to the plan; a source that is
+        // empty even with nothing planned says so honestly.
+        public const string ReservedByPlanReason = "No casts left after the rest of the plan.";
+        public const string NoPreparedUsesReason = "No prepared uses remaining.";
+        public const string NoUsesReason = "No uses remaining.";
+
+        public static string BlockedReason(CastingCapacityEstimate estimate, bool pinnable,
+            CastingCapacityEstimate withoutPlan = null, ResourcePoolKind? kind = null)
         {
             if (!pinnable)
                 return "This spell is known at two levels of one spellbook; this version cannot pick one.";
@@ -577,7 +588,16 @@ namespace KingmakerBuffPlanner.UI
             if (estimate.CanFundAnother) return string.Empty;
             if (estimate.LimitingCategory == CastingCostCategory.Material)
                 return "Material component unavailable.";
-            return "No casts left after the rest of the plan.";
+            if (withoutPlan != null && withoutPlan.Kind == CastingCapacityKind.Finite &&
+                !withoutPlan.CanFundAnother && withoutPlan.LimitingCategory != CastingCostCategory.Material)
+                return kind == ResourcePoolKind.PreparedSlots ? NoPreparedUsesReason : NoUsesReason;
+            return ReservedByPlanReason;
+        }
+
+        public static bool IsGenuineExhaustion(string blockedReason)
+        {
+            return string.Equals(blockedReason, NoPreparedUsesReason, StringComparison.Ordinal) ||
+                string.Equals(blockedReason, NoUsesReason, StringComparison.Ordinal);
         }
 
         // What an enhancement is expected to change, from its verified kind
@@ -696,10 +716,13 @@ namespace KingmakerBuffPlanner.UI
             IEnumerable<string> sharedWith)
         {
             var parts = new List<string>();
+            bool genuine = !usable && IsGenuineExhaustion(blockedReason);
             if (!usable)
-                parts.Add(string.Equals(blockedReason, "No casts left after the rest of the plan.",
+                parts.Add(string.Equals(blockedReason, ReservedByPlanReason,
                     StringComparison.Ordinal) ? "None left after the plan" : (blockedReason ?? string.Empty).TrimEnd('.'));
-            if (!string.IsNullOrEmpty(capacity) && (usable || capacity != "Remaining unknown")) parts.Add(capacity);
+            // A genuinely empty source has nothing more to count: "No prepared
+            // slot left" or "0 / 0 remaining" would only repeat the reason.
+            if (!genuine && !string.IsNullOrEmpty(capacity) && (usable || capacity != "Remaining unknown")) parts.Add(capacity);
             if (!string.IsNullOrEmpty(poolLabel)) parts.Add(poolLabel);
             List<string> shared = (sharedWith ?? new string[0]).Where(value => !string.IsNullOrEmpty(value)).ToList();
             string line = string.Join(" · ", parts.Where(value => value.Length != 0).ToArray());
