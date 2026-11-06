@@ -1,5 +1,60 @@
 # PR #20: observation-owner admission and disposable fixture setup
 
+## Owner-authorized 0.6.11 release: 2026-11-05
+
+The owner authorized finalizing PR #20, merging it and publishing a release
+without further lab campaigns; the owner will playtest the release. Version is
+**0.6.11** (0.6.10 is the published build the playtest reported against). The
+release uses the owner-authorized pre-runtime publisher disposition. **This
+exact release has not been run in the game.** The frozen 1e1a312 native results
+below belong to those bytes only; the version-bump build differs.
+
+Skip-phase diagnosis (from the retained native receipts, no new launch):
+in `pr20-1e1a312-heroism-absent-instant`, the skip-phase before-read shows
+Heroism on Hedwirg ending at 433180490000 with clock 433002390000, i.e.
+**2.97 rounds** left, while the planner's per-level estimate from the
+localized duration text is **1000 rounds** (`10 minutes/level`, CL10). Under
+the documented sufficiency contract (at least half the comparable planned
+duration and at least two rounds) that instance is `remaining-duration-short`,
+so Heroism keeps its step and its reservation takes the last shared level-2
+use. The driver applies in `CastingApplyMode.Ordinary` (strict), so the
+successor's shortage refuses the whole run before submission. That is the
+intended conservative behavior, not a confirmation or spending defect; the
+rule is already covered by `existing-effect-sufficiency-rules`.
+
+The anomaly is the fixture's **3-round native Heroism**: Mirror Image from the
+same Linzi book at CL10 lasted exactly 100 rounds (matching its estimate), and
+the owner's original log shows Heroism from Leinna at CL19 with **1900 rounds**
+left, matching the text estimate. The cause of the short lab duration (the
+artificial AddCasterLevel book, the recipient Hedwirg, or loaded blueprint
+semantics) was **not** established; installed mods were searched and only Call of
+the Wild references the Heroism GUIDs, without a duration change. No duration,
+sufficiency, confirmation or spending check was changed.
+
+| Workstream | Source repair | Automated evidence | Native acceptance |
+| --- | --- | --- | --- |
+| H | Implemented | Captured-expression, recipe, mixed-owner and unobservable-owner regressions pass in both modes | Partial on frozen 1e1a312: instant first + recast Heroism and Mirror Image confirmed with native spending; skip phase refused as above; animated and feat-present NOT RUN |
+| T | Implemented | Material ownership/liveness/atlas checks pass | Legible captions observed at 1920x1080 on older candidate 9716; 1920x1200 lifecycle frames NOT RUN |
+| M | Implemented | Modal input/focus neighbors pass | Physical hover/exit and controller dispatch NOT RUN |
+| W | Implemented | Two-owner item/area wording checks pass | Rendered two-owner view NOT RUN |
+
+Owner test checklist for 0.6.11:
+
+- Plan Heroism followed by another buff (Mirror Image or Heightened Awareness);
+  run it, then run it again with recast allowed. Both runs should continue past
+  Heroism, and the game log should show both casts.
+- With Heroism still active and recast off, run again: Heroism should be skipped
+  without spending a slot, and later spells should still cast.
+- Open, close and reopen the planner, and load a save and reopen it: the title,
+  selected buff, headings, search placeholder and **Require full plan** caption
+  stay visible, both checked and unchecked.
+- Clear plan: both buttons look ordinary, with no red text or exclamation mark;
+  each highlights on hover and returns to normal when the pointer leaves.
+  Cancel is safe from the keyboard and controller, and Undo restores the plan.
+- Blessed Signet with two owners: each row shows **Item charge** with its own
+  count, the targeting says **Area buff**, the origin says **Centred on <name>**,
+  and casting behaves as it did in 0.6.10.
+
 ## Session closed at owner request: 2026-11-06
 
 Work is stopped. [Paste-ready next-session prompt](PR20-NEXT-SESSION-PROMPT.md)
