@@ -453,6 +453,8 @@ namespace KingmakerBuffPlanner.Tests
                 Run("infectious-charms-transient-markers-animated", () => TestTransientMarkerCoverage(root, "animated"));
                 Run("infectious-charms-changing-secondary-instant", () => TestChangingSecondaryRecipient(root, "instant"));
                 Run("infectious-charms-changing-secondary-animated", () => TestChangingSecondaryRecipient(root, "animated"));
+                Run("infectious-charms-secondary-refresh-boundary-instant", () => TestSecondaryRefreshAndBoundary(root, "instant"));
+                Run("infectious-charms-secondary-refresh-boundary-animated", () => TestSecondaryRefreshAndBoundary(root, "animated"));
                 RunProductionExecutionTests(root);
                 RunCastingGraphTests(root);
                 RunDuplicateItemSourceTests(root);

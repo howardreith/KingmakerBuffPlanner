@@ -286,6 +286,88 @@ namespace KingmakerBuffPlanner.Tests
                 "unobservable-nearer/e-missing/e-wrong/e-unread=refused;feat-absent=confirmed");
         }
 
+        // Second review of PR #21 (bd9d01c): an in-place refresh after a
+        // pending unchanged read, and the outer band of the native radius.
+        private static void TestSecondaryRefreshAndBoundary(string root, string mode)
+        {
+            Func<string, Action<RepeatBuffWorld>, RepeatSession> run = (label, configure) =>
+            {
+                var session = CharmsSession(root, mode, "h2r-" + label, configure);
+                WorkspaceApplyResult admitted = session.Apply(true);
+                RepeatAssert(admitted.Allowed, label + " admission: " + admitted.ReviewReason);
+                return session;
+            };
+            Action<string, Action<RepeatBuffWorld>> confirmed = (label, configure) =>
+            {
+                RepeatSession session = run(label, configure);
+                RepeatAssert(session.Host.LastReport.Confirmed == 2 && session.Host.LastReport.NotProcessed == 0 &&
+                    session.Host.LastReport.ResourcesSpent == 2 && session.World.State.Fired.Count == 2,
+                    label + ": a legitimate application was not confirmed or stopped the successor: " + Outcome(session));
+            };
+            Action<string, Action<RepeatBuffWorld>> refused = (label, configure) =>
+            {
+                RepeatSession session = run(label, configure);
+                RepeatAssert(session.Host.LastReport.Confirmed == 0 && session.Host.LastReport.NotProcessed == 1 &&
+                    session.Host.LastReport.ResourcesSpent == 1 && session.World.State.Fired.Count == 1,
+                    label + ": an unconfirmable secondary outcome was accepted: " + Outcome(session));
+            };
+            // Existing primary H/50 and markers seen unchanged by a pending read,
+            // then refreshed in place by the native action at the next read.
+            Action<RepeatBuffWorld> inPlace = world =>
+            {
+                world.Observation = "refresh";
+                world.PendingReadBeforeApplication = true;
+                world.RefreshMarkersInPlace = true;
+                world.MarkerLifetime = 2;
+                world.State.Active["unit-t1"] = new KeyValuePair<string, long>("existing-heroism", 50);
+                world.SeedAdditional("unit-wizard", CharmsCasterMarker, 1);
+                world.SeedAdditional("unit-t2", CharmsTargetMarker, 1);
+            };
+            confirmed("refresh", inPlace);
+            // Same-instance primary refresh with a brand-new secondary marker.
+            confirmed("rf-new-mark", world =>
+            {
+                inPlace(world); world.RefreshMarkersInPlace = false;
+            });
+            // The pending read alone with ordinary new instances.
+            confirmed("pending-new", world => world.PendingReadBeforeApplication = true);
+            // Unrelated applications stay distinct from this attempt's refresh.
+            refused("rf-unrel-same", world => { inPlace(world); world.UnrelatedMarkerOn = "unit-t2"; });
+            refused("rf-unrel-other", world =>
+            {
+                inPlace(world); world.UnrelatedMarkerOn = "unit-t3"; world.ApplicationDistances["unit-t3"] = 6f;
+            });
+
+            // The only eligible recipient just inside the 9.144 m radius.
+            refused("bd-missing", world =>
+            {
+                world.ApplicationOwners = new string[0]; world.ApplicationDistances["unit-t2"] = 9.0f;
+            });
+            confirmed("bd-marked", world =>
+            {
+                world.ApplicationOwners = new[] { "unit-t2" }; world.ApplicationDistances["unit-t2"] = 9.0f;
+            });
+            // Just outside the radius but within one frame's movement: an absent
+            // marker is not evidence that nobody was eligible.
+            refused("band-missing", world =>
+            {
+                world.ApplicationOwners = new string[0]; world.ApplicationDistances["unit-t2"] = 9.6f;
+            });
+            refused("bd-miss-empty", world =>
+            {
+                world.PredictedOwners = new string[0]; world.ApplicationOwners = new string[0];
+                world.ApplicationDistances["unit-t2"] = 9.0f;
+            });
+            // Genuinely empty: readably beyond radius + tolerance.
+            confirmed("beyond-band", world =>
+            {
+                world.ApplicationOwners = new string[0]; world.ApplicationDistances["unit-t2"] = 10.5f;
+            });
+            Console.WriteLine("[INFECTIOUS-CHARMS-H2-REFRESH-BOUNDARY] mode=" + mode +
+                ";refresh/refresh-new-marker/pending-new/boundary-marked/beyond-band-empty=confirmed;" +
+                "refresh-unrelated-in-place/refresh-unrelated-other/boundary-missing/band-missing/boundary-missing-empty-prediction=refused");
+        }
+
         // Exact installed native field contract and the production reader.
         private static void TestNativeTransientLifetimeContract()
         {

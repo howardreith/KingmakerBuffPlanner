@@ -55,6 +55,12 @@ namespace KingmakerBuffPlanner.Tests
             // An unrelated matching application seen while the command is
             // pending, before this attempt's own application.
             internal string UnrelatedMarkerOn;
+            // The production animated adapter's pending progress read: taken
+            // after submission, before the native action applies anything.
+            internal bool PendingReadBeforeApplication;
+            // Native same-instance refresh of an existing marker (Stacking
+            // that prolongs instead of replacing).
+            internal bool RefreshMarkersInPlace;
             // An observation during application (the adapters' progress read),
             // then time passes before the executor's final read.
             internal bool RecordAtApplication = true;
@@ -110,6 +116,8 @@ namespace KingmakerBuffPlanner.Tests
                 if (step.Reservation.TokenIds.Count == 0)
                     State.SpontaneousRemaining -= step.Reservation.Units;
                 string target = step.TargetUnitIds[0];
+                if (PendingReadBeforeApplication && target != "unit-t4")
+                    AppliedEffectJudgement.RecordProgress(_baselines[step], step.EffectObservationUnitIds, Read, Distances(step));
                 if (UnrelatedMarkerOn != null && target != "unit-t4")
                 {
                     PutAdditional(UnrelatedMarkerOn, "c20c575b6352d1692b3074a25232e699");
@@ -150,8 +158,18 @@ namespace KingmakerBuffPlanner.Tests
             {
                 List<ObservedEffectInstance> values;
                 if (!_additional.TryGetValue(owner, out values)) _additional[owner] = values = new List<ObservedEffectInstance>();
+                ObservedEffectInstance existing = values.FirstOrDefault(value => value.EffectId == effect);
                 values.RemoveAll(value => value.EffectId == effect);
-                values.Add(new ObservedEffectInstance(EffectKind.Buff, effect, "aux-" + (++_instance), Round + MarkerLifetime, false));
+                values.Add(new ObservedEffectInstance(EffectKind.Buff, effect,
+                    RefreshMarkersInPlace && existing != null ? existing.InstanceKey : "aux-" + (++_instance), Round + MarkerLifetime, false));
+            }
+
+            internal void SeedAdditional(string owner, string effect, long end)
+            {
+                List<ObservedEffectInstance> values;
+                if (!_additional.TryGetValue(owner, out values)) _additional[owner] = values = new List<ObservedEffectInstance>();
+                values.RemoveAll(value => value.EffectId == effect);
+                values.Add(new ObservedEffectInstance(EffectKind.Buff, effect, "seed-" + (++_instance), end, false));
             }
 
             internal void ReplaceAdditional(string owner, string effect) { PutAdditional(owner, effect); }

@@ -103,7 +103,7 @@ namespace KingmakerBuffPlanner.Execution
         {
             if (byUnit == null) return;
             int observation = ++_observationCount;
-            bool firstSighting = false;
+            bool applied = false;
             foreach (KeyValuePair<string, IEnumerable<ObservedEffectInstance>> pair in byUnit)
             {
                 if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value == null) continue;
@@ -113,12 +113,20 @@ namespace KingmakerBuffPlanner.Execution
                 {
                     SeenEffectInstance prior;
                     if (seen.TryGetValue(instance.Identity, out prior) && prior.Instance.EndTimeTicks >= instance.EndTimeTicks) continue;
-                    seen[instance.Identity] = new SeenEffectInstance(instance, prior == null ? observation : prior.Observation);
-                    if (prior == null) firstSighting = true;
+                    // Review of bd9d01c: an application is the read at which an
+                    // identity becomes new or refreshed relative to the
+                    // pre-submission baseline, or is refreshed again after a
+                    // post-submission sighting - never the read that merely saw
+                    // it unchanged (an in-place refresh keeps its identity).
+                    bool application = IsFresh(pair.Key, instance);
+                    var applications = new List<int>(prior == null ? new int[0] : prior.Applications);
+                    if (application) applications.Add(observation);
+                    seen[instance.Identity] = new SeenEffectInstance(instance, applications);
+                    if (application) applied = true;
                 }
             }
-            // Positions matter only at a read that first saw an application.
-            if (firstSighting && geometry != null && _geometryByObservation.Count < 64)
+            // Positions matter only at a read that saw an application.
+            if (applied && geometry != null && _geometryByObservation.Count < 64)
                 _geometryByObservation[observation] = geometry.ToDictionary(pair => pair.Key,
                     pair => (IReadOnlyList<NearbyEligibleUnit>)(pair.Value ?? new NearbyEligibleUnit[0]).ToList(), StringComparer.Ordinal);
         }
@@ -167,11 +175,20 @@ namespace KingmakerBuffPlanner.Execution
 
     public sealed class SeenEffectInstance
     {
-        internal SeenEffectInstance(ObservedEffectInstance instance, int observation)
-        { Instance = instance; Observation = observation; }
+        internal SeenEffectInstance(ObservedEffectInstance instance, IEnumerable<int> applications)
+        {
+            Instance = instance;
+            Applications = new ReadOnlyCollection<int>(applications.ToList());
+        }
+        // The latest state seen after submission.
         public ObservedEffectInstance Instance { get; private set; }
-        // The 1-based post-submission read that first saw this identity.
-        public int Observation { get; private set; }
+        // Every 1-based post-submission read at which this identity was newly
+        // applied or refreshed relative to the pre-submission baseline (empty:
+        // only ever seen unchanged). An in-place refresh is recorded at the
+        // read that saw the refresh, not at an earlier unchanged sighting.
+        public IReadOnlyList<int> Applications { get; private set; }
+        // The read at which it first became this attempt's application; 0 if never.
+        public int Observation { get { return Applications.Count == 0 ? 0 : Applications[0]; } }
     }
 
     // Final review A3: an expected effect confirms a cast only when this
@@ -266,32 +283,35 @@ namespace KingmakerBuffPlanner.Execution
             }, null).Kind == EffectPresenceKind.Complete;
         }
 
-        // H2 (0.6.11 review, corrected after PR #21 review): the native nearby
-        // wrapper chooses its owner when its action runs. The prediction is
-        // never trusted here. The APPLICATION BOUNDARY is the post-submission
-        // read that first saw this attempt's own effect on the selection
-        // centre; the native wrapper applies the secondary effect in that same
+        // H2 (0.6.11 review, corrected after two PR #21 reviews): the native
+        // nearby wrapper chooses its owner when its action runs. The
+        // prediction is never trusted here. The APPLICATION BOUNDARY is the
+        // post-submission read at which this attempt's own effect on the
+        // selection centre was applied (new or refreshed relative to the
+        // pre-submission baseline - an in-place refresh counts at the read that
+        // saw the refresh). The wrapper applies the secondary effect in that same
         // action, so:
-        //  - every fresh secondary application on an observed candidate must
-        //    have been first seen at exactly that read (an application seen
-        //    earlier or later is unrelated, e.g. while a command was pending);
+        //  - every application of the secondary effect on an observed candidate
+        //    must have happened at exactly that read (earlier or later ones are
+        //    unrelated, e.g. while a command was pending);
         //  - that read must carry readable geometry: every unit the native
         //    filter admitted within radius + tolerance, observable or not;
-        //  - the marked set must be what nearest-first selection could have
-        //    chosen there: each marked unit inside reach, at most `maximum`,
-        //    no unmarked definitely-eligible unit nearer by more than the
-        //    tolerance, and at least min(maximum, definitely-eligible) marked;
-        //  - an eligible unit the planner cannot observe that could have been
-        //    selected makes the outcome unconfirmable.
-        // Empty is accepted only when nothing was definitely eligible there.
+        //  - each marked unit is inside reach and at most `maximum` are marked;
+        //  - while the rule still had room, NO unit inside radius + tolerance
+        //    may be left unmarked: the movement tolerance never turns a
+        //    possibly eligible unit into evidence that nobody was selected;
+        //  - once full, no unmarked unit may be nearer than a marked one by
+        //    more than the tolerance, and no unobservable unit may be a
+        //    plausible choice.
+        // Empty is therefore accepted only when every unit the filter admits
+        // was readably beyond radius + tolerance at the application read.
         private static bool SecondaryReached(EffectLeafExpression leaf, string center, EffectBaseline baseline,
             IDictionary<string, List<ObservedEffectInstance>> after, bool transient, ISet<string> anchors)
         {
             NearbySelectionBinding selection = leaf.SecondarySelection;
             Func<ObservedEffectInstance, bool> matches = value => value.Kind == leaf.Kind && value.EffectId == leaf.EffectId;
             int application = baseline.SeenAfterSubmission(center)
-                .Where(seen => anchors.Contains(seen.Instance.Kind + ":" + seen.Instance.EffectId) &&
-                    baseline.IsFresh(center, seen.Instance))
+                .Where(seen => anchors.Contains(seen.Instance.Kind + ":" + seen.Instance.EffectId) && seen.Observation != 0)
                 .Select(seen => seen.Observation).DefaultIfEmpty(0).Min();
             if (application == 0) return false;
             IReadOnlyList<NearbyEligibleUnit> eligible = baseline.EligibleAt(application, center, selection);
@@ -305,26 +325,24 @@ namespace KingmakerBuffPlanner.Execution
             {
                 List<ObservedEffectInstance> current;
                 if (!after.TryGetValue(candidate, out current)) return false;
-                var sightings = baseline.SeenAfterSubmission(candidate)
-                    .Where(seen => matches(seen.Instance) && baseline.IsFresh(candidate, seen.Instance) &&
+                var applications = baseline.SeenAfterSubmission(candidate)
+                    .Where(seen => matches(seen.Instance) && seen.Observation != 0 &&
                         (transient || current.Any(value => value.Identity == seen.Instance.Identity))).ToList();
-                if (sightings.Count == 0) continue;
-                if (sightings.Any(seen => seen.Observation != application)) return false;
+                if (applications.Count == 0) continue;
+                if (applications.Any(seen => seen.Applications.Any(read => read != application))) return false;
                 if (!distance.ContainsKey(candidate)) return false; // outside reach at application
                 marked.Add(candidate);
             }
             float tolerance = SecondaryDistanceTolerance;
             if (selection.Maximum > 0 && marked.Count > selection.Maximum) return false;
-            var definite = distance.Where(pair => pair.Value <= selection.Radius - tolerance).Select(pair => pair.Key).ToList();
-            foreach (string unit in definite.Where(unit => !marked.Contains(unit)))
-                if (marked.Any(owner => distance[owner] > distance[unit] + tolerance)) return false;
-            int required = selection.Maximum > 0 ? Math.Min(selection.Maximum, definite.Count) : definite.Count;
-            if (marked.Count < required) return false;
-            // Could the native action have chosen a unit nobody can observe?
             bool room = selection.Maximum <= 0 || marked.Count < selection.Maximum;
             float farthest = marked.Count == 0 ? float.NegativeInfinity : marked.Max(owner => distance[owner]);
-            foreach (KeyValuePair<string, float> pair in distance.Where(pair => !observed.Contains(pair.Key)))
-                if (room || pair.Value <= farthest + tolerance) return false;
+            foreach (KeyValuePair<string, float> pair in distance.Where(pair => !marked.Contains(pair.Key)))
+            {
+                if (room) return false; // possibly eligible, left unselected
+                if (!observed.Contains(pair.Key) && pair.Value <= farthest + tolerance) return false;
+                if (marked.Any(owner => distance[owner] > pair.Value + tolerance)) return false;
+            }
             return true;
         }
 

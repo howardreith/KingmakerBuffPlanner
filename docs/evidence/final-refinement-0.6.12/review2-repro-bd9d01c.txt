@@ -1,0 +1,25 @@
+# Second PR #21 review: both findings reproduced at previous head bd9d01c
+# Production: bd9d01c unchanged (build sha256 47b34ba46707716028ff71ad558263c6bbf48ad98b5d576939648ce1df3266f1).
+# Tests: the corrected branch's test files copied over bd9d01c in a scratch worktree.
+# Command: scripts/Test-Development.ps1 -Only 'infectious-charms-secondary-refresh-boundary'
+# Output lines truncated at 260 characters when captured.
+
+## Run 1 (complete test): stops at the first failing case
+Protocol tests: PASS=0 FAIL=2
+FAIL infectious-charms-secondary-refresh-boundary-instant: rf-new-mark: a legitimate application was not confirmed or stopped the successor: confirmed=0;skipped=0;notProcessed=1;spent=1;fired=cast-1;first=TimedOutUnconfirmed:expected-application-unconfirmed-af
+FAIL infectious-charms-secondary-refresh-boundary-animated: rf-new-mark: a legitimate application was not confirmed or stopped the successor: confirmed=0;skipped=0;notProcessed=1;spent=1;fired=cast-1;first=TimedOutUnconfirmed:expected-application-unconfirmed;s
+
+(rf-new-mark: existing Heroism seen unchanged by a pending read, then refreshed in
+place at the application read together with a new nearby marker. The old recorder
+kept the refresh at the unchanged read's number, so the correct marker was judged
+to belong to another read; the routine stopped after spending. The earlier
+"refresh" case with both effects refreshed in place passed at bd9d01c only because
+both kept the same stale read number, judged against that read's geometry.)
+
+## Run 2 (refresh cases removed from the scratch copy so the boundary cases run)
+Protocol tests: PASS=0 FAIL=2
+FAIL infectious-charms-secondary-refresh-boundary-instant: bd-missing: an unconfirmable secondary outcome was accepted: confirmed=2;skipped=0;notProcessed=0;spent=2;fired=cast-1,cast-2;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-n
+FAIL infectious-charms-secondary-refresh-boundary-animated: bd-missing: an unconfirmable secondary outcome was accepted: confirmed=2;skipped=0;notProcessed=0;spent=2;fired=cast-1,cast-2;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-
+
+(bd-missing: the only eligible recipient stationary at 9.0 m inside the 9.144 m
+radius, marker missing; accepted as an empty selection at bd9d01c.)
