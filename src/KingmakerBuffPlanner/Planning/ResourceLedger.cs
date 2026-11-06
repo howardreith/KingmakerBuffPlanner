@@ -17,6 +17,24 @@ namespace KingmakerBuffPlanner.Planning
             if (unlimited && (units != 0 || TokenIds.Count != 0))
                 throw new ArgumentException("An unlimited reservation spends no units or tokens.", "unlimited");
             Unlimited = unlimited;
+            EarlierConfirmedTokenIds = new ReadOnlyCollection<string>(new List<string>());
+        }
+
+        // Run context, never authorization: the prepared-slot tokens reserved
+        // by castings of the SAME run, from the same pool, that already
+        // confirmed. Empty in every plan and projection (it takes no part in
+        // their identity); a run coordinator sets it on the step it is about
+        // to cast. The game's own spend may consume an equivalent slot other
+        // than the one the casting resolved from, so a later casting's own
+        // slot can be gone while an earlier casting's equivalent one is left.
+        public IReadOnlyList<string> EarlierConfirmedTokenIds { get; private set; }
+
+        internal ResourceReservation WithEarlierConfirmedTokens(IEnumerable<string> tokenIds)
+        {
+            var copy = (ResourceReservation)MemberwiseClone();
+            copy.EarlierConfirmedTokenIds = new ReadOnlyCollection<string>((tokenIds ?? new string[0])
+                .Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal).ToList());
+            return copy;
         }
 
         // Review M1: true ONLY when the ledger reserved from a pool the

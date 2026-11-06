@@ -231,6 +231,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 if (providerDirect) throw new InvalidOperationException(countRefusal);
                 return new InstantCastResult(false, false, false, false, false, countRefusal);
             }
+            IList<KeyValuePair<string, bool>> preparedBefore =
+                KingmakerAnimatedCastAdapter.ReadPreparedAvailability(resolved.Caster, step.Provider);
             RuleCastSpell rule;
             try
             {
@@ -275,6 +277,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
             int? availableAfter = KingmakerAnimatedCastAdapter.SafeAvailableCount(
                 sourceAbility);
+            // Which slot the game's own spend consumed: it is not bound to
+            // the resolved slot (Spellbook.SpendInternal takes the last equal one).
+            string preparedSpend = PreparedSpendEvidence.Describe(preparedBefore,
+                KingmakerAnimatedCastAdapter.ReadPreparedAvailability(resolved.Caster, step.Provider));
             bool spent = AvailableCountJudgement.Spent(availableBefore, availableAfter);
             // Review A7: a free casting must read unlimited and unchanged; a
             // finite one must read both of its counts (re-review).
@@ -319,6 +325,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                 ";reservation-pool:" + step.Reservation.PoolKey +
                 ";reservation-unlimited:" + step.Reservation.Unlimited +
                 ";reservation-native-units:" + step.Reservation.Units +
+                ";reservation-tokens:" + string.Join(",", step.Reservation.TokenIds.ToArray()) +
+                ";earlier-confirmed-tokens:" + string.Join(",", step.Reservation.EarlierConfirmedTokenIds.ToArray()) +
+                ";" + preparedSpend +
                 ";" + KingmakerFactResources.Describe(sourceAbility) +
                 ";execution-ability-data:" +
                 KingmakerStickyTouchCastAdapter.Identity(executionAbility) +

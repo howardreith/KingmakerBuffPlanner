@@ -145,6 +145,7 @@
     <Compile Include="Execution\CastingFirstGrant.cs" />
     <Compile Include="Execution\HaltingPlanRunner.cs" />
     <Compile Include="Execution\FactSourceChoice.cs" />
+    <Compile Include="Execution\PreparedSlotChoice.cs" />
     <Compile Include="Execution\AvailableCountJudgement.cs" />
     <Compile Include="GameAdapters\KingmakerFactResources.cs" />
     <Compile Include="Execution\WorldGatedEnumerator.cs" />

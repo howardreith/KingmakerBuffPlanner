@@ -434,6 +434,13 @@ namespace KingmakerBuffPlanner.Tests
                 Run("probe-requires-frozen-artifact-identity", TestProbeRequiresFrozenArtifactIdentity);
                 Run("probe-shutdown-before-selection-is-terminal", TestProbeShutdownBeforeSelectionIsTerminal);
                 Run("prepared-slot-observation-reads-exact-source", TestPreparedSlotObservationReadsExactSource);
+                Run("prepared-spend-choice-contract", TestPreparedSlotChoiceContract);
+                Run("prepared-spend-repeat-single-instant", () => TestPreparedSlotRepeat(root, "instant", false));
+                Run("prepared-spend-repeat-single-animated", () => TestPreparedSlotRepeat(root, "animated", false));
+                Run("prepared-spend-repeat-linked-instant", () => TestPreparedSlotRepeat(root, "instant", true));
+                Run("prepared-spend-repeat-linked-animated", () => TestPreparedSlotRepeat(root, "animated", true));
+                Run("prepared-spend-shortage-instant", () => TestPreparedSlotShortage(root, "instant"));
+                Run("prepared-spend-shortage-animated", () => TestPreparedSlotShortage(root, "animated"));
                 Run("playtest-heroism-captured-condition-and-positive-evidence", TestCapturedHeroismCondition);
                 Run("playtest-heroism-native-caster-fact-contract", TestNativeCasterFactGate);
                 Run("playtest-heroism-captured-instant", () => TestCapturedHeroism(root, "instant"));

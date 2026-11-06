@@ -339,3 +339,22 @@ are contained. ItemEntity/Fact have no persistent item ID, so source tokens are
 stable only for that live object; saved intent is unresolved after reload.
 [Exact IL, fixture, supported bounds, tested HEAD and R1-R7](../docs/LIMITED-USE-REPAIR-CHECKPOINT.md).
 No native game acceptance is inferred from detached native-method execution.
+
+## 2026-11-06 - prepared-slot spend binding (after 0.6.12)
+
+Installed 2.1.7b assembly hash remains
+`3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb`.
+
+| Contract | Verified behaviour |
+| --- | --- |
+| `Spellbook.SpendInternal` (prepared) | walks the level list from the last slot back; spends the first available slot whose `Spell.Equals(spell)`; takes no slot |
+| `AbilityData.Equals` | value equality: blueprint, caster, fact, spellbook, `ConvertedFrom`, `MetamagicData` |
+| `SpellSlot.Spend()` | slot unavailable; linked slots too only when `IsOpposition` |
+| `Spellbook.Memorize` | opposition school -> two linked slots, `LinkedSlots[0]` main, `IsOpposition` set |
+| `GetAvailableForCastSpellCount` | available slots of the blueprint at the level, halved for an opposition school |
+
+Consequence: reserving a specific prepared slot does not bind the native spend
+between equivalent preparations. Execution resolves a step's spent reservation
+to an equivalent slot left by an earlier confirmed casting of the same run
+(`PreparedSlotChoice`). Offline only; native confirmation pending.
+[Checkpoint](../docs/PREPARED-SLOT-SPEND-REPAIR-CHECKPOINT.md).
