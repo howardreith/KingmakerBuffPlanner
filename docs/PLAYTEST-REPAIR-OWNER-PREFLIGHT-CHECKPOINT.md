@@ -1,6 +1,54 @@
 # PR #20: observation-owner admission and disposable fixture setup
 
-## Current checkpoint: 2026-11-06 00:05 UTC
+## Session closed at owner request: 2026-11-06
+
+Work is stopped. [Paste-ready next-session prompt](PR20-NEXT-SESSION-PROMPT.md)
+contains exact inputs, receipts, run IDs, guard requirements and next actions.
+Record inputs: PR branch HEAD **7344f5848594db6ed6666001e89153bb899de4de**;
+frozen native HEAD **1e1a31200628ade5f19eed1d839624ce5ecb33ea**; version0.6.10
+unreleased. The final handoff commit updates records only. No merge or release.
+
+Latest run **pr20-1e1a312-heroism-absent-instant** is **FAIL**, complete:false.
+Heroism and distinct Mirror Image both confirmed in the first phase and both
+confirmed again in recast: **four paid native submissions**, no free casts,
+shared pool **5→3→1**. Each of those four entries records EffectConfirmed,
+native spending and role-scoped-complete+fresh-primary. These successful phases
+are evidence of confirmation and continuation in absent-feat instant mode;
+they are not a passing whole scenario or evidence for feat-present/animated.
+
+The skip phase refused before submission: compiler reservation of Heroism took
+the last slot, making successor qual-cast-2 unavailable (reservation budget0<1).
+Actual native pool still had one use. No fifth cast was submitted. This is the
+next investigation, not another native confirmation failure. Native evidence
+reports fresh Heroism remaining180000000ticks (~18seconds/3rounds), whereas
+capability inventory estimates1000rounds at CL10. Existing sufficiency requires
+half a comparable planned duration. This mismatch is a leading hypothesis;
+the precise assessment reason and loaded duration/fixture semantics remain
+unverified. Do not weaken duration, strength, recipient, conditional, confirmation
+or spending checks to make the recipe pass. No source fix for this issue was made.
+
+The game exited and verified Mods/protected saves restored cleanly at
+**2026-11-06 00:07:03 UTC**. Evidence is under lab
+`runtime-evidence/pr20-1e1a312-heroism-absent-instant/`:
+`qual-outcome.json`, `capability-inventory.json`, `runtime-result.json`,
+`run-completion.json`. Console log:
+`artifacts/playtest-1e1a312-native-absent.log`.
+
+The one-attempt helper stopped. Do not rerun its fixed existing IDs or reuse its
+issued instant allowance, even though its maximum was five and only four were
+submitted. Absent animated, present-feat setup/selection/both modes and matching
+1e1a312 UI/physical observer reruns are NOT RUN. Earlier9716 UI85/0 and physical82/1
+remain separate. Original1920x1200, physical modal/controller, rendered item/area
+coverage remain open. The owner confirmed the shared game can stay idle; actual
+runtime locks/identity/save guards still apply on resume.
+
+Keep source repair, automated verification and native acceptance separate. Start
+with the failed native receipt and focused offline investigation, not another
+broad campaign or unchanged failed casting attempt. Preserve immutable archive
+1e1a312 and use its clean frozen checkout for any matching native diagnostics.
+
+
+## Historical checkpoint: 2026-11-06 00:05 UTC
 
 Frozen runtime remains clean **1e1a31200628ade5f19eed1d839624ce5ecb33ea**,
 DLL/ZIP/MVID unchanged from the identity table below. PR records/test revision
