@@ -47,4 +47,31 @@ $legacy=$good|ConvertFrom-Json; $legacy.SchemaVersion=8; $legacy.GameLogPlannerL
 Write-KbpJsonAtomic $path $legacy
 Assert-KbpScenarioOutcome $request
 $passed++
-Write-Host "Native UI outcome reader: PASS=$passed FAIL=0 (synthetic offline records; old schema-8 verdict retained)."
+# Schema 10 (0.6.12): the native state button names the current policy and
+# autosave is silent. The schema-9 captions are refused under schema 10, and
+# schema 9 keeps refusing the new captions.
+$current = $good | ConvertFrom-Json
+$current.SchemaVersion = 10
+$current.AvailabilityStates = @('cast-available|Plan: Cast available', 'require-full-plan|Plan: Require full')
+$current | Add-Member -NotePropertyName AvailabilityPolicyCaption -NotePropertyValue 'Plan: Cast available' -Force
+$current | Add-Member -NotePropertyName ResourcesSaveStatus -NotePropertyValue '' -Force
+Write-KbpJsonAtomic $path $current
+Assert-KbpScenarioOutcome $request
+$passed++
+$schema10 = $current | ConvertTo-Json -Depth 8
+foreach ($change in @(
+    {param($r) $r.AvailabilityStates=@('cast-available|Require full plan','require-full-plan|Require full plan')},
+    {param($r) $r.AvailabilityStates=@('cast-available|Plan: Cast available','require-full-plan|Require full plan')},
+    {param($r) $r.AvailabilityStates=@($r.AvailabilityStates[0])},
+    {param($r) $r.AvailabilityPolicyCaption='Require full plan'},
+    {param($r) $r.ResourcesSaveStatus='Saved'},
+    {param($r) $r.SchemaVersion=9})) {
+    $bad = $schema10 | ConvertFrom-Json
+    & $change $bad
+    Write-KbpJsonAtomic $path $bad
+    $refused=$false
+    try { Assert-KbpScenarioOutcome $request } catch { $refused=$true }
+    if (-not $refused) { throw 'Invalid schema-10 native UI policy evidence was admitted.' }
+    $passed++
+}
+Write-Host "Native UI outcome reader: PASS=$passed FAIL=0 (synthetic offline records; schema 8/9 verdicts retained, schema 10 added)."

@@ -1630,19 +1630,30 @@ function Assert-KbpScenarioOutcome {
             $labels = @($record.RefusalCastingLabels)
             $lines = @($record.GameLogPlannerLines)
             $reason = '(native-submission-disabled:runtime-test-session:live-workspace-native-ui:cf-grant-absent).'
+            # Schema 9: one checkbox caption in both states. Schema 10 (0.6.12):
+            # a native state button naming the CURRENT policy, and silent autosave.
+            $schemaLabel = if ([int]$record.SchemaVersion -ge 10) { 'schema-10' } else { 'schema-9' }
+            $castAvailableState = if ([int]$record.SchemaVersion -ge 10) { 'cast-available|Plan: Cast available' } else { 'cast-available|Require full plan' }
+            $requireFullState = if ([int]$record.SchemaVersion -ge 10) { 'require-full-plan|Plan: Require full' } else { 'require-full-plan|Require full plan' }
+            if ([int]$record.SchemaVersion -ge 10 -and (
+                [string]$record.ResourcesSaveStatus -ceq 'Saved' -or
+                ([string]$record.AvailabilityPolicyCaption -and
+                    [string]$record.AvailabilityPolicyCaption -cnotin @('Plan: Cast available', 'Plan: Require full')))) {
+                throw 'Native UI schema-10 policy caption or idle save text is not the schema-10 contract.'
+            }
             if ($labels.Count -eq 0 -or @($labels | Select-Object -Unique).Count -ne $labels.Count -or
                 $lines.Count -ne $labels.Count + 1 -or
                 -not $lines[0].StartsWith(('Buff Planner: Long ' + [char]0x2014 + ' 0 cast.'), [StringComparison]::Ordinal) -or
                 -not $lines[0].EndsWith($reason, [StringComparison]::Ordinal) -or
                 @($record.AvailabilityStates).Count -ne 2 -or -not [bool]$record.AvailabilityIntentRestored -or
-                @($record.AvailabilityStates) -cnotcontains 'cast-available|Require full plan' -or
-                @($record.AvailabilityStates) -cnotcontains 'require-full-plan|Require full plan') {
-                throw 'Native UI schema-9 refusal summary or policy observations are incomplete.'
+                @($record.AvailabilityStates) -cnotcontains $castAvailableState -or
+                @($record.AvailabilityStates) -cnotcontains $requireFullState) {
+                throw "Native UI $schemaLabel refusal summary or policy observations are incomplete."
             }
             for ($index = 0; $index -lt $labels.Count; $index++) {
                 if (-not $lines[$index + 1].StartsWith(('Not cast: ' + $labels[$index] + ' ' + [char]0x2014 + ' not attempted: '), [StringComparison]::Ordinal) -or
                     -not $lines[$index + 1].EndsWith($reason, [StringComparison]::Ordinal)) {
-                    throw 'Native UI schema-9 refusal detail is missing or belongs to a different casting.'
+                    throw "Native UI $schemaLabel refusal detail is missing or belongs to a different casting."
                 }
             }
         }
