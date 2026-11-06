@@ -59,6 +59,7 @@
     <Compile Include="AutosaveLifecycleTests.cs" />
     <Compile Include="ClearPlanTests.cs" />
     <Compile Include="ClearPlanViewInputTests.cs" />
+    <Compile Include="ClearRefreshTests.cs" />
     <Compile Include="SharePlanningTests.cs" />
     <Compile Include="UndoHistoryTests.cs" />
     <Compile Include="EverydayUseWordingTests.cs" />

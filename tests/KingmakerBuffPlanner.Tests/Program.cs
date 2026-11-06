@@ -456,6 +456,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunAutosaveLifecycleTests(root);
                 RunClearPlanTests(root);
                 RunClearPlanViewInputTests(root);
+                RunClearRefreshTests(root);
                 RunSharePlanningTests(root);
                 RunUndoHistoryTests(root);
                 RunEverydayUseWordingTests(root);
