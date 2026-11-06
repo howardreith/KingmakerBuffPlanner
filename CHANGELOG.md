@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased - prepared-slot spend repair after 0.6.12
+
+- Two castings of the same prepared spell from one caster (for example two
+  Heroisms on different recipients) no longer stop a routine at the second
+  one with `provider-ability-not-found`. The game spends the last equal
+  prepared slot of a level, not the one the planner reserved, so the second
+  casting now uses the equivalent preparation the first casting left. It
+  never takes a later casting's slot, an unplanned slot or a different
+  preparation, and a real shortage still follows Cast available / Require
+  full. Refusals now say whether the preparation is spent or missing, and
+  cast details name the slots the game actually consumed.
+- Offline only; native acceptance not yet run.
+  [Checkpoint](docs/PREPARED-SLOT-SPEND-REPAIR-CHECKPOINT.md)
+
 ## 0.6.12 - 2026-11-06 - final refinement after 0.6.11
 
 - The footer's Require full plan checkbox is a native button that states the

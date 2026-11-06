@@ -4617,3 +4617,21 @@ ZIP `205703a736661b51b687c50b6bbdacce9fdb692fcc2faa60cf274ab834ad970e`; DLL
 `805a1719d00fcbdb53384d985a70b1a525f59bb968b683669863ea4413cf25de`. No native
 run, installation or save change. Next: owner playtest with the checkpoint
 checklist. [Release record](docs/RELEASE-0.6.12-RECORD.md).
+
+## 2026-11-06 UTC - prepared-slot spend repair (after 0.6.12, unreleased)
+
+Owner 0.6.12 log (`cedb623`): Long halted at the second prepared Heroism with
+`FailedValidation:provider-ability-not-found` before submission; a second Long
+cast it from the same slot. Decompiled installed `Spellbook.SpendInternal`
+spends the LAST available equal slot of the level, and `AbilityData.Equals` is
+value equality, so the first cast consumed the second casting's reservation.
+Rejected: overspending, index compaction, effect confirmation. Branch
+`codex/kingmaker-buff-planner-prepared-slot-repair` from main `de80e87`;
+product `ff2a237`, version 0.6.12 unchanged. A run step may now resolve an
+equivalent slot left by an earlier confirmed casting of the same run; precise
+missing/exhausted refusals; consumed-slot diagnostics. Strict extraction
+reproduced the failure (prepared-spend 2/5); after: focused 65/0, complete
+offline 713/0, source 47/0, Release DLL `83851fec...d056`. Native NOT RUN; no
+package, install or save change. Next: owner review, then one uninterrupted
+native Long through both Heroisms and the successor.
+[Checkpoint](docs/PREPARED-SLOT-SPEND-REPAIR-CHECKPOINT.md).
