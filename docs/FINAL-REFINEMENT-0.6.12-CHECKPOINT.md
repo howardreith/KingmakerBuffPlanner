@@ -3,8 +3,9 @@
 Branch `codex/kingmaker-buff-planner-final-refinement`, started from main
 `fe7e2d0e2c7fe6d5032c4dff3193ba8224c22a99` (v0.6.11 product `3379d15` plus its
 publication record). PR #20 was already merged; no other hotfix work existed.
-Candidate source/commit: **`433d98be3f6c1da0b5fad911cb8ad25edb6dca16`**, version
-**0.6.12 (unreleased)**. Later commits on this branch are documentation only.
+Current candidate: **`e483daf6aff6a130226857686983e5c88492e6ca`** (after PR #21 review
+corrections), version **0.6.12 (unreleased)**. The first candidate `433d98b` is
+superseded; its identities below are kept as history.
 
 Not authorized and not done: merge, release, retag, replacing v0.6.11 assets,
 installing into the owner's game, or touching any save.
@@ -17,6 +18,30 @@ installing into the owner's game, or touching any save.
 | Automated (this branch) | Offline C# tests through the real session/compiler/gate/executors/coordinator/report; only the native boundary is simulated. Listed below. |
 | Native (this branch) | **None.** No game launch, render, physical input or gameplay run on 0.6.12. |
 | Historical | `historical_0.6.10_output_log.txt` (0.6.10 / 6c75425) is context only. |
+
+## PR #21 review corrections (candidate e483daf)
+
+The review of 2970940 found four P2 and one P3 issue (source-traced). All five
+are corrected; the old candidate 433d98b is superseded.
+
+| Item | Root cause | Correction | Evidence |
+| --- | --- | --- | --- |
+| 1 (P2) | Binding iterated predicted owners, so an empty prediction deleted the secondary obligation and its candidates | One selection leaf carries rule, prediction and candidates whatever the prediction size; candidates stay in projection identity | `e-missing` accepted at 2970940; now refused. Empty-to-B confirmed; B eligible with marker missing / wrong owner / unreadable refused; empty-prediction candidate change alters identity |
+| 2 (P2) | Any fresh marker counted; the predicted owner skipped geometry | Application boundary = read that first saw this attempt's own effect on the centre. The adapter records there every unit the wrapper's native filter admits within reach (party or not). Marked units must be first seen at that read, inside reach, nearest-first consistent within 1 m, complete and at most `maximum`; no trusted prediction; unobservable eligible units, missing geometry or earlier/later unrelated applications stay unconfirmed | `pred-far`, `pred-no-geo`, `in-range-wrong` accepted at 2970940 (0/8 refused, both modes); now refused, plus `pending` (unrelated application while the command runs) and `unobservable-nearer` |
+| 3 (P2) | PowerShell reader applied schema-9 captions to every schema >= 9 | Schema 10 expects "Plan: Cast available" / "Plan: Require full" and refuses idle Saved; schema 8/9 unchanged | `Test-NativeUiOutcomeReader.ps1` 19/0 (was 12), schema-10 positive and six negatives |
+| 4 (P2) | Tooltip followed the navigator's retained focus and was raised over its own dialog | Eligibility follows the topmost owner (navigator dialog, Clear, Resources, workspace); opening a navigator dialog dismisses it; Clear's own button tooltips remain | `footer-refinement-tooltip-yields-to-navigator-dialog` (failed with the fix removed) |
+| 5 (P3) | Applied Clear bypassed the command path, leaving a stale refusal as the standing notice | Applied Clear retires the command problem and problem navigation; a current save failure stays | `footer-refinement-clear-retires-stale-run-refusal`, `footer-refinement-clear-keeps-failed-autosave-notice` (both failed with the fix removed) |
+
+Validation on e483daf: focused `-Only 'infectious-charms-,heroism-repeat-,playtest-heroism-,clear-refresh-,footer-refinement-,clear-plan-,footer-,autosave-,human-feedback-,cast-available-,native-ui-,controller-workspace-,undo-history-,casting-workspace-,policy-route-,execution-policy-,blocked-navigation-'` **177/0**; full offline runner **704/0**; reader 19/0; source 47/0; package 6/0. Tests ran on the same DLL bytes as the candidate. The tooltip test simulates the navigator dialog's construction/teardown; real dialog rendering and the live Unavailable route are not exercised. No native run.
+
+| Candidate identity | Value |
+| --- | --- |
+| Commit | e483daf6aff6a130226857686983e5c88492e6ca |
+| ZIP SHA-256 | a4deb8013c9a600c609b22621c638b81fad5bcb1edde3a657af86e2954ab1a30 |
+| DLL SHA-256 | a2c5738186dbcf9bc99ba2da4a393a86416040ef96faa86cbed687c32b23b5f3 |
+| MVID | c178a404-219a-40a4-abd3-4ef1a10cdbc4 |
+
+The H2 description in section 5 below is superseded by this table where they differ.
 
 ## Status by section
 

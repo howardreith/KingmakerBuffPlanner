@@ -4582,3 +4582,15 @@ Baseline 79/0; merged focused 154/0; full offline 701/0; source 47/0; package
 budget; automation fixture lacks a Heroism provider). Next: owner review of the
 draft PR, then a separately budgeted guarded native UI and Heroism check of the
 frozen candidate. [Checkpoint](docs/FINAL-REFINEMENT-0.6.12-CHECKPOINT.md).
+
+## 2026-11-06 UTC - PR #21 review corrections (0.6.12 unreleased)
+
+Review of 2970940: four P2, one P3. Reproduced the H2 gaps at 2970940 (pred-far,
+pred-no-geo, in-range-wrong, e-missing accepted; 0/8). Rejected: checking the
+nearest unit at the final poll (recreates the timing problem) and trusting the
+prediction. Secondary confirmation now uses application-boundary geometry of the
+native filter, first-sighting at that read, nearest-first consistency and
+observability of every eligible unit. Reader schema 10, modal-aware tooltips and
+stale Clear notice corrected. Candidate e483daf; focused 177/0, full 704/0,
+reader 19/0, package 6/0. Native NOT RUN. Next: owner review; then a separately
+budgeted guarded native UI/Heroism check of the frozen candidate.
