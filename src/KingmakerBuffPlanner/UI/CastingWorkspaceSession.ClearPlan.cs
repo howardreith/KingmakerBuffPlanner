@@ -75,6 +75,9 @@ namespace KingmakerBuffPlanner.UI
             if (result.Applied)
             {
                 ClearGraphFocus();
+                // Review P3: a refused attempt's blockers named castings that
+                // no longer exist; its navigation/message must not outlive them.
+                LeaveProblemNavigation();
                 _clearedAuthoring = _authoring;
                 _clearedRevision = _authoring.CurrentRevision;
                 _clearedCount = confirmation.CastingCount;
