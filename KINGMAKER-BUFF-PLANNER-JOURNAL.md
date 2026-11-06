@@ -4594,3 +4594,14 @@ observability of every eligible unit. Reader schema 10, modal-aware tooltips and
 stale Clear notice corrected. Candidate e483daf; focused 177/0, full 704/0,
 reader 19/0, package 6/0. Native NOT RUN. Next: owner review; then a separately
 budgeted guarded native UI/Heroism check of the frozen candidate.
+
+## 2026-11-06 UTC - second PR #21 review corrections (0.6.12 unreleased)
+
+Review of bd9d01c: items 1-5 confirmed fixed; two P2 remained. Reproduced at
+bd9d01c (rf-new-mark unconfirmed after a pending read + in-place refresh;
+bd-missing accepted at 9.0 m of 9.144 m). Rejected: dropping the same-read check
+(would undo the previous repair) and keeping the tolerance-shrunk required count.
+Applications are now dated at the read that saw the identity become new or
+refreshed; with room left, every unit within radius + tolerance must be marked.
+Candidate 54d26f1; focused 179/0, full 706/0, reader 19/0, package 6/0. Native
+NOT RUN. Next: owner review, then a separately budgeted guarded native check.

@@ -3,9 +3,9 @@
 Branch `codex/kingmaker-buff-planner-final-refinement`, started from main
 `fe7e2d0e2c7fe6d5032c4dff3193ba8224c22a99` (v0.6.11 product `3379d15` plus its
 publication record). PR #20 was already merged; no other hotfix work existed.
-Current candidate: **`e483daf6aff6a130226857686983e5c88492e6ca`** (after PR #21 review
-corrections), version **0.6.12 (unreleased)**. The first candidate `433d98b` is
-superseded; its identities below are kept as history.
+Current candidate: **`54d26f17acd42ce699889f61cd65e824d647882a`** (after two PR #21
+review rounds), version **0.6.12 (unreleased)**. Earlier candidates `433d98b` and
+`e483daf` are superseded; their identities below are kept as history.
 
 Not authorized and not done: merge, release, retag, replacing v0.6.11 assets,
 installing into the owner's game, or touching any save.
@@ -18,6 +18,28 @@ installing into the owner's game, or touching any save.
 | Automated (this branch) | Offline C# tests through the real session/compiler/gate/executors/coordinator/report; only the native boundary is simulated. Listed below. |
 | Native (this branch) | **None.** No game launch, render, physical input or gameplay run on 0.6.12. |
 | Historical | `historical_0.6.10_output_log.txt` (0.6.10 / 6c75425) is context only. |
+
+## Second PR #21 review corrections (candidate 54d26f1)
+
+The review of bd9d01c confirmed items 1-5 above as fixed and found two remaining
+P2 issues in secondary confirmation. Both were reproduced at bd9d01c in both
+modes (`docs/evidence/final-refinement-0.6.12/review2-repro-bd9d01c.txt`).
+
+| Item | Root cause | Correction | Evidence |
+| --- | --- | --- | --- |
+| R2-1 (P2) | The recorder dated an in-place refresh at the read that first saw the instance unchanged, so a same-instance primary refresh after a pending read was dated before its own marker | Each seen identity keeps every read at which it became new or refreshed relative to the pre-submission baseline (or was refreshed again); unchanged sightings are not applications. Boundary and same-read rules use those reads | `rf-new-mark` unconfirmed at bd9d01c; now confirmed, with spending and the successor. Pending-read same-instance primary + marker refresh confirmed; unrelated same-instance and other-unit applications refused |
+| R2-2 (P2) | Only units within radius - tolerance set the required count, so a stationary recipient at 9.0 m of 9.144 m with no marker passed as empty | While the rule has room, every unit the native filter admits within radius + tolerance must be marked; empty only when all are readably beyond radius + tolerance | `bd-missing` accepted at bd9d01c; now refused. Boundary marked confirmed; band (9.6 m) missing and empty-prediction boundary missing refused; beyond-band (10.5 m) empty confirmed |
+
+Validation on 54d26f1 (same DLL bytes as the package): focused (same 17
+prefixes) **179/0**; full offline runner **706/0**; reader 19/0; source 47/0;
+package 6/0. No native run.
+
+| Candidate identity | Value |
+| --- | --- |
+| Commit | 54d26f17acd42ce699889f61cd65e824d647882a |
+| ZIP SHA-256 | e4ef274b6cf46b2a1bcca59c2633052db0439365001049fb2eb32235ac6bd005 |
+| DLL SHA-256 | 0dc9e659c46798d892ee8d135256b72cf4256f0d96d76263d1d5e25d89909503 |
+| MVID | 40c8b4c1-74cc-4f24-b4f7-c58bae595820 |
 
 ## PR #21 review corrections (candidate e483daf)
 
