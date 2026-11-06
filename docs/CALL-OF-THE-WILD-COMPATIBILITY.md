@@ -61,3 +61,20 @@ Both runs emitted the same ordered inventory: SHA-256 `a883dd60218a1f9e989a4e6b0
 ## Qualification boundary
 
 This is more than a main-menu load: exact runtime identities, full catalog completion, representative ownership/inclusion, zero unsupported optional candidates, deterministic output, ordered Harmony inventory, protected-save non-use, and exact restoration all passed twice. No project-owned `KBP_` save exists, so optional-provider planning, animated/instant firing, effect/resource equivalence, duration, and persistence were not executed and are not claimed. No protected save was selected or written.
+
+## Infectious Charms contract (0.6.11 review H1/H2, 2026-11-05)
+
+Upstream source (Holic75/KingmakerRebalance `1332fb0db844b7863f484ca978bea2349fe49769`,
+`WizardDiscoveries.createInfectiousCharms`, `Common.createContextActionApplyBuff*`,
+`AoeMechanics.ApplyActionToTargetsInRange.RunAction`) and the installed DLL are
+recorded separately. Installed `Mods\CallOfTheWild\CallOfTheWild.dll` SHA-256
+`4EBF8E1ED3E66FFED72EA33EA325595629423DACD5BFFA23E3C9109144B26915` was inspected by
+reflection-only IL reading (no game launch): both the caster marker
+(`createContextActionApplyBuffToCaster`, IL_0255) and the nearby-target marker
+(closure `b__1`, IL_008B) pass `duration_seconds = 3` (`ldc.i4.3`), and both helpers
+store `UseDurationSeconds = duration_seconds > 0` and `DurationSeconds = (float)duration_seconds`.
+The planner treats those markers as confirmation-only transients (see
+`planning/DISCOVERY-ACTION-CONTRACT-INVENTORY.md`). The nearby wrapper chooses the
+nearest eligible unit when its action runs; the planner's admission-time choice is
+only a prediction, and confirmation follows the attempt's own observations. No
+native Infectious Charms gameplay was run for this change.
