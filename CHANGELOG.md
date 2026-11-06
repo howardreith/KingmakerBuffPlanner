@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.12 - unreleased - final refinement after 0.6.11
+## 0.6.12 - 2026-11-06 - final refinement after 0.6.11
 
 - The footer's Require full plan checkbox is a native button that states the
   current policy ("Plan: Cast available" / "Plan: Require full") and toggles the
@@ -17,8 +17,8 @@
 - Infectious Charms: the three-second follow-up markers no longer decide whether
   an existing Heroism counts as already active, and confirmation follows the
   nearby unit the game actually selects when the spell lands.
-- Unreleased candidate. No native game run, render or physical input exists for
-  this version. [Checkpoint](docs/FINAL-REFINEMENT-0.6.12-CHECKPOINT.md)
+- Owner-authorized pre-runtime release. No native game run, render or physical
+  input exists for this version. [Checkpoint](docs/FINAL-REFINEMENT-0.6.12-CHECKPOINT.md)
 
 ## 0.6.8 - 2026-11-04 - duplicate item sources and stale casting repair
 

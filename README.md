@@ -1,5 +1,14 @@
 # Mr. Bard's Kingmaker Buff Planner
 
+**Release: [0.6.12](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.12).**
+This owner-authorized final refinement turns the plan policy into a native
+button, adds tooltips to every footer action, removes the idle footer text to
+give the workspace more room, gives Clear plan a native scroll dialog, words
+genuinely spent sources honestly after Clear, and corrects Heroism confirmation
+with Call of the Wild's Infectious Charms. This exact release has not been run
+in the game. See the [release notes](docs/RELEASE-NOTES-0.6.12.md) and the
+[checkpoint](docs/FINAL-REFINEMENT-0.6.12-CHECKPOINT.md).
+
 **Release: [0.6.11](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.11).**
 This owner-authorized playtest repair confirms Heroism's conditional effects
 correctly so later planned casts continue, repairs disappearing workspace text,
@@ -136,7 +145,7 @@ did not distinguish a deliberate choice from the old default. See the
 
 Mr. Bard's Kingmaker Buff Planner is a standalone Unity Mod Manager mod built
 against **Windows Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b**. The
-0.6.11 retains the native Linux 2.1.5d version gate but has not passed a
+0.6.12 retains the native Linux 2.1.5d version gate but has not passed a
 native Linux trial.
 
 It plans and applies party buffs while preserving Kingmaker targeting,
@@ -146,7 +155,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.6.11.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.6.12.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including
