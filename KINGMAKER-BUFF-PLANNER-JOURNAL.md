@@ -4605,3 +4605,15 @@ Applications are now dated at the read that saw the identity become new or
 refreshed; with room left, every unit within radius + tolerance must be marked.
 Candidate 54d26f1; focused 179/0, full 706/0, reader 19/0, package 6/0. Native
 NOT RUN. Next: owner review, then a separately budgeted guarded native check.
+
+## 2026-11-06 UTC - 0.6.12 stable release published and verified
+
+Owner merged PR #21 (`8685366`) and requested a release with an incremented
+version. Release-preparation commit `cedb623` (notes, README, dated changelog)
+pushed to main through the guarded helper; v0.6.12 published as Latest by the
+guarded publisher (OwnerAuthorizedPreRuntime). Source 47/0, complete offline
+706/0, gate 8/0, deterministic builds 3/0, package 6/0 local and downloaded.
+ZIP `205703a736661b51b687c50b6bbdacce9fdb692fcc2faa60cf274ab834ad970e`; DLL
+`805a1719d00fcbdb53384d985a70b1a525f59bb968b683669863ea4413cf25de`. No native
+run, installation or save change. Next: owner playtest with the checkpoint
+checklist. [Release record](docs/RELEASE-0.6.12-RECORD.md).
