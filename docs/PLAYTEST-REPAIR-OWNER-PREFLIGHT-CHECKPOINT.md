@@ -1,6 +1,71 @@
 # PR #20: observation-owner admission and disposable fixture setup
 
-## Current checkpoint: 2026-11-05 19:15 UTC
+## Current checkpoint: 2026-11-06 00:05 UTC
+
+Frozen runtime remains clean **1e1a31200628ade5f19eed1d839624ce5ecb33ea**,
+DLL/ZIP/MVID unchanged from the identity table below. PR records/test revision
+now includes **e446bd2**. No runtime code or assembly was changed for this
+test-only correction. No merge or release.
+
+The original supervised launch aggregate exited **1** at 23:50 UTC, after its
+three live-purity windows returned successfully. It reached the later exact
+authoring-action parity assertion at line1085. Both actual lists already matched
+the new twelve gestures, but the assertion still required count11. That missed
+test update is corrected to count12, retaining exact count and order checks.
+The original aggregate remains **FAIL**, not a successful aggregate receipt.
+
+Its three actual inconclusive/retried comparisons (Deployment once, File-WhatIf
+twice) remain in the log. All required pure windows subsequently completed;
+otherwise Stop plus sequential top-level invocation could not reach line1085.
+No history or purity assertion was excluded from that original execution.
+
+Original log SHA-256:
+`98153538045270c42cc527efb4adfe7c8694aac880b3ca13bd71afac6442613c`.
+The explicit bounded resumption verifies clean frozen HEAD, original test bytes
+against Git, the exact late failure/package identity, and that the reviewed
+correction is only count11→12. Its AST omits precisely the three already completed
+window calls (lines79/106/154), binds all runtime/source reads to the frozen
+checkout, and runs the remaining consumer checks. Its footer explicitly reports
+bounded consumer completion, not a new live-purity aggregate PASS.
+
+| Completed prerequisite input | Result / original artifacts evidence |
+| --- | --- |
+| Frozen full C#/source/harness | 688/0, 47/0, 38/0; playtest-1e1a312-launch-prerequisites.log |
+| Physical/problem/spellbook readers | 20/0, 35/0, 50/0; same original log |
+| Deployment purity | 5/0; same original log |
+| Launcher arguments / real File arguments | 35/0, 14/0; original and bounded resumption logs |
+| Three remaining actual purity windows | completed before original late parity failure; original log/source control flow retained |
+| Corrected bounded launcher consumers | 1/0, exit0; playtest-1e1a312-consumer-resume-elevated.log |
+| Remaining fixture inventory / isolated restore / publisher refusals | 3/0, 16/0, 8/0; playtest-1e1a312-remaining-prerequisites.log |
+
+Resumption provenance is recorded in
+`artifacts/playtest-1e1a312-consumer-resume-input.json` (original/corrected test
+hashes, original log hash, completed call locations and generated bounded driver
+hash). The first restricted invocation failed creating its GUID-named test
+registry key; its log/input are retained. The successful invocation used the
+same registry permission as the original supervised gate. No original verdict
+or native completion record was edited. This is completed prerequisite components
+on unchanged frozen inputs, with an explicitly corrected test consumer—not a
+relabelling of the failed aggregate.
+
+Fresh native selection **pr20-1e1a312-select-absent** passed **85/0**, with
+`complete:true`, game exit, Mods restoration and protected saves clean. It
+selected real Heroism plus Mirror Image, Linzi→Hedwirg, actual Infectious Charms
+false and first/recast/skip forecasts **2/2/1**. It reused the exact successfully
+prepared working-save SHA; no repeated setup/rest was needed. The existing writer
+then issued the new instant run's five-submission allowance from this successful
+new lifecycle. The earlier failed selection is never spending authority.
+
+The combined absent-feat helper is now active. Native budget **00:00–01:30 UTC**
+on November6, plus required safe completion/restoration. Next: inspect actual
+instant/animated outcomes, then guarded present-feat preparation, fresh selection,
+new allowances/both modes, followed by matching UI and physical authoring checks.
+No native casting success is claimed by this checkpoint yet. The optional
+coordination question remains unanswered; no idle assurance or approval is
+assumed. Each runtime launch retains actual locks, identity and save guards.
+
+
+## Historical checkpoint: 2026-11-05 19:15 UTC
 
 PR branch remains `codex/kingmaker-buff-planner-playtest-repairs`.
 The original checkout is clean on
