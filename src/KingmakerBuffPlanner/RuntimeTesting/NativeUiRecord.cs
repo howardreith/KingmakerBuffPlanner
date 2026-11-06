@@ -145,8 +145,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         // reserves two legal recipients when seeding the planning probe.
         // Schema 8 proves the reorder gesture selected a casting whose real
         // inspector made Cast later available after the independent adds.
+        // Schema 10 (0.6.11 refinement): the availability policy is a native
+        // state button ("Plan: Cast available" / "Plan: Require full") and
+        // autosave is silent (no idle "Saved" text, failures still shown).
         // Historical records prove only what they observed.
-        public int SchemaVersion { get; set; } = 9;
+        public int SchemaVersion { get; set; } = 10;
         public string RunId { get; set; }
         public string Stage { get; set; }
         public int ScreenWidth { get; set; }
@@ -301,12 +304,16 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!string.IsNullOrEmpty(note)) Notes.Add(note);
         }
 
+        // The policy control's captions this record's schema observed.
+        private string CastAvailableCaption { get { return SchemaVersion >= 10 ? "Plan: Cast available" : "Cast available"; } }
+        private string RequireFullCaption { get { return SchemaVersion >= 10 ? "Plan: Require full" : "Require full plan"; } }
+
         public IList<string> Violations()
         {
             var violations = new List<string>();
             if (SchemaVersion != 1 && SchemaVersion != 2 && SchemaVersion != 3 &&
                 SchemaVersion != 4 && SchemaVersion != 5 && SchemaVersion != 6 &&
-                SchemaVersion != 7 && SchemaVersion != 8 && SchemaVersion != 9)
+                SchemaVersion != 7 && SchemaVersion != 8 && SchemaVersion != 9 && SchemaVersion != 10)
                 violations.Add("schema:" + SchemaVersion);
             if (Stage != FactsStage && Stage != QualifyStage) violations.Add("stage:" + (Stage ?? "null"));
             violations.AddRange(Failures.Select(value => "failure:" + value));
@@ -458,8 +465,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         !GameLogPlannerLines[index + 1].EndsWith(refusal, StringComparison.Ordinal))
                         yield return "game-log-refusal-detail:" + index;
                 if (AvailabilityStates.Count != 2 ||
-                    !AvailabilityStates.Contains("cast-available|Require full plan") ||
-                    !AvailabilityStates.Contains("require-full-plan|Require full plan") || !AvailabilityIntentRestored)
+                    // Schema 9's checkbox kept one caption in both states.
+                    !AvailabilityStates.Contains("cast-available|" + (SchemaVersion >= 10 ? CastAvailableCaption : RequireFullCaption)) ||
+                    !AvailabilityStates.Contains("require-full-plan|" + RequireFullCaption) || !AvailabilityIntentRestored)
                     yield return "availability-states-or-restoration";
             }
         }
@@ -482,12 +490,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (string.IsNullOrWhiteSpace(ResourcesAllSummary) ||
                 !ResourcesAllSummary.StartsWith("All routines", StringComparison.Ordinal))
                 yield return "resources:all-summary-missing";
-            if (string.IsNullOrWhiteSpace(ResourcesSaveStatus)) yield return "resources:save-status-missing";
+            // Schema 10: the save line is error-only (autosave is silent).
+            if (SchemaVersion >= 10 ? ResourcesSaveStatus == "Saved" : string.IsNullOrWhiteSpace(ResourcesSaveStatus))
+                yield return SchemaVersion >= 10 ? "resources:idle-saved-text" : "resources:save-status-missing";
             if (!ResourcesClosedByEscape) yield return "resources:escape-did-not-close";
             if (string.IsNullOrEmpty(ResourcesDocumentBefore) ||
                 ResourcesDocumentBefore != ResourcesDocumentAfter) yield return "resources:changed-plan";
-            if (AvailabilityPolicyCaption != "Require full plan" &&
-                AvailabilityPolicyCaption != "Cast available")
+            if (AvailabilityPolicyCaption != RequireFullCaption &&
+                AvailabilityPolicyCaption != CastAvailableCaption)
                 yield return "availability-policy-caption:" + (AvailabilityPolicyCaption ?? "none");
             if (string.IsNullOrEmpty(RunCaption) ||
                 !RunCaption.StartsWith("Run ", StringComparison.Ordinal))

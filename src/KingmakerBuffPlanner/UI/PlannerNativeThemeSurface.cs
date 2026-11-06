@@ -73,6 +73,18 @@ namespace KingmakerBuffPlanner.UI
             surface.Apply(_sheetPaperDonor, _scrollPaperDonor, PaperUnavailableReason(), Screen.height);
         }
 
+        // A transient surface (the Clear plan dialog) leaves the theme when
+        // it is destroyed, so a later donor change never touches it.
+        internal void UnregisterParchment(ParchmentSurface surface)
+        {
+            if (surface != null) _parchments.Remove(surface);
+        }
+
+        internal void UnregisterRule(ParchmentRule rule)
+        {
+            if (rule != null) _rules.Remove(rule);
+        }
+
         // 0.4.2: the planner's full-screen blocker shows the native table.
         internal void RegisterBackdrop(ParchmentBackdrop backdrop)
         {

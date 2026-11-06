@@ -72,8 +72,29 @@ namespace KingmakerBuffPlanner.UI
             if (!CanClearPlan) return AuthoringEditResult.Refuse(ClearPlanUnavailableReason);
             AuthoringEditResult result = _authoring.RemoveCastings(
                 Document.Castings.Select(value => value.CastingId).ToArray(), "clear-entire-plan");
-            if (result.Applied) ClearGraphFocus();
+            if (result.Applied)
+            {
+                ClearGraphFocus();
+                _clearedAuthoring = _authoring;
+                _clearedRevision = _authoring.CurrentRevision;
+                _clearedCount = confirmation.CastingCount;
+            }
             return result;
+        }
+
+        // The castings the NEXT Undo restores when that Undo reverts a Clear
+        // plan (0 otherwise): the Undo tooltip names the real pending action.
+        private CastingAuthoringService _clearedAuthoring;
+        private int _clearedRevision = -1;
+        private int _clearedCount;
+
+        public int UndoRestoresClearedCount
+        {
+            get
+            {
+                return CanUndo && ReferenceEquals(_clearedAuthoring, _authoring) &&
+                    _clearedRevision == _authoring.CurrentRevision ? _clearedCount : 0;
+            }
         }
     }
 

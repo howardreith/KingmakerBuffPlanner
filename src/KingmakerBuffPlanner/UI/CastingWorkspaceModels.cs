@@ -593,7 +593,7 @@ namespace KingmakerBuffPlanner.UI
             if (notReady > 0)
                 return routineName + " cannot run: " + (notReady == 1 ? "1 casting is" : notReady + " castings are") +
                     " not ready (marked in red)." +
-                    (executable > 0 ? " Uncheck Require full plan to run the other " + executable + "." : string.Empty);
+                    (executable > 0 ? " Switch to Plan: Cast available to run the other " + executable + "." : string.Empty);
             if (!allowed)
                 return routineName + " cannot run: " + (string.IsNullOrEmpty(otherBlock) ? "see the marked castings" : otherBlock) + ".";
             string shortage = shortInOnePass <= 0 ? string.Empty
@@ -622,7 +622,7 @@ namespace KingmakerBuffPlanner.UI
         {
             return routineName + " was not cast: " +
                 (notReady == 1 ? "1 casting is" : notReady + " castings are") +
-                " not ready (red lines and cards). Fix them, or uncheck Require full plan to run the ready ones.";
+                " not ready (red lines and cards). Fix them, or switch to Plan: Cast available to run the ready ones.";
         }
 
         // The mode change is an edit like any other: it saves itself, and
@@ -643,6 +643,14 @@ namespace KingmakerBuffPlanner.UI
         // revision is durable; anything else is named, never hidden.
         public const string RetrySaveAction = "Retry save";
         public const string ReloadAction = "Reload";
+
+        // The workspace's save indicator after the 0.6.11 refinement: empty
+        // while saved or saving (autosave is silent), "Not saved" otherwise.
+        public static string SaveIndicator(string saveState)
+        {
+            string value = saveState ?? string.Empty;
+            return value == "saved" || value == "saving" ? string.Empty : "Not saved";
+        }
 
         public static string SaveStatus(string saveState)
         {

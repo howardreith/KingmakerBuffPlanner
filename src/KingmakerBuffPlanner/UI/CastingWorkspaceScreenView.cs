@@ -120,14 +120,21 @@ namespace KingmakerBuffPlanner.UI
         internal string ProblemRevealCastingIdForRuntime { get; private set; }
         internal bool ProblemChipVisibleBeforeRevealForRuntime { get; private set; }
         internal float ProblemGraphScrollBeforeRevealForRuntime { get; private set; }
-        // Footer.
-        private TMP_Text _footerResult;
-        private TMP_Text _footerSave;
-        private Image _footerLedger;
-        private Button _footerRecovery;
-        private string _shownSaveState;
-        // True while the footer line shows a command's feedback (until the
-        // next command); otherwise it shows Run's status.
+        // Footer: one action row. Owner request after 0.6.11: no idle
+        // explanatory/status line and no "Saved" text; every action explains
+        // itself in a tooltip. Problems (a refused command, a failed save, an
+        // automatic edit) appear in the header's error-only notice, which
+        // reserves no space and is empty while nothing needs attention.
+        private TMP_Text _notice;
+        private Button _noticeRecovery;
+        private string _noticeText = string.Empty;
+        private string _saveIndicator = string.Empty;
+        // The last command problem, shown until the next command.
+        private string _commandProblem;
+        // A one-time load/import note, shown until the next command.
+        private string _loadNote;
+        // Runtime evidence only: the last command message, shown or not.
+        private string _lastCommandMessage = string.Empty;
         private bool _feedbackShown;
         private Button _resourcesButton;
         private RectTransform _resources;
@@ -287,10 +294,18 @@ namespace KingmakerBuffPlanner.UI
             get { return "page=continuous-scroll;book-art-retired;" + WorkspacePaperEvidenceForRuntime; }
         }
 
-        // The footer's result line as the player reads it (runtime evidence).
+        // The header notice as the player reads it (runtime evidence): empty
+        // while nothing needs attention (the idle footer line is retired).
         internal string FooterResultTextForRuntime
         {
-            get { return _footerResult == null ? null : _footerResult.text; }
+            get { return _notice == null ? null : _noticeText; }
+        }
+
+        // Runtime evidence only: the last command message, whether or not
+        // it was worth showing (successful edits are no longer announced).
+        internal string LastCommandMessageForRuntime
+        {
+            get { return _lastCommandMessage; }
         }
 
         internal string WorkspacePaperEvidenceForRuntime
@@ -523,6 +538,7 @@ namespace KingmakerBuffPlanner.UI
         {
             TickWorkspaceKeyboard();
             TickClearPlan();
+            TickTooltip();
             _descriptionShownLastFrame = NativeDescriptionPresenter.IsOpen;
             FitSourceTabs();
             if (_controllerNavigation != null) _controllerNavigation.NoteFrameEnd();
@@ -610,6 +626,8 @@ namespace KingmakerBuffPlanner.UI
             get { return _description == null ? null : _description.LastAbilityGuid; }
         }
 
+        // A view-level problem from outside a command (a missing native
+        // description): the same error-only notice.
         internal void ShowNotice(string text)
         {
             Feedback(text, true);
@@ -665,13 +683,19 @@ namespace KingmakerBuffPlanner.UI
             _session.PresentForReview(inputs);
             double reviewMilliseconds = ElapsedMilliseconds(stageStarted);
             _lastView = view;
-            if (!_importAnnounced && _footerResult != null)
+            if (!_importAnnounced && _notice != null)
             {
                 _importAnnounced = true;
                 string import = PersistenceMessages.ForCastingLoad(_session.LoadStatus,
                     _session.PrimaryPlanFileExists, _session.LoadSourcePath, _session.LoadWarning) ??
                     DescribeImport(_session);
-                if (import != null) Feedback(import);
+                // A one-time load/import event, not idle chatter: shown until
+                // the next command (a blocked import stays a problem).
+                if (import != null)
+                {
+                    if (_session.LegacyImportBlocked) Feedback(import, true);
+                    else _loadNote = import;
+                }
             }
             stageStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             RebuildHeader(view);
@@ -930,17 +954,19 @@ namespace KingmakerBuffPlanner.UI
 
         internal string FooterSaveTextForRuntime
         {
-            get { return _footerSave == null ? null : _footerSave.text; }
+            // "Not saved" while a save problem stands; empty otherwise (no
+            // idle "Saved" text - autosave is the normal, silent case).
+            get { return _notice == null ? null : _saveIndicator; }
         }
 
         internal bool SaveRecoveryShownForRuntime
         {
-            get { return _footerRecovery != null && _footerRecovery.gameObject.activeInHierarchy; }
+            get { return _noticeRecovery != null && _noticeRecovery.gameObject.activeInHierarchy; }
         }
 
         internal string FooterResultForRuntime
         {
-            get { return _footerResult == null ? string.Empty : _footerResult.text; }
+            get { return _notice == null ? string.Empty : _noticeText; }
         }
 
         // Native UI finish evidence: the window title and every label the
@@ -1218,17 +1244,16 @@ namespace KingmakerBuffPlanner.UI
                 if (lane != null)
                     _frameParchment.AddWash(lane.GetComponent<Image>(), PlannerParchmentPalette.WellWashAlpha,
                         PlannerParchmentPalette.SheetWellWashAlpha);
-            _frameParchment.AddWash(_footerLedger, PlannerParchmentPalette.LedgerWashAlpha,
-                PlannerParchmentPalette.SheetLedgerWashAlpha);
             // Between the header row (its controls end 41 units down) and
-            // the routine bar; and in the gap between the lanes (8.5% of the
-            // frame up) and the two-row footer (15%).
+            // the routine bar; and in the gap between the lanes and the one
+            // footer action row (WorkspaceFooterLayout.RuleOffset).
             ParchmentRule header = ParchmentRule.Create("HeaderRule", _frame, _frameParchment, false);
             KingmakerUiFactory.SetAnchors(header.Rect, 0.028f, 1f, 0.972f, 1f);
             _headerRule = header;
             PlaceHeaderRule();
             ParchmentRule footer = ParchmentRule.Create("FooterRule", _frame, _frameParchment, false);
-            KingmakerUiFactory.SetAnchors(footer.Rect, 0.028f, 0.155f, 0.972f, 0.155f);
+            KingmakerUiFactory.SetAnchors(footer.Rect, 0.028f, 0f, 0.972f, 0f,
+                0f, 0f, WorkspaceFooterLayout.RuleOffset, -WorkspaceFooterLayout.RuleOffset);
             // The rules are part of the sheet: drawn right above the paper
             // and beneath every control, so a crowded small screen covers
             // them instead of striking through its routine tabs.
@@ -1421,6 +1446,31 @@ namespace KingmakerBuffPlanner.UI
             closeRect.pivot = new Vector2(1f, 0.5f);
             closeRect.sizeDelta = new Vector2(106f, -8f);
             closeRect.anchoredPosition = new Vector2(-8f, 0f);
+            // The error-only notice between the title and the routine count:
+            // empty (and taking no room anywhere) unless a command was
+            // refused, a save failed, or an automatic edit needs telling.
+            _notice = _kit.Text(header, "Notice", string.Empty, PlannerTextRole.Body, 16f,
+                TextAlignmentOptions.MidlineLeft);
+            _notice.enableWordWrapping = true;
+            _notice.overflowMode = TextOverflowModes.Ellipsis;
+            _notice.enableAutoSizing = true;
+            _notice.fontSizeMin = 13f;
+            _notice.fontSizeMax = 16f;
+            _notice.raycastTarget = true;
+            KingmakerUiFactory.SetAnchors(_notice.rectTransform, 0.165f, 0f, 0.6f, 1f, 0f, 0f, 2f, 2f);
+            _notice.gameObject.SetActive(false);
+            // The notice can be longer than two lines; its full text is its tooltip.
+            RegisterTooltip(_notice, "notice", null, () => new WorkspaceTooltipContent(string.Empty, _noticeText));
+            _noticeRecovery = _kit.Button(header, "SaveRecovery", WorkspaceFooterText.RetrySaveAction,
+                () => Command(RecoveryCommand), PlannerTextRole.Button, 15f);
+            KingmakerUiFactory.SetAnchors(RectOf(_noticeRecovery), 0.6f, 0f, 0.6f, 1f);
+            RectOf(_noticeRecovery).pivot = new Vector2(0f, 0.5f);
+            RectOf(_noticeRecovery).sizeDelta = new Vector2(136f, -8f);
+            RectOf(_noticeRecovery).anchoredPosition = new Vector2(8f, 0f);
+            RegisterTooltip(_noticeRecovery, "plan/save-recovery", "Header", () =>
+                WorkspaceFooterTooltips.SaveRecovery(WorkspaceFooterText.RecoveryAction(_session.FooterSaveState),
+                    WorkspaceFooterText.SaveProblem(_session.FooterSaveState)));
+            _noticeRecovery.gameObject.SetActive(false);
             // Row 2, on the book's top edge: the routines.
             _routineBar = KingmakerUiFactory.CreateRect("RoutineBar", frame);
             KingmakerUiFactory.SetAnchors(_routineBar, 0f, 0.900f, 1f, ParchmentHeaderRule.RoutineBarTopAnchor,
@@ -1430,7 +1480,8 @@ namespace KingmakerBuffPlanner.UI
         private void BuildCatalogue(RectTransform frame)
         {
             RectTransform lane = KingmakerUiFactory.CreateRect("Catalogue", frame);
-            KingmakerUiFactory.SetAnchors(lane, 0.028f, .16f, _controllerAuthoring ? .23f : .163f, .895f);
+            KingmakerUiFactory.SetAnchors(lane, 0.028f, 0f, _controllerAuthoring ? .23f : .163f,
+                WorkspaceFooterLayout.LaneTopFraction, 0f, 0f, WorkspaceFooterLayout.LaneBottom, 0f);
             TextMeshProUGUI title = _kit.Text(lane, "LaneTitle", "Buffs", PlannerTextRole.Heading, 19f,
                 TextAlignmentOptions.MidlineLeft);
             KingmakerUiFactory.SetAnchors(title.rectTransform, 0f, 1f, 1f, 1f);
@@ -1512,7 +1563,8 @@ namespace KingmakerBuffPlanner.UI
         private void BuildGraphArea(RectTransform frame)
         {
             RectTransform area = KingmakerUiFactory.CreateRect("Graph", frame);
-            KingmakerUiFactory.SetAnchors(area, _controllerAuthoring ? .24f : .172f, .16f, .742f, .895f);
+            KingmakerUiFactory.SetAnchors(area, _controllerAuthoring ? .24f : .172f, 0f, .742f,
+                WorkspaceFooterLayout.LaneTopFraction, 0f, 0f, WorkspaceFooterLayout.LaneBottom, 0f);
             // Banner: the selected buff, prominently, and the next step.
             RectTransform banner = KingmakerUiFactory.CreateRect("Banner", area);
             KingmakerUiFactory.SetAnchors(banner, 0f, 1f, 1f, 1f);
@@ -1584,7 +1636,8 @@ namespace KingmakerBuffPlanner.UI
         private void BuildInspector(RectTransform frame)
         {
             RectTransform lane = KingmakerUiFactory.CreateRect("Inspector", frame);
-            KingmakerUiFactory.SetAnchors(lane, .752f, .16f, .972f, .895f);
+            KingmakerUiFactory.SetAnchors(lane, .752f, 0f, .972f, WorkspaceFooterLayout.LaneTopFraction,
+                0f, 0f, WorkspaceFooterLayout.LaneBottom, 0f);
             _inspectorTitle = _kit.Text(lane, "LaneTitle", "New casting", PlannerTextRole.Heading, 19f,
                 TextAlignmentOptions.MidlineLeft);
             KingmakerUiFactory.SetAnchors(_inspectorTitle.rectTransform, 0f, 1f, 1f, 1f);
@@ -1604,33 +1657,47 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
-        // Keep save/feedback above the plan actions in both input modes.
-        // The second row leaves readable labels at the compact layout.
+        // One compact action row (owner request after 0.6.11): the idle
+        // explanatory/status line and the "Saved" text are gone, and their
+        // band now belongs to the lanes (WorkspaceFooterLayout). Every action
+        // explains itself - current state, what a click does, why it is
+        // unavailable - in a tooltip on pointer hover and keyboard/controller
+        // focus. Save problems and refusals use the header's error-only notice.
         private void BuildFooter(RectTransform frame)
         {
             RectTransform footer = KingmakerUiFactory.CreateRect("Footer", frame);
-            KingmakerUiFactory.SetAnchors(footer, 0f, 0f, 1f, .15f, 52f, 44f, 6f, 0f);
-            // Everyday-use v1.2 §2/§4/§5: autosave replaced Save (a passive
-            // status shows it, refreshed with the view), the Run click
-            // authorizes the current revision, and Reload appears - with
-            // Retry save - only as the exceptional recovery action.
-            const float SaveColumn = 112f;
-            _footerSave = _kit.Text(footer, "SaveStatus", string.Empty, PlannerTextRole.Small, 14f,
-                TextAlignmentOptions.MidlineLeft);
-            KingmakerUiFactory.SetAnchors(_footerSave.rectTransform, 0f, 0.5f, 0f, 1f, 0f, 0f, 0f, 0f);
-            _footerSave.rectTransform.offsetMax = new Vector2(SaveColumn - 8f, 0f);
-            _footerRecovery = _kit.Button(footer, "SaveRecovery", WorkspaceFooterText.RetrySaveAction,
-                () => Command(RecoveryCommand), PlannerTextRole.Button, 14f);
-            KingmakerUiFactory.SetAnchors(RectOf(_footerRecovery), 0f, 0.04f, 0f, 0.5f);
-            RectOf(_footerRecovery).offsetMax = new Vector2(SaveColumn - 8f, RectOf(_footerRecovery).offsetMax.y);
-            _footerRecovery.gameObject.SetActive(false);
+            KingmakerUiFactory.SetAnchors(footer, 0f, 0f, 1f, 0f, 52f, 44f,
+                WorkspaceFooterLayout.RowBottom, -WorkspaceFooterLayout.RowTop);
             string[] names = { "Resources", "AvailabilityPolicy", "ExecutionMode", "ClearPlan", "Undo", "Run" };
-            string[] captions = { "Resources", PolicyCaption(), ModeCaption(), "Clear plan", "Undo",
+            string[] keys = { "plan/resources", "plan/availability-policy", "plan/mode", "plan/clear", "plan/undo", "plan/run" };
+            // Every caption a button can show, so its width fits each state at
+            // full size (no truncation, no shrinking into illegibility).
+            string[][] captions =
+            {
+                new[] { "Resources" },
+                new[] { WorkspaceFooterTooltips.CastAvailableCaption, WorkspaceFooterTooltips.RequireFullCaption },
+                new[] { WorkspaceFooterTooltips.ModeCaption("instant"), WorkspaceFooterTooltips.ModeCaption("animated") },
+                new[] { "Clear plan" },
+                new[] { "Undo" },
+                _session.Document.Routines.Select(routine => WorkspaceFooterText.RunCaption(
+                    _session.RoutineDisplayName(routine.RoutineId))).DefaultIfEmpty(
+                        WorkspaceFooterText.RunCaption(_session.RoutineDisplayName(_session.SelectedRoutineId))).ToArray()
+            };
+            string[] initial = { "Resources", PolicyCaption(), ModeCaption(), "Clear plan", "Undo",
                 WorkspaceFooterText.RunCaption(_session.RoutineDisplayName(_session.SelectedRoutineId)) };
             Action[] actions =
             {
                 ToggleResources, ToggleAvailabilityPolicyCommand, ToggleModeCommand, OpenClearPlan, UndoCommand,
                 RunApply
+            };
+            Func<WorkspaceTooltipContent>[] tooltips =
+            {
+                WorkspaceFooterTooltips.Resources,
+                () => WorkspaceFooterTooltips.Policy(_session.AvailabilityPolicy),
+                () => WorkspaceFooterTooltips.Mode(_session.ExecutionMode),
+                () => WorkspaceFooterTooltips.ClearPlan(_session.ClearPlanUnavailableReason, _session.Document.Castings.Count),
+                () => WorkspaceFooterTooltips.Undo(_session.CanUndo, _session.UndoRestoresClearedCount),
+                RunTooltip
             };
             float[] widths = { 128f, 196f, 154f, 128f, 88f, 176f };
             float right = 0f;
@@ -1639,56 +1706,51 @@ namespace KingmakerBuffPlanner.UI
                 Action action = actions[index];
                 Action invoke = names[index] == "Resources" || names[index] == "ClearPlan"
                     ? action : (Action)(() => Command(action));
-                Button button = names[index] == "AvailabilityPolicy"
-                    ? _kit.Checkbox(footer, names[index], "Require full plan",
-                        _session.AvailabilityPolicy == ExecutionProfile.RequireFullPlan, invoke, size: 16f)
-                    : _kit.Button(footer, names[index], captions[index], invoke,
-                        PlannerTextRole.Button, names[index] == "Run" ? 19f : 16f);
+                Button button = _kit.Button(footer, names[index], initial[index], invoke,
+                    PlannerTextRole.Button, names[index] == "Run" ? 19f : 16f);
+                float width = FitCaptions(button, widths[index], captions[index]);
                 RectTransform rect = RectOf(button);
-                KingmakerUiFactory.SetAnchors(rect, 1f, 0.12f, 1f, 0.88f);
+                KingmakerUiFactory.SetAnchors(rect, 1f, 0f, 1f, 1f);
                 rect.pivot = new Vector2(1f, 0.5f);
-                rect.sizeDelta = new Vector2(widths[index], 0f);
+                rect.sizeDelta = new Vector2(width, 0f);
                 rect.anchoredPosition = new Vector2(-right, 0f);
-                rect.anchorMin = new Vector2(1, .04f); rect.anchorMax = new Vector2(1, .48f);
-                right += widths[index] + 8f;
+                right += width + 8f;
+                RegisterTooltip(button, keys[index], "Footer", tooltips[index]);
                 if (names[index] == "Resources") _resourcesButton = button;
-                if (names[index] == "AvailabilityPolicy")
-                {
-                    _policyButton = button;
-                    ControllerControlIdentity.Set(button, "plan/availability-policy", "Footer");
-                    button.GetComponent<ControllerControlIdentity>().Explanation = () =>
-                        "Do not start this routine if a needed planned casting is unavailable. " +
-                        "Checks readiness before execution; native failures can still stop a started run.";
-                    button.gameObject.AddComponent<RightClickProxy>().OnRightClick = () => ShowNotice(
-                        button.GetComponent<ControllerControlIdentity>().Explanation());
-                }
+                if (names[index] == "AvailabilityPolicy") _policyButton = button;
                 if (names[index] == "ExecutionMode") _modeButton = button;
                 if (names[index] == "Undo") _undoButton = button;
-                if (names[index] == "ClearPlan")
-                {
-                    _clearPlanButton = button;
-                    ControllerControlIdentity.Set(button, "plan/clear", "Footer");
-                    button.GetComponent<ControllerControlIdentity>().Explanation = () => _session.ClearPlanUnavailableReason ??
-                        "Remove every planned casting from every routine in one undoable edit.";
-                    button.gameObject.AddComponent<RightClickProxy>().OnRightClick = () => ShowNotice(
-                        _session.ClearPlanUnavailableReason ?? "Remove every planned casting from every routine in one undoable edit.");
-                }
-                if (names[index] == "Undo") ControllerControlIdentity.Set(button, "plan/undo", "Footer");
+                if (names[index] == "ClearPlan") _clearPlanButton = button;
                 if (names[index] == "Run") _runButton = button;
             }
-            _footerResult = _kit.Text(footer, "Result", string.Empty, PlannerTextRole.Body, 18f,
-                TextAlignmentOptions.MidlineLeft);
-            _footerResult.overflowMode = TextOverflowModes.Ellipsis;
-            KingmakerUiFactory.SetAnchors(_footerResult.rectTransform, 0, .55f, 1, 1, SaveColumn, 0, 0, 0);
-            // The footer line's paper ground (washed onto the sheet).
-            RectTransform ledger = KingmakerUiFactory.CreateRect("FooterLedger", footer);
-            KingmakerUiFactory.SetAnchors(ledger, 0, .55f, 1, 1, -8, -8, 0, 0);
-            Image ground = KingmakerUiFactory.AddFramedPanel(ledger, _theme.ParchmentRaised, _theme.GoldAccent);
-            ground.raycastTarget = false;
-            ledger.SetAsFirstSibling();
-            _footerLedger = ground;
             BuildResources(frame);
             ShowSaveState();
+        }
+
+        // The width a native button needs for its widest caption at its full
+        // caption size (ControlCaptionFit), never below the design width.
+        private static float FitCaptions(Button button, float designWidth, IEnumerable<string> captions)
+        {
+            TMP_Text label = button == null ? null : button.GetComponentInChildren<TMP_Text>(true);
+            if (label == null) return designWidth;
+            float widest = 0f;
+            foreach (string caption in captions ?? new string[0])
+            {
+                Vector2 preferred = label.GetPreferredValues(caption ?? string.Empty);
+                if (!float.IsNaN(preferred.x) && !float.IsInfinity(preferred.x)) widest = Mathf.Max(widest, preferred.x);
+            }
+            // The kit's caption sits 10 units inside each edge.
+            return ControlCaptionFit.ResolveExtent(designWidth, ControlCaptionFit.RequiredWidth(widest, 10f) + 4f);
+        }
+
+        private WorkspaceTooltipContent RunTooltip()
+        {
+            string name = _session.RoutineDisplayName(_session.SelectedRoutineId);
+            bool problem = false;
+            string status = _lastView == null ? string.Empty : FooterStatus(_lastView, out problem);
+            bool enabled = _runButton == null || _runButton.interactable;
+            return WorkspaceFooterTooltips.Run(name, _session.AvailabilityPolicy, _session.ExecutionMode, status,
+                enabled);
         }
 
         // The Resources details (UI-08): the selected routine considered on
@@ -1794,6 +1856,7 @@ namespace KingmakerBuffPlanner.UI
                 return;
             }
             long startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+            DismissTooltip();
             NativeDescriptionPresenter.CloseIfOpen();
             ResourceRebuildTiming timing;
             try { timing = RebuildResources(); }
@@ -1863,8 +1926,9 @@ namespace KingmakerBuffPlanner.UI
             string saveState = _session.FooterSaveState;
             string saveProblem = WorkspaceFooterText.SaveProblem(saveState);
             string recovery = WorkspaceFooterText.RecoveryAction(saveState);
+            // Error-only, like the workspace: no idle "Saved" line.
             _resourcesSaveStatus.text = saveProblem == null
-                ? WorkspaceFooterText.SaveStatus(saveState)
+                ? string.Empty
                 : saveProblem + (recovery == null ? string.Empty
                     : " Close Resources to " + recovery + ".");
             _resourcesSaveStatus.color = saveProblem == null
@@ -1964,26 +2028,24 @@ namespace KingmakerBuffPlanner.UI
                 from == 0f ? 4f : 5f, to == 1f ? 4f : 5f, 0f, 0f);
         }
 
-        // The passive save status and its exceptional recovery action,
-        // refreshed with every view rebuild (v1.2 §4: never "Saved" before
-        // the current revision is durable). When the state turns into a
-        // problem, the explanation replaces the footer line once.
+        // The save state, error-only (owner request after 0.6.11: autosave is
+        // silent). A failed or refused save stays named in the header notice
+        // - with Retry save or Reload - for as long as it stands, and the run
+        // durability barrier is unchanged (CastingWorkspaceSession refuses a
+        // Run whose intent is not durable).
         private void ShowSaveState()
         {
-            if (_footerSave == null) return;
+            if (_notice == null) return;
             string state = _session.FooterSaveState;
             string problem = WorkspaceFooterText.SaveProblem(state);
-            _footerSave.text = WorkspaceFooterText.SaveStatus(state);
-            _footerSave.color = problem == null ? PlannerNativeKit.SecondaryInk : BlockedInk;
+            _saveIndicator = WorkspaceFooterText.SaveIndicator(state);
             string action = WorkspaceFooterText.RecoveryAction(state);
-            if (_footerRecovery != null)
+            if (_noticeRecovery != null)
             {
-                _footerRecovery.gameObject.SetActive(action != null);
-                if (action != null) PlannerNativeKit.SetCaption(_footerRecovery, action);
+                _noticeRecovery.gameObject.SetActive(action != null);
+                if (action != null) PlannerNativeKit.SetCaption(_noticeRecovery, action);
             }
-            if (problem != null && !string.Equals(state, _shownSaveState, StringComparison.Ordinal))
-                Feedback(problem, true);
-            _shownSaveState = state;
+            ShowStandingNotice(problem);
         }
 
         private void RecoveryCommand()
@@ -2002,14 +2064,54 @@ namespace KingmakerBuffPlanner.UI
             }
         }
 
-        // The footer's one line: a command's feedback (kept until the next
-        // command; a problem in the blocked ink, an ordinary edit not).
+        // A command's outcome. Only a problem is shown (until the next
+        // command); a routine success ("Casting added", "Mode changed") is
+        // no longer announced - the plan itself shows the change.
         private void Feedback(string text, bool problem = false)
         {
-            if (_footerResult == null || string.IsNullOrEmpty(text)) return;
-            _footerResult.text = text;
-            _footerResult.color = problem ? BlockedInk : PlannerNativeKit.BodyInk;
+            if (string.IsNullOrEmpty(text)) return;
+            _lastCommandMessage = text;
+            if (!problem) return;
+            _commandProblem = text;
             _feedbackShown = true;
+            ShowStandingNotice(WorkspaceFooterText.SaveProblem(_session.FooterSaveState));
+        }
+
+        // What the header notice says now, in priority order: the command
+        // problem just reported, a standing save problem, an automatic
+        // spellbook-removal edit (with its Undo), the last refused attempt
+        // while its problems are being navigated, a one-time load note.
+        private string StandingNotice(string saveProblem)
+        {
+            if (_feedbackShown && !string.IsNullOrEmpty(_commandProblem)) return _commandProblem;
+            if (saveProblem != null) return saveProblem;
+            string removal = _session.SpellbookReconciliationNotice;
+            if (!string.IsNullOrEmpty(removal))
+                return string.IsNullOrEmpty(_session.LastAttemptMessage) ||
+                    _session.LastAttemptMessage.StartsWith(removal, StringComparison.Ordinal)
+                    ? removal : removal + " Last attempt: " + _session.LastAttemptMessage;
+            if (_session.ProblemNavigation.Active && !string.IsNullOrEmpty(_session.LastAttemptMessage))
+                return _session.LastAttemptMessage;
+            return _loadNote;
+        }
+
+        // Unity calls stay in their own frame: the commands above are also
+        // driven by detached fixtures without a native runtime.
+        private void ShowStandingNotice(string saveProblem)
+        {
+            if (ReferenceEquals(_notice, null)) return;
+            RenderNotice(StandingNotice(saveProblem));
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private void RenderNotice(string text)
+        {
+            _noticeText = text ?? string.Empty;
+            bool show = _noticeText.Length != 0;
+            if (_notice.gameObject.activeSelf != show) _notice.gameObject.SetActive(show);
+            if (!string.Equals(_notice.text, _noticeText, StringComparison.Ordinal)) _notice.text = _noticeText;
+            _notice.color = string.Equals(_noticeText, _loadNote, StringComparison.Ordinal)
+                ? PlannerNativeKit.BodyInk : BlockedInk;
         }
 
         // ------------------------------------------------------------------
@@ -2165,9 +2267,9 @@ namespace KingmakerBuffPlanner.UI
             Rect rect = _graphViewport.rect;
             if (rect.width > 300f && rect.height > 200f) return rect.size;
             float frameWidth = Mathf.Max(800f, Screen.width - 48f);
-            float frameHeight = Mathf.Max(600f, Screen.height - 84f);
+            float frameHeight = Mathf.Max(600f, WorkspaceFooterLayout.FrameHeight(Screen.height, _controllerAuthoring));
             return new Vector2(frameWidth * (0.742f - 0.172f) - 16f,
-                frameHeight * (0.895f - 0.085f) - 102f - 6f);
+                WorkspaceFooterLayout.ContentHeight(frameHeight) - 104f);
         }
 
         private void RebuildGraph(CastingGraphView view)
@@ -2980,9 +3082,11 @@ namespace KingmakerBuffPlanner.UI
             if (_disposed || ClearPlanOpen || _clearInput.BlocksBackground || NativeDescriptionBlocksWorkspace) return;
             long commandStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             _nextInteractionStartedAt = commandStarted;
-            // A command's feedback lasts until the next command; without one
-            // the footer shows Run's status again.
+            // A command's problem lasts until the next command; a one-time
+            // load note ends with the first command too.
             _feedbackShown = false;
+            _commandProblem = null;
+            _loadNote = null;
             try
             {
                 action();
@@ -3062,6 +3166,7 @@ namespace KingmakerBuffPlanner.UI
                 return;
             }
             _reloadArmedUntil = 0f;
+            DismissTooltip();
             CastingPlanLoadStatus status = _session.Reload();
             // Castings kept across the reload are deliberate edits made
             // while saving was blocked: now that it is not, they save like
@@ -3084,21 +3189,28 @@ namespace KingmakerBuffPlanner.UI
                 _session.LegacyImportBlocked || !keptSaved);
         }
 
+        // Toggles only the execution mode; its caption (the CURRENT mode)
+        // and an open tooltip update at once; the setting autosaves.
         private void ToggleModeCommand()
         {
             _session.SetExecutionMode(_session.ExecutionMode == "instant" ? "animated" : "instant");
-            PlannerNativeKit.SetCaption(_modeButton, ModeCaption());
-            Feedback(WorkspaceFooterText.ModeChanged(_session.ExecutionMode));
+            if (!ReferenceEquals(_modeButton, null)) SetCaptionOf(_modeButton, ModeCaption());
+            _lastCommandMessage = WorkspaceFooterText.ModeChanged(_session.ExecutionMode);
+            RenderTooltip();
         }
 
+        // The same persisted availability policy the HUD, workspace Run,
+        // keyboard and controller routes read (no new setting, no
+        // migration): exactly one toggle per activation. The caption states
+        // the CURRENT policy; the tooltip names what a click switches to.
         private void ToggleAvailabilityPolicyCommand()
         {
             string next = _session.AvailabilityPolicy == ExecutionProfile.RequireFullPlan
                 ? ExecutionProfile.CastAvailable : ExecutionProfile.RequireFullPlan;
             _session.SetAvailabilityPolicy(next);
-            Feedback(next == ExecutionProfile.CastAvailable
-                ? "Cast available: ready castings run in authored order; every omission is reported."
-                : "Require full plan: any unavailable requested casting refuses the run.");
+            if (!ReferenceEquals(_policyButton, null)) SetCaptionOf(_policyButton, PolicyCaption());
+            _lastCommandMessage = WorkspaceFooterTooltips.PolicyCaption(next);
+            RenderTooltip();
         }
 
         private void ToggleRecipientEditCommand()
@@ -3128,30 +3240,27 @@ namespace KingmakerBuffPlanner.UI
             if (!_session.Undo()) Feedback("Nothing to undo.");
         }
 
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void SetCaptionOf(Button button, string caption)
+        {
+            PlannerNativeKit.SetCaption(button, caption);
+        }
+
         private string ModeCaption()
         {
-            return _session.ExecutionMode == "instant" ? "Mode: Instant" : "Mode: Animated";
+            return WorkspaceFooterTooltips.ModeCaption(_session.ExecutionMode);
         }
 
         private string PolicyCaption()
         {
-            return _session.AvailabilityPolicy == ExecutionProfile.CastAvailable
-                ? "Cast available" : "Require full plan";
+            return WorkspaceFooterTooltips.PolicyCaption(_session.AvailabilityPolicy);
         }
 
-        // The footer's standing line when no command has just spoken: an
-        // automatic spellbook-removal edit (with its Undo) or the last
-        // attempt while it stands, else Run's status.
+        // What Run does now, or exactly why it cannot: the Run tooltip's
+        // status (formerly the footer's idle line).
         private string FooterStatus(CastingGraphView view, out bool problem)
         {
             problem = false;
-            // 0.4.2 (B): an automatic spellbook-removal edit stays named
-            // (with its Undo) until it is undone or superseded.
-            string removal = _session.SpellbookReconciliationNotice;
-            if (!string.IsNullOrEmpty(removal))
-                return string.IsNullOrEmpty(_session.LastAttemptMessage) ||
-                    _session.LastAttemptMessage.StartsWith(removal, StringComparison.Ordinal)
-                    ? removal : removal + " Last attempt: " + _session.LastAttemptMessage;
             CastingApplyDecision gate = view.SelectedRoutineGate;
             int notReady = gate == null ? 0 : gate.BlockingCastings.Count;
             int executable = gate == null ? 0 : gate.ExecutableCastingIds.Count;
@@ -3208,19 +3317,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void RebuildFooter(CastingGraphView view)
         {
-            bool problems = _session.ProblemNavigation.Active;
-            if (problems || _showedProblems)
-            {
-                if (!string.IsNullOrEmpty(_session.LastAttemptMessage) && !_feedbackShown)
-                    Feedback(_session.LastAttemptMessage, true);
-            }
-            _showedProblems = problems;
-            if (!_feedbackShown && _footerResult != null)
-            {
-                bool problem;
-                _footerResult.text = FooterStatus(view, out problem);
-                _footerResult.color = problem ? BlockedInk : PlannerNativeKit.BodyInk;
-            }
+            _showedProblems = _session.ProblemNavigation.Active;
             if (_resources != null && _resources.gameObject.activeSelf)
                 RebuildResources();
             if (_undoButton != null) PlannerNativeKit.SetEnabled(_undoButton, _session.CanUndo);
@@ -3229,13 +3326,12 @@ namespace KingmakerBuffPlanner.UI
             if (_runButton != null)
                 PlannerNativeKit.SetCaption(_runButton, WorkspaceFooterText.RunCaption(
                     _session.RoutineDisplayName(_session.SelectedRoutineId)));
-            if (_policyButton != null)
-            {
-                Transform check = _policyButton.transform.Find("Box/Check");
-                if (check != null) check.gameObject.SetActive(
-                    _session.AvailabilityPolicy == ExecutionProfile.RequireFullPlan);
-            }
+            // Captions state the CURRENT policy and mode (also after a reload
+            // or a change made elsewhere); open tooltips follow.
+            if (_policyButton != null) PlannerNativeKit.SetCaption(_policyButton, PolicyCaption());
+            if (_modeButton != null) PlannerNativeKit.SetCaption(_modeButton, ModeCaption());
             ShowSaveState();
+            RetainTooltip();
         }
 
         private static string DescribeImport(CastingWorkspaceSession session)

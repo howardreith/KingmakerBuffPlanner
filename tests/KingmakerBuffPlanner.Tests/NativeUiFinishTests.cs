@@ -466,7 +466,7 @@ namespace KingmakerBuffPlanner.Tests
                 { CastingGraphText.CatalogueCount(0, 1, "Long"), "1 in other routines" },
                 { CastingGraphText.CatalogueCount(0, 0, "Long"), string.Empty },
                 { WorkspaceFooterText.RunStatus("native-casting-enabled", "Long", 3, false, 1, 2, null, 0),
-                    "Long cannot run: 2 castings are not ready (marked in red). Uncheck Require full plan to run the other 1." },
+                    "Long cannot run: 2 castings are not ready (marked in red). Switch to Plan: Cast available to run the other 1." },
                 { WorkspaceFooterText.RunStatus("native-casting-enabled", "Long", 2, true, 2, 0, null, 1),
                     "Run Long casts 2 castings. 1 casting is short if every routine runs without rest (see Resources)." },
                 { WorkspaceFooterText.RunStatus("native-casting-enabled", "Long", 1, true, 0, 0, null, 0),
@@ -922,6 +922,33 @@ namespace KingmakerBuffPlanner.Tests
                 mutate(bad);
                 Expect(bad.Violations().Count != 0, "A missing, duplicate, wrong-owner or non-refused observation must fail.");
             }
+            // Schema 10: the policy is a state button and autosave is silent.
+            NativeUiRecord current = CurrentRefusalRecord();
+            current.SchemaVersion = 10;
+            current.AvailabilityPolicyCaption = "Plan: Require full";
+            current.ResourcesSaveStatus = string.Empty;
+            current.AvailabilityStates.Clear();
+            current.AvailabilityStates.AddRange(new[] { "cast-available|Plan: Cast available", "require-full-plan|Plan: Require full" });
+            Expect(current.Violations().Count == 0, "Schema 10 rejected the button captions or the silent save: " +
+                string.Join("|", current.Violations().ToArray()));
+            foreach (Action<NativeUiRecord> mutate in new Action<NativeUiRecord>[]
+            {
+                r => r.AvailabilityPolicyCaption = "Require full plan",
+                r => r.AvailabilityPolicyCaption = "Plan: Require",
+                r => r.ResourcesSaveStatus = "Saved",
+                r => r.AvailabilityStates[0] = "cast-available|Plan: Require full",
+                r => r.AvailabilityStates[1] = "require-full-plan|Require full plan"
+            })
+            {
+                NativeUiRecord bad = CurrentRefusalRecord();
+                bad.SchemaVersion = 10;
+                bad.AvailabilityPolicyCaption = "Plan: Require full";
+                bad.ResourcesSaveStatus = string.Empty;
+                bad.AvailabilityStates.Clear();
+                bad.AvailabilityStates.AddRange(new[] { "cast-available|Plan: Cast available", "require-full-plan|Plan: Require full" });
+                mutate(bad);
+                Expect(bad.Violations().Count != 0, "Schema 10 accepted a checkbox-era caption, a wrong state or idle Saved text.");
+            }
             NativeUiRecord historical = CurrentRefusalRecord();
             historical.SchemaVersion = 8;
             Expect(historical.Violations().Contains("game-log-planner-lines:2"),
@@ -1021,7 +1048,7 @@ namespace KingmakerBuffPlanner.Tests
                 { "spellbook-pair-height-or-baseline:Linzi", r => r.Spellbooks[0].PlannerRect = new[] { 1600f, 100f, 150f, 30f } },
                 { "spellbook-top-right-entry-present", r => r.SpellbookTopRightEntryAbsent = false },
                 { "popup-presenter:planner-scroll", r => r.PlannerPopupPresenter = "planner-scroll" },
-                { "schema:10", r => r.SchemaVersion = 10 },
+                { "schema:11", r => r.SchemaVersion = 11 },
                 { "pause:inventory:not-paused-before", r => r.Switches[4].PausedBefore = false },
                 { "pause:not-restored", r => r.OwnedPauseRestored = false },
                 { "unavailable-metamagic:no-view", r => r.Spellbooks.RemoveAt(1) },
