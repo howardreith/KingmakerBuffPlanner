@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - prepared-slot spend repair after 0.6.12
+## 0.6.13 - 2026-11-06 - prepared-slot spend repair after 0.6.12
 
 - Two castings of the same prepared spell from one caster (for example two
   Heroisms on different recipients) no longer stop a routine at the second
@@ -11,8 +11,8 @@
   preparation, and a real shortage still follows Cast available / Require
   full. Refusals now say whether the preparation is spent or missing, and
   cast details name the slots the game actually consumed.
-- Offline only; native acceptance not yet run.
-  [Checkpoint](docs/PREPARED-SLOT-SPEND-REPAIR-CHECKPOINT.md)
+- Owner-authorized pre-runtime release. No native game run exists for this
+  version. [Checkpoint](docs/PREPARED-SLOT-SPEND-REPAIR-CHECKPOINT.md)
 
 ## 0.6.12 - 2026-11-06 - final refinement after 0.6.11
 

@@ -1,5 +1,13 @@
 # Mr. Bard's Kingmaker Buff Planner
 
+**Release: [0.6.13](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.13).**
+This owner-authorized repair lets two castings of the same prepared spell from
+one caster (for example two Heroisms on different recipients) both cast in one
+run, instead of stopping at the second with `provider-ability-not-found`. This
+exact release has not been run in the game. See the
+[release notes](docs/RELEASE-NOTES-0.6.13.md) and the
+[checkpoint](docs/PREPARED-SLOT-SPEND-REPAIR-CHECKPOINT.md).
+
 **Release: [0.6.12](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.12).**
 This owner-authorized final refinement turns the plan policy into a native
 button, adds tooltips to every footer action, removes the idle footer text to
@@ -145,7 +153,7 @@ did not distinguish a deliberate choice from the old default. See the
 
 Mr. Bard's Kingmaker Buff Planner is a standalone Unity Mod Manager mod built
 against **Windows Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b**. The
-0.6.12 retains the native Linux 2.1.5d version gate but has not passed a
+0.6.13 retains the native Linux 2.1.5d version gate but has not passed a
 native Linux trial.
 
 It plans and applies party buffs while preserving Kingmaker targeting,
@@ -155,7 +163,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.6.12.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.6.13.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including
