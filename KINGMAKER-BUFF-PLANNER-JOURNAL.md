@@ -4635,3 +4635,16 @@ offline 713/0, source 47/0, Release DLL `83851fec...d056`. Native NOT RUN; no
 package, install or save change. Next: owner review, then one uninterrupted
 native Long through both Heroisms and the successor.
 [Checkpoint](docs/PREPARED-SLOT-SPEND-REPAIR-CHECKPOINT.md).
+
+## 2026-11-06 UTC - 0.6.13 stable release published and verified
+
+Owner merged PR #22 (`5cef7c2`) and requested a build and release. Release-
+preparation commit `a9ba4c4` (version 0.6.12 -> 0.6.13, notes, README, dated
+changelog) pushed to main through the guarded helper; v0.6.13 published as
+Latest by the guarded publisher (OwnerAuthorizedPreRuntime). Source 47/0,
+complete offline 713/0, gate 8/0, deterministic builds 3/0, package 6/0 local
+and downloaded. ZIP
+`3e0399f3aeb5b89573e10336804f425a9f7cad9c39aa4d160b7a50e1b51dbe11`; DLL
+`b638b0c46a790f4ad6a4c54dae30c90534ff52e1c94e072d77a79a6a63214719`. No native
+run, installation or save change. Next: owner playtest, one uninterrupted Long
+with the repeated-Heroism plan. [Release record](docs/RELEASE-0.6.13-RECORD.md).
