@@ -1,0 +1,86 @@
+diff --git a/tests/KingmakerBuffPlanner.Tests/HeroismRepeatTests.cs b/tests/KingmakerBuffPlanner.Tests/HeroismRepeatTests.cs
+index c271089..8a16500 100644
+--- a/tests/KingmakerBuffPlanner.Tests/HeroismRepeatTests.cs
++++ b/tests/KingmakerBuffPlanner.Tests/HeroismRepeatTests.cs
+@@ -33,6 +33,8 @@ namespace KingmakerBuffPlanner.Tests
+             internal bool NearbyRecipients;
+             internal bool NearbySelectionUnresolved;
+             internal string NearbyOwner;
++            internal long MarkerLifetime = 100;
++            internal string ApplicationOwner;
+             private readonly Dictionary<string, List<ObservedEffectInstance>> _additional =
+                 new Dictionary<string, List<ObservedEffectInstance>>(StringComparer.Ordinal);
+             private string BuffId { get { return CapturedHeroism ? "87ab2fed7feaaff47b62a3320a57ad8d" : "buff-effect"; } }
+@@ -101,7 +103,7 @@ namespace KingmakerBuffPlanner.Tests
+                             "6d949ebb548bd6c31e8d5bd45f96a7b6");
+                     if (Observation != "marker-missing")
+                         PutAdditional(Observation == "marker-wrong-owner" ? (NearbyRecipients ? target : step.Provider.CasterUnitId) :
+-                            NearbyRecipients ? "unit-t2" : target,
++                            NearbyRecipients ? (ApplicationOwner ?? "unit-t2") : target,
+                             "c20c575b6352d1692b3074a25232e699");
+                 }
+                 bool succeeded = Observation != "native-failure";
+@@ -115,7 +117,7 @@ namespace KingmakerBuffPlanner.Tests
+                 List<ObservedEffectInstance> values;
+                 if (!_additional.TryGetValue(owner, out values)) _additional[owner] = values = new List<ObservedEffectInstance>();
+                 values.RemoveAll(value => value.EffectId == effect);
+-                values.Add(new ObservedEffectInstance(EffectKind.Buff, effect, "aux-" + (++_instance), Round + 100, false));
++                values.Add(new ObservedEffectInstance(EffectKind.Buff, effect, "aux-" + (++_instance), Round + MarkerLifetime, false));
+             }
+ 
+             private int Available(CastStep step)
+@@ -411,6 +413,39 @@ namespace KingmakerBuffPlanner.Tests
+             }
+         }
+ 
++        private static string ReproOutcome(RepeatSession run)
++        {
++            var r = run.Host.LastReport;
++            return "confirmed=" + r.Confirmed + ";skipped=" + r.Skipped + ";notProcessed=" + r.NotProcessed +
++                ";spent=" + r.ResourcesSpent + ";fired=" + string.Join(",", run.World.State.Fired.ToArray()) +
++                ";first=" + r.Entries[0].Detail;
++        }
++
++        private static void ReproH1(string root, string mode)
++        {
++            var run = new RepeatSession(root, mode, "r1", capturedHeroism: true, infectiousCharms: true, nearbyRecipients: true);
++            run.World.MarkerLifetime = 1; // Call of the Wild applies both markers for 3 seconds
++            RepeatAssert(run.Apply().Allowed && run.Host.LastReport.Confirmed == 2, "first: " + ReproOutcome(run));
++            int slots = run.World.State.Tokens.Values.Count(v => v);
++            run.World.Round += 1; // markers expired; Heroism has 99 rounds left
++            run.World.State.Active.Remove("unit-t4");
++            RepeatAssert(run.Apply().Allowed, "repeat admission");
++            Console.WriteLine("[BASELINE-REPRO-H1] mode=" + mode + ";heroism-slots-before=" + slots + ";after=" +
++                run.World.State.Tokens.Values.Count(v => v) + ";" + ReproOutcome(run));
++            RepeatAssert(run.Host.LastReport.Skipped == 1 && run.World.State.Tokens.Values.Count(v => v) == slots,
++                "H1 reproduced: adequate long Heroism was recast because its 3 s markers expired");
++        }
++
++        private static void ReproH2(string root, string mode)
++        {
++            var run = new RepeatSession(root, mode, "r2", capturedHeroism: true, infectiousCharms: true, nearbyRecipients: true);
++            run.World.ApplicationOwner = "unit-t3"; // predicted unit-t2; unit-t3 is nearest when the action runs
++            RepeatAssert(run.Apply(true).Allowed, "admission");
++            Console.WriteLine("[BASELINE-REPRO-H2] mode=" + mode + ";predicted=unit-t2;applied=unit-t3;" + ReproOutcome(run));
++            RepeatAssert(run.Host.LastReport.Confirmed == 2 && run.Host.LastReport.NotProcessed == 0,
++                "H2 reproduced: legitimate native A->B selection failed confirmation and stopped the successor");
++        }
++
+         private static void TestHeroismFixtureScope(string root)
+         {
+             Assert(HeroismFixturePreparationPolicy.SaveMustFinishBeforeTermination(true, false, false));
+diff --git a/tests/KingmakerBuffPlanner.Tests/Program.cs b/tests/KingmakerBuffPlanner.Tests/Program.cs
+index 885098d..9e1f466 100644
+--- a/tests/KingmakerBuffPlanner.Tests/Program.cs
++++ b/tests/KingmakerBuffPlanner.Tests/Program.cs
+@@ -448,6 +448,10 @@ namespace KingmakerBuffPlanner.Tests
+             Run("playtest-heroism-mixed-owner-instant", () => TestMixedOwnerHeroism(root, "instant"));
+                 Run("playtest-heroism-mixed-owner-animated", () => TestMixedOwnerHeroism(root, "animated"));
+                 Run("playtest-heroism-captured-animated", () => TestCapturedHeroism(root, "animated"));
++                Run("baseline-repro-h1-instant", () => ReproH1(root, "instant"));
++                Run("baseline-repro-h1-animated", () => ReproH1(root, "animated"));
++                Run("baseline-repro-h2-instant", () => ReproH2(root, "instant"));
++                Run("baseline-repro-h2-animated", () => ReproH2(root, "animated"));
+                 RunProductionExecutionTests(root);
+                 RunCastingGraphTests(root);
+                 RunDuplicateItemSourceTests(root);

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.6.12 - unreleased - final refinement after 0.6.11
+
+- The footer's Require full plan checkbox is a native button that states the
+  current policy ("Plan: Cast available" / "Plan: Require full") and toggles the
+  same saved choice. Every footer action and the Clear dialog's buttons have
+  hover and keyboard/controller-focus tooltips, including disabled reasons.
+- The idle status line and "Saved" text are gone and their row is removed; the
+  catalogue, casting graph, recipients and inspector gain about 97 units of
+  height at 1920x1200 (computed). Save failures still appear, with Retry save,
+  in an error-only header notice; runs still require the latest edit saved.
+- Clear plan uses the game's own message-box scroll paper, a centred native
+  title and ordinary native buttons.
+- After Clear, a source that is genuinely spent reads "No prepared uses
+  remaining." instead of blaming the (now empty) plan. Nothing is refunded.
+- Infectious Charms: the three-second follow-up markers no longer decide whether
+  an existing Heroism counts as already active, and confirmation follows the
+  nearby unit the game actually selects when the spell lands.
+- Unreleased candidate. No native game run, render or physical input exists for
+  this version. [Checkpoint](docs/FINAL-REFINEMENT-0.6.12-CHECKPOINT.md)
+
 ## 0.6.8 - 2026-11-04 - duplicate item sources and stale casting repair
 
 - Exposes every genuinely available identical item copy and capable owner under

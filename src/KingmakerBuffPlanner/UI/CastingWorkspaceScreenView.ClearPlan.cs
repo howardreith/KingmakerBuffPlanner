@@ -11,6 +11,10 @@ namespace KingmakerBuffPlanner.UI
     {
         private Button _clearPlanButton;
         private RectTransform _clearOverlay;
+        // The dialog's native DialogMessageBox scroll paper and its scroll
+        // rule, registered with the theme only while the dialog exists.
+        private ParchmentSurface _clearParchment;
+        private ParchmentRule _clearRule;
         private ClearPlanConfirmation _clearConfirmation;
         private readonly WorkspaceModalInputGate _clearInput = new WorkspaceModalInputGate();
         private CanvasGroup _clearBackground;
@@ -67,45 +71,14 @@ namespace KingmakerBuffPlanner.UI
             }
             _clearInput.Open(Time.frameCount);
             if (ControllerEditorInputBoundary.Active != null) ControllerEditorInputBoundary.Active.ResetWorkspaceActivation();
+            DismissTooltip();
             _clearOverlay = KingmakerUiFactory.CreateRect("ClearPlanConfirmation", _root);
             KingmakerUiFactory.Stretch(_clearOverlay);
             RectTransform blocker = KingmakerUiFactory.CreateRect("Blocker", _clearOverlay);
             KingmakerUiFactory.Stretch(blocker);
             KingmakerUiFactory.AddPanel(blocker, new Color(.08f, .05f, .03f, .58f)).raycastTarget = true;
             // The backdrop intercepts clicks; cancellation is explicit or Back/Escape.
-            RectTransform backing = KingmakerUiFactory.CreateRect("OpaqueParchment", _clearOverlay);
-            PlaceClearPaper(backing);
-            Color parchment = _theme.ParchmentRaised; parchment.a = 1;
-            KingmakerUiFactory.AddPanel(backing, parchment).raycastTarget = false;
-            RectTransform dialog = KingmakerUiFactory.CreateRect("Dialog", _clearOverlay);
-            PlaceClearPaper(dialog);
-            Image paper = _kit.Paint(dialog, PlannerNativeKit.PaperSlip, Color.white, true);
-            if (paper == null) paper = KingmakerUiFactory.AddFramedPanel(dialog, parchment, _theme.GoldAccent);
-            paper.raycastTarget = true;
-            _kit.Frame(dialog, PlannerNativeKit.ThinFrame, Color.white);
-            TMP_Text title = _kit.Text(dialog, "Title", "Clear entire plan?", PlannerTextRole.Heading, 24);
-            KingmakerUiFactory.SetAnchors(title.rectTransform, 0, 1, 1, 1, 24, 24, 0, 0);
-            title.rectTransform.pivot = new Vector2(.5f, 1);
-            title.rectTransform.sizeDelta = new Vector2(-48, 42);
-            title.rectTransform.anchoredPosition = new Vector2(0, -20);
-            TMP_Text body = _kit.Text(dialog, "Warning", _clearConfirmation.Message, PlannerTextRole.Body, 20);
-            body.enableWordWrapping = true;
-            KingmakerUiFactory.Stretch(body.rectTransform, 24, 24, 80, 70);
-            Button cancel = _kit.Button(dialog, "Cancel", "Cancel", () =>
-            {
-                if (_clearInput.Take(Time.frameCount)) CloseClearPlan(false);
-            }, PlannerTextRole.Button, 20);
-            Button clear = _kit.Button(dialog, "Clear", "Clear plan", ConfirmClearPlan, PlannerTextRole.Button, 20);
-            ControllerControlIdentity.Set(cancel, "clear/cancel", "ClearPlan");
-            ControllerControlIdentity.Set(clear, "clear/confirm", "ClearPlan");
-            KingmakerUiFactory.SetAnchors(RectOf(cancel), .05f, 0, .48f, 0, 0, 0, 0, 0);
-            KingmakerUiFactory.SetAnchors(RectOf(clear), .52f, 0, .95f, 0, 0, 0, 0, 0);
-            foreach (Button button in new[] { cancel, clear })
-            {
-                RectOf(button).pivot = new Vector2(.5f, 0);
-                RectOf(button).sizeDelta = new Vector2(RectOf(button).sizeDelta.x, 44);
-                RectOf(button).anchoredPosition = new Vector2(0, 22);
-            }
+            BuildClearDialog(_clearConfirmation.Message, _clearConfirmation.CastingCount);
             if (_nativeTheme != null) _nativeTheme.ApplyTo(_clearOverlay);
             KingmakerUiFactory.OwnPointerHighlights(_clearOverlay);
             PropagateUiLayer();
@@ -123,16 +96,117 @@ namespace KingmakerBuffPlanner.UI
             if (_disposed || !ClearPlanOpen || NativeDescriptionBlocksWorkspace || !_clearInput.Take(Time.frameCount)) return;
             AuthoringEditResult result = _session.ClearPlan(_clearConfirmation, _inputs());
             CloseClearPlan(result.Applied);
-            Feedback(result.Applied ? "Plan cleared. Undo restores it." : result.Reason, !result.Applied);
+            ReportClearOutcome(result);
             RefreshView();
             RestoreClearFocus(result.Applied);
         }
 
-        private void PlaceClearPaper(RectTransform rect)
+        // Review P3: Clear is a command like any other (it does not go
+        // through Command()), so an applied Clear retires the previous
+        // command's problem - a refusal about castings that no longer exist -
+        // instead of leaving it as the standing notice. A current save
+        // failure is a separate standing source and stays shown. A refused
+        // Clear reports its own problem.
+        private void ReportClearOutcome(AuthoringEditResult result)
         {
-            KingmakerUiFactory.SetAnchors(rect, .5f, .5f, .5f, .5f);
-            rect.pivot = new Vector2(.5f, .5f);
-            rect.sizeDelta = new Vector2(Math.Min(640, _root.rect.width - 64), 320);
+            if (result.Applied)
+            {
+                _feedbackShown = false;
+                _commandProblem = null;
+                _loadNote = null;
+            }
+            Feedback(result.Applied ? "Plan cleared. Undo restores it." : result.Reason, !result.Applied);
+            if (result.Applied) ShowStandingNotice(WorkspaceFooterText.SaveProblem(_session.FooterSaveState));
+        }
+
+        // Owner request after 0.6.11: a genuine native scroll, not a tan box.
+        // The dialog draws the game's own DialogMessageBox paper
+        // (dialogue_backsheet) through the same ParchmentSurface as the
+        // workspace sheet - no opaque rectangle under it to defeat the
+        // scroll's silhouette; the flat framed tint is only its exact
+        // fallback when the native paper is unavailable. Native title face
+        // (ornamental initial) centred, the native scroll rule under it,
+        // native body text, ordinary native buttons, and a height that
+        // follows the content.
+        internal const float ClearDialogMaximumWidth = 640f;
+        private const float ClearSidePadding = 56f;
+        private const float ClearTopPadding = 34f;
+        private const float ClearBottomPadding = 30f;
+        private const float ClearTitleHeight = 40f;
+        private const float ClearRuleGap = 6f;
+        private const float ClearRuleHeight = 11f;
+        private const float ClearBodyGap = 14f;
+        private const float ClearActionsGap = 26f;
+        private const float ClearButtonHeight = 46f;
+        private const float ClearButtonWidth = 200f;
+        private const float ClearButtonGap = 28f;
+        private static readonly ParchmentInsets ClearPaperOutsets = new ParchmentInsets(18f, 16f, 18f, 16f);
+
+        private void BuildClearDialog(string message, int castingCount)
+        {
+            RectTransform dialog = KingmakerUiFactory.CreateRect("Dialog", _clearOverlay);
+            KingmakerUiFactory.SetAnchors(dialog, .5f, .5f, .5f, .5f);
+            dialog.pivot = new Vector2(.5f, .5f);
+            float width = Mathf.Min(ClearDialogMaximumWidth, Mathf.Max(360f, _root.rect.width - 96f));
+            // Exact fallback ground (yielded while the native paper draws).
+            Color fallback = _theme.ParchmentRaised; fallback.a = 1;
+            KingmakerUiFactory.AddFramedPanel(dialog, fallback, _theme.GoldAccent).raycastTarget = true;
+            TMP_Text title = _kit.Text(dialog, "Title", "Clear entire plan?", PlannerTextRole.Title, 26f,
+                TextAlignmentOptions.Center);
+            title.enableWordWrapping = false;
+            KingmakerUiFactory.SetAnchors(title.rectTransform, 0f, 1f, 1f, 1f, ClearSidePadding, ClearSidePadding, 0f, 0f);
+            title.rectTransform.pivot = new Vector2(.5f, 1f);
+            title.rectTransform.sizeDelta = new Vector2(-2f * ClearSidePadding, ClearTitleHeight);
+            title.rectTransform.anchoredPosition = new Vector2(0f, -ClearTopPadding);
+            TMP_Text body = _kit.Text(dialog, "Warning", message, PlannerTextRole.Body, 19f,
+                TextAlignmentOptions.Top);
+            body.enableWordWrapping = true;
+            float textWidth = width - 2f * ClearSidePadding;
+            float bodyHeight = Mathf.Ceil(body.GetPreferredValues(message, textWidth, 0f).y) + 4f;
+            float bodyTop = ClearTopPadding + ClearTitleHeight + ClearRuleGap + ClearRuleHeight + ClearBodyGap;
+            KingmakerUiFactory.SetAnchors(body.rectTransform, 0f, 1f, 1f, 1f, ClearSidePadding, ClearSidePadding, 0f, 0f);
+            body.rectTransform.pivot = new Vector2(.5f, 1f);
+            body.rectTransform.sizeDelta = new Vector2(-2f * ClearSidePadding, bodyHeight);
+            body.rectTransform.anchoredPosition = new Vector2(0f, -bodyTop);
+            float height = bodyTop + bodyHeight + ClearActionsGap + ClearButtonHeight + ClearBottomPadding;
+            // Content-appropriate, never taller than the screen allows.
+            height = Mathf.Min(height, Mathf.Max(200f, _root.rect.height - 64f));
+            dialog.sizeDelta = new Vector2(width, height);
+            Button cancel = _kit.Button(dialog, "Cancel", "Cancel", () =>
+            {
+                if (_clearInput.Take(Time.frameCount)) CloseClearPlan(false);
+            }, PlannerTextRole.Button, 18f);
+            Button clear = _kit.Button(dialog, "Clear", "Clear plan", ConfirmClearPlan, PlannerTextRole.Button, 18f);
+            ControllerControlIdentity.Set(cancel, "clear/cancel", "ClearPlan");
+            ControllerControlIdentity.Set(clear, "clear/confirm", "ClearPlan");
+            foreach (Button button in new[] { cancel, clear })
+            {
+                RectTransform rect = RectOf(button);
+                KingmakerUiFactory.SetAnchors(rect, .5f, 0f, .5f, 0f);
+                rect.pivot = new Vector2(button == cancel ? 1f : 0f, 0f);
+                rect.sizeDelta = new Vector2(ClearButtonWidth, ClearButtonHeight);
+                rect.anchoredPosition = new Vector2(button == cancel ? -ClearButtonGap / 2f : ClearButtonGap / 2f,
+                    ClearBottomPadding);
+            }
+            RegisterTooltip(cancel, "clear/cancel", "ClearPlan", WorkspaceFooterTooltips.ClearCancel, true);
+            RegisterTooltip(clear, "clear/confirm", "ClearPlan", () => WorkspaceFooterTooltips.ClearConfirm(castingCount), true);
+            _clearParchment = ParchmentSurface.Create("ClearPlanDialog", dialog, ClearPaperOutsets, ClearPaperOutsets,
+                ParchmentSurfaces.FrameSheetUnitsPerTexel, true);
+            _clearRule = ParchmentRule.Create("TitleRule", dialog, _clearParchment, false);
+            KingmakerUiFactory.SetAnchors(_clearRule.Rect, .5f, 1f, .5f, 1f);
+            _clearRule.Rect.sizeDelta = new Vector2(Mathf.Min(320f, textWidth), ClearRuleHeight);
+            _clearRule.Rect.anchoredPosition = new Vector2(0f, -(ClearTopPadding + ClearTitleHeight + ClearRuleGap +
+                ClearRuleHeight / 2f));
+            if (_nativeTheme != null)
+            {
+                _nativeTheme.RegisterParchment(_clearParchment);
+                _nativeTheme.RegisterRule(_clearRule);
+            }
+        }
+
+        internal string ClearDialogPaperEvidenceForRuntime
+        {
+            get { return _clearParchment == null ? "clear-dialog=closed" : _clearParchment.Evidence; }
         }
 
         private void CloseClearPlan(bool cleared)
@@ -140,6 +214,16 @@ namespace KingmakerBuffPlanner.UI
             if (!ClearPlanOpen) return;
             _session.CancelClearPlan();
             _clearConfirmation = null;
+            DismissTooltip();
+            _tooltipTargets.Remove("clear/cancel");
+            _tooltipTargets.Remove("clear/confirm");
+            if (_nativeTheme != null)
+            {
+                _nativeTheme.UnregisterParchment(_clearParchment);
+                _nativeTheme.UnregisterRule(_clearRule);
+            }
+            _clearParchment = null;
+            _clearRule = null;
             _clearOverlay.gameObject.SetActive(false);
             UnityEngine.Object.Destroy(_clearOverlay.gameObject);
             _clearOverlay = null;

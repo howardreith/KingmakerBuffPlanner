@@ -43,6 +43,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="ProductionExecutionTests.cs" />
     <Compile Include="HeroismRepeatTests.cs" />
+    <Compile Include="InfectiousCharmsRefinementTests.cs" />
     <Compile Include="CastAvailableTests.cs" />
     <Compile Include="FactResourceTests.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\KingmakerFactResources.cs"><Link>GameAdapters\KingmakerFactResources.cs</Link></Compile>
@@ -59,6 +60,8 @@
     <Compile Include="AutosaveLifecycleTests.cs" />
     <Compile Include="ClearPlanTests.cs" />
     <Compile Include="ClearPlanViewInputTests.cs" />
+    <Compile Include="ClearRefreshTests.cs" />
+    <Compile Include="WorkspaceFooterRefinementTests.cs" />
     <Compile Include="SharePlanningTests.cs" />
     <Compile Include="UndoHistoryTests.cs" />
     <Compile Include="EverydayUseWordingTests.cs" />
@@ -168,6 +171,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Infrastructure\Hashing.cs"><Link>Infrastructure\Hashing.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\PlannerSetupModel.cs"><Link>UI\PlannerSetupModel.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceModels.cs"><Link>UI\CastingWorkspaceModels.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\UI\WorkspaceFooterModels.cs"><Link>UI\WorkspaceFooterModels.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.cs"><Link>UI\CastingWorkspaceSession.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.ClearPlan.cs"><Link>UI\CastingWorkspaceSession.ClearPlan.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\CastingWorkspaceSession.Graph.cs"><Link>UI\CastingWorkspaceSession.Graph.cs</Link></Compile>

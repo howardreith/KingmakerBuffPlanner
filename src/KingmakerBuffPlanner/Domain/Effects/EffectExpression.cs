@@ -67,7 +67,9 @@ namespace KingmakerBuffPlanner.Domain.Effects
             EffectTarget target,
             string sourceContract,
             string actionPath,
-            string recipientUnitId = null)
+            string recipientUnitId = null,
+            float? maximumDurationSeconds = null,
+            NearbySelectionBinding secondarySelection = null)
             : base("leaf")
         {
             if (string.IsNullOrWhiteSpace(effectId)) throw new ArgumentException("Effect ID is required.", "effectId");
@@ -77,6 +79,17 @@ namespace KingmakerBuffPlanner.Domain.Effects
             SourceContract = sourceContract ?? string.Empty;
             ActionPath = actionPath ?? string.Empty;
             RecipientUnitId = recipientUnitId;
+            MaximumDurationSeconds = maximumDurationSeconds.HasValue &&
+                !float.IsNaN(maximumDurationSeconds.Value) && !float.IsInfinity(maximumDurationSeconds.Value) &&
+                maximumDurationSeconds.Value > 0 ? maximumDurationSeconds : null;
+            SecondarySelection = secondarySelection;
+        }
+
+        // Copy with a bound owner; lifetime metadata is retained.
+        internal EffectLeafExpression WithOwner(string recipientUnitId, NearbySelectionBinding secondarySelection)
+        {
+            return new EffectLeafExpression(Kind, EffectId, Target, SourceContract, ActionPath,
+                recipientUnitId, MaximumDurationSeconds, secondarySelection ?? SecondarySelection);
         }
 
         [JsonProperty("kind", Order = 2)] public EffectKind Kind { get; private set; }
@@ -86,6 +99,95 @@ namespace KingmakerBuffPlanner.Domain.Effects
         [JsonProperty("actionPath", Order = 6)] public string ActionPath { get; private set; }
         [JsonProperty("recipientUnitId", Order = 7, NullValueHandling = NullValueHandling.Ignore)]
         public string RecipientUnitId { get; private set; }
+        // The longest native lifetime this application can have (fixed
+        // seconds or a constant duration value, worst-case extended); null
+        // when permanent, level/dice-dependent or unread. Inspection
+        // metadata, not catalogue identity (EffectAggregateIdentity).
+        [JsonProperty("maximumDurationSeconds", Order = 8, NullValueHandling = NullValueHandling.Ignore)]
+        public float? MaximumDurationSeconds { get; private set; }
+        // Present only on a leaf bound under a verified nearby-recipient
+        // wrapper: the native action, not the planner, chooses the owner
+        // when it runs (see EffectRecipientBinding).
+        [JsonProperty("secondarySelection", Order = 9, NullValueHandling = NullValueHandling.Ignore)]
+        public NearbySelectionBinding SecondarySelection { get; private set; }
+    }
+
+    // H1 (0.6.11 review): an application whose native lifetime is
+    // structurally shorter than the minimum remaining coverage the planner
+    // ever accepts (ExistingEffectSufficiency.MinimumRemainingRounds) can
+    // never represent lasting buff coverage. It is an immediate
+    // application-confirmation obligation only: confirmation still requires
+    // it, freshly applied by the attempt, but already-active assessment does
+    // not. Leaves whose lifetime is unknown or level-dependent are durable.
+    public static class EffectApplicationLifetime
+    {
+        // Two six-second rounds.
+        public const double MinimumCoverageSeconds = 12;
+
+        public static bool IsTransient(EffectLeafExpression leaf)
+        {
+            return leaf != null && leaf.MaximumDurationSeconds.HasValue &&
+                leaf.MaximumDurationSeconds.Value < MinimumCoverageSeconds;
+        }
+
+        public static bool ContainsTransient(EffectExpression expression)
+        {
+            return Leaves(expression).Any(IsTransient);
+        }
+
+        public static bool ContainsDurable(EffectExpression expression)
+        {
+            return Leaves(expression).Any(leaf => !IsTransient(leaf));
+        }
+
+        // The lasting-coverage obligation: transient leaves become no-ops;
+        // every other node, branch and owner is preserved.
+        public static EffectExpression Durable(EffectExpression expression)
+        {
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null) return IsTransient(leaf) ? (EffectExpression)EmptyEffectExpression.NoAction() : leaf;
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+            {
+                var children = sequence.Children.Select(Durable).ToList();
+                return children.SequenceEqual(sequence.Children) ? expression
+                    : new SequenceEffectExpression(children, sequence.NearbyRecipients);
+            }
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                EffectExpression yes = Durable(conditional.WhenTrue), no = Durable(conditional.WhenFalse);
+                return ReferenceEquals(yes, conditional.WhenTrue) && ReferenceEquals(no, conditional.WhenFalse) ? expression
+                    : new ConditionalEffectExpression(conditional.ConditionContract, yes, no, conditional.CasterFactGate);
+            }
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null)
+            {
+                EffectExpression child = Durable(targeted.Child);
+                return ReferenceEquals(child, targeted.Child) ? expression : new TargetedEffectExpression(targeted.Target, child);
+            }
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null)
+            {
+                EffectExpression child = Durable(reference.Child);
+                return ReferenceEquals(child, reference.Child) ? expression : new ReferencedAbilityExpression(reference.AbilityId, child);
+            }
+            return expression;
+        }
+
+        public static IEnumerable<EffectLeafExpression> Leaves(EffectExpression expression)
+        {
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null) return new[] { leaf };
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null) return sequence.Children.SelectMany(Leaves);
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null) return Leaves(conditional.WhenTrue).Concat(Leaves(conditional.WhenFalse));
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null) return Leaves(targeted.Child);
+            var reference = expression as ReferencedAbilityExpression;
+            return reference == null ? new EffectLeafExpression[0] : Leaves(reference.Child);
+        }
     }
 
     public sealed class SequenceEffectExpression : EffectExpression
@@ -261,13 +363,33 @@ namespace KingmakerBuffPlanner.Domain.Effects
         public IReadOnlyList<string> UnitIds { get; private set; }
         public string Owner(EffectTarget role)
         { return role == EffectTarget.Caster && !_personal ? _caster : _recipient; }
+        // A natively selected secondary obligation has no single owner: null
+        // fails closed for any consumer that does not handle it explicitly.
         public string Owner(EffectLeafExpression leaf, EffectTarget role)
-        { return leaf.RecipientUnitId ?? Owner(role); }
+        { return leaf.SecondarySelection != null ? null : leaf.RecipientUnitId ?? Owner(role); }
+
+        // Owners for lasting-coverage and forecast purposes: the PREDICTED
+        // owners of a natively selected obligation (possibly none), otherwise
+        // the single owner. Confirmation never uses this for a selection.
+        public IReadOnlyList<string> PredictedOwners(EffectLeafExpression leaf, EffectTarget role)
+        {
+            if (leaf.SecondarySelection != null) return leaf.SecondarySelection.PredictedUnitIds;
+            string owner = Owner(leaf, role);
+            return owner == null ? new string[0] : new[] { owner };
+        }
+
+        public static bool ContainsSelection(EffectExpression expression)
+        {
+            return EffectApplicationLifetime.Leaves(expression).Any(leaf => leaf.SecondarySelection != null);
+        }
 
         private static IEnumerable<string> ExplicitOwners(EffectExpression expression)
         {
             var leaf = expression as EffectLeafExpression;
-            if (leaf != null) return leaf.RecipientUnitId == null ? new string[0] : new[] { leaf.RecipientUnitId };
+            // A natively selected secondary owner may be any authorized
+            // candidate: every candidate is observed, from before submission.
+            if (leaf != null) return (leaf.RecipientUnitId == null ? new string[0] : new[] { leaf.RecipientUnitId })
+                .Concat(leaf.SecondarySelection == null ? new string[0] : leaf.SecondarySelection.CandidateUnitIds);
             var sequence = expression as SequenceEffectExpression;
             if (sequence != null) return sequence.Children.SelectMany(ExplicitOwners);
             var conditional = expression as ConditionalEffectExpression;

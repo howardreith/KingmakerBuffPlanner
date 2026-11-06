@@ -218,6 +218,7 @@ Exact target: installed Kingmaker 2.1.7b `Assembly-CSharp.dll` SHA-256 `3b6450ff
 |---|---|---|---|
 | `AbilityEffectRunAction` | `Actions: ActionList` | root action list | PASS |
 | `ContextActionApplyBuff` | `Buff`, duration/permanent flags, `ToCaster`, `AsChild` | unit/caster buff leaf | PASS |
+| `ContextActionApplyBuff` lifetime (0.6.11 review H1) | `Permanent`, `UseDurationSeconds`, `DurationSeconds: float`, `DurationValue: ContextDurationValue` (`Rate`, `DiceType`, `DiceCountValue`, `BonusValue`, `m_IsExtendable`); `ContextValue.ValueType` (`Simple`=0) | a structurally fixed lifetime (seconds, or a `Simple` bonus with no dice) is reported doubled as worst case; below 12 s the leaf is a confirmation-only transient, never lasting coverage; every other lifetime is unknown/durable | PASS (reflection-only read 2026-11-05; detached production-reader test `infectious-charms-transient-lifetime-contract`) |
 | `Conditional` | `ConditionsChecker`, `IfTrue`, `IfFalse` | preserve alternatives as expression branches | PASS |
 | `ContextActionCastSpell` | `Spell`, DC/level overrides | recursive spell edge with cycle guard | PASS |
 | `ContextActionSpawnAreaEffect` | `AreaEffect`, duration, `OnUnit` | inspect area components | PASS |

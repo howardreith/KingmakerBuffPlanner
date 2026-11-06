@@ -49,6 +49,9 @@ namespace KingmakerBuffPlanner.UI
         private readonly ParchmentInsets _outsets;
         private readonly ParchmentInsets _sheetOutsets;
         private readonly float _sheetUnitsPerTexel;
+        // A native dialog draws the DialogMessageBox scroll paper itself
+        // (dialogue_backsheet), never the service-window card sheet.
+        private readonly bool _scrollOnly;
         private readonly RectTransform _bounds;
         private readonly Image _hit;
         private readonly Image _shadow;
@@ -62,9 +65,10 @@ namespace KingmakerBuffPlanner.UI
         private string _fallbackReason = "not-applied";
 
         private ParchmentSurface(string name, RectTransform surface, ParchmentInsets outsets,
-            ParchmentInsets sheetOutsets, float sheetUnitsPerTexel)
+            ParchmentInsets sheetOutsets, float sheetUnitsPerTexel, bool scrollOnly)
         {
             _name = name;
+            _scrollOnly = scrollOnly;
             _surface = surface;
             _outsets = outsets;
             _sheetOutsets = sheetOutsets;
@@ -92,10 +96,10 @@ namespace KingmakerBuffPlanner.UI
         }
 
         internal static ParchmentSurface Create(string name, RectTransform surface, ParchmentInsets outsets,
-            ParchmentInsets sheetOutsets, float sheetUnitsPerTexel)
+            ParchmentInsets sheetOutsets, float sheetUnitsPerTexel, bool scrollOnly = false)
         {
             if (surface == null) throw new ArgumentNullException("surface");
-            return new ParchmentSurface(name, surface, outsets, sheetOutsets, sheetUnitsPerTexel);
+            return new ParchmentSurface(name, surface, outsets, sheetOutsets, sheetUnitsPerTexel, scrollOnly);
         }
 
         internal bool Native { get { return _mode != Paper.Fallback; } }
@@ -128,7 +132,7 @@ namespace KingmakerBuffPlanner.UI
         {
             float reference = ReferencePixelsPerUnit(_surface);
             string sheetFailure = null;
-            if (sheetDonor != null && sheetDonor.sprite != null && sheetDonor.sprite.texture != null)
+            if (!_scrollOnly && sheetDonor != null && sheetDonor.sprite != null && sheetDonor.sprite.texture != null)
             {
                 ParchmentSheetGeometry sheet = ParchmentSheetGeometry.For(_sheetUnitsPerTexel, screenHeight,
                     reference);

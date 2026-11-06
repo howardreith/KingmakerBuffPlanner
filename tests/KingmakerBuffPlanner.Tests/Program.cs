@@ -448,6 +448,13 @@ namespace KingmakerBuffPlanner.Tests
             Run("playtest-heroism-mixed-owner-instant", () => TestMixedOwnerHeroism(root, "instant"));
                 Run("playtest-heroism-mixed-owner-animated", () => TestMixedOwnerHeroism(root, "animated"));
                 Run("playtest-heroism-captured-animated", () => TestCapturedHeroism(root, "animated"));
+                Run("infectious-charms-transient-lifetime-contract", TestNativeTransientLifetimeContract);
+                Run("infectious-charms-transient-markers-instant", () => TestTransientMarkerCoverage(root, "instant"));
+                Run("infectious-charms-transient-markers-animated", () => TestTransientMarkerCoverage(root, "animated"));
+                Run("infectious-charms-changing-secondary-instant", () => TestChangingSecondaryRecipient(root, "instant"));
+                Run("infectious-charms-changing-secondary-animated", () => TestChangingSecondaryRecipient(root, "animated"));
+                Run("infectious-charms-secondary-refresh-boundary-instant", () => TestSecondaryRefreshAndBoundary(root, "instant"));
+                Run("infectious-charms-secondary-refresh-boundary-animated", () => TestSecondaryRefreshAndBoundary(root, "animated"));
                 RunProductionExecutionTests(root);
                 RunCastingGraphTests(root);
                 RunDuplicateItemSourceTests(root);
@@ -456,6 +463,8 @@ namespace KingmakerBuffPlanner.Tests
                 RunAutosaveLifecycleTests(root);
                 RunClearPlanTests(root);
                 RunClearPlanViewInputTests(root);
+                RunClearRefreshTests(root);
+                RunWorkspaceFooterRefinementTests(root);
                 RunSharePlanningTests(root);
                 RunUndoHistoryTests(root);
                 RunEverydayUseWordingTests(root);

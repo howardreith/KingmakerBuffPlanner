@@ -4563,3 +4563,45 @@ No native game PASS, installation, save mutation or tester contact is claimed.
 Session-bound item selection/reselection and unidentified reporter source remain
 explicit release limits. Next: focused disposable published-ZIP trial, or a
 separately budgeted guarded native qualification; preserve frozen product clone.
+
+## 2026-11-06 UTC - final refinement after 0.6.11 (0.6.12 unreleased)
+
+Branch `codex/kingmaker-buff-planner-final-refinement` from main `fe7e2d0`.
+Candidate `433d98be3f6c1da0b5fad911cb8ad25edb6dca16`; DLL
+`a903cdddaf06c63a32a3c4b9c36d9e4986945f6664f5561e348882779a3408c2`, local ZIP
+`e190307935805b272f863e735d4e99b2ba82850f261bccd6a04c7d47e8990e18`.
+Owner requests: policy button, tooltips, removed idle footer/Saved, native scroll
+Clear dialog, post-Clear refresh. The Clear wording was a misattribution of
+genuinely spent sources, not a stale view. H1 (3 s Infectious Charms markers
+deciding lasting coverage) and H2 (frozen nearby owners) reproduced on unpatched
+source 0/4 and fixed structurally from the installed ContextActionApplyBuff and
+Call of the Wild contracts. Rejected: hardcoded Heroism GUIDs, ignoring
+conditional additions, re-resolving the nearby owner once before queueing.
+Baseline 79/0; merged focused 154/0; full offline 701/0; source 47/0; package
+6/0. No native run (launcher purity prerequisites exceed this refinement's
+budget; automation fixture lacks a Heroism provider). Next: owner review of the
+draft PR, then a separately budgeted guarded native UI and Heroism check of the
+frozen candidate. [Checkpoint](docs/FINAL-REFINEMENT-0.6.12-CHECKPOINT.md).
+
+## 2026-11-06 UTC - PR #21 review corrections (0.6.12 unreleased)
+
+Review of 2970940: four P2, one P3. Reproduced the H2 gaps at 2970940 (pred-far,
+pred-no-geo, in-range-wrong, e-missing accepted; 0/8). Rejected: checking the
+nearest unit at the final poll (recreates the timing problem) and trusting the
+prediction. Secondary confirmation now uses application-boundary geometry of the
+native filter, first-sighting at that read, nearest-first consistency and
+observability of every eligible unit. Reader schema 10, modal-aware tooltips and
+stale Clear notice corrected. Candidate e483daf; focused 177/0, full 704/0,
+reader 19/0, package 6/0. Native NOT RUN. Next: owner review; then a separately
+budgeted guarded native UI/Heroism check of the frozen candidate.
+
+## 2026-11-06 UTC - second PR #21 review corrections (0.6.12 unreleased)
+
+Review of bd9d01c: items 1-5 confirmed fixed; two P2 remained. Reproduced at
+bd9d01c (rf-new-mark unconfirmed after a pending read + in-place refresh;
+bd-missing accepted at 9.0 m of 9.144 m). Rejected: dropping the same-read check
+(would undo the previous repair) and keeping the tolerance-shrunk required count.
+Applications are now dated at the read that saw the identity become new or
+refreshed; with room left, every unit within radius + tolerance must be marked.
+Candidate 54d26f1; focused 179/0, full 706/0, reader 19/0, package 6/0. Native
+NOT RUN. Next: owner review, then a separately budgeted guarded native check.

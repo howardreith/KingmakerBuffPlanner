@@ -93,8 +93,12 @@ namespace KingmakerBuffPlanner.Planning
             EffectExpression expression, Func<string, IEnumerable<ActiveEffectInstance>> read,
             ISet<string> ignored, ExistingEffectRequirement requirement)
         {
+            if (!LastingCoverage(ref expression))
+                return new ExistingEffectRecipientAssessment(recipient, ExistingEffectVerdict.NotPresent,
+                    new[] { NoLastingCoverage });
             var scope = new EffectRecipientScope(expression, caster, recipient);
-            if (scope.UnitIds.Count == 1 && scope.UnitIds[0] == recipient)
+            if (scope.UnitIds.Count == 1 && scope.UnitIds[0] == recipient &&
+                !EffectRecipientScope.ContainsSelection(expression))
                 return Assess(recipient, expression, read(recipient), ignored, requirement);
             var instances = scope.UnitIds.ToDictionary(id => id,
                 id => (read(id) ?? new ActiveEffectInstance[0]).Where(value => value != null && !value.Suppressed).ToList(),
@@ -103,17 +107,22 @@ namespace KingmakerBuffPlanner.Planning
             var failures = new HashSet<string>(StringComparer.Ordinal);
             Func<bool, EffectPresenceResult> evaluate = strength => evaluator.EvaluateScoped(expression, (leaf, role) =>
             {
-                string owner = scope.Owner(leaf, role);
-                List<ActiveEffectInstance> values;
-                if (owner == null || !instances.TryGetValue(owner, out values)) return false;
-                bool found = false;
-                foreach (ActiveEffectInstance instance in values.Where(value => value.Marker.Equals(new ActiveEffectMarker(leaf.Kind, leaf.EffectId))))
+                // A lasting effect from a natively selected wrapper covers
+                // its predicted owners (none predicted: nothing to cover).
+                foreach (string owner in scope.PredictedOwners(leaf, role))
                 {
-                    string failure = strength ? Failure(instance, requirement) : null;
-                    if (failure == null) found = true;
-                    else failures.Add(failure + ":" + owner + ":" + leaf.EffectId);
+                    List<ActiveEffectInstance> values;
+                    if (!instances.TryGetValue(owner, out values)) return false;
+                    bool found = false;
+                    foreach (ActiveEffectInstance instance in values.Where(value => value.Marker.Equals(new ActiveEffectMarker(leaf.Kind, leaf.EffectId))))
+                    {
+                        string failure = strength ? Failure(instance, requirement) : null;
+                        if (failure == null) found = true;
+                        else failures.Add(failure + ":" + owner + ":" + leaf.EffectId);
+                    }
+                    if (!found) return false;
                 }
-                return found;
+                return leaf.SecondarySelection != null || scope.Owner(leaf, role) != null;
             }, ignored);
             EffectPresenceResult present = evaluate(false);
             if (present.Kind != EffectPresenceKind.Complete)
@@ -124,6 +133,23 @@ namespace KingmakerBuffPlanner.Planning
                     requirement.DurationComparable ? new string[0] : new[] { "remaining-duration-not-compared" });
             return new ExistingEffectRecipientAssessment(recipient, ExistingEffectVerdict.Insufficient,
                 failures.Count == 0 ? new[] { "present-effect-not-sufficient" } : failures.ToArray());
+        }
+
+        public const string NoLastingCoverage = "no-lasting-coverage";
+
+        // H1 (0.6.11 review): an application whose native lifetime is fixed
+        // below MinimumRemainingRounds (for example Call of the Wild's
+        // three-second Infectious Charms follow-up markers) could never pass
+        // the expiry check below, whether fresh, expired or replaced. It is
+        // a confirmation obligation of the cast, not lasting coverage, so it
+        // is assessed out; the lasting effects keep every strength, owner and
+        // duration check. A casting with no lasting effect is never covered.
+        private static bool LastingCoverage(ref EffectExpression expression)
+        {
+            if (expression == null || !EffectApplicationLifetime.ContainsTransient(expression)) return true;
+            if (!EffectApplicationLifetime.ContainsDurable(expression)) return false;
+            expression = EffectApplicationLifetime.Durable(expression);
+            return true;
         }
 
         public const double MinimumRemainingFraction = 0.5;
@@ -150,6 +176,9 @@ namespace KingmakerBuffPlanner.Planning
         {
             if (expression == null) throw new ArgumentNullException("expression");
             if (requirement == null) throw new ArgumentNullException("requirement");
+            if (!LastingCoverage(ref expression))
+                return new ExistingEffectRecipientAssessment(unitId, ExistingEffectVerdict.NotPresent,
+                    new[] { NoLastingCoverage });
             List<ActiveEffectInstance> live = (instances ?? new ActiveEffectInstance[0])
                 .Where(value => value != null && !value.Suppressed).ToList();
             var evaluator = new EffectPresenceEvaluator();

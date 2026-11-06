@@ -533,6 +533,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             {
                 get
                 {
+                    // H1/H2 (0.6.11 review): the executor judges only after the
+                    // command ends; each running poll records what this
+                    // attempt applied, before a short-lived application expires.
+                    if (_observed != true) KingmakerEffectInstanceReader.RecordProgress(_step, _baseline);
                     if (_stickyLifecycle != null)
                     {
                         CaptureDeliveryCommand();

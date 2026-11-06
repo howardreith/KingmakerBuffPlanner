@@ -450,7 +450,8 @@ namespace KingmakerBuffPlanner.Tests
                 "\"FocusedOrder.Later\"", "Section(\"Enhancements\")", "Checkbox(\"FocusedRecastPolicy\"",
                 "Checkbox(\"DraftRecastPolicy\"", "ActionButton(\"DoneEditing\", \"Done\"" })
                 Expect(view.IndexOf(kept, StringComparison.Ordinal) >= 0 ||
-                    (kept == "\"Mode: \"" && view.IndexOf("Mode: ", StringComparison.Ordinal) >= 0),
+                    (kept == "\"Mode: \"" && (view.IndexOf("Mode: ", StringComparison.Ordinal) >= 0 ||
+                        view.IndexOf("WorkspaceFooterTooltips.ModeCaption(", StringComparison.Ordinal) >= 0)),
                     "a retained control is missing: " + kept);
         }
     }

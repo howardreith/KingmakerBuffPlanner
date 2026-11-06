@@ -8,6 +8,7 @@ using Kingmaker.ElementsSystem;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
 using Kingmaker.UnitLogic.Abilities.Components;
 using Kingmaker.UnitLogic.Abilities.Components.AreaEffects;
+using Kingmaker.UnitLogic.Mechanics;
 using Kingmaker.UnitLogic.Mechanics.Actions;
 using Kingmaker.UnitLogic.Mechanics.Conditions;
 using KingmakerBuffPlanner.Discovery;
@@ -95,7 +96,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (apply != null && apply.Buff != null)
                 return Effect(EffectKind.Buff, apply.Buff.AssetGuid,
                     apply.ToCaster ? EffectTarget.Caster : EffectTarget.CurrentTarget,
-                    "ContextActionApplyBuff");
+                    "ContextActionApplyBuff", MaximumDurationSeconds(apply));
             var conditional = action as Conditional;
             if (conditional != null)
                 return new DiscoveryNode(DiscoveryNodeKind.Conditional, action.GetType().FullName,
@@ -280,10 +281,51 @@ namespace KingmakerBuffPlanner.GameAdapters
             return members;
         }
 
-        private static DiscoveryNode Effect(EffectKind kind, string id, EffectTarget target, string contract)
+        private static DiscoveryNode Effect(EffectKind kind, string id, EffectTarget target, string contract,
+            float? maximumDurationSeconds = null)
         {
             return new DiscoveryNode(DiscoveryNodeKind.Effect, contract, effectKind: kind,
-                effectId: id, target: target, sourceContract: contract);
+                effectId: id, target: target, sourceContract: contract,
+                maximumDurationSeconds: maximumDurationSeconds);
+        }
+
+        // H1 (0.6.11 review): the exact installed ContextActionApplyBuff
+        // lifetime contract (Permanent, UseDurationSeconds/DurationSeconds,
+        // DurationValue Rate/DiceType/DiceCountValue/BonusValue/m_IsExtendable).
+        // Only a structurally fixed lifetime is reported, doubled as a
+        // worst-case extension; permanent, dice-, rank-, property- or
+        // otherwise context-dependent durations are unknown (null), which
+        // keeps the effect a lasting-coverage obligation. Installed Call of
+        // the Wild applies its Infectious Charms markers with
+        // UseDurationSeconds=true and DurationSeconds=3.
+        internal static float? MaximumDurationSeconds(ContextActionApplyBuff apply)
+        {
+            try
+            {
+                if (apply == null || apply.Permanent) return null;
+                if (apply.UseDurationSeconds)
+                    return apply.DurationSeconds > 0 && !float.IsInfinity(apply.DurationSeconds) && !float.IsNaN(apply.DurationSeconds)
+                        ? apply.DurationSeconds * 2 : (float?)null;
+                ContextDurationValue duration = apply.DurationValue;
+                if (duration == null || duration.BonusValue == null ||
+                    duration.BonusValue.ValueType != ContextValueType.Simple) return null;
+                bool noDice = duration.DiceType == Kingmaker.RuleSystem.DiceType.Zero ||
+                    (duration.DiceCountValue != null && duration.DiceCountValue.ValueType == ContextValueType.Simple &&
+                        duration.DiceCountValue.Value == 0);
+                if (!noDice || duration.BonusValue.Value <= 0) return null;
+                float rate;
+                switch (duration.Rate)
+                {
+                    case DurationRate.Rounds: rate = 6; break;
+                    case DurationRate.Minutes: rate = 60; break;
+                    case DurationRate.TenMinutes: rate = 600; break;
+                    case DurationRate.Hours: rate = 3600; break;
+                    case DurationRate.Days: rate = 86400; break;
+                    default: return null;
+                }
+                return duration.BonusValue.Value * rate * 2;
+            }
+            catch (Exception) { return null; }
         }
 
         private static DiscoveryNode Target(EffectTarget target, DiscoveryNode child, string contract)

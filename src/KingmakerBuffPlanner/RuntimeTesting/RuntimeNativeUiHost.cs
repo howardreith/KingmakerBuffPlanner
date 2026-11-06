@@ -930,7 +930,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (!NativeUiWaited(900)) return false;
                     CastingWorkspaceSession live = BuffPlannerUiRoot.CastingWorkspaceSessionForRuntime();
                     _nativeUi.SaveRecoveryWorked = live != null && live.FooterSaveState == "saved" &&
-                        view != null && view.FooterSaveTextForRuntime == "Saved" && !view.SaveRecoveryShownForRuntime;
+                        view != null && string.IsNullOrEmpty(view.FooterSaveTextForRuntime) && !view.SaveRecoveryShownForRuntime;
                     NativeUiCapture("nui-save-recovered.png");
                     NativeUiNext(30);
                     return false;

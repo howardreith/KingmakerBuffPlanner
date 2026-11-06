@@ -560,6 +560,10 @@ namespace KingmakerBuffPlanner.UI
             // Every row with the caster's name, so a pool shared across the
             // party (item charges) is disclosed under each caster.
             var allRows = new List<KeyValuePair<string, CastingGraphSourceRow>>();
+            // The same native resources with no plan reservations at all: a
+            // source that is empty even then is genuinely spent, never
+            // "none left after the plan" (owner report after 0.6.11 Clear).
+            CastingCapacity withoutPlan = null;
             foreach (UnitSnapshot unit in inputs.Snapshot.Units)
             {
                 if (!capable.Contains(unit.UnitId) && !casting.Contains(unit.UnitId)) continue;
@@ -573,6 +577,14 @@ namespace KingmakerBuffPlanner.UI
                     CastingCapacityEstimate estimate = onePass.Capacity == null ? null
                         : onePass.Capacity.AdditionalCastings(provider);
                     bool pinnable = TwinCount(inputs, provider.Key) == 1;
+                    CastingCapacityEstimate unreserved = null;
+                    if (estimate != null && estimate.Kind == CastingCapacityKind.Finite && !estimate.CanFundAnother)
+                    {
+                        if (withoutPlan == null)
+                            withoutPlan = new CastingCapacity(new CastingBudgetLedger(inputs.Snapshot,
+                                inputs.Enhancements ?? new CastEnhancementSnapshot[0]));
+                        unreserved = withoutPlan.AdditionalCastings(provider);
+                    }
                     bool selectedRow = string.Equals(chosenCaster, unit.UnitId, StringComparison.Ordinal) &&
                         Draft.Ability != null &&
                         string.Equals(Draft.Ability.Canonical, provider.Key.Ability.Canonical,
@@ -588,7 +600,8 @@ namespace KingmakerBuffPlanner.UI
                         pool == null ? (ResourcePoolKind?)null : pool.Kind, estimate,
                         CastingGraphText.Capacity(estimate, pool == null ? (ResourcePoolKind?)null : pool.Kind,
                             provider.UnitsPerCast),
-                        pinnable, CastingGraphText.BlockedReason(estimate, pinnable), selectedRow,
+                        pinnable, CastingGraphText.BlockedReason(estimate, pinnable, unreserved,
+                            pool == null ? (ResourcePoolKind?)null : pool.Kind), selectedRow,
                         IsGroupSource(inputs, source) == true,
                         provider.Description, provider.DurationText));
                 }

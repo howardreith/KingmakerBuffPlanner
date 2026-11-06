@@ -33,7 +33,8 @@ namespace KingmakerBuffPlanner.Discovery
             string sourceContract = null,
             string referencedAbilityId = null,
             CasterFactGate casterFactGate = null,
-            NearbyRecipientRule nearbyRecipients = null)
+            NearbyRecipientRule nearbyRecipients = null,
+            float? maximumDurationSeconds = null)
         {
             Kind = kind;
             Identity = identity ?? string.Empty;
@@ -49,6 +50,7 @@ namespace KingmakerBuffPlanner.Discovery
             ReferencedAbilityId = referencedAbilityId ?? string.Empty;
             CasterFactGate = casterFactGate;
             NearbyRecipients = nearbyRecipients;
+            MaximumDurationSeconds = maximumDurationSeconds;
         }
 
         public DiscoveryNodeKind Kind { get; private set; }
@@ -64,5 +66,8 @@ namespace KingmakerBuffPlanner.Discovery
         public string ReferencedAbilityId { get; private set; }
         public CasterFactGate CasterFactGate { get; private set; }
         public NearbyRecipientRule NearbyRecipients { get; private set; }
+        // Effect nodes: the longest native lifetime of the application when
+        // it is structurally fixed (see EffectApplicationLifetime).
+        public float? MaximumDurationSeconds { get; private set; }
     }
 }

@@ -426,7 +426,8 @@ namespace KingmakerBuffPlanner.Tests
             string paper = SourceBlock(view, "private void ApplyScrollPaper()");
             Expect(paper != null && paper.Contains("_nativeTheme.RegisterParchment(_frameParchment);") &&
                 paper.Contains("_nativeTheme.RegisterRule(header);") && paper.Contains("_nativeTheme.RegisterRule(footer);") &&
-                paper.Contains("PlannerParchmentPalette.WellWashAlpha") && paper.Contains("PlannerParchmentPalette.LedgerWashAlpha"),
+                // 0.6.11 refinement: the footer's idle ledger line is retired.
+                paper.Contains("PlannerParchmentPalette.WellWashAlpha") && !paper.Contains("PlannerParchmentPalette.LedgerWashAlpha"),
                 "the workspace frame does not take the scroll paper");
             Expect(!view.Contains("ForceLayoutAndSnap"), "the workspace resets localScale under its paper layers");
             string theme = UiSource("PlannerNativeTheme.cs");
