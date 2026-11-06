@@ -49,6 +49,12 @@ namespace KingmakerBuffPlanner.Tests
             internal readonly Dictionary<string, float> ApplicationDistances = new Dictionary<string, float>(StringComparer.Ordinal);
             internal bool NoGeometry;
             internal string UnreadableUnit;
+            internal float DefaultDistance = 3f;
+            // Eligible units outside the observable party (NPC allies, summons).
+            internal readonly Dictionary<string, float> NonPartyEligible = new Dictionary<string, float>(StringComparer.Ordinal);
+            // An unrelated matching application seen while the command is
+            // pending, before this attempt's own application.
+            internal string UnrelatedMarkerOn;
             // An observation during application (the adapters' progress read),
             // then time passes before the executor's final read.
             internal bool RecordAtApplication = true;
@@ -104,6 +110,11 @@ namespace KingmakerBuffPlanner.Tests
                 if (step.Reservation.TokenIds.Count == 0)
                     State.SpontaneousRemaining -= step.Reservation.Units;
                 string target = step.TargetUnitIds[0];
+                if (UnrelatedMarkerOn != null && target != "unit-t4")
+                {
+                    PutAdditional(UnrelatedMarkerOn, "c20c575b6352d1692b3074a25232e699");
+                    AppliedEffectJudgement.RecordProgress(_baselines[step], step.EffectObservationUnitIds, Read, Distances(step));
+                }
                 KeyValuePair<string, long> prior;
                 State.Active.TryGetValue(target, out prior);
                 if (Observation == "replace" || Observation == "suppressed" || Observation == "wrong-kind" ||
@@ -145,19 +156,25 @@ namespace KingmakerBuffPlanner.Tests
 
             internal void ReplaceAdditional(string owner, string effect) { PutAdditional(owner, effect); }
 
-            // Native distance from each selection centre at this read.
-            private IDictionary<string, float> Distances(CastStep step)
+            // The native filter's view at this read: every eligible unit
+            // within reach of each selection centre (party or not), with the
+            // native distance - what the production adapter records.
+            private IDictionary<string, IReadOnlyList<NearbyEligibleUnit>> Distances(CastStep step)
             {
                 if (NoGeometry) return null;
-                var distances = new Dictionary<string, float>(StringComparer.Ordinal);
+                var geometry = new Dictionary<string, IReadOnlyList<NearbyEligibleUnit>>(StringComparer.Ordinal);
                 foreach (string center in step.ExpectedRecipientUnitIds)
-                    foreach (string unit in step.EffectObservationUnitIds)
+                    foreach (NearbySelectionBinding binding in EffectApplicationLifetime.Leaves(step.ExpectedEffects)
+                        .Select(leaf => leaf.SecondarySelection).Where(value => value != null))
                     {
-                        float distance;
-                        distances[EffectBaseline.DistanceKey(center, unit)] = unit == center ? 0
-                            : ApplicationDistances.TryGetValue(unit, out distance) ? distance : 3f;
+                        float reach = binding.Radius + AppliedEffectJudgement.SecondaryDistanceTolerance;
+                        geometry[EffectBaseline.GeometryKey(center, binding)] = binding.CandidateUnitIds
+                            .Where(unit => unit != center)
+                            .Select(unit => { float d; return new NearbyEligibleUnit(unit, ApplicationDistances.TryGetValue(unit, out d) ? d : DefaultDistance); })
+                            .Concat(NonPartyEligible.Select(pair => new NearbyEligibleUnit(pair.Key, pair.Value)))
+                            .Where(unit => unit.Distance <= reach).ToList();
                     }
-                return distances;
+                return geometry;
             }
 
             private int Available(CastStep step)

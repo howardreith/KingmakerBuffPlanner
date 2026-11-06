@@ -88,16 +88,18 @@ namespace KingmakerBuffPlanner.Execution
         // pre-submission read above remains the only freshness reference.
         private readonly Dictionary<string, Dictionary<string, SeenEffectInstance>> _seen =
             new Dictionary<string, Dictionary<string, SeenEffectInstance>>(StringComparer.Ordinal);
-        private readonly Dictionary<int, IDictionary<string, float>> _distancesByObservation =
-            new Dictionary<int, IDictionary<string, float>>();
+        private readonly Dictionary<int, IDictionary<string, IReadOnlyList<NearbyEligibleUnit>>> _geometryByObservation =
+            new Dictionary<int, IDictionary<string, IReadOnlyList<NearbyEligibleUnit>>>();
         private int _observationCount;
 
         public int ObservationCount { get { return _observationCount; } }
 
-        // distances: key DistanceKey(center, unit) -> native distance, or
-        // null when the reader could not take positions.
+        // geometry: key GeometryKey(center, binding) -> every unit the native
+        // wrapper's own filter admitted within radius + tolerance of that
+        // centre at THIS read (observable or not), with native distances; null
+        // when the reader could not take positions.
         public void RecordObservation(IDictionary<string, IEnumerable<ObservedEffectInstance>> byUnit,
-            IDictionary<string, float> distances = null)
+            IDictionary<string, IReadOnlyList<NearbyEligibleUnit>> geometry = null)
         {
             if (byUnit == null) return;
             int observation = ++_observationCount;
@@ -115,9 +117,10 @@ namespace KingmakerBuffPlanner.Execution
                     if (prior == null) firstSighting = true;
                 }
             }
-            // Positions matter only at the read that first saw an application.
-            if (firstSighting && distances != null && _distancesByObservation.Count < 64)
-                _distancesByObservation[observation] = new Dictionary<string, float>(distances, StringComparer.Ordinal);
+            // Positions matter only at a read that first saw an application.
+            if (firstSighting && geometry != null && _geometryByObservation.Count < 64)
+                _geometryByObservation[observation] = geometry.ToDictionary(pair => pair.Key,
+                    pair => (IReadOnlyList<NearbyEligibleUnit>)(pair.Value ?? new NearbyEligibleUnit[0]).ToList(), StringComparer.Ordinal);
         }
 
         public IEnumerable<SeenEffectInstance> SeenAfterSubmission(string unitId)
@@ -126,15 +129,17 @@ namespace KingmakerBuffPlanner.Execution
             return unitId != null && _seen.TryGetValue(unitId, out seen) ? seen.Values.ToList() : new List<SeenEffectInstance>();
         }
 
-        public float? DistanceAt(int observation, string center, string unitId)
+        // Null when that read carried no readable geometry for the centre/rule.
+        public IReadOnlyList<NearbyEligibleUnit> EligibleAt(int observation, string center, NearbySelectionBinding binding)
         {
-            IDictionary<string, float> distances;
-            float value;
-            return _distancesByObservation.TryGetValue(observation, out distances) &&
-                distances.TryGetValue(DistanceKey(center, unitId), out value) ? (float?)value : null;
+            IDictionary<string, IReadOnlyList<NearbyEligibleUnit>> geometry;
+            IReadOnlyList<NearbyEligibleUnit> eligible;
+            return binding != null && _geometryByObservation.TryGetValue(observation, out geometry) &&
+                geometry.TryGetValue(GeometryKey(center, binding), out eligible) ? eligible : null;
         }
 
-        public static string DistanceKey(string center, string unitId) { return center + "\u001f" + unitId; }
+        public static string GeometryKey(string center, NearbySelectionBinding binding)
+        { return center + "\u001f" + binding.GeometryKey; }
 
         // Not suppressed, and new or refreshed relative to the read taken
         // before submission (never inferred from an after-read alone).
@@ -211,11 +216,23 @@ namespace KingmakerBuffPlanner.Execution
             bool durableExpected = EffectApplicationLifetime.ContainsDurable(expected);
             bool freshPrimary = false;
             var evaluator = new EffectPresenceEvaluator();
+            // The centre's own expected effects: their first fresh sighting
+            // is the attempt's application boundary for nearby selection.
+            var anchors = new HashSet<string>(StringComparer.Ordinal);
+            evaluator.EvaluateScoped(expected, (leaf, role) =>
+            {
+                if (leaf.SecondarySelection == null && scope.Owner(leaf, role) == recipient)
+                    anchors.Add(leaf.Kind + ":" + leaf.EffectId);
+                return true;
+            }, null);
             EffectPresenceResult complete = evaluator.EvaluateScoped(expected, (leaf, role) =>
             {
                 bool transient = EffectApplicationLifetime.IsTransient(leaf);
-                if (requireFresh && leaf.SecondarySelection != null)
-                    return SecondaryReached(leaf, recipient, baseline, after, transient);
+                if (leaf.SecondarySelection != null)
+                    return requireFresh
+                        ? SecondaryReached(leaf, recipient, baseline, after, transient, anchors)
+                        : scope.PredictedOwners(leaf, role).All(predicted => after.ContainsKey(predicted) &&
+                            after[predicted].Any(value => value.Kind == leaf.Kind && value.EffectId == leaf.EffectId));
                 string owner = scope.Owner(leaf, role);
                 List<ObservedEffectInstance> instances;
                 if (owner == null || !after.TryGetValue(owner, out instances)) return false;
@@ -239,61 +256,83 @@ namespace KingmakerBuffPlanner.Execution
             // before submission too; it cannot be inferred from an after-read.
             return evaluator.EvaluateScoped(expected, (leaf, role) =>
             {
-                IReadOnlyList<ObservedEffectInstance> prior;
-                string owner = scope.Owner(leaf, role);
-                return owner != null && before.TryGetValue(owner, out prior) && prior.Any(value =>
-                    !value.Suppressed && value.Kind == leaf.Kind && value.EffectId == leaf.EffectId);
+                if (leaf.SecondarySelection == null && scope.Owner(leaf, role) == null) return false;
+                return scope.PredictedOwners(leaf, role).All(owner =>
+                {
+                    IReadOnlyList<ObservedEffectInstance> prior;
+                    return before.TryGetValue(owner, out prior) && prior.Any(value =>
+                        !value.Suppressed && value.Kind == leaf.Kind && value.EffectId == leaf.EffectId);
+                });
             }, null).Kind == EffectPresenceKind.Complete;
         }
 
-        // H2 (0.6.11 review): the native nearby wrapper chooses its owner when
-        // the action runs, so a planning-time prediction is not the owner the
-        // attempt must have reached. The secondary obligation holds when the
-        // authorized candidates hold between one and the rule's maximum FRESH
-        // applications (an unpredicted owner only with a native distance,
-        // read when that application was first seen, inside the rule's
-        // radius), or - when nothing was applied - when every candidate was
-        // readably outside the radius at the read that first saw this
-        // attempt's effect on the selection centre. Anything else, including
-        // an unreadable candidate or unreadable geometry, is unconfirmed.
+        // H2 (0.6.11 review, corrected after PR #21 review): the native nearby
+        // wrapper chooses its owner when its action runs. The prediction is
+        // never trusted here. The APPLICATION BOUNDARY is the post-submission
+        // read that first saw this attempt's own effect on the selection
+        // centre; the native wrapper applies the secondary effect in that same
+        // action, so:
+        //  - every fresh secondary application on an observed candidate must
+        //    have been first seen at exactly that read (an application seen
+        //    earlier or later is unrelated, e.g. while a command was pending);
+        //  - that read must carry readable geometry: every unit the native
+        //    filter admitted within radius + tolerance, observable or not;
+        //  - the marked set must be what nearest-first selection could have
+        //    chosen there: each marked unit inside reach, at most `maximum`,
+        //    no unmarked definitely-eligible unit nearer by more than the
+        //    tolerance, and at least min(maximum, definitely-eligible) marked;
+        //  - an eligible unit the planner cannot observe that could have been
+        //    selected makes the outcome unconfirmable.
+        // Empty is accepted only when nothing was definitely eligible there.
         private static bool SecondaryReached(EffectLeafExpression leaf, string center, EffectBaseline baseline,
-            IDictionary<string, List<ObservedEffectInstance>> after, bool transient)
+            IDictionary<string, List<ObservedEffectInstance>> after, bool transient, ISet<string> anchors)
         {
             NearbySelectionBinding selection = leaf.SecondarySelection;
             Func<ObservedEffectInstance, bool> matches = value => value.Kind == leaf.Kind && value.EffectId == leaf.EffectId;
-            float reach = selection.Radius + SecondaryDistanceTolerance;
-            int selected = 0;
+            int application = baseline.SeenAfterSubmission(center)
+                .Where(seen => anchors.Contains(seen.Instance.Kind + ":" + seen.Instance.EffectId) &&
+                    baseline.IsFresh(center, seen.Instance))
+                .Select(seen => seen.Observation).DefaultIfEmpty(0).Min();
+            if (application == 0) return false;
+            IReadOnlyList<NearbyEligibleUnit> eligible = baseline.EligibleAt(application, center, selection);
+            if (eligible == null) return false;
+            var distance = eligible.Where(unit => unit.UnitId != center)
+                .GroupBy(unit => unit.UnitId, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Min(unit => unit.Distance), StringComparer.Ordinal);
+            var observed = new HashSet<string>(selection.CandidateUnitIds, StringComparer.Ordinal);
+            var marked = new List<string>();
             foreach (string candidate in selection.CandidateUnitIds)
             {
                 List<ObservedEffectInstance> current;
                 if (!after.TryGetValue(candidate, out current)) return false;
                 var sightings = baseline.SeenAfterSubmission(candidate)
                     .Where(seen => matches(seen.Instance) && baseline.IsFresh(candidate, seen.Instance) &&
-                        (transient || current.Any(value => value.Identity == seen.Instance.Identity)))
-                    .OrderBy(seen => seen.Observation).ToList();
+                        (transient || current.Any(value => value.Identity == seen.Instance.Identity))).ToList();
                 if (sightings.Count == 0) continue;
-                if (candidate != leaf.RecipientUnitId)
-                {
-                    float? distance = baseline.DistanceAt(sightings[0].Observation, center, candidate);
-                    if (distance == null || distance.Value > reach) return false;
-                }
-                selected++;
+                if (sightings.Any(seen => seen.Observation != application)) return false;
+                if (!distance.ContainsKey(candidate)) return false; // outside reach at application
+                marked.Add(candidate);
             }
-            if (selected != 0) return selection.Maximum <= 0 || selected <= selection.Maximum;
-            int landed = baseline.SeenAfterSubmission(center).Where(seen => baseline.IsFresh(center, seen.Instance))
-                .Select(seen => seen.Observation).DefaultIfEmpty(0).Min();
-            if (landed == 0 || selection.CandidateUnitIds.Count == 0) return false;
-            return selection.CandidateUnitIds.All(candidate =>
-            {
-                float? distance = baseline.DistanceAt(landed, center, candidate);
-                return distance != null && distance.Value > reach;
-            });
+            float tolerance = SecondaryDistanceTolerance;
+            if (selection.Maximum > 0 && marked.Count > selection.Maximum) return false;
+            var definite = distance.Where(pair => pair.Value <= selection.Radius - tolerance).Select(pair => pair.Key).ToList();
+            foreach (string unit in definite.Where(unit => !marked.Contains(unit)))
+                if (marked.Any(owner => distance[owner] > distance[unit] + tolerance)) return false;
+            int required = selection.Maximum > 0 ? Math.Min(selection.Maximum, definite.Count) : definite.Count;
+            if (marked.Count < required) return false;
+            // Could the native action have chosen a unit nobody can observe?
+            bool room = selection.Maximum <= 0 || marked.Count < selection.Maximum;
+            float farthest = marked.Count == 0 ? float.NegativeInfinity : marked.Max(owner => distance[owner]);
+            foreach (KeyValuePair<string, float> pair in distance.Where(pair => !observed.Contains(pair.Key)))
+                if (room || pair.Value <= farthest + tolerance) return false;
+            return true;
         }
 
         // Adapters call this at every post-submission read, including reads
         // while an animated command is still running.
         public static void RecordProgress(EffectBaseline baseline, IEnumerable<string> unitIds,
-            Func<string, IEnumerable<ObservedEffectInstance>> read, IDictionary<string, float> distances)
+            Func<string, IEnumerable<ObservedEffectInstance>> read,
+            IDictionary<string, IReadOnlyList<NearbyEligibleUnit>> geometry)
         {
             if (baseline == null || unitIds == null || read == null) return;
             var observed = new Dictionary<string, IEnumerable<ObservedEffectInstance>>(StringComparer.Ordinal);
@@ -302,7 +341,7 @@ namespace KingmakerBuffPlanner.Execution
                 IEnumerable<ObservedEffectInstance> instances = read(unitId);
                 if (instances != null) observed[unitId] = instances.ToList();
             }
-            baseline.RecordObservation(observed, distances);
+            baseline.RecordObservation(observed, geometry);
         }
 
         public static bool Reached(EffectExpression expected,

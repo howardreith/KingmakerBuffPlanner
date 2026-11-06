@@ -1,0 +1,39 @@
+diff --git a/tests/KingmakerBuffPlanner.Tests/InfectiousCharmsRefinementTests.cs b/tests/KingmakerBuffPlanner.Tests/InfectiousCharmsRefinementTests.cs
+index 104ed3c..66d0337 100644
+--- a/tests/KingmakerBuffPlanner.Tests/InfectiousCharmsRefinementTests.cs
++++ b/tests/KingmakerBuffPlanner.Tests/InfectiousCharmsRefinementTests.cs
+@@ -236,6 +236,15 @@ namespace KingmakerBuffPlanner.Tests
+                 "a-to-empty(out-of-range)=confirmed;out-of-range/over-maximum/wrong-owner/vanished/unreadable/no-geometry/stale=refused;feat-absent=confirmed");
+         }
+ 
++        private static void ReviewRepro(string root, string mode, string label, Action<RepeatBuffWorld> configure)
++        {
++            var run = CharmsSession(root, mode, "rv-" + label, configure);
++            RepeatAssert(run.Apply(true).Allowed, label + " admission");
++            Console.WriteLine("[REVIEW-REPRO] head=2970940;mode=" + mode + ";case=" + label + ";" + Outcome(run));
++            RepeatAssert(run.Host.LastReport.Confirmed == 0 && run.Host.LastReport.NotProcessed == 1,
++                label + ": invalid secondary observation was accepted");
++        }
++
+         // Exact installed native field contract and the production reader.
+         private static void TestNativeTransientLifetimeContract()
+         {
+diff --git a/tests/KingmakerBuffPlanner.Tests/Program.cs b/tests/KingmakerBuffPlanner.Tests/Program.cs
+index bcf3ae7..9b0e003 100644
+--- a/tests/KingmakerBuffPlanner.Tests/Program.cs
++++ b/tests/KingmakerBuffPlanner.Tests/Program.cs
+@@ -449,6 +449,14 @@ namespace KingmakerBuffPlanner.Tests
+                 Run("playtest-heroism-mixed-owner-animated", () => TestMixedOwnerHeroism(root, "animated"));
+                 Run("playtest-heroism-captured-animated", () => TestCapturedHeroism(root, "animated"));
+                 Run("infectious-charms-transient-lifetime-contract", TestNativeTransientLifetimeContract);
++                Run("review-repro-pred-far-instant", () => ReviewRepro(root, "instant", "pred-far", w => { w.ApplicationOwners = new[] { "unit-t2" }; w.ApplicationDistances["unit-t2"] = 20f; }));
++                Run("review-repro-pred-no-geo-instant", () => ReviewRepro(root, "instant", "pred-no-geo", w => { w.ApplicationOwners = new[] { "unit-t2" }; w.NoGeometry = true; }));
++                Run("review-repro-in-range-wrong-instant", () => ReviewRepro(root, "instant", "in-range-wrong", w => { w.ApplicationOwners = new[] { "unit-t3" }; w.ApplicationDistances["unit-t2"] = 2.5f; w.ApplicationDistances["unit-t3"] = 6f; }));
++                Run("review-repro-e-missing-instant", () => ReviewRepro(root, "instant", "e-missing", w => { w.PredictedOwners = new string[0]; w.ApplicationOwners = new string[0]; }));
++                Run("review-repro-pred-far-animated", () => ReviewRepro(root, "animated", "pred-far", w => { w.ApplicationOwners = new[] { "unit-t2" }; w.ApplicationDistances["unit-t2"] = 20f; }));
++                Run("review-repro-pred-no-geo-animated", () => ReviewRepro(root, "animated", "pred-no-geo", w => { w.ApplicationOwners = new[] { "unit-t2" }; w.NoGeometry = true; }));
++                Run("review-repro-in-range-wrong-animated", () => ReviewRepro(root, "animated", "in-range-wrong", w => { w.ApplicationOwners = new[] { "unit-t3" }; w.ApplicationDistances["unit-t2"] = 2.5f; w.ApplicationDistances["unit-t3"] = 6f; }));
++                Run("review-repro-e-missing-animated", () => ReviewRepro(root, "animated", "e-missing", w => { w.PredictedOwners = new string[0]; w.ApplicationOwners = new string[0]; }));
+                 Run("infectious-charms-transient-markers-instant", () => TestTransientMarkerCoverage(root, "instant"));
+                 Run("infectious-charms-transient-markers-animated", () => TestTransientMarkerCoverage(root, "animated"));
+                 Run("infectious-charms-changing-secondary-instant", () => TestChangingSecondaryRecipient(root, "instant"));

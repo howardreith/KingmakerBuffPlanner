@@ -567,6 +567,8 @@ namespace KingmakerBuffPlanner.Planning
                     {
                         { "radius", leaf.SecondarySelection.Radius },
                         { "maximum", leaf.SecondarySelection.Maximum },
+                        { "filter", leaf.SecondarySelection.GeometryKey },
+                        { "predictedUnitIds", new JArray(leaf.SecondarySelection.PredictedUnitIds.ToArray()) },
                         { "candidateUnitIds", new JArray(leaf.SecondarySelection.CandidateUnitIds.ToArray()) }
                     });
                 return value;

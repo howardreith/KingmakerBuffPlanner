@@ -97,7 +97,8 @@ namespace KingmakerBuffPlanner.Planning
                 return new ExistingEffectRecipientAssessment(recipient, ExistingEffectVerdict.NotPresent,
                     new[] { NoLastingCoverage });
             var scope = new EffectRecipientScope(expression, caster, recipient);
-            if (scope.UnitIds.Count == 1 && scope.UnitIds[0] == recipient)
+            if (scope.UnitIds.Count == 1 && scope.UnitIds[0] == recipient &&
+                !EffectRecipientScope.ContainsSelection(expression))
                 return Assess(recipient, expression, read(recipient), ignored, requirement);
             var instances = scope.UnitIds.ToDictionary(id => id,
                 id => (read(id) ?? new ActiveEffectInstance[0]).Where(value => value != null && !value.Suppressed).ToList(),
@@ -106,17 +107,22 @@ namespace KingmakerBuffPlanner.Planning
             var failures = new HashSet<string>(StringComparer.Ordinal);
             Func<bool, EffectPresenceResult> evaluate = strength => evaluator.EvaluateScoped(expression, (leaf, role) =>
             {
-                string owner = scope.Owner(leaf, role);
-                List<ActiveEffectInstance> values;
-                if (owner == null || !instances.TryGetValue(owner, out values)) return false;
-                bool found = false;
-                foreach (ActiveEffectInstance instance in values.Where(value => value.Marker.Equals(new ActiveEffectMarker(leaf.Kind, leaf.EffectId))))
+                // A lasting effect from a natively selected wrapper covers
+                // its predicted owners (none predicted: nothing to cover).
+                foreach (string owner in scope.PredictedOwners(leaf, role))
                 {
-                    string failure = strength ? Failure(instance, requirement) : null;
-                    if (failure == null) found = true;
-                    else failures.Add(failure + ":" + owner + ":" + leaf.EffectId);
+                    List<ActiveEffectInstance> values;
+                    if (!instances.TryGetValue(owner, out values)) return false;
+                    bool found = false;
+                    foreach (ActiveEffectInstance instance in values.Where(value => value.Marker.Equals(new ActiveEffectMarker(leaf.Kind, leaf.EffectId))))
+                    {
+                        string failure = strength ? Failure(instance, requirement) : null;
+                        if (failure == null) found = true;
+                        else failures.Add(failure + ":" + owner + ":" + leaf.EffectId);
+                    }
+                    if (!found) return false;
                 }
-                return found;
+                return leaf.SecondarySelection != null || scope.Owner(leaf, role) != null;
             }, ignored);
             EffectPresenceResult present = evaluate(false);
             if (present.Kind != EffectPresenceKind.Complete)

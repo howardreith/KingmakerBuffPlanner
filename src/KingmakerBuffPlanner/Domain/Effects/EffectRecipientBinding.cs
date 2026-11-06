@@ -62,8 +62,13 @@ namespace KingmakerBuffPlanner.Domain.Effects
             NearbySelectionBinding secondary)
         {
             var leaf = expression as EffectLeafExpression;
-            if (leaf != null) return currentOwner == null || leaf.Target != EffectTarget.CurrentTarget ? expression :
-                leaf.WithOwner(currentOwner, secondary);
+            if (leaf != null)
+            {
+                if (leaf.Target != EffectTarget.CurrentTarget) return expression;
+                // One natively selected obligation, whatever the prediction.
+                if (secondary != null) return leaf.WithOwner(null, secondary);
+                return currentOwner == null ? expression : leaf.WithOwner(currentOwner, null);
+            }
             var sequence = expression as SequenceEffectExpression;
             if (sequence != null)
             {
@@ -74,10 +79,13 @@ namespace KingmakerBuffPlanner.Domain.Effects
                     if (selection == null || selection.Predicted == null)
                         return new SequenceEffectExpression(sequence.Children.Select(child =>
                             Bind(child, select, UnresolvedSecondaryRecipient, null)));
-                    var binding = new NearbySelectionBinding(sequence.NearbyRecipients.Radius,
-                        sequence.NearbyRecipients.Maximum, selection.Predicted.Concat(selection.Candidates));
-                    return new SequenceEffectExpression(selection.Predicted.SelectMany(owner =>
-                        sequence.Children.Select(child => Bind(child, select, owner, binding))));
+                    // Review of PR #21: the obligation no longer depends on how
+                    // many owners were predicted; an empty prediction keeps the
+                    // requirement and its authorized candidates.
+                    var binding = new NearbySelectionBinding(sequence.NearbyRecipients,
+                        selection.Predicted, selection.Candidates);
+                    return new SequenceEffectExpression(sequence.Children.Select(child =>
+                        Bind(child, select, null, binding)));
                 }
                 var children = sequence.Children.Select(child => Bind(child, select, currentOwner, secondary)).ToList();
                 return children.SequenceEqual(sequence.Children) ? expression : new SequenceEffectExpression(children);
@@ -125,19 +133,48 @@ namespace KingmakerBuffPlanner.Domain.Effects
         }
     }
 
-    // Authorization for a natively selected secondary owner: the rule's
-    // radius and count bound, and every unit that may be observed for it.
-    // Part of the execution projection, not of catalogue identity.
+    // A natively selected secondary obligation: the wrapper's rule, the
+    // planning-time PREDICTION (preflight/display only, never trusted by
+    // confirmation) and the authorized observable candidates. Part of the
+    // execution projection and its authorization, not of catalogue identity.
     public sealed class NearbySelectionBinding
     {
-        public NearbySelectionBinding(float radius, int maximum, IEnumerable<string> candidateUnitIds)
+        public NearbySelectionBinding(NearbyRecipientRule rule, IEnumerable<string> predicted,
+            IEnumerable<string> candidates)
         {
-            Radius = radius;
-            Maximum = maximum;
-            CandidateUnitIds = NearbyRecipientSelection.Clean(candidateUnitIds ?? new string[0]);
+            if (rule == null) throw new ArgumentNullException("rule");
+            Radius = rule.Radius; Maximum = rule.Maximum;
+            Self = rule.Self; Friends = rule.Friends; Enemies = rule.Enemies;
+            PredictedUnitIds = NearbyRecipientSelection.Clean(predicted ?? new string[0]);
+            CandidateUnitIds = NearbyRecipientSelection.Clean((candidates ?? new string[0]).Concat(PredictedUnitIds));
         }
         [JsonProperty("radius")] public float Radius { get; private set; }
         [JsonProperty("maximum")] public int Maximum { get; private set; }
+        [JsonProperty("self")] public bool Self { get; private set; }
+        [JsonProperty("friends")] public bool Friends { get; private set; }
+        [JsonProperty("enemies")] public bool Enemies { get; private set; }
+        [JsonProperty("predictedUnitIds")] public IReadOnlyList<string> PredictedUnitIds { get; private set; }
+        // Every unit observed for this obligation (prediction included).
         [JsonProperty("candidateUnitIds")] public IReadOnlyList<string> CandidateUnitIds { get; private set; }
+
+        // Groups application-boundary geometry taken with the same filter.
+        [JsonIgnore]
+        public string GeometryKey
+        {
+            get
+            {
+                return Radius.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "|" +
+                    (Self ? "s" : "-") + (Friends ? "f" : "-") + (Enemies ? "e" : "-");
+            }
+        }
+    }
+
+    // One unit the native wrapper's own filter admitted around a selection
+    // centre at one post-submission read, with the native distance.
+    public sealed class NearbyEligibleUnit
+    {
+        public NearbyEligibleUnit(string unitId, float distance) { UnitId = unitId; Distance = distance; }
+        public string UnitId { get; private set; }
+        public float Distance { get; private set; }
     }
 }

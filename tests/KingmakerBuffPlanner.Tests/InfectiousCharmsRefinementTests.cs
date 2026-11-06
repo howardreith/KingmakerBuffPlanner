@@ -33,6 +33,9 @@ namespace KingmakerBuffPlanner.Tests
                     world.MarkerLifetime = 1;
                     world.NativeSelection = true;
                     world.PredictedOwners = new[] { "unit-t2" };
+                    // Only unit-t2 is near the centre unless a case moves someone.
+                    world.DefaultDistance = 25f;
+                    world.ApplicationDistances["unit-t2"] = 2.5f;
                     if (configure != null) configure(world);
                 });
             return run;
@@ -145,13 +148,16 @@ namespace KingmakerBuffPlanner.Tests
 
         private static void TestChangingSecondaryRecipient(string root, string mode)
         {
+            // Every scenario: centre unit-t1; the nearest eligible unit at
+            // application is the native choice (maximum 1, radius 9.144 m).
             var stable = CharmsSession(root, mode, "h2-stable", world => world.ApplicationOwners = new[] { "unit-t2" });
             RepeatAssert(stable.Apply(true).Allowed && stable.Host.LastReport.Confirmed == 2, "stable owners: " + Outcome(stable));
             CastStep step = stable.Steps[0];
             RepeatAssert(new[] { "unit-sorcerer", "unit-t2", "unit-t3", "unit-t4", "unit-wizard" }.All(step.EffectObservationUnitIds.Contains),
                 "authorized candidates were not observed from before submission: " + string.Join(",", step.EffectObservationUnitIds.ToArray()));
             EffectLeafExpression secondary = EffectApplicationLifetime.Leaves(step.ExpectedEffects).Single(leaf => leaf.SecondarySelection != null);
-            RepeatAssert(secondary.RecipientUnitId == "unit-t2" && secondary.EffectId == CharmsTargetMarker &&
+            RepeatAssert(secondary.RecipientUnitId == null && secondary.EffectId == CharmsTargetMarker &&
+                secondary.SecondarySelection.PredictedUnitIds.SequenceEqual(new[] { "unit-t2" }) &&
                 !secondary.SecondarySelection.CandidateUnitIds.Contains("unit-t1"), "prediction/candidate separation lost");
 
             Func<string, Action<RepeatBuffWorld>, RepeatSession> confirmed = (label, configure) =>
@@ -173,44 +179,83 @@ namespace KingmakerBuffPlanner.Tests
                     run.Host.LastReport.ResourcesSpent == 1 && run.World.State.Fired.Count == 1,
                     label + ": an unconfirmable secondary outcome was accepted: " + Outcome(run));
             };
+            Action<RepeatBuffWorld> emptyPrediction = world =>
+            {
+                world.PredictedOwners = new string[0];
+                world.ApplicationDistances["unit-t2"] = 25f;
+                world.ApplicationDistances["unit-t3"] = 2.5f;
+            };
 
-            // A nearest at admission, B legitimately selected at application.
+            // Positive: legitimate native outcomes at the application boundary.
             confirmed("a-to-b", world =>
             {
                 world.ApplicationOwners = new[] { "unit-t3" };
                 world.ApplicationDistances["unit-t2"] = 8.5f; world.ApplicationDistances["unit-t3"] = 2.5f;
             });
-            // Nothing predicted; B arrives before application.
-            confirmed("empty-to-b", world =>
-            {
-                world.PredictedOwners = new string[0]; world.ApplicationOwners = new[] { "unit-t3" };
-            });
-            // A predicted; every eligible unit readably out of range when Heroism landed.
+            var emptyToB = confirmed("empty-to-b", world => { emptyPrediction(world); world.ApplicationOwners = new[] { "unit-t3" }; });
+            EffectLeafExpression kept = EffectApplicationLifetime.Leaves(emptyToB.Steps[0].ExpectedEffects).Single(leaf => leaf.SecondarySelection != null);
+            RepeatAssert(kept.SecondarySelection.PredictedUnitIds.Count == 0 && kept.SecondarySelection.CandidateUnitIds.Contains("unit-t3"),
+                "an empty prediction removed the secondary obligation or its candidates");
             confirmed("a-to-empty", world =>
             {
-                world.ApplicationOwners = new string[0];
-                foreach (string unit in new[] { "unit-sorcerer", "unit-wizard", "unit-t2", "unit-t3", "unit-t4" })
-                    world.ApplicationDistances[unit] = 25f;
+                world.ApplicationOwners = new string[0]; world.ApplicationDistances["unit-t2"] = 25f;
             });
             confirmed("none", world =>
             {
                 world.PredictedOwners = new string[0]; world.ApplicationOwners = new string[0];
+                world.ApplicationDistances["unit-t2"] = 25f;
+            });
+            confirmed("tie", world =>
+            {
+                world.ApplicationOwners = new[] { "unit-t3" };
+                world.ApplicationDistances["unit-t3"] = 2.9f; // within one frame's tolerance of unit-t2
             });
 
+            // Negative: the prediction gets no special trust.
+            refused("in-range-wrong", world =>
+            {
+                world.ApplicationOwners = new[] { "unit-t3" }; world.ApplicationDistances["unit-t3"] = 6f;
+            });
+            refused("pred-far", world =>
+            {
+                world.ApplicationOwners = new[] { "unit-t2" }; world.ApplicationDistances["unit-t2"] = 20f;
+            });
+            refused("pred-no-geo", world => { world.ApplicationOwners = new[] { "unit-t2" }; world.NoGeometry = true; });
+            refused("pending", world =>
+            {
+                world.ApplicationOwners = new[] { "unit-t2" }; world.ApplicationDistances["unit-t3"] = 6f;
+                world.UnrelatedMarkerOn = "unit-t3";
+            });
             refused("out-of-range", world =>
             {
                 world.ApplicationOwners = new[] { "unit-t3" }; world.ApplicationDistances["unit-t3"] = 20f;
             });
-            refused("over-max", world => world.ApplicationOwners = new[] { "unit-t2", "unit-t3" });
+            refused("over-max", world =>
+            {
+                world.ApplicationOwners = new[] { "unit-t2", "unit-t3" }; world.ApplicationDistances["unit-t3"] = 3f;
+            });
             refused("wrong-owner", world => world.Observation = "marker-wrong-owner");
             refused("vanished", world => world.ApplicationOwners = new string[0]);
-            refused("cand-unread", world => { world.ApplicationOwners = new[] { "unit-t3" }; world.UnreadableUnit = "unit-t3"; });
-            refused("no-geometry", world => { world.ApplicationOwners = new[] { "unit-t3" }; world.NoGeometry = true; });
-            // A stale marker on the predicted owner is not this attempt's selection.
+            refused("cand-unread", world =>
+            {
+                world.ApplicationOwners = new[] { "unit-t3" }; world.ApplicationDistances["unit-t3"] = 2f;
+                world.UnreadableUnit = "unit-t3";
+            });
             refused("stale", world =>
             {
-                world.ApplicationOwners = new[] { "unit-t3" }; world.ApplicationDistances["unit-t3"] = 20f;
+                world.ApplicationOwners = new string[0];
                 world.ReplaceAdditional("unit-t2", CharmsTargetMarker);
+            });
+            refused("unobservable-nearer", world =>
+            {
+                world.ApplicationOwners = new[] { "unit-t2" }; world.NonPartyEligible["npc-ally"] = 1.5f;
+            });
+            // Empty prediction, B eligible at application.
+            refused("e-missing", world => { emptyPrediction(world); world.ApplicationOwners = new string[0]; });
+            refused("e-wrong", world => { emptyPrediction(world); world.Observation = "marker-wrong-owner"; });
+            refused("e-unread", world =>
+            {
+                emptyPrediction(world); world.ApplicationOwners = new[] { "unit-t3" }; world.UnreadableUnit = "unit-t3";
             });
 
             // Feature absent: no secondary obligation at all.
@@ -222,18 +267,23 @@ namespace KingmakerBuffPlanner.Tests
                 step.AssignmentId, step.Provider, step.AnchorUnitId, step.TargetUnitIds, step.ExpectedRecipientUnitIds, step.Reservation,
                 step.MaterialReservation, expected, false, step.ExecutionStrategy, step.ExecutionStrategyReason, exactEnhancements: true) },
                 ExplicitProjectionScope.Standard);
-            Func<IEnumerable<string>, float?, EffectExpression> bound = (candidates, seconds) => EffectRecipientBinding.Bind(
+            Func<string[], IEnumerable<string>, float?, EffectExpression> bound = (predicted, candidates, seconds) => EffectRecipientBinding.Bind(
                 EffectConditionBinding.Bind(CapturedHeroismExpression(true, seconds), new Dictionary<string, bool> { { "infectious-charms-feature", true } }),
-                rule => new NearbyRecipientSelection(new[] { "unit-t2" }, candidates));
-            string original = identity(bound(new[] { "unit-t3", "unit-wizard" }, 6f));
-            RepeatAssert(original == identity(bound(new[] { "unit-wizard", "unit-t3" }, 6f)), "candidate order changed identity");
-            RepeatAssert(original != identity(bound(new[] { "unit-t3", "unit-wizard", "unit-t4" }, 6f)), "a widened candidate set reused the identity");
-            RepeatAssert(original != identity(bound(new[] { "unit-t3", "unit-wizard" }, null)), "lifetime classification reused the identity");
-            RepeatAssert(original != identity(EffectRecipientBinding.Bind(EffectConditionBinding.Bind(CapturedHeroismExpression(true, 6f),
-                new Dictionary<string, bool> { { "infectious-charms-feature", true } }), rule => new[] { "unit-t2" })),
-                "prediction-only binding reused a native-selection identity");
-            Console.WriteLine("[INFECTIOUS-CHARMS-H2] mode=" + mode + ";stable=confirmed;a-to-b=confirmed;empty-to-b=confirmed;" +
-                "a-to-empty(out-of-range)=confirmed;out-of-range/over-maximum/wrong-owner/vanished/unreadable/no-geometry/stale=refused;feat-absent=confirmed");
+                rule => new NearbyRecipientSelection(predicted, candidates));
+            string[] a = { "unit-t2" }, none = new string[0];
+            string original = identity(bound(a, new[] { "unit-t3", "unit-wizard" }, 6f));
+            RepeatAssert(original == identity(bound(a, new[] { "unit-wizard", "unit-t3" }, 6f)), "candidate order changed identity");
+            RepeatAssert(original != identity(bound(a, new[] { "unit-t3", "unit-wizard", "unit-t4" }, 6f)), "a widened candidate set reused the identity");
+            RepeatAssert(original != identity(bound(a, new[] { "unit-t3", "unit-wizard" }, null)), "lifetime classification reused the identity");
+            RepeatAssert(original != identity(bound(none, new[] { "unit-t2", "unit-t3", "unit-wizard" }, 6f)), "the prediction reused another identity");
+            string empty = identity(bound(none, new[] { "unit-t3", "unit-wizard" }, 6f));
+            RepeatAssert(empty != identity(bound(none, new[] { "unit-t3", "unit-wizard", "unit-t4" }, 6f)),
+                "an empty prediction's candidate set does not enter authorization identity");
+            RepeatAssert(EffectApplicationLifetime.Leaves(bound(none, new[] { "unit-t3" }, 6f)).Any(leaf => leaf.SecondarySelection != null),
+                "an empty prediction discarded the obligation");
+            Console.WriteLine("[INFECTIOUS-CHARMS-H2] mode=" + mode + ";stable/a-to-b/empty-to-b/a-to-empty/none/tie=confirmed;" +
+                "in-range-wrong/pred-far/pred-no-geo/pending/out-of-range/over-max/wrong-owner/vanished/cand-unread/stale/" +
+                "unobservable-nearer/e-missing/e-wrong/e-unread=refused;feat-absent=confirmed");
         }
 
         // Exact installed native field contract and the production reader.

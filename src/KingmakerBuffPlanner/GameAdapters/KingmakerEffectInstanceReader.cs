@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Kingmaker.EntitySystem.Entities;
 using Kingmaker.Items;
@@ -75,7 +76,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 // The positioned observation first, so a first sighting keeps
                 // the native geometry of the read that made it.
                 AppliedEffectJudgement.RecordProgress(baseline, step.EffectObservationUnitIds, readAfter,
-                    Distances(step, units));
+                    Geometry(step, units));
                 bool confirmed = Judge(step, baseline, readAfter);
                 baseline.RecordConfirmationPoll(confirmed, new EffectBaseline(observed), step.EffectObservationUnitIds);
                 return confirmed;
@@ -95,7 +96,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 Dictionary<string, UnitEntityData> units;
                 Dictionary<string, IEnumerable<ObservedEffectInstance>> observed = ReadAfter(step, out units);
                 AppliedEffectJudgement.RecordProgress(baseline, step.EffectObservationUnitIds,
-                    unitId => observed.ContainsKey(unitId) ? observed[unitId] : null, Distances(step, units));
+                    unitId => observed.ContainsKey(unitId) ? observed[unitId] : null, Geometry(step, units));
             }
             catch (Exception) { /* An unreadable progress read records nothing. */ }
         }
@@ -115,37 +116,43 @@ namespace KingmakerBuffPlanner.GameAdapters
             return observed;
         }
 
-        // Native distance (the same UnitEntityData.DistanceTo the nearby
-        // wrapper sorts by) from each expected recipient - the selection
-        // centre - to each observed unit. Only steps with a natively selected
-        // owner need positions; null when any is unreadable.
-        private static IDictionary<string, float> Distances(CastStep step, Dictionary<string, UnitEntityData> units)
+        // Application-boundary geometry for natively selected obligations: at
+        // this read, every unit the nearby wrapper's own filter (the same
+        // GameHelper.GetTargetsAround query, self/friend/enemy test and
+        // UnitEntityData.DistanceTo it sorts by) admits within radius plus the
+        // judgement tolerance of each selection centre - party or not - with
+        // its native distance. Null when anything is unreadable.
+        private static IDictionary<string, IReadOnlyList<NearbyEligibleUnit>> Geometry(CastStep step,
+            Dictionary<string, UnitEntityData> units)
         {
-            if (!HasSecondarySelection(step.ExpectedEffects)) return null;
+            var bindings = EffectApplicationLifetime.Leaves(step.ExpectedEffects)
+                .Select(leaf => leaf.SecondarySelection).Where(binding => binding != null)
+                .GroupBy(binding => binding.GeometryKey, StringComparer.Ordinal).Select(group => group.First()).ToList();
+            if (bindings.Count == 0) return null;
             try
             {
-                var distances = new Dictionary<string, float>(StringComparer.Ordinal);
+                UnitEntityData caster;
+                if (!units.TryGetValue(step.Provider.CasterUnitId, out caster)) return null;
+                var geometry = new Dictionary<string, IReadOnlyList<NearbyEligibleUnit>>(StringComparer.Ordinal);
                 foreach (string center in step.ExpectedRecipientUnitIds)
                 {
                     UnitEntityData origin;
                     if (!units.TryGetValue(center, out origin)) return null;
-                    foreach (string unitId in step.EffectObservationUnitIds)
+                    foreach (NearbySelectionBinding binding in bindings)
                     {
-                        UnitEntityData unit;
-                        if (!units.TryGetValue(unitId, out unit)) return null;
-                        distances[EffectBaseline.DistanceKey(center, unitId)] = origin.DistanceTo(unit);
+                        float reach = binding.Radius + AppliedEffectJudgement.SecondaryDistanceTolerance;
+                        geometry[EffectBaseline.GeometryKey(center, binding)] = Kingmaker.Designers.GameHelper
+                            .GetTargetsAround(origin.Position, reach, false, false)
+                            .Where(unit => unit != null && unit != origin && (binding.Self || unit != caster) &&
+                                (caster.IsAlly(unit) ? binding.Friends : binding.Enemies) &&
+                                !string.IsNullOrWhiteSpace(unit.UniqueId))
+                            .Select(unit => new NearbyEligibleUnit(unit.UniqueId, origin.DistanceTo(unit)))
+                            .ToList();
                     }
                 }
-                return distances;
+                return geometry;
             }
             catch (Exception) { return null; }
-        }
-
-        private static bool HasSecondarySelection(EffectExpression expression)
-        {
-            foreach (EffectLeafExpression leaf in EffectApplicationLifetime.Leaves(expression))
-                if (leaf.SecondarySelection != null) return true;
-            return false;
         }
 
         private static bool Judge(CastStep step, EffectBaseline baseline,

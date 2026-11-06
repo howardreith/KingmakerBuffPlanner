@@ -148,10 +148,13 @@ namespace KingmakerBuffPlanner.Execution
                 var scope = new EffectRecipientScope(expected, casting.CasterUnitId, casting.DirectTargetUnitId);
                 new EffectPresenceEvaluator().EvaluateScoped(expected, (leaf, role) =>
                 {
-                    List<ActiveEffectInstance> onUnit;
-                    if (instances.TryGetValue(scope.Owner(leaf, role), out onUnit))
-                        onUnit.Add(new ActiveEffectInstance(leaf.Kind, leaf.EffectId, null,
-                            option.Provider.EffectiveCasterLevel, casting.Ability.MetamagicMask));
+                    foreach (string owner in scope.PredictedOwners(leaf, role))
+                    {
+                        List<ActiveEffectInstance> onUnit;
+                        if (instances.TryGetValue(owner, out onUnit))
+                            onUnit.Add(new ActiveEffectInstance(leaf.Kind, leaf.EffectId, null,
+                                option.Provider.EffectiveCasterLevel, casting.Ability.MetamagicMask));
+                    }
                     return true;
                 }, null);
             }

@@ -1,0 +1,3 @@
+# PR #21 review items 1-2 reproduced at previous head 2970940 (scratch worktree, test-only patch)
+# Command: scripts/Test-Development.ps1 -Only 'review-repro-'  (build sha256 43b51754fe412b90a768c94141f1a742565118beb26a97d702b460f218468f96)
+Protocol tests: PASS=0 FAIL=8

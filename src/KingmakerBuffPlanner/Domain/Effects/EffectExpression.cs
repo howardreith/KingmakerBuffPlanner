@@ -363,8 +363,25 @@ namespace KingmakerBuffPlanner.Domain.Effects
         public IReadOnlyList<string> UnitIds { get; private set; }
         public string Owner(EffectTarget role)
         { return role == EffectTarget.Caster && !_personal ? _caster : _recipient; }
+        // A natively selected secondary obligation has no single owner: null
+        // fails closed for any consumer that does not handle it explicitly.
         public string Owner(EffectLeafExpression leaf, EffectTarget role)
-        { return leaf.RecipientUnitId ?? Owner(role); }
+        { return leaf.SecondarySelection != null ? null : leaf.RecipientUnitId ?? Owner(role); }
+
+        // Owners for lasting-coverage and forecast purposes: the PREDICTED
+        // owners of a natively selected obligation (possibly none), otherwise
+        // the single owner. Confirmation never uses this for a selection.
+        public IReadOnlyList<string> PredictedOwners(EffectLeafExpression leaf, EffectTarget role)
+        {
+            if (leaf.SecondarySelection != null) return leaf.SecondarySelection.PredictedUnitIds;
+            string owner = Owner(leaf, role);
+            return owner == null ? new string[0] : new[] { owner };
+        }
+
+        public static bool ContainsSelection(EffectExpression expression)
+        {
+            return EffectApplicationLifetime.Leaves(expression).Any(leaf => leaf.SecondarySelection != null);
+        }
 
         private static IEnumerable<string> ExplicitOwners(EffectExpression expression)
         {
