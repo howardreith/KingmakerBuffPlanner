@@ -93,6 +93,9 @@ namespace KingmakerBuffPlanner.Planning
             EffectExpression expression, Func<string, IEnumerable<ActiveEffectInstance>> read,
             ISet<string> ignored, ExistingEffectRequirement requirement)
         {
+            if (!LastingCoverage(ref expression))
+                return new ExistingEffectRecipientAssessment(recipient, ExistingEffectVerdict.NotPresent,
+                    new[] { NoLastingCoverage });
             var scope = new EffectRecipientScope(expression, caster, recipient);
             if (scope.UnitIds.Count == 1 && scope.UnitIds[0] == recipient)
                 return Assess(recipient, expression, read(recipient), ignored, requirement);
@@ -126,6 +129,23 @@ namespace KingmakerBuffPlanner.Planning
                 failures.Count == 0 ? new[] { "present-effect-not-sufficient" } : failures.ToArray());
         }
 
+        public const string NoLastingCoverage = "no-lasting-coverage";
+
+        // H1 (0.6.11 review): an application whose native lifetime is fixed
+        // below MinimumRemainingRounds (for example Call of the Wild's
+        // three-second Infectious Charms follow-up markers) could never pass
+        // the expiry check below, whether fresh, expired or replaced. It is
+        // a confirmation obligation of the cast, not lasting coverage, so it
+        // is assessed out; the lasting effects keep every strength, owner and
+        // duration check. A casting with no lasting effect is never covered.
+        private static bool LastingCoverage(ref EffectExpression expression)
+        {
+            if (expression == null || !EffectApplicationLifetime.ContainsTransient(expression)) return true;
+            if (!EffectApplicationLifetime.ContainsDurable(expression)) return false;
+            expression = EffectApplicationLifetime.Durable(expression);
+            return true;
+        }
+
         public const double MinimumRemainingFraction = 0.5;
 
         // Whatever the duration comparability: an instance with less than
@@ -150,6 +170,9 @@ namespace KingmakerBuffPlanner.Planning
         {
             if (expression == null) throw new ArgumentNullException("expression");
             if (requirement == null) throw new ArgumentNullException("requirement");
+            if (!LastingCoverage(ref expression))
+                return new ExistingEffectRecipientAssessment(unitId, ExistingEffectVerdict.NotPresent,
+                    new[] { NoLastingCoverage });
             List<ActiveEffectInstance> live = (instances ?? new ActiveEffectInstance[0])
                 .Where(value => value != null && !value.Suppressed).ToList();
             var evaluator = new EffectPresenceEvaluator();

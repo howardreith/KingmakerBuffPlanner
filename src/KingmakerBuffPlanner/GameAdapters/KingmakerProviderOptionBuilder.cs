@@ -153,7 +153,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                         UnitEntityData target;
                         liveUnits.TryGetValue(targetId, out target);
                         effectsByTarget[targetId] = EffectRecipientBinding.Bind(applicable,
-                            rule => SelectNearbyRecipients(rule, caster, target));
+                            rule => new NearbyRecipientSelection(SelectNearbyRecipients(rule, caster, target),
+                                NearbyRecipientCandidates(rule, caster, target, snapshot.Units
+                                    .Select(unit => { UnitEntityData live; return liveUnits.TryGetValue(unit.UnitId, out live) ? live : null; }))));
                     }
                 options.Add(new ProviderPlanningOption(provider, reachableIds, anchors,
                     provider.EffectiveCasterLevel, provider.ExpectedDurationRounds,
@@ -256,6 +258,28 @@ namespace KingmakerBuffPlanner.GameAdapters
                     .Select(value => value.Unit.UniqueId).ToArray();
             }
             catch (Exception) { return null; }
+        }
+
+        // H2 (0.6.11 review): every OBSERVABLE unit (a snapshot party member
+        // or pet, so the compiler's readable-owner preflight never sees a new
+        // unreadable owner)
+        // the native wrapper's own unit filter could legitimately select when
+        // its action runs, whatever its distance now - movement between
+        // admission and application can change the nearest. Distance and the
+        // count bound are checked against the attempt's own observations.
+        private static IReadOnlyList<string> NearbyRecipientCandidates(NearbyRecipientRule rule,
+            UnitEntityData caster, UnitEntityData target, IEnumerable<UnitEntityData> observable)
+        {
+            if (caster == null || target == null) return new string[0];
+            try
+            {
+                return observable.Where(unit => unit != null && unit != target &&
+                        (rule.Self || unit != caster) &&
+                        (caster.IsAlly(unit) ? rule.Friends : rule.Enemies))
+                    .Select(unit => unit.UniqueId).Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal).ToArray();
+            }
+            catch (Exception) { return new string[0]; }
         }
 
         private static string[] LegalAnchorIds(

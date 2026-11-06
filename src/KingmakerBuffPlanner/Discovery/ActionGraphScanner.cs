@@ -87,7 +87,8 @@ namespace KingmakerBuffPlanner.Discovery
                             node.EffectId,
                             ResolveLeafTarget(targetOverride, node.Target),
                             node.SourceContract,
-                            path);
+                            path,
+                            maximumDurationSeconds: node.MaximumDurationSeconds);
                     case DiscoveryNodeKind.OffensiveAction:
                         diagnostics.Add(new DiscoveryDiagnostic(
                             "offensive-action", node.Identity, node.SourceContract, path));

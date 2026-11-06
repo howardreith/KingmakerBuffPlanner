@@ -33,6 +33,26 @@ namespace KingmakerBuffPlanner.Tests
             internal bool NearbyRecipients;
             internal bool NearbySelectionUnresolved;
             internal string NearbyOwner;
+            // 0.6.11 review H1/H2 realism. MarkerSeconds is the discovered
+            // native lifetime metadata of the two Infectious Charms markers
+            // (installed Call of the Wild: UseDurationSeconds, 3 s, reported
+            // as 6 s worst-case); null reproduces an unknown lifetime.
+            // MarkerLifetime is the fixture's round-granular end: a 3 s
+            // marker is gone by the next round.
+            internal float? MarkerSeconds;
+            internal long MarkerLifetime = 100;
+            // Native selection: the owners the wrapper actually chooses when
+            // the action runs, and the native distances at that moment.
+            internal bool NativeSelection;
+            internal string[] PredictedOwners;
+            internal string[] ApplicationOwners;
+            internal readonly Dictionary<string, float> ApplicationDistances = new Dictionary<string, float>(StringComparer.Ordinal);
+            internal bool NoGeometry;
+            internal string UnreadableUnit;
+            // An observation during application (the adapters' progress read),
+            // then time passes before the executor's final read.
+            internal bool RecordAtApplication = true;
+            internal bool DelayFinalRead;
             private readonly Dictionary<string, List<ObservedEffectInstance>> _additional =
                 new Dictionary<string, List<ObservedEffectInstance>>(StringComparer.Ordinal);
             private string BuffId { get { return CapturedHeroism ? "87ab2fed7feaaff47b62a3320a57ad8d" : "buff-effect"; } }
@@ -50,7 +70,7 @@ namespace KingmakerBuffPlanner.Tests
             private IEnumerable<ObservedEffectInstance> Read(string target, bool before)
             {
                 KeyValuePair<string, long> active;
-                if (!before && (Observation == "unreadable" ||
+                if (!before && (Observation == "unreadable" || target == UnreadableUnit ||
                     (Observation == "caster-unreadable" && target == "unit-wizard"))) return null;
                 var result = State.Active.TryGetValue(target, out active) && active.Value > Round
                     ? new[] { new ObservedEffectInstance(
@@ -99,11 +119,16 @@ namespace KingmakerBuffPlanner.Tests
                     if (Observation != "caster-missing")
                         PutAdditional(Observation == "caster-wrong-owner" ? target : step.Provider.CasterUnitId,
                             "6d949ebb548bd6c31e8d5bd45f96a7b6");
-                    if (Observation != "marker-missing")
-                        PutAdditional(Observation == "marker-wrong-owner" ? (NearbyRecipients ? target : step.Provider.CasterUnitId) :
-                            NearbyRecipients ? "unit-t2" : target,
-                            "c20c575b6352d1692b3074a25232e699");
+                    if (Observation == "marker-wrong-owner")
+                        PutAdditional(NearbyRecipients ? target : step.Provider.CasterUnitId, "c20c575b6352d1692b3074a25232e699");
+                    else if (Observation != "marker-missing")
+                        foreach (string owner in NearbyRecipients && ApplicationOwners != null ? ApplicationOwners
+                            : new[] { NearbyRecipients ? "unit-t2" : target })
+                            PutAdditional(owner, "c20c575b6352d1692b3074a25232e699");
                 }
+                if (RecordAtApplication)
+                    AppliedEffectJudgement.RecordProgress(_baselines[step], step.EffectObservationUnitIds, Read, Distances(step));
+                if (DelayFinalRead) Round += 1;
                 bool succeeded = Observation != "native-failure";
                 return new InstantCastResult(true, succeeded, false, Available(step) < before,
                     true, "simulated-native:" + Observation,
@@ -115,7 +140,24 @@ namespace KingmakerBuffPlanner.Tests
                 List<ObservedEffectInstance> values;
                 if (!_additional.TryGetValue(owner, out values)) _additional[owner] = values = new List<ObservedEffectInstance>();
                 values.RemoveAll(value => value.EffectId == effect);
-                values.Add(new ObservedEffectInstance(EffectKind.Buff, effect, "aux-" + (++_instance), Round + 100, false));
+                values.Add(new ObservedEffectInstance(EffectKind.Buff, effect, "aux-" + (++_instance), Round + MarkerLifetime, false));
+            }
+
+            internal void ReplaceAdditional(string owner, string effect) { PutAdditional(owner, effect); }
+
+            // Native distance from each selection centre at this read.
+            private IDictionary<string, float> Distances(CastStep step)
+            {
+                if (NoGeometry) return null;
+                var distances = new Dictionary<string, float>(StringComparer.Ordinal);
+                foreach (string center in step.ExpectedRecipientUnitIds)
+                    foreach (string unit in step.EffectObservationUnitIds)
+                    {
+                        float distance;
+                        distances[EffectBaseline.DistanceKey(center, unit)] = unit == center ? 0
+                            : ApplicationDistances.TryGetValue(unit, out distance) ? distance : 3f;
+                    }
+                return distances;
             }
 
             private int Available(CastStep step)
@@ -128,6 +170,8 @@ namespace KingmakerBuffPlanner.Tests
             public bool EffectsObserved(CastStep step)
             {
                 EffectBaseline baseline;
+                if (_baselines.TryGetValue(step, out baseline))
+                    AppliedEffectJudgement.RecordProgress(baseline, step.EffectObservationUnitIds, Read, Distances(step));
                 return _baselines.TryGetValue(step, out baseline) &&
                     AppliedEffectJudgement.AllReached(step.ExpectedRecipientUnitIds,
                         step.ExpectedEffects, baseline, Read, step.PreCoveredRecipientUnitIds, step.Provider.CasterUnitId);
@@ -190,10 +234,15 @@ namespace KingmakerBuffPlanner.Tests
                     Sentinel, "level-2"), "Sentinel fixture", 2, "pool-unit-sorcerer", 1,
                     null, null, 1, 100, "", "10 minutes/level");
                 var providers = new[] { wizard, sentinel };
-                EffectExpression heroism = CapturedHeroism ? CapturedHeroismExpression(NearbyRecipients) : Leaf("buff-effect");
+                EffectExpression heroism = CapturedHeroism ? CapturedHeroismExpression(NearbyRecipients, MarkerSeconds) : Leaf("buff-effect");
                 var facts = CapturedHeroism ? new Dictionary<string, bool> { { "infectious-charms-feature", InfectiousCharms } } : null;
-                var bound = current.Snapshot.Units.ToDictionary(unit => unit.UnitId, unit =>
-                    EffectRecipientBinding.Bind(EffectConditionBinding.Bind(heroism, facts), rule =>
+                var bound = current.Snapshot.Units.ToDictionary(unit => unit.UnitId, unit => NativeSelection
+                    // The production builder's shape: prediction plus every
+                    // observable unit the rule's own filter admits.
+                    ? EffectRecipientBinding.Bind(EffectConditionBinding.Bind(heroism, facts), rule => new NearbyRecipientSelection(
+                        NearbySelectionUnresolved ? null : PredictedOwners ?? new[] { unit.UnitId == "unit-t2" ? "unit-t3" : "unit-t2" },
+                        current.Snapshot.Units.Select(other => other.UnitId).Where(id => id != unit.UnitId)))
+                    : EffectRecipientBinding.Bind(EffectConditionBinding.Bind(heroism, facts), rule =>
                         NearbySelectionUnresolved ? null : new[] { NearbyOwner ?? (unit.UnitId == "unit-t2" ? "unit-t3" : "unit-t2") }), StringComparer.Ordinal);
                 var options = providers.Select(provider => new ProviderPlanningOption(provider,
                     provider == sentinel ? new[] { "unit-t4" } : current.Snapshot.Units.Select(unit => unit.UnitId), new[] { provider.Key.CasterUnitId },
@@ -293,8 +342,9 @@ namespace KingmakerBuffPlanner.Tests
             internal readonly List<CastStep> Steps = new List<CastStep>();
 
             internal RepeatSession(string root, string mode, string name, bool party = false, bool capturedHeroism = false,
-                bool infectiousCharms = false, bool nearbyRecipients = false)
+                bool infectiousCharms = false, bool nearbyRecipients = false, Action<RepeatBuffWorld> configure = null)
             {
+                if (configure != null) configure(World);
                 World.CapturedHeroism = capturedHeroism;
                 World.InfectiousCharms = infectiousCharms;
                 World.NearbyRecipients = nearbyRecipients;
@@ -357,11 +407,13 @@ namespace KingmakerBuffPlanner.Tests
         // catalogue at 85e7410 (kbp041-rel-catalog-full), not inferred from the
         // handoff's flat GUID list. The feature identity is symbolic here;
         // the live adapter supplies the actual condition Fact.AssetGuid.
-        private static EffectExpression CapturedHeroismExpression(bool nearby = false)
+        private static EffectExpression CapturedHeroismExpression(bool nearby = false, float? markerSeconds = null)
         {
             Func<DiscoveryNode[], DiscoveryNode> sequence = children => new DiscoveryNode(DiscoveryNodeKind.Sequence, "ActionList", children);
             Func<string, EffectTarget, DiscoveryNode> buff = (id, target) => new DiscoveryNode(DiscoveryNodeKind.Effect,
-                "ContextActionApplyBuff", effectId: id, target: target, sourceContract: "ContextActionApplyBuff");
+                "ContextActionApplyBuff", effectId: id, target: target, sourceContract: "ContextActionApplyBuff",
+                // Heroism's own buff is level-dependent: no fixed lifetime.
+                maximumDurationSeconds: id == "87ab2fed7feaaff47b62a3320a57ad8d" ? null : markerSeconds);
             return new ActionGraphScanner().Scan(new DiscoveryNode(DiscoveryNodeKind.AbilityReference,
                 "5ab0d42fb68c9e34abae4921822b9d63", new[] { sequence(new[] {
                     buff("87ab2fed7feaaff47b62a3320a57ad8d", EffectTarget.CurrentTarget),

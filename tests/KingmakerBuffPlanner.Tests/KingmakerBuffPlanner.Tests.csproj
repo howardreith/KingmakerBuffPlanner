@@ -43,6 +43,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="ProductionExecutionTests.cs" />
     <Compile Include="HeroismRepeatTests.cs" />
+    <Compile Include="InfectiousCharmsRefinementTests.cs" />
     <Compile Include="CastAvailableTests.cs" />
     <Compile Include="FactResourceTests.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\KingmakerFactResources.cs"><Link>GameAdapters\KingmakerFactResources.cs</Link></Compile>

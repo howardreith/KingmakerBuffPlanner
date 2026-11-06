@@ -79,6 +79,72 @@ namespace KingmakerBuffPlanner.Execution
             return unitId != null && _byUnit.TryGetValue(unitId, out instances);
         }
 
+        // H1/H2 (0.6.11 review): authoritative per-attempt observations made
+        // AFTER submission. Each instance identity this attempt was seen to
+        // hold is kept with the read that first saw it and, when the adapter
+        // could read them, the native distances at that read. A short-lived
+        // application seen while the cast resolved is therefore not judged
+        // "never applied" because it expired before a later read; the
+        // pre-submission read above remains the only freshness reference.
+        private readonly Dictionary<string, Dictionary<string, SeenEffectInstance>> _seen =
+            new Dictionary<string, Dictionary<string, SeenEffectInstance>>(StringComparer.Ordinal);
+        private readonly Dictionary<int, IDictionary<string, float>> _distancesByObservation =
+            new Dictionary<int, IDictionary<string, float>>();
+        private int _observationCount;
+
+        public int ObservationCount { get { return _observationCount; } }
+
+        // distances: key DistanceKey(center, unit) -> native distance, or
+        // null when the reader could not take positions.
+        public void RecordObservation(IDictionary<string, IEnumerable<ObservedEffectInstance>> byUnit,
+            IDictionary<string, float> distances = null)
+        {
+            if (byUnit == null) return;
+            int observation = ++_observationCount;
+            bool firstSighting = false;
+            foreach (KeyValuePair<string, IEnumerable<ObservedEffectInstance>> pair in byUnit)
+            {
+                if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value == null) continue;
+                Dictionary<string, SeenEffectInstance> seen;
+                if (!_seen.TryGetValue(pair.Key, out seen)) _seen[pair.Key] = seen = new Dictionary<string, SeenEffectInstance>(StringComparer.Ordinal);
+                foreach (ObservedEffectInstance instance in pair.Value.Where(value => value != null && !value.Suppressed))
+                {
+                    SeenEffectInstance prior;
+                    if (seen.TryGetValue(instance.Identity, out prior) && prior.Instance.EndTimeTicks >= instance.EndTimeTicks) continue;
+                    seen[instance.Identity] = new SeenEffectInstance(instance, prior == null ? observation : prior.Observation);
+                    if (prior == null) firstSighting = true;
+                }
+            }
+            // Positions matter only at the read that first saw an application.
+            if (firstSighting && distances != null && _distancesByObservation.Count < 64)
+                _distancesByObservation[observation] = new Dictionary<string, float>(distances, StringComparer.Ordinal);
+        }
+
+        public IEnumerable<SeenEffectInstance> SeenAfterSubmission(string unitId)
+        {
+            Dictionary<string, SeenEffectInstance> seen;
+            return unitId != null && _seen.TryGetValue(unitId, out seen) ? seen.Values.ToList() : new List<SeenEffectInstance>();
+        }
+
+        public float? DistanceAt(int observation, string center, string unitId)
+        {
+            IDictionary<string, float> distances;
+            float value;
+            return _distancesByObservation.TryGetValue(observation, out distances) &&
+                distances.TryGetValue(DistanceKey(center, unitId), out value) ? (float?)value : null;
+        }
+
+        public static string DistanceKey(string center, string unitId) { return center + "\u001f" + unitId; }
+
+        // Not suppressed, and new or refreshed relative to the read taken
+        // before submission (never inferred from an after-read alone).
+        public bool IsFresh(string unitId, ObservedEffectInstance instance)
+        {
+            IReadOnlyList<ObservedEffectInstance> before;
+            return instance != null && !instance.Suppressed && TryGet(unitId, out before) &&
+                !before.Any(old => old.Identity == instance.Identity && old.EndTimeTicks >= instance.EndTimeTicks);
+        }
+
         public string Describe(IEnumerable<string> recipients)
         {
             var units = (recipients ?? new string[0]).ToList();
@@ -94,6 +160,15 @@ namespace KingmakerBuffPlanner.Execution
         }
     }
 
+    public sealed class SeenEffectInstance
+    {
+        internal SeenEffectInstance(ObservedEffectInstance instance, int observation)
+        { Instance = instance; Observation = observation; }
+        public ObservedEffectInstance Instance { get; private set; }
+        // The 1-based post-submission read that first saw this identity.
+        public int Observation { get; private set; }
+    }
+
     // Final review A3: an expected effect confirms a cast only when this
     // attempt put it there. Presence alone is no proof: a recast over an
     // insufficient, suppressed or deliberately recast instance would find
@@ -106,10 +181,18 @@ namespace KingmakerBuffPlanner.Execution
     // recipient set confirms nothing (final review A2).
     public static class AppliedEffectJudgement
     {
+        // A natively selected secondary owner's distance from the selection
+        // centre may differ from the native read by one frame of movement.
+        public const float SecondaryDistanceTolerance = 1.0f;
+
         public static bool ReachedScoped(EffectExpression expected, string caster, string recipient,
             EffectBaseline baseline, Func<string, IEnumerable<ObservedEffectInstance>> readAfter, bool requireFresh = true)
         {
             if (expected == null || baseline == null || readAfter == null) return false;
+            // H1: kept coverage is lasting coverage; a short-lived application
+            // is only ever a delivery obligation of the attempt that made it.
+            if (!requireFresh && EffectApplicationLifetime.ContainsDurable(expected))
+                expected = EffectApplicationLifetime.Durable(expected);
             var scope = new EffectRecipientScope(expected, caster, recipient);
             var before = new Dictionary<string, IReadOnlyList<ObservedEffectInstance>>(StringComparer.Ordinal);
             var after = new Dictionary<string, List<ObservedEffectInstance>>(StringComparer.Ordinal);
@@ -122,16 +205,32 @@ namespace KingmakerBuffPlanner.Execution
                 before[owner] = prior;
                 after[owner] = current.Where(value => value != null && !value.Suppressed).ToList();
             }
+            // Every confirmation read is also an observation of this attempt.
+            baseline.RecordObservation(after.ToDictionary(pair => pair.Key,
+                pair => (IEnumerable<ObservedEffectInstance>)pair.Value, StringComparer.Ordinal));
+            bool durableExpected = EffectApplicationLifetime.ContainsDurable(expected);
             bool freshPrimary = false;
             var evaluator = new EffectPresenceEvaluator();
             EffectPresenceResult complete = evaluator.EvaluateScoped(expected, (leaf, role) =>
             {
+                bool transient = EffectApplicationLifetime.IsTransient(leaf);
+                if (requireFresh && leaf.SecondarySelection != null)
+                    return SecondaryReached(leaf, recipient, baseline, after, transient);
                 string owner = scope.Owner(leaf, role);
                 List<ObservedEffectInstance> instances;
                 if (owner == null || !after.TryGetValue(owner, out instances)) return false;
-                var matching = instances.Where(value => value.Kind == leaf.Kind && value.EffectId == leaf.EffectId).ToList();
-                if (owner == recipient && matching.Any(value => !before[owner].Any(old => old.Identity == value.Identity &&
-                    old.EndTimeTicks >= value.EndTimeTicks))) freshPrimary = true;
+                Func<ObservedEffectInstance, bool> matches = value => value.Kind == leaf.Kind && value.EffectId == leaf.EffectId;
+                var matching = instances.Where(matches).ToList();
+                if (transient)
+                {
+                    // Delivered by THIS attempt, at this read or an earlier
+                    // post-submission read; never old presence.
+                    bool delivered = matching.Any(value => baseline.IsFresh(owner, value)) ||
+                        baseline.SeenAfterSubmission(owner).Any(seen => matches(seen.Instance) && baseline.IsFresh(owner, seen.Instance));
+                    if (delivered && owner == recipient && !durableExpected) freshPrimary = true;
+                    return delivered;
+                }
+                if (owner == recipient && matching.Any(value => baseline.IsFresh(owner, value))) freshPrimary = true;
                 return matching.Count != 0;
             }, null);
             if (complete.Kind != EffectPresenceKind.Complete) return false;
@@ -145,6 +244,65 @@ namespace KingmakerBuffPlanner.Execution
                 return owner != null && before.TryGetValue(owner, out prior) && prior.Any(value =>
                     !value.Suppressed && value.Kind == leaf.Kind && value.EffectId == leaf.EffectId);
             }, null).Kind == EffectPresenceKind.Complete;
+        }
+
+        // H2 (0.6.11 review): the native nearby wrapper chooses its owner when
+        // the action runs, so a planning-time prediction is not the owner the
+        // attempt must have reached. The secondary obligation holds when the
+        // authorized candidates hold between one and the rule's maximum FRESH
+        // applications (an unpredicted owner only with a native distance,
+        // read when that application was first seen, inside the rule's
+        // radius), or - when nothing was applied - when every candidate was
+        // readably outside the radius at the read that first saw this
+        // attempt's effect on the selection centre. Anything else, including
+        // an unreadable candidate or unreadable geometry, is unconfirmed.
+        private static bool SecondaryReached(EffectLeafExpression leaf, string center, EffectBaseline baseline,
+            IDictionary<string, List<ObservedEffectInstance>> after, bool transient)
+        {
+            NearbySelectionBinding selection = leaf.SecondarySelection;
+            Func<ObservedEffectInstance, bool> matches = value => value.Kind == leaf.Kind && value.EffectId == leaf.EffectId;
+            float reach = selection.Radius + SecondaryDistanceTolerance;
+            int selected = 0;
+            foreach (string candidate in selection.CandidateUnitIds)
+            {
+                List<ObservedEffectInstance> current;
+                if (!after.TryGetValue(candidate, out current)) return false;
+                var sightings = baseline.SeenAfterSubmission(candidate)
+                    .Where(seen => matches(seen.Instance) && baseline.IsFresh(candidate, seen.Instance) &&
+                        (transient || current.Any(value => value.Identity == seen.Instance.Identity)))
+                    .OrderBy(seen => seen.Observation).ToList();
+                if (sightings.Count == 0) continue;
+                if (candidate != leaf.RecipientUnitId)
+                {
+                    float? distance = baseline.DistanceAt(sightings[0].Observation, center, candidate);
+                    if (distance == null || distance.Value > reach) return false;
+                }
+                selected++;
+            }
+            if (selected != 0) return selection.Maximum <= 0 || selected <= selection.Maximum;
+            int landed = baseline.SeenAfterSubmission(center).Where(seen => baseline.IsFresh(center, seen.Instance))
+                .Select(seen => seen.Observation).DefaultIfEmpty(0).Min();
+            if (landed == 0 || selection.CandidateUnitIds.Count == 0) return false;
+            return selection.CandidateUnitIds.All(candidate =>
+            {
+                float? distance = baseline.DistanceAt(landed, center, candidate);
+                return distance != null && distance.Value > reach;
+            });
+        }
+
+        // Adapters call this at every post-submission read, including reads
+        // while an animated command is still running.
+        public static void RecordProgress(EffectBaseline baseline, IEnumerable<string> unitIds,
+            Func<string, IEnumerable<ObservedEffectInstance>> read, IDictionary<string, float> distances)
+        {
+            if (baseline == null || unitIds == null || read == null) return;
+            var observed = new Dictionary<string, IEnumerable<ObservedEffectInstance>>(StringComparer.Ordinal);
+            foreach (string unitId in unitIds)
+            {
+                IEnumerable<ObservedEffectInstance> instances = read(unitId);
+                if (instances != null) observed[unitId] = instances.ToList();
+            }
+            baseline.RecordObservation(observed, distances);
         }
 
         public static bool Reached(EffectExpression expected,

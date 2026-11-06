@@ -558,6 +558,17 @@ namespace KingmakerBuffPlanner.Planning
                     { "actionPath", leaf.ActionPath }
                 };
                 if (leaf.RecipientUnitId != null) value.Add("recipientUnitId", leaf.RecipientUnitId);
+                // 0.6.11 review H1/H2: what confirmation accepts is part of
+                // what a run allowance authorizes. Absent keys keep every other
+                // projection identity unchanged.
+                if (EffectApplicationLifetime.IsTransient(leaf)) value.Add("transientApplication", true);
+                if (leaf.SecondarySelection != null)
+                    value.Add("secondarySelection", new JObject
+                    {
+                        { "radius", leaf.SecondarySelection.Radius },
+                        { "maximum", leaf.SecondarySelection.Maximum },
+                        { "candidateUnitIds", new JArray(leaf.SecondarySelection.CandidateUnitIds.ToArray()) }
+                    });
                 return value;
             }
             var sequence = expression as SequenceEffectExpression;

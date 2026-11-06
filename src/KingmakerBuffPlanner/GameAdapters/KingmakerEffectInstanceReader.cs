@@ -68,22 +68,84 @@ namespace KingmakerBuffPlanner.GameAdapters
             try
             {
                 if (step == null || baseline == null || step.ExpectedEffects == null) return false;
-                Dictionary<string, UnitEntityData> units = KingmakerAnimatedCastAdapter.CollectUnits();
-                HashSet<string> ids = ExpectedIds(step.ExpectedEffects);
-                var observed = new Dictionary<string, IEnumerable<ObservedEffectInstance>>(StringComparer.Ordinal);
-                foreach (string unitId in step.EffectObservationUnitIds)
-                {
-                    UnitEntityData unit;
-                    observed[unitId] = units.TryGetValue(unitId, out unit) && unit.Descriptor != null
-                        ? Instances(unit, ids) : null;
-                }
+                Dictionary<string, UnitEntityData> units;
+                Dictionary<string, IEnumerable<ObservedEffectInstance>> observed = ReadAfter(step, out units);
                 Func<string, IEnumerable<ObservedEffectInstance>> readAfter = unitId =>
                     observed.ContainsKey(unitId) ? observed[unitId] : null;
+                // The positioned observation first, so a first sighting keeps
+                // the native geometry of the read that made it.
+                AppliedEffectJudgement.RecordProgress(baseline, step.EffectObservationUnitIds, readAfter,
+                    Distances(step, units));
                 bool confirmed = Judge(step, baseline, readAfter);
                 baseline.RecordConfirmationPoll(confirmed, new EffectBaseline(observed), step.EffectObservationUnitIds);
                 return confirmed;
             }
             catch (Exception) { return false; }
+        }
+
+        // H1/H2 (0.6.11 review): a post-submission read taken while an
+        // animated command is still running. It confirms nothing by itself;
+        // it records what this attempt was seen to apply, and where, before a
+        // short-lived application can expire.
+        internal static void RecordProgress(CastStep step, EffectBaseline baseline)
+        {
+            try
+            {
+                if (step == null || baseline == null || step.ExpectedEffects == null) return;
+                Dictionary<string, UnitEntityData> units;
+                Dictionary<string, IEnumerable<ObservedEffectInstance>> observed = ReadAfter(step, out units);
+                AppliedEffectJudgement.RecordProgress(baseline, step.EffectObservationUnitIds,
+                    unitId => observed.ContainsKey(unitId) ? observed[unitId] : null, Distances(step, units));
+            }
+            catch (Exception) { /* An unreadable progress read records nothing. */ }
+        }
+
+        private static Dictionary<string, IEnumerable<ObservedEffectInstance>> ReadAfter(CastStep step,
+            out Dictionary<string, UnitEntityData> units)
+        {
+            units = KingmakerAnimatedCastAdapter.CollectUnits();
+            HashSet<string> ids = ExpectedIds(step.ExpectedEffects);
+            var observed = new Dictionary<string, IEnumerable<ObservedEffectInstance>>(StringComparer.Ordinal);
+            foreach (string unitId in step.EffectObservationUnitIds)
+            {
+                UnitEntityData unit;
+                observed[unitId] = units.TryGetValue(unitId, out unit) && unit.Descriptor != null
+                    ? Instances(unit, ids) : null;
+            }
+            return observed;
+        }
+
+        // Native distance (the same UnitEntityData.DistanceTo the nearby
+        // wrapper sorts by) from each expected recipient - the selection
+        // centre - to each observed unit. Only steps with a natively selected
+        // owner need positions; null when any is unreadable.
+        private static IDictionary<string, float> Distances(CastStep step, Dictionary<string, UnitEntityData> units)
+        {
+            if (!HasSecondarySelection(step.ExpectedEffects)) return null;
+            try
+            {
+                var distances = new Dictionary<string, float>(StringComparer.Ordinal);
+                foreach (string center in step.ExpectedRecipientUnitIds)
+                {
+                    UnitEntityData origin;
+                    if (!units.TryGetValue(center, out origin)) return null;
+                    foreach (string unitId in step.EffectObservationUnitIds)
+                    {
+                        UnitEntityData unit;
+                        if (!units.TryGetValue(unitId, out unit)) return null;
+                        distances[EffectBaseline.DistanceKey(center, unitId)] = origin.DistanceTo(unit);
+                    }
+                }
+                return distances;
+            }
+            catch (Exception) { return null; }
+        }
+
+        private static bool HasSecondarySelection(EffectExpression expression)
+        {
+            foreach (EffectLeafExpression leaf in EffectApplicationLifetime.Leaves(expression))
+                if (leaf.SecondarySelection != null) return true;
+            return false;
         }
 
         private static bool Judge(CastStep step, EffectBaseline baseline,
