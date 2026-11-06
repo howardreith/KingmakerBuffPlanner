@@ -21,7 +21,7 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "& .\
 & C:\Dev\KingmakerBuffPlannerLab\codex-policy\Push-KingmakerBuffPlanner.ps1 -RepositoryRoot <clone> -AllowDefaultBranch -Confirm:$false
 powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "& .\scripts\Publish-Release.ps1 -Publish -ConfirmOwnerAuthorizedPreRuntimeRelease -ReleaseNotesPath docs/RELEASE-NOTES-0.6.13.md"
 gh release download v0.6.13 --pattern KingmakerBuffPlanner-0.6.13.zip --pattern SHA256SUMS.txt --dir artifacts/verification/0.6.13
-powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "& .\scriptsalidate-package.ps1 -PackagePath artifacts/verification/0.6.13/KingmakerBuffPlanner-0.6.13.zip"
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "& .\scripts\validate-package.ps1 -PackagePath artifacts/verification/0.6.13/KingmakerBuffPlanner-0.6.13.zip"
 ```
 
 | Check | Actual result |
