@@ -1,3 +1,21 @@
-# PR #21 review items 1-2 reproduced at previous head 2970940 (scratch worktree, test-only patch)
-# Command: scripts/Test-Development.ps1 -Only 'review-repro-'  (build sha256 43b51754fe412b90a768c94141f1a742565118beb26a97d702b460f218468f96)
+# PR #21 review items 1-2 reproduced at previous head 2970940 (scratch worktree, test-only patch review-repro-2970940.patch)
+# Command: scripts/Test-Development.ps1 -Only 'review-repro-'
+# Build: PASS=1 FAIL=0 configuration=Release sha256=43b51754fe412b90a768c94141f1a742565118beb26a97d702b460f218468f96
+# Lines below are the run's console output, truncated at 200 characters when captured.
+[REVIEW-REPRO] head=2970940;mode=instant;case=pred-far;confirmed=2;skipped=0;notProcessed=0;spent=2;fired=cast-1,cast-2;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-native
+[REVIEW-REPRO] head=2970940;mode=instant;case=pred-no-geo;confirmed=2;skipped=0;notProcessed=0;spent=2;fired=cast-1,cast-2;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-nat
+[REVIEW-REPRO] head=2970940;mode=instant;case=in-range-wrong;confirmed=2;skipped=0;notProcessed=0;spent=2;fired=cast-1,cast-2;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-
+[REVIEW-REPRO] head=2970940;mode=instant;case=e-missing;confirmed=2;skipped=0;notProcessed=0;spent=2;fired=cast-1,cast-2;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-nativ
+[REVIEW-REPRO] head=2970940;mode=animated;case=pred-far;confirmed=2;skipped=0;notProcessed=0;spent=2;fired=cast-1,cast-2;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-nativ
+[REVIEW-REPRO] head=2970940;mode=animated;case=pred-no-geo;confirmed=2;skipped=0;notProcessed=0;spent=2;fired=cast-1,cast-2;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-na
+[REVIEW-REPRO] head=2970940;mode=animated;case=in-range-wrong;confirmed=2;skipped=0;notProcessed=0;spent=2;fired=cast-1,cast-2;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated
+[REVIEW-REPRO] head=2970940;mode=animated;case=e-missing;confirmed=2;skipped=0;notProcessed=0;spent=2;fired=cast-1,cast-2;first=EffectConfirmed:EffectConfirmed:expected-effects-observed;simulated-nati
 Protocol tests: PASS=0 FAIL=8
+FAIL review-repro-pred-far-instant: pred-far: invalid secondary observation was accepted
+FAIL review-repro-pred-no-geo-instant: pred-no-geo: invalid secondary observation was accepted
+FAIL review-repro-in-range-wrong-instant: in-range-wrong: invalid secondary observation was accepted
+FAIL review-repro-e-missing-instant: e-missing: invalid secondary observation was accepted
+FAIL review-repro-pred-far-animated: pred-far: invalid secondary observation was accepted
+FAIL review-repro-pred-no-geo-animated: pred-no-geo: invalid secondary observation was accepted
+FAIL review-repro-in-range-wrong-animated: in-range-wrong: invalid secondary observation was accepted
+FAIL review-repro-e-missing-animated: e-missing: invalid secondary observation was accepted
