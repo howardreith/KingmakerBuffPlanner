@@ -487,6 +487,9 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(heading.rectTransform, 0, 1, 1, 1, 24, 24, 0, 0);
             heading.rectTransform.pivot = new Vector2(.5f, 1); heading.rectTransform.sizeDelta = new Vector2(heading.rectTransform.sizeDelta.x, 48);
             _modal = backdrop; backdrop.SetAsLastSibling();
+            // Review P2: the workspace tooltip of the control behind this
+            // dialog must not stay (or be re-raised) above it.
+            if (_workspace != null) _workspace.NavigatorModalOpened();
             return panel;
         }
 

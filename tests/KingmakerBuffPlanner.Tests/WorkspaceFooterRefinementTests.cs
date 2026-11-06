@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using KingmakerBuffPlanner.Persistence;
+using KingmakerBuffPlanner.Planning;
 using KingmakerBuffPlanner.UI;
 
 namespace KingmakerBuffPlanner.Tests
@@ -21,6 +22,171 @@ namespace KingmakerBuffPlanner.Tests
             Run("footer-refinement-policy-toggle-is-one-persisted-step", () => TestFooterPolicyToggle(root));
             Run("footer-refinement-notice-is-error-only-and-save-failure-stays", () => TestFooterNoticeErrorOnly(root));
             Run("footer-refinement-undo-names-a-pending-cleared-plan", () => TestFooterUndoNamesClear(root));
+            Run("footer-refinement-tooltip-yields-to-navigator-dialog", () => TestTooltipYieldsToNavigatorDialog(root));
+            Run("footer-refinement-clear-retires-stale-run-refusal", () => TestClearRetiresStaleRefusal(root));
+            Run("footer-refinement-clear-keeps-failed-autosave-notice", () => TestClearKeepsFailedAutosave(root));
+        }
+
+        // Review P2 (PR #21): footer focus -> controller Inspect opens the
+        // navigator's Control details dialog -> no background tooltip shows
+        // or is raised over it, hover included -> the dialog closes -> the
+        // still-focused control's help returns. The real view, navigator,
+        // focus model and Execute(Inspect) route run; only the dialog's
+        // Unity construction (ShowText/CreateModal) and control liveness are
+        // the detached rendering boundary.
+        private static void TestTooltipYieldsToNavigatorDialog(string root)
+        {
+            var fixture = new DescriptionViewFixture(root, "tooltip-navigator-dialog");
+            Assembly product = fixture.Product;
+            object view = fixture.View, navigator = fixture.Navigator;
+            Type rectType = typeof(UnityEngine.RectTransform);
+            Action openDialog = () => SetNative(navigator, "_modal", DetachedViewObject(rectType));
+            Type itemType = product.GetType("KingmakerBuffPlanner.UI.ControllerFocusItem", true);
+            Type boundsType = product.GetType("KingmakerBuffPlanner.UI.ControllerFocusBounds", true);
+            Array items = Array.CreateInstance(itemType, 2);
+            string[] keys = { "plan/undo", "plan/run" };
+            for (int index = 0; index < 2; index++)
+            {
+                object bounds = Activator.CreateInstance(boundsType, ViewInputMembers, null,
+                    new object[] { index * 120f, 0f, index * 120f + 100f, 40f }, null);
+                items.SetValue(Activator.CreateInstance(itemType, ViewInputMembers, null,
+                    new object[] { keys[index], "Footer", "Action", true, (Action)(() => { }), null, openDialog,
+                        bounds, true, null }, null), index);
+            }
+            ViewInputCall(fixture.Focus, "Replace", new object[] { items });
+            ViewInputCall(fixture.Focus, "Restore", "plan/undo");
+            // Registered footer targets (as RegisterTooltip records them) plus
+            // a Clear dialog button, which only its own dialog may show.
+            object targets = view.GetType().GetProperty("_tooltipTargets", ViewInputMembers).GetValue(view, null);
+            Type targetType = view.GetType().GetNestedType("TooltipTarget", BindingFlags.NonPublic);
+            Action<string, bool> register = (key, modal) =>
+            {
+                object target = Activator.CreateInstance(targetType, true);
+                SetNative(target, "Rect", DetachedViewObject(rectType));
+                // The product context's own Func<WorkspaceTooltipContent>.
+                Type contentType = product.GetType("KingmakerBuffPlanner.UI.WorkspaceTooltipContent", true);
+                SetNative(target, "Content", System.Linq.Expressions.Expression.Lambda(
+                    typeof(Func<>).MakeGenericType(contentType),
+                    System.Linq.Expressions.Expression.New(contentType.GetConstructor(new[] { typeof(string), typeof(string) }),
+                        System.Linq.Expressions.Expression.Constant(key),
+                        System.Linq.Expressions.Expression.Constant(key + " help"))).Compile());
+                SetNative(target, "Modal", modal);
+                targets.GetType().GetProperty("Item").SetValue(targets, target, new object[] { key });
+            };
+            register("plan/undo", false); register("plan/run", false); register("clear/cancel", true);
+            SetNative(view, "_tooltipControlLive", (Func<UnityEngine.RectTransform, bool>)(rect => true));
+            Func<string> shown = () => (string)ViewInputCall(view, "get_TooltipKeyForRuntime");
+            Func<string> source = () => (string)ViewInputCall(view, "get_TooltipSourceForRuntime");
+            Type command = product.GetType("KingmakerBuffPlanner.UI.ControllerWorkspaceCommand", true);
+
+            ViewInputCall(view, "TickTooltip");
+            Expect(shown() == "plan/undo" && source() == "Focus", "footer focus did not show its tooltip: " + shown());
+            ViewInputCall(navigator, "Execute", Enum.Parse(command, "Inspect"));
+            Expect((bool)ViewInputCall(view, "get_NavigatorModalOpen"), "Inspect did not open the navigator dialog");
+            ViewInputCall(view, "TickTooltip");
+            Expect(shown() == null, "the footer tooltip stayed over the Control details dialog");
+            ViewInputCall(view, "OnTooltipHover", "plan/run", true);
+            Expect(shown() == null, "a background hover raised a tooltip over the dialog");
+            ViewInputCall(view, "TickTooltip");
+            Expect(shown() == null, "the retained focus key raised the tooltip again");
+            Expect(!(bool)ViewInputCall(view, "TooltipTargetUsable", "plan/undo") &&
+                !(bool)ViewInputCall(view, "TooltipTargetUsable", "clear/cancel"),
+                "the navigator dialog did not suppress every other layer's help");
+            ViewInputCall(view, "OnTooltipHover", "plan/run", false);
+            // CloseOwnedModal's Unity teardown is the boundary; its state is null.
+            SetNative(navigator, "_modal", null);
+            ViewInputCall(view, "TickTooltip");
+            Expect(shown() == "plan/undo" && source() == "Focus",
+                "after the dialog closed the focused control's help did not return: " + shown());
+            // The production open hook drops the owner immediately, not a frame later.
+            openDialog();
+            ViewInputCall(view, "NavigatorModalOpened");
+            Expect(shown() == null, "opening the dialog did not dismiss the tooltip at once");
+            SetNative(navigator, "_modal", null);
+            // Clear's own buttons keep their help while Clear is the topmost dialog.
+            SetNative(view, "_clearOverlay", DetachedViewObject(rectType));
+            Expect((bool)ViewInputCall(view, "TooltipTargetUsable", "clear/cancel") &&
+                !(bool)ViewInputCall(view, "TooltipTargetUsable", "plan/undo"), "Clear dialog tooltip ownership changed");
+            SetNative(view, "_clearOverlay", null);
+        }
+
+        // Review P3 (PR #21): a refused Run's notice and problem navigation
+        // must not outlive a successful Clear of the castings it named. The
+        // session half runs the real refused Run; the view half runs the real
+        // view notice code over a product-context session's real Clear.
+        private static void TestClearRetiresStaleRefusal(string root)
+        {
+            string dir;
+            var dispatch = new DisabledCastingDispatchBoundary();
+            CastingWorkspaceSession session = ProblemSession(root, "clear-retires", new[] {
+                ProblemCasting("z", 0, source: GraphSourceB), ProblemCasting("a", 1) }, out dir, dispatch);
+            CastingWorkspaceInputs inputs = GraphInputs();
+            session.BuildGraph(inputs);
+            session.PresentForReview(inputs);
+            WorkspaceApplyResult refusal = session.Apply(CastingApplyMode.Ordinary, "long", inputs);
+            string refusalText = session.LastAttemptMessage;
+            Expect(!refusal.Allowed && session.ProblemNavigation.Active && !string.IsNullOrEmpty(refusalText),
+                "fixture Run was not refused with problems");
+            Expect(session.ClearPlan(session.BeginClearPlan(inputs), inputs).Applied && session.Document.Castings.Count == 0,
+                "clear refused");
+            Expect(!session.ProblemNavigation.Active && session.LastAttemptMessage == null,
+                "problem navigation still pointed at cleared castings");
+
+            string viewDir;
+            ClearFixture(root, "clear-retires-view", out viewDir);
+            Assembly product = ViewInputProduct();
+            object productSession = ProductSession(product, viewDir);
+            object view = DetachedViewObject(product.GetType("KingmakerBuffPlanner.UI.CastingWorkspaceScreenView", true));
+            SetNative(view, "_session", productSession);
+            Func<string> standing = () => (string)ViewInputCall(view, "StandingNotice", WorkspaceFooterText.SaveProblem(
+                (string)productSession.GetType().GetProperty("FooterSaveState").GetValue(productSession, null)));
+            ViewInputCall(view, "Feedback", refusalText, true); // as the Run command reports it
+            Expect(standing() == refusalText, "the refusal was not the standing notice");
+            object confirmation = ViewInputCall(productSession, "BeginClearPlan", new object[] { null });
+            object cleared = ViewInputCall(productSession, "ClearPlan", confirmation, null);
+            Expect((bool)cleared.GetType().GetProperty("Applied").GetValue(cleared, null), "view-side clear refused");
+            ViewInputCall(view, "ReportClearOutcome", cleared);
+            Expect(standing() == null, "a successful Clear left the old refusal as the notice: " + standing());
+            Expect((string)ViewInputCall(view, "get_LastCommandMessageForRuntime") == "Plan cleared. Undo restores it.",
+                "the Clear outcome was not recorded");
+            // A refused Clear (stale confirmation) still reports its own problem.
+            object again = ViewInputCall(productSession, "ClearPlan", confirmation, null);
+            string reason = (string)again.GetType().GetProperty("Reason").GetValue(again, null);
+            ViewInputCall(view, "ReportClearOutcome", again);
+            Expect(!(bool)again.GetType().GetProperty("Applied").GetValue(again, null) && standing() == reason,
+                "a refused Clear's reason was hidden");
+        }
+
+        // Review P3: retiring the command problem never hides a current,
+        // genuine autosave failure (with its Retry save).
+        private static void TestClearKeepsFailedAutosave(string root)
+        {
+            string dir;
+            ClearFixture(root, "clear-keeps-save-failure", out dir);
+            Assembly product = ViewInputProduct();
+            object session = ProductSession(product, dir);
+            Type sessionType = session.GetType();
+            Func<string> saveState = () => (string)sessionType.GetProperty("FooterSaveState").GetValue(session, null);
+            object view = DetachedViewObject(product.GetType("KingmakerBuffPlanner.UI.CastingWorkspaceScreenView", true));
+            SetNative(view, "_session", session);
+            ViewInputCall(view, "Feedback", "Long was not cast: 2 castings are not ready.", true);
+            string path = new CastingPlanRepository(dir).GetProfilePath("clear-campaign");
+            using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                object cleared = ViewInputCall(session, "ClearPlan", ViewInputCall(session, "BeginClearPlan", new object[] { null }), null);
+                Expect((bool)cleared.GetType().GetProperty("Applied").GetValue(cleared, null) &&
+                    ((string)sessionType.GetProperty("AutosaveStatus").GetValue(session, null)).StartsWith("save-failed", StringComparison.Ordinal),
+                    "the held profile did not make the Clear autosave fail");
+                ViewInputCall(view, "ReportClearOutcome", cleared);
+                string problem = WorkspaceFooterText.SaveProblem(saveState());
+                Expect(problem != null && (string)ViewInputCall(view, "StandingNotice", problem) == problem,
+                    "the failed autosave was hidden after Clear");
+                Expect(WorkspaceFooterText.RecoveryAction(saveState()) == WorkspaceFooterText.RetrySaveAction,
+                    "the failed autosave lost its Retry save");
+            }
+            Expect((bool)ViewInputCall(session, "RetryFailedSave") &&
+                (string)ViewInputCall(view, "StandingNotice", WorkspaceFooterText.SaveProblem(saveState())) == null,
+                "a recovered save still showed a notice");
         }
 
         private static void TestFooterTooltipContent()

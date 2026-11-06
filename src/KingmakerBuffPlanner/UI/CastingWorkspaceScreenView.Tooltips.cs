@@ -103,7 +103,11 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_disposed) return;
             string focus = null;
-            if (_controllerNavigation != null && (_controllerAuthoring || _controllerNavigation.KeyboardFocusActive))
+            // Review P2: while the navigator's own dialog (Control details,
+            // Unavailable, search keyboard) owns input, its retained focus key
+            // belongs to the control BEHIND it: no background owner shows.
+            if (_controllerNavigation != null && !NavigatorModalOpen &&
+                (_controllerAuthoring || _controllerNavigation.KeyboardFocusActive))
             {
                 focus = _controllerNavigation.FocusKey;
                 if (focus == null || !_tooltipTargets.ContainsKey(focus)) focus = null;
@@ -127,14 +131,57 @@ namespace KingmakerBuffPlanner.UI
             RenderTooltip();
         }
 
+        // The navigator's own modal (a Control details / Unavailable reader or
+        // the search keyboard) - built above every workspace layer, including
+        // the Clear dialog.
+        internal bool NavigatorModalOpen
+        {
+            get { return _controllerNavigation != null && _controllerNavigation.ModalOpen; }
+        }
+
+        // The navigator opened its dialog: drop the background owner now,
+        // not one frame later, so nothing is raised over the dialog.
+        internal void NavigatorModalOpened()
+        {
+            if (!_disposed) DismissTooltip();
+        }
+
+        // Test seam for detached fixtures (no native runtime): whether the
+        // control still exists and is shown. Production uses the native read.
+#pragma warning disable 0649 // assigned only by detached test fixtures
+        private Func<RectTransform, bool> _tooltipControlLive;
+#pragma warning restore 0649
+
         private bool TooltipTargetUsable(string key)
         {
             TooltipTarget target;
-            if (!_tooltipTargets.TryGetValue(key, out target) || target.Rect == null ||
-                !target.Rect.gameObject.activeInHierarchy) return false;
+            if (!_tooltipTargets.TryGetValue(key, out target) || ReferenceEquals(target.Rect, null) ||
+                !(_tooltipControlLive ?? NativeControlLive)(target.Rect)) return false;
+            return TooltipOwnerAllows(key, target);
+        }
+
+        // Which layer owns presentation, topmost first: the navigator's
+        // dialog suppresses everything; the Clear dialog shows only its own
+        // buttons' help; Resources suppresses the footer; otherwise the
+        // workspace's controls (the notice only while it says something).
+        private bool TooltipOwnerAllows(string key, TooltipTarget target)
+        {
+            if (NavigatorModalOpen) return false;
             if (ClearPlanOpen) return target.Modal;
-            if (target.Modal || (_resources != null && _resources.gameObject.activeSelf)) return false;
-            return key != "notice" || _noticeText.Length != 0;
+            if (target.Modal || (!ReferenceEquals(_resources, null) && ResourcesShown())) return false;
+            return key != "notice" || (_noticeText ?? string.Empty).Length != 0;
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static bool NativeControlLive(RectTransform rect)
+        {
+            return rect != null && rect.gameObject.activeInHierarchy;
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private bool ResourcesShown()
+        {
+            return _resources != null && _resources.gameObject.activeSelf;
         }
 
         // Reference checks only: no Unity method is even compiled into this
@@ -150,8 +197,9 @@ namespace KingmakerBuffPlanner.UI
         private void DrawTooltip()
         {
             TooltipTarget target;
+            // Never raised over a dialog that does not own this tooltip.
             if (!_tooltipState.Visible || !_tooltipTargets.TryGetValue(_tooltipState.Key, out target) ||
-                target.Rect == null)
+                target.Rect == null || !TooltipOwnerAllows(_tooltipState.Key, target))
             {
                 if (_tooltipPanel != null && _tooltipPanel.gameObject.activeSelf) _tooltipPanel.gameObject.SetActive(false);
                 return;

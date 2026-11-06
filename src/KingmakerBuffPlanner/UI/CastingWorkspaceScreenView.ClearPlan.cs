@@ -96,9 +96,27 @@ namespace KingmakerBuffPlanner.UI
             if (_disposed || !ClearPlanOpen || NativeDescriptionBlocksWorkspace || !_clearInput.Take(Time.frameCount)) return;
             AuthoringEditResult result = _session.ClearPlan(_clearConfirmation, _inputs());
             CloseClearPlan(result.Applied);
-            Feedback(result.Applied ? "Plan cleared. Undo restores it." : result.Reason, !result.Applied);
+            ReportClearOutcome(result);
             RefreshView();
             RestoreClearFocus(result.Applied);
+        }
+
+        // Review P3: Clear is a command like any other (it does not go
+        // through Command()), so an applied Clear retires the previous
+        // command's problem - a refusal about castings that no longer exist -
+        // instead of leaving it as the standing notice. A current save
+        // failure is a separate standing source and stays shown. A refused
+        // Clear reports its own problem.
+        private void ReportClearOutcome(AuthoringEditResult result)
+        {
+            if (result.Applied)
+            {
+                _feedbackShown = false;
+                _commandProblem = null;
+                _loadNote = null;
+            }
+            Feedback(result.Applied ? "Plan cleared. Undo restores it." : result.Reason, !result.Applied);
+            if (result.Applied) ShowStandingNotice(WorkspaceFooterText.SaveProblem(_session.FooterSaveState));
         }
 
         // Owner request after 0.6.11: a genuine native scroll, not a tan box.
