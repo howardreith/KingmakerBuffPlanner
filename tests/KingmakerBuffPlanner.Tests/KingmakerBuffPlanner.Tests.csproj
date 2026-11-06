@@ -43,6 +43,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="ProductionExecutionTests.cs" />
     <Compile Include="HeroismRepeatTests.cs" />
+    <Compile Include="PreparedSlotSpendTests.cs" />
     <Compile Include="InfectiousCharmsRefinementTests.cs" />
     <Compile Include="CastAvailableTests.cs" />
     <Compile Include="FactResourceTests.cs" />
@@ -127,6 +128,7 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\CastingFirstGrant.cs"><Link>Execution\CastingFirstGrant.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\HaltingPlanRunner.cs"><Link>Execution\HaltingPlanRunner.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\FactSourceChoice.cs"><Link>Execution\FactSourceChoice.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\PreparedSlotChoice.cs"><Link>Execution\PreparedSlotChoice.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\AvailableCountJudgement.cs"><Link>Execution\AvailableCountJudgement.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Execution\WorldGatedEnumerator.cs"><Link>Execution\WorldGatedEnumerator.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\UI\ClassicRunScreenPolicy.cs"><Link>UI\ClassicRunScreenPolicy.cs</Link></Compile>

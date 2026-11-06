@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using KingmakerBuffPlanner.Domain.Planning;
 
@@ -30,6 +31,7 @@ namespace KingmakerBuffPlanner.Execution
         {
             if (plan == null) throw new ArgumentNullException("plan");
             if (report == null) throw new ArgumentNullException("report");
+            var confirmedSteps = new List<CastStep>();
             for (int index = 0; index < plan.Steps.Count; index++)
             {
                 CastStep step = plan.Steps[index];
@@ -39,7 +41,8 @@ namespace KingmakerBuffPlanner.Execution
                         HaltedDetailPrefix + HaltedAfterStep.Value);
                     continue;
                 }
-                var single = new CastPlan(new[] { step }, new TargetPlanOutcome[0], new string[0]);
+                var single = new CastPlan(new[] { PreparedRunContext.ForStep(step, confirmedSteps) },
+                    new TargetPlanOutcome[0], new string[0]);
                 var partial = new ExecutionReport(single);
                 IEnumerator work = _executor.Execute(single, partial);
                 try
@@ -64,6 +67,7 @@ namespace KingmakerBuffPlanner.Execution
                 if (partial.Failed != 0 ||
                     !partial.Records.Any(record => record.Status == CastExecutionStatus.EffectConfirmed))
                     HaltedAfterStep = index;
+                else confirmedSteps.Add(step);
             }
         }
     }

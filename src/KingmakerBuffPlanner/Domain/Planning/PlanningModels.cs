@@ -647,6 +647,16 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public IReadOnlyList<string> OmittedEnhancementIds { get; private set; }
         public IReadOnlyDictionary<string, int> EnhancementUsageByPool
         { get; private set; }
+
+        // The same step with run context on its reservation (see
+        // ResourceReservation.EarlierConfirmedTokenIds); every other value,
+        // including the authorized tokens, is unchanged.
+        internal CastStep WithReservation(ResourceReservation reservation)
+        {
+            var copy = (CastStep)MemberwiseClone();
+            copy.Reservation = reservation;
+            return copy;
+        }
     }
 
     public sealed class MaterialReservation

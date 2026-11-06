@@ -140,10 +140,13 @@ namespace KingmakerBuffPlanner.GameAdapters
             string countRefusal = AvailableCountJudgement.BeforeSubmission(step.Reservation, availableBefore);
             if (countRefusal != null) throw new InvalidOperationException(countRefusal);
             UnitCommand previousCommand = resolved.Caster.Commands.PreviousCommand;
+            IList<KeyValuePair<string, bool>> preparedBefore =
+                ReadPreparedAvailability(resolved.Caster, step.Provider);
             resolved.Caster.Commands.AddToQueue(command);
             return new KingmakerAnimatedOperation(command, step,
                 resolved.Caster, resolved.Target, resolved.Ability,
-                delivery, previousCommand, availableBefore, resolved.Resolution, baseline);
+                delivery, previousCommand, availableBefore, resolved.Resolution, baseline,
+                preparedBefore);
         }
 
         internal static bool TryResolve(CastStep step, out ResolvedCast resolved, out string reason)
@@ -250,19 +253,26 @@ namespace KingmakerBuffPlanner.GameAdapters
                 }
                 if (reservedTokenIds != null && reservedTokenIds.Count != 0)
                 {
-                    foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null &&
-                        s.Spell != null && (forObservation || s.Available) && s.IsMainSlot &&
-                        reservedTokenIds.Contains(SlotId(s))))
+                    if (forObservation)
                     {
-                        AbilityData match = KingmakerAbilityVariants.Resolve(
-                            slot.Spell, provider.Ability);
-                        if (match != null)
+                        foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null &&
+                            s.Spell != null && s.IsMainSlot && reservedTokenIds.Contains(SlotId(s))))
                         {
-                            resolution = "reserved-memorized-slot:" + SlotId(slot);
-                            return match;
+                            AbilityData match = KingmakerAbilityVariants.Resolve(
+                                slot.Spell, provider.Ability);
+                            if (match != null)
+                            {
+                                resolution = "reserved-memorized-slot:" + SlotId(slot);
+                                return match;
+                            }
                         }
+                        return null;
                     }
-                    return null;
+                    Dictionary<string, AbilityData> matches;
+                    List<PreparedSlotCandidate> candidates = PreparedCandidates(book, provider, out matches);
+                    string chosen = PreparedSlotChoice.Choose(reservedTokenIds,
+                        reservation.EarlierConfirmedTokenIds, candidates, out resolution, out refusal);
+                    return chosen == null ? null : matches[chosen];
                 }
                 foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null &&
                     s.Spell != null && s.IsMainSlot))
@@ -418,6 +428,61 @@ namespace KingmakerBuffPlanner.GameAdapters
             return views;
         }
 
+        // Every memorized slot of the book, in the game's own list order, with
+        // the preparation the game's spend treats it as. Spellbook.Spend
+        // (SpendInternal, installed 2.1.7b) walks a level's slots from the
+        // last one back and spends the first available slot whose spell
+        // Equals the cast AbilityData - it takes no slot - so slots of one
+        // EquivalenceKey are interchangeable to it.
+        private static List<PreparedSlotCandidate> PreparedCandidates(Spellbook book,
+            ProviderKey provider, out Dictionary<string, AbilityData> matches)
+        {
+            matches = new Dictionary<string, AbilityData>(StringComparer.Ordinal);
+            var candidates = new List<PreparedSlotCandidate>();
+            var representatives = new List<SpellSlot>();
+            foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null && s.Spell != null))
+            {
+                int preparation = representatives.FindIndex(other => SameNativePreparation(other, slot));
+                if (preparation < 0)
+                {
+                    representatives.Add(slot);
+                    preparation = representatives.Count - 1;
+                }
+                AbilityData match = KingmakerAbilityVariants.Resolve(slot.Spell, provider.Ability);
+                string id = SlotId(slot);
+                if (match != null && !matches.ContainsKey(id)) matches[id] = match;
+                candidates.Add(new PreparedSlotCandidate(id, slot.Available, slot.IsMainSlot,
+                    match != null, "preparation-" + preparation,
+                    (slot.LinkedSlots ?? new SpellSlot[0]).Where(s => s != null).Select(SlotId)));
+            }
+            return candidates;
+        }
+
+        private static bool SameNativePreparation(SpellSlot left, SpellSlot right)
+        {
+            return left.SpellLevel == right.SpellLevel && left.Type == right.Type &&
+                left.IsOpposition == right.IsOpposition && left.BusySlotsCount == right.BusySlotsCount &&
+                left.Spell != null && left.Spell.Equals(right.Spell);
+        }
+
+        // Read-only native spend evidence: every memorized slot of the
+        // step's book and whether it is available, in the game's order.
+        internal static IList<KeyValuePair<string, bool>> ReadPreparedAvailability(
+            UnitEntityData caster, ProviderKey provider)
+        {
+            try
+            {
+                if (caster == null || provider == null ||
+                    provider.Ability.SourceKind != SourceKind.Spellbook) return null;
+                Spellbook book = caster.Descriptor.Spellbooks.FirstOrDefault(b => b != null &&
+                    b.Blueprint != null && b.Blueprint.AssetGuid == provider.SpellbookGuid);
+                if (book == null || book.Blueprint.Spontaneous) return null;
+                return book.GetAllMemorizedSpells().Where(s => s != null)
+                    .Select(s => new KeyValuePair<string, bool>(SlotId(s), s.Available)).ToList();
+            }
+            catch (Exception) { return null; }
+        }
+
         private static string SlotId(SpellSlot slot)
         {
             return PreparedSlotIds.Format(slot.SpellLevel, (int)slot.Type, slot.Index);
@@ -500,6 +565,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             private readonly string _resolution;
             private readonly EffectBaseline _baseline;
             private readonly AnimatedStickyTouchLifecycle _stickyLifecycle;
+            private readonly IList<KeyValuePair<string, bool>> _preparedBefore;
             private int _postCompletionFrames;
             private int _pollFrames;
             private bool? _observed;
@@ -513,8 +579,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                 AbilityData sourceAbility,
                 BlueprintAbility deliveryBlueprint,
                 UnitCommand previousCommandAtStart, int? availableBefore, string resolution,
-                EffectBaseline baseline)
+                EffectBaseline baseline, IList<KeyValuePair<string, bool>> preparedBefore)
             {
+                _preparedBefore = preparedBefore;
                 _resolution = resolution ?? "unrecorded";
                 _baseline = baseline;
                 _carrierCommand = command;
@@ -662,6 +729,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                         ";reservation-pool:" + _step.Reservation.PoolKey +
                         ";reservation-unlimited:" + _step.Reservation.Unlimited +
                         ";reservation-native-units:" + _step.Reservation.Units +
+                        ";reservation-tokens:" + string.Join(",", _step.Reservation.TokenIds.ToArray()) +
+                        ";earlier-confirmed-tokens:" +
+                        string.Join(",", _step.Reservation.EarlierConfirmedTokenIds.ToArray()) +
+                        ";" + PreparedSpendEvidence.Describe(_preparedBefore,
+                            ReadPreparedAvailability(_caster, _step.Provider)) +
                         ";" + KingmakerFactResources.Describe(_sourceAbility) +
                         ";targets:" + string.Join(",",
                             _step.ExpectedRecipientUnitIds.ToArray()) +

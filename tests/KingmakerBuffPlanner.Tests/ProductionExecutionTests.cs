@@ -6886,7 +6886,12 @@ namespace KingmakerBuffPlanner.Tests
                 // Re-review: observation reads a consumed reserved slot (it is
                 // still the source); execution needs it available.
                 !adapter.Contains("return ResolveAbility(caster, step.Provider, step.Reservation, out resolution, out refusal, true);") ||
-                !resolve.Contains("s.Spell != null && (forObservation || s.Available) && s.IsMainSlot &&") ||
+                // 0.6.12 prepared-slot repair: the observation branch reads the
+                // reserved slot whatever its availability; execution resolves
+                // through PreparedSlotChoice, whose availability and
+                // equivalent-slot rules are behaviour-tested (prepared-spend-*).
+                !resolve.Contains("if (forObservation)\n                    {\n                        foreach (SpellSlot slot in book.GetAllMemorizedSpells().Where(s => s != null &&\n                            s.Spell != null && s.IsMainSlot && reservedTokenIds.Contains(SlotId(s))))") ||
+                !resolve.Contains("string chosen = PreparedSlotChoice.Choose(reservedTokenIds,\n                        reservation.EarlierConfirmedTokenIds, candidates, out resolution, out refusal);") ||
                 !resolve.Contains("atWillProvenance + \";pool=\" + (reservation == null ? \"unreserved\" : reservation.PoolKey);") ||
                 !atWill.Contains("provenance = \"ability=\" + chosen.Identity + \"@cl\" + chosen.CasterLevel + \";at-will-candidates=\" +") ||
                 !source("KingmakerProbeObserver.cs").Contains(

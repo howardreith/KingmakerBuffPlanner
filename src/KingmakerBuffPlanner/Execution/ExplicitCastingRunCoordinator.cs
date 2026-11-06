@@ -161,6 +161,7 @@ namespace KingmakerBuffPlanner.Execution
             int activeIndex = -1;
             string haltedAfter = null;
             string haltReason = null;
+            var confirmedSteps = new List<CastStep>();
             try
             {
                 for (int index = 0; index < projection.Plan.Steps.Count; index++)
@@ -177,7 +178,8 @@ namespace KingmakerBuffPlanner.Execution
                         entries.Add(NotProcessed(castingId, haltReason));
                         continue;
                     }
-                    CastStep step = projection.Plan.Steps[index];
+                    CastStep planned = projection.Plan.Steps[index];
+                    CastStep step = PreparedRunContext.ForStep(planned, confirmedSteps);
                     var single = new CastPlan(new[] { step },
                         new TargetPlanOutcome[0],
                         new[] { "explicit-run;projection=" + projection.ProjectionId +
@@ -237,11 +239,15 @@ namespace KingmakerBuffPlanner.Execution
                         haltedAfter = castingId;
                         haltReason = entry.FinalStatus + ":" + entry.Detail;
                     }
-                    // One frame between castings: an owner that stops the run
-                    // here stops it BETWEEN castings (the next one never
-                    // starts), not in the middle of the next submission.
-                    else if (index + 1 < projection.Plan.Steps.Count)
-                        yield return null;
+                    else
+                    {
+                        confirmedSteps.Add(planned);
+                        // One frame between castings: an owner that stops the run
+                        // here stops it BETWEEN castings (the next one never
+                        // starts), not in the middle of the next submission.
+                        if (index + 1 < projection.Plan.Steps.Count)
+                            yield return null;
+                    }
                 }
                 reported = true;
                 completed(new ExplicitCastingRunOutcome(projection.ProjectionId, entries,
