@@ -4669,3 +4669,14 @@ a recipient click added a persisted duplicate, execution stopped enforcing the s
 inspector described the plain rule. Baseline 14/3 at `55e3603`; source 47/0, build 1/0, complete
 offline 731/0. Native NOT RUN. Exact next action: re-review, then the native steps in
 [the checkpoint](docs/DURABLE-ITEM-SOURCE-CHECKPOINT.md).
+
+## 2026-11-08 UTC - 0.6.14 stable release published and verified
+
+PR #23 accepted by the owner; main fast-forwarded through the guarded helper to release-preparation
+commit `2eab694aeef5aec11b73ee63cf0072f6e07d78ce`, version 0.6.14. v0.6.14 published as Latest by the guarded
+publisher (OwnerAuthorizedPreRuntime). Source 47/0, complete offline 731/0, gate 8/0, deterministic
+builds 3/0, package 6/0 local and downloaded. ZIP
+`be0a2ffa72586c611cc146592011261b59510aac1f56fccfc389c55f0d343ebb`; DLL
+`4d1453cd9e6a76257d15366328e4f155f9f14eccd86ac8a1803c805700c4c998`. No native run, installation or
+save change. Next: owner playtest using the native steps in
+[the checkpoint](docs/DURABLE-ITEM-SOURCE-CHECKPOINT.md). [Release record](docs/RELEASE-0.6.14-RECORD.md).
