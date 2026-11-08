@@ -183,6 +183,7 @@ namespace KingmakerBuffPlanner.UI
         Add,
         Remove,
         InspectGroupCoverage,
+        InspectItemSource,
         Disambiguate,
         Retarget,
         Recentre,
@@ -698,6 +699,8 @@ namespace KingmakerBuffPlanner.UI
                     return "Has casting " + castingLabel + " · click to remove it";
                 case CastingGraphRecipientAction.InspectGroupCoverage:
                     return "Covered by " + castingLabel + " · click to inspect it";
+                case CastingGraphRecipientAction.InspectItemSource:
+                    return "Casting " + castingLabel + " needs its source · click to inspect it";
                 case CastingGraphRecipientAction.Disambiguate:
                     return "Multiple matching castings (" + castingLabel +
                         ") · inspect one to remove it";

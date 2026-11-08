@@ -576,8 +576,10 @@ namespace KingmakerBuffPlanner.Domain.Planning
             IDictionary<string, int> enhancementUsageByPool = null,
             IEnumerable<string> omittedEnhancementIds = null,
             IEnumerable<string> preCoveredRecipientUnitIds = null,
-            bool exactEnhancements = false)
+            bool exactEnhancements = false,
+            string requiredItemSelector = null)
         {
+            RequiredItemSelector = requiredItemSelector ?? string.Empty;
             ExactEnhancements = exactEnhancements;
             SourceId = sourceId ?? string.Empty;
             AssignmentId = assignmentId ?? sourceId ?? string.Empty;
@@ -616,6 +618,9 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public string SourceId { get; private set; }
         public string AssignmentId { get; private set; }
         public ProviderKey Provider { get; private set; }
+        // The casting's authored item-slot rule, or "". Execution validates it
+        // in addition to Provider, whose key may be the plain rule.
+        public string RequiredItemSelector { get; private set; }
         public string AnchorUnitId { get; private set; }
         public IReadOnlyList<string> TargetUnitIds { get; private set; }
         public IReadOnlyList<string> ExpectedRecipientUnitIds { get; private set; }

@@ -1181,7 +1181,7 @@ namespace KingmakerBuffPlanner.UI
             PlannedCasting focusedRecord = FocusedCasting();
             if (focusedRecord != null)
                 view._focusedProviders.AddRange(ProviderChoices(inputs, focusedRecord.SourceId,
-                    null, focusedRecord.CasterUnitId, focusedRecord.Ability,
+                    null, focusedRecord.CasterUnitId, EffectiveRecordAbility(focusedRecord, inputs),
                     focusedRecord.SpellbookGuid));
             string providerDraftCaster = Draft.CasterUnitId ?? SelectedCasterUnitId;
             if (!string.IsNullOrEmpty(providerDraftCaster))
@@ -1298,7 +1298,7 @@ namespace KingmakerBuffPlanner.UI
                         StringComparison.Ordinal));
                 // A chosen enhancement is always listed: its chip is the only
                 // control that removes it (re-review of the offer fix).
-                if (!chosen && !OffersEnhancement(enhancement, focused.Ability, focused.SpellbookGuid, inputs))
+                if (!chosen && !OffersEnhancement(enhancement, EffectiveRecordAbility(focused, inputs), focused.SpellbookGuid, inputs))
                     continue;
                 view._focusedEnhancements.Add(new WorkspaceEnhancementOption(
                     enhancement.EnhancementId, enhancement.DisplayName,
@@ -2095,7 +2095,7 @@ namespace KingmakerBuffPlanner.UI
                 ProviderPlanningOption option = _lastInputs.ProviderOptions.FirstOrDefault(
                     value => value != null && value.Provider != null &&
                         string.Equals(value.Provider.Key.Ability.Canonical,
-                            casting.Ability.Canonical, StringComparison.Ordinal));
+                            EffectiveRecordAbility(casting, _lastInputs).Canonical, StringComparison.Ordinal));
                 if (option != null && !string.IsNullOrWhiteSpace(option.Provider.DisplayName))
                     spell = option.Provider.DisplayName;
             }

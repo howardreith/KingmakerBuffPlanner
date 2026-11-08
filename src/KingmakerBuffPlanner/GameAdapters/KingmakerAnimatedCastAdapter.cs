@@ -168,7 +168,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             string resolution;
             string refusal;
             AbilityData ability = ResolveAbility(caster, step.Provider, step.Reservation,
-                out resolution, out refusal);
+                out resolution, out refusal, false, step.RequiredItemSelector);
             if (ability == null) return Fail(refusal ?? "provider-ability-not-found", out reason);
             resolved = new ResolvedCast(caster, ability, new TargetWrapper(target)) { Resolution = resolution };
             return true;
@@ -189,7 +189,8 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             string resolution;
             string refusal;
-            return ResolveAbility(caster, step.Provider, step.Reservation, out resolution, out refusal, true);
+            return ResolveAbility(caster, step.Provider, step.Reservation, out resolution, out refusal, true,
+                step.RequiredItemSelector);
         }
 
         // resolution: how the authored provider became the ability data the
@@ -201,7 +202,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             ResourceReservation reservation,
             out string resolution,
             out string refusal,
-            bool forObservation = false)
+            bool forObservation = false,
+            string requiredItemSelector = null)
         {
             resolution = null;
             refusal = null;
@@ -333,7 +335,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                         fact.Data, provider.Ability);
                     if (selection == null) continue;
                     string bindingRefusal = KingmakerFactResources.ValidateBinding(caster.UniqueId,
-                        selection.Source, selection.Concrete, provider, reservation);
+                        selection.Source, selection.Concrete, provider, reservation, requiredItemSelector);
                     if (bindingRefusal != null) { bindingRefusals.Add(bindingRefusal); continue; }
                     KingmakerFactResource resource;
                     string resourceRefusal;

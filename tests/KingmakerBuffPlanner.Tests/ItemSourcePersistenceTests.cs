@@ -44,6 +44,13 @@ namespace KingmakerBuffPlanner.Tests
             Run("item-source-diagnostics-report-changes-once", () => TestItemSourceDiagnostics(root));
             Run("item-source-execution-binds-the-live-item", TestItemSourceExecutionBinding);
             Run("item-source-slot-rule-binds-its-slot", TestItemSourceSlotBinding);
+            Run("item-source-single-remaining-copy-toggles-existing-casting",
+                () => TestItemSourceSingleRemainingCopyToggle(root));
+            Run("item-source-unresolved-casting-is-shown-not-doubled",
+                () => TestItemSourceUnresolvedCastingIsNotDoubled(root));
+            Run("item-source-single-remaining-copy-keeps-slot-in-execution", TestItemSourceSlotSurvivesCompilation);
+            Run("item-source-single-remaining-copy-inspector-states-slot",
+                () => TestItemSourceSingleRemainingCopyInspector(root));
         }
 
         // The Kingmaker save path deserializes ItemEntity through its
@@ -688,6 +695,208 @@ namespace KingmakerBuffPlanner.Tests
             SetNative(item, "HoldingSlot", ringOne);
             Expect(KingmakerFactResources.ValidateBinding("unit-cleric", data, data, key, null) != null,
                 "The slot rule bound an item in another slot.");
+        }
+
+        // Authors a Ring 2 selection while two copies are equipped, then
+        // returns the plan directory as saved through the real session.
+        private static string AuthorRingTwoCasting(string root, string name, string type, out string castingId)
+        {
+            LiveItemCopy[] both =
+            {
+                Copy("unit-sayan", ItemSlotRule(type, "Ring1"), "session-item-one", 3, type, "Ring1"),
+                Copy("unit-sayan", ItemSlotRule(type, "Ring2"), "session-item-two", 3, type, "Ring2")
+            };
+            CastingWorkspaceInputs inputs = ItemInputs(both);
+            string directory = StoreItemPlan(root, name, ItemPlan());
+            UI.CastingWorkspaceSession session = OpenItemPlan(directory, inputs);
+            session.SelectGraphCaster("unit-sayan", inputs);
+            Expect(session.SelectGraphSource(both[1].Provider.Key.Canonical, inputs).Applied, "select Ring 2");
+            UI.CastingGraphEditResult added = session.AddGraphCasting("unit-sayan", inputs);
+            Expect(added.Applied, "add the Ring 2 casting");
+            session.Save();
+            castingId = added.CastingId;
+            return directory;
+        }
+
+        private static void TestItemSourceSingleRemainingCopyToggle(string root)
+        {
+            const string Type = "signet";
+            string castingId;
+            string directory = AuthorRingTwoCasting(root, "toggle-single", Type, out castingId);
+            LiveItemCopy remaining = Copy("unit-sayan", ItemRule(Type), "session-item-left", 3, Type, "Ring2");
+            CastingWorkspaceInputs after = ItemInputs(remaining);
+            UI.CastingWorkspaceSession reopened = OpenItemPlan(directory, after);
+            Expect(reopened.BuildGraph(after).CastingById(castingId).Readiness == ResolvedCastingReadiness.Ready,
+                "The Ring 2 casting did not resolve to the sole remaining copy.");
+            Expect(reopened.SelectGraphSource(remaining.Provider.Key.Canonical, after).Applied, "select remaining source");
+            Expect(reopened.BuildGraph(after).TargetById("unit-sayan").Action == UI.CastingGraphRecipientAction.Remove,
+                "The recipient did not recognize its existing casting.");
+            UI.CastingGraphClickResult click = reopened.ClickGraphRecipient("unit-sayan", after);
+            Expect(click.Outcome == UI.CastingGraphClickOutcome.Removed && click.CastingId == castingId &&
+                reopened.Document.Castings.Count == 0,
+                "The click did not remove the existing casting: " + click.Outcome + ", castings=" +
+                reopened.Document.Castings.Count);
+            Expect(new UI.CastingWorkspaceSession(directory, ItemPlanCampaign).Document.Castings.Count == 0,
+                "A second casting was persisted.");
+
+            // The direct add path has the same guard, and leaves the rule intact.
+            directory = AuthorRingTwoCasting(root, "guard-single", Type, out castingId);
+            reopened = OpenItemPlan(directory, after);
+            reopened.SelectGraphSource(remaining.Provider.Key.Canonical, after);
+            UI.CastingGraphEditResult direct = reopened.AddGraphCasting("unit-sayan", after);
+            Expect(!direct.Applied && direct.ShowedExisting && direct.CastingId == castingId &&
+                reopened.Document.Castings.Single().Ability.Equals(ItemSlotRule(Type, "Ring2")),
+                "The add guard allowed a duplicate or rewrote the saved slot rule.");
+
+            // Neighbours from the review's table: both must keep toggling off.
+            LiveItemCopy single = Copy("unit-sayan", ItemRule(Type), "session-item-solo", 3);
+            CastingWorkspaceInputs singleInputs = ItemInputs(single);
+            string ordinary = StoreItemPlan(root, "toggle-ordinary", ItemPlan(
+                SavedGroupCasting("cast-1", 0, ItemRule(Type), "unit-sayan")));
+            UI.CastingWorkspaceSession plain = OpenItemPlan(ordinary, singleInputs);
+            plain.SelectGraphSource(single.Provider.Key.Canonical, singleInputs);
+            Expect(plain.ClickGraphRecipient("unit-sayan", singleInputs).Outcome == UI.CastingGraphClickOutcome.Removed &&
+                plain.Document.Castings.Count == 0, "An ordinary single-copy casting stopped toggling off.");
+
+            directory = AuthorRingTwoCasting(root, "toggle-both", Type, out castingId);
+            LiveItemCopy[] both =
+            {
+                Copy("unit-sayan", ItemSlotRule(Type, "Ring1"), "session-item-c", 3, Type, "Ring1"),
+                Copy("unit-sayan", ItemSlotRule(Type, "Ring2"), "session-item-d", 3, Type, "Ring2")
+            };
+            CastingWorkspaceInputs bothInputs = ItemInputs(both);
+            UI.CastingWorkspaceSession stillTwo = OpenItemPlan(directory, bothInputs);
+            stillTwo.SelectGraphSource(both[1].Provider.Key.Canonical, bothInputs);
+            Expect(stillTwo.ClickGraphRecipient("unit-sayan", bothInputs).Outcome == UI.CastingGraphClickOutcome.Removed &&
+                stillTwo.Document.Castings.Count == 0, "A slot casting with both copies equipped stopped toggling off.");
+        }
+
+        private static void TestItemSourceSlotSurvivesCompilation()
+        {
+            ItemEntity item;
+            AbilityData data = ItemSourceFixture(3, out item);
+            var body = NativeObject<UnitBody>();
+            var ringOne = NativeObject<EquipmentSlot<BlueprintItemEquipmentRing>>();
+            var ringTwo = NativeObject<EquipmentSlot<BlueprintItemEquipmentRing>>();
+            SetNative(body, "Ring1", ringOne);
+            SetNative(body, "Ring2", ringTwo);
+            SetNative(data.Caster, "Body", body);
+            SetNative(item, "HoldingSlot", ringTwo);
+            KingmakerFactResource resource = ReadNativeFact(data);
+            // Discovery's view of the sole remaining copy: the plain rule,
+            // with its slot published alongside.
+            var provider = new ProviderSnapshot(new ProviderKey("unit-cleric", string.Empty,
+                    new AbilityKey(ItemSourceAbilityGuid, string.Empty, 0, SourceKind.Item, resource.Selector),
+                    resource.InstanceId), "Bless", 0, resource.Pool.PoolKey, resource.Cost, null, null, 1, 10,
+                string.Empty, string.Empty, "Blessed Signet", 0, string.Empty,
+                ItemSourceSelector.ForEquippedSlot(ItemSourceItemGuid, "Ring2"));
+            UnitSnapshot[] units = new[] { "unit-cleric", "unit-t1" }.Select(id => new UnitSnapshot(id, id, false,
+                string.Empty, new TargetValidationSnapshot(true, true, true, true))).ToArray();
+            var snapshot = new PartyProviderSnapshot(units, new[] { provider }, new[] { resource.Pool });
+            var options = new[] { new ProviderPlanningOption(provider, units.Select(unit => unit.UnitId),
+                new[] { "unit-cleric" }, 1, 10) };
+            EffectExpression expression = Leaf("signet-buff");
+            var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal)
+            {
+                { ItemPlanSource, expression }, { provider.Key.Ability.Canonical, expression }
+            };
+            CastingPlanDocument saved = ThroughPlanFile(CastingDocument(DirectCasting("cast-1", "long",
+                "unit-cleric", "unit-t1", ItemPlanSource, ItemSlotRule(ItemSourceItemGuid, "Ring2"))));
+            ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(saved, snapshot, options, effects,
+                new CastEnhancementSnapshot[0]);
+            Expect(plan.Castings.Single().IsExecutable, "The slot rule did not resolve to its occupant.");
+            ExplicitStepConversion conversion = ExplicitCastingStepConverter.Convert(plan,
+                new CastingExecutionGate().Evaluate(plan, CastingApplyMode.Ordinary, "long"), options, effects);
+            Expect(conversion.Converted, "conversion: " + conversion.Refusal);
+            CastStep step = conversion.Plan.Steps.Single();
+            Expect(step.Provider.Equals(provider.Key) &&
+                step.RequiredItemSelector == ItemSourceSelector.ForEquippedSlot(ItemSourceItemGuid, "Ring2") &&
+                conversion.CanonicalContract.Contains("requiredItemSelector"),
+                "The authored slot rule did not travel with the live provider.");
+            Expect(KingmakerFactResources.ValidateBinding("unit-cleric", data, data, step.Provider,
+                    step.Reservation, step.RequiredItemSelector) == null,
+                "Execution refused the item still in its saved slot.");
+            SetNative(item, "HoldingSlot", ringOne);
+            string refusal = KingmakerFactResources.ValidateBinding("unit-cleric", data, data, step.Provider,
+                step.Reservation, step.RequiredItemSelector);
+            Expect(refusal != null && refusal.Contains("left-saved-slot"),
+                "Execution accepted the item after it left the slot the casting requires: " + (refusal ?? "accepted"));
+        }
+
+        private static void TestItemSourceUnresolvedCastingIsNotDoubled(string root)
+        {
+            const string Type = "signet";
+            LiveItemCopy remaining = Copy("unit-sayan", ItemRule(Type), "session-item-left", 3, Type, "Ring2");
+            CastingWorkspaceInputs oneCopy = ItemInputs(remaining);
+            LiveItemCopy[] copies =
+            {
+                Copy("unit-sayan", ItemSlotRule(Type, "Ring1"), "session-item-a", 3, Type, "Ring1"),
+                Copy("unit-sayan", ItemSlotRule(Type, "Ring2"), "session-item-b", 3, Type, "Ring2")
+            };
+            CastingWorkspaceInputs twoCopies = ItemInputs(copies);
+            var cases = new[]
+            {
+                new { Name = "slot-empty", Saved = ItemSlotRule(Type, "Ring1"), Inputs = oneCopy, Row = remaining },
+                new { Name = "ambiguous", Saved = ItemRule(Type), Inputs = twoCopies, Row = copies[1] }
+            };
+            foreach (var item in cases)
+            {
+                string directory = StoreItemPlan(root, "unresolved-" + item.Name, ItemPlan(
+                    SavedGroupCasting("cast-1", 0, item.Saved, "unit-sayan")));
+                UI.CastingWorkspaceSession session = OpenItemPlan(directory, item.Inputs);
+                string before = session.DocumentIntentSignature();
+                Expect(session.SelectGraphSource(item.Row.Provider.Key.Canonical, item.Inputs).Applied, "select row");
+                UI.CastingGraphTargetNode portrait = session.BuildGraph(item.Inputs).TargetById("unit-sayan");
+                Expect(portrait.Action == UI.CastingGraphRecipientAction.InspectItemSource &&
+                    portrait.Hint.Contains("needs its source"),
+                    item.Name + ": the unresolved casting was not surfaced: " + portrait.Action);
+                UI.CastingGraphClickResult click = session.ClickGraphRecipient("unit-sayan", item.Inputs);
+                Expect(click.Outcome == UI.CastingGraphClickOutcome.Focused && click.CastingId == "cast-1" &&
+                    session.DocumentIntentSignature() == before,
+                    item.Name + ": the click changed the plan: " + click.Outcome);
+                session.SelectGraphSource(item.Row.Provider.Key.Canonical, item.Inputs);
+                UI.CastingGraphEditResult direct = session.AddGraphCasting("unit-sayan", item.Inputs);
+                Expect(!direct.Applied && direct.ShowedExisting && session.Document.Castings.Count == 1,
+                    item.Name + ": the add path doubled an unresolved casting.");
+            }
+
+            // Two resolved copies stay independent sources on one recipient.
+            string independent = StoreItemPlan(root, "unresolved-independent", ItemPlan(
+                SavedGroupCasting("cast-1", 0, ItemSlotRule(Type, "Ring1"), "unit-sayan")));
+            UI.CastingWorkspaceSession both = OpenItemPlan(independent, twoCopies);
+            both.SelectGraphSource(copies[1].Provider.Key.Canonical, twoCopies);
+            Expect(both.BuildGraph(twoCopies).TargetById("unit-sayan").Action == UI.CastingGraphRecipientAction.Add,
+                "A different live copy was treated as the same source.");
+
+            // Moving another casting onto this recipient honours the same comparison.
+            var direct2 = new PlannedCasting("cast-2", "long", 1, ItemPlanSource, ItemSlotRule(Type, "Ring2"),
+                "unit-sayan", null, CastingTargetMode.DirectTarget, "unit-raine", null, null, null, null,
+                ExistingEffectPolicy.Overwrite, null, CastingAuthoringState.Ready, null);
+            var direct1 = new PlannedCasting("cast-1", "long", 0, ItemPlanSource, ItemRule(Type),
+                "unit-sayan", null, CastingTargetMode.DirectTarget, "unit-tias", null, null, null, null,
+                ExistingEffectPolicy.Overwrite, null, CastingAuthoringState.Ready, null);
+            string retarget = StoreItemPlan(root, "unresolved-retarget", ItemPlan(direct1, direct2));
+            UI.CastingWorkspaceSession moving = OpenItemPlan(retarget, oneCopy);
+            moving.FocusGraphCasting("cast-2");
+            Expect(moving.BeginChangeRecipient().Applied, "arm recipient change");
+            UI.CastingGraphClickResult moved = moving.ClickGraphRecipient("unit-tias", oneCopy);
+            Expect(moved.Outcome == UI.CastingGraphClickOutcome.Refused &&
+                moved.Edit.Reason.StartsWith("recipient-already-has-casting", StringComparison.Ordinal),
+                "A retarget doubled the same live source on one recipient: " + moved.Outcome);
+        }
+
+        private static void TestItemSourceSingleRemainingCopyInspector(string root)
+        {
+            const string Type = "signet";
+            string castingId;
+            string directory = AuthorRingTwoCasting(root, "inspector-single", Type, out castingId);
+            CastingWorkspaceInputs after = ItemInputs(
+                Copy("unit-sayan", ItemRule(Type), "session-item-left", 3, Type, "Ring2"));
+            UI.CastingWorkspaceSession reopened = OpenItemPlan(directory, after);
+            reopened.FocusGraphCasting(castingId);
+            string note = reopened.BuildGraph(after).Inspector.ItemSourceNote;
+            Expect(note.Contains("Ring 2") && note.Contains("Blessed Signet") && !note.Contains("whichever"),
+                "The inspector did not state the saved slot rule: " + note);
         }
     }
 }

@@ -244,7 +244,8 @@ namespace KingmakerBuffPlanner.Planning
                     enhancementUsage,
                     casting.OmittedEnhancementIds,
                     mass ? casting.PreCoveredUnitIds : null,
-                    true));
+                    true,
+                    casting.RequiredItemSelector));
                 ids.Add(casting.CastingId);
             }
             if (steps.Count == 0)
@@ -489,6 +490,9 @@ namespace KingmakerBuffPlanner.Planning
                     stepObject.Add("preCoveredRecipientUnitIds", Sorted(step.PreCoveredRecipientUnitIds));
                 if (!step.EffectObservationUnitIds.SequenceEqual(step.ExpectedRecipientUnitIds))
                     stepObject.Add("effectObservationUnitIds", Sorted(step.EffectObservationUnitIds));
+                // Likewise only a slot-ruled item step carries this key.
+                if (step.RequiredItemSelector.Length != 0)
+                    stepObject.Add("requiredItemSelector", step.RequiredItemSelector);
                 stepArray.Add(stepObject);
             }
             var root = new JObject

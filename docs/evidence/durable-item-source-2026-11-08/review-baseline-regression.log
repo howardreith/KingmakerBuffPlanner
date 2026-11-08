@@ -1,0 +1,7 @@
+Review baseline: production source unchanged at 55e3603f2e019c7fbbd239f58dd6fcb2a38f0054; only the three review regressions added to ItemSourcePersistenceTests.cs.
+Command: KingmakerBuffPlanner.Tests.exe --only item-source-
+
+Protocol tests: PASS=14 FAIL=3
+FAIL item-source-single-remaining-copy-toggles-existing-casting: The recipient did not recognize its existing casting.
+FAIL item-source-single-remaining-copy-keeps-slot-in-execution: Execution accepted the item after it left the slot the casting requires.
+FAIL item-source-single-remaining-copy-inspector-states-slot: The inspector did not state the saved slot rule: Uses the Blessed Signet unit-sayan has equipped, whichever copy that is.

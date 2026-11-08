@@ -6882,10 +6882,10 @@ namespace KingmakerBuffPlanner.Tests
                 !resolve.Contains("if (route == CantripRoute.Refused)\n                {\n                    refusal = AtWillCantripChoice.FreeReservationRefusal;\n                    return null;") ||
                 !resolve.Contains("if (route == CantripRoute.AtWillOnly || route == CantripRoute.AtWillThenSlot)") ||
                 !resolve.Contains("if (route == CantripRoute.AtWillOnly)\n                    {\n                        refusal = AtWillCantripChoice.MissingRefusal;\n                        return null;") ||
-                !adapter.Contains("AbilityData ability = ResolveAbility(caster, step.Provider, step.Reservation,\n                out resolution, out refusal);") ||
+                !adapter.Contains("AbilityData ability = ResolveAbility(caster, step.Provider, step.Reservation,\n                out resolution, out refusal, false, step.RequiredItemSelector);") ||
                 // Re-review: observation reads a consumed reserved slot (it is
                 // still the source); execution needs it available.
-                !adapter.Contains("return ResolveAbility(caster, step.Provider, step.Reservation, out resolution, out refusal, true);") ||
+                !adapter.Contains("return ResolveAbility(caster, step.Provider, step.Reservation, out resolution, out refusal, true,\n                step.RequiredItemSelector);") ||
                 // 0.6.12 prepared-slot repair: the observation branch reads the
                 // reserved slot whatever its availability; execution resolves
                 // through PreparedSlotChoice, whose availability and

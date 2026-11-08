@@ -142,6 +142,7 @@ namespace KingmakerBuffPlanner.UI
                         : Refused(removal);
                 }
                 case CastingGraphRecipientAction.InspectGroupCoverage:
+                case CastingGraphRecipientAction.InspectItemSource:
                 {
                     FocusGraphCasting(decision.CastingId);
                     return new CastingGraphClickResult(CastingGraphClickOutcome.Focused, null,
@@ -363,7 +364,7 @@ namespace KingmakerBuffPlanner.UI
                     casting != null &&
                     string.Equals(casting.SourceId, SelectedSourceId, StringComparison.Ordinal) &&
                     string.Equals(casting.RoutineId, SelectedRoutineId, StringComparison.Ordinal) &&
-                    MatchesSelectedVariant(casting, Draft.Ability, Draft.CasterUnitId ?? SelectedCasterUnitId) &&
+                    MatchesSelectedVariant(casting, Draft.Ability, Draft.CasterUnitId ?? SelectedCasterUnitId, inputs) &&
                     (casting.TargetMode != CastingTargetMode.DirectTarget) == group)
                 .OrderBy(casting => casting.Order)
                 .ThenBy(casting => casting.CastingId, StringComparer.Ordinal).ToList();
@@ -377,6 +378,21 @@ namespace KingmakerBuffPlanner.UI
                 return new GraphRecipientDecision(CastingGraphRecipientAction.Remove,
                     group, centred[0].CastingId, new[] { centred[0].CastingId }, null,
                     string.Empty, false);
+
+            // A saved casting here may turn out to be this very source once
+            // its selection resolves. Adding beside it could cast twice and
+            // removing it would discard intent, so the click shows it instead.
+            PlannedCasting unresolved = _authoring.Document.Castings.FirstOrDefault(casting =>
+                casting != null &&
+                string.Equals(casting.SourceId, SelectedSourceId, StringComparison.Ordinal) &&
+                string.Equals(casting.RoutineId, SelectedRoutineId, StringComparison.Ordinal) &&
+                (casting.TargetMode != CastingTargetMode.DirectTarget) == group &&
+                string.Equals(RecipientOf(casting), unitId, StringComparison.Ordinal) &&
+                CompareToSelected(casting, Draft.Ability, Draft.CasterUnitId ?? SelectedCasterUnitId, inputs) ==
+                    ItemSourceMatch.Unresolved);
+            if (unresolved != null)
+                return new GraphRecipientDecision(CastingGraphRecipientAction.InspectItemSource, group,
+                    unresolved.CastingId, new[] { unresolved.CastingId }, null, string.Empty, false);
 
             if (group && same.Count != 0)
             {
@@ -450,19 +466,34 @@ namespace KingmakerBuffPlanner.UI
         }
 
         private static bool MatchesSelectedVariant(PlannedCasting casting, AbilityKey ability,
-            string casterUnitId)
+            string casterUnitId, CastingWorkspaceInputs inputs)
         {
             // SourceId is the normalized catalogue entry; AbilityKey keeps
             // variants/metamagic forms distinct inside that entry. Before an
             // exact source has been chosen there is no variant to narrow by.
-            if (ability == null) return true;
-            if (casting.Ability == null || !string.Equals(casting.Ability.Canonical, ability.Canonical,
-                    StringComparison.Ordinal))
-                return false;
-            // An item rule is per caster: the same rule on another caster
-            // names a different physical source and a separate budget.
-            return ability.SourceKind != SourceKind.Item ||
-                string.Equals(casting.CasterUnitId, casterUnitId, StringComparison.Ordinal);
+            return ability == null ||
+                CompareToSelected(casting, ability, casterUnitId, inputs) == ItemSourceMatch.Same;
+        }
+
+        // The compiler's own view of whether this saved casting draws on the
+        // selected source; an item rule is compared per caster.
+        private static ItemSourceMatch CompareToSelected(PlannedCasting casting, AbilityKey ability,
+            string casterUnitId, CastingWorkspaceInputs inputs)
+        {
+            return ItemSourceResolution.Compare(casting.Ability, casting.CasterUnitId, ability, casterUnitId,
+                LiveProviders(inputs));
+        }
+
+        private static IEnumerable<ProviderSnapshot> LiveProviders(CastingWorkspaceInputs inputs)
+        {
+            return inputs == null || inputs.ProviderOptions == null ? new ProviderSnapshot[0]
+                : inputs.ProviderOptions.Where(option => option != null && option.Provider != null)
+                    .Select(option => option.Provider);
+        }
+
+        private static AbilityKey EffectiveRecordAbility(PlannedCasting record, CastingWorkspaceInputs inputs)
+        {
+            return ItemSourceResolution.EffectiveAbility(record.Ability, record.CasterUnitId, LiveProviders(inputs));
         }
 
         // Why the focused casting may not move to this recipient, or null.
@@ -481,7 +512,8 @@ namespace KingmakerBuffPlanner.UI
                 .Where(value => value != null && !string.Equals(value.CastingId, focused.CastingId,
                         StringComparison.Ordinal) &&
                     string.Equals(value.SourceId, focused.SourceId, StringComparison.Ordinal) &&
-                    MatchesSelectedVariant(value, focused.Ability, focused.CasterUnitId) &&
+                    CompareToSelected(value, focused.Ability, focused.CasterUnitId, _lastInputs) !=
+                        ItemSourceMatch.Different &&
                     string.Equals(value.RoutineId, focused.RoutineId, StringComparison.Ordinal) &&
                     (value.TargetMode != CastingTargetMode.DirectTarget) == group &&
                     string.Equals(RecipientOf(value), unitId, StringComparison.Ordinal))

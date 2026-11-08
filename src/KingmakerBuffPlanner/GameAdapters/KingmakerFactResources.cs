@@ -153,7 +153,7 @@ namespace KingmakerBuffPlanner.GameAdapters
         }
 
         internal static string ValidateBinding(string unitId, AbilityData source, AbilityData concrete,
-            ProviderKey provider, ResourceReservation reservation)
+            ProviderKey provider, ResourceReservation reservation, string requiredItemSelector = null)
         {
             KingmakerFactResource resource;
             string refusal;
@@ -161,8 +161,14 @@ namespace KingmakerBuffPlanner.GameAdapters
             // The run binds to the one live object planned; the saved rule
             // must additionally still describe that object.
             if (resource.Kind != provider.Ability.SourceKind || resource.InstanceId != provider.SourceInstanceId ||
-                (resource.Kind == SourceKind.Item && !RuleDescribes(provider.Ability, resource, concrete)))
+                (resource.Kind == SourceKind.Item &&
+                    !RuleDescribes(provider.Ability.SpecialSourceId, resource, concrete)))
                 return "fact-source-identity-mismatch";
+            // The provider may carry the plain rule; the authored slot rule
+            // still has to hold for this same live item.
+            if (resource.Kind == SourceKind.Item && !string.IsNullOrEmpty(requiredItemSelector) &&
+                !RuleDescribes(requiredItemSelector, resource, concrete))
+                return "fact-source-item-left-saved-slot:" + requiredItemSelector;
             if (reservation != null && (resource.Pool.PoolKey != reservation.PoolKey ||
                 (resource.Pool.Kind == ResourcePoolKind.Unlimited) != reservation.Unlimited ||
                 resource.Cost != reservation.Units))
@@ -173,9 +179,9 @@ namespace KingmakerBuffPlanner.GameAdapters
             return null;
         }
 
-        private static bool RuleDescribes(AbilityKey ability, KingmakerFactResource resource, AbilityData concrete)
+        private static bool RuleDescribes(string selector, KingmakerFactResource resource, AbilityData concrete)
         {
-            ItemSourceSelection selection = ItemSourceSelector.Parse(ability.SpecialSourceId);
+            ItemSourceSelection selection = ItemSourceSelector.Parse(selector);
             if (!selection.IsDurable ||
                 resource.Selector != ItemSourceSelector.ForEquippedType(selection.ItemBlueprintGuid))
                 return false;

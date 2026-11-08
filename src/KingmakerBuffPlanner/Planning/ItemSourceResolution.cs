@@ -8,6 +8,16 @@ using KingmakerBuffPlanner.Domain.Providers;
 
 namespace KingmakerBuffPlanner.Planning
 {
+    public enum ItemSourceMatch
+    {
+        Different,
+        Same,
+        // A saved rule for this caster's same item and ability that names no
+        // single live source now. It may become the selected source later,
+        // so it is neither a separate source nor proven to be the same one.
+        Unresolved
+    }
+
     // Pure resolution of a saved item selection against the current providers.
     // Compiler, inspector and diagnostics share it so they cannot disagree.
     public static class ItemSourceResolution
@@ -40,6 +50,40 @@ namespace KingmakerBuffPlanner.Planning
                 string.Equals(provider.EquippedSlotSelector, saved.SpecialSourceId,
                     StringComparison.Ordinal)).ToList();
             return occupant.Count == 1 ? occupant[0].Key.Ability : saved;
+        }
+
+        // The saved slot rule to enforce on execution, or "" when the saved
+        // selection has none. Survives EffectiveAbility's substitution.
+        public static string RequiredSelector(AbilityKey saved)
+        {
+            return saved != null && saved.SourceKind == SourceKind.Item &&
+                ItemSourceSelector.Parse(saved.SpecialSourceId).Kind == ItemSelectionKind.EquippedSlot
+                    ? saved.SpecialSourceId : string.Empty;
+        }
+
+        // Whether a saved casting draws on the selected source, judged as the
+        // compiler judges it: both sides through EffectiveAbility, per caster.
+        public static ItemSourceMatch Compare(AbilityKey saved, string savedCasterUnitId, AbilityKey selected,
+            string selectedCasterUnitId, IEnumerable<ProviderSnapshot> providers)
+        {
+            if (saved == null || selected == null) return ItemSourceMatch.Different;
+            if (saved.SourceKind != SourceKind.Item || selected.SourceKind != SourceKind.Item)
+                return saved.Equals(selected) ? ItemSourceMatch.Same : ItemSourceMatch.Different;
+            if (!string.Equals(savedCasterUnitId, selectedCasterUnitId, StringComparison.Ordinal))
+                return ItemSourceMatch.Different;
+            List<ProviderSnapshot> own = OwnedBy(providers, savedCasterUnitId);
+            AbilityKey left = EffectiveAbility(saved, savedCasterUnitId, own);
+            AbilityKey right = EffectiveAbility(selected, selectedCasterUnitId, own);
+            if (left.Equals(right)) return ItemSourceMatch.Same;
+            ItemSourceSelection savedRule = ItemSourceSelector.Parse(left.SpecialSourceId);
+            ItemSourceSelection selectedRule = ItemSourceSelector.Parse(right.SpecialSourceId);
+            bool sameItemAndAbility = savedRule.IsDurable && selectedRule.IsDurable &&
+                string.Equals(savedRule.ItemBlueprintGuid, selectedRule.ItemBlueprintGuid, StringComparison.Ordinal) &&
+                string.Equals(left.BaseAbilityGuid, right.BaseAbilityGuid, StringComparison.Ordinal) &&
+                string.Equals(left.VariantGuid, right.VariantGuid, StringComparison.Ordinal) &&
+                left.MetamagicMask == right.MetamagicMask;
+            return sameItemAndAbility && !own.Any(provider => provider.Key.Ability.Equals(left))
+                ? ItemSourceMatch.Unresolved : ItemSourceMatch.Different;
         }
 
         // Why a saved selection has no provider on its caster, or null when

@@ -68,8 +68,10 @@ namespace KingmakerBuffPlanner.Planning
             IReadOnlyList<string> costShape = null,
             IReadOnlyList<string> preCoveredUnitIds = null,
             CastExecutionStrategy? executionStrategy = null,
-            string executionStrategyReason = null)
+            string executionStrategyReason = null,
+            string requiredItemSelector = null)
         {
+            RequiredItemSelector = requiredItemSelector ?? string.Empty;
             ExecutionStrategy = executionStrategy;
             ExecutionStrategyReason = executionStrategyReason;
             CastingId = castingId;
@@ -128,6 +130,11 @@ namespace KingmakerBuffPlanner.Planning
         public CastExecutionStrategy? ExecutionStrategy { get; private set; }
         public string ExecutionStrategyReason { get; private set; }
 
+        // The authored slot rule, kept beside the live Provider: that key may
+        // be the plain rule once the caster has a single copy, and execution
+        // must still refuse the item if it leaves the saved slot.
+        public string RequiredItemSelector { get; private set; }
+
         // The casting's would-be cost vector as "category:pool:units",
         // independent of whether it reserves now (an already-satisfied
         // casting keeps the shape of what it would spend). The review
@@ -154,7 +161,7 @@ namespace KingmakerBuffPlanner.Planning
                 OmittedEnhancementIds, ExistingEffectPolicy, IgnoredPresenceMarkers,
                 readiness, readinessReasons, CapableCasterUnitIds, Provenance, cost,
                 ExistingEffectNotes, costShape ?? CostShape, PreCoveredUnitIds,
-                ExecutionStrategy, ExecutionStrategyReason);
+                ExecutionStrategy, ExecutionStrategyReason, RequiredItemSelector);
         }
 
         public string CastingId { get; private set; }
@@ -402,6 +409,7 @@ namespace KingmakerBuffPlanner.Planning
             out List<ModifierUsageDemand> modifierDemands)
         {
             var reasons = new List<string>();
+            string requiredItemSelector = ItemSourceResolution.RequiredSelector(casting.Ability);
             AbilityKey effectiveAbility = ItemSourceResolution.EffectiveAbility(
                 casting.Ability, casting.CasterUnitId, snapshot.Providers);
             if (!ReferenceEquals(effectiveAbility, casting.Ability))
@@ -601,7 +609,7 @@ namespace KingmakerBuffPlanner.Planning
                 reasons.Distinct(StringComparer.Ordinal)
                     .OrderBy(value => value, StringComparer.Ordinal).ToList(),
                 capableCasters, casting.Provenance, null, existingNotes, null, preCovered,
-                strategy, strategyReason);
+                strategy, strategyReason, requiredItemSelector);
         }
 
         // Applies the casting's enabled targeting modifiers in authored

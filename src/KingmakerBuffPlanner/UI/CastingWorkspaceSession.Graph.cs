@@ -245,7 +245,7 @@ namespace KingmakerBuffPlanner.UI
                 return AuthoringEditResult.Refuse("enhancement-unavailable:" + enhancementId);
             if (enhancement.AffectsTargeting)
                 return AuthoringEditResult.Refuse("enhancement-changes-targeting:" + enhancementId);
-            if (!OffersEnhancement(enhancement, focused.Ability, focused.SpellbookGuid, _lastInputs))
+            if (!OffersEnhancement(enhancement, EffectiveRecordAbility(focused, _lastInputs), focused.SpellbookGuid, _lastInputs))
                 return AuthoringEditResult.Refuse("enhancement-not-applicable:" + enhancementId);
             // Everyday-use v1.2 §8: a NEW choice must also be meaningful
             // for this exact buff; removing a saved irrelevant choice is
@@ -755,7 +755,7 @@ namespace KingmakerBuffPlanner.UI
                     bool chosen = selection != null;
                     if (!chosen)
                     {
-                        if (!OffersEnhancement(enhancement, focused.Ability, focused.SpellbookGuid, inputs))
+                        if (!OffersEnhancement(enhancement, EffectiveRecordAbility(focused, inputs), focused.SpellbookGuid, inputs))
                             continue;
                         // Applicable but (for rods) a meaningless choice for
                         // this buff: not offered, with the reason recorded
@@ -852,19 +852,21 @@ namespace KingmakerBuffPlanner.UI
                     CastingRunPresentation.DescribeExistingEffectNote(note, nameOf)),
                 CastingRunPresentation.DescribeEntry(lastRun));
             inspector.Modifiers = modifierOptions;
-            inspector.ItemSourceNote = ItemSourceNote(option, chip, casterName);
+            inspector.ItemSourceNote = ItemSourceNote(focused, option, chip, casterName);
             return inspector;
         }
 
         // The selection contract in the player's words; never a physical
         // identity claim, because the game cannot provide one.
-        private static string ItemSourceNote(ProviderPlanningOption option, CastingGraphCasting chip,
-            string casterName)
+        private static string ItemSourceNote(PlannedCasting focused, ProviderPlanningOption option,
+            CastingGraphCasting chip, string casterName)
         {
             if (chip != null && chip.NeedsItemSourceChoice)
                 return "Choose Change caster/source, then click the current item row. This casting keeps its other settings.";
             if (option == null || option.Provider.Key.Ability.SourceKind != SourceKind.Item) return string.Empty;
-            ItemSourceSelection selection = ItemSourceSelector.Parse(option.Provider.Key.Ability.SpecialSourceId);
+            // The saved rule, not the live key: a slot rule is still in force
+            // when discovery publishes a sole remaining copy under the plain rule.
+            ItemSourceSelection selection = ItemSourceSelector.Parse(focused.Ability.SpecialSourceId);
             string item = option.Provider.SourceDisplayName;
             if (selection.Kind == ItemSelectionKind.EquippedSlot)
                 return "Uses the " + item + " in " + casterName + "'s " +
@@ -1191,7 +1193,7 @@ namespace KingmakerBuffPlanner.UI
             // direct-manipulation layer for explicit disambiguation.
             List<PlannedCasting> same = _authoring.Document.Castings.Where(casting => casting != null &&
                 string.Equals(casting.SourceId, sourceId, StringComparison.Ordinal) &&
-                MatchesSelectedVariant(casting, ability, casterUnitId) &&
+                CompareToSelected(casting, ability, casterUnitId, _lastInputs) != ItemSourceMatch.Different &&
                 string.Equals(casting.RoutineId, routineId, StringComparison.Ordinal))
                 .OrderBy(casting => casting.Order).ThenBy(casting => casting.CastingId, StringComparer.Ordinal)
                 .ToList();

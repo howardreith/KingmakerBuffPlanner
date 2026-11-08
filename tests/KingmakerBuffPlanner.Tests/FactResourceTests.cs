@@ -347,7 +347,7 @@ namespace KingmakerBuffPlanner.Tests
             public CastRuntimeValidation Validate(CastStep step)
             {
                 string refusal = KingmakerFactResources.ValidateBinding("unit-cleric", _data, _data,
-                    step.Provider, step.Reservation) ??
+                    step.Provider, step.Reservation, step.RequiredItemSelector) ??
                     AvailableCountJudgement.BeforeSubmission(step.Reservation, KingmakerFactResources.KingmakerCount(_data));
                 return refusal == null ? CastRuntimeValidation.Pass() : CastRuntimeValidation.Fail(refusal);
             }
