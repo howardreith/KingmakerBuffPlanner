@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - durable item-source selection
+## 0.6.14 - 2026-11-08 - durable item-source selection after 0.6.13
 
 - A casting from an item (such as Blessed Signet) now stays connected after saving, loading,
   changing area and resting. It uses the item of that type the caster has equipped, and each
@@ -10,7 +10,8 @@
 - Castings saved by older versions show "Source needed" and are repaired once in place with
   Change caster/source, keeping their other settings. The "(select again after loading)"
   warning is gone.
-- No native game run exists for this change yet. [Checkpoint](docs/DURABLE-ITEM-SOURCE-CHECKPOINT.md)
+- Owner-authorized pre-runtime release. No native game run exists for this
+  version. [Checkpoint](docs/DURABLE-ITEM-SOURCE-CHECKPOINT.md)
 
 ## 0.6.13 - 2026-11-06 - prepared-slot spend repair after 0.6.12
 
