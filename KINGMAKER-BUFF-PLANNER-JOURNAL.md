@@ -4660,3 +4660,12 @@ marker effect, repurposing a native field, and auto-migrating old tokens. Baseli
 NOT RUN: the owner's game was running and the Automation fixture lacks a charged item. Exact
 next action: owner review, then the native steps in
 [the checkpoint](docs/DURABLE-ITEM-SOURCE-CHECKPOINT.md).
+
+## 2026-11-08 UTC - PR #23 review correction (durable item source)
+
+Product `5ebb83b186e9d9b922710dd63d9b29f8ca17729f` on `codex/kingmaker-buff-planner-durable-item-source`, version 0.6.13
+unchanged. Review of `55e3603` found the two-copies-to-one transition lost the saved slot rule:
+a recipient click added a persisted duplicate, execution stopped enforcing the slot, and the
+inspector described the plain rule. Baseline 14/3 at `55e3603`; source 47/0, build 1/0, complete
+offline 731/0. Native NOT RUN. Exact next action: re-review, then the native steps in
+[the checkpoint](docs/DURABLE-ITEM-SOURCE-CHECKPOINT.md).
