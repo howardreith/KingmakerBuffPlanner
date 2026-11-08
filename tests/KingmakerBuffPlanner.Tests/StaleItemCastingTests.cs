@@ -184,7 +184,8 @@ namespace KingmakerBuffPlanner.Tests
             string caster, string name)
         {
             string token = "session-item-" + item;
-            var ability = new AbilityKey(abilityGuid, string.Empty, 0, SourceKind.Item, token);
+            var ability = new AbilityKey(abilityGuid, string.Empty, 0, SourceKind.Item,
+                ItemSourceSelector.ForEquippedType("item-type-" + item));
             return new ProviderSnapshot(new ProviderKey(caster, string.Empty, ability, token),
                 name, 0, "item|" + token, 1, null, null, 5, 100);
         }

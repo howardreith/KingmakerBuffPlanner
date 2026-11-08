@@ -315,6 +315,13 @@ namespace KingmakerBuffPlanner.GameAdapters
             List<ResourcePoolSnapshot> pools)
         {
             var poolKeys = new HashSet<string>(pools.Select(p => p.PoolKey), StringComparer.Ordinal);
+            // Identical copies on this caster need the slot-qualified rule.
+            Dictionary<string, int> copies = unit.Descriptor.Abilities.Enumerable
+                .Where(a => a != null && a.Data != null && a.Data.SourceItem != null &&
+                    a.Data.SourceItem.Blueprint != null)
+                .Select(a => a.Data.SourceItem).Distinct()
+                .GroupBy(item => item.Blueprint.AssetGuid, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
             foreach (Ability fact in unit.Descriptor.Abilities.Enumerable
                 .Where(a => a != null && a.Data != null && a.Data.Blueprint != null)
                 .OrderBy(a => a.Blueprint.AssetGuid, StringComparer.Ordinal))
@@ -323,7 +330,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 if (source.Spellbook != null) continue;
                 foreach (KingmakerAbilitySelection selection in
                     ExpandOwned(new[] { source }, unit, string.Empty))
-                    AddFactProvider(unit, selection, providers, pools, poolKeys);
+                    AddFactProvider(unit, selection, providers, pools, poolKeys, copies);
             }
         }
 
@@ -345,7 +352,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             KingmakerAbilitySelection selection,
             List<ProviderSnapshot> providers,
             List<ResourcePoolSnapshot> pools,
-            HashSet<string> poolKeys)
+            HashSet<string> poolKeys,
+            Dictionary<string, int> itemCopies)
         {
             AbilityData data = selection.Concrete;
             KingmakerFactResource nativeResource;
@@ -355,9 +363,18 @@ namespace KingmakerBuffPlanner.GameAdapters
             SourceKind sourceKind = resourceKnown ? nativeResource.Kind :
                 data.SourceItem != null ? SourceKind.Item : SourceKind.Fact;
             AbilityKey ability = KingmakerAbilityVariants.ToAbilityKey(selection, sourceKind);
+            string slotSelector = string.Empty;
             if (resourceKnown && sourceKind == SourceKind.Item)
+            {
+                string itemGuid = data.SourceItem.Blueprint.AssetGuid;
+                string slot = KingmakerFactResources.EquippedSlotId(unit.Descriptor, data.SourceItem);
+                if (slot != null) slotSelector = ItemSourceSelector.ForEquippedSlot(itemGuid, slot);
+                int copies;
+                itemCopies.TryGetValue(itemGuid, out copies);
                 ability = new AbilityKey(ability.BaseAbilityGuid, ability.VariantGuid,
-                    ability.MetamagicMask, sourceKind, nativeResource.InstanceId);
+                    ability.MetamagicMask, sourceKind,
+                    ItemSourceSelector.ForDiscoveredItem(itemGuid, slot, copies));
+            }
             _rawCandidateCount++;
             EffectExpression expression;
             string reason;
@@ -405,8 +422,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 pool.PoolKey, cost, null, ToMaterialRequirement(selection),
                 CasterLevel(data), ExpectedDurationRounds(data, duration),
                 Description(selection), duration, data.SourceItem == null ? selection.SourceDisplayName :
-                    data.SourceItem.Name + " (select again after loading)",
-                selection.VariantOrder));
+                    data.SourceItem.Name,
+                selection.VariantOrder, string.Empty, slotSelector));
         }
 
         private void AddSpellProvider(

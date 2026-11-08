@@ -127,6 +127,7 @@
     <Compile Include="Domain\Effects\DiscoveredEffectLookup.cs" />
     <Compile Include="Domain\Effects\CatalogSourceIdentity.cs" />
     <Compile Include="Domain\Identity\StableKeys.cs" />
+    <Compile Include="Domain\Identity\ItemSourceSelector.cs" />
     <Compile Include="Domain\Authoring\CastingIntentModels.cs" />
     <Compile Include="Domain\Providers\ProviderSnapshots.cs" />
     <Compile Include="Domain\Planning\PlanningModels.cs" />
@@ -220,6 +221,7 @@
     <Compile Include="Planning\CastingAuthoringService.cs" />
     <Compile Include="Planning\CastingSourceIdentityMigration.cs" />
     <Compile Include="Planning\ExplicitCastingCompiler.cs" />
+    <Compile Include="Planning\ItemSourceResolution.cs" />
     <Compile Include="Planning\CastingBudget.cs" />
     <Compile Include="Planning\CastingForecast.cs" />
     <Compile Include="Planning\CastingExecutionGate.cs" />

@@ -2380,6 +2380,7 @@ namespace KingmakerBuffPlanner.UI
                                 _session.Model.SourceGroupings()),
                         isRunActive: () => _castingHost != null && _castingHost.IsRunning));
             created.RunLog = WriteCastingRunLog;
+            created.DiagnosticLog = line => Debug.Log(line);
             return created;
         }
 

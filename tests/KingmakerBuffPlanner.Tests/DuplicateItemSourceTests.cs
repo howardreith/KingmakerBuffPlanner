@@ -13,9 +13,9 @@ using KingmakerBuffPlanner.UI;
 
 namespace KingmakerBuffPlanner.Tests
 {
-    // Discovery builds a separate expression for every physical item's
-    // ability key. These tests carry those distinct objects through the
-    // production catalogue, workspace, compiler and saved-plan repository.
+    // Identical item copies keep separate providers and charge pools. These
+    // tests carry independently scanned copies through the production
+    // catalogue, workspace, compiler and saved-plan repository.
     // The only fixture boundary is the discovered party/providers/pools.
     internal static partial class Program
     {
@@ -89,8 +89,11 @@ namespace KingmakerBuffPlanner.Tests
             {
                 string token = "session-item-copy-" + index;
                 string caster = "item-caster-" + (sameCaster ? 1 : index);
-                var ability = new AbilityKey(DuplicateItemAbilityGuid, string.Empty, 0,
-                    SourceKind.Item, token);
+                // Discovery's rule: identical copies on one caster are told
+                // apart by slot; copies on different casters by their caster.
+                var ability = new AbilityKey(DuplicateItemAbilityGuid, string.Empty, 0, SourceKind.Item,
+                    sameCaster ? ItemSourceSelector.ForEquippedSlot("duplicate-item-type", "Quick" + index)
+                        : ItemSourceSelector.ForEquippedType("duplicate-item-type"));
                 providers.Add(DuplicateItemProvider(caster, ability, token,
                     "item|" + token, "Item blessing"));
                 pools.Add(new ResourcePoolSnapshot("item|" + token, ResourcePoolKind.ItemCharges,
@@ -187,12 +190,8 @@ namespace KingmakerBuffPlanner.Tests
         {
             DuplicateItemParty party = DuplicateItemFixture(false);
             Expect(party.Catalogue.Sources.Count == 1 &&
-                party.Catalogue.Sources[0].Providers.Count == 3 &&
-                party.Catalogue.Sources[0].Abilities.Count == 3,
+                party.Catalogue.Sources[0].Providers.Count == 3,
                 "The fixture did not discover three exact copies under one catalogue buff.");
-            Expect(!ReferenceEquals(party.Effects[party.Providers[0].Key.Ability.Canonical],
-                party.Effects[party.Providers[1].Key.Ability.Canonical]),
-                "The fixture reused an expression object and cannot reproduce the reported defect.");
             string directory;
             CastingWorkspaceSession session = DuplicateItemSession(root, "across-casters", out directory);
             session.SelectGraphBuff(DuplicateItemSourceId, party.Inputs);
@@ -223,7 +222,7 @@ namespace KingmakerBuffPlanner.Tests
                     casting.Ability.SpecialSourceId).OrderBy(value => value, StringComparer.Ordinal)
                 .SequenceEqual(party.Providers.Select(provider => provider.Key.Ability.SpecialSourceId)
                     .OrderBy(value => value, StringComparer.Ordinal)),
-                "The saved plan did not retain the three exact item tokens.");
+                "The saved plan did not retain each casting's item selection rule.");
         }
 
         private static void TestDuplicateItemsOnOneCaster(string root)
@@ -345,7 +344,7 @@ namespace KingmakerBuffPlanner.Tests
                     ResourcePoolKind.SpontaneousLevel, 2, 2, null));
                 string token = "session-item-variant-" + index;
                 var variant = new AbilityKey("item-variant-parent", "item-variant-child-" + index,
-                    0, SourceKind.Item, token);
+                    0, SourceKind.Item, ItemSourceSelector.ForEquippedType("item-variant-type"));
                 providers.Add(DuplicateItemProvider("variant-caster-" + index, variant, token,
                     "item|" + token, "Variant benefit " + index));
                 pools.Add(new ResourcePoolSnapshot("item|" + token, ResourcePoolKind.ItemCharges, 2, 2, null));

@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Kingmaker.Items;
+using Kingmaker.Items.Slots;
 using Kingmaker.Blueprints;
 using Kingmaker.Blueprints.Items.Equipment;
+using Kingmaker.UnitLogic;
 using Kingmaker.UnitLogic.Abilities;
 using Kingmaker.UnitLogic.Abilities.Components;
 using KingmakerBuffPlanner.Domain.Identity;
@@ -18,16 +21,18 @@ namespace KingmakerBuffPlanner.GameAdapters
     {
         internal SourceKind Kind;
         internal string InstanceId;
+        // The durable selection rule for an item source; empty otherwise.
+        internal string Selector = string.Empty;
         internal ResourcePoolSnapshot Pool;
         internal int Cost;
     }
 
     internal static class KingmakerFactResources
     {
-        // ItemEntity has no persistent ID in 2.1.7b. Never approximate one
-        // from a blueprint, inventory position or equipment slot. This token
-        // survives rescans of the SAME object; after reload the authored
-        // selection stays saved but unresolved until explicitly reselected.
+        // ItemEntity has no persistent ID in 2.1.7b. This token identifies one
+        // live object for pools, reservations and the run's exact binding; it
+        // is never persisted. What a saved plan keeps is the explicit rule in
+        // KingmakerFactResource.Selector, which is not a physical identity.
         private static readonly ConditionalWeakTable<ItemEntity, ItemIdentity> ItemIdentities =
             new ConditionalWeakTable<ItemEntity, ItemIdentity>();
 
@@ -69,8 +74,12 @@ namespace KingmakerBuffPlanner.GameAdapters
                 bool charges = item != null && item.IsSpendCharges;
                 if (resource && charges)
                     return Refuse("combined-item-and-ability-resource", out refusal);
+                if (item != null && (item.Blueprint == null || string.IsNullOrWhiteSpace(item.Blueprint.AssetGuid)))
+                    return Refuse("item-blueprint-unread", out refusal);
                 string instance = item == null ? string.Empty :
                     ItemIdentities.GetValue(item, value => new ItemIdentity()).Id;
+                string selector = item == null ? string.Empty :
+                    ItemSourceSelector.ForEquippedType(item.Blueprint.AssetGuid);
                 if (charges)
                 {
                     var blueprint = item.Blueprint as BlueprintItemEquipment;
@@ -80,7 +89,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                         return Refuse("item-charge-count-mismatch", out refusal);
                     result = new KingmakerFactResource
                     {
-                        Kind = SourceKind.Item, InstanceId = instance, Cost = 1,
+                        Kind = SourceKind.Item, InstanceId = instance, Selector = selector, Cost = 1,
                         Pool = new ResourcePoolSnapshot("item|" + instance, ResourcePoolKind.ItemCharges,
                             Math.Max(item.Charges, blueprint.Charges), item.Charges, null)
                     };
@@ -95,7 +104,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     result = new KingmakerFactResource
                     {
                         Kind = item == null ? SourceKind.AbilityResource : SourceKind.Item,
-                        InstanceId = instance, Cost = cost,
+                        InstanceId = instance, Selector = selector, Cost = cost,
                         Pool = new ResourcePoolSnapshot(unitId + "|resource|" + logic.RequiredResource.AssetGuid,
                             ResourcePoolKind.AbilityResource,
                             Math.Max(remaining, logic.RequiredResource.GetMaxAmount(concrete.Caster)), remaining, null)
@@ -107,7 +116,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 result = new KingmakerFactResource
                 {
                     Kind = item == null ? SourceKind.Fact : SourceKind.Item,
-                    InstanceId = instance, Cost = 0,
+                    InstanceId = instance, Selector = selector, Cost = 0,
                     Pool = new ResourcePoolSnapshot(item == null
                         ? unitId + "|free|" + (source.Blueprint.Parent ?? source.Blueprint).AssetGuid : "item|" + instance,
                         ResourcePoolKind.Unlimited, 0, 0, null)
@@ -149,8 +158,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             KingmakerFactResource resource;
             string refusal;
             if (!TryRead(unitId, source, concrete, out resource, out refusal)) return refusal;
+            // The run binds to the one live object planned; the saved rule
+            // must additionally still describe that object.
             if (resource.Kind != provider.Ability.SourceKind || resource.InstanceId != provider.SourceInstanceId ||
-                (resource.Kind == SourceKind.Item && resource.InstanceId != provider.Ability.SpecialSourceId))
+                (resource.Kind == SourceKind.Item && !RuleDescribes(provider.Ability, resource, concrete)))
                 return "fact-source-identity-mismatch";
             if (reservation != null && (resource.Pool.PoolKey != reservation.PoolKey ||
                 (resource.Pool.Kind == ResourcePoolKind.Unlimited) != reservation.Unlimited ||
@@ -160,6 +171,57 @@ namespace KingmakerBuffPlanner.GameAdapters
                     ";bound-kind=" + resource.Pool.Kind + ";planned-cost=" + reservation.Units +
                     ";bound-cost=" + resource.Cost;
             return null;
+        }
+
+        private static bool RuleDescribes(AbilityKey ability, KingmakerFactResource resource, AbilityData concrete)
+        {
+            ItemSourceSelection selection = ItemSourceSelector.Parse(ability.SpecialSourceId);
+            if (!selection.IsDurable ||
+                resource.Selector != ItemSourceSelector.ForEquippedType(selection.ItemBlueprintGuid))
+                return false;
+            return selection.Kind != ItemSelectionKind.EquippedSlot ||
+                EquippedSlotId(concrete.Caster, concrete.SourceItem) == selection.SlotId;
+        }
+
+        // The named position an equipped item occupies on its wielder, or
+        // null when it is not in one of these slots. A position, not an item
+        // identity: only used for an explicit choice between identical copies.
+        internal static string EquippedSlotId(UnitDescriptor owner, ItemEntity item)
+        {
+            try
+            {
+                ItemSlot held = item == null ? null : item.HoldingSlot;
+                UnitBody body = owner == null ? null : owner.Body;
+                if (held == null || body == null) return null;
+                var named = new KeyValuePair<string, ItemSlot>[]
+                {
+                    new KeyValuePair<string, ItemSlot>("Armor", body.Armor),
+                    new KeyValuePair<string, ItemSlot>("Belt", body.Belt),
+                    new KeyValuePair<string, ItemSlot>("Head", body.Head),
+                    new KeyValuePair<string, ItemSlot>("Feet", body.Feet),
+                    new KeyValuePair<string, ItemSlot>("Gloves", body.Gloves),
+                    new KeyValuePair<string, ItemSlot>("Neck", body.Neck),
+                    new KeyValuePair<string, ItemSlot>("Ring1", body.Ring1),
+                    new KeyValuePair<string, ItemSlot>("Ring2", body.Ring2),
+                    new KeyValuePair<string, ItemSlot>("Wrist", body.Wrist),
+                    new KeyValuePair<string, ItemSlot>("Shoulders", body.Shoulders)
+                };
+                foreach (KeyValuePair<string, ItemSlot> slot in named)
+                    if (ReferenceEquals(slot.Value, held)) return slot.Key;
+                int quick = 0;
+                foreach (ItemSlot slot in body.QuickSlots)
+                {
+                    if (ReferenceEquals(slot, held)) return "Quick" + quick;
+                    quick++;
+                }
+                for (int set = 0; set < body.HandsEquipmentSets.Count; set++)
+                {
+                    if (ReferenceEquals(body.HandsEquipmentSets[set].PrimaryHand, held)) return "Set" + set + "Primary";
+                    if (ReferenceEquals(body.HandsEquipmentSets[set].SecondaryHand, held)) return "Set" + set + "Secondary";
+                }
+                return null;
+            }
+            catch (Exception) { return null; }
         }
 
         private static bool Refuse(string reason, out string refusal)

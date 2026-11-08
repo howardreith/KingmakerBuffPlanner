@@ -402,6 +402,11 @@ namespace KingmakerBuffPlanner.Planning
             out List<ModifierUsageDemand> modifierDemands)
         {
             var reasons = new List<string>();
+            AbilityKey effectiveAbility = ItemSourceResolution.EffectiveAbility(
+                casting.Ability, casting.CasterUnitId, snapshot.Providers);
+            if (!ReferenceEquals(effectiveAbility, casting.Ability))
+                casting = casting.WithProvider(casting.CasterUnitId, effectiveAbility,
+                    casting.SpellbookGuid, casting.Enhancements);
             var capableCasters = snapshot.Providers
                 .Where(provider => string.Equals(
                     provider.Key.Ability.Canonical, casting.Ability.Canonical,
@@ -671,10 +676,18 @@ namespace KingmakerBuffPlanner.Planning
             {
                 HashSet<string> granted;
                 if (!grantedByUnit.TryGetValue(unitId, out granted) ||
-                    !granted.Contains(casting.Ability.Canonical))
+                    !granted.Contains(StructuralGrantKey(casting)))
                     return false;
             }
             return true;
+        }
+
+        // An item rule is shared by every copy of the type, but one copy's
+        // casting never makes another copy's casting (and charges) redundant.
+        private static string StructuralGrantKey(ResolvedCasting casting)
+        {
+            return casting.Ability.SourceKind == SourceKind.Item && casting.Provider != null
+                ? casting.Provider.Canonical : casting.Ability.Canonical;
         }
 
         private static void ProjectEffects(
@@ -692,7 +705,7 @@ namespace KingmakerBuffPlanner.Planning
                     granted = new HashSet<string>(StringComparer.Ordinal);
                     grantedByUnit[unitId] = granted;
                 }
-                granted.Add(casting.Ability.Canonical);
+                granted.Add(StructuralGrantKey(casting));
             }
         }
 
@@ -715,7 +728,10 @@ namespace KingmakerBuffPlanner.Planning
             }
             if (!capableCasters.Contains(casting.CasterUnitId))
             {
-                reasons.Add("caster-not-capable:" + casting.CasterUnitId);
+                // Never "cannot cast" when the real problem is a saved item
+                // selection that no longer identifies a live source.
+                reasons.Add(ItemSourceResolution.Refusal(casting.Ability, casting.CasterUnitId,
+                    snapshot.Providers) ?? "caster-not-capable:" + casting.CasterUnitId);
                 return null;
             }
             IEnumerable<ProviderPlanningOption> candidates = options.Where(option =>
@@ -747,7 +763,8 @@ namespace KingmakerBuffPlanner.Planning
             {
                 // The exact physical source was not pinned; picking one
                 // silently would reintroduce first-available substitution.
-                reasons.Add("exact-source-ambiguous:" + ordered.Count);
+                reasons.Add((casting.Ability.SourceKind == SourceKind.Item
+                    ? ItemSourceResolution.Ambiguous : "exact-source-ambiguous") + ":" + ordered.Count);
                 return null;
             }
             return ordered[0];

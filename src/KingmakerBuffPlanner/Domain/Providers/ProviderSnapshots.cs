@@ -165,7 +165,8 @@ namespace KingmakerBuffPlanner.Domain.Providers
             string durationText = "",
             string sourceDisplayName = "",
             int variantOrder = 0,
-            string sourceBookName = "")
+            string sourceBookName = "",
+            string equippedSlotSelector = "")
         {
             Key = key ?? throw new ArgumentNullException("key");
             if (spellLevel < 0) throw new ArgumentOutOfRangeException("spellLevel");
@@ -191,9 +192,13 @@ namespace KingmakerBuffPlanner.Domain.Providers
             Description = description ?? string.Empty;
             DurationText = durationText ?? string.Empty;
             SourceBookName = sourceBookName ?? string.Empty;
+            EquippedSlotSelector = equippedSlotSelector ?? string.Empty;
         }
 
         public ProviderKey Key { get; private set; }
+        // This item's slot-qualified selector, published even when the key
+        // uses the plain rule; empty for non-items and unlocated slots.
+        public string EquippedSlotSelector { get; private set; }
         // The spellbook's name as the game shows it (for example "Wizard"),
         // empty for items and abilities; it names the exact source in the
         // planner's provider choices (re-review).

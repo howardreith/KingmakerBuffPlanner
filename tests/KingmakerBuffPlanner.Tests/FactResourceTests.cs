@@ -58,6 +58,7 @@ namespace KingmakerBuffPlanner.Tests
             SetNative(blueprint, "Components", new BlueprintComponent[0]);
             SetNative(blueprint, "MaterialComponent", new BlueprintAbility.MaterialComponentData());
             var equipment = NativeObject<BlueprintItemEquipmentUsable>();
+            SetNative(equipment, "m_AssetGuid", "bbbb0000000000000000000000000001");
             equipment.Ability = blueprint;
             equipment.SpendCharges = spendCharges;
             equipment.Charges = 5;
@@ -96,7 +97,7 @@ namespace KingmakerBuffPlanner.Tests
         {
             return new ProviderSnapshot(new ProviderKey("unit-cleric", string.Empty,
                 new AbilityKey(data.Blueprint.AssetGuid, variant, 0, resource.Kind,
-                    resource.Kind == SourceKind.Item ? resource.InstanceId : string.Empty),
+                    resource.Kind == SourceKind.Item ? resource.Selector : string.Empty),
                 resource.InstanceId), "Native item fixture", 0, resource.Pool.PoolKey, resource.Cost, null);
         }
 
@@ -223,11 +224,11 @@ namespace KingmakerBuffPlanner.Tests
             document = saved ?? CastingDocument(Enumerable.Range(0, count).Select(index =>
                 DirectCasting("native-cast-" + index, "long", "unit-cleric", "unit-t" + (index % 3 + 1),
                     "native-source", provider.Key.Ability)).ToArray());
-            // Existing persistence format already retains the entire ability
-            // key, including the item token. No migration/rebinding guess.
+            // The persisted key carries the selection rule, never the live
+            // object's token.
             string json = Newtonsoft.Json.JsonConvert.SerializeObject(CastingPlanProfile.FromDocument(document));
             document = Newtonsoft.Json.JsonConvert.DeserializeObject<CastingPlanProfile>(json).ToDocument();
-            if (saved == null && document.Castings.Any(casting => casting.Ability.SpecialSourceId != resource.InstanceId))
+            if (saved == null && document.Castings.Any(casting => casting.Ability.SpecialSourceId != resource.Selector))
                 throw new InvalidOperationException("Saved item selection lost its exact identity.");
             plan = new ExplicitCastingCompiler().Compile(document, snapshot, options, effects,
                 new CastEnhancementSnapshot[0]);
@@ -294,11 +295,21 @@ namespace KingmakerBuffPlanner.Tests
             AbilityData other = NativeItemAbility("replacement", 5, out replacement);
             CastingPlanDocument retained;
             NativeFactProjection(other, 2, out retained, out plan, out decision, saved);
-            if (decision.Allowed || retained.Castings.Count != 2 ||
+            // The rule is "this caster's equipped item of this type", so
+            // another equipped copy of the type satisfies it without a rewrite.
+            if (!decision.Allowed || retained.Castings.Count != 2 ||
                 retained.Castings.Any(casting => casting.Ability.SpecialSourceId != saved.Castings[0].Ability.SpecialSourceId) ||
                 retained.Castings[1].DirectTargetUnitId != saved.Castings[1].DirectTargetUnitId ||
-                plan.Castings.Any(casting => casting.IsExecutable) || replacement.Charges != 5)
-                throw new InvalidOperationException("An item replacement rebound/deleted saved intent.");
+                plan.Castings.Any(casting => !casting.IsExecutable) || replacement.Charges != 5)
+                throw new InvalidOperationException("Another equipped copy of the type did not satisfy the rule.");
+            ItemEntity differentType;
+            AbilityData different = NativeItemAbility("different-type", 5, out differentType);
+            SetNative(differentType.Blueprint, "m_AssetGuid", "bbbb0000000000000000000000000002");
+            NativeFactProjection(different, 2, out retained, out plan, out decision, saved);
+            if (decision.Allowed || retained.Castings.Count != 2 ||
+                retained.Castings.Any(casting => casting.Ability.SpecialSourceId != saved.Castings[0].Ability.SpecialSourceId) ||
+                plan.Castings.Any(casting => casting.IsExecutable) || differentType.Charges != 5)
+                throw new InvalidOperationException("A different item type rebound/deleted saved intent.");
             // v0.6.6 stored this source as a resource-less Fact. Keep that
             // request, but require the owner to choose the correctly priced
             // Item provider; never migrate it to an arbitrary identical spell.

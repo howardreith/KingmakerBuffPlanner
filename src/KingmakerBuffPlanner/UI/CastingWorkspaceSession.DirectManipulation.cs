@@ -363,7 +363,7 @@ namespace KingmakerBuffPlanner.UI
                     casting != null &&
                     string.Equals(casting.SourceId, SelectedSourceId, StringComparison.Ordinal) &&
                     string.Equals(casting.RoutineId, SelectedRoutineId, StringComparison.Ordinal) &&
-                    MatchesSelectedVariant(casting, Draft.Ability) &&
+                    MatchesSelectedVariant(casting, Draft.Ability, Draft.CasterUnitId ?? SelectedCasterUnitId) &&
                     (casting.TargetMode != CastingTargetMode.DirectTarget) == group)
                 .OrderBy(casting => casting.Order)
                 .ThenBy(casting => casting.CastingId, StringComparer.Ordinal).ToList();
@@ -449,14 +449,20 @@ namespace KingmakerBuffPlanner.UI
             return casting.Origin.AnchorUnitId;
         }
 
-        private static bool MatchesSelectedVariant(PlannedCasting casting, AbilityKey ability)
+        private static bool MatchesSelectedVariant(PlannedCasting casting, AbilityKey ability,
+            string casterUnitId)
         {
             // SourceId is the normalized catalogue entry; AbilityKey keeps
             // variants/metamagic forms distinct inside that entry. Before an
             // exact source has been chosen there is no variant to narrow by.
-            return ability == null || (casting.Ability != null &&
-                string.Equals(casting.Ability.Canonical, ability.Canonical,
-                    StringComparison.Ordinal));
+            if (ability == null) return true;
+            if (casting.Ability == null || !string.Equals(casting.Ability.Canonical, ability.Canonical,
+                    StringComparison.Ordinal))
+                return false;
+            // An item rule is per caster: the same rule on another caster
+            // names a different physical source and a separate budget.
+            return ability.SourceKind != SourceKind.Item ||
+                string.Equals(casting.CasterUnitId, casterUnitId, StringComparison.Ordinal);
         }
 
         // Why the focused casting may not move to this recipient, or null.
@@ -475,7 +481,7 @@ namespace KingmakerBuffPlanner.UI
                 .Where(value => value != null && !string.Equals(value.CastingId, focused.CastingId,
                         StringComparison.Ordinal) &&
                     string.Equals(value.SourceId, focused.SourceId, StringComparison.Ordinal) &&
-                    MatchesSelectedVariant(value, focused.Ability) &&
+                    MatchesSelectedVariant(value, focused.Ability, focused.CasterUnitId) &&
                     string.Equals(value.RoutineId, focused.RoutineId, StringComparison.Ordinal) &&
                     (value.TargetMode != CastingTargetMode.DirectTarget) == group &&
                     string.Equals(RecipientOf(value), unitId, StringComparison.Ordinal))

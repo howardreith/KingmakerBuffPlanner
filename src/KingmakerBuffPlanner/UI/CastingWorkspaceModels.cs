@@ -777,6 +777,17 @@ namespace KingmakerBuffPlanner.UI
                 case "caster-unresolved": return "no caster chosen";
                 case "caster-not-in-party": return "the caster is not in the party";
                 case "caster-not-capable": return "the caster cannot cast this";
+                case ItemSourceResolution.Missing:
+                    return "its saved item is not equipped on this caster; use Change caster/source to choose a current source";
+                case ItemSourceResolution.Ambiguous:
+                    return "identical copies of its item are equipped; use Change caster/source and click the copy to use";
+                case ItemSourceResolution.SlotEmpty:
+                    return "its saved equipment slot no longer holds this item; use Change caster/source to choose a current copy";
+                case ItemSourceResolution.LegacySession:
+                case ItemSourceResolution.LegacyFact:
+                    return "saved by an older version that could not remember its item; use Change caster/source and click the item once";
+                case ItemSourceResolution.Invalid:
+                    return "its saved item selection is unreadable; use Change caster/source to choose a current source";
                 case "source-unresolvable": return "the buff's source was not found";
                 case "exact-source-ambiguous": return "the caster can cast it in more than one way; pick the exact spell or item";
                 case "provider-option-unavailable": return "the caster cannot cast it right now";

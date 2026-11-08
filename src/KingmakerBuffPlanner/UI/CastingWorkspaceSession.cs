@@ -1534,14 +1534,20 @@ namespace KingmakerBuffPlanner.UI
             ProviderPlanningOption fallback = FindDraftOption(
                 inputs, record.SourceId, record.CasterUnitId, out candidates);
             if (record.Ability == null) return fallback;
-            ProviderPlanningOption exact = inputs.ProviderOptions.FirstOrDefault(option =>
+            AbilityKey ability = ItemSourceResolution.EffectiveAbility(record.Ability, record.CasterUnitId,
+                inputs.ProviderOptions.Where(option => option != null).Select(option => option.Provider));
+            List<ProviderPlanningOption> matching = inputs.ProviderOptions.Where(option =>
                 option != null && option.Provider != null &&
                 string.Equals(option.Provider.Key.CasterUnitId, record.CasterUnitId,
                     StringComparison.Ordinal) &&
-                string.Equals(option.Provider.Key.Ability.Canonical, record.Ability.Canonical,
+                string.Equals(option.Provider.Key.Ability.Canonical, ability.Canonical,
                     StringComparison.Ordinal) &&
                 (record.SpellbookGuid == null || string.Equals(option.Provider.Key.SpellbookGuid,
-                    record.SpellbookGuid, StringComparison.Ordinal)));
+                    record.SpellbookGuid, StringComparison.Ordinal))).ToList();
+            // Copies the rule cannot tell apart stay unresolved here too, the
+            // same answer the compiler gives.
+            if (ability.SourceKind == SourceKind.Item && matching.Count > 1) return null;
+            ProviderPlanningOption exact = matching.FirstOrDefault();
             // A saved fact/item selection names its exact source. A replacement
             // may be offered for explicit reselection, but must not appear
             // to be the unresolved casting's current source in its inspector.
@@ -2557,6 +2563,10 @@ namespace KingmakerBuffPlanner.UI
             {
                 return AuthoringEditResult.Refuse("provider-invalid:" + exception.Message);
             }
+            if (result.Applied && key.Ability.SourceKind == SourceKind.Item)
+                LogItemSource("reassigned;casting=" + focused.CastingId + ";caster=" + key.CasterUnitId +
+                    ";from=" + focused.Ability.SourceKind + ":" + focused.Ability.SpecialSourceId +
+                    ";to=" + key.Ability.SpecialSourceId + ";live=" + key.SourceInstanceId);
             if (result.Applied && dropped.Count != 0)
                 return new AuthoringEditResult(true, "the new caster does not have " + string.Join(", ", dropped) +
                     " (Undo restores " + (dropped.Count == 1 ? "it" : "them") + ")", result.Scope, result.AffectedCastingIds);
@@ -2868,7 +2878,36 @@ namespace KingmakerBuffPlanner.UI
                 inputs.LiveEffects, StrictInstant);
             _compiledPlans[key] = plan;
             CompilationCountForRuntime++;
+            LogItemSourceResolutions(plan, inputs);
             return plan;
+        }
+
+        // Diagnostic sink for item-source resolution (the mod log, not the
+        // in-game log). A line is written only when a casting's result
+        // changes, never on an ordinary refresh.
+        public Action<string> DiagnosticLog { get; set; }
+        private readonly Dictionary<string, string> _itemSourceLogged =
+            new Dictionary<string, string>(StringComparer.Ordinal);
+
+        private void LogItemSourceResolutions(ExplicitCastingPlan plan, CastingWorkspaceInputs inputs)
+        {
+            if (DiagnosticLog == null) return;
+            foreach (ResolvedCasting casting in plan.Castings.Where(ItemSourceResolution.IsItemRelated))
+            {
+                string line = ItemSourceResolution.Describe(casting, inputs.Snapshot.Providers);
+                string previous;
+                if (_itemSourceLogged.TryGetValue(casting.CastingId, out previous) &&
+                    string.Equals(previous, line, StringComparison.Ordinal))
+                    continue;
+                _itemSourceLogged[casting.CastingId] = line;
+                LogItemSource("resolution;" + line);
+            }
+        }
+
+        private void LogItemSource(string detail)
+        {
+            try { if (DiagnosticLog != null) DiagnosticLog("[KBP-ITEM-SOURCE] " + detail); }
+            catch (Exception) { }
         }
 
         private CastingForecast ForecastOnePass(CastingWorkspaceInputs inputs)

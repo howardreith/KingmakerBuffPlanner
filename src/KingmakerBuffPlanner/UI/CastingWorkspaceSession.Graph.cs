@@ -150,7 +150,7 @@ namespace KingmakerBuffPlanner.UI
             if (unit == null) return GraphRefusal("target-not-in-party:" + unitId);
             bool? group = IsGroupSource(_lastInputs, source);
             if (group == null) return GraphRefusal("ability-targeting-unsupported:" + source);
-            PlannedCasting existing = ExistingCastingFor(source, option.Provider.Key.Ability,
+            PlannedCasting existing = ExistingCastingFor(source, option.Provider.Key.Ability, caster,
                 SelectedRoutineId, unitId, group.Value);
             if (existing != null)
             {
@@ -492,7 +492,10 @@ namespace KingmakerBuffPlanner.UI
                     casting.IsExecutable && whole != null &&
                         whole.Readiness == ResolvedCastingReadiness.AlreadySatisfied,
                     chipDescription, chipDuration, chipTitle,
-                    casting.Provider == null ? null : casting.Provider.Ability));
+                    casting.Provider == null ? null : casting.Provider.Ability)
+                {
+                    NeedsItemSourceChoice = casting.ReadinessReasons.Any(ItemSourceResolution.IsRefusal)
+                });
             }
             // Parallel castings (same caster, source and target) stay distinct.
             foreach (IGrouping<string, CastingGraphCasting> same in chips.GroupBy(value =>
@@ -516,6 +519,8 @@ namespace KingmakerBuffPlanner.UI
             bool cannotRun = casting.Readiness == ResolvedCastingReadiness.Ready &&
                 ExplicitCastingStepConverter.StandardExecutionLimitation(casting,
                     TargetingModifierEnhancementMap(inputs)) != null;
+            if (casting.ReadinessReasons.Any(ItemSourceResolution.IsRefusal))
+                return CastingGraphText.ItemSourceNeeded;
             return CastingGraphText.CardStatus(casting.Readiness, cannotRun, casting.ExistingEffectNotes);
         }
 
@@ -607,7 +612,10 @@ namespace KingmakerBuffPlanner.UI
                 }
                 string displayName = string.IsNullOrWhiteSpace(unit.DisplayName) ? unit.UnitId : unit.DisplayName;
                 allRows.AddRange(rows.Select(row => new KeyValuePair<string, CastingGraphSourceRow>(displayName, row)));
-                string note = !capable.Contains(unit.UnitId) ? "Cannot cast this buff now."
+                string note = chips.Any(value => value.NeedsItemSourceChoice &&
+                        string.Equals(value.CasterUnitId, unit.UnitId, StringComparison.Ordinal))
+                    ? "A saved item casting needs its source: select it, then Change caster/source."
+                    : !capable.Contains(unit.UnitId) ? "Cannot cast this buff now."
                     : rows.Count > 1 && !rows.Any(value => value.Selected) ? "Choose the exact source."
                     : rows.Count != 0 && rows.All(value => !value.Usable) ? "Nothing left to cast it with."
                     : string.Empty;
@@ -844,7 +852,25 @@ namespace KingmakerBuffPlanner.UI
                     CastingRunPresentation.DescribeExistingEffectNote(note, nameOf)),
                 CastingRunPresentation.DescribeEntry(lastRun));
             inspector.Modifiers = modifierOptions;
+            inspector.ItemSourceNote = ItemSourceNote(option, chip, casterName);
             return inspector;
+        }
+
+        // The selection contract in the player's words; never a physical
+        // identity claim, because the game cannot provide one.
+        private static string ItemSourceNote(ProviderPlanningOption option, CastingGraphCasting chip,
+            string casterName)
+        {
+            if (chip != null && chip.NeedsItemSourceChoice)
+                return "Choose Change caster/source, then click the current item row. This casting keeps its other settings.";
+            if (option == null || option.Provider.Key.Ability.SourceKind != SourceKind.Item) return string.Empty;
+            ItemSourceSelection selection = ItemSourceSelector.Parse(option.Provider.Key.Ability.SpecialSourceId);
+            string item = option.Provider.SourceDisplayName;
+            if (selection.Kind == ItemSelectionKind.EquippedSlot)
+                return "Uses the " + item + " in " + casterName + "'s " +
+                    ItemSourceSelector.SlotLabel(selection.SlotId) + " slot.";
+            return selection.Kind == ItemSelectionKind.EquippedType
+                ? "Uses the " + item + " " + casterName + " has equipped, whichever copy that is." : string.Empty;
         }
 
         private static string LeftAfterPlan(CastingCapacity capacity, CastingCostCategory category,
@@ -1157,7 +1183,7 @@ namespace KingmakerBuffPlanner.UI
             return grouping == CastGroupingKind.MassConfiguredTargets;
         }
 
-        private PlannedCasting ExistingCastingFor(string sourceId, AbilityKey ability,
+        private PlannedCasting ExistingCastingFor(string sourceId, AbilityKey ability, string casterUnitId,
             string routineId, string unitId, bool group)
         {
             // SourceId is the normalized buff while AbilityKey keeps an
@@ -1165,7 +1191,7 @@ namespace KingmakerBuffPlanner.UI
             // direct-manipulation layer for explicit disambiguation.
             List<PlannedCasting> same = _authoring.Document.Castings.Where(casting => casting != null &&
                 string.Equals(casting.SourceId, sourceId, StringComparison.Ordinal) &&
-                MatchesSelectedVariant(casting, ability) &&
+                MatchesSelectedVariant(casting, ability, casterUnitId) &&
                 string.Equals(casting.RoutineId, routineId, StringComparison.Ordinal))
                 .OrderBy(casting => casting.Order).ThenBy(casting => casting.CastingId, StringComparer.Ordinal)
                 .ToList();
@@ -1208,7 +1234,12 @@ namespace KingmakerBuffPlanner.UI
                 return provider.SourceBookName + " level " + provider.SpellLevel + metamagic;
             string resource = pool == null ? "Resource" : WorkspacePoolLabels.Describe(pool.Kind, null, null,
                 provider.SourceDisplayName);
-            return char.ToUpperInvariant(resource[0]) + resource.Substring(1) + metamagic;
+            // Identical copies are told apart by the slot the rule names.
+            ItemSourceSelection selection = ItemSourceSelector.Parse(provider.Key.Ability.SpecialSourceId);
+            string copy = provider.Key.Ability.SourceKind == SourceKind.Item &&
+                selection.Kind == ItemSelectionKind.EquippedSlot
+                    ? " · " + ItemSourceSelector.SlotLabel(selection.SlotId) : string.Empty;
+            return char.ToUpperInvariant(resource[0]) + resource.Substring(1) + copy + metamagic;
         }
 
         // The pool that controls a source row's count, without its owner

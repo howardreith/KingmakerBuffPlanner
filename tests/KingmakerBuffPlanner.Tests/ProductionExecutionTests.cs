@@ -43,7 +43,7 @@ namespace KingmakerBuffPlanner.Tests
             }
             Run("fact-resource-native-item-discovery-reservation-binding", TestNativeFactResources);
             Run("fact-resource-five-cast-finite-unlimited-and-full-plan-shortage", TestNativeFactRoutine);
-            Run("fact-resource-saved-selection-refuses-replacement-and-survives-rescan", TestNativeFactSavedSelection);
+            Run("fact-resource-saved-selection-follows-equipped-rule-and-survives-rescan", TestNativeFactSavedSelection);
             Run("fact-resource-final-boundary-refuses-stale-counts", TestResourceFinalBoundary);
             Run("fact-resource-unexpected-spend-report-retains-effect-and-failure", TestUnexpectedSpendReport);
             Run("existing-effect-sufficiency-rules", TestExistingEffectSufficiencyRules);

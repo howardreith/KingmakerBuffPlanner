@@ -2765,6 +2765,9 @@ namespace KingmakerBuffPlanner.UI
             Line("Headline", RelationLine(view, inspector), PlannerTextRole.Strong, 18f, null);
             string source = SourceCaption(view, chip);
             if (source.Length != 0) Line("Source", source, PlannerTextRole.Secondary, 15f, null);
+            if (inspector.ItemSourceNote.Length != 0)
+                Line("ItemSourceNote", inspector.ItemSourceNote, PlannerTextRole.Small, 13f,
+                    chip != null && chip.NeedsItemSourceChoice ? BlockedInk : (Color?)null);
             if (unresolvedSource)
                 ActionButton("Remove", "Remove casting " + chip.OrderLabel, RemoveCastingCommand);
             RectTransform change = Row("ExplicitChange", 32f);

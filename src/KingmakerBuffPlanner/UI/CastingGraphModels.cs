@@ -296,6 +296,9 @@ namespace KingmakerBuffPlanner.UI
         public bool Selected { get; private set; }
         public CastingAuthoringState State { get; private set; }
         public bool NeedsReview { get; private set; }
+        // The saved item selection found no live source: the repair is a
+        // source choice, not a resource or capability problem.
+        public bool NeedsItemSourceChoice { get; internal set; }
         // Ready in its routine alone, but short of a resource when every
         // routine runs in one pass.
         public bool ShortInOnePass { get; private set; }
@@ -395,6 +398,8 @@ namespace KingmakerBuffPlanner.UI
 
         public PlannedCasting Casting { get; private set; }
         public string CastingId { get { return Casting.CastingId; } }
+        // What this casting's item selection means, or how to repair it.
+        public string ItemSourceNote { get; internal set; } = string.Empty;
         // Targeting modifiers (Share Transmutation) for THIS casting -
         // on/off with the same honest availability the compiler judges.
         public IReadOnlyList<CastingGraphModifierOption> Modifiers { get; internal set; }
@@ -582,7 +587,9 @@ namespace KingmakerBuffPlanner.UI
             CastingCapacityEstimate withoutPlan = null, ResourcePoolKind? kind = null)
         {
             if (!pinnable)
-                return "This spell is known at two levels of one spellbook; this version cannot pick one.";
+                return kind == ResourcePoolKind.ItemCharges
+                    ? "Identical copies of this item could not be told apart; keep one equipped."
+                    : "This spell is known at two levels of one spellbook; this version cannot pick one.";
             if (estimate == null || estimate.Kind == CastingCapacityKind.Unknown)
                 return string.Empty;
             if (estimate.CanFundAnother) return string.Empty;
@@ -657,6 +664,8 @@ namespace KingmakerBuffPlanner.UI
         // facts, never collapsed: "Active · Will skip" (the policy skips an
         // active effect), "Active · Will recast" (it is active, or present but
         // not sufficient, and this casting casts again anyway).
+        public const string ItemSourceNeeded = "Source needed";
+
         public static string CardStatus(ResolvedCastingReadiness readiness, bool cannotRunYet,
             IEnumerable<string> existingEffectCodes)
         {

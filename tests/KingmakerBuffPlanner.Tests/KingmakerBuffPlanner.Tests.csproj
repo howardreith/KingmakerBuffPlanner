@@ -47,6 +47,7 @@
     <Compile Include="InfectiousCharmsRefinementTests.cs" />
     <Compile Include="CastAvailableTests.cs" />
     <Compile Include="FactResourceTests.cs" />
+    <Compile Include="ItemSourcePersistenceTests.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\KingmakerFactResources.cs"><Link>GameAdapters\KingmakerFactResources.cs</Link></Compile>
     <Compile Include="CastingGraphTests.cs" />
     <Compile Include="DuplicateItemSourceTests.cs" />
@@ -152,6 +153,8 @@
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingAuthoringService.cs"><Link>Planning\CastingAuthoringService.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingSourceIdentityMigration.cs"><Link>Planning\CastingSourceIdentityMigration.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ExplicitCastingCompiler.cs"><Link>Planning\ExplicitCastingCompiler.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\ItemSourceResolution.cs"><Link>Planning\ItemSourceResolution.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Domain\Identity\ItemSourceSelector.cs"><Link>Domain\Identity\ItemSourceSelector.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingBudget.cs"><Link>Planning\CastingBudget.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingForecast.cs"><Link>Planning\CastingForecast.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\Planning\CastingExecutionGate.cs"><Link>Planning\CastingExecutionGate.cs</Link></Compile>

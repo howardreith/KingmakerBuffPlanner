@@ -466,6 +466,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunCastingGraphTests(root);
                 RunDuplicateItemSourceTests(root);
                 RunStaleItemCastingTests(root);
+                RunItemSourcePersistenceTests(root);
                 RunBlockedNavigationTests(root);
                 RunAutosaveLifecycleTests(root);
                 RunClearPlanTests(root);
