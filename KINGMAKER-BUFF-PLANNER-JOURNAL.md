@@ -4648,3 +4648,15 @@ and downloaded. ZIP
 `b638b0c46a790f4ad6a4c54dae30c90534ff52e1c94e072d77a79a6a63214719`. No native
 run, installation or save change. Next: owner playtest, one uninterrupted Long
 with the repeated-Heroism plan. [Release record](docs/RELEASE-0.6.13-RECORD.md).
+
+## 2026-11-08 UTC - durable item-source selection (after 0.6.13, unreleased)
+
+Branch `codex/kingmaker-buff-planner-durable-item-source`, base `5122e3a`, product
+`472e2f5502ec798f3e86ef9a45aade2e21b77a0d`, version 0.6.13 unchanged. 2.1.7b serializes no ItemEntity identity, so saved
+castings moved from a per-object session token to an explicit equipped-item rule, with a slot
+qualifier for an explicit choice between identical copies. Rejected: a save-contract hook, a
+marker effect, repurposing a native field, and auto-migrating old tokens. Baseline regression
+0/1 at `5122e3a` (`caster-not-capable`); source 47/0, build 1/0, complete offline 727/0. Native
+NOT RUN: the owner's game was running and the Automation fixture lacks a charged item. Exact
+next action: owner review, then the native steps in
+[the checkpoint](docs/DURABLE-ITEM-SOURCE-CHECKPOINT.md).

@@ -5,4 +5,3 @@ Protocol tests: PASS=0 FAIL=1
 FAIL item-source-survives-item-serialization-roundtrip: System.InvalidOperationException: A saved item casting lost its source across a save/load item reconstruction: caster-not-capable:unit-cleric
    at KingmakerBuffPlanner.Tests.Program.TestItemSourceSurvivesRoundtrip() in C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-DIS\tests\KingmakerBuffPlanner.Tests\ItemSourcePersistenceTests.cs:line 148
    at KingmakerBuffPlanner.Tests.Program.<>c.<RunItemSourcePersistenceTests>b__575_0() in C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-DIS\tests\KingmakerBuffPlanner.Tests\ItemSourcePersistenceTests.cs:line 31
-

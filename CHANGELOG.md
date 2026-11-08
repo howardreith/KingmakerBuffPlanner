@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased - durable item-source selection
+
+- A casting from an item (such as Blessed Signet) now stays connected after saving, loading,
+  changing area and resting. It uses the item of that type the caster has equipped, and each
+  run still spends that one item's own charges.
+- With identical copies equipped, choose a copy once under Change caster/source; the choice
+  is remembered by equipment slot. A casting never silently picks between copies.
+- Castings saved by older versions show "Source needed" and are repaired once in place with
+  Change caster/source, keeping their other settings. The "(select again after loading)"
+  warning is gone.
+- No native game run exists for this change yet. [Checkpoint](docs/DURABLE-ITEM-SOURCE-CHECKPOINT.md)
+
 ## 0.6.13 - 2026-11-06 - prepared-slot spend repair after 0.6.12
 
 - Two castings of the same prepared spell from one caster (for example two
