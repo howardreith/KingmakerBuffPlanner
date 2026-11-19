@@ -1,3 +1,5 @@
+2026-11-19 · Chinese WORKING opened and displayed-name search passed on 0.6.18. The native comparison fixture selected by English name and failed its three-recipient prerequisite. Version 0.6.19 uses the observed blueprint/source identity. [Receipts](docs/LOCALIZATION.md#candidate-and-evidence).
+
 2026-11-19 · Frozen 0.6.18 at `14c831269c28dd3a147ca989fc8ce69619746ab0` after four 0.6.17 startup tests exposed Chinese load admission, text clipping and untranslated source qualifiers. The [acceptance record](docs/LOCALIZATION.md#candidate-and-evidence) includes all five 0.6.17 transaction outcomes and restoration receipts.
 
 2026-11-19 · Recovered the passing 0.6.17 pre-live gate for `d6e341fcc4951764f7b650cef481014507ef8e98` and verified both frozen hashes. The [localization record](docs/LOCALIZATION.md#candidate-and-evidence) identifies the 0.6.16 failed request and restoration separately.

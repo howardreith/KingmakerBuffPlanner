@@ -1,4 +1,4 @@
-For the frozen 0.6.18 localization candidate, resume from its [frozen candidate and guarded acceptance instructions](docs/LOCALIZATION.md#candidate-and-evidence).
+For the frozen 0.6.19 localization candidate, resume from its [frozen candidate and guarded acceptance instructions](docs/LOCALIZATION.md#candidate-and-evidence).
 
 > **Stable 0.6.14 published, 2026-11-08:** owner-authorized pre-runtime release after accepted PR #23 (durable item-source selection), from product `2eab694aeef5aec11b73ee63cf0072f6e07d78ce`. Publisher: source 47/0, complete offline 731/0, gate 8/0, deterministic builds 3/0, package 6/0; downloaded ZIP `be0a2ffa...3ebb` matches SHA256SUMS. Native acceptance NOT RUN. [Release record](docs/RELEASE-0.6.14-RECORD.md).
 

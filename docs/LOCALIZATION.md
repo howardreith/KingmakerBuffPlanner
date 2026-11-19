@@ -51,7 +51,26 @@ Identity, recipient, strength, caster level, suppression and metamagic checks st
 
 ## Candidate and evidence
 
-**Current frozen candidate 0.6.18** · Product and harness source `14c831269c28dd3a147ca989fc8ce69619746ab0`. The frozen worktree is `KBP-ZHCN-Acceptance` at `codex/kingmaker-buff-planner-zhcn-0618-candidate`. The build manifest and artifact are under `artifacts/local-runtime/0.6.18/`. Documentation commits on the PR branch describe these bytes.
+**Current frozen candidate 0.6.19** · Product and harness source `7a732c4fed1fffc8d1cf740f9d54f5250c18313d`, worktree `KBP-ZHCN-AcceptanceRecords` on `codex/kingmaker-buff-planner-zhcn-0619-candidate`. Review records are committed separately. The validated package and manifest are under `artifacts/local-runtime/0.6.19/`.
+
+| 0.6.19 artifact | Identity |
+|---|---|
+| DLL SHA-256 | `25e0c922d9acacaa6952b528d701a7a6be66596015adcddd46b6c2942598cea1` |
+| ZIP SHA-256 | `34e90fe9cb9881cbe309b49fc1bb10380313c10ac5f17f163c1e585edc7f910e` |
+| Assembly MVID | `7be8e4f8-1412-4bbc-a351-eca3059e7cd7` |
+
+The no-cast native UI fixture now looks up Resistance by its blueprint GUID in the book and by its canonical source ID in the workspace. The successful English seed in `zhcn17-en-auto-01/native-ui.json` recorded the exact fact provider `ability|7bc8e27cba24f0e43ae64ed201ad5785`. A focused regression exercises a competing source with the same display name, English and Chinese captions, and an absent comparison source. This harness change accounts for the new DLL.
+
+| 0.6.19 verification | Receipt in the frozen worktree |
+|---|---|
+| Focused suite 54/54, full C# suite 749/749 | `artifacts/zhcn19-focused.log` and `artifacts/zhcn19-source.log`. Same development prefixes as 0.6.18. |
+| Build 1/1, package 8/8, local package 1/1, installed UMM 6/6 | `artifacts/zhcn19-build.log` and `artifacts/zhcn19-umm.log` |
+| 1,086 keys per catalog and 1,083 call sites, zero errors | `artifacts/zhcn19-catalog.json` |
+| Candidate pre-live aggregate | PASS, exit 0. `Test-SourceOnly.ps1` recorded aggregate 1/1, including deployment purity 5/5, child arguments 14/14, launcher file purity 13/13 and install rollback 16/16 in `artifacts/zhcn19-source.log`. |
+
+### Historical 0.6.18 evidence
+
+**Frozen candidate 0.6.18** · Product and harness source `14c831269c28dd3a147ca989fc8ce69619746ab0`. The frozen worktree is `KBP-ZHCN-Acceptance` at `codex/kingmaker-buff-planner-zhcn-0618-candidate`. The build manifest and artifact are under `artifacts/local-runtime/0.6.18/`. Documentation commits on the PR branch describe these bytes.
 
 | 0.6.18 artifact | Identity |
 |---|---|
@@ -69,6 +88,8 @@ In the 0.6.17 forced-Chinese workspace, the provider label needed 21.6 units in 
 | Source 47/47, build 1/1, package validation 8/8, local package 1/1 | `artifacts/zhcn18-build.log` · `Build-Local.ps1` |
 | Installed UMM 6/6, 1,086 keys in each catalog, all 1,083 lookup sites resolved | `artifacts/zhcn18-umm.log` and `artifacts/zhcn18-catalog.json` · `Test-LocalizationSettings.ps1` and `Test-LocalizationCatalogs.ps1` |
 | Candidate pre-live gate | PASS, exit 0. `artifacts/zhcn18-source.log` records 748/748 C# tests, deployment purity 5/5, child arguments 14/14, launcher purity 13/13, rollback 16/16 and aggregate 1/1. `Test-SourceOnly.ps1` |
+
+**Guarded run `zhcn18-zh-auto-01`.** The fixed loader opened WORKING in zhCN/zhCN. The native name search for 光亮术 narrowed eight sources to three and restored the catalog. The banner detail, guidance and provider labels rendered. Hint preferred height was 18.72, its rectangle was 19 and the catalog started at 21. See `nui-localization-layout-search.json`, `nui-planner-from-spellbook.png` and `nui-facts-hud.json`. The run subsequently FAILED because authoring searched for the English display name Resistance and picked a different source with only two legal targets. The subsequent unseeded popup and catalog checks failed. `run-completion.json` (SHA-256 prefix `e759e8ac45c9fe52`) verifies exit, restoration and clean protected saves. The 0.6.19 harness retains the three-target precondition.
 
 ### Historical 0.6.17 evidence
 
@@ -172,7 +193,7 @@ $facts = @{ Scenario='live-workspace-native-ui'; NativeUiStage='facts'; DisplayM
 
 R01–R05 require rendered screens and direct operation, including forced-Chinese UMM controls and the HUD's native tooltip under English startup. R06 additionally requires a Chinese IME and actual controller checks for R05 require a connected controller. At baseline Windows reported only US English input and no matching controller. R07 needs a verified normal and Extend-capable provider in WORKING, a fresh guarded selection and run-bound casting allowance for each authorized execution. Historical inventory of this WORKING fixture had no Extend source or rod. R08 requires signed-off restoration evidence for every transaction, including the pre-run game registry for controlled startups. Never mutate BASELINE or another save to prepare a test.
 
-| ID | 0.6.18 live acceptance |
+| ID | 0.6.19 live acceptance |
 |---|---|
 | R01 | **PENDING.** Repeat the English/Automatic workspace and its ordinary transitions on the corrected bytes |
 | R02 | **PENDING.** Start in zhCN with Automatic. Inspect actual native names and rendered planner labels, search a party provider by its Chinese name, then make a representative allowance-bound cast |
@@ -181,6 +202,6 @@ R01–R05 require rendered screens and direct operation, including forced-Chines
 | R05 | **PENDING.** At 1280×720 and the normal supported layout inspect resources, status, Clear/Undo, long tooltips and scroll limits. Repeat the controller routes with a connected controller |
 | R06 | **PENDING.** Use a Chinese IME for real candidate selection, commit, cancellation and focus transitions. Exercise paste, edit and clear separately. Save/reload a Unicode name where supported |
 | R07 | **PENDING.** The guarded selector found no eligible Extend recipe in WORKING. Supply an approved WORKING fixture and run a fresh selector. With run-specific admission, compare instant and animated normal/extended skips, recasts and resource counts across languages |
-| R08 | **Per transaction.** `zhcn17-en-auto-01` (game PASS) and `zhcn17-zh-auto-01` (game FAIL) each verified game exit, registry, physical display, Mods and clean protected saves. The transaction table above covers all five 0.6.17 restorations. The 0.6.16 failed run was restored. Check each new 0.6.18 transaction against the same obligation |
+| R08 | **Per transaction.** `zhcn17-en-auto-01` (game PASS) and `zhcn17-zh-auto-01` (game FAIL) each verified game exit, registry, physical display, Mods and clean protected saves. The transaction table above covers all five 0.6.17 restorations. The 0.6.16 failed run was restored. The failed 0.6.18 run also verified restoration. Check each new 0.6.19 transaction against the same obligation |
 
 The English-duration parser and the maximum transient lifetime were both rejected as mechanical estimators. A UI source assertion that required an inline English caption was updated to check the new binding and its actual English output. An early full offline run found ten such outdated checks. A subsequent run found a test naming supported revision 6 as “future”. The fixture now uses the next unsupported revision. The final 738/0 result supersedes those offline failures. Native rendering, IME safety and native gameplay outcomes remain unverified on these bytes.
