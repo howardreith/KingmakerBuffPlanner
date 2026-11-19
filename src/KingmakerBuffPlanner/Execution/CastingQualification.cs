@@ -1556,8 +1556,8 @@ namespace KingmakerBuffPlanner.Execution
                         reject(key + "|conditional-shape:" + CastingCapabilityInventory.Structure(expected));
                         continue;
                     }
-                    if (!ExistingEffectSufficiency.IsPerLevelDuration(provider.DurationText))
-                    { reject(key + "|duration-not-per-level:" + provider.DurationText); continue; }
+                    if (provider.Duration.Kind != DurationKind.PerCasterLevel || !provider.Duration.Extendable)
+                    { reject(key + "|duration-not-per-level:" + provider.Duration.Kind); continue; }
                     if (provider.ExpectedDurationRounds < 2 * MinimumJudgedRounds)
                     {
                         reject(key + "|duration-too-short-to-judge:" +

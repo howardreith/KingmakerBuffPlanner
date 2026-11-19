@@ -82,11 +82,11 @@ namespace KingmakerBuffPlanner.UI
                 _buttons.Add(category, button);
             }
             _selectedOnly = KingmakerUiFactory.CreateButton("SelectedOnly", root, theme,
-                "Selected only", () => toggleSelectedOnly());
+                PlannerText.Get("classic.selected.only"), () => toggleSelectedOnly());
             _selectedOnly.gameObject.AddComponent<LayoutElement>().preferredWidth = 180f;
             _selectedOnlyLabel = _selectedOnly.GetComponentInChildren<Text>(true);
             PlannerHoverTooltip hover = _selectedOnly.gameObject.AddComponent<PlannerHoverTooltip>();
-            hover.Text = "Show buffs with one or more selected targets in the active routine.";
+            hover.Text = PlannerText.Get("classic.selected.hint");
             hover.Show = showTooltip;
         }
 
@@ -100,7 +100,7 @@ namespace KingmakerBuffPlanner.UI
                     ? _theme.BurgundyPrimary : _theme.ParchmentRaised;
             }
             _selectedOnly.interactable = interactable;
-            _selectedOnlyLabel.text = (selectedOnly ? "✓ " : string.Empty) + "Selected only";
+            _selectedOnlyLabel.text = (selectedOnly ? "✓ " : string.Empty) + PlannerText.Get("classic.selected.only");
             Image selectedImage = _selectedOnly.targetGraphic as Image;
             if (selectedImage != null) selectedImage.color = selectedOnly
                 ? _theme.BurgundyPrimary : _theme.ParchmentRaised;
@@ -639,7 +639,7 @@ namespace KingmakerBuffPlanner.UI
                 TextAnchor.MiddleCenter);
             KingmakerUiFactory.Stretch(_fallback.rectTransform);
             _name = KingmakerUiFactory.CreateText("SelectedName", Root, theme,
-                "Select a buff", 23, TextAnchor.MiddleLeft);
+                PlannerText.Get("classic.select.buff"), 23, TextAnchor.MiddleLeft);
             _name.fontStyle = FontStyle.Bold;
             _name.color = theme.BurgundyPrimary;
             _name.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -654,12 +654,12 @@ namespace KingmakerBuffPlanner.UI
             _description.verticalOverflow = VerticalWrapMode.Truncate;
             KingmakerUiFactory.SetAnchors(_description.rectTransform, 0.105f, 0.39f, 0.42f, 0.59f);
             _casterPolicy = KingmakerUiFactory.CreateButton(
-                "ChooseCasters", Root, theme, "Casters: Automatic",
+                "ChooseCasters", Root, theme, PlannerText.Get("classic.caster.auto"),
                 () => openCasters());
             KingmakerUiFactory.SetAnchors((RectTransform)_casterPolicy.transform,
                 0.105f, 0.20f, 0.42f, 0.39f);
             _casterPolicyLabel = KingmakerUiFactory.SetButtonLabel(
-                _casterPolicy, "Casters: Automatic");
+                _casterPolicy, PlannerText.Get("classic.caster.auto"));
             _casterPolicyLabel.alignment = TextAnchor.MiddleLeft;
             _casterPolicyLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
             _casterPolicyLabel.verticalOverflow = VerticalWrapMode.Overflow;
@@ -667,11 +667,11 @@ namespace KingmakerBuffPlanner.UI
                 _casterPolicy.gameObject.AddComponent<PlannerHoverTooltip>();
             _casterPolicyTooltip.Show = showTooltip;
             _enhancement = KingmakerUiFactory.CreateButton("ChooseEnhancement", Root, theme,
-                "Enhancement: None available", () => openEnhancements());
+                PlannerText.Get("classic.enhancement.unavailable"), () => openEnhancements());
             KingmakerUiFactory.SetAnchors((RectTransform)_enhancement.transform,
                 0.105f, 0.025f, 0.42f, 0.19f);
             _enhancementLabel = KingmakerUiFactory.SetButtonLabel(_enhancement,
-                "Enhancement: None available");
+                PlannerText.Get("classic.enhancement.unavailable"));
             _enhancementLabel.alignment = TextAnchor.MiddleLeft;
             _enhancementLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
             _enhancementTooltip = _enhancement.gameObject.AddComponent<PlannerHoverTooltip>();
@@ -684,18 +684,18 @@ namespace KingmakerBuffPlanner.UI
             _targets = new PlannerTargetStripView(Root, theme, showTooltip);
             KingmakerUiFactory.SetAnchors(_targets.Root, 0.435f, 0.34f, 0.84f, 0.77f);
             _selectAll = KingmakerUiFactory.CreateButton("SelectAllValid", Root, theme,
-                "Select All Valid", () => selectAll());
+                PlannerText.Get("classic.targets.valid"), () => selectAll());
             KingmakerUiFactory.SetAnchors((RectTransform)_selectAll.transform,
                 0.85f, 0.52f, 0.975f, 0.73f);
             _clear = KingmakerUiFactory.CreateButton("ClearTargets", Root, theme,
-                "Clear Targets", () => clear());
+                PlannerText.Get("classic.targets.clear"), () => clear());
             KingmakerUiFactory.SetAnchors((RectTransform)_clear.transform,
                 0.85f, 0.27f, 0.975f, 0.48f);
             // Direct selected-spell entry into the assignment/resource
             // editor: the same surface the header button opens, seeded with
             // this source's assignments.
             _assignments = KingmakerUiFactory.CreateButton("EditAssignments", Root, theme,
-                "Edit Assignments", () =>
+                PlannerText.Get("classic.assignments.edit"), () =>
                 {
                     if (openAssignments != null) openAssignments();
                 });
@@ -725,20 +725,19 @@ namespace KingmakerBuffPlanner.UI
             _icon.sprite = icon;
             _icon.gameObject.SetActive(icon != null);
             _fallback.gameObject.SetActive(available && icon == null);
-            _name.text = available ? source.DisplayName : "Select a buff";
+            _name.text = available ? source.DisplayName : PlannerText.Get("classic.select.buff");
             _meta.text = available ? BuffCardViewModel.SourceSummary(source) +
                 (source.SpellLevel > 0 ? " | Level " + source.SpellLevel : string.Empty) +
                 (string.IsNullOrWhiteSpace(source.DurationText) ? string.Empty :
                     " | " + source.DurationText) : string.Empty;
             _description.text = available ? Compact(source.Description, 190) :
-                "Choose a card, then click portraits to edit the active routine.";
+                PlannerText.Get("classic.choose.card");
             KingmakerUiFactory.SetButtonLabel(
                 _casterPolicy, casting.CasterPolicy.Summary);
             _casterPolicyTooltip.Text = casting.CasterPolicy.Description;
             _casterPolicy.image.color = casting.CasterPolicy.Warning
                 ? _theme.AmberWarning : _theme.ParchmentRaised;
-            _targetsLabel.text = "Targets for " + char.ToUpperInvariant(routineId[0]) +
-                routineId.Substring(1);
+            _targetsLabel.text = PlannerText.Get("classic.routine.targets", char.ToUpperInvariant(routineId[0]) + routineId.Substring(1));
             _targets.Bind(targets, portrait, toggle, statusColor);
             _plan.text = planSummary ?? string.Empty;
             KingmakerUiFactory.SetButtonLabel(_enhancement, casting.EnhancementLabel);
@@ -775,7 +774,7 @@ namespace KingmakerBuffPlanner.UI
         private static string Compact(string value, int limit)
         {
             string normalized = string.IsNullOrWhiteSpace(value) ?
-                "No description is available." : value.Replace("\r", " ").Replace("\n", " ").Trim();
+                PlannerText.Get("classic.missing.description") : value.Replace("\r", " ").Replace("\n", " ").Trim();
             return normalized.Length <= limit ? normalized : normalized.Substring(0, limit - 3) + "...";
         }
     }
@@ -825,7 +824,7 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.AddFramedPanel(_frame, theme.ParchmentRaised,
                 theme.BurgundyPrimary, 2f).raycastTarget = true;
             Text title = KingmakerUiFactory.CreateText("EnhancementChooserTitle", _frame, theme,
-                "CASTING ENHANCEMENT", 24, TextAnchor.MiddleLeft);
+                PlannerText.Get("classic.enhancement.title"), 24, TextAnchor.MiddleLeft);
             title.fontStyle = FontStyle.Bold;
             title.color = theme.BurgundyPrimary;
             KingmakerUiFactory.SetAnchors(title.rectTransform, 0.05f, 0.90f, 0.72f, 0.98f);
@@ -844,7 +843,7 @@ namespace KingmakerBuffPlanner.UI
             _budget.verticalOverflow = VerticalWrapMode.Truncate;
             KingmakerUiFactory.SetAnchors(_budget.rectTransform, 0.05f, 0.735f, 0.95f, 0.83f);
             Button close = KingmakerUiFactory.CreateButton("CloseEnhancementChooser", _frame,
-                theme, "CLOSE", Hide);
+                theme, PlannerText.Get("classic.close"), Hide);
             _closeButton = close;
             KingmakerUiFactory.SetAnchors((RectTransform)close.transform,
                 0.83f, 0.90f, 0.95f, 0.98f);
@@ -1108,14 +1107,14 @@ namespace KingmakerBuffPlanner.UI
                 theme.BurgundyPrimary, 2f).raycastTarget = true;
             Text title = KingmakerUiFactory.CreateText(
                 "CasterPolicyChooserTitle", _frame, theme,
-                "CASTER POLICY", 24, TextAnchor.MiddleLeft);
+                PlannerText.Get("classic.caster.title"), 24, TextAnchor.MiddleLeft);
             title.fontStyle = FontStyle.Bold;
             title.color = theme.BurgundyPrimary;
             KingmakerUiFactory.SetAnchors(
                 title.rectTransform, 0.035f, 0.89f, 0.48f, 0.97f);
             _subtitle = KingmakerUiFactory.CreateText(
                 "CasterPolicyChooserSubtitle", _frame, theme,
-                "Choose order, enabled casters, and maximum casts per run.",
+                PlannerText.Get("classic.caster.hint"),
                 14, TextAnchor.MiddleLeft);
             _subtitle.color = theme.MutedBrownText;
             _subtitle.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -1123,12 +1122,12 @@ namespace KingmakerBuffPlanner.UI
                 _subtitle.rectTransform, 0.035f, 0.80f, 0.72f, 0.89f);
             _resetButton = KingmakerUiFactory.CreateButton(
                 "ResetCasterPolicy", _frame, theme,
-                "RESET AUTOMATIC", () => _reset());
+                PlannerText.Get("classic.caster.reset"), () => _reset());
             KingmakerUiFactory.SetAnchors(
                 (RectTransform)_resetButton.transform,
                 0.69f, 0.89f, 0.84f, 0.97f);
             Button close = KingmakerUiFactory.CreateButton(
-                "CloseCasterPolicyChooser", _frame, theme, "CLOSE", Hide);
+                "CloseCasterPolicyChooser", _frame, theme, PlannerText.Get("classic.close"), Hide);
             KingmakerUiFactory.SetAnchors(
                 (RectTransform)close.transform,
                 0.85f, 0.89f, 0.965f, 0.97f);
@@ -1164,8 +1163,7 @@ namespace KingmakerBuffPlanner.UI
             bool refresh = Root.gameObject.activeSelf;
             float previousOffset = refresh ? _content.anchoredPosition.y : 0f;
             ClearRows();
-            _subtitle.text = model.Summary +
-                "\nMaximum per run applies only to this buff in one routine execution.";
+            _subtitle.text = PlannerText.Get("classic.caster.cap.detail", model.Summary);
             _resetButton.interactable = interactable;
             foreach (ProviderPolicyRowViewModel provider in model.Providers)
                 BuildRow(provider, portrait == null
@@ -1247,21 +1245,21 @@ namespace KingmakerBuffPlanner.UI
 
             Button enabled = KingmakerUiFactory.CreateButton(
                 "Enabled", row, _theme,
-                model.Enabled ? "USE" : "DO NOT USE",
+                model.Enabled ? PlannerText.Get("classic.caster.enable") : PlannerText.Get("classic.caster.disable"),
                 () => _setEnabled(model.ProviderKey, !model.Enabled));
             KingmakerUiFactory.SetAnchors(
                 (RectTransform)enabled.transform,
                 0.49f, 0.22f, 0.62f, 0.78f);
             enabled.interactable = interactable;
             Button earlier = KingmakerUiFactory.CreateButton(
-                "Earlier", row, _theme, "EARLIER",
+                "Earlier", row, _theme, PlannerText.Get("classic.order.earlier"),
                 () => _moveEarlier(model.ProviderKey));
             KingmakerUiFactory.SetAnchors(
                 (RectTransform)earlier.transform,
                 0.635f, 0.22f, 0.735f, 0.78f);
             earlier.interactable = interactable && model.CanMoveEarlier;
             Button later = KingmakerUiFactory.CreateButton(
-                "Later", row, _theme, "LATER",
+                "Later", row, _theme, PlannerText.Get("classic.order.later"),
                 () => _moveLater(model.ProviderKey));
             KingmakerUiFactory.SetAnchors(
                 (RectTransform)later.transform,
@@ -1269,8 +1267,7 @@ namespace KingmakerBuffPlanner.UI
             later.interactable = interactable && model.CanMoveLater;
             Button maximum = KingmakerUiFactory.CreateButton(
                 "MaximumPerRun", row, _theme,
-                "MAX/RUN\n" + (model.MaximumCasts == null
-                    ? "Unlimited" : model.MaximumCasts.Value.ToString()),
+                PlannerText.Get("classic.cap", model.MaximumCasts == null ? PlannerText.Get("classic.caster.unlimited") : model.MaximumCasts.Value.ToString()),
                 () => _setMaximum(
                     model.ProviderKey, model.NextMaximumCasts()));
             KingmakerUiFactory.SetAnchors(
@@ -1289,7 +1286,7 @@ namespace KingmakerBuffPlanner.UI
             PlannerHoverTooltip tooltip =
                 maximum.gameObject.AddComponent<PlannerHoverTooltip>();
             tooltip.Text =
-                "Maximum casts from this exact provider in one routine execution.";
+                PlannerText.Get("classic.caster.cap.hint");
             tooltip.Show = _showTooltip;
             _rows.Add(row.gameObject);
         }
@@ -1343,7 +1340,7 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.AddFramedPanel(_frame, theme.ParchmentRaised,
                 theme.BurgundyPrimary, 2f).raycastTarget = true;
             Text title = KingmakerUiFactory.CreateText("Title", _frame, theme,
-                "TARGETS", 22, TextAnchor.MiddleLeft);
+                PlannerText.Get("classic.targets.title"), 22, TextAnchor.MiddleLeft);
             title.fontStyle = FontStyle.Bold;
             title.color = theme.BurgundyPrimary;
             KingmakerUiFactory.SetAnchors(title.rectTransform, 0.04f, 0.90f, 0.60f, 0.98f);
@@ -1352,7 +1349,7 @@ namespace KingmakerBuffPlanner.UI
             _subtitle.color = theme.MutedBrownText;
             KingmakerUiFactory.SetAnchors(_subtitle.rectTransform, 0.04f, 0.83f, 0.96f, 0.90f);
             _closeButton = KingmakerUiFactory.CreateButton("Close", _frame, theme,
-                "CLOSE", Hide);
+                PlannerText.Get("classic.close"), Hide);
             KingmakerUiFactory.SetAnchors((RectTransform)_closeButton.transform,
                 0.84f, 0.90f, 0.97f, 0.98f);
             _scroll = KingmakerUiFactory.CreateScrollView("TargetRows", _frame, theme,
@@ -1528,12 +1525,12 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.AddFramedPanel(_frame, theme.ParchmentRaised,
                 theme.BurgundyPrimary, 2f).raycastTarget = true;
             Text title = KingmakerUiFactory.CreateText("CastingOrderTitle", _frame, theme,
-                "ASSIGNMENTS & RESOURCES", 24, TextAnchor.MiddleLeft);
+                PlannerText.Get("classic.assignments.title"), 24, TextAnchor.MiddleLeft);
             title.fontStyle = FontStyle.Bold;
             title.color = theme.BurgundyPrimary;
             KingmakerUiFactory.SetAnchors(title.rectTransform, 0.03f, 0.955f, 0.42f, 0.99f);
             _addButton = KingmakerUiFactory.CreateButton("AddAssignment", _frame,
-                theme, "ADD ASSIGNMENT", () =>
+                theme, PlannerText.Get("classic.assignments.add"), () =>
                 {
                     if (_addAssignment != null)
                     {
@@ -1546,7 +1543,7 @@ namespace KingmakerBuffPlanner.UI
                 0.43f, 0.955f, 0.585f, 0.99f);
             _addButton.interactable = false;
             _closeButton = KingmakerUiFactory.CreateButton("CloseCastingOrder", _frame,
-                theme, "CLOSE", Hide);
+                theme, PlannerText.Get("classic.close"), Hide);
             KingmakerUiFactory.SetAnchors((RectTransform)_closeButton.transform,
                 0.86f, 0.955f, 0.985f, 0.99f);
             BuildRoutineToggles(_frame);
@@ -1579,7 +1576,7 @@ namespace KingmakerBuffPlanner.UI
             RectTransform bar = KingmakerUiFactory.CreateRect("ForecastToggles", frame);
             KingmakerUiFactory.SetAnchors(bar, 0.03f, 0.905f, 0.97f, 0.955f);
             Text label = KingmakerUiFactory.CreateText("ForecastLabel", bar, _theme,
-                "FORECAST (one run per selected routine):", 13, TextAnchor.MiddleLeft);
+                PlannerText.Get("classic.forecast.label"), 13, TextAnchor.MiddleLeft);
             label.color = _theme.MutedBrownText;
             KingmakerUiFactory.SetAnchors(label.rectTransform, 0f, 0.1f, 0.42f, 0.9f);
             string[] routines = { "long", "important", "short" };
@@ -1601,7 +1598,7 @@ namespace KingmakerBuffPlanner.UI
                 _routineToggles.Add(toggle);
             }
             Button reverse = KingmakerUiFactory.CreateButton(
-                "ForecastReverse", bar, _theme, "REVERSE",
+                "ForecastReverse", bar, _theme, PlannerText.Get("classic.forecast.reverse"),
                 () =>
                 {
                     _forecastSequence.Reverse();
@@ -1700,7 +1697,7 @@ namespace KingmakerBuffPlanner.UI
                 string routing = model.ResolvedProviderTexts.Count == 0
                     ? string.Empty
                     : " | via " + string.Join(", ", model.ResolvedProviderTexts.ToArray()) +
-                        " -> " + (model.RecipientNames.Count == 0 ? "no recipients"
+                        " -> " + (model.RecipientNames.Count == 0 ? PlannerText.Get("classic.no.recipients")
                             : string.Join(", ", model.RecipientNames.ToArray()));
                 Text identity = KingmakerUiFactory.CreateText("Identity", row, _theme,
                     model.Number + ". " + model.SourceDisplayName + " — " + model.CasterText +
@@ -1719,7 +1716,7 @@ namespace KingmakerBuffPlanner.UI
                 if (model.Editable)
                 {
                     Button targets = KingmakerUiFactory.CreateButton("Targets", row, _theme,
-                        "+ TARGETS", () =>
+                        PlannerText.Get("classic.targets.add"), () =>
                         {
                             if (_openAssignmentTargets != null)
                                 _openAssignmentTargets(model.SourceId, model.AssignmentId);
@@ -1729,7 +1726,7 @@ namespace KingmakerBuffPlanner.UI
                     Text targetsLabel = targets.GetComponentInChildren<Text>(true);
                     if (targetsLabel != null) targetsLabel.fontSize = 11;
                     Button caster = KingmakerUiFactory.CreateButton("Caster", row, _theme,
-                        "CASTER", () =>
+                        PlannerText.Get("classic.caster.label"), () =>
                         {
                             if (_cycleCaster != null) _cycleCaster(model.AssignmentId);
                             _refresh();
@@ -1739,7 +1736,7 @@ namespace KingmakerBuffPlanner.UI
                     Text casterLabel = caster.GetComponentInChildren<Text>(true);
                     if (casterLabel != null) casterLabel.fontSize = 11;
                     Button enhance = KingmakerUiFactory.CreateButton("Enhance", row, _theme,
-                        "ENHANCE", () =>
+                        PlannerText.Get("classic.enhance"), () =>
                         {
                             if (_openAssignmentEnhancements != null)
                                 _openAssignmentEnhancements(model.SourceId, model.AssignmentId);
@@ -1749,7 +1746,7 @@ namespace KingmakerBuffPlanner.UI
                     Text enhanceLabel = enhance.GetComponentInChildren<Text>(true);
                     if (enhanceLabel != null) enhanceLabel.fontSize = 11;
                     Button removeRow = KingmakerUiFactory.CreateButton("RemoveRow", row, _theme,
-                        "REMOVE", () =>
+                        PlannerText.Get("classic.remove"), () =>
                         {
                             if (_removeAssignment != null) _removeAssignment(model.AssignmentId);
                             _refresh();
@@ -1760,7 +1757,7 @@ namespace KingmakerBuffPlanner.UI
                     if (removeLabel != null) removeLabel.fontSize = 11;
                 }
                 Button earlier = KingmakerUiFactory.CreateButton("Earlier", row, _theme,
-                    "EARLIER", () =>
+                    PlannerText.Get("classic.order.earlier"), () =>
                     {
                         _moveEarlier(model.AssignmentId);
                         _refresh();
@@ -1771,7 +1768,7 @@ namespace KingmakerBuffPlanner.UI
                 Text earlierLabel = earlier.GetComponentInChildren<Text>(true);
                 if (earlierLabel != null) earlierLabel.fontSize = 11;
                 Button later = KingmakerUiFactory.CreateButton("Later", row, _theme,
-                    "LATER", () =>
+                    PlannerText.Get("classic.order.later"), () =>
                     {
                         _moveLater(model.AssignmentId);
                         _refresh();
@@ -1825,7 +1822,7 @@ namespace KingmakerBuffPlanner.UI
             Text removeLabel = remove.GetComponentInChildren<Text>(true);
             if (removeLabel != null) removeLabel.fontSize = 11;
             Button move = KingmakerUiFactory.CreateButton("MoveTarget", row, _theme,
-                destination == null ? "MOVE" : "MOVE -> " + destination.Number,
+                destination == null ? PlannerText.Get("classic.move") : PlannerText.Get("classic.move.to", destination.Number),
                 () =>
                 {
                     if (_moveTarget != null && destination != null)
@@ -1838,7 +1835,7 @@ namespace KingmakerBuffPlanner.UI
             Text moveLabel = move.GetComponentInChildren<Text>(true);
             if (moveLabel != null) moveLabel.fontSize = 11;
             Button split = KingmakerUiFactory.CreateButton("SplitTarget", row, _theme,
-                "SPLIT", () =>
+                PlannerText.Get("classic.split"), () =>
                 {
                     if (_splitTarget != null) _splitTarget(model.AssignmentId, unitId);
                     _refresh();
@@ -1853,7 +1850,7 @@ namespace KingmakerBuffPlanner.UI
         {
             IReadOnlyList<ResourceUsageLineViewModel> lines = _resourceLines(_routineId);
             _resources.text = lines.Count == 0
-                ? "No limited resource usage in this routine."
+                ? PlannerText.Get("classic.resource.none")
                 : "RESOURCES — " + string.Join("\n", lines
                     .Select(line => line.Summary).ToArray());
         }
@@ -1920,7 +1917,7 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.AddFramedPanel(Root, theme.ParchmentRaised,
                 theme.BurgundyPrimary, 2f);
             Text title = KingmakerUiFactory.CreateText("SettingsTitle", Root, theme,
-                "PLANNER SETTINGS", 24, TextAnchor.MiddleCenter);
+                PlannerText.Get("classic.settings.title"), 24, TextAnchor.MiddleCenter);
             title.color = theme.BurgundyPrimary;
             title.fontStyle = FontStyle.Bold;
             KingmakerUiFactory.SetAnchors(title.rectTransform, 0.06f, 0.84f, 0.94f, 0.97f);
@@ -1950,11 +1947,11 @@ namespace KingmakerBuffPlanner.UI
 
         internal void Bind(PlannerSettingsViewModel model, bool interactable)
         {
-            Set(_mode, "Casting mode: " + model.CastingMode, interactable);
-            Set(_combat, "Combat use: " + model.CombatUse, false);
-            Set(_existing, "Existing buffs: " + model.ExistingBuffs, interactable);
-            Set(_fallback, "Fallback: " + model.Fallback, false);
-            Set(_hotkey, "Planner hotkey: " + model.Hotkey, interactable);
+            Set(_mode, PlannerText.Get("classic.settings.mode", model.CastingMode), interactable);
+            Set(_combat, PlannerText.Get("classic.settings.combat", model.CombatUse), false);
+            Set(_existing, PlannerText.Get("classic.settings.existing", model.ExistingBuffs), interactable);
+            Set(_fallback, PlannerText.Get("classic.settings.fallback", model.Fallback), false);
+            Set(_hotkey, PlannerText.Get("classic.settings.hotkey", model.Hotkey), interactable);
         }
 
         private Button SettingButton(string name, float minY, float maxY,

@@ -214,6 +214,11 @@
     <Compile Include="Infrastructure\AtomicFile.cs" />
     <Compile Include="Infrastructure\Hashing.cs" />
     <Compile Include="Infrastructure\ModLog.cs" />
+    <EmbeddedResource Include="Localization\enGB.json"><LogicalName>KBP.Text.enGB.json</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="Localization\zhCN.json"><LogicalName>KBP.Text.zhCN.json</LogicalName></EmbeddedResource>
+    <Compile Include="Localization\PlannerText.cs" />
+    <Compile Include="GameAdapters\KingmakerLanguage.cs" />
+    <Compile Include="GameAdapters\KingmakerDurationAdapter.cs" />
     <Compile Include="Main.cs" />
     <Compile Include="Infrastructure\PlannerUpdateFrameGate.cs" />
     <Compile Include="Planning\ResourceLedger.cs" />
@@ -290,6 +295,7 @@
     <Compile Include="UI\BuffGridMetrics.cs" />
     <Compile Include="UI\PlannerViews.cs" />
     <Compile Include="UI\PlannerHotkey.cs" />
+    <Compile Include="UI\PlannerImeGuard.cs" />
     <Compile Include="UI\PlannerHotkeyBinding.cs" />
     <Compile Include="UI\CatalogUiDiagnostics.cs" />
     <Compile Include="UI\CatalogLayoutDiagnostics.cs" />

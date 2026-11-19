@@ -2596,6 +2596,35 @@ namespace KingmakerBuffPlanner.UI
             return true;
         }
 
+        internal static bool CanChangePresentation(bool nativeLocaleChanged)
+        {
+                var root = _instance;
+                return root == null || ((root._castingHost == null || !root._castingHost.IsRunning) &&
+                    (root._castingWorkspace == null || (!nativeLocaleChanged && root._castingWorkspace.CanRefreshLanguage)) &&
+                    root._controllerRoutines == null && (root._screen == null || !root._screen.IsOpen));
+        }
+
+        internal static void LanguageChanged()
+        {
+            if (_instance == null) return;
+            var root = _instance;
+            if (root._castingWorkspace == null) root._workspaceInputs = null;
+            else
+            {
+                var prior = root._castingWorkspace;
+                Component host = root._controllerEditor == null ? (Component)StaticCanvas.Instance : root._controllerHost;
+                root._castingWorkspace = prior.WithCurrentLanguage(host);
+                if (root._controllerEditor != null)
+                {
+                    root._controllerEditor.TextRoot = root._castingWorkspace.RootObject.transform;
+                    root._controllerEditor.Command = root._castingWorkspace.ControllerCommand;
+                }
+                prior.Dispose();
+            }
+            root._lastCastingPress.Clear();
+            if (_instance._spellbookEntry != null) _instance._spellbookEntry.Release();
+        }
+
         private void Tick(float deltaTime)
         {
             if (!_enabled) return;
@@ -2636,7 +2665,7 @@ namespace KingmakerBuffPlanner.UI
                 if (_spellbookEntry != null) _spellbookEntry.Tick();
                 TickWindowHandoff();
                 if (_castingWorkspace != null) _castingWorkspace.TickGeometry();
-                if (Input.GetKeyDown(KeyCode.Escape))
+                if (!PlannerImeGuard.Active && Input.GetKeyDown(KeyCode.Escape))
                 {
                     if (_controllerEditor != null) _controllerEditor.RequestBack();
                     else TakeEscape("Escape");

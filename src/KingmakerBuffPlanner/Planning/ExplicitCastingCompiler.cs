@@ -1103,8 +1103,7 @@ namespace KingmakerBuffPlanner.Planning
         {
             if (!requirement.DurationComparable || requirement.PlannedExpectedRounds <= 0)
                 return "already-covered:";
-            double planned = requirement.PlannedExpectedRounds *
-                ((requirement.PlannedMetamagicMask & ExistingEffectSufficiency.ExtendMetamagicFlag) != 0 ? 2.0 : 1.0);
+            double planned = requirement.FinalExpectedRounds;
             var effects = new HashSet<string>(LeafEffectIds(expression), StringComparer.Ordinal);
             bool outlasts = (instances ?? new ActiveEffectInstance[0]).Any(value => value != null &&
                 !value.Suppressed && effects.Contains(value.EffectId) &&
@@ -1167,8 +1166,8 @@ namespace KingmakerBuffPlanner.Planning
             }
             return new ExistingEffectRequirement(provider.EffectiveCasterLevel, mask,
                 provider.ExpectedDurationRounds,
-                ExistingEffectSufficiency.IsPerLevelDuration(provider.DurationText),
-                unprovable);
+                provider.Duration.Kind == DurationKind.PerCasterLevel,
+                unprovable, provider.Duration.Extendable);
         }
 
         private static IReadOnlyList<string> CostShapeOf(IEnumerable<CastingDemand> demands)

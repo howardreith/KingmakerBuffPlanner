@@ -293,7 +293,7 @@ namespace KingmakerBuffPlanner.UI
                 button.OnHoverSoundActive = nativeButton.OnHoverSoundActive;
             }
             button.onClick.AddListener(BeginHandoff);
-            CreateCaption(buttonRect, footer.Label, "Buff Planner");
+            CreateCaption(buttonRect, footer.Label, PlannerText.Get("settings.heading"));
             _ownedButton = button;
             _ownedButton.interactable = true;
             ButtonsAttachedForRuntime++;
@@ -371,11 +371,11 @@ namespace KingmakerBuffPlanner.UI
             var rect = go.AddComponent<RectTransform>();
             rect.SetParent(button, false);
             TextMeshProUGUI label = go.AddComponent<TextMeshProUGUI>();
-            label.font = native.font;
+            label.font = PlannerText.Chinese && PlannerChineseFont.Primary != null ? PlannerChineseFont.Primary : native.font;
             go.SetActive(true);
             KingmakerUiFactory.Stretch(rect, 0, 0, 0, 0);
-            label.font = native.font;
-            label.fontSharedMaterial = native.fontSharedMaterial;
+            label.font = PlannerText.Chinese && PlannerChineseFont.Primary != null ? PlannerChineseFont.Primary : native.font;
+            label.fontSharedMaterial = label.font == native.font ? native.fontSharedMaterial : label.font.material;
             label.enableAutoSizing = native.enableAutoSizing;
             label.fontSizeMin = native.fontSizeMin;
             label.fontSizeMax = native.fontSizeMax;

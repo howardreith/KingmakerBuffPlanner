@@ -21,8 +21,8 @@ namespace KingmakerBuffPlanner.UI
 
     public static class WorkspaceFooterTooltips
     {
-        public const string CastAvailableCaption = "Plan: Cast available";
-        public const string RequireFullCaption = "Plan: Require full";
+        public static string CastAvailableCaption { get { return PlannerText.Get("footer.policy.available"); } }
+        public static string RequireFullCaption { get { return PlannerText.Get("footer.policy.full"); } }
 
         // The caption states the CURRENT policy, never the next action.
         public static string PolicyCaption(string availabilityPolicy)
@@ -32,66 +32,50 @@ namespace KingmakerBuffPlanner.UI
 
         public static string ModeCaption(string mode)
         {
-            return mode == "instant" ? "Mode: Instant" : "Mode: Animated";
+            return mode == "instant" ? PlannerText.Get("footer.mode.instant") : PlannerText.Get("footer.mode.animated");
         }
 
         public static WorkspaceTooltipContent Resources()
         {
-            return new WorkspaceTooltipContent("Resources",
-                "Shows each caster's current spell slots, uses and charges beside what the plan reserves, " +
-                "for the selected routine or for every routine without rest. Opening it spends nothing.");
+            return new WorkspaceTooltipContent(PlannerText.Get("footer.resources.title"),
+                PlannerText.Get("footer.resources.body"));
         }
 
         public static WorkspaceTooltipContent Policy(string availabilityPolicy)
         {
             if (availabilityPolicy == ExecutionProfile.RequireFullPlan)
                 return new WorkspaceTooltipContent(RequireFullCaption,
-                    "Current: Require full. When you run a routine, every needed planned casting is checked " +
-                    "first; if any is unavailable, nothing is cast and the game log names what blocked it. " +
-                    "This is a check before casting, not an undo if a cast fails later.\n" +
-                    "Click to switch to Cast available.");
+                    PlannerText.Get("footer.policy.fullHint"));
             return new WorkspaceTooltipContent(CastAvailableCaption,
-                "Current: Cast available (default). Running a routine casts the planned castings that are " +
-                "available and affordable, in saved order, and the game log names each casting it omits. " +
-                "Already-active and disabled castings behave as before.\n" +
-                "Click to switch to Require full.");
+                PlannerText.Get("footer.policy.availableHint"));
         }
 
         public static WorkspaceTooltipContent Mode(string mode)
         {
             if (mode == "instant")
                 return new WorkspaceTooltipContent(ModeCaption(mode),
-                    "Current: Instant. Each planned casting resolves at once through the game's own spell " +
-                    "rules and spends the same slots, uses and charges as casting by hand. A casting with no " +
-                    "supported instant route is not ready in this mode, and a failed cast stops the run.\n" +
-                    "Click to switch to Animated.");
+                    PlannerText.Get("footer.mode.instantHint"));
             return new WorkspaceTooltipContent(ModeCaption(mode),
-                "Current: Animated. Your characters cast each planned spell as a normal in-game action, one " +
-                "after another, spending their own slots, uses and charges. A failed or interrupted cast " +
-                "stops the run.\nClick to switch to Instant.");
+                PlannerText.Get("footer.mode.animatedHint"));
         }
 
         public static WorkspaceTooltipContent ClearPlan(string unavailableReason, int castingCount)
         {
             if (!string.IsNullOrEmpty(unavailableReason))
-                return new WorkspaceTooltipContent("Clear plan", "Unavailable: " + unavailableReason);
-            return new WorkspaceTooltipContent("Clear plan",
-                "Opens a confirmation to remove " + (castingCount == 1 ? "the 1 planned casting"
-                    : "all " + castingCount + " planned castings") + " from every routine. Active buffs stay " +
-                "in place and nothing is refunded. Undo can restore the plan.");
+                return new WorkspaceTooltipContent(PlannerText.Get("footer.clear.title"), PlannerText.Get("footer.clear.unavailable", unavailableReason));
+            return new WorkspaceTooltipContent(PlannerText.Get("footer.clear.title"),
+                (castingCount == 1 ? PlannerText.Get("footer.clear.open.one", castingCount) : PlannerText.Get("footer.clear.open.many", castingCount)));
         }
 
         // restoresCleared: the castings the next Undo brings back after a
         // Clear plan (0 when the next Undo reverts some other edit).
         public static WorkspaceTooltipContent Undo(bool canUndo, int restoresCleared)
         {
-            const string Limits = " Undo changes the plan only: it never reverses spells already cast or resources spent.";
             if (!canUndo)
-                return new WorkspaceTooltipContent("Undo", "Nothing to undo yet." + Limits);
+                return new WorkspaceTooltipContent(PlannerText.Get("footer.undo.title"), PlannerText.Get("footer.undo.empty"));
             if (restoresCleared > 0)
-                return new WorkspaceTooltipContent("Undo", "Restores the cleared plan (" + restoresCleared +
-                    (restoresCleared == 1 ? " casting)." : " castings).") + Limits);
-            return new WorkspaceTooltipContent("Undo", "Reverts your last plan edit." + Limits);
+                return new WorkspaceTooltipContent(PlannerText.Get("footer.undo.title"), (restoresCleared == 1 ? PlannerText.Get("footer.undo.restore.one", restoresCleared) : PlannerText.Get("footer.undo.restore.many", restoresCleared)));
+            return new WorkspaceTooltipContent(PlannerText.Get("footer.undo.title"), PlannerText.Get("footer.undo.last"));
         }
 
         // status: the Run line the footer used to show (WorkspaceFooterText.
@@ -99,32 +83,30 @@ namespace KingmakerBuffPlanner.UI
         public static WorkspaceTooltipContent Run(string routineName, string availabilityPolicy, string mode,
             string status, bool enabled)
         {
-            string body = "Runs " + routineName + " now with " + PolicyCaption(availabilityPolicy) + " and " +
-                ModeCaption(mode) + ".";
+            string body = PlannerText.Get("footer.run.body", routineName, PolicyCaption(availabilityPolicy), ModeCaption(mode));
             if (!string.IsNullOrEmpty(status)) body += "\n" + status;
-            if (!enabled) body = "Unavailable now. " + body;
+            if (!enabled) body = PlannerText.Get("footer.run.disabled", body);
             return new WorkspaceTooltipContent(WorkspaceFooterText.RunCaption(routineName), body);
         }
 
         public static WorkspaceTooltipContent ClearCancel()
         {
-            return new WorkspaceTooltipContent("Cancel", "Keeps every planned casting. Nothing changes.");
+            return new WorkspaceTooltipContent(PlannerText.Get("footer.clear.cancel"), PlannerText.Get("footer.clear.cancelHint"));
         }
 
         public static WorkspaceTooltipContent ClearConfirm(int castingCount)
         {
-            return new WorkspaceTooltipContent("Clear plan",
-                "Removes " + (castingCount == 1 ? "the 1 planned casting" : "all " + castingCount + " planned castings") +
-                " from every routine in one edit. Active buffs stay; nothing is refunded. Undo restores the plan.");
+            return new WorkspaceTooltipContent(PlannerText.Get("footer.clear.title"),
+                (castingCount == 1 ? PlannerText.Get("footer.clear.confirm.one", castingCount) : PlannerText.Get("footer.clear.confirm.many", castingCount)));
         }
 
         public static WorkspaceTooltipContent SaveRecovery(string recoveryAction, string problem)
         {
             if (recoveryAction == WorkspaceFooterText.ReloadAction)
                 return new WorkspaceTooltipContent(recoveryAction,
-                    "Reloads the stored casting plan. " + (problem ?? string.Empty));
+                    PlannerText.Get("footer.recovery.reloadHint", problem ?? string.Empty));
             return new WorkspaceTooltipContent(recoveryAction ?? WorkspaceFooterText.RetrySaveAction,
-                "Writes your latest plan edit to disk again. " + (problem ?? string.Empty));
+                PlannerText.Get("footer.recovery.retryHint", problem ?? string.Empty));
         }
     }
 

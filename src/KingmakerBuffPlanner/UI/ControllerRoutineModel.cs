@@ -137,20 +137,19 @@ namespace KingmakerBuffPlanner.UI
             _stop = stop;
             _running = running;
             _activeRoutine = activeRoutine;
-            Message = unavailable ?? "Select a saved routine, then confirm Run. Nothing runs while browsing.";
+            Message = unavailable ?? PlannerText.Get("pad.intro");
             if (session != null && session.Document.Castings.Count == 0)
                 Message = (session.LoadStatus == CastingPlanLoadStatus.Absent
-                    ? "No saved casting plan was found for this campaign. " : "No buffs are configured in this campaign plan. ") +
-                    "Choose Configure plans to open the controller planner here. Changes autosave.";
+                    ? PlannerText.Get("pad.empty.plan") : PlannerText.Get("pad.empty.buffs")) +
+                    PlannerText.Get("pad.configure.tip");
             if (session != null && session.PersistenceBlocked)
-                Message = "The saved plan could not be loaded: " + session.LoadWarning +
-                    ". Open the planner's recovery controls, then return here.";
+                Message = PlannerText.Get("pad.load.failed", session.LoadWarning);
             if (session != null)
             {
                 string saveProblem = WorkspaceFooterText.SaveProblem(session.FooterSaveState);
                 if (saveProblem != null)
                     Message = saveProblem + "\n" + (session.PersistenceBlocked ? Message :
-                        session.LoadWarning + "\nOpen the planner's recovery controls, then return here.") +
+                        PlannerText.Get("pad.load.warning", session.LoadWarning)) +
                         (session.LegacyImportBlocked ? "\n" + session.LegacyImportBlockReason : string.Empty);
                 string latest = ControllerRoutineDetails.LatestOutcome(session);
                 if (latest != null) Message = latest;
@@ -164,8 +163,8 @@ namespace KingmakerBuffPlanner.UI
         internal string Message { get; private set; }
         internal bool ResultsOpen { get; private set; }
         internal bool ConfigureRequested { get { return _configureRequested; } }
-        internal string Summary { get { return Message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Ready."; } }
-        internal string ConfirmHint { get { return Focus == 4 ? (_requiresConversion ? (_reviewingConversion ? "Switch planner" : "Review setup") : "Open planner") : Focus == 5 ? "View results" : Focus == 3 ? "Stop" : "Run " + Row(Focus).Substring(4).Split('(')[0].Trim(); } }
+        internal string Summary { get { return Message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? PlannerText.Get("pad.ready"); } }
+        internal string ConfirmHint { get { return Focus == 4 ? (_requiresConversion ? (_reviewingConversion ? PlannerText.Get("pad.switch") : PlannerText.Get("pad.review")) : PlannerText.Get("pad.open")) : Focus == 5 ? PlannerText.Get("pad.results") : Focus == 3 ? PlannerText.Get("pad.stop") : PlannerText.Get("routine.run", RoutineName(Focus)); } }
         internal bool Running { get { return _running(); } }
         internal string ActiveRoutine { get { return _activeRoutine(); } }
         internal string CampaignId { get { return _session == null ? null : _session.CampaignId; } }
@@ -174,25 +173,31 @@ namespace KingmakerBuffPlanner.UI
         {
             get
             {
-                if (_session == null) return _unavailable ?? "No saved plan is available.";
-                return (_session.ExecutionMode == "instant" ? "Instant" : "Animated") + " | " +
+                if (_session == null) return _unavailable ?? PlannerText.Get("pad.no.plan");
+                return (_session.ExecutionMode == "instant" ? PlannerText.Get("pad.mode.instant") : PlannerText.Get("pad.mode.animated")) + " | " +
                     (_session.AvailabilityPolicy == ExecutionProfile.CastAvailable
-                        ? "Cast available" : "Require full plan") + " | " +
+                        ? PlannerText.Get("pad.policy.available") : PlannerText.Get("pad.policy.full")) + " | " +
                     WorkspaceFooterText.SaveStatus(_session.FooterSaveState);
             }
         }
 
+        private string RoutineName(int index)
+        {
+            string id = RoutineIds[index];
+            return _session == null ? PlannerText.Routine(id) : _session.RoutineDisplayName(id);
+        }
+
         internal string Row(int index)
         {
-            if (index == 4) return _requiresConversion ? (_reviewingConversion ? "Switch to casting-first planner" : "Review casting-first setup") : "Configure plans";
-            if (index == 5) return "View results / explanations";
-            if (index == 3) return Running ? "Stop " + (ActiveRoutine ?? "running routine") : "Stop (no active run)";
+            if (index == 4) return _requiresConversion ? (_reviewingConversion ? PlannerText.Get("pad.switch.full") : PlannerText.Get("pad.review.setup")) : PlannerText.Get("pad.configure");
+            if (index == 5) return PlannerText.Get("pad.explanations");
+            if (index == 3) return Running ? "Stop " + (ActiveRoutine ?? "running routine") : PlannerText.Get("pad.stop.idle");
             string id = RoutineIds[index];
-            string name = _session == null ? char.ToUpperInvariant(id[0]) + id.Substring(1)
-                : _session.RoutineDisplayName(id);
+            string name = RoutineName(index);
             int count = _session == null ? 0 : _session.Document.Castings.Count(c => c.RoutineId == id);
-            return "Run " + name + (_session == null ? string.Empty : " (" + count + " castings)") +
-                (Running && ActiveRoutine == id ? " — RUNNING" : string.Empty);
+            string caption = _session == null ? PlannerText.Get("routine.run", name)
+                : PlannerText.Get("routine.runCount", name, count);
+            return Running && ActiveRoutine == id ? PlannerText.Get("routine.running", caption) : caption;
         }
 
         internal void Move(int direction)
@@ -227,7 +232,7 @@ namespace KingmakerBuffPlanner.UI
         {
             if (!_reviewingConversion || _configureRequested) return false;
             _reviewingConversion = false;
-            Message = "Classic is retained unchanged. Review casting-first setup to read the switch consent.";
+            Message = PlannerText.Get("pad.classic.retained");
             return true;
         }
 
@@ -242,48 +247,47 @@ namespace KingmakerBuffPlanner.UI
                     if (!_reviewingConversion)
                     {
                         _reviewingConversion = true;
-                        Message = "Classic is retained. Switching is one-way: the Classic file is preserved and archived by the existing import path. Review unresolved imports in the planner. Confirm Switch to casting-first planner to consent, or Back to keep Classic unchanged.";
+                        Message = PlannerText.Get("pad.classic.consent");
                     }
                     else _configureRequested = true;
                     return;
                 }
-                if (Running) Message = "Stop the active routine before opening the editor. Select Stop; completed buffs are kept.";
-                else if (_session == null) Message = _unavailable ?? "The campaign session is unavailable. Return after loading finishes.";
+                if (Running) Message = PlannerText.Get("pad.stop.before.edit");
+                else if (_session == null) Message = _unavailable ?? PlannerText.Get("pad.session.unavailable");
                 else _configureRequested = true;
                 return;
             }
             if (Focus == 3)
             {
-                if (!Running) { Message = "There is no active routine to stop."; return; }
-                Message = "Stop requested. The cast in progress may finish; no later cast will start.";
+                if (!Running) { Message = PlannerText.Get("pad.no.active"); return; }
+                Message = PlannerText.Get("pad.stop.requested");
                 _stop();
                 return;
             }
             if (Running)
             {
-                Message = "A routine is running. Select Stop to end it after the cast in progress.";
+                Message = PlannerText.Get("pad.stop.running");
                 return;
             }
             if (_session == null)
             {
-                Message = _unavailable ?? "Configure and save a plan with mouse and keyboard first.";
+                Message = _unavailable ?? PlannerText.Get("pad.configure.first");
                 return;
             }
             if (!_run(RoutineIds[Focus]))
-                Message = "The routine entry is unavailable. Close this menu and try again after loading finishes.";
+                Message = PlannerText.Get("pad.wait.load");
             if (Running) Focus = 3;
         }
 
         internal void ShowResult(string message)
         {
-            Message = message ?? "No result is available.";
+            Message = message ?? PlannerText.Get("pad.result.none");
         }
     }
 
     internal static class ControllerRoutineDetails
     {
-        private const string RepairNote = "\nOpen the planner for repair. Back returns to the game. " +
-            "Use the planner's Retry save/Reload controls when needed.";
+        private static string RepairNote { get { return PlannerText.Get("pad.repair"); } }
 
         internal static string LatestOutcome(CastingWorkspaceSession session)
         {

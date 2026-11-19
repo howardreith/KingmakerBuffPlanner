@@ -66,6 +66,11 @@ namespace KingmakerBuffPlanner.UI
                 ? Resources.GetBuiltinResource<Font>("Arial.ttf") : nativeText.font;
             theme.HeaderFont = theme.BodyFont;
             theme.BodyTextMaterial = nativeText == null ? null : nativeText.material;
+            if (PlannerText.Chinese && PlannerChineseFont.UnityFont != null)
+            {
+                theme.BodyFont = theme.HeaderFont = PlannerChineseFont.UnityFont;
+                theme.BodyTextMaterial = null;
+            }
             if (nativeRoot != null)
             {
                 Transform root = nativeRoot.transform;
@@ -344,6 +349,7 @@ namespace KingmakerBuffPlanner.UI
             hint.color = theme.MutedBrownText;
             hint.fontStyle = FontStyle.Italic;
             Stretch(hint.rectTransform, 10, 8, 5, 5);
+            rect.gameObject.AddComponent<PlannerImeGuard>();
             InputField field = rect.gameObject.AddComponent<InputField>();
             field.textComponent = inputText;
             field.placeholder = hint;

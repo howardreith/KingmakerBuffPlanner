@@ -464,52 +464,52 @@ namespace KingmakerBuffPlanner.UI
                 case "targeting-invalid":
                     return ShapeAdvice(detail);
                 case "targeting-requires-direct-target":
-                    return "choose who receives it to switch back to a single target.";
+                    return PlannerText.Get("reason.refusal.single");
                 case "draft-ability-unresolved":
                     if (detail.StartsWith("no-caster-selected", StringComparison.Ordinal))
-                        return "choose who casts it first.";
+                        return PlannerText.Get("reason.refusal.casterFirst");
                     if (detail.StartsWith("no-provider-for-source-and-caster", StringComparison.Ordinal))
-                        return "that character cannot cast this buff.";
+                        return PlannerText.Get("reason.refusal.unusable");
                     if (detail.StartsWith("exact-source-ambiguous", StringComparison.Ordinal))
-                        return "that character can cast it in more than one way; pick one under Cast from.";
-                    return "the party could not be read; close and reopen the planner.";
+                        return PlannerText.Get("reason.refusal.exact");
+                    return PlannerText.Get("reason.refusal.noParty");
                 case "no-editing-focus":
                 case "focused-casting-missing":
-                    return "select a casting card (Edit) first.";
+                    return PlannerText.Get("reason.refusal.selectCard");
                 case "targeting-mode-unsupported":
                 case "target-mode-unsupported":
-                    return "this buff cannot be cast that way.";
+                    return PlannerText.Get("reason.refusal.mode");
                 case "targeting-requires-anchor":
-                    return "choose the group's origin first.";
+                    return PlannerText.Get("reason.refusal.origin");
                 case "ready-requires-caster":
-                    return "choose who casts it before marking it Ready.";
+                    return PlannerText.Get("reason.refusal.readyCaster");
                 case "ready-requires-import-review":
-                    return "review what the import changed before marking it Ready.";
+                    return PlannerText.Get("reason.refusal.readyReview");
                 case "state-unchanged":
-                    return "it already is.";
+                    return PlannerText.Get("reason.refusal.noChange");
                 case "casting-unknown":
                 case "casting-missing":
                 case "casting-null":
-                    return "that casting no longer exists.";
+                    return PlannerText.Get("reason.refusal.missingCast");
                 case "routine-unknown":
-                    return "that routine no longer exists.";
+                    return PlannerText.Get("reason.refusal.missingRoutine");
                 case "no-import-review":
                 case "no-import-notices":
-                    return "there is nothing to review.";
+                    return PlannerText.Get("reason.refusal.nothingReview");
                 case "provider-unavailable":
-                    return "that character can no longer cast this buff that way.";
+                    return PlannerText.Get("reason.refusal.unavailableProvider");
                 case "provider-unchanged":
                 case "recast-policy-unchanged":
                 case "routine-unchanged":
-                    return "it already is.";
+                    return PlannerText.Get("reason.refusal.noChange");
                 case "already-first":
-                    return "it is already cast first in its routine.";
+                    return PlannerText.Get("reason.refusal.first");
                 case "already-last":
-                    return "it is already cast last in its routine.";
+                    return PlannerText.Get("reason.refusal.last");
                 case "provider-not-pinnable":
-                    return "that character knows this spell at more than one level in the same spellbook, and this version cannot pick one of them; cast it another way.";
+                    return PlannerText.Get("reason.refusal.levelAmbiguous");
                 default:
-                    return head.Length == 0 ? "not possible right now." : head.Replace('-', ' ') + ".";
+                    return head.Length == 0 ? PlannerText.Get("reason.refusal.unknown") : head.Replace('-', ' ') + ".";
             }
         }
 
@@ -523,21 +523,21 @@ namespace KingmakerBuffPlanner.UI
             switch (message.Trim())
             {
                 case "A direct-target casting requires its direct target.":
-                    return "choose who receives this casting first.";
+                    return PlannerText.Get("reason.refusal.recipient");
                 case "A group casting requires an origin.":
                 case "An anchored casting must select an anchor unit.":
-                    return "choose the unit the group spell is centred on first.";
+                    return PlannerText.Get("reason.refusal.anchor");
                 case "A caster-centered casting must use the caster origin.":
-                    return "a caster-centred group spell is centred on its caster.";
+                    return PlannerText.Get("reason.refusal.casterOrigin");
                 case "A group casting has an origin, not a direct target.":
-                    return "a group casting has no single recipient; switch to a single target to pick one.";
+                    return PlannerText.Get("reason.refusal.groupTarget");
                 case "A direct-target casting cannot carry a group origin.":
                 case "A direct-target casting cannot carry required coverage.":
-                    return "a single-target casting has no group area; switch to group targeting for that.";
+                    return PlannerText.Get("reason.refusal.directTarget");
                 default:
                     if (message.IndexOf("caster", StringComparison.OrdinalIgnoreCase) >= 0)
-                        return "choose who casts it first.";
-                    return "this casting is not complete yet.";
+                        return PlannerText.Get("reason.refusal.casterFirst");
+                    return PlannerText.Get("reason.refusal.incomplete");
             }
         }
     }
@@ -609,13 +609,13 @@ namespace KingmakerBuffPlanner.UI
             string noun = castAvailable
                 ? (executable == 1 ? " available casting." : " available castings.")
                 : (executable == 1 ? " casting." : " castings.");
-            return "Run " + routineName + " casts " + executable + noun + omitted + shortage;
+            return PlannerText.Get("footer.run.title", routineName) + " casts " + executable + noun + omitted + shortage;
         }
 
         // The Run button names the routine it runs: the selected one.
         public static string RunCaption(string routineName)
         {
-            return "Run " + routineName;
+            return PlannerText.Get("footer.run.title", routineName);
         }
 
         public static string RunBlocked(string routineName, int notReady)
@@ -773,69 +773,67 @@ namespace KingmakerBuffPlanner.UI
             string head = colon < 0 ? value : value.Substring(0, colon);
             switch (head)
             {
-                case "unresolved-saved-request": return "this casting is a Draft; finish its choices and mark it Ready";
-                case "caster-unresolved": return "no caster chosen";
-                case "caster-not-in-party": return "the caster is not in the party";
-                case "caster-not-capable": return "the caster cannot cast this";
+                case "unresolved-saved-request": return PlannerText.Get("reason.unresolved-saved-request");
+                case "caster-unresolved": return PlannerText.Get("reason.caster-unresolved");
+                case "caster-not-in-party": return PlannerText.Get("reason.caster-not-in-party");
+                case "caster-not-capable": return PlannerText.Get("reason.caster-not-capable");
                 case ItemSourceResolution.Missing:
-                    return "its saved item is not equipped on this caster; use Change caster/source to choose a current source";
+                    return PlannerText.Get("reason.item.Missing");
                 case ItemSourceResolution.Ambiguous:
-                    return "identical copies of its item are equipped; use Change caster/source and click the copy to use";
+                    return PlannerText.Get("reason.item.Ambiguous");
                 case ItemSourceResolution.SlotEmpty:
-                    return "its saved equipment slot no longer holds this item; use Change caster/source to choose a current copy";
+                    return PlannerText.Get("reason.item.SlotEmpty");
                 case ItemSourceResolution.LegacySession:
                 case ItemSourceResolution.LegacyFact:
-                    return "saved by an older version that could not remember its item; use Change caster/source and click the item once";
+                    return PlannerText.Get("reason.item.LegacyFact");
                 case ItemSourceResolution.Invalid:
-                    return "its saved item selection is unreadable; use Change caster/source to choose a current source";
-                case "source-unresolvable": return "the buff's source was not found";
-                case "exact-source-ambiguous": return "the caster can cast it in more than one way; pick the exact spell or item";
-                case "provider-option-unavailable": return "the caster cannot cast it right now";
-                case "spellbook-constraint-unsatisfied": return "not in the chosen spellbook";
-                case "resource-pool-unknown": return "its resource was not found";
-                case "resource-pool-exhausted": return "no casts left";
-                case "prepared-slots-exhausted": return "no prepared uses remain";
-                case "no-eligible-prepared-token": return "the selected prepared uses are required by earlier planned castings";
-                case "insufficient-shared-resource": return "remaining shared uses are required by earlier planned castings";
-                case "enhancement-exhausted": return "a required enhancement has no uses remaining";
-                case "enhancement-pool-exhausted": return "not enough required enhancement uses after earlier planned castings";
-                case "enhancement-pool-unknown": return "the required enhancement's resource pool is unavailable";
-                case "enhancement-balance-unknown": return "the required enhancement's remaining uses could not be read";
-                case "material-unavailable": return "not enough material components after earlier planned castings";
-                case "target-not-in-party": return "the recipient is not in the party";
-                case "effect-owner-unresolved": return "a required effect owner could not be determined; refresh after nearby units move";
-                case "effect-owner-not-readable": return "a required effect owner is outside the readable party and pets; this casting cannot be confirmed";
-                case "target-not-friendly": return "the recipient is not an ally";
-                case "target-not-conscious": return "the recipient is unconscious";
-                case "target-not-alive": return "the recipient is dead";
-                case "target-not-targetable": return "the recipient cannot be targeted";
-                case "target-unreachable": return "the caster cannot target this recipient";
-                case "target-mode-mismatch": return "the buff cannot be cast this way";
-                case "origin-anchor-illegal": return "the group spell cannot be centred there";
-                case "origin-caster-illegal": return "the group spell cannot be centred on its caster; centre it on a party member";
-                case "predicted-coverage-empty": return "no party member would be reached";
-                case "ability-targeting-unsupported": return "this buff's targeting is not supported";
-                case "targeting-modifier-unavailable": return "a required targeting modifier is not available";
-                case "share-source-unresolved": return "the exact spell for sharing was not resolved";
-                case "share-feature-unavailable": return "the caster does not have Share Transmutation";
-                case "share-source-not-supported": return "Share Transmutation does not support this exact spell";
-                case "share-no-legal-recipient": return "no legal ally to share it with";
-                case "share-not-needed": return "this spell can already target others";
-                case "share-unverified-caster": return "the sharing caster could not be verified";
-                case "enhancements-unvalidated": return "an enhancement could not be checked";
-                case "enhancement-incompatible": return "an enhancement does not fit this casting";
+                    return PlannerText.Get("reason.item.Invalid");
+                case "source-unresolvable": return PlannerText.Get("reason.source-unresolvable");
+                case "exact-source-ambiguous": return PlannerText.Get("reason.exact-source-ambiguous");
+                case "provider-option-unavailable": return PlannerText.Get("reason.provider-option-unavailable");
+                case "spellbook-constraint-unsatisfied": return PlannerText.Get("reason.spellbook-constraint-unsatisfied");
+                case "resource-pool-unknown": return PlannerText.Get("reason.resource-pool-unknown");
+                case "resource-pool-exhausted": return PlannerText.Get("reason.resource-pool-exhausted");
+                case "prepared-slots-exhausted": return PlannerText.Get("reason.prepared-slots-exhausted");
+                case "no-eligible-prepared-token": return PlannerText.Get("reason.no-eligible-prepared-token");
+                case "insufficient-shared-resource": return PlannerText.Get("reason.insufficient-shared-resource");
+                case "enhancement-exhausted": return PlannerText.Get("reason.enhancement-exhausted");
+                case "enhancement-pool-exhausted": return PlannerText.Get("reason.enhancement-pool-exhausted");
+                case "enhancement-pool-unknown": return PlannerText.Get("reason.enhancement-pool-unknown");
+                case "enhancement-balance-unknown": return PlannerText.Get("reason.enhancement-balance-unknown");
+                case "material-unavailable": return PlannerText.Get("reason.material-unavailable");
+                case "target-not-in-party": return PlannerText.Get("reason.target-not-in-party");
+                case "effect-owner-unresolved": return PlannerText.Get("reason.effect-owner-unresolved");
+                case "effect-owner-not-readable": return PlannerText.Get("reason.effect-owner-not-readable");
+                case "target-not-friendly": return PlannerText.Get("reason.target-not-friendly");
+                case "target-not-conscious": return PlannerText.Get("reason.target-not-conscious");
+                case "target-not-alive": return PlannerText.Get("reason.target-not-alive");
+                case "target-not-targetable": return PlannerText.Get("reason.target-not-targetable");
+                case "target-unreachable": return PlannerText.Get("reason.target-unreachable");
+                case "target-mode-mismatch": return PlannerText.Get("reason.target-mode-mismatch");
+                case "origin-anchor-illegal": return PlannerText.Get("reason.origin-anchor-illegal");
+                case "origin-caster-illegal": return PlannerText.Get("reason.origin-caster-illegal");
+                case "predicted-coverage-empty": return PlannerText.Get("reason.predicted-coverage-empty");
+                case "ability-targeting-unsupported": return PlannerText.Get("reason.ability-targeting-unsupported");
+                case "targeting-modifier-unavailable": return PlannerText.Get("reason.targeting-modifier-unavailable");
+                case "share-source-unresolved": return PlannerText.Get("reason.share-source-unresolved");
+                case "share-feature-unavailable": return PlannerText.Get("reason.share-feature-unavailable");
+                case "share-source-not-supported": return PlannerText.Get("reason.share-source-not-supported");
+                case "share-no-legal-recipient": return PlannerText.Get("reason.share-no-legal-recipient");
+                case "share-not-needed": return PlannerText.Get("reason.share-not-needed");
+                case "share-unverified-caster": return PlannerText.Get("reason.share-unverified-caster");
+                case "enhancements-unvalidated": return PlannerText.Get("reason.enhancements-unvalidated");
+                case "enhancement-incompatible": return PlannerText.Get("reason.enhancement-incompatible");
                 case "enhancement-changes-targeting":
                     // v1.2 §7: Share is a targeting choice made before the
                     // target ("Share with an ally"), never an enhancement.
-                    return "an enhancement that changes whom the spell reaches (such as Share Transmutation) - " +
-                        "remove it and use \"Share with an ally\" before choosing the target";
-                case "import-review-unresolved": return "imported: needs your review";
-                case "already-active": return "already active";
-                case "present-effect-not-sufficient": return "the active effect is weaker or about to expire";
+                    return PlannerText.Get("reason.enhancement-changes-targeting");
+                case "import-review-unresolved": return PlannerText.Get("reason.import-review-unresolved");
+                case "already-active": return PlannerText.Get("reason.already-active");
+                case "present-effect-not-sufficient": return PlannerText.Get("reason.present-effect-not-sufficient");
                 case CastingExecutionPolicy.InstantRouteUnavailable:
-                    return "it cannot be cast instantly (" + InstantRouteCause(value) +
-                        "); switch the mode to Animated to cast it, or remove it";
-                default: return head.Length == 0 ? "not ready" : head.Replace('-', ' ');
+                    return PlannerText.Get("reason.instantUnavailable", InstantRouteCause(value));
+                default: return head.Length == 0 ? PlannerText.Get("reason.notReady") : head.Replace('-', ' ');
             }
         }
 
@@ -845,13 +843,13 @@ namespace KingmakerBuffPlanner.UI
             string[] parts = code.Split(new[] { ':' }, 3);
             string reason = parts.Length == 3 ? parts[2] : string.Empty;
             if (reason.StartsWith("enhancement-native-command-required", StringComparison.Ordinal))
-                return "a chosen enhancement needs a normal cast";
+                return PlannerText.Get("reason.instant.enhancement");
             if (reason.StartsWith("sticky-delivery", StringComparison.Ordinal) ||
                 reason.StartsWith("provider-direct-sticky-touch", StringComparison.Ordinal))
-                return "its touch delivery needs a normal cast";
+                return PlannerText.Get("reason.instant.touch");
             if (reason.StartsWith("multiple-direct-cast-providers", StringComparison.Ordinal))
-                return "its enhancements need a normal cast together";
-            return "it needs a normal animated cast";
+                return PlannerText.Get("reason.instant.combined");
+            return PlannerText.Get("reason.instant.animated");
         }
 
         // A nested refusal ("targeting-modifier-unavailable:<id>:<reason>")
@@ -875,13 +873,13 @@ namespace KingmakerBuffPlanner.UI
         {
             string value = item ?? string.Empty;
             if (value == "automatic-caster-pending-review")
-                return "the old plan let the planner pick any caster; choose one";
+                return PlannerText.Get("reason.import.caster");
             if (value == "provider-pin-without-caster-pending-review")
-                return "the old plan named a source but no caster; choose the caster";
+                return PlannerText.Get("reason.import.source");
             if (value == "group-origin-and-count-pending-review")
-                return "the old plan cast this on a group; check where it is centred and who it reaches";
+                return PlannerText.Get("reason.import.group");
             if (value == "no-recipient:pending-review")
-                return "the old plan named no recipient; choose one";
+                return PlannerText.Get("reason.import.recipient");
             if (value.StartsWith("grouping-unknown:", StringComparison.Ordinal))
             {
                 // Focused re-review: the recipients the old plan named.
@@ -889,16 +887,14 @@ namespace KingmakerBuffPlanner.UI
                 string[] ids = targetsAt < 0 ? new string[0]
                     : value.Substring(targetsAt + 8).Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
                 // Names only: without a way to name them, no ids are shown.
-                return "the old plan did not say single target or group" +
-                    (ids.Length == 0 || unitName == null ? string.Empty
-                        : " (it named " + string.Join(", ", ids.Select(unitName).ToArray()) + ")") + "; choose";
+                return (ids.Length > 0 && unitName != null ? PlannerText.Get("reason.import.shapeNamed", string.Join(", ", ids.Select(unitName).ToArray())) : PlannerText.Get("reason.import.shape"));
             }
             if (value.StartsWith("provider-pin:", StringComparison.Ordinal))
-                return "the old plan used one exact source; check it";
+                return PlannerText.Get("reason.import.exact");
             if (value.StartsWith("enhancement:", StringComparison.Ordinal))
                 return value.Contains(":required:")
-                    ? "the old plan required an enhancement; check which one"
-                    : "the old plan allowed an optional enhancement; check which one";
+                    ? PlannerText.Get("reason.import.required")
+                    : PlannerText.Get("reason.import.optional");
             int colon = value.IndexOf(':');
             return (colon < 0 ? value : value.Substring(0, colon)).Replace('-', ' ');
         }

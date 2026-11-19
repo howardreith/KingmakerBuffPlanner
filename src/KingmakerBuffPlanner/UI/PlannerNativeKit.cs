@@ -15,6 +15,17 @@ namespace KingmakerBuffPlanner.UI
     // the sprites the spellbook, its spell description and the service
     // windows draw with. Fonts/sprites are borrowed; role materials are
     // owned per workspace so native donor teardown cannot invalidate labels.
+    internal static class PlannerChineseFont
+    {
+        // Bundled Unity Font and the separate TMP atlas are both in the installed game's Resources.
+        private static Font _unityFont;
+        internal static Font UnityFont
+        {
+            get { return _unityFont ?? (_unityFont = Resources.Load<Font>("Fonts & Materials/SourceHanSerifSC/SourceHanSerifSC-Regular")); }
+        }
+        internal static TMP_FontAsset Primary { get { return Resources.Load<TMP_FontAsset>("Fonts & Materials/SourceHanSerifSC-Regular"); } }
+    }
+
     internal enum PlannerTextRole
     {
         // The window title: bold, with the native ornamental initial.
@@ -82,6 +93,7 @@ namespace KingmakerBuffPlanner.UI
         private readonly bool _controller;
         private readonly HashSet<string> _initializationSamples = new HashSet<string>();
 
+        private TMP_FontAsset _ownedFont;
         internal TMP_FontAsset BodyFont { get; private set; }
         internal bool HasInitialFont { get; private set; }
 
@@ -121,6 +133,21 @@ namespace KingmakerBuffPlanner.UI
                 BodyFont = canvas.GetComponentsInChildren<TMP_Text>(true).Where(label => label != null && label.font != null)
                     .Select(label => label.font).FirstOrDefault(font => font.material != null &&
                         font.material.shader != null && MaterialAtlasInstanceId(font.material) != 0);
+            if (PlannerText.Chinese && BodyFont != null)
+            {
+                var chinese = PlannerChineseFont.Primary;
+                var additional = Resources.Load<TMP_FontAsset>("Fonts & Materials/SourceHanSerifSC-AddChar");
+                if (chinese != null)
+                {
+                    var fallbacks = new List<TMP_FontAsset> { chinese };
+                    if (additional != null) fallbacks.Add(additional);
+                    if (BodyFont.fallbackFontAssets != null)
+                        fallbacks.AddRange(BodyFont.fallbackFontAssets.Where(f => f != null && !fallbacks.Contains(f)));
+                    _ownedFont = UnityEngine.Object.Instantiate(BodyFont);
+                    _ownedFont.fallbackFontAssets = fallbacks;
+                    BodyFont = _ownedFont;
+                }
+            }
             int bodyAtlas = MaterialAtlasInstanceId(BodyFont == null ? null : BodyFont.material);
             foreach (Material material in Resources.FindObjectsOfTypeAll<Material>())
             {
@@ -168,7 +195,7 @@ namespace KingmakerBuffPlanner.UI
         // description and the Buff Planner tooltip draw their titles).
         internal string Ornamented(string title)
         {
-            if (string.IsNullOrEmpty(title) || !HasInitialFont) return title ?? string.Empty;
+            if (string.IsNullOrEmpty(title) || !HasInitialFont || PlannerText.Chinese || title[0] > 127) return title ?? string.Empty;
             return "<font=\"" + InitialFontName + "\"><color=" + InitialColor + "><size=140%>" + title.Substring(0, 1) +
                 "</size></color></font>" + title.Substring(1);
         }
@@ -218,7 +245,7 @@ namespace KingmakerBuffPlanner.UI
             if (material != null) label.fontSharedMaterial = material;
             label.fontSize = size > 0f ? size : DefaultSize(role);
             label.color = InkFor(role);
-            label.fontStyle = StyleFor(role);
+            label.fontStyle = PlannerText.Chinese ? StyleFor(role) & ~(FontStyles.SmallCaps | FontStyles.UpperCase) : StyleFor(role);
             label.characterSpacing = 0f;
         }
 
@@ -441,6 +468,7 @@ namespace KingmakerBuffPlanner.UI
             value.enableWordWrapping = false;
             value.richText = false;
             KingmakerUiFactory.Stretch(value.rectTransform);
+            go.AddComponent<PlannerImeGuard>();
             TMP_InputField field = go.AddComponent<TMP_InputField>();
             field.textViewport = area;
             field.textComponent = value;
@@ -471,6 +499,7 @@ namespace KingmakerBuffPlanner.UI
         public void Dispose()
         {
             _ownedMaterials.Dispose();
+            if (_ownedFont != null) UnityEngine.Object.Destroy(_ownedFont);
         }
 
         // The native ornamental rule (Separator_left / middle / right), as

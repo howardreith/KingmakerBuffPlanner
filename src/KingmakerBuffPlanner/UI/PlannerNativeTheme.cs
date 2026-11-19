@@ -281,6 +281,12 @@ namespace KingmakerBuffPlanner.UI
         internal static void ApplyText(Text donor, Text target)
         {
             if (donor == null || target == null) return;
+            if (PlannerText.Chinese && PlannerChineseFont.UnityFont != null)
+            {
+                target.font = PlannerChineseFont.UnityFont;
+                target.material = null;
+                return;
+            }
             if (donor.font != null) target.font = donor.font;
             if (donor.material != null) target.material = donor.material;
         }

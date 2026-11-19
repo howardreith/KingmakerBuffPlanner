@@ -40,8 +40,13 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="..\..\src\KingmakerBuffPlanner\Localization\enGB.json"><LogicalName>KBP.Text.enGB.json</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\src\KingmakerBuffPlanner\Localization\zhCN.json"><LogicalName>KBP.Text.zhCN.json</LogicalName></EmbeddedResource>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Localization\PlannerText.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="ProductionExecutionTests.cs" />
+    <Compile Include="NativeDurationTests.cs" />
+    <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\KingmakerDurationAdapter.cs" />
     <Compile Include="HeroismRepeatTests.cs" />
     <Compile Include="PreparedSlotSpendTests.cs" />
     <Compile Include="InfectiousCharmsRefinementTests.cs" />

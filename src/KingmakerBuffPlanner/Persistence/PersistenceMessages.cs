@@ -12,19 +12,15 @@ namespace KingmakerBuffPlanner.Persistence
         {
             string detail = exception == null ? string.Empty : exception.Message ?? string.Empty;
             if (detail.StartsWith("refusing-to-overwrite-another-campaigns-primary", StringComparison.Ordinal))
-                return "Not saved: the plan file for this campaign holds another campaign's plan. " +
-                    "It was left unchanged.";
+                return PlannerText.Get("persistence.save.otherCampaign");
             if (detail.StartsWith("refusing-to-overwrite-invalid-primary", StringComparison.Ordinal) ||
                 detail.StartsWith("refusing-to-overwrite-unreadable-or-newer-primary", StringComparison.Ordinal))
-                return "Not saved: the plan file could not be read or comes from a newer planner. " +
-                    "It was left unchanged; move it aside to save here.";
+                return PlannerText.Get("persistence.save.protected");
             if (detail.StartsWith("Candidate persistence is blocked: legacy-import", StringComparison.Ordinal))
-                return "Not saved: your classic plan could not be imported, and nothing is saved until it is. " +
-                    "Repair or restore it, then press Reload.";
+                return PlannerText.Get("persistence.save.importBlocked");
             if (detail.StartsWith("Candidate persistence is blocked", StringComparison.Ordinal))
-                return "Not saved: your casting plan file could not be read or comes from a newer planner. " +
-                    "Move it and its backups (.bak1 to .bak3) out of UserSettings, then press Reload.";
-            return "Not saved: " + (detail.Length == 0 ? "the plan could not be written." : detail);
+                return PlannerText.Get("persistence.save.loadBlocked");
+            return (detail.Length == 0 ? PlannerText.Get("persistence.save.failed") : PlannerText.Get("persistence.save.error", detail));
         }
 
         // Final review B4: what the player is told when a planner opens and
@@ -47,29 +43,22 @@ namespace KingmakerBuffPlanner.Persistence
         {
             bool primaryUnreadable = ClassicPrimaryUnreadable(warning, primaryFileName);
             if (primaryUnreadable && string.IsNullOrEmpty(sourcePath))
-                return "Your saved planner setup could not be read or comes from a newer planner. It was " +
-                    "left unchanged and a new setup is shown; changes are not saved while that file is " +
-                    "there - move it aside to save here.";
+                return PlannerText.Get("persistence.classic.loadUnreadable");
             if (primaryUnreadable && recoveredFromBackup)
-                return "Your saved planner setup could not be read, so its latest backup was loaded. The " +
-                    "unreadable file was left unchanged; changes are not saved while it is there - move " +
-                    "it aside to save here.";
+                return PlannerText.Get("persistence.classic.loadProtectedBackup");
             if (recoveredFromBackup)
-                return "Your saved planner setup file was missing, so its latest readable backup was loaded.";
+                return PlannerText.Get("persistence.classic.loadBackup");
             // Focused re-review: a missing file whose backups cannot be read
             // saves normally, but the saves replace those backups in turn.
             if (string.IsNullOrEmpty(sourcePath) && !string.IsNullOrEmpty(warning))
-                return "Your saved planner setup file was missing and its backups could not be read, so a new " +
-                    "setup is shown. Saving works, but it replaces those backups in turn - move them out of " +
-                    "UserSettings to keep them.";
+                return PlannerText.Get("persistence.classic.loadNoBackup");
             return null;
         }
 
         public static string ForClassicSaveRefusal(string refusal)
         {
             if (string.IsNullOrEmpty(refusal)) return null;
-            return "Not saved: the saved planner setup for this campaign could not be read or comes " +
-                "from a newer planner. It was left unchanged; move it aside to save here.";
+            return PlannerText.Get("persistence.classic.saveRefused");
         }
 
         // The casting plan files a load could not use, by name: a newer one
@@ -108,17 +97,11 @@ namespace KingmakerBuffPlanner.Persistence
                     // and only those are moved (a readable backup behind them
                     // then loads).
                     string files = UnusableCastingFiles(status, sourcePath, warning);
-                    return "Your casting plan could not be read or comes from a newer planner" +
-                        (files.Length == 0 ? string.Empty : " (" + files + ")") + ", so nothing was loaded " +
-                        "from it and saving is blocked. It was left unchanged: move " +
-                        (files.Length == 0 ? "that file" : "those files") + " out of UserSettings, then press " +
-                        "Reload - the newest readable backup is then loaded, or the planner starts over.";
+                    return (files.Length == 0 ? PlannerText.Get("persistence.load.blocked") : PlannerText.Get("persistence.load.blockedFiles", files));
                 case CastingPlanLoadStatus.RecoveredFromBackup:
                     return primaryFileExists
-                        ? "Your casting plan could not be read, so its latest backup was loaded. The " +
-                            "unreadable file was left unchanged; saving is refused while it is there - move " +
-                            "it aside to save here."
-                        : "Your casting plan file was missing, so its latest backup was loaded.";
+                        ? PlannerText.Get("persistence.load.protectedBackup")
+                        : PlannerText.Get("persistence.load.backup");
                 default:
                     return null;
             }
@@ -131,9 +114,8 @@ namespace KingmakerBuffPlanner.Persistence
                 !warning.StartsWith("review-state-save-failed:", StringComparison.Ordinal))
                 return null;
             return warning.IndexOf("review-state-file-protected:", StringComparison.Ordinal) >= 0
-                ? "Plan accepted for this session only: the saved review file could not be read or comes " +
-                    "from a newer planner, and was left unchanged."
-                : "Plan accepted for this session only: the review could not be saved.";
+                ? PlannerText.Get("persistence.review.protected")
+                : PlannerText.Get("persistence.review.saveFailed");
         }
     }
 }

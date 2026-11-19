@@ -49,7 +49,7 @@ namespace KingmakerBuffPlanner.UI
                 RectTransform panel = Rect(_root.transform, "Menu", new Vector2(.5f, .5f), new Vector2(.5f, .5f));
                 panel.sizeDelta = new Vector2(880, 660);
                 panel.gameObject.AddComponent<Image>().color = new Color(.09f, .075f, .065f, 1);
-                _title = Label(panel, donor, "Title", "Buff Planner", 28, 22, 18, 836, 42, _log);
+                _title = Label(panel, donor, "Title", PlannerText.Get("pad.title"), 28, 22, 18, 836, 42, _log);
                 _settings = Label(panel, donor, "Settings", "", 22, 22, 68, 836, 38);
                 for (int i = 0; i < 6; i++)
                 {
@@ -60,10 +60,10 @@ namespace KingmakerBuffPlanner.UI
                     _rows[i] = Label(row, donor, "Caption", "", 24, 12, 2, 812, 36, i == 0 ? _log : null);
                 }
                 _status = Label(panel, donor, "Status", "", 21, 22, 386, 836, 150, _log);
-                Hint(panel, donor, RewiredConsts.Action.DPadUp, "Select", 22, 560, 130);
+                Hint(panel, donor, RewiredConsts.Action.DPadUp, PlannerText.Get("pad.select"), 22, 560, 130);
                 _confirm = Hint(panel, donor, RewiredConsts.Action.Confirm, "", 220, 560, 330);
-                _back = Hint(panel, donor, RewiredConsts.Action.Decline, "Back to game", 590, 560, 220);
-                Label(panel, donor, "AuthoringNote", "Configure opens the controller planner. Changes autosave.", 20, 22, 612, 836, 32);
+                _back = Hint(panel, donor, RewiredConsts.Action.Decline, PlannerText.Get("pad.back.game"), 590, 560, 220);
+                Label(panel, donor, "AuthoringNote", PlannerText.Get("pad.configure.note"), 20, 22, 612, 836, 32);
                 BuildResults(panel, donor);
                 _settleFrame = Time.frameCount + 2;
             }
@@ -75,7 +75,7 @@ namespace KingmakerBuffPlanner.UI
         internal void Refresh(ControllerRoutineModel model, bool paused, bool closing)
         {
             _settings.text = model.Settings;
-            _status.text = closing ? "Release controls to continue."
+            _status.text = closing ? PlannerText.Get("pad.release")
                 : model.Running ? "Running: " + model.ActiveRoutine + (paused ? " (waiting while the game is paused)" : "")
                 : model.Summary;
             for (int i = 0; i < 6; i++)
@@ -85,7 +85,7 @@ namespace KingmakerBuffPlanner.UI
                 _rows[i].color = model.Available(i) ? new Color(1, .94f, .80f, 1) : new Color(.62f, .59f, .54f, 1);
             }
             _confirm.text = model.ConfirmHint;
-            _back.text = "Back to game";
+            _back.text = PlannerText.Get("pad.back.game");
             if (_details.text != model.Message)
             {
                 _details.text = model.Message;
@@ -110,7 +110,7 @@ namespace KingmakerBuffPlanner.UI
         {
             _detailsPanel = Rect(panel, "Results", Vector2.zero, Vector2.one);
             _detailsPanel.gameObject.AddComponent<Image>().color = new Color(.09f, .075f, .065f, 1);
-            Label(_detailsPanel, donor, "ResultsTitle", "Results and explanations", 28, 22, 18, 836, 42);
+            Label(_detailsPanel, donor, "ResultsTitle", PlannerText.Get("pad.result.title"), 28, 22, 18, 836, 42);
             RectTransform viewport = Rect(_detailsPanel, "Viewport", new Vector2(0, 1), new Vector2(0, 1));
             Place(viewport, 22, 84, 816, 440);
             viewport.gameObject.AddComponent<Image>().color = new Color(.13f, .11f, .09f, 1);
@@ -132,8 +132,8 @@ namespace KingmakerBuffPlanner.UI
             bar.targetGraphic = thumb;
             bar.direction = Scrollbar.Direction.BottomToTop;
             _scroll.verticalScrollbar = bar;
-            Hint(_detailsPanel, donor, RewiredConsts.Action.DPadDown, "Scroll", 22, 570, 220);
-            Hint(_detailsPanel, donor, RewiredConsts.Action.Decline, "Back to routines", 440, 570, 340);
+            Hint(_detailsPanel, donor, RewiredConsts.Action.DPadDown, PlannerText.Get("pad.scroll"), 22, 570, 220);
+            Hint(_detailsPanel, donor, RewiredConsts.Action.Decline, PlannerText.Get("pad.back.routines"), 440, 570, 340);
             _detailsPanel.gameObject.SetActive(false);
         }
 
@@ -184,7 +184,7 @@ namespace KingmakerBuffPlanner.UI
                 hint.anchoredPosition = new Vector2(0, 64);
                 hint.sizeDelta = new Vector2(360, 44);
                 hint.gameObject.AddComponent<Image>().color = new Color(.08f, .07f, .06f, .95f);
-                Hint(hint, donor, action, "Buff Planner", 8, 4, 300);
+                Hint(hint, donor, action, PlannerText.Get("pad.title"), 8, 4, 300);
                 return hint.gameObject;
             }
             catch { UnityEngine.Object.Destroy(hint.gameObject); throw; }
@@ -216,10 +216,10 @@ namespace KingmakerBuffPlanner.UI
             if (log != null) log("[KBP-CONTROLLER-LAYOUT] label=" + name + ";phase=before-component;rect=" + rect.rect.size);
             var label = rect.gameObject.AddComponent<TextMeshProUGUI>();
             Measure(label, "after-component", width, log);
-            label.font = donor.font;
+            label.font = PlannerText.Chinese && PlannerChineseFont.Primary != null ? PlannerChineseFont.Primary : donor.font;
             // Font's base material, not a donor label's potentially masked
             // stencil/clipping material. Never mutate either shared material.
-            label.fontSharedMaterial = donor.font.material;
+            label.fontSharedMaterial = label.font.material;
             rect.gameObject.SetActive(true);
             Measure(label, "after-activation", width, log);
             label.autoSizeTextContainer = false;

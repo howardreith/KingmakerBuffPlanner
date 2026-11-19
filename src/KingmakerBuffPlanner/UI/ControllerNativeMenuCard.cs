@@ -222,7 +222,7 @@ namespace KingmakerBuffPlanner.UI
                     }
                     catch (Exception exception)
                     { _log.Error("[KBP-CONTROLLER-CARD] request-refused:exception;" + Describe(entry), exception); }
-                }, "Buff Planner", false, true);
+                }, PlannerText.Get("pad.title"), false, true);
                 entry.MenuModel = viewModel; entry.Rows = __result;
                 ControllerOwnedItems.Ensure((List<InGameMenuEntityVM>)Models.GetValue(viewModel), entry.Model);
                 entry.Card.Bind(entry.Model);

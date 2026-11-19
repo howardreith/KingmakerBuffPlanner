@@ -25,6 +25,7 @@ namespace KingmakerBuffPlanner.Tests
     {
         private static void RunProductionExecutionTests(string root)
         {
+            RunNativeDurationTests();
             RunCastAvailableTests(root);
             foreach (string executionMode in new[] { "instant", "animated" })
             {
@@ -162,7 +163,7 @@ namespace KingmakerBuffPlanner.Tests
             var provider = new ProviderSnapshot(
                 new ProviderKey("unit-cleric", "book-unit-cleric", CastingBuffAbility, "level-2"),
                 "Fixture Buff", 2, "pool-unit-cleric", 1, null, null, 10, 6000,
-                string.Empty, "1 hour/level");
+                string.Empty, "1 hour/level", duration: new DurationEstimate(DurationKind.PerCasterLevel, 6000, true));
             var pools = new[]
             {
                 new ResourcePoolSnapshot("pool-unit-cleric", ResourcePoolKind.SpontaneousLevel,
@@ -327,12 +328,9 @@ namespace KingmakerBuffPlanner.Tests
                 assess(plain, pair, new[] { leaf("leaf-a", 10) }).Verdict !=
                     ExistingEffectVerdict.NotPresent)
                 throw new InvalidOperationException("Multi-effect sufficiency was not all-of.");
-            if (!ExistingEffectSufficiency.IsPerLevelDuration("1 hour/level") ||
-                !ExistingEffectSufficiency.IsPerLevelDuration("10 minutes per level") ||
-                !ExistingEffectSufficiency.IsPerLevelDuration("1 min./level") ||
-                ExistingEffectSufficiency.IsPerLevelDuration("24 hours") ||
-                ExistingEffectSufficiency.IsPerLevelDuration(string.Empty))
-                throw new InvalidOperationException("Per-level duration detection is wrong.");
+            var fixedDuration = new ExistingEffectRequirement(10, 8, 100, false, extendable: false);
+            if (fixedDuration.FinalExpectedRounds != 100 || fixedDuration.DurationComparable)
+                throw new InvalidOperationException("Fixed nonextendable duration changed.");
         }
 
         // The compiler applies the live policy per casting: an already
@@ -4758,6 +4756,7 @@ namespace KingmakerBuffPlanner.Tests
             internal string MissRecipient;
             internal string DirectEffect = "shared-effect";
             internal int DirectCasterLevel = 9;
+            internal bool GroupPerLevel;
             internal string GroupDurationText = string.Empty;
             internal double LiveRemaining = 80;
             internal int AnimatedFrames = 3;
@@ -4865,7 +4864,7 @@ namespace KingmakerBuffPlanner.Tests
                     "level-1"), "Direct Ward", 1, "pool-arcanist", 1, null, null, DirectCasterLevel, 90);
                 var group = new ProviderSnapshot(new ProviderKey("unit-cleric", "book-cleric", Group,
                     "level-2"), "Group Ward", 2, "pool-cleric", 1, new[] { Token }, null, 9, 90,
-                    string.Empty, GroupDurationText);
+                    string.Empty, GroupDurationText, duration: new DurationEstimate(GroupPerLevel ? DurationKind.PerCasterLevel : DurationKind.Fixed, 90, true));
                 var anchored = new ProviderSnapshot(new ProviderKey("unit-bard", "book-bard", Anchored,
                     "level-3"), "Anchored Arrows", 3, "pool-bard", 1, null, null, 9, 5400);
                 var pools = new[]
@@ -5077,7 +5076,7 @@ namespace KingmakerBuffPlanner.Tests
             // it did live on 2026-09-24); one that does not is not.
             foreach (double remaining in new[] { 500d, 80d })
             {
-                var outlasting = new GroupBuffWorld { GroupDurationText = "1 minute/level", LiveRemaining = remaining };
+                var outlasting = new GroupBuffWorld { GroupPerLevel = true, GroupDurationText = "1 minute/level", LiveRemaining = remaining };
                 outlasting.Active["unit-t1|shared-effect"] = new KeyValuePair<string, long>("old", 99999);
                 CastingWorkspaceInputs outlastingInputs = outlasting.Inputs();
                 ResolvedCasting groupCasting = new ExplicitCastingCompiler().Compile(
@@ -5174,6 +5173,7 @@ namespace KingmakerBuffPlanner.Tests
             // spell, and failure shapes (the rod not applied, its charge kept).
             internal const string RodId = "metamagic-rod|unit-arcanist|rod-guid";
             internal int RodCharges = 3;
+            internal bool PerLevel;
             internal string DurationText = string.Empty;
             internal bool RodIgnored;
             internal bool RodChargeKept;
@@ -5314,7 +5314,7 @@ namespace KingmakerBuffPlanner.Tests
                     new TargetValidationSnapshot(true, true, true, true))).ToList();
                 var strength = new ProviderSnapshot(new ProviderKey("unit-arcanist",
                         BrownFurPowerfulChangeProfile.CastingSpellbookGuid, Strength, "level-2"),
-                    "Strength Spell", 2, "pool-arcanist", 1, null, null, 10, ExpectedRounds, string.Empty, DurationText);
+                    "Strength Spell", 2, "pool-arcanist", 1, null, null, 10, ExpectedRounds, string.Empty, DurationText, duration: new DurationEstimate(PerLevel ? DurationKind.PerCasterLevel : DurationKind.Fixed, ExpectedRounds, true));
                 var other = new ProviderSnapshot(new ProviderKey("unit-arcanist",
                         BrownFurPowerfulChangeProfile.CastingSpellbookGuid, Other, "level-1"),
                     "Other Spell", 1, "pool-arcanist-1", 1, null, null, 10, 100);
@@ -6052,7 +6052,7 @@ namespace KingmakerBuffPlanner.Tests
         private static void TestRodQualificationRecipe(string root)
         {
             string rod = EnhancedBuffWorld.RodId;
-            CastingWorkspaceInputs inputs = new EnhancedBuffWorld { DurationText = "1 minute/level" }.Inputs();
+            CastingWorkspaceInputs inputs = new EnhancedBuffWorld { PerLevel = true, DurationText = "1 minute/level" }.Inputs();
             CastingQualificationSelection selection = CastingQualificationRecipe.SelectRodExtend(inputs, "fixture-campaign");
             if (!selection.Selected || selection.Recipe != CastingQualificationRecipe.RodExtendDirect ||
                 selection.Castings.Count != 2 || selection.Castings[0].Enhancements.Count != 0 ||
@@ -6065,22 +6065,22 @@ namespace KingmakerBuffPlanner.Tests
                     string.Join(",", selection.Coverage.ToArray()) + " rejections=" +
                     string.Join(",", selection.Rejections.ToArray()));
             CastingQualificationSelection besideEmpower = CastingQualificationRecipe.SelectRodExtend(
-                new EnhancedBuffWorld { DurationText = "1 minute/level", WithEmpowerRod = true }.Inputs(), "fixture-campaign");
+                new EnhancedBuffWorld { PerLevel = true, DurationText = "1 minute/level", WithEmpowerRod = true }.Inputs(), "fixture-campaign");
             if (!besideEmpower.Selected || besideEmpower.Enhancement.EnhancementId != rod ||
                 !besideEmpower.Rejections.Contains("metamagic-rod|unit-arcanist|empower-guid|not-an-extend-rod"))
                 throw new InvalidOperationException("A rod other than Extend was taken, or refused silently: " +
                     string.Join(",", besideEmpower.Rejections.ToArray()));
             CastingQualificationSelection conditional = CastingQualificationRecipe.SelectRodExtend(
-                new EnhancedBuffWorld { DurationText = "1 minute/level", ConditionalStrength = true }.Inputs(),
+                new EnhancedBuffWorld { PerLevel = true, DurationText = "1 minute/level", ConditionalStrength = true }.Inputs(),
                 "fixture-campaign");
             CastingQualificationSelection brief = CastingQualificationRecipe.SelectRodExtend(
-                new EnhancedBuffWorld { DurationText = "1 round/level", ExpectedRounds = 9 }.Inputs(), "fixture-campaign");
+                new EnhancedBuffWorld { PerLevel = true, DurationText = "1 round/level", ExpectedRounds = 9 }.Inputs(), "fixture-campaign");
             // Twice the judged minimum: at exactly ten rounds the plain cast
             // would read under a minute and fail every time.
             CastingQualificationSelection borderline = CastingQualificationRecipe.SelectRodExtend(
-                new EnhancedBuffWorld { DurationText = "1 round/level", ExpectedRounds = 19 }.Inputs(), "fixture-campaign");
+                new EnhancedBuffWorld { PerLevel = true, DurationText = "1 round/level", ExpectedRounds = 19 }.Inputs(), "fixture-campaign");
             CastingQualificationSelection enough = CastingQualificationRecipe.SelectRodExtend(
-                new EnhancedBuffWorld { DurationText = "1 round/level", ExpectedRounds = 20 }.Inputs(), "fixture-campaign");
+                new EnhancedBuffWorld { PerLevel = true, DurationText = "1 round/level", ExpectedRounds = 20 }.Inputs(), "fixture-campaign");
             if (borderline.Selected || !enough.Selected ||
                 !borderline.Rejections.Any(value => value.EndsWith("|duration-too-short-to-judge:19", StringComparison.Ordinal)))
                 throw new InvalidOperationException("The rod recipe's duration boundary is wrong: " +
@@ -6098,7 +6098,7 @@ namespace KingmakerBuffPlanner.Tests
                     string.Join(",", fixedDuration.Rejections.ToArray()));
             foreach (string mode in new[] { "instant", "animated" })
             {
-                var run = new EnhancedBuffWorld { DurationText = "1 minute/level" };
+                var run = new EnhancedBuffWorld { PerLevel = true, DurationText = "1 minute/level" };
                 CastingQualificationRecord record = RunEnhanced(Path.Combine(root, "qr-" + mode[0]), run, mode, true,
                     CastingQualificationRecipe.RodExtendDirect);
                 IList<string> violations = record.Violations();
@@ -6115,16 +6115,16 @@ namespace KingmakerBuffPlanner.Tests
                         record.TerminalReason + "|" + string.Join("|", violations.ToArray()) + "|" + plainSeconds + ">" +
                         extendedSeconds + "|charges=" + run.RodCharges);
             }
-            var ignored = new EnhancedBuffWorld { DurationText = "1 minute/level", RodIgnored = true };
+            var ignored = new EnhancedBuffWorld { PerLevel = true, DurationText = "1 minute/level", RodIgnored = true };
             CastingQualificationRecord ignoredRecord = RunEnhanced(Path.Combine(root, "qr-ignored"), ignored, "instant", true,
                 CastingQualificationRecipe.RodExtendDirect);
-            var kept = new EnhancedBuffWorld { DurationText = "1 minute/level", RodChargeKept = true };
+            var kept = new EnhancedBuffWorld { PerLevel = true, DurationText = "1 minute/level", RodChargeKept = true };
             CastingQualificationRecord keptRecord = RunEnhanced(Path.Combine(root, "qr-kept"), kept, "instant", true,
                 CastingQualificationRecipe.RodExtendDirect);
-            var stronger = new EnhancedBuffWorld { DurationText = "1 minute/level", RodChangesStrength = true };
+            var stronger = new EnhancedBuffWorld { PerLevel = true, DurationText = "1 minute/level", RodChangesStrength = true };
             CastingQualificationRecord strongerRecord = RunEnhanced(Path.Combine(root, "qr-stronger"), stronger, "instant", true,
                 CastingQualificationRecipe.RodExtendDirect);
-            var instant = new EnhancedBuffWorld { DurationText = "1 minute/level", PlainZeroDuration = true };
+            var instant = new EnhancedBuffWorld { PerLevel = true, DurationText = "1 minute/level", PlainZeroDuration = true };
             CastingQualificationRecord instantRecord = RunEnhanced(Path.Combine(root, "qr-zero"), instant, "instant", true,
                 CastingQualificationRecipe.RodExtendDirect);
             // The published observation carries the game clock, or why it
@@ -6138,7 +6138,7 @@ namespace KingmakerBuffPlanner.Tests
                     " / " + unclocked);
             // A plain duration too short to judge the doubling on fails the
             // plain step (the provider claimed enough rounds).
-            var shortPlain = new EnhancedBuffWorld { DurationText = "1 minute/level",
+            var shortPlain = new EnhancedBuffWorld { PerLevel = true, DurationText = "1 minute/level",
                 PlainDurationTicks = TimeSpan.FromSeconds(30).Ticks };
             CastingQualificationRecord shortRecord = RunEnhanced(Path.Combine(root, "qr-short"), shortPlain, "instant", true,
                 CastingQualificationRecipe.RodExtendDirect);
@@ -6152,7 +6152,7 @@ namespace KingmakerBuffPlanner.Tests
             // A casting-first step switches off what it did not choose.
             foreach (string mode in new[] { "instant", "animated" })
             {
-                var leftOn = new EnhancedBuffWorld { DurationText = "1 minute/level", RodLeftOn = true };
+                var leftOn = new EnhancedBuffWorld { PerLevel = true, DurationText = "1 minute/level", RodLeftOn = true };
                 CastingQualificationRecord leftOnRecord = RunEnhanced(Path.Combine(root, "qr-on-" + mode[0]), leftOn, mode,
                     true, CastingQualificationRecipe.RodExtendDirect);
                 CastingQualificationStepResult plainOn = leftOnRecord.Step("plain");
@@ -6166,14 +6166,14 @@ namespace KingmakerBuffPlanner.Tests
             }
             // The executor: the same plain step, exact (casting-first) and not
             // (a classic step), with the rod left on.
-            var contrastWorld = new EnhancedBuffWorld { DurationText = "1 minute/level", RodLeftOn = true };
+            var contrastWorld = new EnhancedBuffWorld { PerLevel = true, DurationText = "1 minute/level", RodLeftOn = true };
             CastingWorkspaceInputs contrastInputs = contrastWorld.Inputs();
             CastStep plainStep = CastingQualificationForecast.Forecast(
                 CastingQualificationRecipe.SelectRodExtend(contrastInputs, "fixture-campaign"), contrastInputs,
                 "fixture-campaign")[0].Projection.Plan.Steps[0];
             foreach (bool exact in new[] { true, false })
             {
-                var world = new EnhancedBuffWorld { DurationText = "1 minute/level", RodLeftOn = true };
+                var world = new EnhancedBuffWorld { PerLevel = true, DurationText = "1 minute/level", RodLeftOn = true };
                 var plan = new CastPlan(new[] { CloneStep(plainStep, exact: exact) }, new TargetPlanOutcome[0], new string[0]);
                 var report = new ExecutionReport(plan);
                 System.Collections.IEnumerator work = new InstantCastExecutor(world, true).Execute(plan, report);

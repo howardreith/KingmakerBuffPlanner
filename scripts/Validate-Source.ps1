@@ -237,8 +237,21 @@ if (-not $hudSource.Contains('Destroy(_root.gameObject)') -or
 $assertions++
 
 $screenSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\UI\BuffPlannerScreenView.cs') -Raw
+$englishCatalog = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Localization\enGB.json') | ConvertFrom-Json
+$requiredCaptions = @{
+    'classic.title' = 'BUFF PLANNER'
+    'classic.settings.mode' = 'Casting mode: {0}'
+    'classic.selected.only' = 'Selected only'
+    'classic.selected.hint' = 'Show buffs with one or more selected targets in the active routine.'
+    'classic.caster.title' = 'CASTER POLICY'
+    'classic.cap' = "MAX/RUN`n{0}"
+    'classic.caster.disable' = 'DO NOT USE'
+}
+foreach ($key in $requiredCaptions.Keys) {
+    if ($englishCatalog.$key -cne $requiredCaptions[$key]) { throw "English caption contract failed: $key" }
+}
 foreach ($requiredScreenContract in @('CanvasGroup', 'GraphicRaycaster', 'raycastTarget = true',
-        'blocksRaycasts = true', 'interactable = true', 'BUFF PLANNER',
+        'blocksRaycasts = true', 'interactable = true', 'PlannerText.Get("classic.title")',
         'CanaryEvidence', 'BuffGridView', 'PlannerSelectedBuffView')) {
     if (-not $screenSource.Contains($requiredScreenContract)) {
         throw "Full-screen raycast/visual contract is missing: $requiredScreenContract"
@@ -274,12 +287,12 @@ if ($screenSource.Contains('_viewModel.SetCategory(category);' + [Environment]::
         '                RefreshCatalog(false);')) {
     throw 'Category and Selected only callbacks must rebind their selected visual state.'
 }
-if ([regex]::Matches($viewSource, [regex]::Escape('"Casting mode: "')).Count -ne 1) {
+if ([regex]::Matches($viewSource, [regex]::Escape('PlannerText.Get("classic.settings.mode",')).Count -ne 1) {
     throw 'Exactly one player-facing Casting mode control must remain.'
 }
 foreach ($gridContract in @('ColumnCount = 4', 'PoolCapacity = 32',
-        'HorizontalScrolling = false', 'Selected only',
-        'Show buffs with one or more selected targets in the active routine.',
+        'HorizontalScrolling = false', 'PlannerText.Get("classic.selected.only")',
+        'PlannerText.Get("classic.selected.hint")',
         'BuffCardGridScrollSink')) {
     if (-not ($viewSource.Contains($gridContract) -or $viewModelSource.Contains($gridContract) -or
         $gridMetricsSource.Contains($gridContract))) {
@@ -313,8 +326,8 @@ $presentationSource = Get-Content -LiteralPath (Join-Path $root `
     'src\KingmakerBuffPlanner\UI\PlannerPresentationModels.cs') -Raw
 foreach ($casterPolicyContract in @('SetProviderEnabled', 'SetProviderMaximumCasts',
         'MoveProviderEarlier', 'MoveProviderLater',
-        'ResetSelectedSourceProvidersToAutomatic', 'CASTER POLICY',
-        'MAX/RUN', 'DO NOT USE', 'Planned casters:')) {
+        'ResetSelectedSourceProvidersToAutomatic', 'PlannerText.Get("classic.caster.title")',
+        'PlannerText.Get("classic.cap",', 'PlannerText.Get("classic.caster.disable")', 'Planned casters:')) {
     if (-not ($setupModelSource.Contains($casterPolicyContract) -or
         $presentationSource.Contains($casterPolicyContract) -or
         $viewSource.Contains($casterPolicyContract))) {

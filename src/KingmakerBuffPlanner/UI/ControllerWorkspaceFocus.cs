@@ -259,10 +259,10 @@ namespace KingmakerBuffPlanner.UI
         internal string Confirm()
         {
             ControllerFocusItem item = Current;
-            if (item == null) return "No controls in this view.";
-            if (ReadingScrollKey != null) return "No visible control in this scroll position.";
-            if (!item.Visible) return "The focused control is outside the visible area.";
-            if (!item.Enabled) return "Unavailable: " + item.Caption;
+            if (item == null) return PlannerText.Get("pad.empty.controls");
+            if (ReadingScrollKey != null) return PlannerText.Get("pad.empty.visible");
+            if (!item.Visible) return PlannerText.Get("pad.outside");
+            if (!item.Enabled) return PlannerText.Get("pad.unavailable.item", item.Caption);
             item.Activate();
             return null;
         }

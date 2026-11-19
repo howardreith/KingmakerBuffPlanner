@@ -115,7 +115,7 @@ namespace KingmakerBuffPlanner.UI
                 _commandProblem = null;
                 _loadNote = null;
             }
-            Feedback(result.Applied ? "Plan cleared. Undo restores it." : result.Reason, !result.Applied);
+            Feedback(result.Applied ? PlannerText.Get("clear.done") : result.Reason, !result.Applied);
             if (result.Applied) ShowStandingNotice(WorkspaceFooterText.SaveProblem(_session.FooterSaveState));
         }
 
@@ -151,7 +151,7 @@ namespace KingmakerBuffPlanner.UI
             // Exact fallback ground (yielded while the native paper draws).
             Color fallback = _theme.ParchmentRaised; fallback.a = 1;
             KingmakerUiFactory.AddFramedPanel(dialog, fallback, _theme.GoldAccent).raycastTarget = true;
-            TMP_Text title = _kit.Text(dialog, "Title", "Clear entire plan?", PlannerTextRole.Title, 26f,
+            TMP_Text title = _kit.Text(dialog, "Title", PlannerText.Get("clear.question"), PlannerTextRole.Title, 26f,
                 TextAlignmentOptions.Center);
             title.enableWordWrapping = false;
             KingmakerUiFactory.SetAnchors(title.rectTransform, 0f, 1f, 1f, 1f, ClearSidePadding, ClearSidePadding, 0f, 0f);
@@ -291,7 +291,7 @@ namespace KingmakerBuffPlanner.UI
 
         private void TickWorkspaceKeyboard()
         {
-            if (_disposed || _controllerAuthoring || _clearInput.BlocksBackground || _controllerNavigation == null ||
+            if (_disposed || PlannerImeGuard.Active || _controllerAuthoring || _clearInput.BlocksBackground || _controllerNavigation == null ||
                 NativeDescriptionBlocksWorkspace) return;
             TMP_InputField field = EventSystem.current == null || EventSystem.current.currentSelectedGameObject == null ? null :
                 EventSystem.current.currentSelectedGameObject.GetComponent<TMP_InputField>();

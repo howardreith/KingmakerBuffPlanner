@@ -21,9 +21,7 @@ namespace KingmakerBuffPlanner.UI
         {
             get
             {
-                return "This removes " + (CastingCount == 1 ? "the 1 planned casting" :
-                    "all " + CastingCount + " planned castings") +
-                    " from every routine. Active buffs will stay in place. You can restore the plan with Undo.";
+                return (CastingCount == 1 ? PlannerText.Get("clear.warning.one", CastingCount) : PlannerText.Get("clear.warning.many", CastingCount));
             }
         }
     }
@@ -39,8 +37,8 @@ namespace KingmakerBuffPlanner.UI
             {
                 if (_submissionInFlight || (_isRunActive != null && _isRunActive()) ||
                     (_lastInputs != null && _lastInputs.RunActive))
-                    return "Stop the active routine before editing the plan.";
-                return Document.Castings.Count == 0 ? "The entire plan is already empty." : null;
+                    return PlannerText.Get("clear.running");
+                return Document.Castings.Count == 0 ? PlannerText.Get("clear.empty") : null;
             }
         }
 
@@ -67,7 +65,7 @@ namespace KingmakerBuffPlanner.UI
         {
             if (inputs != null) _lastInputs = inputs;
             if (!IsClearPlanCurrent(confirmation))
-                return AuthoringEditResult.Refuse("The plan changed. Open Clear plan again to review it.");
+                return AuthoringEditResult.Refuse(PlannerText.Get("clear.changed"));
             CancelClearPlan();
             if (!CanClearPlan) return AuthoringEditResult.Refuse(ClearPlanUnavailableReason);
             AuthoringEditResult result = _authoring.RemoveCastings(

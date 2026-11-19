@@ -700,10 +700,10 @@ namespace KingmakerBuffPlanner.UI
 
         private static string TooltipTitle(string routineId)
         {
-            if (routineId == "setup") return "Buff Planner";
-            if (routineId == "long") return "Long Buffs";
-            if (routineId == "important") return "Important Buffs";
-            return "Short Buffs";
+            if (routineId == "setup") return PlannerText.Get("hud.title");
+            if (routineId == "long") return PlannerText.Get("hud.long");
+            if (routineId == "important") return PlannerText.Get("hud.important");
+            return PlannerText.Get("hud.short");
         }
 
         private void RefreshNativeTooltipText()
@@ -726,9 +726,8 @@ namespace KingmakerBuffPlanner.UI
         private string SetupTooltip()
         {
             return _castingFirst != null && _castingFirst()
-                ? "Open the Buff Planner. Shortcut: " + PlannerHotkey.Binding +
-                    ". The moon button runs your Long routine with one click."
-                : "Open Buff Planner setup. Shortcut: " + PlannerHotkey.Binding + ".";
+                ? PlannerText.Get("hud.open.workspace", PlannerHotkey.Binding)
+                : PlannerText.Get("hud.open.setup", PlannerHotkey.Binding);
         }
 
         private Button CreatePlannerButton(
@@ -1097,19 +1096,17 @@ namespace KingmakerBuffPlanner.UI
                 if (casting != null) return casting;
             }
             string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
-            if (_session.Model == null) return "Load a campaign to run " + name + ".";
+            if (_session.Model == null) return PlannerText.Get("hud.need.campaign", name);
             if (_session.IsExecuting)
                 return _session.ClassicRunHeld
-                    ? "A buff routine is waiting to cast: it continues once the game runs and no planner window is open."
-                    : "A buff routine is already executing.";
+                    ? PlannerText.Get("hud.waiting")
+                    : PlannerText.Get("hud.running");
             RoutineProfile routine = _session.Model.Profile.Routines
                 .FirstOrDefault(item => item.RoutineId == routineId);
             if (routine == null || routine.Assignments.Count == 0)
-                return "No " + name + " buffs are configured.";
+                return PlannerText.Get("hud.empty.routine", name);
             int targets = routine.Assignments.Sum(item => item.WantedTargetUnitIds.Count);
-            return "Execute " + name + ": " + routine.Assignments.Count +
-                " buffs, " + targets + " requested targets, " +
-                _session.Model.Profile.Execution.Mode + " mode.";
+            return PlannerText.Get("hud.routine.summary", name, routine.Assignments.Count, targets, _session.Model.Profile.Execution.Mode);
         }
 
         // The owned glyph as a neutral alpha mask (64 x 64, white ink),

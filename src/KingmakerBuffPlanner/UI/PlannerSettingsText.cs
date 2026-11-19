@@ -11,23 +11,16 @@ namespace KingmakerBuffPlanner.UI
     // forward (never back).
     public static class PlannerSettingsText
     {
-        public const string Heading = "Buff Planner";
+        public static string Heading { get { return PlannerText.Get("settings.heading"); } }
 
-        public const string SwitchToCastingFirst = "Switch to the casting-first planner";
+        public static string SwitchToCastingFirst { get { return PlannerText.Get("settings.switch"); } }
 
         // null = the planner has not loaded yet (the page can draw before
         // the first update constructs it).
         public static string Describe(PlannerMode? mode, string hotkey)
         {
-            if (mode == null) return "The planner loads with the game.";
-            string open = "Open it with " + hotkey + " or the HUD's Setup (gear) button; " +
-                "the HUD's moon button runs your Long routine.";
-            if (mode == PlannerMode.CastingFirst)
-                return "Each saved casting is exactly one cast - its own caster, spell source, " +
-                    "target and enhancements. Every edit saves itself. " + open;
-            return "This game still uses the Classic planner, chosen in an earlier version. " +
-                "The casting-first planner replaces it: your classic plan is imported once and " +
-                "kept unchanged on disk.";
+            if (mode == null) return PlannerText.Get("settings.loading");
+            return mode == PlannerMode.CastingFirst ? PlannerText.Get("settings.current", hotkey) : PlannerText.Get("settings.classic");
         }
 
         // Whether the one-way switch is offered (only from a stored
@@ -39,8 +32,7 @@ namespace KingmakerBuffPlanner.UI
 
         public static string Switched(string hotkey)
         {
-            return "The casting-first planner is now your planner. Open it with " + hotkey +
-                " to see the imported plan.";
+            return PlannerText.Get("settings.switched", hotkey);
         }
     }
 }

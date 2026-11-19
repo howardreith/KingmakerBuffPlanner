@@ -61,11 +61,11 @@ namespace KingmakerBuffPlanner.UI
             RectTransform glyphs = KingmakerUiFactory.CreateRect("MappedControllerHints", _root);
             KingmakerUiFactory.SetAnchors(glyphs, 0, 0, 1, 0);
             glyphs.pivot = new Vector2(.5f, 0); glyphs.sizeDelta = new Vector2(0, 48);
-            ControllerRoutineView.Hint(glyphs, _hint, RewiredConsts.Action.Confirm, "Select", 20, 4, 150);
-            ControllerRoutineView.Hint(glyphs, _hint, RewiredConsts.Action.Decline, "Back", 210, 4, 150);
-            ControllerRoutineView.Hint(glyphs, _hint, RewiredConsts.Action.Func01, "Inspect", 400, 4, 150);
-            ControllerRoutineView.Hint(glyphs, _hint, RewiredConsts.Action.LeftUp, "Routine", 590, 4, 150);
-            ControllerRoutineView.Hint(glyphs, _hint, RewiredConsts.Action.RightUp, "Routine", 780, 4, 150);
+            ControllerRoutineView.Hint(glyphs, _hint, RewiredConsts.Action.Confirm, PlannerText.Get("pad.select"), 20, 4, 150);
+            ControllerRoutineView.Hint(glyphs, _hint, RewiredConsts.Action.Decline, PlannerText.Get("pad.back"), 210, 4, 150);
+            ControllerRoutineView.Hint(glyphs, _hint, RewiredConsts.Action.Func01, PlannerText.Get("pad.inspect"), 400, 4, 150);
+            ControllerRoutineView.Hint(glyphs, _hint, RewiredConsts.Action.LeftUp, PlannerText.Get("pad.routine"), 590, 4, 150);
+            ControllerRoutineView.Hint(glyphs, _hint, RewiredConsts.Action.RightUp, PlannerText.Get("pad.routine"), 780, 4, 150);
             if (_keyboardPresentation) { glyphs.gameObject.SetActive(false); _hint.gameObject.SetActive(false); }
             _outline = KingmakerUiFactory.CreateRect("ControllerFocus", _root);
             Image fill = _outline.gameObject.AddComponent<Image>();
@@ -189,9 +189,9 @@ namespace KingmakerBuffPlanner.UI
                     () =>
                     {
                         if (captured != null && captured.isActiveAndEnabled && captured.gameObject.activeInHierarchy && captured.IsInteractable()) captured.onClick.Invoke();
-                        else ShowText("Unavailable", details);
+                        else ShowText(PlannerText.Get("pad.unavailable"), details);
                     }, null,
-                    proxy != null && proxy.OnRightClick != null ? proxy.OnRightClick : (Action)(() => ShowText("Control details", details)),
+                    proxy != null && proxy.OnRightClick != null ? proxy.OnRightClick : (Action)(() => ShowText(PlannerText.Get("pad.details"), details)),
                     BoundsOf(rect), IsVisible(rect), ScrollKey(rect)));
             }
             foreach (TMP_InputField field in scope.GetComponentsInChildren<TMP_InputField>(false))
@@ -202,7 +202,7 @@ namespace KingmakerBuffPlanner.UI
                 RectTransform rect = field.transform as RectTransform;
                 if (rect == null) continue;
                 _rects[key] = rect;
-                targets.Add(new ControllerFocusItem(key, "Catalogue", "Search buffs", field.IsInteractable(), () => OpenKeyboard(captured),
+                targets.Add(new ControllerFocusItem(key, "Catalogue", PlannerText.Get("pad.search"), field.IsInteractable(), () => OpenKeyboard(captured),
                     null, null, BoundsOf(rect), IsVisible(rect), ScrollKey(rect)));
             }
             _focus.Replace(targets.OrderBy(t => Array.IndexOf(Regions, t.Region)));
@@ -303,7 +303,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 string unavailable = _focus.Confirm();
                 if (_focus.ReadingScrollKey != null) return;
-                if (unavailable != null) ShowText("Unavailable", unavailable);
+                if (unavailable != null) ShowText(PlannerText.Get("pad.unavailable"), unavailable);
                 _rebuild(); return;
             }
             if (command == ControllerWorkspaceCommand.Inspect)
@@ -428,8 +428,7 @@ namespace KingmakerBuffPlanner.UI
             if (!PlaceOutline(rect)) return;
             ControllerFocusItem current = _focus.Current;
             string caption = current == null ? "" : current.Caption.Split('\n')[0];
-            _hint.text = (current == null ? "" : current.Region + " > ") + caption +
-                "\nD-pad: move to adjacent controls. Right stick: scroll. Back leaves one layer.";
+            _hint.text = PlannerText.Get("pad.focus.keys", current == null ? "" : current.Region + " > ", caption);
         }
 
         private void DrawPaneFocus(ScrollRect scroll)
@@ -438,8 +437,7 @@ namespace KingmakerBuffPlanner.UI
             if (scroll == null || scroll.viewport == null || !PlaceOutline(scroll.viewport))
             { _outline.gameObject.SetActive(false); return; }
             ControllerFocusItem current = _focus.Current;
-            _hint.text = (current == null ? "" : current.Region + " > ") + "Scrollable text" +
-                "\nRight stick: scroll. D-pad: return to controls. Back leaves one layer.";
+            _hint.text = PlannerText.Get("pad.scroll.keys", current == null ? "" : current.Region + " > ");
         }
 
         private bool PlaceOutline(RectTransform rect)
@@ -503,14 +501,14 @@ namespace KingmakerBuffPlanner.UI
             _reader = viewport.gameObject.AddComponent<ScrollRect>();
             _reader.horizontal = false; _reader.movementType = ScrollRect.MovementType.Clamped;
             _reader.viewport = viewport;
-            TMP_Text body = _kit.Text(viewport, "Body", text ?? "No details available.", PlannerTextRole.Body, 20);
+            TMP_Text body = _kit.Text(viewport, "Body", text ?? PlannerText.Get("pad.no.details"), PlannerTextRole.Body, 20);
             RectTransform content = body.rectTransform;
             content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1); content.pivot = new Vector2(.5f, 1);
             content.sizeDelta = Vector2.zero;
             Canvas.ForceUpdateCanvases();
             content.sizeDelta = new Vector2(0, Math.Max(viewport.rect.height, body.GetPreferredValues(body.text, viewport.rect.width, 0).y + 16));
             _reader.content = content; _reader.verticalNormalizedPosition = 1;
-            TMP_Text footer = _kit.Text(panel, "Hints", "Up/Down or right stick: scroll    Confirm / Back: close details", PlannerTextRole.Body, 18);
+            TMP_Text footer = _kit.Text(panel, "Hints", PlannerText.Get("pad.details.keys"), PlannerTextRole.Body, 18);
             KingmakerUiFactory.SetAnchors(footer.rectTransform, 0, 0, 1, 0, 24, 24, 0, 0);
             footer.rectTransform.pivot = new Vector2(.5f, 0); footer.rectTransform.sizeDelta = new Vector2(footer.rectTransform.sizeDelta.x, 48);
         }
@@ -524,7 +522,7 @@ namespace KingmakerBuffPlanner.UI
             if (UnityEngine.EventSystems.EventSystem.current != null)
                 UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null);
             _search = field; _keyboard = new ControllerSearchKeyboard(field.text);
-            RectTransform panel = CreateModal("Search buffs — controller keyboard");
+            RectTransform panel = CreateModal(PlannerText.Get("pad.search.title"));
             _keyboardText = _kit.Text(panel, "Draft", _keyboard.Draft, PlannerTextRole.Strong, 24);
             KingmakerUiFactory.SetAnchors(_keyboardText.rectTransform, 0, .78f, 1, .88f, 24, 24, 0, 0);
             _keyboardHints = _kit.Text(panel, "Hints", "", PlannerTextRole.Body, 18);
@@ -545,7 +543,7 @@ namespace KingmakerBuffPlanner.UI
         {
             _keyboardText.text = _keyboard.Draft + "_";
             for (int i = 0; i < _keys.Count; i++) _keys[i].color = i == _keyboard.Focus ? new Color(.45f, .75f, 1, 1) : new Color(.84f, .77f, .61f, 1);
-            _hint.text = "D-pad: character   Confirm: " + ControllerSearchKeyboard.Keys[_keyboard.Focus] + "   Back: cancel search (keep previous text)";
+            _hint.text = PlannerText.Get("pad.keyboard.keys", ControllerSearchKeyboard.Keys[_keyboard.Focus]);
             _keyboardHints.text = _hint.text;
         }
 

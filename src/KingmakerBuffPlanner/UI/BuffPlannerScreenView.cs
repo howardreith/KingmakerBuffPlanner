@@ -184,13 +184,12 @@ namespace KingmakerBuffPlanner.UI
             bool ready = model != null && !_session.IsExecuting;
             if (model == null)
             {
-                _status.text = "Load a campaign to begin.";
-                _result.text = "Load a campaign to configure and execute buff routines.";
+                _status.text = PlannerText.Get("classic.start");
+                _result.text = PlannerText.Get("classic.start.detail");
             }
             else
             {
-                _status.text = model.Snapshot.Units.Count + " targets | " +
-                    model.Sources.Count + " buffs found";
+                _status.text = PlannerText.Get("classic.status", model.Snapshot.Units.Count, model.Sources.Count);
                 // Final review B4: a saved setup that could not be read, or a
                 // change that was not saved, is always shown: once in full in
                 // the result line when it first appears, and in the status
@@ -199,9 +198,9 @@ namespace KingmakerBuffPlanner.UI
                 // Focused re-review: only a notice that refuses saves says so
                 // in the status line; a run waiting for the planner to close
                 // says that too.
-                if (_session.ClassicSavesRefused) _status.text += " | changes are not saved";
+                if (_session.ClassicSavesRefused) _status.text += PlannerText.Get("classic.status.unsaved");
                 if (_session.IsExecuting)
-                    _status.text += " | a routine is waiting: close the planner to let it cast";
+                    _status.text += PlannerText.Get("classic.status.held");
                 if (!string.IsNullOrEmpty(notice) &&
                     !string.Equals(notice, _shownPersistenceNotice, StringComparison.Ordinal))
                 {
@@ -210,8 +209,8 @@ namespace KingmakerBuffPlanner.UI
                 }
                 if (string.IsNullOrWhiteSpace(_result.text))
                     _result.text = _session.ProfileStatus.StartsWith("No prior profile",
-                        StringComparison.Ordinal) ? "New planner setup created for this campaign." :
-                        "Planner setup is ready.";
+                        StringComparison.Ordinal) ? PlannerText.Get("classic.profile.created") :
+                        PlannerText.Get("classic.profile.ready");
             }
             _routineTabs.Bind(ActiveRoutineId, _viewModel.RoutineSummary, ready);
             _categoryTabs.Bind(_viewModel.Category, _viewModel.SelectedOnly, ready);
@@ -219,7 +218,7 @@ namespace KingmakerBuffPlanner.UI
             if (model != null) _settings.Bind(new PlannerSettingsViewModel(model.Profile), ready);
             _executeButton.interactable = ready;
             Text executeLabel = _executeButton.GetComponentInChildren<Text>(true);
-            if (executeLabel != null) executeLabel.text = "APPLY " + ActiveRoutineId.ToUpperInvariant();
+            if (executeLabel != null) executeLabel.text = PlannerText.Get("classic.apply", PlannerText.Chinese ? PlannerText.Routine(ActiveRoutineId) : ActiveRoutineId.ToUpperInvariant());
             // The ready-only escape hatch exists exactly when the routine is
             // incomplete; a complete routine never shows it.
             bool incomplete = false;
@@ -511,7 +510,7 @@ namespace KingmakerBuffPlanner.UI
                 _viewModel.SetRoutine(routineId);
                 RefreshAll(false);
             });
-            _search = KingmakerUiFactory.CreateInputField("Search", frame, _theme, "Search buffs...");
+            _search = KingmakerUiFactory.CreateInputField("Search", frame, _theme, PlannerText.Get("classic.search"));
             KingmakerUiFactory.SetAnchors((RectTransform)_search.transform,
                 0.02f, 0.805f, 0.31f, 0.85f);
             _search.onValueChanged.AddListener(value =>
@@ -681,17 +680,17 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(header, 0, 0.93f, 1, 1, 14, 14, 5, 5);
             KingmakerUiFactory.AddFramedPanel(header, _theme.ParchmentRaised, _theme.GoldAccent);
             Text title = KingmakerUiFactory.CreateText("Title", header, _theme,
-                "BUFF PLANNER", 28, TextAnchor.MiddleCenter);
+                PlannerText.Get("classic.title"), 28, TextAnchor.MiddleCenter);
             KingmakerUiFactory.Stretch(title.rectTransform, 100, 200, 4, 4);
             Text mode = KingmakerUiFactory.CreateText("PlannerMode", header, _theme,
-                ModeLabel, 15, TextAnchor.MiddleLeft);
+                PlannerText.Get("classic.mode"), 15, TextAnchor.MiddleLeft);
             mode.fontStyle = FontStyle.Bold;
             mode.color = _theme.BurgundyPrimary;
             KingmakerUiFactory.SetAnchors(mode.rectTransform, 0.01f, 0.50f, 0.12f, 0.98f);
             if (_switchToCastingFirst != null)
             {
                 Button switchMode = KingmakerUiFactory.CreateButton("SwitchToCastingFirst", header,
-                    _theme, "Use the casting-first planner", () => _switchToCastingFirst());
+                    _theme, PlannerText.Get("classic.switch"), () => _switchToCastingFirst());
                 KingmakerUiFactory.SetAnchors((RectTransform)switchMode.transform,
                     0.12f, 0.50f, 0.30f, 0.97f);
             }
@@ -700,7 +699,7 @@ namespace KingmakerBuffPlanner.UI
             _status.color = _theme.MutedBrownText;
             KingmakerUiFactory.SetAnchors(_status.rectTransform, 0.01f, 0.02f, 0.40f, 0.44f);
             Button settings = KingmakerUiFactory.CreateButton("Settings", header, _theme,
-                "Settings", () => _settings.Show(!_settings.IsOpen));
+                PlannerText.Get("classic.settings.label"), () => _settings.Show(!_settings.IsOpen));
             KingmakerUiFactory.SetAnchors((RectTransform)settings.transform,
                 0.46f, 0.14f, 0.57f, 0.86f);
             // The header entry to the assignment/resource editor carries its
@@ -708,7 +707,7 @@ namespace KingmakerBuffPlanner.UI
             // anchors plus caption fitting keep it readable at every
             // supported resolution.
             Button castingOrder = KingmakerUiFactory.CreateButton("CastingOrder", header,
-                _theme, "Assignments & Resources", OpenCastingOrder);
+                _theme, PlannerText.Get("classic.resources.label"), OpenCastingOrder);
             KingmakerUiFactory.SetAnchors((RectTransform)castingOrder.transform,
                 0.585f, 0.14f, 0.895f, 0.86f);
             Button close = KingmakerUiFactory.CreateButton("Close", header, _theme,
@@ -756,9 +755,9 @@ namespace KingmakerBuffPlanner.UI
                     child.AssignmentId != assignmentId &&
                     child.TargetUnitIds.Contains(unitId));
                 if (!legal && !assigned && !siblingOwned)
-                    reason = "not reachable by this assignment";
+                    reason = PlannerText.Get("classic.target.unreachable");
                 else if (siblingOwned)
-                    reason = "assigned to another assignment — use Move to transfer";
+                    reason = PlannerText.Get("classic.target.transfer");
                 rows.Add(new AssignmentTargetRowViewModel(unitId,
                     string.IsNullOrWhiteSpace(unit.DisplayName) ? unitId : unit.DisplayName,
                     assigned, legal && !siblingOwned, reason, () =>
@@ -835,18 +834,18 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(_tooltip.rectTransform, 0.015f, 0.10f, 0.68f, 0.90f);
             _tooltip.gameObject.SetActive(false);
             Button close = KingmakerUiFactory.CreateButton("Close", footer, _theme,
-                "CLOSE", () => _close());
+                PlannerText.Get("classic.close"), () => _close());
             KingmakerUiFactory.SetAnchors((RectTransform)close.transform,
                 0.72f, 0.12f, 0.80f, 0.88f);
             _readyOnlyButton = KingmakerUiFactory.CreateButton("ExecuteReadyOnly", footer,
-                _theme, "APPLY READY ONLY", () =>
+                _theme, PlannerText.Get("classic.ready.only"), () =>
                 {
                     if (_executeReadyOnly != null) _executeReadyOnly(ActiveRoutineId);
                 });
             KingmakerUiFactory.SetAnchors((RectTransform)_readyOnlyButton.transform,
                 0.81f, 0.08f, 0.905f, 0.92f);
             _executeButton = KingmakerUiFactory.CreateButton("Execute", footer, _theme,
-                "APPLY LONG", () => _execute(ActiveRoutineId));
+                PlannerText.Get("classic.apply.long"), () => _execute(ActiveRoutineId));
             KingmakerUiFactory.SetAnchors((RectTransform)_executeButton.transform,
                 0.91f, 0.08f, 0.985f, 0.92f);
         }
@@ -873,7 +872,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 ShowResult(new QuickExecutionResult(ActiveRoutineId, "Description",
                     QuickExecutionDisposition.Refused,
-                    "The selected ability blueprint is no longer available.", 0, 0, 0));
+                    PlannerText.Get("classic.description.gone"), 0, 0, 0));
                 return;
             }
             _description.Show(source, ability, ResolveAbilityIcon(source));
@@ -1223,13 +1222,13 @@ namespace KingmakerBuffPlanner.UI
         private static string BuildBody(BlueprintAbility ability)
         {
             var sections = new List<string>();
-            Add(sections, "Target", Safe(ability.GetTarget));
-            Add(sections, "Duration", ability.LocalizedDuration);
-            Add(sections, "Casting time", Safe(() => UIUtilityTexts.GetAbilityActionText(ability)));
-            Add(sections, "Saving throw", ability.LocalizedSavingThrow);
-            Add(sections, "Spell resistance", Safe(() =>
+            Add(sections, PlannerText.Get("classic.description.target"), Safe(ability.GetTarget));
+            Add(sections, PlannerText.Get("classic.description.duration"), ability.LocalizedDuration);
+            Add(sections, PlannerText.Get("classic.description.time"), Safe(() => UIUtilityTexts.GetAbilityActionText(ability)));
+            Add(sections, PlannerText.Get("classic.description.save"), ability.LocalizedSavingThrow);
+            Add(sections, PlannerText.Get("classic.description.resistance"), Safe(() =>
                 UIUtilityTexts.GetSpellResistanceText(ability)));
-            Add(sections, "Descriptors", Safe(() =>
+            Add(sections, PlannerText.Get("classic.description.descriptors"), Safe(() =>
                 UIUtilityTexts.GetSpellDescriptorsText(ability)));
             if (!string.IsNullOrWhiteSpace(ability.Description))
                 sections.Add(ability.Description);
@@ -1254,7 +1253,7 @@ namespace KingmakerBuffPlanner.UI
         internal Action Close;
         private void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Escape) && Close != null)
+            if (!PlannerImeGuard.Active && Input.GetKeyDown(KeyCode.Escape) && Close != null)
             {
                 PlannerHotkey.MarkEscapeTaken();
                 Close();

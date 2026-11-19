@@ -179,7 +179,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal void RequestBack()
         {
-            if (!Valid) return;
+            if (!Valid || PlannerImeGuard.Active) return;
             _backIntent.Request(_latch, Time.frameCount);
         }
 
@@ -198,7 +198,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal void Tick()
         {
-            if (!Valid) return;
+            if (!Valid || PlannerImeGuard.Active) return;
             if (Game.Instance.CurrentMode != GameModeType.FullScreenUi) { _modeWaitFrames++; return; }
             bool neutral = ControllerRoutineMenu.ControlsAreNeutral() &&
                 !Input.GetMouseButton(0) && !Input.GetMouseButton(1) && !Input.GetMouseButton(2) && !Input.GetKey(KeyCode.Escape);

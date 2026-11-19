@@ -1,4 +1,5 @@
 using System;
+using KingmakerBuffPlanner.GameAdapters;
 using KingmakerBuffPlanner.Infrastructure;
 using KingmakerBuffPlanner.RuntimeTesting;
 using UnityModManagerNet;
@@ -29,12 +30,32 @@ namespace KingmakerBuffPlanner
         internal static bool HotkeyArmed { get { return _hotkeyArmedLogged && _enabled; } }
         internal static int HotkeyKeydownCount { get { return _hotkeyKeydownCount; } }
 
+        private static PlannerLanguageSettings _languageSettings;
+        private static string _gameLocale;
+        private static GUIStyle _languageButton;
+        private static GUIStyle _settingsLabel;
+
+        private static void UpdateLanguage()
+        {
+            string locale = KingmakerLanguage.Current;
+            string language = PlannerLanguage.Resolve(_languageSettings.Language, locale);
+            if (language == PlannerText.Language && locale == _gameLocale) return;
+            if (!BuffPlannerUiRoot.CanChangePresentation(locale != _gameLocale)) return;
+            PlannerText.Language = language;
+            _gameLocale = locale;
+            _modeMessage = string.Empty;
+            BuffPlannerUiRoot.LanguageChanged();
+        }
+
         public static bool Load(UnityModManager.ModEntry modEntry)
         {
             if (modEntry == null) throw new ArgumentNullException("modEntry");
 
             _log = new ModLog(modEntry.Logger);
             _modEntry = modEntry;
+            PlannerText.Initialize(message => _log.Info("[KBP-TEXT] " + message));
+            _languageSettings = UnityModManager.ModSettings.Load<PlannerLanguageSettings>(modEntry) ?? new PlannerLanguageSettings();
+            _languageSettings.Language = PlannerLanguage.Normalize(_languageSettings.Language);
             _updateFrameGate = new PlannerUpdateFrameGate();
             _firstUpdateLogged = false;
             _hotkeyArmedLogged = false;
@@ -181,6 +202,7 @@ namespace KingmakerBuffPlanner
                     ";source=" + _updateSource + ".");
             }
 
+            UpdateLanguage();
             bool hotkeyDown = false;
             try
             {
@@ -232,6 +254,18 @@ namespace KingmakerBuffPlanner
         {
             try
             {
+                if (_languageButton == null)
+                {
+                    var font = PlannerChineseFont.UnityFont;
+                    _languageButton = new GUIStyle(GUI.skin.button) { font = font };
+                    _settingsLabel = new GUIStyle(GUI.skin.label) { font = font, wordWrap = true };
+                }
+                GUILayout.Label(PlannerText.Get("settings.language"), _settingsLabel);
+                GUILayout.BeginHorizontal();
+                DrawLanguageOption(PlannerLanguage.Automatic, PlannerText.Get("settings.automatic"));
+                DrawLanguageOption(PlannerLanguage.English, "English");
+                DrawLanguageOption(PlannerLanguage.Chinese, "简体中文");
+                GUILayout.EndHorizontal();
                 DrawPlannerMode();
             }
             catch (Exception exception)
@@ -257,17 +291,27 @@ namespace KingmakerBuffPlanner
         // Classic choice, no "experimental", no acceptance step. A stored
         // explicit classic choice from an earlier version gets one way
         // forward (PlannerSettingsText decides; this only draws it).
+        private static void DrawLanguageOption(string value, string caption)
+        {
+            bool selected = _languageSettings.Language == value;
+            if (GUILayout.Toggle(selected, caption, _languageButton) && !selected)
+            {
+                _languageSettings.Language = value;
+                _languageSettings.Save(_modEntry);
+            }
+        }
+
         private static void DrawPlannerMode()
         {
             KingmakerBuffPlanner.Persistence.PlannerMode? mode = BuffPlannerUiRoot.SelectedPlannerMode;
-            GUILayout.Label(PlannerSettingsText.Heading);
-            GUILayout.Label(PlannerSettingsText.Describe(mode, PlannerHotkey.Binding));
+            GUILayout.Label(PlannerSettingsText.Heading, _settingsLabel);
+            GUILayout.Label(PlannerSettingsText.Describe(mode, PlannerHotkey.Binding), _settingsLabel);
             if (PlannerSettingsText.OffersSwitch(mode) &&
-                GUILayout.Button(PlannerSettingsText.SwitchToCastingFirst, GUILayout.ExpandWidth(false)))
+                GUILayout.Button(PlannerSettingsText.SwitchToCastingFirst, _languageButton, GUILayout.ExpandWidth(false)))
                 _modeMessage = BuffPlannerUiRoot.TrySetPlannerMode(
                     KingmakerBuffPlanner.Persistence.PlannerMode.CastingFirst) ??
                     PlannerSettingsText.Switched(PlannerHotkey.Binding);
-            if (!string.IsNullOrEmpty(_modeMessage)) GUILayout.Label(_modeMessage);
+            if (!string.IsNullOrEmpty(_modeMessage)) GUILayout.Label(_modeMessage, _settingsLabel);
         }
 
         private static bool OnUnload(UnityModManager.ModEntry modEntry)
@@ -283,6 +327,8 @@ namespace KingmakerBuffPlanner
             if (_updateDriver != null) UnityEngine.Object.Destroy(_updateDriver.gameObject);
             _updateDriver = null;
             _modEntry = null;
+            _languageButton = null;
+            _settingsLabel = null;
             BuffPlannerUiRoot.DestroyOwned();
             ControllerRoutineIntegration.Uninstall();
             PlannerPointerOwnership.Uninstall();

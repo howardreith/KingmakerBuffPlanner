@@ -32,7 +32,7 @@ namespace KingmakerBuffPlanner.UI
                 var panel = KingmakerUiFactory.CreateRect("Notice", _surface.transform);
                 panel.anchorMin = panel.anchorMax = new Vector2(.5f, .5f); panel.sizeDelta = new Vector2(680, 112);
                 KingmakerUiFactory.AddPanel(panel, new Color(.94f, .89f, .77f, 1));
-                var label = _kit.Text(panel, "Status", "Opening Buff Planner…\nRelease controls to continue. Back cancels.", PlannerTextRole.Body, 22);
+                var label = _kit.Text(panel, "Status", PlannerText.Get("pad.handoff"), PlannerTextRole.Body, 22);
                 KingmakerUiFactory.Stretch(label.rectTransform, 20, 20, 12, 12);
                 _layer = new InputLayer { ContextName = "KingmakerBuffPlanner.Handoff", CursorEnabled = false };
                 var back = _layer.AddButton(_ => Canceled = true, RewiredConsts.Action.Decline, InputActionEventType.ButtonJustPressed, false, false);

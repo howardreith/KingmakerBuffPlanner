@@ -42,7 +42,7 @@ namespace KingmakerBuffPlanner.Planning
     {
         public ExistingEffectRequirement(int plannedCasterLevel,
             int plannedMetamagicMask, int plannedExpectedRounds,
-            bool durationComparable, string strengthUnprovableReason = null)
+            bool durationComparable, string strengthUnprovableReason = null, bool extendable = true)
         {
             if (plannedCasterLevel < 0) throw new ArgumentOutOfRangeException("plannedCasterLevel");
             if (plannedMetamagicMask < 0) throw new ArgumentOutOfRangeException("plannedMetamagicMask");
@@ -51,6 +51,8 @@ namespace KingmakerBuffPlanner.Planning
             PlannedMetamagicMask = plannedMetamagicMask;
             PlannedExpectedRounds = plannedExpectedRounds;
             DurationComparable = durationComparable;
+            FinalExpectedRounds = plannedExpectedRounds * (extendable &&
+                (plannedMetamagicMask & ExistingEffectSufficiency.ExtendMetamagicFlag) != 0 ? 2.0 : 1.0);
             StrengthUnprovableReason = string.IsNullOrEmpty(strengthUnprovableReason)
                 ? null : strengthUnprovableReason;
         }
@@ -62,6 +64,7 @@ namespace KingmakerBuffPlanner.Planning
         // applied metamagic enhancements).
         public int PlannedMetamagicMask { get; private set; }
         // 0 = unknown.
+        public double FinalExpectedRounds { get; private set; }
         public int PlannedExpectedRounds { get; private set; }
         // The expected duration is a trustworthy per-level estimate.
         public bool DurationComparable { get; private set; }
@@ -244,9 +247,7 @@ namespace KingmakerBuffPlanner.Planning
             if (instance.RemainingRounds != null && requirement.DurationComparable &&
                 requirement.PlannedExpectedRounds > 0)
             {
-                double expected = requirement.PlannedExpectedRounds *
-                    ((requirement.PlannedMetamagicMask & ExtendMetamagicFlag) != 0 ? 2.0 : 1.0);
-                double minimum = expected * MinimumRemainingFraction;
+                double minimum = requirement.FinalExpectedRounds * MinimumRemainingFraction;
                 if (instance.RemainingRounds.Value < minimum)
                     return "remaining-duration-short:" +
                         Math.Floor(instance.RemainingRounds.Value).ToString(
@@ -256,15 +257,5 @@ namespace KingmakerBuffPlanner.Planning
             return null;
         }
 
-        // A per-level duration text ("1 hour/level", "10 minutes per level")
-        // makes the provider's expected-duration estimate trustworthy; any
-        // other text (fixed durations, other languages) is not compared.
-        public static bool IsPerLevelDuration(string durationText)
-        {
-            if (string.IsNullOrWhiteSpace(durationText)) return false;
-            string compact = new string(durationText.ToLowerInvariant()
-                .Where(value => !char.IsWhiteSpace(value) && value != '.').ToArray());
-            return compact.Contains("/level") || compact.Contains("perlevel");
-        }
     }
 }

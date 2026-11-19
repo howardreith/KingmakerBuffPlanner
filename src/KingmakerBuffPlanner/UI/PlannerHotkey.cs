@@ -48,6 +48,7 @@ namespace KingmakerBuffPlanner.UI
                 BindingFlags.Static | BindingFlags.NonPublic);
             _harmony = HarmonyInstance.Create(HarmonyId);
             _harmony.Patch(_inputMatched, new HarmonyMethod(prefix), null, null);
+            PlannerImeGuard.Install(_harmony);
             log.Info("[KBP-HOTKEY] exact native binding isolation installed;target=" +
                 _inputMatched.DeclaringType.FullName + ".InputMatched;default=" + _binding + ".");
         }
@@ -59,7 +60,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal static bool GetKeyDown()
         {
-            return ModifiersHeld() && Input.GetKeyDown(PrimaryKey());
+            return !PlannerImeGuard.Active && ModifiersHeld() && Input.GetKeyDown(PrimaryKey());
         }
 
         internal static bool ShouldSuppressNativeBinding(
@@ -73,6 +74,7 @@ namespace KingmakerBuffPlanner.UI
         {
             if (_harmony != null && _inputMatched != null)
                 _harmony.Unpatch(_inputMatched, HarmonyPatchType.Prefix, HarmonyId);
+            if (_harmony != null) PlannerImeGuard.Uninstall(_harmony, HarmonyId);
             _harmony = null;
             _inputMatched = null;
             _binding = PlannerHotkeyBinding.Default;
@@ -83,6 +85,7 @@ namespace KingmakerBuffPlanner.UI
             long startedAt = RuntimePerformanceDiagnostics.BeginOperation();
             try
             {
+                if (PlannerImeGuard.Active) { __result = false; return false; }
                 bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
                 bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
                 bool alt = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);

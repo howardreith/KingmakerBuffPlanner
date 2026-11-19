@@ -72,9 +72,10 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 return "Threnodic needs a mind-affecting spell and an undead recipient; this recipient is not verified undead.";
             if (mask == ExtendMask)
             {
-                int duration = provider == null ? 0 : provider.ExpectedDurationRounds;
-                if (duration <= 0)
-                    return "Extend needs a spell with a real duration; this one has none.";
+                if (provider == null || provider.Duration.Kind == DurationKind.Unknown)
+                    return "Extend needs a spell with a verifiable duration.";
+                if (!provider.Duration.Extendable)
+                    return "This spell's duration cannot be extended.";
                 return string.Empty;
             }
             return string.Empty;

@@ -149,6 +149,22 @@ namespace KingmakerBuffPlanner.Domain.Providers
         public TargetValidationSnapshot TargetValidation { get; private set; }
     }
 
+    public enum DurationKind { Unknown, Fixed, PerCasterLevel, Permanent }
+
+    public struct DurationEstimate
+    {
+        public DurationEstimate(DurationKind kind, int baseRounds, bool extendable)
+        {
+            Kind = kind;
+            BaseRounds = baseRounds;
+            Extendable = extendable;
+        }
+        public DurationKind Kind { get; }
+        public int BaseRounds { get; }
+        public bool Extendable { get; }
+        public static DurationEstimate Permanent { get { return new DurationEstimate(DurationKind.Permanent, 0, false); } }
+    }
+
     public sealed class ProviderSnapshot
     {
         public ProviderSnapshot(
@@ -166,7 +182,7 @@ namespace KingmakerBuffPlanner.Domain.Providers
             string sourceDisplayName = "",
             int variantOrder = 0,
             string sourceBookName = "",
-            string equippedSlotSelector = "")
+            string equippedSlotSelector = "", DurationEstimate? duration = null)
         {
             Key = key ?? throw new ArgumentNullException("key");
             if (spellLevel < 0) throw new ArgumentOutOfRangeException("spellLevel");
@@ -188,7 +204,8 @@ namespace KingmakerBuffPlanner.Domain.Providers
                 .OrderBy(v => v, StringComparer.Ordinal).ToList());
             MaterialComponent = materialComponent;
             EffectiveCasterLevel = effectiveCasterLevel;
-            ExpectedDurationRounds = expectedDurationRounds;
+            Duration = duration ?? (expectedDurationRounds == 0 ? default(DurationEstimate)
+                : new DurationEstimate(DurationKind.Fixed, expectedDurationRounds, true));
             Description = description ?? string.Empty;
             DurationText = durationText ?? string.Empty;
             SourceBookName = sourceBookName ?? string.Empty;
@@ -216,7 +233,8 @@ namespace KingmakerBuffPlanner.Domain.Providers
         public IReadOnlyList<string> EligibleTokenIds { get; private set; }
         public MaterialRequirementSnapshot MaterialComponent { get; private set; }
         public int EffectiveCasterLevel { get; private set; }
-        public int ExpectedDurationRounds { get; private set; }
+        public DurationEstimate Duration { get; private set; }
+        public int ExpectedDurationRounds { get { return Duration.BaseRounds; } }
         public string Description { get; private set; }
         public string DurationText { get; private set; }
     }

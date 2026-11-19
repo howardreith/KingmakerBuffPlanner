@@ -2237,8 +2237,9 @@ namespace KingmakerBuffPlanner.UI
                 value => value != null && string.Equals(value.RoutineId, routineId,
                     StringComparison.Ordinal));
             if (routine != null && !string.IsNullOrWhiteSpace(routine.Name)) return routine.Name;
-            return string.IsNullOrEmpty(routineId) ? "Routine"
-                : char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
+            return string.IsNullOrEmpty(routineId) ? PlannerText.Get("workspace.routine")
+                : (routineId == "long" || routineId == "short" || routineId == "important" ? PlannerText.Routine(routineId)
+                    : char.ToUpperInvariant(routineId[0]) + routineId.Substring(1));
         }
 
         // ------------------------------------------------------------------

@@ -418,12 +418,14 @@ namespace KingmakerBuffPlanner.GameAdapters
                 return;
             }
             string duration = DurationText(selection);
+            int level = CasterLevel(data);
+            DurationEstimate estimate = KingmakerDurationAdapter.Estimate(data.Blueprint, level);
             providers.Add(new ProviderSnapshot(keyForProvider, selection.DisplayName, 0,
                 pool.PoolKey, cost, null, ToMaterialRequirement(selection),
-                CasterLevel(data), ExpectedDurationRounds(data, duration),
+                level, estimate.BaseRounds,
                 Description(selection), duration, data.SourceItem == null ? selection.SourceDisplayName :
                     data.SourceItem.Name,
-                selection.VariantOrder, string.Empty, slotSelector));
+                selection.VariantOrder, string.Empty, slotSelector, estimate));
         }
 
         private void AddSpellProvider(
@@ -462,12 +464,14 @@ namespace KingmakerBuffPlanner.GameAdapters
                 unit.UniqueId, spellbook.Blueprint.AssetGuid, ability, sourceInstance);
             if (providers.Any(p => p.Key.Equals(key))) return;
             string duration = DurationText(selection);
+            int level = CasterLevel(data);
+            DurationEstimate estimate = KingmakerDurationAdapter.Estimate(data.Blueprint, level);
             providers.Add(new ProviderSnapshot(key, selection.DisplayName,
                 source.SpellLevel, poolKey, cost, tokens,
-                ToMaterialRequirement(selection), CasterLevel(data),
-                ExpectedDurationRounds(data, duration), Description(selection),
+                ToMaterialRequirement(selection), level,
+                estimate.BaseRounds, Description(selection),
                 duration, selection.SourceDisplayName, selection.VariantOrder,
-                SpellbookName(spellbook)));
+                SpellbookName(spellbook), duration: estimate));
         }
 
         // The spellbook as the game names it, else its class; empty when
@@ -488,18 +492,6 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             try { return Math.Max(0, data.CalculateParams().CasterLevel); }
             catch (Exception) { return 0; }
-        }
-
-        private static int ExpectedDurationRounds(AbilityData data, string duration)
-        {
-            int casterLevel = Math.Max(1, CasterLevel(data));
-            string normalized = duration.ToLowerInvariant();
-            if (normalized.Contains("day")) return 14400 * casterLevel;
-            if (normalized.Contains("hour")) return 600 * casterLevel;
-            if (normalized.Contains("10 min") || normalized.Contains("ten min")) return 100 * casterLevel;
-            if (normalized.Contains("minute") || normalized.Contains(" min")) return 10 * casterLevel;
-            if (normalized.Contains("round")) return casterLevel;
-            return 0;
         }
 
         private static AbilityKey ToAbilityKey(AbilityData data, SourceKind sourceKind)
