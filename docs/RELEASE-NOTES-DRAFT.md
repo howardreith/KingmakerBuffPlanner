@@ -1,3 +1,11 @@
+# 0.6.15 draft for owner review
+
+- Choose Automatic, English, or 简体中文 in Unity Mod Manager. Automatic follows a Simplified Chinese game. Native spell and item names continue to follow the game language under either override.
+- Planner menus, casting controls, resources, notifications and visible execution messages have Simplified Chinese catalogs. Saved custom routine names retain their exact spelling.
+- Existing-buff and Extend decisions now use the ability's duration data regardless of the language used for its description.
+
+[Candidate and acceptance status](LOCALIZATION.md#candidate-and-evidence)
+
 # Mr. Bard's Kingmaker Buff Planner 0.6.10
 
 Owner-authorized stable update following merged PR #19.

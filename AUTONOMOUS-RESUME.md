@@ -1,3 +1,5 @@
+For the 0.6.15 localization sprint, resume from its [frozen candidate and guarded acceptance instructions](docs/LOCALIZATION.md#candidate-and-evidence).
+
 > **Stable 0.6.14 published, 2026-11-08:** owner-authorized pre-runtime release after accepted PR #23 (durable item-source selection), from product `2eab694aeef5aec11b73ee63cf0072f6e07d78ce`. Publisher: source 47/0, complete offline 731/0, gate 8/0, deterministic builds 3/0, package 6/0; downloaded ZIP `be0a2ffa...3ebb` matches SHA256SUMS. Native acceptance NOT RUN. [Release record](docs/RELEASE-0.6.14-RECORD.md).
 
 > **PR #23 review correction, 2026-11-08:** product `5ebb83b186e9d9b922710dd63d9b29f8ca17729f`, version 0.6.13 unchanged (unreleased). A saved slot rule now stays in force after a duplicate item is removed: recipient toggles use the compiler's comparison, and execution validates the authored rule beside the live item. Reproduced before (14/3), source 47/0, complete offline 731/0, DLL `9cb90a51...8cf2`. Native NOT RUN. Next: re-review, then the native steps in the [checkpoint](docs/DURABLE-ITEM-SOURCE-CHECKPOINT.md).
