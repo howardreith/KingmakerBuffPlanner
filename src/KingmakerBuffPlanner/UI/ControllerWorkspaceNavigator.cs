@@ -44,8 +44,8 @@ namespace KingmakerBuffPlanner.UI
         private bool _disposed, _initialFocusPending = true;
         private readonly bool _keyboardPresentation;
         private bool _keyboardFocusActive;
-        private readonly UnityEngine.EventSystems.EventSystem _keyboardEvents;
-        private readonly bool _priorKeyboardNavigation;
+        private UnityEngine.EventSystems.EventSystem _keyboardEvents;
+        private bool _priorKeyboardNavigation;
         private static readonly string[] Regions = { "Header", "Routines", "Catalogue", "Casters", "Castings", "Recipients", "Inspector", "Footer", "Resources", "ClearPlan" };
 
         internal ControllerWorkspaceNavigator(CastingWorkspaceScreenView workspace, PlannerNativeKit kit, bool keyboardPresentation = false)
@@ -78,17 +78,16 @@ namespace KingmakerBuffPlanner.UI
             AddFocusBorder("Left", Vector2.zero, new Vector2(0, 1), Vector2.zero, new Vector2(3, 0));
             AddFocusBorder("Right", new Vector2(1, 0), Vector2.one, new Vector2(-3, 0), Vector2.zero);
             Rebuild();
-            if (_keyboardPresentation)
-            {
-                // The owned workspace uses semantic navigation. Native Submit
-                // must not also activate the pointer's last selected button.
-                _keyboardEvents = UnityEngine.EventSystems.EventSystem.current;
-                if (_keyboardEvents != null)
-                {
-                    _priorKeyboardNavigation = _keyboardEvents.sendNavigationEvents;
-                    _keyboardEvents.sendNavigationEvents = false;
-                }
-            }
+            if (_keyboardPresentation) CaptureKeyboardNavigation(UnityEngine.EventSystems.EventSystem.current);
+        }
+
+        private void CaptureKeyboardNavigation(UnityEngine.EventSystems.EventSystem events)
+        {
+            // Native Submit would also activate the pointer's last selected button.
+            _keyboardEvents = events;
+            if (events == null) return;
+            _priorKeyboardNavigation = events.sendNavigationEvents;
+            events.sendNavigationEvents = false;
         }
 
         private void AddFocusBorder(string name, Vector2 min, Vector2 max, Vector2 offsetMin, Vector2 offsetMax)
@@ -572,10 +571,17 @@ namespace KingmakerBuffPlanner.UI
 
         public void Dispose()
         {
+            if (_disposed) return;
             _disposed = true;
             if (_keyboardEvents != null) _keyboardEvents.sendNavigationEvents = _priorKeyboardNavigation;
-            if (_modal != null) UnityEngine.Object.Destroy(_modal.gameObject);
-            if (_outline != null) UnityEngine.Object.Destroy(_outline.gameObject);
+            if (_modal != null) DestroyControl(_modal);
+            if (_outline != null) DestroyControl(_outline);
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void DestroyControl(RectTransform control)
+        {
+            UnityEngine.Object.Destroy(control.gameObject);
         }
     }
 }

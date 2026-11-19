@@ -37,15 +37,21 @@ namespace KingmakerBuffPlanner.UI
         {
             get
             {
+                bool ownedPreedit = false;
                 if (!string.IsNullOrEmpty(Input.compositionString))
                 {
                     var events = EventSystem.current;
                     var selected = events == null ? null : events.currentSelectedGameObject;
-                    if (selected != null && selected.GetComponent<PlannerImeGuard>() != null)
-                        _lastPreedit = Time.frameCount;
+                    ownedPreedit = selected != null && selected.GetComponent<PlannerImeGuard>() != null;
                 }
-                return Time.frameCount - _lastPreedit <= 1;
+                return ObservePreedit(ownedPreedit, Time.frameCount);
             }
+        }
+
+        private static bool ObservePreedit(bool ownedPreedit, int frame)
+        {
+            if (ownedPreedit) _lastPreedit = frame;
+            return frame - _lastPreedit <= 1;
         }
 
         private static bool BeforeFieldKey(Component __instance, Event evt)

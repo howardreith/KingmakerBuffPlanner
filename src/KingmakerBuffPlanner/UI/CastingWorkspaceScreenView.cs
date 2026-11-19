@@ -256,18 +256,17 @@ namespace KingmakerBuffPlanner.UI
                 !_clearInput.BlocksBackground && !Input.GetMouseButton(0); }
         }
 
-        internal CastingWorkspaceScreenView WithCurrentLanguage(Component host)
+        internal CastingWorkspaceScreenView CreateLanguageView(Component host)
         {
-            var view = new CastingWorkspaceScreenView(host, _session, _inputs, _freshInputs, _close,
+            return new CastingWorkspaceScreenView(host, _session, _inputs, _freshInputs, _close,
                 _switchToClassic, _log, _controllerAuthoring, _controllerRunRequest);
-            try
-            {
-                view._sourceCategory = _sourceCategory;
-                view._buffSearch.text = _buffQuery;
-                view.RefreshView();
-                return view;
-            }
-            catch { view.Dispose(); throw; }
+        }
+
+        internal void RestoreLanguageView(CastingWorkspaceScreenView view)
+        {
+            view._sourceCategory = _sourceCategory;
+            view._buffSearch.text = _buffQuery;
+            view.RefreshView();
         }
 
         internal Transform ControllerFocusScope { get { return ClearPlanOpen ? _clearOverlay : ControllerResourcesOpen ? _resources : _root; } }

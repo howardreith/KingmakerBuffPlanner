@@ -69,6 +69,13 @@ namespace KingmakerBuffPlanner.UI
         internal ControllerBackIntent(Func<T> selected, Func<T, bool> focused, Action<T> leaveText, Action back)
         { _selected = selected; _focused = focused; _leaveText = leaveText; _back = back; }
 
+        internal void Reset()
+        {
+            _pending = false;
+            _pendingText = _canceledText = null;
+            _canceledFrame = int.MinValue;
+        }
+
         internal void ObserveTextCancellation(T field, int frame)
         {
             _canceledText = field;

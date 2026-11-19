@@ -47,6 +47,7 @@
     <Compile Include="ProductionExecutionTests.cs" />
     <Compile Include="NativeDurationTests.cs" />
     <Compile Include="LocalizationTests.cs" />
+    <Compile Include="LocalizationInputTests.cs" />
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\KingmakerDurationAdapter.cs" />
     <Compile Include="HeroismRepeatTests.cs" />
     <Compile Include="PreparedSlotSpendTests.cs" />

@@ -2089,8 +2089,7 @@ namespace KingmakerBuffPlanner.UI
                 // and Close control before acquiring its input ownership.
                 if (_controllerEditor != null)
                 {
-                    _controllerEditor.TextRoot = _castingWorkspace.RootObject.transform;
-                    _controllerEditor.Command = _castingWorkspace.ControllerCommand;
+                    BindControllerWorkspace();
                     lease = BuffPlannerInputLease.Acquire(boundary);
                 }
                 double constructionMilliseconds = ElapsedMilliseconds(constructionStarted);
@@ -2614,17 +2613,36 @@ namespace KingmakerBuffPlanner.UI
             {
                 var prior = root._castingWorkspace;
                 Component host = root._controllerEditor == null ? (Component)StaticCanvas.Instance : root._controllerHost;
-                root._castingWorkspace = prior.WithCurrentLanguage(host);
-                if (root._controllerEditor != null)
-                {
-                    root._controllerEditor.TextRoot = root._castingWorkspace.RootObject.transform;
-                    root._controllerEditor.Command = root._castingWorkspace.ControllerCommand;
-                }
-                prior.Dispose();
+                try { root.ReplaceWorkspaceForLanguage(() => prior.CreateLanguageView(host), prior.RestoreLanguageView); }
+                catch (Exception error) { root._log.Error("[KBP-WORKSPACE] Language refresh failed; workspace closed.", error); }
             }
             root._lastCastingPress.Clear();
             if (root._hud != null) root._hud.RefreshNativeTooltipText();
             if (_instance._spellbookEntry != null) _instance._spellbookEntry.Release();
+        }
+
+        private void BindControllerWorkspace()
+        {
+            _controllerEditor.TextRoot = _castingWorkspace.RootObject.transform;
+            _controllerEditor.Command = _castingWorkspace.ControllerCommand;
+        }
+
+        private void ReplaceWorkspaceForLanguage(Func<CastingWorkspaceScreenView> build,
+            Action<CastingWorkspaceScreenView> restorePresentation)
+        {
+            try
+            {
+                // Dispose the old navigator before the new one captures the native navigation state.
+                _castingWorkspace.Dispose();
+                _castingWorkspace = build();
+                restorePresentation(_castingWorkspace);
+                if (_controllerEditor != null) BindControllerWorkspace();
+            }
+            catch
+            {
+                CloseCastingWorkspace();
+                throw;
+            }
         }
 
         private void Tick(float deltaTime)

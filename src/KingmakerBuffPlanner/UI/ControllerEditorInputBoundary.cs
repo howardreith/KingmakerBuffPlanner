@@ -151,6 +151,7 @@ namespace KingmakerBuffPlanner.UI
         internal void ResetWorkspaceActivation()
         {
             _pendingCommand = null;
+            _backIntent.Reset();
             _latch.Reset();
             _repeat.Reset();
         }
@@ -159,8 +160,19 @@ namespace KingmakerBuffPlanner.UI
         {
             bindings.AddRange(_layer.AddButton(_ =>
             {
-                if (Valid && _latch.Take(Time.frameCount)) _pendingCommand = command;
+                if (Valid) CaptureCommand(command, PlannerImeGuard.Active, Time.frameCount);
             }, action, InputActionEventType.ButtonJustPressed, false, false).Binds.Cast<object>());
+        }
+
+        private bool SuppressComposition(bool composing)
+        {
+            if (composing) ResetWorkspaceActivation();
+            return composing;
+        }
+
+        private void CaptureCommand(ControllerWorkspaceCommand command, bool composing, int frame)
+        {
+            if (!SuppressComposition(composing) && _latch.Take(frame)) _pendingCommand = command;
         }
 
         private ControllerWorkspaceCommand? Navigation()
@@ -179,7 +191,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal void RequestBack()
         {
-            if (!Valid || PlannerImeGuard.Active) return;
+            if (!Valid || SuppressComposition(PlannerImeGuard.Active)) return;
             _backIntent.Request(_latch, Time.frameCount);
         }
 
@@ -192,28 +204,34 @@ namespace KingmakerBuffPlanner.UI
         internal void ObserveTextCancellation(TMPro.TMP_InputField field)
         {
             if (field != null && TextRoot != null && field.transform.IsChildOf(TextRoot) &&
-                Valid && field.isFocused && field.wasCanceled)
+                Valid && !SuppressComposition(PlannerImeGuard.Active) && field.isFocused && field.wasCanceled)
                 _backIntent.ObserveTextCancellation(field, Time.frameCount);
         }
 
         internal void Tick()
         {
-            if (!Valid || PlannerImeGuard.Active) return;
+            if (!Valid) return;
             if (Game.Instance.CurrentMode != GameModeType.FullScreenUi) { _modeWaitFrames++; return; }
             bool neutral = ControllerRoutineMenu.ControlsAreNeutral() &&
                 !Input.GetMouseButton(0) && !Input.GetMouseButton(1) && !Input.GetMouseButton(2) && !Input.GetKey(KeyCode.Escape);
-            _latch.Observe(neutral, Time.frameCount);
-            if (!_armed && _latch.Ready(Time.frameCount))
+            DispatchInput(PlannerImeGuard.Active, neutral, Time.frameCount, Time.unscaledTime, Navigation());
+        }
+
+        private void DispatchInput(bool composing, bool neutral, int frame, float time, ControllerWorkspaceCommand? direction)
+        {
+            if (SuppressComposition(composing)) return;
+            _latch.Observe(neutral, frame);
+            if (!_armed && _latch.Ready(frame))
             {
                 _armed = true;
                 if (_module != null) _module.allowMouseInput = true;
             }
-            _backIntent.Complete(_latch, neutral, Time.frameCount);
+            _backIntent.Complete(_latch, neutral, frame);
             ControllerWorkspaceCommand? command = _pendingCommand;
             _pendingCommand = null;
             if (command.HasValue && Command != null) Command(command.Value);
-            ControllerWorkspaceCommand? navigation = _latch.Ready(Time.frameCount) ? Navigation() : null;
-            if (_repeat.Take(navigation, Time.unscaledTime) && Command != null) Command(navigation.Value);
+            ControllerWorkspaceCommand? navigation = _latch.Ready(frame) ? direction : null;
+            if (_repeat.Take(navigation, time) && Command != null) Command(navigation.Value);
         }
 
         public void YieldFullScreenOwnership() { _modeOwned = false; }

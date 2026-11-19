@@ -27,6 +27,7 @@ namespace KingmakerBuffPlanner.Tests
         {
             RunNativeDurationTests();
             RunLocalizationTests(root);
+            RunLocalizationInputTests(root);
             RunCastAvailableTests(root);
             foreach (string executionMode in new[] { "instant", "animated" })
             {
