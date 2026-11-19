@@ -60,7 +60,7 @@ Base `639b5d2a3119efa2d2db9323f663d6aa69cd1d65`, frozen 0.6.15 source `b48e9ebeb
 | Assembly-CSharp.dll | Installed Kingmaker 2.1.7b, SHA-256 `3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb` |
 | Automation fixture | BASELINE `f13de02d7c59a70a34d335a413f0d90fc7e63cdcb327224ecf5885ed6e1f8300`, WORKING at preflight `c567fd46c79482df5c45fc4ef79173ce47a1e448912a307f13b867e0359af0af` |
 
-Local evidence paths are relative to the frozen KBP-ZHCN worktree. The package and its build manifest are in `artifacts/local-runtime/0.6.15/`. The catalog receipt is `artifacts/zhcn-catalog-audit.json` and the pre-live transcript is `artifacts/zhcn-source-only.log`.
+Local evidence paths are relative to the frozen KBP-ZHCN worktree. The package and its build manifest are in `artifacts/local-runtime/0.6.15/`. The catalog receipt is `artifacts/zhcn-catalog-audit.json` and the pre-live transcript is `artifacts/zhcn-source-only.log`. The post-stop receipt `artifacts/zhcn-stop-evidence.json` records enGB, zero game processes, an absent deployment lock and sentinel, and the unchanged hashes of both fixtures.
 
 | Checks | Result |
 |---|---|
@@ -68,13 +68,16 @@ Local evidence paths are relative to the frozen KBP-ZHCN worktree. The package a
 | L04–L06 | Presentation invalidation, Unicode/native-name filtering and the English/Chinese/edit/save/reload/English fixture passed. Byte-level comparison before editing and JSON comparison after editing preserved unrelated fields |
 | D01–D05 | Assembly-backed structural estimates, English/Chinese/blank duration parity, readiness, resource demand, forecast contract, two-round and half-duration thresholds, source/rod overlap, permanent/fixed/unknown/mixed graphs and existing-effect/transient fixtures passed |
 | Build and offline | 47 source checks, one build, eight archive checks, one local package, 40 launcher argument cases, 62 focused tests and 738 full offline tests passed with zero failures in each. The 38 filesystem harness, 20 physical-search, 35 problem-navigation and 50 spellbook-entry reader cases passed |
-| Live | Pending the guarded pre-live suite and candidate observations. Asset inspection covered all 539 distinct Han characters in the catalog. Rendered glyphs, layout, clipboard input and IME composition need separate live observations |
+| Installed UMM | Six isolated checks against the packaged DLL and installed UMM passed, including the actual Settings.xml path, freshly deserialized saved preferences, invalid value fallback without a rewrite, and the guarded startup XML fixture |
+| Pre-live guards | Deployment WhatIf purity 5/0 and launcher child-argument checks 14/0 passed. The source-only aggregate was stopped before its non-WhatIf real-launch refusal case when an unrelated Steam launch window was observed. The full launcher purity receipt is pending. Standalone isolated fixture evidence 3/0, install rollback 16/0, publisher-gate tests 8/0 and display transaction 10/0 passed afterward |
+| Live | **BLOCKED.** Steam displayed an unrelated “Launching...” window alongside Civilization V and a World Builder error dialog. The repository stop condition applied before staging. There were zero Kingmaker processes, no deployment lock and no candidate transaction. No game-language, game-save or installation changes were made. Asset inspection covered all 539 distinct Han characters in the catalog. Rendered glyphs, layout, clipboard input and IME composition still need observations |
 
 Commands used for the candidate and focused regressions:
 
 ```powershell
 .\scripts\Test-Development.ps1 -Only 'localization-,duration-,rollback-candidate,quick-result-has-no-floating,focused-casting-routine-order,planners-show-unusable,provider-choices-name,classic-run-advances,planner-mode-is-stated,planner-escape-never,spellbook-entry-pairs,direct-manipulation-sidebar,human-feedback-native-resources,presentation-view-models,clear-plan,run-presentation,native-ui-game-log,controller-workspace,casting-workspace-persistence-round-trip,live-existing-effect,cast-available-migration,infectious-charms-transient'
 .\scripts\Test-LocalizationCatalogs.ps1
+.\scripts\Test-LocalizationSettings.ps1 -CandidateDll .\artifacts\local-runtime\0.6.15\staging\KingmakerBuffPlanner\KingmakerBuffPlanner.dll
 .\scripts\Test-RuntimeLauncherArguments.ps1
 .\scripts\Build-Local.ps1
 .\scripts\Test-SourceOnly.ps1
@@ -83,6 +86,8 @@ Commands used for the candidate and focused regressions:
 ## Runtime acceptance
 
 After the pre-live suite passes, run from the frozen worktree in Windows PowerShell 5.1. Each observation requires a unique run ID. Inspect the actual `gameLocale`, `plannerLanguage`, captured frames, loaded WORKING identity and transaction restoration records. The native facts probe does not cast. Only a separately admitted casting scenario can qualify gameplay.
+
+The next admission is after the unrelated Steam operation has been resolved by its owner and the desktop is clear. Re-run the pre-live suite from the frozen candidate before any stage or launch. Keep the sealed fixture and original installation in place.
 
 ```powershell
 $facts = @{ Scenario='live-workspace-native-ui'; NativeUiStage='facts'; DisplayMode='windowed-1280x720'; FixtureFamily='Automation'; CompatibilityProfileId='full-user'; TimeoutSeconds=900 }
@@ -93,3 +98,16 @@ $facts = @{ Scenario='live-workspace-native-ui'; NativeUiStage='facts'; DisplayM
 ```
 
 R01–R05 require rendered screens and direct operation, including forced-Chinese UMM controls and the HUD's native tooltip under English startup. R06 additionally requires a Chinese IME and actual controller checks for R05 require a connected controller. At baseline Windows reported only US English input and no matching controller. R07 needs a verified normal and Extend-capable provider in WORKING, a fresh guarded selection and run-bound casting allowance for each authorized execution. Historical inventory of this WORKING fixture had no Extend source or rod. R08 requires signed-off restoration evidence for every transaction, including the pre-run game registry for controlled startups. Never mutate BASELINE or another save to prepare a test.
+
+| ID | Candidate observation still required |
+|---|---|
+| R01 | Open from the English HUD and spellbook in Automatic. Inspect the plan, change selection and close normally |
+| R02 | Start in zhCN with Automatic. Inspect actual native names and rendered planner labels, search a party provider by its Chinese name, then make a representative allowance-bound cast |
+| R03 | Start in enGB with the forced zhCN fixture. Inspect UMM, TMP, uGUI, editable fields and the native HUD tooltip. Check English native content alongside Chinese planner text |
+| R04 | Start in zhCN with the English override. Change the preference at a safe boundary, reopen and restart with the saved preference. Compare plan and assignment identities |
+| R05 | At 1280×720 and the normal supported layout inspect resources, status, Clear/Undo, long tooltips and scroll limits. Repeat the controller routes with a connected controller |
+| R06 | Use a Chinese IME for real candidate selection, commit, cancellation and focus transitions. Exercise paste, edit and clear separately. Save/reload a Unicode name where supported |
+| R07 | Use `live-cast-qual-select` with `-QualificationRecipe rod-extend-direct` to establish current WORKING capability. Prepare an approved WORKING-only fixture if absent. With run-specific admission, compare instant and animated normal/extended skips, recasts and resource counts across languages |
+| R08 | Verify the original game registry, normal Mods and all protected-save hashes after every admitted run. No candidate was staged in this sprint |
+
+The English-duration parser and the maximum transient lifetime were both rejected as mechanical estimators. A UI source assertion that required an inline English caption was updated to check the new binding and its actual English output. An early full offline run found ten such outdated checks. A subsequent run found a test naming supported revision 6 as “future”. The fixture now uses the next unsupported revision. The final 738/0 result supersedes those offline failures. Native rendering, IME safety and native gameplay outcomes remain unverified on these bytes.
