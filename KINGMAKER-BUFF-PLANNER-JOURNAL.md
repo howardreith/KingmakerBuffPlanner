@@ -1,3 +1,5 @@
+2026-11-19 · PR #24 recovery harness `416032f` restored the original 1,134-entry Mods tree and retained the candidate in quarantine. The failed completion receipt and deployment lock survive. The 0.6.19 product remains at `7a732c4`. [Recovery tests, receipts and display obligation](docs/LOCALIZATION.md#mods-recovery-for-zhcn19-zh-auto-01).
+
 2026-11-19 · Chinese WORKING opened and displayed-name search passed on 0.6.18. The native comparison fixture selected by English name and failed its three-recipient prerequisite. Version 0.6.19 uses the observed blueprint/source identity. [Receipts](docs/LOCALIZATION.md#candidate-and-evidence).
 
 2026-11-19 · Frozen 0.6.18 at `14c831269c28dd3a147ca989fc8ce69619746ab0` after four 0.6.17 startup tests exposed Chinese load admission, text clipping and untranslated source qualifiers. The [acceptance record](docs/LOCALIZATION.md#candidate-and-evidence) includes all five 0.6.17 transaction outcomes and restoration receipts.
