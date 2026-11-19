@@ -51,7 +51,28 @@ Identity, recipient, strength, caster level, suppression and metamagic checks st
 
 ## Candidate and evidence
 
-The corrected 0.6.16 candidate comes from `4bf737406060200661556452588308baeeef4851`, following reviewed PR head `cfac4bce02274b4f0e7f3ecb0f4aaf2659759c40` on the same base. The original 0.6.15 package and evidence remain in KBP-ZHCN. The new frozen worktree is KBP-ZHCN-Review on branch `codex/kingmaker-buff-planner-zhcn-input-candidate`. The review branch is `codex/kingmaker-buff-planner-zhcn-localization`.
+**Current frozen candidate 0.6.17** · Product and launcher source `d6e341fcc4951764f7b650cef481014507ef8e98`. Base `639b5d2a3119efa2d2db9323f663d6aa69cd1d65`. The package and manifest are in `KBP-ZHCN-InputReview/artifacts/local-runtime/0.6.17/`, frozen on `codex/kingmaker-buff-planner-zhcn-0617-candidate`. Later acceptance records live on the PR branch. The ZIP and staging DLL were rehashed on resumption and matched the manifest.
+
+| 0.6.17 artifact | Identity |
+|---|---|
+| DLL SHA-256 | `6e900b4bcab34afb7a8badad413ec74ef8fb25e4d13c28bde301e526d4eb5329` |
+| ZIP SHA-256 | `d8e4c8a561749e653a8e814fc026b8770e881f83b699a121aca9e0918b63ace8` |
+| Assembly MVID | `861fd6cd-c084-4734-8285-7f20feec727d` |
+
+The 0.6.17 request reader admits the launcher's two optional locale fields for controlled native UI runs. It checks supported values, screen and scenario scope, and continues to reject extra fields. The host compares both observed languages for Automatic and manual fixtures.
+
+| Check | 0.6.17 result and receipt |
+|---|---|
+| Focused behavior | `Test-Development.ps1 -Only 'native-ui-scenario-admission,localization-,controller-workspace,clear-plan-view,casting-workspace-persistence-round-trip'` passed 39/39 on the product changes before the freeze (6.2 seconds, console receipt `c2e5e3`). The request reproduction initially failed 0/1 with `invalid-request:live-save-parameters`. |
+| Build and archive | Source 47/47, build 1/1, package validation 8/8 and local package 1/1. See `artifacts/zhcn17-build.log` in the frozen worktree. |
+| Packaged DLL and catalogs | `Test-LocalizationSettings.ps1` against the staged DLL passed 6/6. `Test-LocalizationCatalogs.ps1` found 1,082 entries in each language and 1,079 lookup sites with zero errors. Captured in invocation 71491, console receipt `41a078`. |
+| Pre-live gate | Recovered the original `Test-SourceOnly.ps1` invocation 71491, exit 0. `artifacts/zhcn17-source.log` ends with aggregate 1/1 and independently records 746/746 C# tests for **0.6.17**. Launcher argument cases 40, source 47, filesystem harness 38, physical search 20, navigation 35, spellbook 50, deployment purity 5, launcher file purity 13, fixture inventory 3, install rollback 16 and publisher gate 8 all passed. |
+
+### Historical 0.6.16 evidence
+
+The guarded English/Automatic run `zhcn16-en-auto-02` loaded the 0.6.16 DLL and rejected the request with `invalid-request:live-save-parameters` before the workspace opened. The game exited normally. The launcher's completion receipt records `complete=false`, `gameResultStatus=none`, `kingmakerExited=true`, `restorationVerified=true`, and `protectedSavesClean=true`. The protected-save comparison found zero changes or violations. See `runtime-evidence/zhcn16-en-auto-02/{orchestration,run-completion,protected-saves}.json` in the lab and `KBP-ZHCN-Review/artifacts/zhcn16-en-auto-02.log` for the display, registry and installation rollback.
+
+The historical 0.6.16 candidate came from `4bf737406060200661556452588308baeeef4851`, following reviewed PR head `cfac4bce02274b4f0e7f3ecb0f4aaf2659759c40` on the same base. The original 0.6.15 package and evidence remain in KBP-ZHCN. Its frozen worktree is KBP-ZHCN-Review on branch `codex/kingmaker-buff-planner-zhcn-input-candidate`. The review branch is `codex/kingmaker-buff-planner-zhcn-localization`.
 
 | 0.6.16 artifact | Identity |
 |---|---|
@@ -104,7 +125,7 @@ Commands used for the candidate and focused regressions:
 
 ## Runtime acceptance
 
-After the pre-live suite passes, run from the frozen worktree in Windows PowerShell 5.1. Each observation requires a unique run ID. Inspect the actual `gameLocale`, `plannerLanguage`, captured frames, loaded WORKING identity and transaction restoration records. The native facts probe does not cast. Only a separately admitted casting scenario can qualify gameplay.
+The 0.6.17 pre-live suite passed. Run from the frozen worktree in Windows PowerShell 5.1. Each observation requires a unique run ID. Inspect the actual `gameLocale`, `plannerLanguage`, captured frames, loaded WORKING identity and transaction restoration records. The native facts probe does not cast. Only a separately admitted casting scenario can qualify gameplay.
 
 Before 0.6.16 admission the previous unrelated launch window had cleared. The current-session Steam safety check passed. The physical input inventory found US English (0409:00000409) and no matching game controller. The BASELINE and WORKING hashes matched the values recorded above.
 
@@ -118,15 +139,15 @@ $facts = @{ Scenario='live-workspace-native-ui'; NativeUiStage='facts'; DisplayM
 
 R01–R05 require rendered screens and direct operation, including forced-Chinese UMM controls and the HUD's native tooltip under English startup. R06 additionally requires a Chinese IME and actual controller checks for R05 require a connected controller. At baseline Windows reported only US English input and no matching controller. R07 needs a verified normal and Extend-capable provider in WORKING, a fresh guarded selection and run-bound casting allowance for each authorized execution. Historical inventory of this WORKING fixture had no Extend source or rod. R08 requires signed-off restoration evidence for every transaction, including the pre-run game registry for controlled startups. Never mutate BASELINE or another save to prepare a test.
 
-| ID | Candidate observation still required |
+| ID | 0.6.17 status and observation still required |
 |---|---|
-| R01 | Open from the English HUD and spellbook in Automatic. Inspect the plan, change selection and close normally |
-| R02 | Start in zhCN with Automatic. Inspect actual native names and rendered planner labels, search a party provider by its Chinese name, then make a representative allowance-bound cast |
-| R03 | Start in enGB with the forced zhCN fixture. Inspect UMM, TMP, uGUI, editable fields and the native HUD tooltip. Check English native content alongside Chinese planner text |
-| R04 | Start in zhCN with the English override. Change the preference at a safe boundary, reopen and restart with the saved preference. Compare plan and assignment identities |
-| R05 | At 1280×720 and the normal supported layout inspect resources, status, Clear/Undo, long tooltips and scroll limits. Repeat the controller routes with a connected controller |
-| R06 | Use a Chinese IME for real candidate selection, commit, cancellation and focus transitions. Exercise paste, edit and clear separately. Save/reload a Unicode name where supported |
-| R07 | Use `live-cast-qual-select` with `-QualificationRecipe rod-extend-direct` to establish current WORKING capability. Prepare an approved WORKING-only fixture if absent. With run-specific admission, compare instant and animated normal/extended skips, recasts and resource counts across languages |
-| R08 | Verify the original game registry, normal Mods and all protected-save hashes after every admitted run. No candidate was staged in this sprint |
+| R01 | **PENDING.** Open from the English HUD and spellbook in Automatic. Inspect the plan, change selection and close normally |
+| R02 | **PENDING.** Start in zhCN with Automatic. Inspect actual native names and rendered planner labels, search a party provider by its Chinese name, then make a representative allowance-bound cast |
+| R03 | **PENDING.** Start in enGB with the forced zhCN fixture. Inspect UMM, TMP, uGUI, editable fields and the native HUD tooltip. Check English native content alongside Chinese planner text |
+| R04 | **PENDING.** Start in zhCN with the English override. Change the preference at a safe boundary, reopen and restart with the saved preference. Compare plan and assignment identities |
+| R05 | **PENDING.** At 1280×720 and the normal supported layout inspect resources, status, Clear/Undo, long tooltips and scroll limits. Repeat the controller routes with a connected controller |
+| R06 | **PENDING.** Use a Chinese IME for real candidate selection, commit, cancellation and focus transitions. Exercise paste, edit and clear separately. Save/reload a Unicode name where supported |
+| R07 | **PENDING.** Use `live-cast-qual-select` with `-QualificationRecipe rod-extend-direct` to establish current WORKING capability. Prepare an approved WORKING-only fixture if absent. With run-specific admission, compare instant and animated normal/extended skips, recasts and resource counts across languages |
+| R08 | **Per transaction.** Restoration passed for the failed 0.6.16 run above. Verify game registry, normal Mods and protected saves for each 0.6.17 run |
 
 The English-duration parser and the maximum transient lifetime were both rejected as mechanical estimators. A UI source assertion that required an inline English caption was updated to check the new binding and its actual English output. An early full offline run found ten such outdated checks. A subsequent run found a test naming supported revision 6 as “future”. The fixture now uses the next unsupported revision. The final 738/0 result supersedes those offline failures. Native rendering, IME safety and native gameplay outcomes remain unverified on these bytes.

@@ -1,3 +1,5 @@
+2026-11-19 · Recovered the passing 0.6.17 pre-live gate for `d6e341fcc4951764f7b650cef481014507ef8e98` and verified both frozen hashes. The [localization record](docs/LOCALIZATION.md#candidate-and-evidence) identifies the 0.6.16 failed request and restoration separately.
+
 2026-11-19 · PR #24 input correction froze 0.6.16 at `4bf737406060200661556452588308baeeef4851`. Eight input regressions and all 746 offline tests passed. The [candidate record](docs/LOCALIZATION.md#candidate-and-evidence) distinguishes these results from the earlier artifact.
 
 2026-11-19 · Prepared the 0.6.15 Simplified Chinese candidate for draft PR #24. The frozen build, test counts and open live checks are in the [localization record](docs/LOCALIZATION.md#candidate-and-evidence).
