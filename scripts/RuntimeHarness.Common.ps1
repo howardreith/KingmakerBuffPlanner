@@ -1063,6 +1063,9 @@ function Restore-KbpRuntimeTransaction {
     $statePath = Join-Path $StateRoot ('transactions\' + $RunId + '\transaction.json')
     $state = Read-KbpJson $statePath
     if ($state.schemaVersion -ne 1 -or $state.runId -cne $RunId) { throw 'Runtime transaction state identity is invalid.' }
+    if ($null -ne $state.PSObject.Properties['modsRecovery']) {
+        throw "Display recovery for $RunId must be finalized through Restore-Local.ps1."
+    }
     if ($state.status -ceq 'Restored') { return $state }
     Assert-KbpOwnedLock $state.lockPath $RunId $state.token
     # Serialized with the owner's other lab (review C3): this run's Mods

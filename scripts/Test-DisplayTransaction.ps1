@@ -127,12 +127,8 @@ try {
     Write-Host 'PASS mismatch-recovery-remains-guarded'
     $passed++
 
-    $restoreText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Restore-Local.ps1') -Raw
-    $physicalAt = $restoreText.IndexOf('Confirm-KbpPhysicalDisplaySnapshotFile')
-    $modsAt = $restoreText.IndexOf('Restore-KbpRuntimeTransaction')
-    Assert-Test ($physicalAt -ge 0 -and $modsAt -gt $physicalAt) `
-        'Restore-Local can release the Mods transaction before display verification.'
-    Write-Host 'PASS recovery-verifies-display-before-mods'
+    & (Join-Path $PSScriptRoot 'Test-DisplayModsRecovery.ps1')
+    Write-Host 'PASS scoped-mods-recovery-keeps-launch-exclusion'
     $passed++
 
     $goodCase = New-ScreenCase (Join-Path $boundary 'screen-good')

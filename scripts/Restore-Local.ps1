@@ -1,6 +1,8 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
     [Parameter(Mandatory = $true)][ValidatePattern('^[A-Za-z0-9._-]{1,100}$')][string]$RunId,
+    # Recover the original Mods under the held lock after an isolated display mismatch.
+    [switch]$RestoreModsOnly,
     # The launcher compares the protected saves itself (before calling this).
     [switch]$SkipProtectedSaveComparison,
     # Focused re-review: for a comparison that can never be made (its
@@ -36,6 +38,15 @@ if ($CloseUnverifiableComparison -and -not $pending) {
     throw "Refusing -CloseUnverifiableComparison: no protected-save comparison of run $RunId is pending."
 }
 if (-not $PSCmdlet.ShouldProcess($RunId, 'restore and hash-verify the exact pre-run Mods state')) { return }
+function Invoke-LocalRecovery {
+    $transaction = Read-KbpJson $statePath
+    if ($RestoreModsOnly -or $null -ne $transaction.PSObject.Properties['modsRecovery']) {
+        if ($SkipProtectedSaveComparison -or $CloseUnverifiableComparison) { throw 'Display recovery requires clean save evidence.' }
+        . (Join-Path $PSScriptRoot 'RuntimeDisplayRecovery.ps1')
+        $recovered = Invoke-KbpDisplayRecovery $RunId $StateRoot $EvidenceRoot -ModsOnly:$RestoreModsOnly
+        Write-Host "Mods recovery: run=$RunId phase=$($recovered.status) restorationVerified=$($recovered.restorationVerified)"
+        return
+    }
 # A display-mode run's saved game registry comes back first (the game must
 # not run); an already restored snapshot is left as it is.
 $registryPath = Join-Path (Split-Path -Parent $statePath) 'display-registry.json'
@@ -130,3 +141,17 @@ catch {
 }
 Write-Host "Runtime restoration: verified=$($state.restorationVerified) run=$RunId"
 if ($null -ne $saveFailure) { throw $saveFailure }
+}
+
+# Serializes retries, including ordinary restoration racing an explicit recovery.
+# A process interruption abandons the mutex but keeps the durable deployment lock.
+$mutex = [Threading.Mutex]::new($false, ('Global\KbpRestore-' + $RunId.ToLowerInvariant()))
+$held = $false
+try {
+    try { $held = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $held = $true }
+    if (-not $held) { throw "Another restore is active for $RunId." }
+    Invoke-LocalRecovery
+} finally {
+    if ($held) { $mutex.ReleaseMutex() }
+    $mutex.Dispose()
+}
