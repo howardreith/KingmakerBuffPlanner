@@ -172,6 +172,13 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 {
                     _nativeUi.RunId = _request.RunId;
                     _nativeUi.Stage = NativeUiStage;
+                    object expectedGame, expectedPlanner;
+                    if (_request.Parameters.TryGetValue("acceptanceGameLocale", out expectedGame) &&
+                        !string.Equals(expectedGame as string, GameAdapters.KingmakerLanguage.Current, StringComparison.OrdinalIgnoreCase))
+                        return FinishNativeUi("acceptance-game-locale-mismatch");
+                    if (_request.Parameters.TryGetValue("acceptancePlannerLanguage", out expectedPlanner) &&
+                        !string.Equals(expectedPlanner as string, PlannerText.Language, StringComparison.OrdinalIgnoreCase))
+                        return FinishNativeUi("acceptance-planner-language-mismatch");
                     _nativeUi.ScreenWidth = Screen.width;
                     _nativeUi.ScreenHeight = Screen.height;
                     Canvas canvas = StaticCanvas.Instance == null ? null : StaticCanvas.Instance.GetComponent<Canvas>();
@@ -181,6 +188,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (cluster == null) return FinishNativeUi("hud-native-cluster-missing");
                     var hudFacts = new JObject
                     {
+                        { "gameLocale", GameAdapters.KingmakerLanguage.Current },
+                        { "plannerLanguage", PlannerText.Language },
                         { "panel", NativeUiFacts.Subtree(cluster, "Menu_Buttons48px") },
                         { "log", NativeUiFacts.Subtree(NativeUiFacts.GameLogPanel(), "game-log") },
                         { "plannerHud", hud.ObjectEvidence }

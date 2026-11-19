@@ -88,11 +88,18 @@ param(
     # planner's native integration. Neither takes a casting allowance and
     # neither sends OS input.
     [ValidateSet('facts', 'qualify')][string]$NativeUiStage,
+    [ValidateSet('enGB', 'zhCN')][string]$AcceptanceGameLocale,
+    [ValidateSet('enGB', 'zhCN')][string]$AcceptancePlannerLanguage,
     [ValidateSet('absent', 'present')][string]$HeroismCondition
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if (($AcceptanceGameLocale -or $AcceptancePlannerLanguage) -and ($Scenario -ine 'live-workspace-native-ui' -or $DisplayMode -ieq 'owner')) {
+    $PSCmdlet.ThrowTerminatingError([System.Management.Automation.ErrorRecord]::new(
+        [ArgumentException]::new('Language fixtures require the windowed native UI scenario and its registry rollback.'),
+        'KBP_LOCALE_SCENARIO', [System.Management.Automation.ErrorCategory]::InvalidArgument, $Scenario))
+}
 if ($Scenario -ieq 'live-heroism-fixture-prepare') {
     if ($FixtureFamily -ine 'Automation' -or $CompatibilityProfileId -ine 'full-user' -or
         [string]::IsNullOrWhiteSpace($HeroismCondition) -or $TimeoutSeconds -lt 900) {
@@ -498,6 +505,25 @@ try {
         # apply to this run only and are restored by it (the game's saved
         # options otherwise override Unity's command-line screen flags).
         Set-KbpWindowedScreenValues -KeyPath $script:KbpGameRegistryKey -Size $displaySize
+        if ($AcceptanceGameLocale) {
+            # The complete registry preimage is already durable under the transaction lock.
+            $localeBytes = if ($AcceptanceGameLocale -ieq 'zhCN') { [Text.Encoding]::ASCII.GetBytes("zhCN`0") }
+                else { [Text.Encoding]::ASCII.GetBytes("enGB`0") }
+            Set-ItemProperty -LiteralPath $script:KbpGameRegistryKey -Name 'LocalePref_h3990592140' -Type Binary -Value $localeBytes -ErrorAction Stop
+        }
+    }
+    if ($AcceptancePlannerLanguage) {
+        # Seed the same UMM preference a player saves. Only the freshly staged candidate may receive it.
+        $mods = Join-Path (Get-KbpGamePath) 'Mods'
+        $sentinel = Get-Content -LiteralPath (Join-Path $mods '.kbp-runtime-sentinel.json') -Raw | ConvertFrom-Json
+        if ($sentinel.runId -cne $runId -or $sentinel.statePath -cne $statePath) { throw 'Locale fixture requires the active candidate transaction.' }
+        $settings = Join-Path $mods 'KingmakerBuffPlanner/Settings.xml'
+        $preference = if ($AcceptancePlannerLanguage -ieq 'zhCN') { 'zhCN' } else { 'enGB' }
+        $file = [IO.File]::Open($settings, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        try {
+            $bytes = [Text.Encoding]::UTF8.GetBytes("<PlannerLanguageSettings><Language>$preference</Language></PlannerLanguageSettings>")
+            $file.Write($bytes, 0, $bytes.Length)
+        } finally { $file.Dispose() }
     }
     $scenarioParameters = if ($null -ne $savePair) { @{
         workingSaveName = $savePair.working.name; workingFileName = $savePair.working.fileName
@@ -543,6 +569,8 @@ try {
     if ($Scenario -ceq 'live-workspace-native-ui') {
         # Which native UI stage the host records and judges.
         $scenarioParameters.nativeUiStage = $NativeUiStage
+        if ($AcceptanceGameLocale) { $scenarioParameters.acceptanceGameLocale = $AcceptanceGameLocale }
+        if ($AcceptancePlannerLanguage) { $scenarioParameters.acceptancePlannerLanguage = $AcceptancePlannerLanguage }
     }
     if ($Scenario -ceq 'live-heroism-fixture-prepare') { $scenarioParameters.heroismCondition = $HeroismCondition }
     if ($null -ne $qualificationAllowanceJson) {

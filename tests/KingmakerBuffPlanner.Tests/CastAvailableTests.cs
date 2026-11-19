@@ -125,7 +125,7 @@ namespace KingmakerBuffPlanner.Tests
             Expect(!CastingRunPolicy.Apply(backup, null, "long", run.World.Inputs()).Allowed &&
                 File.ReadAllText(path) == "{bad-json", "migration overwrote protected primary");
             File.WriteAllBytes(path, original);
-            var future = JObject.Parse(File.ReadAllText(path)); future["formatRevision"] = 6;
+            var future = JObject.Parse(File.ReadAllText(path)); future["formatRevision"] = CastingPlanProfile.CurrentFormatRevision + 1;
             File.WriteAllText(path, future.ToString());
             var unsupported = new CastingWorkspaceSession(dir, "repeat-campaign", boundary);
             Expect(unsupported.PersistenceBlocked && unsupported.LoadStatus == CastingPlanLoadStatus.UnsupportedSchema &&
