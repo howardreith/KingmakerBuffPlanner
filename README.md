@@ -1,5 +1,9 @@
 # Mr. Bard's Kingmaker Buff Planner
 
+## [0.6.19 release](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.19)
+
+Choose Automatic, English, or 简体中文 in Unity Mod Manager. The planner can follow Kingmaker's language or use your preference. Native spell and item names follow the game. [Release notes](docs/RELEASE-NOTES-0.6.19.md).
+
 **Release: [0.6.14](https://github.com/howardreith/KingmakerBuffPlanner/releases/tag/v0.6.14).**
 This owner-authorized repair keeps saved item castings, such as Blessed Signet,
 connected to their source across save and load. Castings already disconnected
@@ -159,8 +163,8 @@ did not distinguish a deliberate choice from the old default. See the
 [development checkpoint](docs/CAST-AVAILABLE-DEFAULT-CHECKPOINT.md).
 
 Mr. Bard's Kingmaker Buff Planner is a standalone Unity Mod Manager mod built
-against **Windows Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b**. The
-0.6.14 retains the native Linux 2.1.5d version gate but has not passed a
+against **Windows Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b**. Version
+0.6.19 retains the native Linux 2.1.5d version gate but has not passed a
 native Linux trial.
 
 It plans and applies party buffs while preserving Kingmaker targeting,
@@ -170,7 +174,7 @@ packaging, and runtime automation owned by this repository.
 
 ## Install and use
 
-Download `KingmakerBuffPlanner-0.6.14.zip` from the GitHub Release's **Assets**
+Download `KingmakerBuffPlanner-0.6.19.zip` from the GitHub Release's **Assets**
 section. Do not download GitHub's automatically generated source-code archives.
 
 Back up your existing `Mods\KingmakerBuffPlanner` folder (including

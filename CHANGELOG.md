@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.19 - 2026-11-19 - Simplified Chinese planner
+
+- Added Automatic, English and 简体中文 preferences for planner text. Game-provided names follow the game language.
+- Existing-buff duration checks use ability data across languages.
+- Restored keyboard navigation after language switches and suppressed queued controller commands during IME composition.
+- Owner-authorized pre-runtime release. [Release notes](docs/RELEASE-NOTES-0.6.19.md).
+
 ## 0.6.14 - 2026-11-08 - durable item-source selection after 0.6.13
 
 - A casting from an item (such as Blessed Signet) now stays connected after saving, loading,
