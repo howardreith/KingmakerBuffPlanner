@@ -68,7 +68,7 @@ In the 0.6.17 forced-Chinese workspace, the provider label needed 21.6 units in 
 | 53/53 focused checks | `artifacts/zhcn18-focused.log` · `Test-Development.ps1 -Only 'localization-,workspace-source-label,controller-workspace,clear-plan-view,casting-workspace-persistence-round-trip,native-ui-'` |
 | Source 47/47, build 1/1, package validation 8/8, local package 1/1 | `artifacts/zhcn18-build.log` · `Build-Local.ps1` |
 | Installed UMM 6/6, 1,086 keys in each catalog, all 1,083 lookup sites resolved | `artifacts/zhcn18-umm.log` and `artifacts/zhcn18-catalog.json` · `Test-LocalizationSettings.ps1` and `Test-LocalizationCatalogs.ps1` |
-| Candidate pre-live gate | In progress · `artifacts/zhcn18-source.log` · `Test-SourceOnly.ps1` |
+| Candidate pre-live gate | PASS, exit 0. `artifacts/zhcn18-source.log` records 748/748 C# tests, deployment purity 5/5, child arguments 14/14, launcher purity 13/13, rollback 16/16 and aggregate 1/1. `Test-SourceOnly.ps1` |
 
 ### Historical 0.6.17 evidence
 
