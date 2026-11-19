@@ -1,3 +1,5 @@
+2026-11-19 · Frozen 0.6.18 at `14c831269c28dd3a147ca989fc8ce69619746ab0` after four 0.6.17 startup tests exposed Chinese load admission, text clipping and untranslated source qualifiers. The [acceptance record](docs/LOCALIZATION.md#candidate-and-evidence) includes all five 0.6.17 transaction outcomes and restoration receipts.
+
 2026-11-19 · Recovered the passing 0.6.17 pre-live gate for `d6e341fcc4951764f7b650cef481014507ef8e98` and verified both frozen hashes. The [localization record](docs/LOCALIZATION.md#candidate-and-evidence) identifies the 0.6.16 failed request and restoration separately.
 
 2026-11-19 · PR #24 input correction froze 0.6.16 at `4bf737406060200661556452588308baeeef4851`. Eight input regressions and all 746 offline tests passed. The [candidate record](docs/LOCALIZATION.md#candidate-and-evidence) distinguishes these results from the earlier artifact.
