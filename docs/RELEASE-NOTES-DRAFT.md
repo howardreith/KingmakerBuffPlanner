@@ -1,4 +1,7 @@
-# 0.6.15 draft for owner review
+# 0.6.16 draft for owner review
+
+- Changing planner language while the keyboard workspace is open preserves navigation ownership through repeated refreshes and restores the original game navigation setting on close.
+- Controller Confirm, Inspect and routine-switch presses during Chinese composition are discarded. A fresh press works after the controls return to neutral.
 
 - Choose Automatic, English, or 简体中文 in Unity Mod Manager. Automatic follows a Simplified Chinese game. Native spell and item names continue to follow the game language under either override.
 - Planner menus, casting controls, resources, notifications and visible execution messages have Simplified Chinese catalogs. Saved custom routine names retain their exact spelling.

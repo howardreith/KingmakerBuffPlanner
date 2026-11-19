@@ -51,6 +51,25 @@ Identity, recipient, strength, caster level, suppression and metamagic checks st
 
 ## Candidate and evidence
 
+The corrected 0.6.16 candidate comes from `4bf737406060200661556452588308baeeef4851`, following reviewed PR head `cfac4bce02274b4f0e7f3ecb0f4aaf2659759c40` on the same base. The original 0.6.15 package and evidence remain in KBP-ZHCN. The new frozen worktree is KBP-ZHCN-Review on branch `codex/kingmaker-buff-planner-zhcn-input-candidate`. The review branch is `codex/kingmaker-buff-planner-zhcn-localization`.
+
+| 0.6.16 artifact | Identity |
+|---|---|
+| DLL SHA-256 | `c61bd0a3b656059e78b0781fbe5906a8e8837aca821406a244c7da14416d7ef6` |
+| Local runtime ZIP SHA-256 | `3750e4cac9f447d59ec33bbefcb69058014a588158a23c1421fb7acead5426c9` |
+| Assembly MVID | `44647b34-1720-424d-ba49-1e17d3b65191` |
+| Package and build manifest | `artifacts/local-runtime/0.6.16/` in KBP-ZHCN-Review |
+
+During a language refresh the old workspace releases keyboard navigation before the replacement captures it. The replacement retains the authoring session and restores its search and category. Construction or presentation failure closes the failed view and releases the workspace input lease. Rewired command capture and dispatch both discard pending input during owned IME preedit and its grace frame. Confirm, Inspect and both routine-switch commands require a subsequent neutral frame before another press can act.
+
+**Corrected-candidate offline verification.** Eight new behavior regressions exercise initially enabled and disabled native navigation, three successive replacements and close, failure during construction or presentation restoration, and all four controller commands across preedit, release, grace and rearming. They use the shipped lifecycle, installed EventSystem property and production command methods with detached UI and frame inputs. Focused selection passed 38/38 and the complete C# suite passed 746/746. Installed UMM settings passed 6/6. Package validation passed 8/8, including both catalogs. The audit resolved 1,079 lookup sites and all 1,082 keys per catalog with zero errors.
+
+Evidence is local to KBP-ZHCN-Review under `artifacts/zhcn16-focused.log`, `zhcn16-source.log`, `zhcn16-build.log`, `zhcn16-umm.log`, `zhcn16-catalog.json`, `zhcn16-preflight.json` and `zhcn16-ime.json`. Commands include `Test-Development.ps1 -Only 'localization-,controller-workspace,clear-plan-view,casting-workspace-persistence-round-trip'`, `Build-Local.ps1`, `Test-SourceOnly.ps1`, `Test-LocalizationCatalogs.ps1` and `Test-LocalizationSettings.ps1 -CandidateDll artifacts/local-runtime/0.6.16/staging/KingmakerBuffPlanner/KingmakerBuffPlanner.dll`. The package is reused across downstream checks.
+
+The corrected candidate's full pre-live aggregate passed 1/0. It includes 40 launcher argument cases, 47 source checks, the 746-test C# suite, 38 filesystem harness cases, 20 physical-search, 35 problem-navigation and 50 spellbook-entry evidence cases, 5 deployment purity checks, 14 child-argument checks, 13 launcher purity checks, 3 fixture inventory, 16 rollback and 8 publisher-gate checks. All reported zero failures. The first English admission attempt (`zhcn16-en-auto-01`) was interrupted after creating an empty evidence directory and before entering a staging transaction. There was no game process, lock, active candidate sentinel or transaction record on resumption.
+
+### Historical 0.6.15 evidence
+
 Base `639b5d2a3119efa2d2db9323f663d6aa69cd1d65`, frozen 0.6.15 source `b48e9ebebcff8747f8b5e76dd479fd0d91ebab28`. The PR branch is `codex/kingmaker-buff-planner-zhcn-localization`. The candidate worktree stays on the same source under `codex/kingmaker-buff-planner-zhcn-candidate`.
 
 | Artifact | Identity |
@@ -87,7 +106,7 @@ Commands used for the candidate and focused regressions:
 
 After the pre-live suite passes, run from the frozen worktree in Windows PowerShell 5.1. Each observation requires a unique run ID. Inspect the actual `gameLocale`, `plannerLanguage`, captured frames, loaded WORKING identity and transaction restoration records. The native facts probe does not cast. Only a separately admitted casting scenario can qualify gameplay.
 
-The next admission is after the unrelated Steam operation has been resolved by its owner and the desktop is clear. Re-run the pre-live suite from the frozen candidate before any stage or launch. Keep the sealed fixture and original installation in place.
+Before 0.6.16 admission the previous unrelated launch window had cleared. The current-session Steam safety check passed. The physical input inventory found US English (0409:00000409) and no matching game controller. The BASELINE and WORKING hashes matched the values recorded above.
 
 ```powershell
 $facts = @{ Scenario='live-workspace-native-ui'; NativeUiStage='facts'; DisplayMode='windowed-1280x720'; FixtureFamily='Automation'; CompatibilityProfileId='full-user'; TimeoutSeconds=900 }
