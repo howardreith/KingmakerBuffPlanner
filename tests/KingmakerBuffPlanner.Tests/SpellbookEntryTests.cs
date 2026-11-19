@@ -154,7 +154,9 @@ namespace KingmakerBuffPlanner.Tests
             string source = ProductionSource("UI", "BuffPlannerSpellbookEntryController.cs");
             if (!source.Contains("SpellbookFooterLayout.Compute(") || !source.Contains("_nativeFooter.Restore()") ||
                 !source.Contains("button.spriteState = footer.Apply.spriteState;") ||
-                !source.Contains("label.fontSharedMaterial = native.fontSharedMaterial;") ||
+                !source.Contains("CreateCaption(buttonRect, footer.Label, PlannerText.Get(\"settings.heading\"));") ||
+                !source.Contains("label.font = PlannerFontOwner.For(go, native.font);") ||
+                !source.Contains("label.fontSharedMaterial = label.font == native.font ? native.fontSharedMaterial : label.font.material;") ||
                 source.Contains("SpellbookEntryPlacement") || source.Contains("KingmakerUiFactory.CreateButton("))
                 throw new InvalidOperationException("The spellbook entry is not the native footer pair.");
         }

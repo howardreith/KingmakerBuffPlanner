@@ -227,6 +227,12 @@ namespace KingmakerBuffPlanner.UI
             DrawFocus(true);
         }
 
+        private static string DisplayRegion(string region)
+        {
+            return !string.IsNullOrEmpty(region) && Array.IndexOf(Regions, region) >= 0
+                ? PlannerText.Get("classic.region." + region) : region ?? string.Empty;
+        }
+
         private static string Region(Transform control)
         {
             for (Transform node = control; node != null; node = node.parent)
@@ -428,7 +434,7 @@ namespace KingmakerBuffPlanner.UI
             if (!PlaceOutline(rect)) return;
             ControllerFocusItem current = _focus.Current;
             string caption = current == null ? "" : current.Caption.Split('\n')[0];
-            _hint.text = PlannerText.Get("pad.focus.keys", current == null ? "" : current.Region + " > ", caption);
+            _hint.text = PlannerText.Get("pad.focus.keys", current == null ? "" : DisplayRegion(current.Region) + " > ", caption);
         }
 
         private void DrawPaneFocus(ScrollRect scroll)
@@ -533,7 +539,7 @@ namespace KingmakerBuffPlanner.UI
                 int col = index % ControllerSearchKeyboard.Columns, row = index / ControllerSearchKeyboard.Columns;
                 KingmakerUiFactory.SetAnchors(cell, .04f + col * .115f, .65f - row * .105f, .145f + col * .115f, .74f - row * .105f);
                 Image fill = KingmakerUiFactory.AddPanel(cell, Color.white); _keys.Add(fill);
-                TMP_Text caption = _kit.Text(cell, "Caption", ControllerSearchKeyboard.Keys[index], PlannerTextRole.Body, 20, TextAlignmentOptions.Center);
+                TMP_Text caption = _kit.Text(cell, "Caption", ControllerSearchKeyboard.Caption(index), PlannerTextRole.Body, 20, TextAlignmentOptions.Center);
                 KingmakerUiFactory.Stretch(caption.rectTransform, 2, 2, 2, 2);
             }
             DrawKeyboard();
@@ -543,7 +549,7 @@ namespace KingmakerBuffPlanner.UI
         {
             _keyboardText.text = _keyboard.Draft + "_";
             for (int i = 0; i < _keys.Count; i++) _keys[i].color = i == _keyboard.Focus ? new Color(.45f, .75f, 1, 1) : new Color(.84f, .77f, .61f, 1);
-            _hint.text = PlannerText.Get("pad.keyboard.keys", ControllerSearchKeyboard.Keys[_keyboard.Focus]);
+            _hint.text = PlannerText.Get("pad.keyboard.keys", ControllerSearchKeyboard.Caption(_keyboard.Focus));
             _keyboardHints.text = _hint.text;
         }
 

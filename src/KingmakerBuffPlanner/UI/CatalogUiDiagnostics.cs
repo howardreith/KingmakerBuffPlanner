@@ -91,6 +91,12 @@ namespace KingmakerBuffPlanner.UI
                 .ThenBy(source => source.SpellLevel)
                 .ThenBy(source => source.SourceId, StringComparer.Ordinal).ToList();
             diagnostics.VisibleViewModels = values.Count;
+            var display = new List<string>();
+            if (!string.IsNullOrWhiteSpace(Search)) display.Add(PlannerText.Get("classic.filter.search", Search));
+            if (SelectedOnly) display.Add(PlannerText.Get("classic.filter.only", PlannerText.Chinese ? PlannerText.Routine(routineId) : routineId));
+            if (SourceCategory != PlannerSourceCategory.All)
+                display.Add(PlannerText.Chinese ? PlannerText.Get("classic.category." + SourceCategory) : SourceCategory.ToString().ToLowerInvariant());
+            diagnostics.DisplayFilters = display.Count == 0 ? PlannerText.Get("classic.list.none") : string.Join(", ", display.ToArray());
             diagnostics.ActiveFilters = active.Count == 0 ? "none" :
                 string.Join(", ", active.ToArray());
             return values;
@@ -109,6 +115,7 @@ namespace KingmakerBuffPlanner.UI
         internal int AfterAvailability;
         internal int VisibleViewModels;
         internal string ActiveFilters = string.Empty;
+        internal string DisplayFilters = string.Empty;
 
         public override string ToString()
         {

@@ -213,6 +213,7 @@ $candidateMembersRev3 = @('acknowledgedImportNotices', 'resolvedReviewItems', 'f
 $candidateMembersRev4 = @('availabilityPolicy', 'formatRevision')
 # Revision 5 changes availability semantics, with no new JSON members.
 $candidateMembersRev5 = @('formatRevision')
+$candidateMembersRev6 = @('hasDefaultCaption', 'formatRevision')
 
 function Get-KbpJsonMemberNames($Node) {
     $names = New-Object System.Collections.Generic.List[string]
@@ -250,6 +251,7 @@ function Get-KbpCandidateRequirement([string]$Path) {
         if ($candidateMembersRev1 -ccontains $name) { continue }
         if ($candidateMembersRev2 -ccontains $name) { if ($required -lt 2) { $required = 2 }; continue }
         if ($candidateMembersRev3 -ccontains $name) { if ($required -lt 3) { $required = 3 }; continue }
+        if ($candidateMembersRev6 -ccontains $name -and $name -ceq 'hasDefaultCaption') { if ($required -lt 6) { $required = 6 }; continue }
         if ($candidateMembersRev4 -ccontains $name) { if ($required -lt 4) { $required = 4 }; continue }
         return $null
     }

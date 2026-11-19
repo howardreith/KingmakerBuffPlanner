@@ -28,7 +28,7 @@ namespace KingmakerBuffPlanner.UI
             layout.childControlHeight = true;
             layout.childForceExpandHeight = true;
             _buttons = _ids.Select(id => KingmakerUiFactory.CreateButton("Routine." + id,
-                root, theme, id.ToUpperInvariant(), () => selected(id))).ToArray();
+                root, theme, PlannerText.Routine(id).ToUpperInvariant(), () => selected(id))).ToArray();
         }
 
         internal Button Button(string id)
@@ -77,7 +77,7 @@ namespace KingmakerBuffPlanner.UI
             foreach (PlannerSourceCategory category in Enum.GetValues(typeof(PlannerSourceCategory)))
             {
                 Button button = KingmakerUiFactory.CreateButton("Category." + category, root,
-                    theme, category.ToString(), () => selectCategory(category));
+                    theme, PlannerText.Get("classic.category." + category), () => selectCategory(category));
                 button.gameObject.AddComponent<LayoutElement>().preferredWidth = 118f;
                 _buttons.Add(category, button);
             }
@@ -306,7 +306,7 @@ namespace KingmakerBuffPlanner.UI
             bool configured = model != null;
             Rect.gameObject.SetActive(configured);
             if (!configured) return;
-            _label.text = model.Abbreviation;
+            _label.text = model.Caption;
             _background.color = model.IsActive
                 ? new Color(0.38f, 0.13f, 0.10f, 1f)
                 : new Color(0.74f, 0.65f, 0.45f, 0.82f);
@@ -727,7 +727,7 @@ namespace KingmakerBuffPlanner.UI
             _fallback.gameObject.SetActive(available && icon == null);
             _name.text = available ? source.DisplayName : PlannerText.Get("classic.select.buff");
             _meta.text = available ? BuffCardViewModel.SourceSummary(source) +
-                (source.SpellLevel > 0 ? " | Level " + source.SpellLevel : string.Empty) +
+                (source.SpellLevel > 0 ? PlannerText.Get("classic.spell.level", source.SpellLevel) : string.Empty) +
                 (string.IsNullOrWhiteSpace(source.DurationText) ? string.Empty :
                     " | " + source.DurationText) : string.Empty;
             _description.text = available ? Compact(source.Description, 190) :
@@ -737,7 +737,7 @@ namespace KingmakerBuffPlanner.UI
             _casterPolicyTooltip.Text = casting.CasterPolicy.Description;
             _casterPolicy.image.color = casting.CasterPolicy.Warning
                 ? _theme.AmberWarning : _theme.ParchmentRaised;
-            _targetsLabel.text = PlannerText.Get("classic.routine.targets", char.ToUpperInvariant(routineId[0]) + routineId.Substring(1));
+            _targetsLabel.text = PlannerText.Get("classic.routine.targets", PlannerText.Routine(routineId));
             _targets.Bind(targets, portrait, toggle, statusColor);
             _plan.text = planSummary ?? string.Empty;
             KingmakerUiFactory.SetButtonLabel(_enhancement, casting.EnhancementLabel);
@@ -899,9 +899,8 @@ namespace KingmakerBuffPlanner.UI
             int selectedRow = -1;
             ClearRows();
             string scope = _assignmentId == null ? string.Empty
-                : " | assignment " + _assignmentId;
-            _subtitle.text = model.CasterText + scope + " | " + model.CandidateCount +
-                (model.CandidateCount == 1 ? " applicable option" : " applicable options");
+                : PlannerText.Get("classic.assignment.suffix", _assignmentId);
+            _subtitle.text = PlannerText.Get(model.CandidateCount == 1 ? "classic.options.one" : "classic.options.many", model.CasterText, scope, model.CandidateCount);
             _budget.text = model.EnhancementBudgetText ?? string.Empty;
             _budget.gameObject.SetActive(
                 !string.IsNullOrWhiteSpace(model.EnhancementBudgetText));
@@ -920,7 +919,7 @@ namespace KingmakerBuffPlanner.UI
                 bool selected = _assignmentId == null ? choice.Selected : assignmentSelected;
                 string selection = choice.CheckboxStyle
                     ? (selected ? "[x] " : "[ ] ")
-                    : (selected ? "SELECTED | " : string.Empty);
+                    : (selected ? PlannerText.Get("classic.option.selected") : string.Empty);
                 if (selected && selectedRow < 0) selectedRow = rowIndex;
                 string policy = _assignmentId != null && selected
                     ? " | " + choice.PolicyCaption
@@ -1584,7 +1583,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 string routineId = routines[index];
                 Button toggle = KingmakerUiFactory.CreateButton(
-                    "ForecastToggle." + routineId, bar, _theme, routineId.ToUpperInvariant(),
+                    "ForecastToggle." + routineId, bar, _theme, PlannerText.Routine(routineId).ToUpperInvariant(),
                     () =>
                     {
                         // Selection order is the player's explicit sequence.
@@ -1696,12 +1695,9 @@ namespace KingmakerBuffPlanner.UI
             {
                 string routing = model.ResolvedProviderTexts.Count == 0
                     ? string.Empty
-                    : " | via " + string.Join(", ", model.ResolvedProviderTexts.ToArray()) +
-                        " -> " + (model.RecipientNames.Count == 0 ? PlannerText.Get("classic.no.recipients")
-                            : string.Join(", ", model.RecipientNames.ToArray()));
+                    : PlannerText.Get("classic.assignment.route", string.Join(", ", model.ResolvedProviderTexts.ToArray()), model.RecipientNames.Count == 0 ? PlannerText.Get("classic.no.recipients") : string.Join(", ", model.RecipientNames.ToArray()));
                 Text identity = KingmakerUiFactory.CreateText("Identity", row, _theme,
-                    model.Number + ". " + model.SourceDisplayName + " — " + model.CasterText +
-                    " | targets " + model.TargetNames.Count + routing,
+                    PlannerText.Get("classic.assignment.identity", model.Number, model.SourceDisplayName, model.CasterText, model.TargetNames.Count, routing),
                     14, TextAnchor.MiddleLeft);
                 identity.horizontalOverflow = HorizontalWrapMode.Wrap;
                 identity.verticalOverflow = VerticalWrapMode.Overflow;
@@ -1779,8 +1775,7 @@ namespace KingmakerBuffPlanner.UI
                 Text laterLabel = later.GetComponentInChildren<Text>(true);
                 if (laterLabel != null) laterLabel.fontSize = 11;
                 Text enhancements = KingmakerUiFactory.CreateText("Enhancements", row, _theme,
-                    "Enhancements: " + (model.EnhancementTexts.Count == 0
-                        ? "none" : string.Join(", ", model.EnhancementTexts.ToArray())),
+                    PlannerText.Get("classic.assignment.enhancements", model.EnhancementTexts.Count == 0 ? PlannerText.Get("classic.list.none") : string.Join(", ", model.EnhancementTexts.ToArray())),
                     12, TextAnchor.MiddleLeft);
                 enhancements.color = _theme.MutedBrownText;
                 enhancements.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -1851,8 +1846,7 @@ namespace KingmakerBuffPlanner.UI
             IReadOnlyList<ResourceUsageLineViewModel> lines = _resourceLines(_routineId);
             _resources.text = lines.Count == 0
                 ? PlannerText.Get("classic.resource.none")
-                : "RESOURCES — " + string.Join("\n", lines
-                    .Select(line => line.Summary).ToArray());
+                : PlannerText.Get("classic.resources.list", string.Join("\n", lines.Select(line => line.Summary).ToArray()));
         }
 
         private void BindForecast()
@@ -1866,7 +1860,7 @@ namespace KingmakerBuffPlanner.UI
                 toggle.image.color = position >= 0 ? _theme.GreenSuccess : _theme.ParchmentRaised;
                 Text toggleLabel = toggle.GetComponentInChildren<Text>(true);
                 if (toggleLabel != null)
-                    toggleLabel.text = orderNames[index].ToUpperInvariant() +
+                    toggleLabel.text = PlannerText.Routine(orderNames[index]).ToUpperInvariant() +
                         (position >= 0 ? " " + (position + 1) : string.Empty);
             }
             if (_reverseButton != null)
@@ -1874,29 +1868,23 @@ namespace KingmakerBuffPlanner.UI
                     ? _theme.GreenSuccess : _theme.ParchmentRaised;
             if (_forecastSequence.Count == 0)
             {
-                _forecast.text = "Select routines above in order for a combined " +
-                    "forecast. " + SequentialForecastPlanner.Result.AssumptionText;
+                _forecast.text = PlannerText.Get("classic.forecast.select", PlannerText.Get("classic.forecast.assumptions"));
                 return;
             }
             SequentialForecastPlanner.Result forecast = _sequenceForecast(_forecastSequence);
-            var builder = new System.Text.StringBuilder("FORECAST — ");
+            var builder = new System.Text.StringBuilder(PlannerText.Get("classic.forecast.heading"));
             foreach (SequentialForecastPlanner.Occurrence occurrence in forecast.Occurrences)
             {
                 int unmet = occurrence.Plan.Outcomes.Count(o =>
                     o.Kind == TargetOutcomeKind.Unfulfilled);
-                builder.Append(occurrence.RoutineId).Append(": ")
-                    .Append(occurrence.Plan.Steps.Count).Append(" cast(s), ")
-                    .Append(occurrence.Plan.Outcomes.Count(o =>
-                        o.Kind == TargetOutcomeKind.Fulfilled)).Append(" covered, ")
-                    .Append(unmet).Append(" unmet; ");
+                builder.Append(PlannerText.Get("classic.forecast.row", PlannerText.Chinese ? PlannerText.Routine(occurrence.RoutineId) : occurrence.RoutineId, occurrence.Plan.Steps.Count, occurrence.Plan.Outcomes.Count(o => o.Kind == TargetOutcomeKind.Fulfilled), unmet));
             }
             foreach (KeyValuePair<string, int> balance in forecast.ForecastRemainingByNativePool
                 .Where(pair => pair.Value >= 0)
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal))
-                builder.Append("\n").Append(balance.Key).Append(" forecast remaining ")
-                    .Append(balance.Value);
+                builder.Append(PlannerText.Get("classic.forecast.remaining", balance.Key, balance.Value));
             builder.Append("\n").Append(
-                SequentialForecastPlanner.Result.AssumptionText);
+                PlannerText.Get("classic.forecast.assumptions"));
             _forecast.text = builder.ToString();
         }
     }
@@ -1929,7 +1917,7 @@ namespace KingmakerBuffPlanner.UI
             _fallback = SettingButton("Fallback", 0.23f, 0.36f, null, theme);
             _hotkey = SettingButton("PlannerHotkey", 0.08f, 0.21f, toggleHotkey, theme);
             Button done = KingmakerUiFactory.CreateButton("SettingsDone", Root, theme,
-                CastingPanelLayoutContract.SettingsCloseLabel, () => close());
+                PlannerText.Get("classic.close"), () => close());
             KingmakerUiFactory.SetAnchors((RectTransform)done.transform, 0.72f, 0.015f, 0.94f, 0.12f);
             Root.gameObject.SetActive(false);
         }

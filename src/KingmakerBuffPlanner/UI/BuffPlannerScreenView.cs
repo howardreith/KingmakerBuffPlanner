@@ -256,8 +256,7 @@ namespace KingmakerBuffPlanner.UI
             if (model != null && cards.Count != 0 && !cards.Any(card => card.SourceId == model.SelectedSourceId))
                 model.SelectSource(cards[0].SourceId);
             _grid.Bind(cards, preserveScroll);
-            _catalogSummary.text = cards.Count + (cards.Count == 1 ? " buff" : " buffs") +
-                " • alphabetical • " + filters.ActiveFilters;
+            _catalogSummary.text = PlannerText.Get(cards.Count == 1 ? "classic.catalog.one" : "classic.catalog.many", cards.Count, filters.DisplayFilters);
             RefreshSelected();
             KingmakerUiFactory.ForceLayoutAndSnap(_root);
             RecordEnhancementRenderEvidence();
@@ -1202,10 +1201,10 @@ namespace KingmakerBuffPlanner.UI
             _icon.gameObject.SetActive(icon != null);
             _fallback.gameObject.SetActive(icon == null);
             _name.text = source.DisplayName;
-            string school = ability.School.ToString() == "None"
-                ? string.Empty : ability.School.ToString();
+            string school = ability.School == Kingmaker.Blueprints.Classes.Spells.SpellSchool.None
+                ? string.Empty : Safe(() => Kingmaker.Blueprints.Root.LocalizedTexts.Instance.SpellSchoolNames.GetText(ability.School));
             _meta.text = BuffCardViewModel.SourceSummary(source) +
-                (source.SpellLevel > 0 ? " | Level " + source.SpellLevel : string.Empty) +
+                (source.SpellLevel > 0 ? PlannerText.Get("classic.spell.level", source.SpellLevel) : string.Empty) +
                 (string.IsNullOrWhiteSpace(school) ? string.Empty : " | " + school);
             _body.text = BuildBody(ability);
             _scroll.verticalNormalizedPosition = 1f;

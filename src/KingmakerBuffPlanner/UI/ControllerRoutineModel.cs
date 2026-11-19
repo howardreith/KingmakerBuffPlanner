@@ -191,7 +191,7 @@ namespace KingmakerBuffPlanner.UI
         {
             if (index == 4) return _requiresConversion ? (_reviewingConversion ? PlannerText.Get("pad.switch.full") : PlannerText.Get("pad.review.setup")) : PlannerText.Get("pad.configure");
             if (index == 5) return PlannerText.Get("pad.explanations");
-            if (index == 3) return Running ? "Stop " + (ActiveRoutine ?? "running routine") : PlannerText.Get("pad.stop.idle");
+            if (index == 3) return Running ? PlannerText.Get("classic.stop.current", ActiveRoutine == null ? PlannerText.Get("classic.running.sequence") : PlannerText.Chinese ? PlannerText.Routine(ActiveRoutine) : ActiveRoutine) : PlannerText.Get("pad.stop.idle");
             string id = RoutineIds[index];
             string name = RoutineName(index);
             int count = _session == null ? 0 : _session.Document.Castings.Count(c => c.RoutineId == id);

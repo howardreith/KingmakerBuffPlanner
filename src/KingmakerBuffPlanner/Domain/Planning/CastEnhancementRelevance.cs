@@ -46,6 +46,14 @@ namespace KingmakerBuffPlanner.Domain.Planning
     // compiler's own validation are unchanged).
     public static class CastEnhancementRelevance
     {
+        internal const string PiercingReason = "Piercing helps spells beat spell resistance; a buff cast on allies never checks it.";
+        internal const string PersistentReason = "Persistent rerolls failed saves; a buff on allies asks no save.";
+        internal const string SelectiveReason = "Selective excludes creatures from an area; a buff area has nothing to exclude.";
+        internal const string QuickenReason = "Quicken buys action economy; the planner applies buffs out of combat and never spends it.";
+        internal const string ThrenodicReason = "Threnodic needs a mind-affecting spell and an undead recipient; this recipient is not verified undead.";
+        internal const string ExtendUnknownReason = "Extend needs a spell with a verifiable duration.";
+        internal const string ExtendUnsupportedReason = "This spell's duration cannot be extended.";
+
         public const int ExtendMask = 0x8;
         public const int QuickenMask = 0x4;
         public const int PiercingMask = 0x80000;
@@ -61,21 +69,21 @@ namespace KingmakerBuffPlanner.Domain.Planning
             if (enhancement.Category != CastEnhancementCategory.MetamagicRod) return string.Empty;
             int mask = enhancement.MetamagicMask;
             if (mask == PiercingMask)
-                return "Piercing helps spells beat spell resistance; a buff cast on allies never checks it.";
+                return PiercingReason;
             if (mask == PersistentMask)
-                return "Persistent rerolls failed saves; a buff on allies asks no save.";
+                return PersistentReason;
             if (mask == SelectiveMask)
-                return "Selective excludes creatures from an area; a buff area has nothing to exclude.";
+                return SelectiveReason;
             if (mask == QuickenMask)
-                return "Quicken buys action economy; the planner applies buffs out of combat and never spends it.";
+                return QuickenReason;
             if (mask == ThrenodicMask)
-                return "Threnodic needs a mind-affecting spell and an undead recipient; this recipient is not verified undead.";
+                return ThrenodicReason;
             if (mask == ExtendMask)
             {
-                if (provider == null || provider.Duration.Kind == DurationKind.Unknown)
-                    return "Extend needs a spell with a verifiable duration.";
+                if (provider == null || (provider.Duration.Kind == DurationKind.Unknown && !provider.Duration.Extendable))
+                    return ExtendUnknownReason;
                 if (!provider.Duration.Extendable)
-                    return "This spell's duration cannot be extended.";
+                    return ExtendUnsupportedReason;
                 return string.Empty;
             }
             return string.Empty;

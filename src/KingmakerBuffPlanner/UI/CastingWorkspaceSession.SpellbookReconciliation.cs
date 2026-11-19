@@ -121,9 +121,8 @@ namespace KingmakerBuffPlanner.UI
             if (EditingFocusCastingId != null && ids.Contains(EditingFocusCastingId))
                 EditingFocusCastingId = null;
             bool durable = IntentIsDurable;
-            SpellbookReconciliationNotice = durable ? notice + " Undo available."
-                : notice + " Not saved yet (" + (_autosaveStatus ?? "unknown") +
-                    "): nothing will be cast until the plan is saved. Undo available.";
+            SpellbookReconciliationNotice = durable ? PlannerText.Get("spellbook.removal.durable", notice)
+                : PlannerText.Get("spellbook.removal.unsaved", notice, _autosaveStatus ?? PlannerText.Get("spellbook.removal.unknown"));
             return new SpellbookReconciliationOutcome(SpellbookReconciliationStatus.Applied,
                 string.Empty, decision, ids, SpellbookReconciliationNotice, durable);
         }
@@ -143,23 +142,24 @@ namespace KingmakerBuffPlanner.UI
                 List<string> casters = group.Select(value => UnitDisplayName(inputs,
                         value.CasterUnitId)).Distinct(StringComparer.Ordinal)
                     .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToList();
-                List<string> possessive = casters.Select(value => value + "'s").ToList();
-                string owners = possessive.Count == 1 ? possessive[0] + " spellbook"
-                    : string.Join(", ", possessive.Take(possessive.Count - 1).ToArray()) + " and " +
-                        possessive[possessive.Count - 1] + " spellbooks";
-                parts.Add("Removed " + count + " " + SpellName(group.Key.BaseAbilityGuid, inputs) +
-                    (count == 1 ? " casting" : " castings") + ": no longer " +
-                    (group.Key.Reason == SpellbookRemovalReason.NoLongerPrepared
-                        ? "prepared" : "known") + " in " + owners);
+                List<string> possessive = casters.Select(value => PlannerText.Get("spellbook.removal.owner", value)).ToList();
+                string owners = possessive.Count == 1 ? PlannerText.Get("spellbook.removal.singleBook", possessive[0])
+                    : PlannerText.Get("spellbook.removal.manyBooks",
+                        string.Join(PlannerText.Get("spellbook.removal.ownerSeparator"), possessive.Take(possessive.Count - 1).ToArray()),
+                        possessive[possessive.Count - 1]);
+                string key = group.Key.Reason == SpellbookRemovalReason.NoLongerPrepared
+                    ? (count == 1 ? "spellbook.removal.prepared.one" : "spellbook.removal.prepared.many")
+                    : (count == 1 ? "spellbook.removal.known.one" : "spellbook.removal.known.many");
+                parts.Add(PlannerText.Get(key, count, SpellName(group.Key.BaseAbilityGuid, inputs), owners));
             }
-            return string.Join("; ", parts.ToArray()) + ".";
+            return PlannerText.Get("spellbook.removal.sentence", string.Join(PlannerText.Get("spellbook.removal.sentenceSeparator"), parts.ToArray()));
         }
 
         private static string SpellName(string baseAbilityGuid, CastingWorkspaceInputs inputs)
         {
             string name = inputs == null || inputs.SpellbookMembership == null ? null
                 : inputs.SpellbookMembership.NameOf(baseAbilityGuid);
-            return name ?? "removed spell";
+            return name ?? PlannerText.Get("spellbook.removal.unnamed");
         }
 
         // An Undo of the reconciliation edit restores the castings (planner

@@ -12,9 +12,21 @@ namespace KingmakerBuffPlanner.GameAdapters
 
     internal static class KingmakerLanguage
     {
+        private static int _lastLocale = -1;
+        private static string _localeName;
         internal static string Current
         {
-            get { return LocalizationManager.CurrentPack == null ? null : LocalizationManager.CurrentLocale.ToString(); }
+            get
+            {
+                if (LocalizationManager.CurrentPack == null) return null;
+                var locale = LocalizationManager.CurrentLocale;
+                if ((int)locale != _lastLocale)
+                {
+                    _lastLocale = (int)locale;
+                    _localeName = locale.ToString();
+                }
+                return _localeName;
+            }
         }
     }
 }

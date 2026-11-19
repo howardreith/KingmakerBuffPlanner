@@ -66,7 +66,7 @@ namespace KingmakerBuffPlanner.UI
 
         internal RoutineSummaryViewModel RoutineSummary(string routineId)
         {
-            string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
+            string name = PlannerText.Routine(routineId);
             PlannerSetupModel model = _session.Model;
             if (model == null) return new RoutineSummaryViewModel(routineId, name, 0, 0);
             int requested = model.Profile.Routines.First(item => item.RoutineId == routineId)
@@ -88,18 +88,18 @@ namespace KingmakerBuffPlanner.UI
         internal string PlanSummary()
         {
             PlannerSetupModel model = _session.Model;
-            if (model == null) return "Load a campaign to build a plan.";
+            if (model == null) return PlannerText.Get("classic.load.plan");
             try
             {
                 RoutinePlanResult preview = _session.PreviewRoutine(ActiveRoutineId);
                 SetupSourceRow source = model.SelectedSource;
-                if (source == null) return "Select a buff to view its plan.";
+                if (source == null) return PlannerText.Get("classic.select.plan");
                 return new SelectedBuffPlanSummaryViewModel(source, model, ActiveRoutineId,
                     preview).Text;
             }
             catch (Exception exception)
             {
-                return "Plan unavailable: " + exception.Message;
+                return PlannerText.Get("classic.plan.unavailable", exception.Message);
             }
         }
 

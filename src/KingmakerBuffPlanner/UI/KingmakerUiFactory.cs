@@ -66,7 +66,7 @@ namespace KingmakerBuffPlanner.UI
                 ? Resources.GetBuiltinResource<Font>("Arial.ttf") : nativeText.font;
             theme.HeaderFont = theme.BodyFont;
             theme.BodyTextMaterial = nativeText == null ? null : nativeText.material;
-            if (PlannerText.Chinese && PlannerChineseFont.UnityFont != null)
+            if (PlannerChineseFont.Required && PlannerChineseFont.UnityFont != null)
             {
                 theme.BodyFont = theme.HeaderFont = PlannerChineseFont.UnityFont;
                 theme.BodyTextMaterial = null;

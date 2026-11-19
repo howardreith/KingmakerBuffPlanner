@@ -47,42 +47,32 @@ namespace KingmakerBuffPlanner.UI
             Func<string, string> castingLabel)
         {
             Func<string, string> label = castingLabel ?? (id => id);
-            var text = new StringBuilder();
-            text.Append(routineName);
-            if (report.Cancelled)
-                text.Append(" stopped (").Append(StopReason(report.TerminalReason)).Append("): ");
-            else if (report.Halted)
-                text.Append(" stopped after a cast failed: ");
-            else
-                text.Append(": ");
-            text.Append(report.Confirmed).Append(" confirmed of ").Append(report.Entries.Count)
-                .Append(report.Entries.Count == 1 ? " saved casting" : " saved castings");
-            if (report.Skipped != 0)
-                text.Append("; ").Append(report.Skipped).Append(" already active");
             int disabled = report.Entries.Count(IsDisabled);
-            if (report.Omitted - disabled != 0)
-                text.Append("; ").Append(report.Omitted - disabled).Append(" unavailable");
-            if (disabled != 0) text.Append("; ").Append(disabled).Append(" disabled");
-            CastingOutcomeEntry failed = report.Entries.FirstOrDefault(
-                entry => entry.State == CastingOutcomeState.Failed);
+            var facts = new List<string>
+            {
+                PlannerText.Get(report.Entries.Count == 1 ? "run.confirmed.one" : "run.confirmed.many",
+                    report.Confirmed, report.Entries.Count)
+            };
+            AddCount(facts, "run.count.active", report.Skipped);
+            AddCount(facts, "run.count.unavailable", report.Omitted - disabled);
+            AddCount(facts, "run.count.disabled", disabled);
+            CastingOutcomeEntry failed = report.Entries.FirstOrDefault(entry => entry.State == CastingOutcomeState.Failed);
             if (failed != null)
-                text.Append("; failed: ").Append(label(failed.CastingId))
-                    .Append(" (").Append(ShortDetail(failed.Detail)).Append(")");
-            if (report.CancelledCastings != 0)
-                text.Append("; ").Append(report.CancelledCastings).Append(" interrupted");
-            if (report.NotProcessed != 0)
-                text.Append("; ").Append(report.NotProcessed).Append(" not attempted");
+                facts.Add(PlannerText.Get("run.failure.detail", label(failed.CastingId), ShortDetail(failed.Detail)));
+            AddCount(facts, "run.count.interrupted", report.CancelledCastings);
+            AddCount(facts, "run.count.unattempted", report.NotProcessed);
+            string detail = string.Join(PlannerText.Get("run.join.detail"), facts.ToArray());
+            string summary = report.Cancelled
+                ? PlannerText.Get("run.summary.stopped", routineName, StopReason(report.TerminalReason), detail)
+                : report.Halted ? PlannerText.Get("run.summary.halted", routineName, detail)
+                : PlannerText.Get("run.summary.normal", routineName, detail);
             int free = report.Entries.Count(entry => entry.FreeCast);
-            text.Append(". Casts with observed resource use: ").Append(report.ResourcesSpent);
-            if (free != 0) text.Append(" (plus ").Append(free).Append(" free)");
-            int failedEffects = report.Entries.Count(entry => entry.EffectObserved && !entry.EffectConfirmed);
-            if (failedEffects != 0)
-                text.Append("; effect observed on ").Append(failedEffects).Append(" unvalidated cast(s)");
-            text.Append(".");
-            if (report.CleanupFailures.Count != 0)
-                text.Append(" Cleanup uncertain: ")
-                    .Append(string.Join("; ", report.CleanupFailures.ToArray())).Append(".");
-            return text.ToString();
+            var observations = new List<string> { free == 0
+                ? PlannerText.Get("run.spent", report.ResourcesSpent)
+                : PlannerText.Get("run.spent.free", report.ResourcesSpent, free) };
+            AddCount(observations, "run.unvalidated.effects", report.Entries.Count(e => e.EffectObserved && !e.EffectConfirmed));
+            string message = PlannerText.Get("run.summary.observations", summary, string.Join(PlannerText.Get("run.join.detail"), observations.ToArray()));
+            return report.CleanupFailures.Count == 0 ? message : PlannerText.Get("run.summary.cleanup", message, string.Join(PlannerText.Get("run.join.detail"), report.CleanupFailures.ToArray()));
         }
 
 
@@ -91,21 +81,23 @@ namespace KingmakerBuffPlanner.UI
         internal static string GameLogLine(CastingRunReport report, string routineName)
         {
             if (report == null) throw new ArgumentNullException("report");
-            var text = new StringBuilder("Buff Planner: ").Append(routineName);
-            if (report.Cancelled) text.Append(" stopped");
-            else if (report.Halted || report.Failed != 0) text.Append(" finished with a failure");
-            else if (report.Omitted > report.Entries.Count(IsDisabled)) text.Append(" finished with omissions");
-            else text.Append(" done");
-            text.Append(" - ").Append(report.Confirmed).Append(" cast");
-            if (report.Skipped != 0) text.Append(", ").Append(report.Skipped).Append(" already active");
             int disabled = report.Entries.Count(IsDisabled);
-            if (report.Omitted - disabled != 0)
-                text.Append(", ").Append(report.Omitted - disabled).Append(" unavailable");
-            if (disabled != 0) text.Append(", ").Append(disabled).Append(" disabled");
-            if (report.Failed != 0) text.Append(", ").Append(report.Failed).Append(" failed");
-            if (report.CancelledCastings != 0) text.Append(", ").Append(report.CancelledCastings).Append(" interrupted");
-            if (report.NotProcessed != 0) text.Append(", ").Append(report.NotProcessed).Append(" not attempted");
-            return text.Append(".").ToString();
+            var counts = new List<string> { PlannerText.Get("run.count.confirmed", report.Confirmed) };
+            AddCount(counts, "run.count.active", report.Skipped);
+            AddCount(counts, "run.count.unavailable", report.Omitted - disabled);
+            AddCount(counts, "run.count.disabled", disabled);
+            AddCount(counts, "run.count.failed", report.Failed);
+            AddCount(counts, "run.count.interrupted", report.CancelledCastings);
+            AddCount(counts, "run.count.unattempted", report.NotProcessed);
+            string key = report.Cancelled ? "run.log.stopped"
+                : report.Halted || report.Failed != 0 ? "run.log.failed"
+                : report.Omitted > disabled ? "run.log.omitted" : "run.log.done";
+            return PlannerText.Get(key, routineName, string.Join(PlannerText.Get("run.join.count"), counts.ToArray()));
+        }
+
+        private static void AddCount(ICollection<string> labels, string key, int count)
+        {
+            if (count != 0) labels.Add(PlannerText.Get(key, count));
         }
 
         private static bool IsDisabled(CastingOutcomeEntry entry)
@@ -124,13 +116,13 @@ namespace KingmakerBuffPlanner.UI
             foreach (CastingOutcomeEntry entry in report.Entries)
             {
                 if (entry.State == CastingOutcomeState.EffectConfirmed) continue;
-                string why = entry.State == CastingOutcomeState.Skipped ? "already active"
-                    : IsDisabled(entry) ? "explicitly disabled"
+                string why = entry.State == CastingOutcomeState.Skipped ? PlannerText.Get("run.reason.active")
+                    : IsDisabled(entry) ? PlannerText.Get("run.reason.disabled")
                     : entry.State == CastingOutcomeState.Omitted
-                        ? string.Join("; ", entry.OmissionReasons.Select(code => reason(entry.CastingId, code)).ToArray())
+                        ? string.Join(PlannerText.Get("run.join.detail"), entry.OmissionReasons.Select(code => reason(entry.CastingId, code)).ToArray())
                         : DescribeEntry(entry);
                 if (string.IsNullOrEmpty(why)) why = WorkspaceReasonText.Describe(entry.Detail);
-                lines.Add("Not cast: " + label(entry.CastingId) + " — " + why + ".");
+                lines.Add(PlannerText.Get("run.log.detail", label(entry.CastingId), why));
             }
             return lines.AsReadOnly();
         }
@@ -146,31 +138,36 @@ namespace KingmakerBuffPlanner.UI
             int unavailable = gate.Omissions.Count - active - disabled;
             bool strict = !gate.Allowed && gate.BlockingCastings.Count != 0;
             bool empty = gate.ExecutableCastingIds.Count + gate.Omissions.Count == 0;
-            string summary = "Buff Planner: " + name + " — 0 cast";
-            if (unavailable != 0) summary += ", " + unavailable + " unavailable";
-            if (active != 0) summary += ", " + active + " already active";
-            if (disabled != 0) summary += ", " + disabled + " disabled";
-            if (strict) summary += ", " + gate.ExecutableCastingIds.Count + " withheld by Require full plan";
-            else if (gate.ExecutableCastingIds.Count != 0)
-                summary += ". " + DescribeRefusal(name, result);
-            else if (empty) summary += ": nothing configured to cast";
-            else if (active != 0 && unavailable == 0 && disabled == 0)
-                summary += ": the needed effects are already present";
-            var lines = new List<string> { summary.TrimEnd('.') + "." };
+            var counts = new List<string> { PlannerText.Get("run.count.confirmed", 0) };
+            AddCount(counts, "run.count.unavailable", unavailable);
+            AddCount(counts, "run.count.active", active);
+            AddCount(counts, "run.count.disabled", disabled);
+            if (strict) counts.Add(PlannerText.Get("run.count.withheld", gate.ExecutableCastingIds.Count));
+            string detail = string.Join(PlannerText.Get("run.join.count"), counts.ToArray());
+            string summary;
+            if (!strict && gate.ExecutableCastingIds.Count != 0)
+                summary = PlannerText.Get("run.admission.refused", name, detail, DescribeRefusal(name, result).TrimEnd('.', '。'));
+            else
+            {
+                string key = empty ? "run.admission.empty"
+                    : active != 0 && unavailable == 0 && disabled == 0 ? "run.admission.satisfied" : "run.admission.summary";
+                summary = PlannerText.Get(key, name, detail);
+            }
+            var lines = new List<string> { summary };
             var omissions = gate.Omissions.ToDictionary(o => o.CastingId, StringComparer.Ordinal);
             foreach (string id in orderedIds)
             {
                 CastingOmission omission;
                 string why;
                 if (omissions.TryGetValue(id, out omission))
-                    why = omission.Readiness == ResolvedCastingReadiness.Disabled ? "explicitly disabled"
-                        : omission.Readiness == ResolvedCastingReadiness.AlreadySatisfied ? "already active"
-                        : string.Join("; ", omission.Reasons.Select(code => reason(id, code)).ToArray());
+                    why = omission.Readiness == ResolvedCastingReadiness.Disabled ? PlannerText.Get("run.reason.disabled")
+                        : omission.Readiness == ResolvedCastingReadiness.AlreadySatisfied ? PlannerText.Get("run.reason.active")
+                        : string.Join(PlannerText.Get("run.join.detail"), omission.Reasons.Select(code => reason(id, code)).ToArray());
                 else if (gate.ExecutableCastingIds.Contains(id))
-                    why = strict ? "ready, withheld by Require full plan"
-                        : "not attempted: " + DescribeRefusal(name, result);
+                    why = strict ? PlannerText.Get("run.reason.strict")
+                        : PlannerText.Get("run.reason.notattempted", DescribeRefusal(name, result));
                 else continue;
-                lines.Add("Not cast: " + label(id) + " — " + why + ".");
+                lines.Add(PlannerText.Get("run.log.detail", label(id), why));
             }
             return lines.AsReadOnly();
         }
@@ -179,10 +176,12 @@ namespace KingmakerBuffPlanner.UI
         internal static string GameLogRefusal(string refusal)
         {
             string value = (refusal ?? string.Empty).Trim();
-            if (value.Length == 0) return "Buff Planner: nothing was cast.";
+            if (value.Length == 0) return PlannerText.Get("run.log.empty");
             int end = value.IndexOf(". ", StringComparison.Ordinal);
+            int fullStop = value.IndexOf('。');
+            if (fullStop >= 0 && (end < 0 || fullStop < end)) end = fullStop;
             string first = end < 0 ? value : value.Substring(0, end + 1);
-            return "Buff Planner: " + first.TrimEnd('.') + ".";
+            return PlannerText.Get("run.log.refusal", first.TrimEnd('.', '。'));
         }
 
         // One casting's outcome in the last run, as its card shows it. The
@@ -191,23 +190,23 @@ namespace KingmakerBuffPlanner.UI
         internal static string DescribeEntry(CastingOutcomeEntry entry)
         {
             if (entry == null) return null;
-            string spent = entry.ResourceSpent ? "; resource use observed" : string.Empty;
-            if (entry.EffectObserved && !entry.EffectConfirmed) spent += "; effect observed, cast unvalidated";
+            string spent = entry.ResourceSpent ? PlannerText.Get("run.entry.resource") : string.Empty;
+            if (entry.EffectObserved && !entry.EffectConfirmed) spent += PlannerText.Get("run.entry.unvalidated");
             switch (entry.State)
             {
                 case CastingOutcomeState.EffectConfirmed:
-                    return entry.FreeCast ? "cast, effect confirmed (free)"
-                        : "cast, effect confirmed";
+                    return entry.FreeCast ? PlannerText.Get("run.entry.free")
+                        : PlannerText.Get("run.entry.confirmed");
                 case CastingOutcomeState.Skipped:
-                    return "skipped: the effect was already active";
+                    return PlannerText.Get("run.entry.skipped");
                 case CastingOutcomeState.Omitted:
-                    return "left out of the run (" + ShortDetail(entry.Detail) + ")";
+                    return PlannerText.Get("run.entry.omitted", ShortDetail(entry.Detail));
                 case CastingOutcomeState.Failed:
-                    return "failed (" + ShortDetail(entry.Detail) + ")" + spent;
+                    return PlannerText.Get("run.entry.failed", ShortDetail(entry.Detail), spent);
                 case CastingOutcomeState.Cancelled:
-                    return "interrupted when the run stopped" + spent;
+                    return PlannerText.Get("run.entry.interrupted", spent);
                 default:
-                    return "not attempted: the run stopped earlier";
+                    return PlannerText.Get("run.entry.unattempted");
             }
         }
 
@@ -215,10 +214,7 @@ namespace KingmakerBuffPlanner.UI
         {
             CastingProblemNavigation problems = session.ProblemNavigation;
             if (!problems.Active) return string.Empty;
-            return session.RoutineDisplayName(problems.RoutineId) + " was not cast. Showing Problem " +
-                problems.Position + " of " + problems.Count + ": " +
-                session.CastingLabel(problems.Current.CastingId) + ". Not ready: " +
-                string.Join("; ", problems.Current.Reasons.Select(WorkspaceReasonText.Describe).ToArray()) + ".";
+            return PlannerText.Get("run.problem", session.RoutineDisplayName(problems.RoutineId), problems.Position, problems.Count, session.CastingLabel(problems.Current.CastingId), string.Join(PlannerText.Get("run.join.detail"), problems.Current.Reasons.Select(WorkspaceReasonText.Describe).ToArray()));
         }
 
         internal static string DescribeRefusal(string routineName, WorkspaceApplyResult result,
@@ -239,37 +235,33 @@ namespace KingmakerBuffPlanner.UI
             if (reason == CastingExecutionPolicy.CombatActive) return CombatRefusalText;
             string text;
             if (reason.StartsWith("nothing-to-cast", StringComparison.Ordinal))
-                text = "nothing to cast - every buff is already active, disabled or omitted";
+                text = PlannerText.Get("run.refusal.empty");
             else if (reason == "nothing-presented" || reason == "not-accepted")
                 // v1.2 §5: the Run press itself authorizes the plan, so
                 // these are internal faults, never a step for the player.
-                text = "the run could not be authorized (an internal check failed) - nothing was cast";
+                text = PlannerText.Get("run.refusal.authorization");
             else if (reason == "material-change-requires-review")
-                text = "the plan changed while the run was starting - nothing was cast; press again " +
-                    "to run the current plan";
+                text = PlannerText.Get("run.refusal.changed");
             else if (reason.StartsWith("persistence-failed", StringComparison.Ordinal))
-                text = "your latest edit is not saved yet, so nothing was cast - the planner " +
-                    "shows why and offers Retry save";
+                text = PlannerText.Get("run.refusal.persistence");
             else if (reason.StartsWith("apply-refused", StringComparison.Ordinal))
-                text = "some castings are blocked (" + (result.GateDecision == null ? 0
-                    : result.GateDecision.BlockingReasons.Count) +
-                    ") - fix them or switch the planner to Plan: Cast available";
+                text = PlannerText.Get("run.refusal.blocked", result.GateDecision == null ? 0 : result.GateDecision.BlockingReasons.Count);
             else if (reason.StartsWith("import-notices-pending", StringComparison.Ordinal) ||
                 reason.StartsWith("legacy-import-unresolved", StringComparison.Ordinal))
-                text = "the imported plan still needs your review in the planner";
+                text = PlannerText.Get("run.refusal.import");
             else if (reason.StartsWith("execution-projection-refused", StringComparison.Ordinal))
-                text = "a casting uses a setting this version cannot execute yet";
+                text = PlannerText.Get("run.refusal.projection");
             else if (reason.StartsWith("execution-in-progress", StringComparison.Ordinal))
-                text = "another routine is already running";
+                text = PlannerText.Get("run.refusal.busy");
             else if (reason.StartsWith("native-submission-disabled", StringComparison.Ordinal) ||
                 reason.StartsWith("native-casting-unavailable", StringComparison.Ordinal))
-                text = "native casting is not available in this session";
+                text = PlannerText.Get("run.refusal.native");
             else
-                text = "refused";
-            return routineName + " was not cast: " + text + ". (" + reason + ")";
+                text = PlannerText.Get("run.refusal.generic");
+            return PlannerText.Get("run.refusal", routineName, text, reason);
         }
 
-        internal const string CombatRefusalText = "Buff routines cannot run during combat.";
+        internal static string CombatRefusalText { get { return PlannerText.Get("run.combat"); } }
 
         // v1.2 §5: a HUD routine button's tooltip in casting-first mode. A
         // click runs that routine at once after a fresh check of the party;
@@ -279,15 +271,12 @@ namespace KingmakerBuffPlanner.UI
             string executionMode, string lastPress)
         {
             string text = castings == null
-                ? "Cast " + routineName + ": one click runs your saved " + routineName + " routine now"
-                : "Cast " + routineName + ": " + castings.Value +
-                    (castings.Value == 1 ? " casting" : " castings") + ", " + executionMode +
-                    " mode. One click runs " + (castings.Value == 1 ? "it" : "them") + " now";
-            text += " (the party is checked first; available castings run in authored order unless " +
-                "Require full plan is enabled; omissions are explained in the game log).";
+                ? PlannerText.Get("run.tooltip.cold", routineName)
+                : PlannerText.Get(castings.Value == 1 ? "run.tooltip.one" : "run.tooltip.many",
+                    routineName, castings.Value, executionMode);
+            text = PlannerText.Get("run.tooltip.policy", text);
             if (string.IsNullOrEmpty(lastPress)) return text;
-            return text + " Last: " + (lastPress.Length <= 180 ? lastPress
-                : lastPress.Substring(0, 177) + "...");
+            return PlannerText.Get("run.tooltip.last", text, lastPress.Length <= 180 ? lastPress : lastPress.Substring(0, 177) + "...");
         }
 
         // An executor-contract limitation (the converter refusal) in words.
@@ -295,10 +284,9 @@ namespace KingmakerBuffPlanner.UI
         {
             string value = limitation ?? string.Empty;
             if (value.Contains(":targeting-modifier:"))
-                return "a targeting modifier (such as Share Transmutation) that is not verified as " +
-                    "executable for this caster";
+                return PlannerText.Get("run.limit.target");
             if (value.Contains(":exact-enhancement-source:"))
-                return "an exact rod or item identity is not executed yet";
+                return PlannerText.Get("run.limit.exact");
             return value;
         }
 
@@ -326,35 +314,32 @@ namespace KingmakerBuffPlanner.UI
                         break;
                     }
             if (value.StartsWith("already-active:", StringComparison.Ordinal))
-                return "already active on " + FirstSegment(value, "already-active:") + " (skipped)";
+                return PlannerText.Get("run.effect.active", FirstSegment(value, "already-active:"));
             if (value.StartsWith("already-covered:", StringComparison.Ordinal))
-                return "already active on " + FirstSegment(value, "already-covered:") +
-                    " (the cast goes ahead for the others)";
+                return PlannerText.Get("run.effect.covered", FirstSegment(value, "already-covered:"));
             if (value.StartsWith("already-covered-longer:", StringComparison.Ordinal))
-                return "already active on " + FirstSegment(value, "already-covered-longer:") +
-                    ", lasting longer than this cast (the cast goes ahead for the others and may shorten it)";
+                return PlannerText.Get("run.effect.longer", FirstSegment(value, "already-covered-longer:"));
             if (value.StartsWith("existing-active-recast:", StringComparison.Ordinal))
-                return "active on " + FirstSegment(value, "existing-active-recast:") +
-                    " but set to always recast";
+                return PlannerText.Get("run.effect.recast", FirstSegment(value, "existing-active-recast:"));
             if (value.StartsWith("existing-incomplete:", StringComparison.Ordinal))
-                return "partly present on " + FirstSegment(value, "existing-incomplete:") + " (will cast)";
+                return PlannerText.Get("run.effect.incomplete", FirstSegment(value, "existing-incomplete:"));
             if (value.StartsWith("existing-insufficient:", StringComparison.Ordinal))
             {
                 string unit = FirstSegment(value, "existing-insufficient:");
                 string why = value.Substring("existing-insufficient:".Length + unit.Length);
                 string reason = why.Contains("weaker-caster-level")
-                    ? "weaker (lower caster level)"
+                    ? PlannerText.Get("run.effect.weak")
                     : why.Contains("remaining-duration-short") || why.Contains("expiring")
-                        ? "about to expire"
+                        ? PlannerText.Get("run.effect.expiring")
                         : why.Contains("missing-metamagic") || why.Contains("metamagic-unverified")
-                            ? "without the planned metamagic"
+                            ? PlannerText.Get("run.effect.metamagic")
                             : why.Contains("equivalence-unproven") ||
                               why.Contains("caster-level-unverified")
-                                ? "not provably as strong"
+                                ? PlannerText.Get("run.effect.unproven")
                                 : why.Contains("suppression-unreadable")
-                                    ? "possibly suppressed"
-                                    : "not sufficient";
-                return "present on " + unit + " but " + reason + " (will recast)";
+                                    ? PlannerText.Get("run.effect.suppressed")
+                                    : PlannerText.Get("run.effect.insufficient");
+                return PlannerText.Get("run.effect.recastexplain", unit, reason);
             }
             return value;
         }
@@ -389,19 +374,19 @@ namespace KingmakerBuffPlanner.UI
                 reason = reason.Substring("cancelled:".Length);
             switch (reason)
             {
-                case "player-stopped": return "you stopped it";
-                case "deadline": return "it took too long";
-                case "mod-disabled": return "the mod was disabled";
-                case "mod-unload": return "the mod was unloaded";
-                case "area-unloading": return "the area changed";
-                case "root-teardown": return "the planner shut down";
-                default: return reason.Length == 0 ? "stopped" : reason;
+                case "player-stopped": return PlannerText.Get("run.stop.player");
+                case "deadline": return PlannerText.Get("run.stop.deadline");
+                case "mod-disabled": return PlannerText.Get("run.stop.disabled");
+                case "mod-unload": return PlannerText.Get("run.stop.unload");
+                case "area-unloading": return PlannerText.Get("run.stop.area");
+                case "root-teardown": return PlannerText.Get("run.stop.teardown");
+                default: return reason.Length == 0 ? PlannerText.Get("run.stop.generic") : PlannerText.Get("run.stop.detail", reason);
             }
         }
 
         private static string ShortDetail(string detail)
         {
-            if (string.IsNullOrEmpty(detail)) return "no detail";
+            if (string.IsNullOrEmpty(detail)) return PlannerText.Get("run.detail.missing");
             return detail.Length <= 120 ? detail : detail.Substring(0, 117) + "...";
         }
     }

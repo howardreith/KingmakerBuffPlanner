@@ -3871,7 +3871,9 @@ namespace KingmakerBuffPlanner.Tests
                 !uiRoot.Contains("Routine UI result:") ||
                 !screen.Contains("result.Message") ||
                 !session.Contains("[KBP-QUICK]") ||
-                !session.Contains("skipped active=") ||
+                !session.Contains("PlannerText.Get(\"classic.session.none.executable\", routineName, skipped, unfulfilled, variantReselection)") ||
+                PlannerText.Get("classic.session.none.executable", "Long", 12, 0, "") !=
+                    "No Long casts can run: skipped active=12; unfulfilled=0." ||
                 !hud.Contains("Setup|Long|Important|Short") ||
                 !hud.Contains("RoutineTooltip"))
                 throw new InvalidOperationException(
@@ -16303,7 +16305,7 @@ namespace KingmakerBuffPlanner.Tests
             string dir = Path.Combine(root, "l5-format");
             Directory.CreateDirectory(dir);
             var repository = new CastingPlanRepository(dir);
-            repository.Save(CastingPlanProfile.FromDocument(CastingDocument()));
+            repository.Save(CastingPlanProfile.CreateDefault("fixture-campaign"));
             string path = repository.GetProfilePath("fixture-campaign");
             Newtonsoft.Json.Linq.JObject written = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(path));
             if ((int)written["formatRevision"] != CastingPlanProfile.CurrentFormatRevision)

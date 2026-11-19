@@ -90,7 +90,7 @@ namespace KingmakerBuffPlanner.UI
         public string PoolLabel { get; private set; }
         public ResourcePoolKind? PoolKind { get; private set; }
         public CastingCapacityEstimate Capacity { get; private set; }
-        // "3 of 4 casts remaining", "1 exact slot ready", "Unlimited".
+        // "3 of 4 casts remaining", "1 exact slot ready", PlannerText.Get("graph.capacity.unlimited").
         public string CapacityText { get; private set; }
         // False when the casting could not record which of two identical
         // entries it means (the same spell at two levels of one book).
@@ -339,7 +339,7 @@ namespace KingmakerBuffPlanner.UI
 
         public string EnhancementId { get; private set; }
         public string Name { get; private set; }
-        // "Metamagic rod" or "Class feature".
+        // PlannerText.Get("graph.enhancement.rod") or PlannerText.Get("graph.enhancement.feature").
         public string Mechanism { get; private set; }
         // The item or feature that provides it.
         public string SourceName { get; private set; }
@@ -534,36 +534,39 @@ namespace KingmakerBuffPlanner.UI
     {
         public static string TargetingLabel(bool? group, bool area)
         {
-            return area ? "Area buff" : group == true ? "Group buff"
-                : group == false ? "Single target" : "Targeting not understood";
+            return area ? PlannerText.Get("graph.target.area") : group == true ? PlannerText.Get("graph.target.group")
+                : group == false ? PlannerText.Get("graph.target.single") : PlannerText.Get("graph.target.unknown");
         }
         // What a source can still fund after the whole plan, as the caster
         // lane shows it.
         public static string Capacity(CastingCapacityEstimate estimate, ResourcePoolKind? kind,
             int unitsPerCast)
         {
-            if (estimate == null) return "Remaining unknown";
-            if (estimate.Kind == CastingCapacityKind.Unlimited) return "Unlimited";
-            if (estimate.Kind == CastingCapacityKind.Unknown) return "Remaining unknown";
+            if (estimate == null) return PlannerText.Get("graph.capacity.unknown");
+            if (estimate.Kind == CastingCapacityKind.Unlimited) return PlannerText.Get("graph.capacity.unlimited");
+            if (estimate.Kind == CastingCapacityKind.Unknown) return PlannerText.Get("graph.capacity.unknown");
             int count = estimate.AdditionalCastings;
             string more = estimate.IsLowerBound ? "+" : string.Empty;
             if (count == 0)
             {
                 if (estimate.LimitingCategory == CastingCostCategory.Material)
-                    return "Blocked: material unavailable";
-                if (kind == ResourcePoolKind.PreparedSlots) return "No prepared slot left";
+                    return PlannerText.Get("graph.capacity.noMaterial");
+                if (kind == ResourcePoolKind.PreparedSlots) return PlannerText.Get("graph.capacity.noPrepared");
                 int? total = Casts(estimate.NativeAvailableNow, unitsPerCast);
-                return "0 / " + (total == null ? "?" : total.Value.ToString()) + " remaining";
+                return PlannerText.Get("graph.capacity.empty", total == null ? "?" : total.Value.ToString());
             }
             string limited = estimate.LimitingCategory == CastingCostCategory.Material
-                ? " (material limits it)" : string.Empty;
+                ? PlannerText.Get("graph.capacity.materialLimit") : string.Empty;
             if (kind == ResourcePoolKind.PreparedSlots)
-                return count + more + (count == 1 ? " exact slot ready" : " exact slots ready") + limited;
+                return (count == 1 ? PlannerText.Get("graph.capacity.prepared.one", count + more, limited)
+                    : PlannerText.Get("graph.capacity.prepared.many", count + more, limited));
             int? all = Casts(estimate.NativeAvailableNow, unitsPerCast);
             bool showAll = all != null && !estimate.IsLowerBound && all.Value >= count;
             int noun = showAll ? all.Value : count;
-            return count + more + (showAll ? " of " + all.Value : string.Empty) +
-                (noun == 1 ? " cast" : " casts") + " remaining" + limited;
+            return (showAll && noun == 1 ? PlannerText.Get("graph.capacity.knownTotal.one", count + more, all.Value, limited)
+                    : !showAll && noun == 1 ? PlannerText.Get("graph.capacity.remaining.one", count + more, limited)
+                    : showAll && noun != 1 ? PlannerText.Get("graph.capacity.knownTotal.many", count + more, all.Value, limited)
+                    : PlannerText.Get("graph.capacity.remaining.many", count + more, limited));
         }
 
         private static int? Casts(int? units, int unitsPerCast)
@@ -576,7 +579,7 @@ namespace KingmakerBuffPlanner.UI
         // can. The plan's own capacity decides, never a view count.
         // withoutPlan is the same source asked against the native resources
         // with NO plan reservations (owner playtest after 0.6.11: a cleared
-        // plan still read "None left after the plan" for a caster whose
+        // plan still read PlannerText.Get("graph.source.reserved") for a caster whose
         // prepared slots were genuinely spent). Only a shortage the plan's
         // own reservations cause is attributed to the plan; a source that is
         // empty even with nothing planned says so honestly.
@@ -589,13 +592,13 @@ namespace KingmakerBuffPlanner.UI
         {
             if (!pinnable)
                 return kind == ResourcePoolKind.ItemCharges
-                    ? "Identical copies of this item could not be told apart; keep one equipped."
-                    : "This spell is known at two levels of one spellbook; this version cannot pick one.";
+                    ? PlannerText.Get("graph.blocked.itemCopies")
+                    : PlannerText.Get("graph.blocked.level");
             if (estimate == null || estimate.Kind == CastingCapacityKind.Unknown)
                 return string.Empty;
             if (estimate.CanFundAnother) return string.Empty;
             if (estimate.LimitingCategory == CastingCostCategory.Material)
-                return "Material component unavailable.";
+                return PlannerText.Get("graph.blocked.material");
             if (withoutPlan != null && withoutPlan.Kind == CastingCapacityKind.Finite &&
                 !withoutPlan.CanFundAnother && withoutPlan.LimitingCategory != CastingCostCategory.Material)
                 return kind == ResourcePoolKind.PreparedSlots ? NoPreparedUsesReason : NoUsesReason;
@@ -614,18 +617,18 @@ namespace KingmakerBuffPlanner.UI
         {
             if (enhancement == null) return string.Empty;
             if (enhancement.AffectsTargeting)
-                return "Changes whom the spell reaches (not executed in this version).";
+                return PlannerText.Get("graph.enhancement.targeting");
             if (enhancement.Category == CastEnhancementCategory.MetamagicRod)
             {
                 var parts = new List<string>();
                 int mask = enhancement.MetamagicMask;
                 if ((mask & ExistingEffectSufficiency.ExtendMetamagicFlag) != 0)
-                    parts.Add("duration x2");
-                if ((mask & 1) != 0) parts.Add("variable numbers +50%");
-                if ((mask & 2) != 0) parts.Add("variable numbers maximized");
-                if ((mask & 16) != 0) parts.Add("spell level raised");
+                    parts.Add(PlannerText.Get("graph.enhancement.extend"));
+                if ((mask & 1) != 0) parts.Add(PlannerText.Get("graph.enhancement.empower"));
+                if ((mask & 2) != 0) parts.Add(PlannerText.Get("graph.enhancement.maximize"));
+                if ((mask & 16) != 0) parts.Add(PlannerText.Get("graph.enhancement.heighten"));
                 return parts.Count == 0
-                    ? enhancement.EffectDisplayName + " metamagic (effect not calculated)."
+                    ? PlannerText.Get("graph.enhancement.unknownMeta", enhancement.EffectDisplayName)
                     : char.ToUpperInvariant(parts[0][0]) + string.Join(", ", parts.ToArray()).Substring(1) + ".";
             }
             if (!string.IsNullOrWhiteSpace(enhancement.Description))
@@ -633,14 +636,14 @@ namespace KingmakerBuffPlanner.UI
                 string description = enhancement.Description.Trim();
                 return description.Length <= 160 ? description : description.Substring(0, 157) + "...";
             }
-            return enhancement.EffectDisplayName + " (effect not calculated).";
+            return PlannerText.Get("graph.enhancement.unknown", enhancement.EffectDisplayName);
         }
 
         public static string Mechanism(CastEnhancementSnapshot enhancement)
         {
             if (enhancement == null) return string.Empty;
             return enhancement.Category == CastEnhancementCategory.MetamagicRod
-                ? "Metamagic rod" : "Class feature";
+                ? PlannerText.Get("graph.enhancement.rod") : PlannerText.Get("graph.enhancement.feature");
         }
 
         // An enhancement's own applicability refusal, in words.
@@ -649,39 +652,39 @@ namespace KingmakerBuffPlanner.UI
             switch (failure ?? string.Empty)
             {
                 case "": return string.Empty;
-                case "caster-mismatch": return "Belongs to another character.";
-                case "source-not-spellbook": return "Only spells from a spellbook can use it.";
-                case "spellbook-not-qualified": return "Not for this spellbook.";
-                case "ability-not-qualified": return "Not for this spell.";
-                case "metamagic-already-applied": return "This spell already has that metamagic.";
-                case "spell-level-exceeds-limit": return "The spell's level is above this rod's limit.";
-                case "category-unsupported": return "Not supported in this version.";
+                case "caster-mismatch": return PlannerText.Get("graph.enhancement.owner");
+                case "source-not-spellbook": return PlannerText.Get("graph.enhancement.spellOnly");
+                case "spellbook-not-qualified": return PlannerText.Get("graph.enhancement.wrongBook");
+                case "ability-not-qualified": return PlannerText.Get("graph.enhancement.wrongSpell");
+                case "metamagic-already-applied": return PlannerText.Get("graph.enhancement.duplicate");
+                case "spell-level-exceeds-limit": return PlannerText.Get("graph.enhancement.tooHigh");
+                case "category-unsupported": return PlannerText.Get("graph.enhancement.unsupported");
                 default: return failure.Replace('-', ' ') + ".";
             }
         }
 
         // Native UI finish (UI-04): the casting card's state as one short
         // phrase. An active effect and what the run does about it are two
-        // facts, never collapsed: "Active · Will skip" (the policy skips an
-        // active effect), "Active · Will recast" (it is active, or present but
+        // facts, never collapsed: PlannerText.Get("graph.card.skip") (the policy skips an
+        // active effect), PlannerText.Get("graph.card.recast") (it is active, or present but
         // not sufficient, and this casting casts again anyway).
-        public const string ItemSourceNeeded = "Source needed";
+        public static string ItemSourceNeeded { get { return PlannerText.Get("graph.card.itemSource"); } }
 
         public static string CardStatus(ResolvedCastingReadiness readiness, bool cannotRunYet,
             IEnumerable<string> existingEffectCodes)
         {
             switch (readiness)
             {
-                case ResolvedCastingReadiness.AlreadySatisfied: return "Active · Will skip";
+                case ResolvedCastingReadiness.AlreadySatisfied: return PlannerText.Get("graph.card.skip");
                 case ResolvedCastingReadiness.Ready:
-                    if (cannotRunYet) return "Ready · Cannot run yet";
+                    if (cannotRunYet) return PlannerText.Get("graph.card.wait");
                     bool present = (existingEffectCodes ?? new string[0]).Any(code => code != null &&
                         (code.StartsWith("existing-active-recast:", StringComparison.Ordinal) ||
                          code.StartsWith("existing-insufficient:", StringComparison.Ordinal)));
-                    return present ? "Active · Will recast" : "Ready";
-                case ResolvedCastingReadiness.Disabled: return "Disabled";
-                case ResolvedCastingReadiness.Draft: return "Draft";
-                default: return "Not ready";
+                    return present ? PlannerText.Get("graph.card.recast") : PlannerText.Get("graph.card.ready");
+                case ResolvedCastingReadiness.Disabled: return PlannerText.Get("graph.card.disabled");
+                case ResolvedCastingReadiness.Draft: return PlannerText.Get("graph.card.draft");
+                default: return PlannerText.Get("graph.card.blocked");
             }
         }
 
@@ -694,51 +697,51 @@ namespace KingmakerBuffPlanner.UI
             switch (action)
             {
                 case CastingGraphRecipientAction.Add:
-                    return group ? "Click to centre a casting here" : "Click to add a casting";
+                    return group ? PlannerText.Get("graph.recipient.addGroup") : PlannerText.Get("graph.recipient.add");
                 case CastingGraphRecipientAction.Remove:
-                    return "Has casting " + castingLabel + " · click to remove it";
+                    return PlannerText.Get("graph.recipient.remove", castingLabel);
                 case CastingGraphRecipientAction.InspectGroupCoverage:
-                    return "Covered by " + castingLabel + " · click to inspect it";
+                    return PlannerText.Get("graph.recipient.covered", castingLabel);
                 case CastingGraphRecipientAction.InspectItemSource:
-                    return "Casting " + castingLabel + " needs its source · click to inspect it";
+                    return PlannerText.Get("graph.recipient.missingSource", castingLabel);
                 case CastingGraphRecipientAction.Disambiguate:
-                    return "Multiple matching castings (" + castingLabel +
-                        ") · inspect one to remove it";
+                    return PlannerText.Get("graph.recipient.multiple", castingLabel);
                 case CastingGraphRecipientAction.Retarget:
-                    return "Click to move it here";
+                    return PlannerText.Get("graph.recipient.move");
                 case CastingGraphRecipientAction.Recentre:
-                    return "Click to centre it here";
+                    return PlannerText.Get("graph.recipient.centre");
                 default:
-                    return string.IsNullOrEmpty(reason) ? "Cannot receive it" : reason;
+                    return string.IsNullOrEmpty(reason) ? PlannerText.Get("graph.recipient.unavailable") : reason;
             }
         }
 
         // The sidebar's single instruction while adding a casting.
         public static string NextStep(bool buffSelected, bool casterChosen, bool sourceChosen, bool group)
         {
-            if (!buffSelected) return "Choose a buff";
-            if (!casterChosen || !sourceChosen) return "Choose a caster and source";
-            return group ? "Choose where to centre it" : "Choose a recipient";
+            if (!buffSelected) return PlannerText.Get("graph.step.buff");
+            if (!casterChosen || !sourceChosen) return PlannerText.Get("graph.step.source");
+            return group ? PlannerText.Get("graph.step.origin") : PlannerText.Get("graph.step.recipient");
         }
 
         // A source row's second line: what the plan leaves of it and which
         // resource it spends; a source that cannot fund another casting says
         // so first.
         public static string SourceLine(bool usable, string blockedReason, string capacity, string poolLabel,
-            IEnumerable<string> sharedWith)
+            IEnumerable<string> sharedWith, bool capacityKnown = true)
         {
             var parts = new List<string>();
             bool genuine = !usable && IsGenuineExhaustion(blockedReason);
             if (!usable)
                 parts.Add(string.Equals(blockedReason, ReservedByPlanReason,
-                    StringComparison.Ordinal) ? "None left after the plan" : (blockedReason ?? string.Empty).TrimEnd('.'));
+                    StringComparison.Ordinal) ? PlannerText.Get("graph.source.reserved") : blockedReason == NoPreparedUsesReason ? PlannerText.Get("graph.capacity.preparedSpent").TrimEnd('.')
+                    : blockedReason == NoUsesReason ? PlannerText.Get("graph.capacity.spent").TrimEnd('.') : (blockedReason ?? string.Empty).TrimEnd('.'));
             // A genuinely empty source has nothing more to count: "No prepared
             // slot left" or "0 / 0 remaining" would only repeat the reason.
-            if (!genuine && !string.IsNullOrEmpty(capacity) && (usable || capacity != "Remaining unknown")) parts.Add(capacity);
+            if (!genuine && !string.IsNullOrEmpty(capacity) && (usable || capacityKnown)) parts.Add(capacity);
             if (!string.IsNullOrEmpty(poolLabel)) parts.Add(poolLabel);
             List<string> shared = (sharedWith ?? new string[0]).Where(value => !string.IsNullOrEmpty(value)).ToList();
             string line = string.Join(" · ", parts.Where(value => value.Length != 0).ToArray());
-            return shared.Count == 0 ? line : line + " (shared with " + string.Join(", ", shared.ToArray()) + ")";
+            return shared.Count == 0 ? line : PlannerText.Get("graph.source.shared", line, string.Join(", ", shared.ToArray()));
         }
 
         // A catalogue entry's planned-casting count, only when it says
@@ -746,26 +749,25 @@ namespace KingmakerBuffPlanner.UI
         public static string CatalogueCount(int routineCount, int planCount, string routineName)
         {
             if (routineCount > 0)
-                return routineCount + " in " + routineName +
-                    (planCount > routineCount ? " · " + planCount + " in all" : string.Empty);
-            if (planCount > 0) return planCount + " in other routines";
+                return (planCount <= routineCount ? PlannerText.Get("graph.count.routine", routineCount, routineName)
+                    : PlannerText.Get("graph.count.routineAndPlan", routineCount, routineName, planCount));
+            if (planCount > 0) return PlannerText.Get("graph.count.other", planCount);
             return string.Empty;
         }
 
         public static string Guidance(bool buffSelected, string casterName, int casterSources,
             string sourceLabel, bool group, int castingsShown)
         {
-            if (!buffSelected) return "Choose a buff on the left.";
+            if (!buffSelected) return PlannerText.Get("graph.guidance.buff");
             if (string.IsNullOrEmpty(casterName))
                 return castingsShown == 0
-                    ? "Choose who casts it: click a caster, then who receives it."
-                    : "Click a casting's line or card to edit it, or choose a caster to add another.";
+                    ? PlannerText.Get("graph.guidance.caster")
+                    : PlannerText.Get("graph.guidance.edit");
             if (string.IsNullOrEmpty(sourceLabel))
-                return casterName + " can cast it " + casterSources +
-                    " ways: choose the exact source under " + casterName + ".";
+                return PlannerText.Get("graph.guidance.exact", casterName, casterSources);
             return group
-                ? casterName + " · " + sourceLabel + ": click the unit the group spell is centred on. One casting reaches everyone in range."
-                : casterName + " · " + sourceLabel + ": click who receives it. Each click adds one casting.";
+                ? PlannerText.Get("graph.guidance.origin", casterName, sourceLabel)
+                : PlannerText.Get("graph.guidance.recipient", casterName, sourceLabel);
         }
     }
 

@@ -51,6 +51,17 @@ try {
         $info.Author -cne 'Mr. Bard') {
         throw 'Package entry point or public UMM metadata validation failed.'
     }
+    # Verify the bytes distributed inside the assembly. Loading from bytes leaves the extracted DLL unlocked.
+    $assembly = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes((Join-Path $mod 'KingmakerBuffPlanner.dll')))
+    foreach ($locale in @('enGB', 'zhCN')) {
+        $catalog = $assembly.GetManifestResourceStream("KBP.Text.$locale.json")
+        if ($null -eq $catalog) { throw "Missing packaged catalog for $locale." }
+        try { $hash = (Get-FileHash -Algorithm SHA256 -InputStream $catalog).Hash.ToLowerInvariant() }
+        finally { $catalog.Dispose() }
+        if ($hash -cne (Get-KbpSha256 (Join-Path $root "src/KingmakerBuffPlanner/Localization/$locale.json"))) {
+            throw "Packaged catalog differs from the source catalog for $locale."
+        }
+    }
     # The installable package carries the repository's MIT license verbatim.
     if ((Get-KbpSha256 (Join-Path $mod 'LICENSE')) -cne (Get-KbpSha256 (Join-Path $root 'LICENSE'))) {
         throw 'Packaged LICENSE does not match the repository LICENSE.'
@@ -59,4 +70,4 @@ try {
 finally {
     if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Recurse -Force }
 }
-Write-Host "Package validation: PASS=6 FAIL=0 sha256=$(Get-KbpSha256 $package)"
+Write-Host "Package validation: PASS=8 FAIL=0 sha256=$(Get-KbpSha256 $package)"

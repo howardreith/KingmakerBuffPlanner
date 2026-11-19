@@ -40,11 +40,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 get
                 {
-                    return "Requested " + RequestedTargets + " targets: " +
-                        Fulfilled + " covered by " + PlannedCasts + " planned cast(s), " +
-                        SkippedActive + " already active, " + Unfulfilled + " unmet." +
-                        (UnmetReasons.Count == 0 ? string.Empty :
-                            " Unmet: " + string.Join("; ", UnmetReasons.ToArray()));
+                    return PlannerText.Get("classic.targets.summary", RequestedTargets, Fulfilled, PlannedCasts, SkippedActive, Unfulfilled, UnmetReasons.Count == 0 ? string.Empty : PlannerText.Get("classic.targets.reasons", string.Join("; ", UnmetReasons.ToArray())));
                 }
             }
         }
@@ -58,7 +54,7 @@ namespace KingmakerBuffPlanner.UI
                 .Where(o => o.Kind == TargetOutcomeKind.Unfulfilled)
                 .Select(o => o.UnitId + " (" + o.Reason + ")")
                 .Concat(plan.UnresolvableRequests.Select(o =>
-                    o.UnitId + " (saved buff unavailable: " + o.Reason + ")"))
+                    PlannerText.Get("classic.saved.unavailable", o.UnitId, o.Reason)))
                 .OrderBy(value => value, StringComparer.Ordinal).ToList();
             return new Decision(unmet.Count != 0,
                 plan.Outcomes.Count + plan.UnresolvableRequests.Count, fulfilled,
@@ -286,10 +282,10 @@ namespace KingmakerBuffPlanner.UI
         public IReadOnlyList<string> RecipientNames { get; internal set; }
 
         public string Status =>
-            PinUnresolved ? "Pinned caster unavailable" :
-            UnfulfilledTargets > 0 ? UnfulfilledTargets + " unmet target(s)" :
-            PlannedCasts == 0 ? FulfilledTargets + " already active" :
-            "Planned " + PlannedCasts + " cast(s) covering " + FulfilledTargets + " target(s)";
+            PinUnresolved ? PlannerText.Get("classic.caster.unresolved") :
+            UnfulfilledTargets > 0 ? PlannerText.Get("classic.target.short", UnfulfilledTargets) :
+            PlannedCasts == 0 ? PlannerText.Get("classic.target.active", FulfilledTargets) :
+            PlannerText.Get("classic.planned.casts", PlannedCasts, FulfilledTargets);
 
         public static IReadOnlyList<CastingAssignmentRowViewModel> CreateRoutineRows(
             BuffPlannerProfile profile, string routineId,
@@ -333,9 +329,8 @@ namespace KingmakerBuffPlanner.UI
                 var pair = ordered[index];
                 CastingAssignmentProfile child = pair.Child;
                 string casterText = child.IsAutomatic
-                    ? "Automatic"
-                    : "Pinned: " + (unitDisplayName == null
-                        ? child.CasterUnitId : unitDisplayName(child.CasterUnitId)) +
+                    ? PlannerText.Get("classic.caster.automatic")
+                    : PlannerText.Get("classic.caster.pinned", unitDisplayName == null ? child.CasterUnitId : unitDisplayName(child.CasterUnitId)) +
                         (string.IsNullOrWhiteSpace(child.SpellbookGuid)
                             ? string.Empty : " | " + child.SpellbookGuid) +
                         (string.IsNullOrWhiteSpace(child.ProviderKey)
@@ -349,7 +344,7 @@ namespace KingmakerBuffPlanner.UI
                 List<string> enhancementTexts = child.Enhancements.Select(selection =>
                     (enhancementDisplayName == null
                         ? selection.EnhancementId : enhancementDisplayName(selection.EnhancementId)) +
-                    (selection.IsRequired ? string.Empty : " (cast without when unavailable)"))
+                    (selection.IsRequired ? string.Empty : PlannerText.Get("classic.enhancement.castwithout")))
                     .ToList();
                 int plannedCasts = plan == null ? 0 : plan.Steps.Count(step =>
                     step.AssignmentId == child.AssignmentId);
@@ -422,12 +417,8 @@ namespace KingmakerBuffPlanner.UI
             get
             {
                 string competing = CompetingRoutineIds.Count == 0 ? string.Empty :
-                    " | also requested by " + string.Join(", ", CompetingRoutineIds.ToArray()) +
-                        " (their own runs)";
-                return DisplayName + ": requested " + RequestedUsage +
-                    " / available " + AvailableNow + " / allocated " + AllocatedUsage +
-                    " / unmet " + UnmetDemand + " / forecast remaining " + ForecastRemaining +
-                    competing;
+                    PlannerText.Get("classic.resource.shared", string.Join(", ", CompetingRoutineIds.Select(id => PlannerText.Chinese ? PlannerText.Routine(id) : id).ToArray()));
+                return PlannerText.Get("classic.resource.summary", DisplayName, RequestedUsage, AvailableNow, AllocatedUsage, UnmetDemand, ForecastRemaining, competing);
             }
         }
     }

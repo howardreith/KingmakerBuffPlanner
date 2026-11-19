@@ -18,12 +18,43 @@ namespace KingmakerBuffPlanner.UI
     internal static class PlannerChineseFont
     {
         // Bundled Unity Font and the separate TMP atlas are both in the installed game's Resources.
+        internal static bool Required { get { return PlannerText.Chinese || PlannerText.NativeChinese; } }
         private static Font _unityFont;
         internal static Font UnityFont
         {
             get { return _unityFont ?? (_unityFont = Resources.Load<Font>("Fonts & Materials/SourceHanSerifSC/SourceHanSerifSC-Regular")); }
         }
-        internal static TMP_FontAsset Primary { get { return Resources.Load<TMP_FontAsset>("Fonts & Materials/SourceHanSerifSC-Regular"); } }
+        internal static TMP_FontAsset CloneWithFallbacks(TMP_FontAsset donor)
+        {
+            if (!Required || donor == null) return null;
+            var chinese = Resources.Load<TMP_FontAsset>("Fonts & Materials/SourceHanSerifSC-Regular");
+            if (chinese == null || donor == chinese) return null;
+            var additional = Resources.Load<TMP_FontAsset>("Fonts & Materials/SourceHanSerifSC-AddChar");
+            var fallbacks = new List<TMP_FontAsset> { chinese };
+            if (additional != null) fallbacks.Add(additional);
+            if (donor.fallbackFontAssets != null)
+                fallbacks.AddRange(donor.fallbackFontAssets.Where(f => f != null && !fallbacks.Contains(f)));
+            var clone = UnityEngine.Object.Instantiate(donor);
+            clone.fallbackFontAssets = fallbacks;
+            return clone;
+        }
+    }
+
+    // The component lives only on planner-owned objects. Labels under one menu share its clone.
+    internal sealed class PlannerFontOwner : MonoBehaviour
+    {
+        private TMP_FontAsset _font;
+        internal static TMP_FontAsset For(GameObject label, TMP_FontAsset donor)
+        {
+            if (!PlannerChineseFont.Required) return donor;
+            var scope = label.GetComponentInParent<PlannerFontOwner>() ?? label.AddComponent<PlannerFontOwner>();
+            if (scope._font == null) scope._font = PlannerChineseFont.CloneWithFallbacks(donor);
+            return scope._font != null ? scope._font : donor;
+        }
+        private void OnDestroy()
+        {
+            if (_font != null) UnityEngine.Object.Destroy(_font);
+        }
     }
 
     internal enum PlannerTextRole
@@ -133,21 +164,8 @@ namespace KingmakerBuffPlanner.UI
                 BodyFont = canvas.GetComponentsInChildren<TMP_Text>(true).Where(label => label != null && label.font != null)
                     .Select(label => label.font).FirstOrDefault(font => font.material != null &&
                         font.material.shader != null && MaterialAtlasInstanceId(font.material) != 0);
-            if (PlannerText.Chinese && BodyFont != null)
-            {
-                var chinese = PlannerChineseFont.Primary;
-                var additional = Resources.Load<TMP_FontAsset>("Fonts & Materials/SourceHanSerifSC-AddChar");
-                if (chinese != null)
-                {
-                    var fallbacks = new List<TMP_FontAsset> { chinese };
-                    if (additional != null) fallbacks.Add(additional);
-                    if (BodyFont.fallbackFontAssets != null)
-                        fallbacks.AddRange(BodyFont.fallbackFontAssets.Where(f => f != null && !fallbacks.Contains(f)));
-                    _ownedFont = UnityEngine.Object.Instantiate(BodyFont);
-                    _ownedFont.fallbackFontAssets = fallbacks;
-                    BodyFont = _ownedFont;
-                }
-            }
+            _ownedFont = PlannerChineseFont.CloneWithFallbacks(BodyFont);
+            if (_ownedFont != null) BodyFont = _ownedFont;
             int bodyAtlas = MaterialAtlasInstanceId(BodyFont == null ? null : BodyFont.material);
             foreach (Material material in Resources.FindObjectsOfTypeAll<Material>())
             {

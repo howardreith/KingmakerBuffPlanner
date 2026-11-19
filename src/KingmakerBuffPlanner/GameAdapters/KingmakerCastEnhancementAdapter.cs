@@ -281,7 +281,15 @@ namespace KingmakerBuffPlanner.GameAdapters
         private static string NamedMetamagic(int metamagicMask)
         {
             string native = ((Metamagic)metamagicMask).ToString();
-            if (CastEnhancementNaming.IsReadableName(native)) return native;
+            if (CastEnhancementNaming.IsReadableName(native))
+            {
+                if (Kingmaker.Localization.LocalizationManager.CurrentPack != null)
+                {
+                    string localized = Kingmaker.UI.Common.UIUtilityTexts.GetMetamagicName((Metamagic)metamagicMask);
+                    if (CastEnhancementNaming.IsReadableName(localized)) return localized;
+                }
+                return native;
+            }
             return CallOfTheWildMetamagicNames.Describe(metamagicMask);
         }
 

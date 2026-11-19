@@ -315,7 +315,7 @@ namespace KingmakerBuffPlanner.UI
         // Returns null on success, otherwise why the mode was not changed.
         internal static string TrySetPlannerMode(PlannerMode mode)
         {
-            if (_instance == null) return "The planner is not loaded yet.";
+            if (_instance == null) return PlannerText.Get("run.root.notloaded");
             return _instance.SetPlannerMode(mode);
         }
 
@@ -323,10 +323,10 @@ namespace KingmakerBuffPlanner.UI
         {
             if (mode == _plannerMode) return null;
             if (NativeCastingSessionPolicy.Locked)
-                return "The planner mode cannot be changed during an automated test session.";
+                return PlannerText.Get("run.root.testmode");
             if ((_castingHost != null && _castingHost.IsRunning) ||
                 (_session != null && _session.IsExecuting) || _quickStartPending)
-                return "A buff routine is running; wait for it to finish or stop it first.";
+                return PlannerText.Get("run.root.busy");
             // Neither planner may stay open across the switch.
             CloseCastingWorkspace();
             if (_screen != null) _screen.Close();
@@ -334,7 +334,7 @@ namespace KingmakerBuffPlanner.UI
             catch (Exception exception)
             {
                 _log.Error("[KBP-MODE] planner mode could not be saved.", exception);
-                return "The planner mode could not be saved: " + exception.Message;
+                return PlannerText.Get("run.root.save.mode", exception.Message);
             }
             _plannerMode = mode;
             if (_screen != null) _screen.DiscardUnshownResult();
@@ -1385,16 +1385,17 @@ namespace KingmakerBuffPlanner.UI
         {
             if (!_enabled || _session == null) return false;
             if (_session.IsExecuting || _quickStartPending) return false;
-            string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
+            string name = CastingSession == null ? PlannerText.Routine(routineId) : CastingSession.RoutineDisplayName(routineId);
             if (_castingHost.IsRunning)
             {
-                string running = _castingHost.ActiveScopeRoutineId ?? "the";
+                string running = _castingHost.ActiveScopeRoutineId;
                 _castingHost.RequestStop(CastingExecutionHost.PlayerStopReason);
                 _log.Info("[KBP-CF-RUN] stop requested by routine press;routine=" + routineId +
                     ";running=" + running + ";effective=after-current-cast.");
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Refused,
-                    "Stopping the running " + running + " routine after the cast in progress.",
+                    running == null ? PlannerText.Get("run.root.stopUnnamed")
+                        : PlannerText.Get("run.root.stopping", CastingSession == null ? PlannerText.Routine(running) : CastingSession.RoutineDisplayName(running)),
                     0, 0, 0));
                 return true;
             }
@@ -1407,25 +1408,23 @@ namespace KingmakerBuffPlanner.UI
             {
                 _log.Error("[KBP-CF-RUN] fresh preflight inputs unavailable;routine=" +
                     routineId + ".", exception);
-                string refusal = name + " was not cast: the party state could not be refreshed (" +
-                    exception.Message + ").";
+                string refusal = PlannerText.Get("run.root.refresh.failed", name, exception.Message);
                 if (CastingSession != null) CastingSession.ReportRunRefusal(refusal);
                 if (_castingWorkspace != null) _castingWorkspace.ShowNotice(refusal);
                 if (CastingSession == null) ReportClosedPlannerRefusal(refusal);
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Refused,
-                    name + " was not cast: the party state could not be refreshed (" +
-                    exception.Message + ").", 0, 0, 0));
+                    refusal, 0, 0, 0));
                 return true;
             }
             CastingWorkspaceSession session;
             string unavailable = EnsureCastingSession(out session, false);
             if (session == null)
             {
-                ReportClosedPlannerRefusal("Cannot run " + name + ": " + unavailable);
+                ReportClosedPlannerRefusal(PlannerText.Get("run.root.run.unavailable", name, unavailable));
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Refused,
-                    "Cannot run " + name + ": " + unavailable, 0, 0, 0));
+                    PlannerText.Get("run.root.run.unavailable", name, unavailable), 0, 0, 0));
                 return true;
             }
             name = session.RoutineDisplayName(routineId);
@@ -1436,10 +1435,10 @@ namespace KingmakerBuffPlanner.UI
             {
                 _log.Error("[KBP-CF-RUN] apply failed before submission;routine=" +
                     routineId + ".", exception);
-                ReportClosedPlannerRefusal(name + " failed before anything was cast: " + exception.Message);
+                ReportClosedPlannerRefusal(PlannerText.Get("run.root.precast.failed", name, exception.Message));
                 CompleteQuick(completed, new QuickExecutionResult(routineId, name,
                     QuickExecutionDisposition.Failed,
-                    name + " failed before anything was cast: " + exception.Message,
+                    PlannerText.Get("run.root.precast.failed", name, exception.Message),
                     0, 0, 0));
                 return true;
             }
@@ -1894,9 +1893,9 @@ namespace KingmakerBuffPlanner.UI
                 if (refused != null) { OpenControllerQuick(refused); return; }
             }
             if (!CastingFirstActive)
-                OpenControllerQuick("Classic is retained. Open Review casting-first setup for controller-readable switch consent. Nothing has been switched.");
+                OpenControllerQuick(PlannerText.Get("controller.classic.consentHint"));
             else if (!OpenCastingWorkspace() && ControllerContextValid())
-                OpenControllerQuick("The editor could not open. Input was released. See the log for the unavailable host/input contract.");
+                OpenControllerQuick(PlannerText.Get("controller.editor.unavailable"));
         }
 
         private void OpenControllerQuick(string notice = null)
@@ -1910,9 +1909,9 @@ namespace KingmakerBuffPlanner.UI
                 string unavailable = null;
                 string campaign = Game.Instance.Player == null ? null : Game.Instance.Player.GameId;
                 if (!root.CastingFirstActive)
-                    unavailable = "Classic is selected. Review casting-first setup to read and approve the one-way switch. Classic has not been switched.";
+                    unavailable = PlannerText.Get("run.root.classic");
                 else if (string.IsNullOrWhiteSpace(campaign))
-                    unavailable = "No campaign profile is available. Return after the campaign has loaded.";
+                    unavailable = PlannerText.Get("run.root.noprofile");
                 else
                 {
                     bool refresh = root._session.Model == null || root._session.Model.Profile == null ||
@@ -1921,7 +1920,7 @@ namespace KingmakerBuffPlanner.UI
                     if (session != null && session.CampaignId != campaign)
                     {
                         session = null;
-                        unavailable = "The loaded campaign could not be bound. Close this menu and try again after loading.";
+                        unavailable = PlannerText.Get("run.root.bind");
                     }
                 }
                 var model = new ControllerRoutineModel(session, unavailable,
@@ -1932,7 +1931,7 @@ namespace KingmakerBuffPlanner.UI
                 if (_controllerConfirmRoutine != null)
                 {
                     model.FocusRoutine(_controllerConfirmRoutine);
-                    notice = "Confirm Run " + (session == null ? _controllerConfirmRoutine : session.RoutineDisplayName(_controllerConfirmRoutine)) + ". Nothing has been cast yet.";
+                    notice = PlannerText.Get("run.root.confirm", session == null ? PlannerText.Routine(_controllerConfirmRoutine) : session.RoutineDisplayName(_controllerConfirmRoutine));
                     _controllerConfirmRoutine = null;
                 }
                 root._controllerRoutines = new ControllerRoutineMenu(_controllerDonor, model, root._log.Info);
@@ -1995,7 +1994,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 if (!ControllerContextValid()) { CloseControllerRoutines(); return; }
                 if (_castingHost.IsRunning)
-                { _controllerRoutines.ShowResult("Select Stop before opening the editor."); return; }
+                { _controllerRoutines.ShowResult(PlannerText.Get("run.root.before.edit")); return; }
                 BeginControllerAuthoring(_controllerRoutines.ConversionApproved);
             }
         }
@@ -2107,7 +2106,7 @@ namespace KingmakerBuffPlanner.UI
                     constructionMilliseconds, reconciliationMilliseconds);
                 _castingWorkspace.RefreshView();
                 if (_controllerEditor != null)
-                    _castingWorkspace.ShowNotice("Controller: D-pad moves to adjacent controls; bumpers choose routines; Context inspects; right stick scrolls. Confirm selects the highlighted action. Changes autosave. Back dismisses one layer.");
+                    _castingWorkspace.ShowNotice(PlannerText.Get("run.root.controls"));
                 if (reconciliation != null && reconciliation.Applied)
                     _castingWorkspace.ShowNotice(reconciliation.Notice);
                 _castingWorkspaceOpens++;
@@ -2335,7 +2334,7 @@ namespace KingmakerBuffPlanner.UI
             string campaignId = _session.Model == null || _session.Model.Profile == null
                 ? null : _session.Model.Profile.CampaignId;
             if (string.IsNullOrEmpty(campaignId))
-                return string.IsNullOrEmpty(_session.Status) ? "no campaign is loaded" : _session.Status;
+                return string.IsNullOrEmpty(_session.Status) ? PlannerText.Get("run.root.no.campaign") : _session.Status;
             // Review F1: the transition owner performs the binding change:
             // the outgoing campaign's intent gets a durability attempt, and
             // a failure an explicit reachable recovery owner, before the
@@ -2499,12 +2498,12 @@ namespace KingmakerBuffPlanner.UI
             string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
             if (_castingHost != null && _castingHost.IsRunning)
                 return (_castingRunHeld
-                        ? "Waiting for the game to run (it is paused, or a window is open). "
+                        ? PlannerText.Get("run.root.waiting")
                         : string.Empty) +
                     (string.Equals(_castingHost.ActiveScopeRoutineId, routineId,
                         StringComparison.Ordinal)
-                        ? name + " is running. Press again to stop it after the cast in progress."
-                        : "Another routine is running. Press to stop it after the cast in progress.");
+                        ? PlannerText.Get("run.root.stop.active", name)
+                        : PlannerText.Get("run.root.stop.other"));
             CastingWorkspaceSession session = CastingSession;
             // Final review B7: a session, or a press result, kept from another
             // campaign never describes the one now loaded.
@@ -2598,16 +2597,18 @@ namespace KingmakerBuffPlanner.UI
 
         internal static bool CanChangePresentation(bool nativeLocaleChanged)
         {
-                var root = _instance;
-                return root == null || ((root._castingHost == null || !root._castingHost.IsRunning) &&
-                    (root._castingWorkspace == null || (!nativeLocaleChanged && root._castingWorkspace.CanRefreshLanguage)) &&
-                    root._controllerRoutines == null && (root._screen == null || !root._screen.IsOpen));
+            var root = _instance;
+            return root == null || ((root._castingHost == null || !root._castingHost.IsRunning) &&
+                (root._session == null || !root._session.IsExecuting) && !root._quickStartPending &&
+                (root._castingWorkspace == null || (!nativeLocaleChanged && root._castingWorkspace.CanRefreshLanguage)) &&
+                root._controllerRoutines == null && (root._screen == null || !root._screen.IsOpen));
         }
 
         internal static void LanguageChanged()
         {
             if (_instance == null) return;
             var root = _instance;
+            if (root.CastingSession != null) root.CastingSession.InvalidatePresentation();
             if (root._castingWorkspace == null) root._workspaceInputs = null;
             else
             {
@@ -2622,6 +2623,7 @@ namespace KingmakerBuffPlanner.UI
                 prior.Dispose();
             }
             root._lastCastingPress.Clear();
+            if (root._hud != null) root._hud.RefreshNativeTooltipText();
             if (_instance._spellbookEntry != null) _instance._spellbookEntry.Release();
         }
 

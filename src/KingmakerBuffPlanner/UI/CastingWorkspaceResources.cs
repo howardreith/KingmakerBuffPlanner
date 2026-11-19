@@ -24,7 +24,7 @@ namespace KingmakerBuffPlanner.UI
         {
             PoolKey = line.PoolKey;
             Category = line.Category;
-            Label = label ?? "Resource";
+            Label = label ?? PlannerText.Get("resources.fallback");
             AvailableNow = line.AvailableNow;
             Needed = line.RequestedUsage;
             WouldSpend = wouldSpend;
@@ -45,7 +45,7 @@ namespace KingmakerBuffPlanner.UI
         public int ExecutableCastCount { get; private set; }
         public IReadOnlyList<string> ResponsibleCastingIds { get; private set; }
 
-        public string AvailableText { get { return Unlimited ? "Unlimited" : Number(AvailableNow); } }
+        public string AvailableText { get { return Unlimited ? PlannerText.Get("resources.unlimited") : Number(AvailableNow); } }
         public string NeededText
         {
             get { return Unlimited ? CastCount(ResponsibleCastingIds.Count) : Needed.ToString(); }
@@ -58,12 +58,12 @@ namespace KingmakerBuffPlanner.UI
 
         private static string Number(int? value)
         {
-            return value == null ? "Unknown" : value.Value.ToString();
+            return value == null ? PlannerText.Get("resources.unknown") : value.Value.ToString();
         }
 
         private static string CastCount(int count)
         {
-            return count + (count == 1 ? " cast" : " casts");
+            return PlannerText.Get(count == 1 ? "resources.casts.one" : "resources.casts.many", count);
         }
     }
 
@@ -73,7 +73,7 @@ namespace KingmakerBuffPlanner.UI
             IEnumerable<WorkspaceResourceRow> rows)
         {
             Key = key ?? string.Empty;
-            Label = label ?? "Shared resources";
+            Label = label ?? PlannerText.Get("resources.shared");
             Rows = new ReadOnlyCollection<WorkspaceResourceRow>(
                 (rows ?? new WorkspaceResourceRow[0]).ToList());
         }
@@ -181,26 +181,26 @@ namespace KingmakerBuffPlanner.UI
             int run = decision.Allowed ? decision.ExecutableCastingIds.Count : 0;
             int omitted = decision.Omissions.Count;
             string policy = ApplyMode == CastingApplyMode.ReadyCastsOnly
-                ? "Cast available" : "Require full plan";
+                ? PlannerText.Get("resources.policyAvailable") : PlannerText.Get("resources.policyStrict");
             string summary;
             if (!decision.Allowed)
-                summary = policy + ": blocked; nothing would be spent. " +
-                    (decision.BlockingCastings.Count == 0
-                        ? "The plan has a global refusal."
-                        : decision.BlockingCastings.Count +
-                          (decision.BlockingCastings.Count == 1
-                              ? " casting is not ready." : " castings are not ready."));
+            {
+                int blocked = decision.BlockingCastings.Count;
+                summary = blocked == 0 ? PlannerText.Get("resources.forecast.global", policy)
+                    : PlannerText.Get(blocked == 1 ? "resources.forecast.blocked.one" : "resources.forecast.blocked.many", policy, blocked);
+            }
             else if (run == 0)
-                summary = policy + ": nothing would be cast or spent; " + omitted +
-                    (omitted == 1 ? " saved casting is omitted." : " saved castings are omitted.");
+                summary = PlannerText.Get(omitted == 1 ? "resources.forecast.empty.one" : "resources.forecast.empty.many", policy, omitted);
             else
-                summary = policy + ": " + run + (run == 1 ? " casting" : " castings") +
-                    " would run in authored order" + (omitted == 0 ? "." : "; " + omitted +
-                    (omitted == 1 ? " saved casting is omitted." : " saved castings are omitted."));
+            {
+                string ready = PlannerText.Get(run == 1 ? "resources.forecast.run.one" : "resources.forecast.run.many", policy, run);
+                summary = omitted == 0 ? PlannerText.Get("resources.forecast.runComplete", ready)
+                    : PlannerText.Get(omitted == 1 ? "resources.forecast.runOmit.one" : "resources.forecast.runOmit.many", ready, omitted);
+            }
 
             return new WorkspaceResourceReport(scope,
-                routine == null ? "All routines — no rest"
-                    : RoutineDisplayName(routine) + " only",
+                routine == null ? PlannerText.Get("resources.all")
+                    : PlannerText.Get("resources.scope", RoutineDisplayName(routine)),
                 policy, summary, saved, run, omitted, decision, groups);
         }
 
@@ -224,10 +224,10 @@ namespace KingmakerBuffPlanner.UI
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Distinct(StringComparer.InvariantCultureIgnoreCase)
                 .OrderBy(value => value, StringComparer.InvariantCultureIgnoreCase).ToList();
-            if (exact.Count == 0) return label + " - exact prepared slots";
+            if (exact.Count == 0) return PlannerText.Get("resources.exact.label", label);
             string shown = string.Join(", ", exact.Take(3).ToArray());
             if (exact.Count > 3) shown += " +" + (exact.Count - 3);
-            return label + " - exact prepared: " + shown;
+            return PlannerText.Get("resources.exact.named", label, shown);
         }
 
         private static List<string> ResourceOwners(CastingBudgetLine line,

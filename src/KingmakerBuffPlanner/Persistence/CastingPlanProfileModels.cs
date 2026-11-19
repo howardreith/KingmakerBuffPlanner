@@ -30,9 +30,10 @@ namespace KingmakerBuffPlanner.Persistence
         // CandidateProfileFormat" = "<schema>.<revision>"), which install
         // rollback reads from the restored binary itself.
         //   5 = cast-available default and one-time legacy policy reset
-        internal const int CurrentFormatRevision = 5;
+        //   6 = optional provenance for localizable built-in routine captions
+        internal const int CurrentFormatRevision = 6;
         internal const int AvailabilityPolicyRevision = 5;
-        internal const string CandidateFormatToken = "6.5";
+        internal const string CandidateFormatToken = "6.6";
         internal const string CandidateFormatAttributeKey =
             "KingmakerBuffPlanner.CandidateProfileFormat";
 
@@ -86,9 +87,9 @@ namespace KingmakerBuffPlanner.Persistence
                 CampaignId = campaignId,
                 Routines = new List<RoutineDefinitionProfile>
                 {
-                    RoutineDefinitionProfile.FromDomain(new RoutineDefinition("long", "Long")),
-                    RoutineDefinitionProfile.FromDomain(new RoutineDefinition("important", "Important")),
-                    RoutineDefinitionProfile.FromDomain(new RoutineDefinition("short", "Short"))
+                    RoutineDefinitionProfile.FromDomain(new RoutineDefinition("long", "Long", true)),
+                    RoutineDefinitionProfile.FromDomain(new RoutineDefinition("important", "Important", true)),
+                    RoutineDefinitionProfile.FromDomain(new RoutineDefinition("short", "Short", true))
                 },
                 Castings = new List<PlannedCastingProfile>(),
                 Ui = UiProfile.Default(),
@@ -112,7 +113,8 @@ namespace KingmakerBuffPlanner.Persistence
             return new CastingPlanProfile
             {
                 SchemaVersion = CurrentSchemaVersion,
-                FormatRevision = CurrentFormatRevision,
+                FormatRevision = document.Routines.Any(routine => routine.HasDefaultCaption)
+                    ? CurrentFormatRevision : AvailabilityPolicyRevision,
                 CampaignId = document.CampaignId,
                 Routines = document.Routines
                     .Select(value => RoutineDefinitionProfile.FromDomain(value)).ToList(),
@@ -133,20 +135,28 @@ namespace KingmakerBuffPlanner.Persistence
         [JsonProperty("routineId", Required = Required.Always, Order = 1)]
         public string RoutineId { get; set; }
         [JsonProperty("name", Required = Required.Always, Order = 2)]
-        public string Name { get; set; }
+        public string Name
+        {
+            get { return _name; }
+            set { if (_name != null && _name != value) HasDefaultCaption = false; _name = value; }
+        }
+        private string _name;
+        [JsonProperty("hasDefaultCaption", Order = 3, DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool HasDefaultCaption { get; set; }
 
         internal static RoutineDefinitionProfile FromDomain(RoutineDefinition routine)
         {
             return new RoutineDefinitionProfile
             {
                 RoutineId = routine.RoutineId,
-                Name = routine.Name
+                Name = routine.Name,
+                HasDefaultCaption = routine.HasDefaultCaption
             };
         }
 
         internal RoutineDefinition ToDomain()
         {
-            return new RoutineDefinition(RoutineId, Name);
+            return new RoutineDefinition(RoutineId, Name, HasDefaultCaption);
         }
     }
 

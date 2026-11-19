@@ -36,6 +36,7 @@ namespace KingmakerBuffPlanner.UI
             try
             {
                 _root = new GameObject("KingmakerBuffPlanner.ControllerRoutines", typeof(RectTransform));
+                _root.AddComponent<PlannerFontOwner>();
                 Canvas canvas = _root.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
                 canvas.sortingOrder = 250;
@@ -76,7 +77,7 @@ namespace KingmakerBuffPlanner.UI
         {
             _settings.text = model.Settings;
             _status.text = closing ? PlannerText.Get("pad.release")
-                : model.Running ? "Running: " + model.ActiveRoutine + (paused ? " (waiting while the game is paused)" : "")
+                : model.Running ? PlannerText.Get(paused ? "classic.running.paused" : "classic.running.active", PlannerText.Chinese ? PlannerText.Routine(model.ActiveRoutine) : model.ActiveRoutine)
                 : model.Summary;
             for (int i = 0; i < 6; i++)
             {
@@ -165,7 +166,7 @@ namespace KingmakerBuffPlanner.UI
                 hint.anchoredPosition = new Vector2(0, -24);
                 hint.sizeDelta = new Vector2(450, 48);
                 hint.gameObject.AddComponent<Image>().color = new Color(.08f, .07f, .06f, .95f);
-                Hint(hint, donor, RewiredConsts.Action.Func01, "Buff Planner — saved routines", 8, 6);
+                Hint(hint, donor, RewiredConsts.Action.Func01, PlannerText.Get("classic.controller.entry"), 8, 6);
                 return hint.gameObject;
             }
             catch
@@ -216,7 +217,7 @@ namespace KingmakerBuffPlanner.UI
             if (log != null) log("[KBP-CONTROLLER-LAYOUT] label=" + name + ";phase=before-component;rect=" + rect.rect.size);
             var label = rect.gameObject.AddComponent<TextMeshProUGUI>();
             Measure(label, "after-component", width, log);
-            label.font = PlannerText.Chinese && PlannerChineseFont.Primary != null ? PlannerChineseFont.Primary : donor.font;
+            label.font = PlannerFontOwner.For(rect.gameObject, donor.font);
             // Font's base material, not a donor label's potentially masked
             // stencil/clipping material. Never mutate either shared material.
             label.fontSharedMaterial = label.font.material;

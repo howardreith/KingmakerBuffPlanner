@@ -72,7 +72,19 @@ namespace KingmakerBuffPlanner
         {
             if (string.IsNullOrWhiteSpace(value) || Slot.Replace(value, "").IndexOfAny(new[] { '{', '}' }) >= 0)
                 return false;
-            return Tokens(Slot, english).OrderBy(x => x).SequenceEqual(Tokens(Slot, value).OrderBy(x => x))
+            // Unrecognized or unterminated markup is never passed to TMP.
+            if (Tag.Replace(value, "").Contains("<") || Tag.Replace(english, "").Contains("<")) return false;
+            var nesting = new Stack<string>();
+            foreach (string tag in Tokens(Tag, value))
+            {
+                string name = tag.Trim('<', '>', '/').Split('=')[0];
+                if (tag.StartsWith("</", StringComparison.Ordinal))
+                {
+                    if (nesting.Count == 0 || nesting.Pop() != name) return false;
+                }
+                else nesting.Push(name);
+            }
+            return nesting.Count == 0 && Tokens(Slot, english).OrderBy(x => x).SequenceEqual(Tokens(Slot, value).OrderBy(x => x))
                 && Tokens(Tag, english).SequenceEqual(Tokens(Tag, value));
         }
 
@@ -86,7 +98,7 @@ namespace KingmakerBuffPlanner
             string value;
             if (language != PlannerLanguage.Chinese || !_chinese.TryGetValue(key, out value))
                 if (!_english.TryGetValue(key, out value)) return key;
-            return string.Format(CultureInfo.InvariantCulture, value, args);
+            return args.Length == 0 ? value : string.Format(CultureInfo.InvariantCulture, value, args);
         }
     }
 
@@ -94,6 +106,7 @@ namespace KingmakerBuffPlanner
     {
         private static MessageCatalog _catalog;
         internal static string Language { get; set; } = PlannerLanguage.English;
+        internal static bool NativeChinese { get; set; }
         internal static bool Chinese { get { return Language == PlannerLanguage.Chinese; } }
 
         internal static void Initialize(Action<string> warn)

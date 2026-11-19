@@ -172,11 +172,11 @@ namespace KingmakerBuffPlanner.UI
             // Content-appropriate, never taller than the screen allows.
             height = Mathf.Min(height, Mathf.Max(200f, _root.rect.height - 64f));
             dialog.sizeDelta = new Vector2(width, height);
-            Button cancel = _kit.Button(dialog, "Cancel", "Cancel", () =>
+            Button cancel = _kit.Button(dialog, "Cancel", PlannerText.Get("footer.clear.cancel"), () =>
             {
                 if (_clearInput.Take(Time.frameCount)) CloseClearPlan(false);
             }, PlannerTextRole.Button, 18f);
-            Button clear = _kit.Button(dialog, "Clear", "Clear plan", ConfirmClearPlan, PlannerTextRole.Button, 18f);
+            Button clear = _kit.Button(dialog, "Clear", PlannerText.Get("clear.title"), ConfirmClearPlan, PlannerTextRole.Button, 18f);
             ControllerControlIdentity.Set(cancel, "clear/cancel", "ClearPlan");
             ControllerControlIdentity.Set(clear, "clear/confirm", "ClearPlan");
             foreach (Button button in new[] { cancel, clear })
@@ -263,7 +263,7 @@ namespace KingmakerBuffPlanner.UI
             if (ClearPlanOpen && !_session.IsClearPlanCurrent(_clearConfirmation))
             {
                 CloseClearPlan(false);
-                Feedback("The plan changed. Open Clear plan again to review it.", true);
+                Feedback(PlannerText.Get("clear.changed"), true);
             }
             bool neutral = !Input.anyKey &&
                 (!_controllerAuthoring || ControllerRoutineMenu.ControlsAreNeutral());
@@ -291,8 +291,8 @@ namespace KingmakerBuffPlanner.UI
 
         private void TickWorkspaceKeyboard()
         {
-            if (_disposed || PlannerImeGuard.Active || _controllerAuthoring || _clearInput.BlocksBackground || _controllerNavigation == null ||
-                NativeDescriptionBlocksWorkspace) return;
+            if (_disposed || _controllerAuthoring || _clearInput.BlocksBackground || _controllerNavigation == null ||
+                NativeDescriptionBlocksWorkspace || _workspaceKeyboardInput.CompositionActive()) return;
             TMP_InputField field = EventSystem.current == null || EventSystem.current.currentSelectedGameObject == null ? null :
                 EventSystem.current.currentSelectedGameObject.GetComponent<TMP_InputField>();
             bool tab = _workspaceKeyboardInput.KeyDown(KeyCode.Tab);

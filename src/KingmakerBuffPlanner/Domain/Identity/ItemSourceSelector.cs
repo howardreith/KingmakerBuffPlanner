@@ -93,27 +93,27 @@ namespace KingmakerBuffPlanner.Domain.Identity
         }
 
         // The player-facing name of a slot id, or "" for anything unknown.
-        public static string SlotLabel(string slotId)
+        public static string SlotLabel(string slotId, Func<string, int, string> display = null)
         {
             string value = slotId ?? string.Empty;
             switch (value)
             {
-                case "Armor": return "Armor";
-                case "Belt": return "Belt";
-                case "Head": return "Head";
-                case "Feet": return "Feet";
-                case "Gloves": return "Gloves";
-                case "Neck": return "Neck";
-                case "Ring1": return "Ring 1";
-                case "Ring2": return "Ring 2";
-                case "Wrist": return "Wrist";
-                case "Shoulders": return "Shoulders";
+                case "Armor": return display == null ? "Armor" : display(value, 0);
+                case "Belt": return display == null ? "Belt" : display(value, 0);
+                case "Head": return display == null ? "Head" : display(value, 0);
+                case "Feet": return display == null ? "Feet" : display(value, 0);
+                case "Gloves": return display == null ? "Gloves" : display(value, 0);
+                case "Neck": return display == null ? "Neck" : display(value, 0);
+                case "Ring1": return display == null ? "Ring 1" : display(value, 0);
+                case "Ring2": return display == null ? "Ring 2" : display(value, 0);
+                case "Wrist": return display == null ? "Wrist" : display(value, 0);
+                case "Shoulders": return display == null ? "Shoulders" : display(value, 0);
             }
             int index;
             const string Quick = "Quick";
             if (value.StartsWith(Quick, StringComparison.Ordinal) &&
                 TryIndex(value.Substring(Quick.Length), out index))
-                return "Quick slot " + (index + 1);
+                return display == null ? "Quick slot " + (index + 1) : display(Quick, index + 1);
             foreach (string hand in new[] { "Primary", "Secondary" })
             {
                 const string Set = "Set";
@@ -121,7 +121,8 @@ namespace KingmakerBuffPlanner.Domain.Identity
                     value.EndsWith(hand, StringComparison.Ordinal) &&
                     value.Length > Set.Length + hand.Length &&
                     TryIndex(value.Substring(Set.Length, value.Length - Set.Length - hand.Length), out index))
-                    return "Weapon set " + (index + 1) + (hand == "Primary" ? " main hand" : " off hand");
+                    return display == null ? "Weapon set " + (index + 1) + (hand == "Primary" ? " main hand" : " off hand")
+                        : display(hand, index + 1);
             }
             return string.Empty;
         }

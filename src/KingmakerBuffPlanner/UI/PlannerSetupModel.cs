@@ -382,8 +382,8 @@ namespace KingmakerBuffPlanner.UI
             IReadOnlyList<string> selected = GetSelectedEnhancementIds(routineId);
             IReadOnlyList<CastEnhancementSnapshot> applicable = GetApplicableEnhancements();
             if (selected.Count == 0) return applicable.Count == 0
-                ? "Enhancement: None available"
-                : "Enhancement: None  " + applicable.Count + " available";
+                ? PlannerText.Get("classic.enhancement.unavailable")
+                : PlannerText.Get("classic.session.enhance.choose", applicable.Count);
             List<CastEnhancementSnapshot> values = selected.Select(GetEnhancement)
                 .Where(value => value != null).OrderBy(value => value.DisplayName,
                     StringComparer.OrdinalIgnoreCase).ThenBy(value =>
@@ -391,14 +391,10 @@ namespace KingmakerBuffPlanner.UI
             if (values.Count != selected.Count || values.Any(value =>
                     !applicable.Any(option => option.EnhancementId ==
                         value.EnhancementId)))
-                return "Enhancement unavailable: " + string.Join(" + ",
-                    selected.Select(id => GetEnhancement(id) == null ?
-                        "Unknown source" : GetEnhancement(id).DisplayName).ToArray());
+                return PlannerText.Get("classic.session.enhance.unavailable", string.Join(" + ", selected.Select(id => GetEnhancement(id) == null ? PlannerText.Get("classic.session.unknown.source") : GetEnhancement(id).DisplayName).ToArray()));
             if (values.Count == 1)
-                return "Enhancement: " + values[0].DisplayName +
-                    UsesSuffix(values[0]) + AggregateUsageSuffix(values);
-            return "Enhancements: " + string.Join(" + ", values.Select(value =>
-                value.DisplayName).ToArray()) + AggregateUsageSuffix(values);
+                return PlannerText.Get("classic.session.enhance.single", values[0].DisplayName, UsesSuffix(values[0]), AggregateUsageSuffix(values));
+            return PlannerText.Get("classic.session.enhance.multiple", string.Join(" + ", values.Select(value => value.DisplayName).ToArray()), AggregateUsageSuffix(values));
         }
 
         public string GetEnhancementDescription(string routineId)
@@ -407,22 +403,20 @@ namespace KingmakerBuffPlanner.UI
             if (selected.Count == 0)
             {
                 IReadOnlyList<CastEnhancementSnapshot> options = GetApplicableEnhancements();
-                return options.Count == 0 ? "No applicable cast enhancements are available." :
-                    "Choose None or an applicable caster-owned enhancement. " +
-                    options.Count + " option(s) available.";
+                return options.Count == 0 ? PlannerText.Get("classic.session.enhance.no.available") :
+                    PlannerText.Get("classic.session.enhance.choose.owner", options.Count);
             }
             List<CastEnhancementSnapshot> values = selected.Select(GetEnhancement)
                 .Where(value => value != null).OrderBy(value => value.DisplayName,
                     StringComparer.OrdinalIgnoreCase).ThenBy(value =>
                     value.EnhancementId, StringComparer.Ordinal).ToList();
             if (values.Count != selected.Count)
-                return "Unavailable persisted enhancement(s): " + string.Join(", ",
-                    selected.Where(id => GetEnhancement(id) == null).ToArray());
+                return PlannerText.Get("classic.session.enhance.unresolved", string.Join(", ", selected.Where(id => GetEnhancement(id) == null).ToArray()));
             string details = string.Join("\n", values.Select(value =>
                 value.DisplayName + " — " + EffectName(value) +
                 (value.Category == CastEnhancementCategory.MetamagicRod
-                    ? " | Maximum spell level " + value.MaximumSpellLevel
-                    : " | Qualifying caster spell only") +
+                    ? PlannerText.Get("classic.session.enhance.maxlevel", value.MaximumSpellLevel)
+                    : PlannerText.Get("classic.session.enhance.caster.only")) +
                 (string.IsNullOrWhiteSpace(value.Description) ? string.Empty :
                     "\n" + value.Description)).ToArray());
             return details + AggregateUsageDescription(values);
@@ -505,9 +499,10 @@ namespace KingmakerBuffPlanner.UI
                     ?? "Metamagic";
             if (value == "Metamagic" || string.IsNullOrWhiteSpace(value) ||
                 string.Equals(value.Trim(), "Spell", StringComparison.OrdinalIgnoreCase))
-                return "Metamagic";
+                return PlannerText.Get("classic.session.meta");
             if (enhancement.Category == CastEnhancementCategory.ClassFeature)
                 return value;
+            if (PlannerText.Chinese) return value;
             return value.EndsWith(" Spell", StringComparison.OrdinalIgnoreCase)
                 ? value : value + " Spell";
         }
@@ -515,8 +510,7 @@ namespace KingmakerBuffPlanner.UI
         internal static string UsesSuffix(CastEnhancementSnapshot enhancement)
         {
             if (enhancement == null || enhancement.RemainingUses == null) return string.Empty;
-            return "  " + enhancement.RemainingUses.Value +
-                (enhancement.RemainingUses.Value == 1 ? " use" : " uses");
+            return PlannerText.Get(enhancement.RemainingUses.Value == 1 ? "classic.session.uses.one" : "classic.session.uses.many", enhancement.RemainingUses.Value);
         }
 
         // Resolves one request per child assignment so each child's pins,
@@ -626,11 +620,7 @@ namespace KingmakerBuffPlanner.UI
                 {
                     CastEnhancementSnapshot representative = values.First(value =>
                         value.UsagePoolId == pair.Key);
-                    return representative.UsagePoolDisplayName + ": " +
-                        pair.Value + " per cast / " +
-                        (representative.RemainingUses == null ? "unlimited" :
-                            representative.RemainingUses.Value.ToString() +
-                            " remaining");
+                    return PlannerText.Get("classic.session.aggregate", representative.UsagePoolDisplayName, pair.Value, representative.RemainingUses == null ? PlannerText.Get("classic.session.aggregate.unlimited") : PlannerText.Get("classic.session.aggregate.remaining", representative.RemainingUses.Value));
                 }).OrderBy(value => value, StringComparer.Ordinal).ToArray();
             return summaries.Length == 0 ? string.Empty : "  " +
                 string.Join("; ", summaries);

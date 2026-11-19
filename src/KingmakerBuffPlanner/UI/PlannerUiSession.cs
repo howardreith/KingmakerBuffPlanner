@@ -38,7 +38,7 @@ namespace KingmakerBuffPlanner.UI
             _overrides = EffectOverrideRegistry.Load(
                 System.IO.Path.Combine(modPath, "NativeEffectOverrides.json"));
             _log = log;
-            Status = "Open a campaign to configure routines.";
+            Status = PlannerText.Get("classic.session.need.campaign");
         }
 
         internal PlannerSetupModel Model { get; private set; }
@@ -149,7 +149,7 @@ namespace KingmakerBuffPlanner.UI
                     _enhancements = null;
                     _enhancementAdapter = null;
                     CatalogDiscovery = null;
-                    Status = "No campaign is loaded. Profiles are external and are not created at the main menu.";
+                    Status = PlannerText.Get("classic.session.campaign.menu");
                     return;
                 }
                 string campaignId = Game.Instance.Player.GameId;
@@ -212,13 +212,7 @@ namespace KingmakerBuffPlanner.UI
                 _effects = effects;
                 CatalogDiscovery = snapshotBuilder.Diagnostics;
                 LastBindingFailure = string.Empty;
-                Status = snapshot.Units.Count + " party/pet targets; " +
-                    Model.Sources.Count + " discovered buff sources; " +
-                    snapshot.Providers.Count + " providers; " +
-                    _enhancements.Length + " cast enhancements." +
-                    (Model.VariantReselectionNotices.Count == 0 ? string.Empty :
-                        " " + Model.VariantReselectionNotices.Count +
-                        " saved variant selection(s) require reselection.");
+                Status = PlannerText.Get("classic.session.discovery.counts", snapshot.Units.Count, Model.Sources.Count, snapshot.Providers.Count, _enhancements.Length, Model.VariantReselectionNotices.Count == 0 ? string.Empty : PlannerText.Get("classic.session.discovery.variants", Model.VariantReselectionNotices.Count));
                 int rodCount = _enhancements.Count(value => value.Category ==
                     CastEnhancementCategory.MetamagicRod);
                 int classFeatureCount = _enhancements.Count(value => value.Category ==
@@ -272,7 +266,7 @@ namespace KingmakerBuffPlanner.UI
                 Model = null;
                 _enhancementAdapter = null;
                 CatalogDiscovery = null;
-                Status = "Setup refresh failed: " + exception.Message;
+                Status = PlannerText.Get("classic.session.refresh.failed", exception.Message);
                 _log.Error("Planner UI refresh failed.", exception);
             }
         }
@@ -281,7 +275,7 @@ namespace KingmakerBuffPlanner.UI
         {
             LastBindingFailure = (stage ?? "binding") + ": " +
                 (exception == null ? "unknown failure" : exception.Message);
-            Status = "Catalog UI binding failed at " + LastBindingFailure;
+            Status = PlannerText.Get("classic.session.bind.failed", LastBindingFailure);
             _log.Error("[KBP-CATALOG] " + Status, exception ??
                 new InvalidOperationException(LastBindingFailure));
         }
@@ -518,7 +512,7 @@ namespace KingmakerBuffPlanner.UI
                 () => IsExecuting,
                 () => Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Refused,
-                    "Another buff routine is already executing.", 0, 0, 0)),
+                    PlannerText.Get("classic.session.busy"), 0, 0, 0)),
                 CombatNow,
                 () =>
                 {
@@ -545,7 +539,7 @@ namespace KingmakerBuffPlanner.UI
                 ";model=" + (Model != null) + ";profile=" + (ProfileStatus ?? string.Empty) + ".");
             if (Model == null)
             {
-                string unavailable = "Cannot run " + routineName + ": " + Status;
+                string unavailable = PlannerText.Get("classic.session.cannot", routineName, Status);
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Refused, unavailable, 0, 0, 0));
                 _log.Info("[KBP-QUICK] deliberately refused;group=" + routineId +
@@ -572,7 +566,7 @@ namespace KingmakerBuffPlanner.UI
             }
             catch (Exception exception)
             {
-                Status = "Routine preview failed: " + exception.Message;
+                Status = PlannerText.Get("classic.session.preview", exception.Message);
                 _log.Error("Routine preview failed.", exception);
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Failed, Status, 0, 0, 0));
@@ -588,7 +582,7 @@ namespace KingmakerBuffPlanner.UI
             RoutineProfile routine = configuredRoutine;
             if (routine.Assignments.Count == 0)
             {
-                Status = "No " + routineName + " buffs are configured.";
+                Status = PlannerText.Get("hud.empty.routine", routineName);
                 LastExecutionReport = new ExecutionReport(preview.Plan);
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Refused, Status, 0, 0, 0));
@@ -603,8 +597,7 @@ namespace KingmakerBuffPlanner.UI
                     outcome.Kind == TargetOutcomeKind.SkippedAlreadyActive);
                 int unfulfilled = preview.Plan.Outcomes.Count(outcome =>
                     outcome.Kind == TargetOutcomeKind.Unfulfilled);
-                Status = "No " + routineName + " casts can run: skipped active=" + skipped +
-                    "; unfulfilled=" + unfulfilled + "." + variantReselection;
+                Status = PlannerText.Get("classic.session.none.executable", routineName, skipped, unfulfilled, variantReselection);
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Refused, Status, 0, 0, 0));
                 _log.Info("[KBP-QUICK] deliberately refused;group=" + routineId +
@@ -618,8 +611,7 @@ namespace KingmakerBuffPlanner.UI
             if (materialChange != null)
             {
                 LastExecutionReport = new ExecutionReport(preview.Plan);
-                Status = "The plan changed since your last review (" + materialChange +
-                    "). Review the updated preview before applying.";
+                Status = PlannerText.Get("classic.session.plan.changed", materialChange);
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Refused, Status,
                     preview.Plan.Steps.Count, 0, 0));
@@ -631,8 +623,7 @@ namespace KingmakerBuffPlanner.UI
             if (gate.Blocked && !readyOnlyExplicit)
             {
                 LastExecutionReport = new ExecutionReport(preview.Plan);
-                Status = gate.Summary + " Apply blocked to avoid running only part of " +
-                    routineName + "; use Apply Ready Casts Only to run the ready subset.";
+                Status = PlannerText.Get("classic.session.partial.refused", gate.Summary, routineName);
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Refused, Status,
                     gate.PlannedCasts, 0, 0));
@@ -673,8 +664,7 @@ namespace KingmakerBuffPlanner.UI
                     preview.Plan.Steps.Count, out grantRefusal))
             {
                 LastExecutionReport = new ExecutionReport(preview.Plan);
-                Status = routineName + " was not cast: native casting is disabled in this " +
-                    "automated test session.";
+                Status = PlannerText.Get("classic.session.automated.lock", routineName);
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Refused, Status, preview.Plan.Steps.Count, 0, 0));
                 _log.Info("[KBP-QUICK] runtime-test lock refused;group=" + routineId +
@@ -721,15 +711,11 @@ namespace KingmakerBuffPlanner.UI
                         if (!animated) return;
                         bool share = selected.Any(value => value.AffectsTargeting);
                         string cause = share && !directCapable
-                            ? "Gunslinger " + providerVersion +
-                                " has no compatible Instant Share capability (" + directReason + ")."
+                            ? PlannerText.Get("classic.session.compat.share", providerVersion, directReason)
                             : selected.Any(value => value.RequiresNativeCommand)
-                                ? string.Join(", ", selected.Where(value => value.RequiresNativeCommand)
-                                    .Select(value => value.DisplayName).ToArray()) +
-                                    " requires native animated casting."
+                                ? PlannerText.Get("classic.session.require.animation", string.Join(", ", selected.Where(value => value.RequiresNativeCommand).Select(value => value.DisplayName).ToArray()))
                                 : step.ExecutionStrategyReason;
-                        string warning = "Warning: " + (share ? "Share Transmutation" : "This cast") +
-                            " is using animated casting in Instant mode. " + cause;
+                        string warning = PlannerText.Get(share ? "classic.session.share.animation" : "classic.session.cast.animation", cause);
                         fallbackWarnings.Add(warning);
                         Status = warning;
                         _log.Info("[KBP-INSTANT-FALLBACK] " + warning);
@@ -742,7 +728,7 @@ namespace KingmakerBuffPlanner.UI
             _log.Info("[KBP-QUICK] execution invoked;group=" + routineId +
                 ";mode=" + Model.Profile.Execution.Mode + ";steps=" +
                 preview.Plan.Steps.Count + ".");
-            Status = "Executing " + routineId + " routine: " + preview.Plan.Steps.Count + " planned casts.";
+            Status = PlannerText.Get("classic.session.progress", PlannerText.Chinese ? routineName : routineId, preview.Plan.Steps.Count);
             _log.Info("Routine plan: " + DescribePlan(preview.Plan));
             // Failures stop later castings (batch 3, section 6): the runner
             // halts after the first step that did not confirm its effect.
@@ -783,9 +769,7 @@ namespace KingmakerBuffPlanner.UI
             IsExecuting = false;
             if (failure != null)
             {
-                Status = "Routine execution failed: " + failure.Message +
-                    (fallbackWarnings.Count == 0 ? "" : " " +
-                        string.Join(" ", fallbackWarnings.OrderBy(value => value).ToArray()));
+                Status = PlannerText.Get("classic.session.execute.failed", failure.Message, fallbackWarnings.Count == 0 ? "" : " " + string.Join(" ", fallbackWarnings.OrderBy(value => value).ToArray()));
                 _log.Error("Routine execution failed.", failure);
                 Complete(completed, new QuickExecutionResult(routineId, routineName,
                     QuickExecutionDisposition.Failed, Status,
@@ -796,30 +780,20 @@ namespace KingmakerBuffPlanner.UI
             ExecutionReport report = LastExecutionReport;
             Refresh();
             bool confirmed = report.Failed == 0 && report.Confirmed == report.Planned;
-            Status = (confirmed ? "Routine confirmed: " : "Routine not confirmed: ") +
-                "planned=" + report.Planned + "; queued=" + report.Queued +
-                "; submitted=" + report.Submitted + "; cast-started=" + report.CastStarted +
-                "; effect-confirmed=" + report.Confirmed +
-                "; spend-invoked=" + report.SpendInvocations +
-                "; spent=" + report.ResourcesSpent + "; failed=" + report.Failed +
-                "; skipped=" + report.Skipped + "; unfulfilled=" + report.Unfulfilled + "." +
-                (runner.HaltedAfterStep == null ? string.Empty
-                    : " Stopped after cast " + (runner.HaltedAfterStep.Value + 1) +
-                        " did not confirm; the later casts were not attempted.") +
-                variantReselection;
+            Status = PlannerText.Get(confirmed ? "classic.session.result.confirmed" : "classic.session.result.unconfirmed",
+                report.Planned, report.Queued, report.Submitted, report.CastStarted, report.Confirmed,
+                report.SpendInvocations, report.ResourcesSpent, report.Failed, report.Skipped, report.Unfulfilled,
+                runner.HaltedAfterStep == null ? string.Empty :
+                    PlannerText.Get("classic.session.halted", runner.HaltedAfterStep.Value + 1), variantReselection);
             if (fallbackWarnings.Count != 0)
-                Status = "Instant mode was not fully satisfied. " +
-                    string.Join(" ", fallbackWarnings.OrderBy(value => value).ToArray()) + " " + Status;
+                Status = PlannerText.Get("classic.session.instant.incomplete", string.Join(" ", fallbackWarnings.OrderBy(value => value).ToArray()), Status);
             CastExecutionRecord firstFailure = report.Records.FirstOrDefault(record =>
                 record.Status == CastExecutionStatus.FailedValidation ||
                 record.Status == CastExecutionStatus.FailedSubmission ||
                 record.Status == CastExecutionStatus.FailedExecution ||
                 record.Status == CastExecutionStatus.TimedOutUnconfirmed);
             if (firstFailure != null)
-                Status += " Failure: " + firstFailure.Status + "; provider=" +
-                    firstFailure.ProviderKey + "; targets=" +
-                    string.Join(",", firstFailure.TargetUnitIds.ToArray()) + "; " +
-                    firstFailure.Detail;
+                Status += PlannerText.Get("classic.session.failure", firstFailure.Status, firstFailure.ProviderKey, string.Join(",", firstFailure.TargetUnitIds.ToArray()), firstFailure.Detail);
             foreach (CastExecutionRecord record in report.Records)
                 _log.Info("Routine outcome: group=" + routineId + ";step=" +
                     record.StepIndex + ";status=" + record.Status +
@@ -854,8 +828,7 @@ namespace KingmakerBuffPlanner.UI
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
             return names.Length == 0 ? string.Empty :
-                " Reselect a concrete variant for: " +
-                string.Join(", ", names) + ".";
+                PlannerText.Get("classic.session.reselect", string.Join(", ", names));
         }
 
         private static string DescribePlan(CastPlan plan)
@@ -888,11 +861,9 @@ namespace KingmakerBuffPlanner.UI
             // Focused re-review: a run that never submitted a cast says so.
             bool submitted = LastExecutionReport != null && LastExecutionReport.AnyCastAttempted;
             // Last review: accurate between casts as well as during one.
-            Status = name + " stopped before it finished (" + (reason ?? "stopped") + "): " +
-                (submitted
-                    ? LastExecutionReport.Confirmed + " of " + LastExecutionReport.Planned +
-                        " casts were confirmed; a cast in progress, if any, was cleaned up, and nothing after it was attempted."
-                    : "it had not cast anything yet, and nothing was attempted.");
+            Status = submitted
+                ? PlannerText.Get("classic.session.interrupted.paid", name, reason ?? PlannerText.Get("run.stop.generic"), LastExecutionReport.Confirmed, LastExecutionReport.Planned)
+                : PlannerText.Get("classic.session.interrupted.empty", name, reason ?? PlannerText.Get("run.stop.generic"));
             _log.Info("[KBP-QUICK] classic run ended by its owner;group=" + routineId +
                 ";reason=" + (reason ?? "stopped") + ".");
             return new QuickExecutionResult(routineId, name,
@@ -908,8 +879,7 @@ namespace KingmakerBuffPlanner.UI
         {
             IsExecuting = false;
             string name = RoutineDisplayName(routineId);
-            Status = name + " failed before a confirmed result: " +
-                (exception == null ? "unknown execution error" : exception.Message);
+            Status = PlannerText.Get("classic.session.unexpected", name, exception == null ? PlannerText.Get("classic.session.unknown") : exception.Message);
             _log.Error("[KBP-QUICK] unexpected execution-stage failure;group=" +
                 routineId + ";visibleResult=true.", exception ??
                 new InvalidOperationException(Status));
@@ -925,7 +895,8 @@ namespace KingmakerBuffPlanner.UI
             RoutineProfile routine = Model == null ? null : Model.Profile.Routines
                 .FirstOrDefault(item => item.RoutineId == routineId);
             if (routine != null && !string.IsNullOrWhiteSpace(routine.Name)) return routine.Name;
-            if (string.IsNullOrWhiteSpace(routineId)) return "Routine";
+            if (string.IsNullOrWhiteSpace(routineId)) return PlannerText.Get("classic.routine.default");
+            if (PlannerText.Chinese) return PlannerText.Routine(routineId);
             return char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
         }
 

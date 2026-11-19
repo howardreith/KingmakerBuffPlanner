@@ -103,9 +103,9 @@ namespace KingmakerBuffPlanner.UI
         public static WorkspaceTooltipContent SaveRecovery(string recoveryAction, string problem)
         {
             if (recoveryAction == WorkspaceFooterText.ReloadAction)
-                return new WorkspaceTooltipContent(recoveryAction,
+                return new WorkspaceTooltipContent(WorkspaceFooterText.RecoveryCaption(recoveryAction),
                     PlannerText.Get("footer.recovery.reloadHint", problem ?? string.Empty));
-            return new WorkspaceTooltipContent(recoveryAction ?? WorkspaceFooterText.RetrySaveAction,
+            return new WorkspaceTooltipContent(WorkspaceFooterText.RecoveryCaption(recoveryAction ?? WorkspaceFooterText.RetrySaveAction),
                 PlannerText.Get("footer.recovery.retryHint", problem ?? string.Empty));
         }
     }

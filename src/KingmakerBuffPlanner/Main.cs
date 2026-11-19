@@ -43,6 +43,7 @@ namespace KingmakerBuffPlanner
             if (!BuffPlannerUiRoot.CanChangePresentation(locale != _gameLocale)) return;
             PlannerText.Language = language;
             _gameLocale = locale;
+            PlannerText.NativeChinese = locale == PlannerLanguage.Chinese;
             _modeMessage = string.Empty;
             BuffPlannerUiRoot.LanguageChanged();
         }
@@ -275,9 +276,9 @@ namespace KingmakerBuffPlanner
             try
             {
                 _lastSnapshot = BuffPlannerUiRoot.GetSnapshot();
-                GUILayout.Label("Mr. Bard's Kingmaker Buff Planner bootstrap diagnostics");
+                GUILayout.Label(PlannerText.Get("settings.diagnosticHeading"), _settingsLabel);
                 GUILayout.TextArea(_lastSnapshot, GUILayout.MinHeight(100f));
-                if (GUILayout.Button("Log bootstrap snapshot"))
+                if (GUILayout.Button(PlannerText.Get("settings.diagnosticLog"), _languageButton))
                     _log.Info("[KBP-BOOT] snapshot;" + _lastSnapshot);
             }
             catch (Exception exception)

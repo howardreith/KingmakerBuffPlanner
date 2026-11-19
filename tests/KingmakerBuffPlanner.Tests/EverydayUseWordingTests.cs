@@ -55,7 +55,7 @@ namespace KingmakerBuffPlanner.Tests
             string take = WithoutComments(MemberBody(rootSource, "private bool TakeEscape("));
             int marked = take.IndexOf("PlannerHotkey.MarkEscapeTaken();", StringComparison.Ordinal);
             int handled = take.IndexOf("_castingWorkspace.HandleEscape()", StringComparison.Ordinal);
-            if (!root.Contains("if (Input.GetKeyDown(KeyCode.Escape))") ||
+            if (!root.Contains("if (!PlannerImeGuard.Active && Input.GetKeyDown(KeyCode.Escape))") ||
                 !root.Contains("if (_controllerEditor != null) _controllerEditor.RequestBack();") ||
                 !root.Contains("else TakeEscape(\"Escape\");") ||
                 !root.Contains("new ControllerEditorInputBoundary(() => TakeEscape(\"controller-Back\"))") ||

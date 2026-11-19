@@ -338,11 +338,11 @@ namespace KingmakerBuffPlanner.UI
             // this placeholder provides no provider or readiness judgment.
             if (ProblemNavigation.Active && !sources.Any(value =>
                     string.Equals(value.SourceId, source, StringComparison.Ordinal)))
-                sources.Add(new WorkspaceSourceOption(source, "Unavailable saved buff", true,
+                sources.Add(new WorkspaceSourceOption(source, PlannerText.Get("authoring.savedUnavailable"), true,
                     iconAbility: FocusedCasting()?.Ability));
             WorkspaceSourceOption selected = sources.FirstOrDefault(value => value.Selected);
-            view.SelectedSourceCaption = selected == null ? (source.Length == 0 ? "no buff selected"
-                : "unnamed buff source") : selected.Label;
+            view.SelectedSourceCaption = selected == null ? (source.Length == 0 ? PlannerText.Get("authoring.noneSelected")
+                : PlannerText.Get("authoring.unnamedSource")) : selected.Label;
             view.SelectedSourceIcon = selected == null ? null : selected.IconAbility;
             view.SelectedSourceIsGroup = source.Length == 0 ? null : IsGroupSource(inputs, source);
             view.Routines = _authoring.Document.Routines.Select(routine => new CastingGraphRoutineTab(
@@ -415,11 +415,9 @@ namespace KingmakerBuffPlanner.UI
                 view.SelectedSourceIsGroup == true, chips.Count);
             // Budgets: the selected run and the whole plan in one pass, each
             // labelled; a preview never approves anything.
-            view.SelectedRunLabel = RoutineDisplayName(SelectedRoutineId) + " run on its own";
+            view.SelectedRunLabel = PlannerText.Get("authoring.runAlone", RoutineDisplayName(SelectedRoutineId));
             view.SelectedRunBudget = FooterLinesOf(plan);
-            view.OnePassLabel = "Whole plan in one pass (" + string.Join(" > ",
-                _authoring.Document.Routines.Select(value => RoutineDisplayName(value.RoutineId)).ToArray()) +
-                ", no rest)";
+            view.OnePassLabel = PlannerText.Get("authoring.onePass", string.Join(" > ", _authoring.Document.Routines.Select(value => RoutineDisplayName(value.RoutineId)).ToArray()));
             view.OnePassBudget = FooterLinesOf(onePass.Plan);
             view.SelectedRoutineGate = routineGate;
             view.ReviewStatus = _review.StatusFor(SelectedRoutineId);
@@ -461,7 +459,7 @@ namespace KingmakerBuffPlanner.UI
                     .Where(code => !review || !code.StartsWith("import-review-unresolved",
                         StringComparison.Ordinal))
                     .Select(WorkspaceReasonText.Describe).FirstOrDefault() ??
-                    (review ? "imported: needs your review" : string.Empty);
+                    (review ? PlannerText.Get("authoring.importReview") : string.Empty);
                 ResolvedCasting whole = onePass.CastingById(casting.CastingId);
                 ProviderPlanningOption chipOption = casting.Provider == null ? null
                     : inputs.ProviderOptions.FirstOrDefault(value => value != null &&
@@ -559,8 +557,8 @@ namespace KingmakerBuffPlanner.UI
                 partyIds.Contains(value.CasterUnitId)).Select(value => value.CasterUnitId),
                 StringComparer.Ordinal);
             if (chips.Any(value => value.CasterUnitId == null || !partyIds.Contains(value.CasterUnitId)))
-                nodes.Add(new CastingGraphCasterNode(string.Empty, "Needs a caster", false, null,
-                    "Imported castings whose caster is not chosen or not in the party.", true));
+                nodes.Add(new CastingGraphCasterNode(string.Empty, PlannerText.Get("authoring.needsCaster"), false, null,
+                    PlannerText.Get("authoring.unassigned"), true));
             string chosenCaster = Draft.CasterUnitId ?? SelectedCasterUnitId;
             // Every row with the caster's name, so a pool shared across the
             // party (item charges) is disclosed under each caster.
@@ -614,10 +612,10 @@ namespace KingmakerBuffPlanner.UI
                 allRows.AddRange(rows.Select(row => new KeyValuePair<string, CastingGraphSourceRow>(displayName, row)));
                 string note = chips.Any(value => value.NeedsItemSourceChoice &&
                         string.Equals(value.CasterUnitId, unit.UnitId, StringComparison.Ordinal))
-                    ? "A saved item casting needs its source: select it, then Change caster/source."
-                    : !capable.Contains(unit.UnitId) ? "Cannot cast this buff now."
-                    : rows.Count > 1 && !rows.Any(value => value.Selected) ? "Choose the exact source."
-                    : rows.Count != 0 && rows.All(value => !value.Usable) ? "Nothing left to cast it with."
+                    ? PlannerText.Get("authoring.itemRepair")
+                    : !capable.Contains(unit.UnitId) ? PlannerText.Get("authoring.cannotCast")
+                    : rows.Count > 1 && !rows.Any(value => value.Selected) ? PlannerText.Get("authoring.chooseSource")
+                    : rows.Count != 0 && rows.All(value => !value.Usable) ? PlannerText.Get("authoring.depleted")
                     : string.Empty;
                 nodes.Add(new CastingGraphCasterNode(unit.UnitId, unit.DisplayName,
                     string.Equals(chosenCaster, unit.UnitId, StringComparison.Ordinal), rows, note, false));
@@ -690,15 +688,15 @@ namespace KingmakerBuffPlanner.UI
                 : FindRecordOption(inputs, focused);
             int routineCount = _authoring.Document.Castings.Count(value => string.Equals(
                 value.RoutineId, focused.RoutineId, StringComparison.Ordinal));
-            string casterName = focused.CasterUnitId == null ? "No caster chosen" : nameOf(focused.CasterUnitId);
+            string casterName = focused.CasterUnitId == null ? PlannerText.Get("authoring.missingCaster") : nameOf(focused.CasterUnitId);
             string targetLabel;
             switch (focused.TargetMode)
             {
                 case CastingTargetMode.CasterCenteredOrigin:
-                    targetLabel = "Centred on " + casterName;
+                    targetLabel = PlannerText.Get("authoring.centreCaster", casterName);
                     break;
                 case CastingTargetMode.AnchoredOrigin:
-                    targetLabel = "Centred on " + nameOf(focused.Origin.AnchorUnitId);
+                    targetLabel = PlannerText.Get("authoring.centreAnchor", nameOf(focused.Origin.AnchorUnitId));
                     break;
                 default:
                     targetLabel = nameOf(focused.DirectTargetUnitId);
@@ -707,7 +705,7 @@ namespace KingmakerBuffPlanner.UI
             ResourcePoolSnapshot pool = option == null ? null : inputs.Snapshot.ResourcePools
                 .FirstOrDefault(value => string.Equals(value.PoolKey, option.Provider.ResourcePoolKey,
                     StringComparison.Ordinal));
-            string sourceLabel = option == null ? "Source not resolved"
+            string sourceLabel = option == null ? PlannerText.Get("authoring.unresolved")
                 : SourceRowLabel(option.Provider, pool) + " · " + SourcePoolLabel(option.Provider, pool);
             bool review = focused.Provenance != null && focused.Provenance.UnresolvedReviewItems.Count != 0;
             IEnumerable<string> reasons = resolved == null ? new string[0] : resolved.ReadinessReasons
@@ -735,8 +733,7 @@ namespace KingmakerBuffPlanner.UI
                     // An at-will source's pool has no count to show.
                     bool unlimited = category == CastingCostCategory.NativePool && capacity != null &&
                         capacity.NativeKind(key) == ResourcePoolKind.Unlimited;
-                    costLines.Add("Would spend: " + CostLabel(new CastingCostLine(category, key,
-                        Math.Max(units, 1), null, null)) + LeftAfterPlan(capacity, category, key, unlimited));
+                    costLines.Add(PlannerText.Get("authoring.wouldSpend", CostLabel(new CastingCostLine(category, key, Math.Max(units, 1), null, null)), LeftAfterPlan(capacity, category, key, unlimited)));
                 }
             var enhancements = new List<CastingGraphEnhancementOption>();
             if (inputs.Enhancements != null && focused.CasterUnitId != null)
@@ -770,29 +767,27 @@ namespace KingmakerBuffPlanner.UI
                     if (!chosen)
                     {
                         if (enhancement.AffectsTargeting)
-                            unavailable = "Changes whom the spell reaches; not executed in this version.";
+                            unavailable = PlannerText.Get("authoring.changesTarget");
                         else if (option != null)
                             unavailable = CastingGraphText.Applicability(enhancement.ApplicabilityFailure(option.Provider));
                         if (unavailable.Length == 0 && !CastEnhancementSnapshot.AreCompatible(
                                 chosenSnapshots.Concat(new[] { enhancement })))
-                            unavailable = "Cannot be combined with " + string.Join(", ", chosenSnapshots
-                                .Select(EnhancementTitle).ToArray()) + " on one casting.";
+                            unavailable = PlannerText.Get("authoring.cannotCombine", string.Join(", ", chosenSnapshots.Select(EnhancementTitle).ToArray()));
                         if (unavailable.Length == 0 && enhancement.RemainingUses == 0)
-                            unavailable = "No uses left.";
+                            unavailable = PlannerText.Get("authoring.noUses");
                         if (unavailable.Length == 0 && remaining != null &&
                             remaining.Value < enhancement.UsageUnitsPerCast)
-                            unavailable = "Not enough uses left after the rest of the plan (" + remaining.Value +
-                                " left, needs " + enhancement.UsageUnitsPerCast + ").";
+                            unavailable = PlannerText.Get("authoring.insufficientUses", remaining.Value, enhancement.UsageUnitsPerCast);
                     }
                     string poolName = enhancement.UsagePoolDisplayName;
                     enhancements.Add(new CastingGraphEnhancementOption(enhancement.EnhancementId,
                         EnhancementTitle(enhancement), CastingGraphText.Mechanism(enhancement),
                         enhancement.DisplayName, chosen, selection == null || selection.Required, unavailable,
-                        enhancement.UsageUnitsPerCast + (enhancement.UsageUnitsPerCast == 1 ? " use" : " uses") +
-                            " of " + poolName, poolName, remaining, available,
-                        remaining == null ? poolName + ": uses left unknown"
-                            : poolName + ": " + remaining.Value + (available == null ? string.Empty
-                                : " of " + available.Value) + " left after the whole plan",
+                        (enhancement.UsageUnitsPerCast != 1 ? PlannerText.Get("authoring.use.many", enhancement.UsageUnitsPerCast, poolName)
+                    : PlannerText.Get("authoring.use.one", enhancement.UsageUnitsPerCast, poolName)), poolName, remaining, available,
+                        remaining == null ? PlannerText.Get("authoring.usesUnknown", poolName)
+                            : (available != null ? PlannerText.Get("authoring.left.known", poolName, remaining.Value, available.Value)
+                    : PlannerText.Get("authoring.left.unknown", poolName, remaining.Value)),
                         CastingGraphText.ExpectedEffect(enhancement)));
                 }
             }
@@ -829,9 +824,7 @@ namespace KingmakerBuffPlanner.UI
             if (focused.TargetMode != CastingTargetMode.DirectTarget && resolved != null)
                 // WP3: read-only information; whoever the area reaches when
                 // it is cast is affected and nobody is required.
-                coverageText = "Expected to reach " + resolved.PredictedBeneficiaryUnitIds.Count + ": " +
-                    string.Join(", ", resolved.PredictedBeneficiaryUnitIds.Select(nameOf).ToArray()) +
-                    " (whoever is in the area when it is cast)";
+                coverageText = PlannerText.Get("authoring.reach", resolved.PredictedBeneficiaryUnitIds.Count, string.Join(", ", resolved.PredictedBeneficiaryUnitIds.Select(nameOf).ToArray()));
             CastingOutcomeEntry lastRun = LastRunReport == null ? null : LastRunReport.Entries
                 .FirstOrDefault(entry => string.Equals(entry.CastingId, focused.CastingId, StringComparison.Ordinal));
             ProviderPlanningOption inspectOption = option;
@@ -840,7 +833,7 @@ namespace KingmakerBuffPlanner.UI
             string inspectDuration = inspectOption == null ? string.Empty
                 : inspectOption.Provider.DurationText;
             CastingGraphInspector inspector = new CastingGraphInspector(focused, chip,
-                "Casting " + (focused.Order + 1) + " in " + RoutineDisplayName(focused.RoutineId),
+                PlannerText.Get("authoring.castingOrdinal", focused.Order + 1, RoutineDisplayName(focused.RoutineId)),
                 casterName + " → " + targetLabel, casterName, sourceLabel, targetLabel,
                 RoutineDisplayName(focused.RoutineId), routineCount, reasons, reviewItems, costLines,
                 enhancements, providers, retargets, coverageText,
@@ -862,17 +855,16 @@ namespace KingmakerBuffPlanner.UI
             CastingGraphCasting chip, string casterName)
         {
             if (chip != null && chip.NeedsItemSourceChoice)
-                return "Choose Change caster/source, then click the current item row. This casting keeps its other settings.";
+                return PlannerText.Get("authoring.repairItem");
             if (option == null || option.Provider.Key.Ability.SourceKind != SourceKind.Item) return string.Empty;
             // The saved rule, not the live key: a slot rule is still in force
             // when discovery publishes a sole remaining copy under the plain rule.
             ItemSourceSelection selection = ItemSourceSelector.Parse(focused.Ability.SpecialSourceId);
             string item = option.Provider.SourceDisplayName;
             if (selection.Kind == ItemSelectionKind.EquippedSlot)
-                return "Uses the " + item + " in " + casterName + "'s " +
-                    ItemSourceSelector.SlotLabel(selection.SlotId) + " slot.";
+                return PlannerText.Get("authoring.itemSlot", item, casterName, ItemSourceSelector.SlotLabel(selection.SlotId, (slot, index) => PlannerText.Get("slot." + slot, index)));
             return selection.Kind == ItemSelectionKind.EquippedType
-                ? "Uses the " + item + " " + casterName + " has equipped, whichever copy that is." : string.Empty;
+                ? PlannerText.Get("authoring.itemType", item, casterName) : string.Empty;
         }
 
         private static string LeftAfterPlan(CastingCapacity capacity, CastingCostCategory category,
@@ -894,9 +886,9 @@ namespace KingmakerBuffPlanner.UI
                 default:
                     return string.Empty;
             }
-            if (remaining == null) return " · left after the whole plan: unknown";
-            return " · " + remaining.Value + (available == null ? string.Empty : " of " + available.Value) +
-                " left after the whole plan";
+            if (remaining == null) return PlannerText.Get("authoring.afterUnknown");
+            return (available != null ? PlannerText.Get("authoring.after.known", remaining.Value, available.Value)
+                    : PlannerText.Get("authoring.after.unknown", remaining.Value));
         }
 
         // v1.2 (S7) / E16: arm or disarm a targeting modifier (Share
@@ -1081,11 +1073,10 @@ namespace KingmakerBuffPlanner.UI
                 {
                     title = snapshot.DisplayName;
                     detail = snapshot.Description;
-                    cost = snapshot.UsageUnitsPerCast +
-                        (snapshot.UsageUnitsPerCast == 1 ? " use" : " uses") + " of " +
-                        snapshot.UsagePoolDisplayName +
-                        (snapshot.RemainingUses == null ? " (uses left unknown)"
-                            : " · " + snapshot.RemainingUses.Value + " left");
+                    cost = (snapshot.UsageUnitsPerCast != 1 && snapshot.RemainingUses != null ? PlannerText.Get("authoring.modifier.many.balance", snapshot.UsageUnitsPerCast, snapshot.UsagePoolDisplayName, snapshot.RemainingUses.Value)
+                    : snapshot.UsageUnitsPerCast != 1 && snapshot.RemainingUses == null ? PlannerText.Get("authoring.modifier.many.unknown", snapshot.UsageUnitsPerCast, snapshot.UsagePoolDisplayName)
+                    : snapshot.UsageUnitsPerCast == 1 && snapshot.RemainingUses != null ? PlannerText.Get("authoring.modifier.one.balance", snapshot.UsageUnitsPerCast, snapshot.UsagePoolDisplayName, snapshot.RemainingUses.Value)
+                    : PlannerText.Get("authoring.modifier.one.unknown", snapshot.UsageUnitsPerCast, snapshot.UsagePoolDisplayName));
                 }
                 rows.Add(new CastingGraphModifierOption(modifier.ModifierId, title, detail,
                     cost, isSelected, available, available ? string.Empty : refusal));
@@ -1231,16 +1222,16 @@ namespace KingmakerBuffPlanner.UI
         // ability or item by its resource.
         private static string SourceRowLabel(ProviderSnapshot provider, ResourcePoolSnapshot pool)
         {
-            string metamagic = provider.Key.Ability.MetamagicMask != 0 ? " (metamagic)" : string.Empty;
+            string metamagic = provider.Key.Ability.MetamagicMask != 0 ? PlannerText.Get("authoring.metamagicSuffix") : string.Empty;
             if (!string.IsNullOrWhiteSpace(provider.SourceBookName))
-                return provider.SourceBookName + " level " + provider.SpellLevel + metamagic;
-            string resource = pool == null ? "Resource" : WorkspacePoolLabels.Describe(pool.Kind, null, null,
+                return PlannerText.Get("authoring.sourceLevel", provider.SourceBookName, provider.SpellLevel, metamagic);
+            string resource = pool == null ? PlannerText.Get("authoring.resource") : WorkspacePoolLabels.Describe(pool.Kind, null, null,
                 provider.SourceDisplayName);
             // Identical copies are told apart by the slot the rule names.
             ItemSourceSelection selection = ItemSourceSelector.Parse(provider.Key.Ability.SpecialSourceId);
             string copy = provider.Key.Ability.SourceKind == SourceKind.Item &&
                 selection.Kind == ItemSelectionKind.EquippedSlot
-                    ? " · " + ItemSourceSelector.SlotLabel(selection.SlotId) : string.Empty;
+                    ? " · " + ItemSourceSelector.SlotLabel(selection.SlotId, (slot, index) => PlannerText.Get("slot." + slot, index)) : string.Empty;
             return char.ToUpperInvariant(resource[0]) + resource.Substring(1) + copy + metamagic;
         }
 
@@ -1248,7 +1239,7 @@ namespace KingmakerBuffPlanner.UI
         // (the row sits under its caster already).
         private static string SourcePoolLabel(ProviderSnapshot provider, ResourcePoolSnapshot pool)
         {
-            if (pool == null) return "unknown resource";
+            if (pool == null) return PlannerText.Get("authoring.unknownResource");
             return WorkspacePoolLabels.Describe(pool.Kind,
                 pool.Kind == ResourcePoolKind.SpontaneousLevel || pool.Kind == ResourcePoolKind.PreparedSlots
                     ? provider.SpellLevel : (int?)null, null, provider.SourceDisplayName);

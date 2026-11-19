@@ -330,19 +330,19 @@ namespace KingmakerBuffPlanner.UI
                 string.Equals(value.UnitId, unitId, StringComparison.Ordinal));
             if (unit == null)
                 return RefusedRecipient(false, "target-not-in-party:" + (unitId ?? string.Empty),
-                    "Not in the current party.", false, null);
+                    PlannerText.Get("authoring.recipient.party"), false, null);
 
             PlannedCasting focused = FocusedCasting();
             if (GraphEditIntent == CastingGraphEditIntent.ChangeRecipient)
             {
                 if (focused == null)
                     return RefusedRecipient(false, "no-editing-focus",
-                        "Choose a casting before changing its recipient.", true, null);
+                        PlannerText.Get("authoring.recipient.noFocused"), true, null);
                 bool editingGroup = focused.TargetMode != CastingTargetMode.DirectTarget;
                 if (string.Equals(RecipientOf(focused), unitId, StringComparison.Ordinal))
                     return RefusedRecipient(editingGroup, "target-unchanged",
-                        editingGroup ? "This is already the casting's centre."
-                            : "This is already the casting's recipient.", false,
+                        editingGroup ? PlannerText.Get("authoring.recipient.sameCentre")
+                            : PlannerText.Get("authoring.recipient.sameRecipient"), false,
                         focused.CastingId);
                 string editingRefusal = RecipientRefusal(focused, unitId, editingGroup);
                 if (editingRefusal != null)
@@ -358,7 +358,7 @@ namespace KingmakerBuffPlanner.UI
             if (selectedGroup == null)
                 return RefusedRecipient(false,
                     "ability-targeting-unsupported:" + (SelectedSourceId ?? string.Empty),
-                    "This buff's targeting is not understood.", true, null);
+                    PlannerText.Get("authoring.recipient.targetUnknown"), true, null);
             bool group = selectedGroup.Value;
             List<PlannedCasting> same = _authoring.Document.Castings.Where(casting =>
                     casting != null &&
@@ -419,8 +419,8 @@ namespace KingmakerBuffPlanner.UI
             if (!reachable)
                 return RefusedRecipient(group,
                     group ? "origin-anchor-illegal:" + unitId : "target-unreachable:" + unitId,
-                    group ? "The group spell cannot be centred here."
-                        : "Out of this caster's reach.", false, null);
+                    group ? PlannerText.Get("authoring.recipient.originIllegal")
+                        : PlannerText.Get("authoring.recipient.unreachable"), false, null);
             if (!group)
             {
                 string invalid = InvalidTargetReason(unit);
@@ -444,13 +444,13 @@ namespace KingmakerBuffPlanner.UI
         {
             if (string.IsNullOrEmpty(refusal) ||
                 refusal.StartsWith("draft-ability-unresolved", StringComparison.Ordinal))
-                return "Choose a caster and exact source first.";
+                return PlannerText.Get("authoring.recipient.sourceFirst");
             if (refusal.StartsWith("target-unreachable", StringComparison.Ordinal))
-                return "Out of this caster's reach.";
+                return PlannerText.Get("authoring.recipient.unreachable");
             if (refusal.StartsWith("origin-", StringComparison.Ordinal))
-                return "The group spell cannot be centred here.";
+                return PlannerText.Get("authoring.recipient.originIllegal");
             if (refusal.StartsWith("recipient-already-has-casting", StringComparison.Ordinal))
-                return "This recipient already has another matching casting.";
+                return PlannerText.Get("authoring.recipient.assigned");
             return WorkspaceRefusalText.Describe(refusal);
         }
 

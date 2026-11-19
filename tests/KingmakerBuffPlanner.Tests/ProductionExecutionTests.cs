@@ -26,6 +26,7 @@ namespace KingmakerBuffPlanner.Tests
         private static void RunProductionExecutionTests(string root)
         {
             RunNativeDurationTests();
+            RunLocalizationTests(root);
             RunCastAvailableTests(root);
             foreach (string executionMode in new[] { "instant", "animated" })
             {
@@ -1254,10 +1255,13 @@ namespace KingmakerBuffPlanner.Tests
                 !workspaceSource.Contains(CollapsedWhitespace(": PersistenceMessages.ForCastingLoad(status, _session.PrimaryPlanFileExists,\n" +
                     "                            _session.LoadSourcePath, _session.LoadWarning) ??")) ||
                 !workspaceSource.Contains("if (_session.IsDirty && Time.unscaledTime > _reloadArmedUntil)") ||
-                !source("BuffPlannerScreenView.cs").Contains("if (_session.ClassicSavesRefused) _status.text += \" | changes are not saved\";") ||
+                !source("BuffPlannerScreenView.cs").Contains("if (_session.ClassicSavesRefused) _status.text += PlannerText.Get(\"classic.status.unsaved\");") ||
+                PlannerText.Get("classic.status.unsaved") != " | changes are not saved" ||
+                PlannerText.Get("workspace.status.importFile") != " · not saved: the classic plan could not be imported" ||
+                PlannerText.Get("workspace.status.readFile") != " · not saved: the plan file cannot be read" ||
                 !workspaceSource.Contains(CollapsedWhitespace("                (!_session.SavesRefused ? string.Empty\n" +
-                    "                    : _session.LegacyImportBlocked ? \" · not saved: the classic plan could not be imported\"\n" +
-                    "                    : \" · not saved: the plan file cannot be read\");")) ||
+                    "                    : _session.LegacyImportBlocked ? PlannerText.Get(\"workspace.status.importFile\")\n" +
+                    "                    : PlannerText.Get(\"workspace.status.readFile\"));")) ||
                 !castingSession.Contains("\"Candidate persistence is blocked: \" + (LegacyImportBlocked ? \"legacy-import\" : LoadStatus.ToString()) +"))
                 throw new InvalidOperationException("A planner does not show its persistence notice.");
         }
@@ -1469,9 +1473,9 @@ namespace KingmakerBuffPlanner.Tests
                 "bool? groupAbility = _session.FocusedCastingIsGroupAbility(_inputs());",
                 "if (groupAbility == true)",
                 "else if (groupAbility == false)",
-                "ActionButton(\"FocusedMode.Group\", \"Make it a group casting (centred on the caster)\"",
+                "ActionButton(\"FocusedMode.Group\", PlannerText.Get(\"workspace.groupMode\")",
                 "_session.SetFocusedTargeting(CastingTargetMode.CasterCenteredOrigin, null, null, null)",
-                "ActionButton(\"FocusedSingle.\" + unit, \"Single target: \" + target.DisplayName",
+                "ActionButton(\"FocusedSingle.\" + unit, PlannerText.Get(\"authoring.inspector.singleTarget\", target.DisplayName)",
                 "_session.SetFocusedTargeting(CastingTargetMode.DirectTarget, unit, null, null)",
                 // Human-feedback 0.5.1 moved the one-pass shortfall from the
                 // retired Resources body into the footer run status (the
@@ -1484,6 +1488,9 @@ namespace KingmakerBuffPlanner.Tests
             // Native UI finish (UI-05): the sidebar's routine reassignment is
             // gone (routines are chosen in the routine bar); the session's
             // move-to-routine stays, exercised above.
+            if (PlannerText.Get("workspace.groupMode") != "Make it a group casting (centred on the caster)" ||
+                PlannerText.Get("authoring.inspector.singleTarget", "Linzi") != "Single target: Linzi")
+                throw new InvalidOperationException("The focused control does not explain its targeting mode.");
             if (view.Contains("MoveFocusedCastingToRoutine") || view.Contains("\"FocusedRoutine.\""))
                 throw new InvalidOperationException("The sidebar still reassigns routines.");
             if (!graph.Contains(".UnresolvedReviewItems.Select(item => WorkspaceReasonText.DescribeReviewItem(item, nameOf))"))
@@ -1850,10 +1857,10 @@ namespace KingmakerBuffPlanner.Tests
             string forecast = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
                 "UI", "SequentialForecastPlanner.cs")).Replace("\r\n", "\n");
             if (!builder.Contains("duration, selection.SourceDisplayName, selection.VariantOrder,\n" +
-                    "                SpellbookName(spellbook)));") ||
+                    "                SpellbookName(spellbook), duration: estimate));") ||
                 !builder.Contains("string name = spellbook.Blueprint.DisplayName;") ||
                 !builder.Contains("name = spellbook.Blueprint.CharacterClass.Name;") ||
-                !forecast.Contains("provider.VariantOrder, provider.SourceBookName));"))
+                !forecast.Contains("provider.VariantOrder, provider.SourceBookName, provider.EquippedSlotSelector, provider.Duration));"))
                 throw new InvalidOperationException("The spellbook's name is not read or not kept.");
         }
 
@@ -8223,11 +8230,15 @@ namespace KingmakerBuffPlanner.Tests
                 !rootSource.Contains("if (_screen != null && !CastingFirstActive)\n                _screen.Present(result,") ||
                 System.Text.RegularExpressions.Regex.Matches(rootSource, "_screen.DiscardUnshownResult\\(\\);").Count != 2 ||
                 !rootSource.Contains("if (_screen != null) _screen.DiscardUnshownResult();\n            EndClassicRun(\"area-unloading\");") ||
-                !sessionSource.Contains("\" casts were confirmed; a cast in progress, if any, was cleaned up, and nothing after it was attempted.\"") ||
+                !sessionSource.Contains("? PlannerText.Get(\"classic.session.interrupted.paid\", name, reason ?? PlannerText.Get(\"run.stop.generic\"), LastExecutionReport.Confirmed, LastExecutionReport.Planned)") ||
+                PlannerText.Get("classic.session.interrupted.paid", "Routine", "area", 1, 3) !=
+                    "Routine stopped before it finished (area): 1 of 3 casts were confirmed; a cast in progress, if any, was cleaned up, and nothing after it was attempted." ||
                 !controllerSource.Contains("                _unshownResult = result;\n                _unshownResultCampaign = campaignId;") ||
                 !controllerSource.Contains("ClassicRunScreenPolicy.ShowStashedResult(_unshownResultCampaign,") ||
                 !controllerSource.Contains("                    _view.ShowResult(_unshownResult);") ||
-                !sessionSource.Contains("\"it had not cast anything yet, and nothing was attempted.\"") ||
+                !sessionSource.Contains(": PlannerText.Get(\"classic.session.interrupted.empty\", name, reason ?? PlannerText.Get(\"run.stop.generic\"))") ||
+                PlannerText.Get("classic.session.interrupted.empty", "Routine", "area") !=
+                    "Routine stopped before it finished (area): it had not cast anything yet, and nothing was attempted." ||
                 !sessionSource.Contains("bool submitted = LastExecutionReport != null && LastExecutionReport.AnyCastAttempted;") ||
                 !File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner", "UI",
                     "BuffPlannerHudButtonController.cs")).Contains("return _session.ClassicRunHeld"))

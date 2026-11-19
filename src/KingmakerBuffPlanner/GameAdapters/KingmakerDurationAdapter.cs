@@ -31,17 +31,20 @@ namespace KingmakerBuffPlanner.GameAdapters
         internal static DurationEstimate Estimate(BlueprintAbility ability, int casterLevel)
         {
             if (ReferenceEquals(ability, null)) return default(DurationEstimate);
+            var unknown = new DurationEstimate(DurationKind.Unknown, 0,
+                (ability.AvailableMetamagic & Kingmaker.UnitLogic.Abilities.Metamagic.Extend) != 0);
             try
             {
                 var applications = ability.GetComponents<AbilityApplyEffect>().ToArray();
                 if (applications.Length != 1 || applications[0].GetType() != typeof(AbilityEffectRunAction) ||
                     ability.GetComponents<AbilityExecuteActionOnCast>().Any(x => x.Actions != null &&
-                        x.Actions.Actions != null && x.Actions.Actions.Length != 0)) return default(DurationEstimate);
+                        x.Actions.Actions != null && x.Actions.Actions.Length != 0)) return unknown;
                 int budget = 128;
-                return ReadList(((AbilityEffectRunAction)applications[0]).Actions,
+                var estimate = ReadList(((AbilityEffectRunAction)applications[0]).Actions,
                     ability.GetComponents<ContextRankConfig>().ToArray(), casterLevel, 0, ref budget);
+                return estimate.Kind == DurationKind.Unknown ? unknown : estimate;
             }
-            catch (Exception) { return default(DurationEstimate); }
+            catch (Exception) { return unknown; }
         }
 
         private static DurationEstimate ReadList(ActionList list, ContextRankConfig[] ranks, int level, int depth, ref int budget)

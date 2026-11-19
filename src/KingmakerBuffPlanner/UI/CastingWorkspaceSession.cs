@@ -683,8 +683,7 @@ namespace KingmakerBuffPlanner.UI
             if (legacy)
             {
                 _executionSettings.AvailabilityPolicy = chosenPolicy ?? ExecutionProfile.CastAvailable;
-                AvailabilityMigrationNotice = "Upgraded: Cast available is now the default. Old profiles " +
-                    "did not record whether Require full plan was chosen. Switch to Plan: Require full once if you want it.";
+                AvailabilityMigrationNotice = PlannerText.Get("authoring.session.policy.migration");
             }
             else AvailabilityMigrationNotice = null;
         }
@@ -1062,6 +1061,40 @@ namespace KingmakerBuffPlanner.UI
         public AuthoringEditResult AcknowledgeImportNotices()
         {
             return _authoring.AcknowledgeImportNotices();
+        }
+
+        // The saved strings and acknowledgment keys stay byte-for-byte identical.
+        // Imported provider keys may contain punctuation; read only the known trailing fields.
+        internal string DescribeImportNotice(string notice)
+        {
+            const string prefix = "legacy-provider-preference:";
+            const string bannedField = ";banned=";
+            const string priorityField = ";priority=";
+            const string maximumField = ";maximumCasts=";
+            if (string.IsNullOrEmpty(notice) || !notice.StartsWith(prefix, StringComparison.Ordinal))
+                return PlannerText.Get("import.notice.unknown");
+
+            int bannedAt = notice.LastIndexOf(bannedField, StringComparison.Ordinal);
+            int priorityAt = notice.LastIndexOf(priorityField, StringComparison.Ordinal);
+            int maximumAt = notice.LastIndexOf(maximumField, StringComparison.Ordinal);
+            if (bannedAt <= prefix.Length || priorityAt < bannedAt + bannedField.Length || maximumAt < priorityAt + priorityField.Length)
+                return PlannerText.Get("import.notice.unknown");
+            bool banned;
+            if (!bool.TryParse(notice.Substring(bannedAt + bannedField.Length,
+                    priorityAt - bannedAt - bannedField.Length), out banned))
+                return PlannerText.Get("import.notice.unknown");
+            string providerKey = notice.Substring(prefix.Length, bannedAt - prefix.Length);
+            string priority = notice.Substring(priorityAt + priorityField.Length, maximumAt - priorityAt - priorityField.Length);
+            string maximum = notice.Substring(maximumAt + maximumField.Length);
+            string name = PlannerText.Get("import.notice.sourceAbsent");
+            ProviderSnapshot provider = _lastInputs == null || _lastInputs.Snapshot == null ? null :
+                _lastInputs.Snapshot.Providers.FirstOrDefault(p => p.Key.Canonical == providerKey);
+            if (provider != null)
+                name = PlannerText.Get("import.notice.namedSource", provider.DisplayName,
+                    UnitDisplayName(_lastInputs, provider.Key.CasterUnitId));
+            return PlannerText.Get("import.notice.provider", name, PlannerText.Get(banned ? "import.notice.yes" : "import.notice.no"),
+                priority == "none" ? PlannerText.Get("import.notice.unset") : priority,
+                maximum == "none" ? PlannerText.Get("import.notice.unset") : maximum);
         }
 
         public IReadOnlyList<string> PendingImportNotices
@@ -1930,6 +1963,14 @@ namespace KingmakerBuffPlanner.UI
 
         public CastingRunReport LastRunReport { get; private set; }
 
+        internal void InvalidatePresentation()
+        {
+            _runReasons.Clear();
+            _runLabels.Clear();
+            LastAttemptMessage = null;
+            _calculationCacheInputs = null;
+        }
+
         // Deliberate attempts only. Rendering, discovery and controller handoff
         // never emit. The native writer is supplied at the composition root.
         public Action<IReadOnlyList<string>, bool> RunLog { get; set; }
@@ -1981,11 +2022,10 @@ namespace KingmakerBuffPlanner.UI
             foreach (PlannedCasting casting in Document.Castings.Where(c => c.RoutineId == scope).OrderBy(c => c.Order))
             {
                 _runOrder.Add(casting.CastingId);
-                _runLabels[casting.CastingId] = CastingLabel(casting.CastingId) +
-                    " [casting " + (casting.Order + 1) +
-                    (casting.TargetMode == CastingTargetMode.DirectTarget || casting.Origin == null
-                        ? string.Empty : "; group centered on " + UnitDisplayName(_lastInputs,
-                            casting.Origin.IsCasterCentered ? casting.CasterUnitId : casting.Origin.AnchorUnitId)) + "]";
+                _runLabels[casting.CastingId] = casting.TargetMode == CastingTargetMode.DirectTarget || casting.Origin == null
+                    ? PlannerText.Get("run.label.direct", CastingLabel(casting.CastingId), casting.Order + 1)
+                    : PlannerText.Get("run.label.group", CastingLabel(casting.CastingId), casting.Order + 1,
+                        UnitDisplayName(_lastInputs, casting.Origin.IsCasterCentered ? casting.CasterUnitId : casting.Origin.AnchorUnitId));
             }
         }
 
@@ -2011,10 +2051,10 @@ namespace KingmakerBuffPlanner.UI
                     ProviderKey providerKey;
                     _runProviders.TryGetValue(castingId, out providerKey);
                     var provider = _lastInputs.Snapshot.Providers.FirstOrDefault(p => p.Key.Equals(providerKey));
-                    string resource = pool.Kind == ResourcePoolKind.PreparedSlots ? "prepared uses"
+                    string resource = pool.Kind == ResourcePoolKind.PreparedSlots ? PlannerText.Get("run.resource.prepared")
                         : pool.Kind == ResourcePoolKind.SpontaneousLevel && provider != null
-                            ? "level " + provider.SpellLevel + " spell slots"
-                            : pool.Kind == ResourcePoolKind.ItemCharges ? "item charges" : "uses in the shared pool";
+                            ? PlannerText.Get("run.resource.level", provider.SpellLevel)
+                            : pool.Kind == ResourcePoolKind.ItemCharges ? PlannerText.Get("run.resource.item") : PlannerText.Get("run.resource.shared");
                     bool depleted = pool.Remaining == 0;
                     if (pool.Kind == ResourcePoolKind.PreparedSlots && provider != null)
                     {
@@ -2022,19 +2062,18 @@ namespace KingmakerBuffPlanner.UI
                         depleted = !pool.Tokens.Any(t => provider.EligibleTokenIds.Contains(t.TokenId) &&
                             available.Contains(t.TokenId) && t.LinkedTokenIds.All(available.Contains));
                     }
-                    text = depleted ? "no " + resource + " remain"
+                    text = depleted ? PlannerText.Get("run.resource.exhausted", resource)
                         : provider != null && pool.Kind != ResourcePoolKind.PreparedSlots && pool.Remaining < provider.UnitsPerCast
-                            ? "not enough " + resource + " remain for this casting"
-                            : "not enough " + resource + "; earlier planned castings have first claim on this pool";
+                            ? PlannerText.Get("run.resource.insufficient", resource)
+                            : PlannerText.Get("run.resource.prior", resource);
                 }
                 var enhancement = _lastInputs.Enhancements.FirstOrDefault(e =>
                     code == "enhancement-exhausted:" + e.EnhancementId ||
                     code.StartsWith("enhancement-pool-exhausted:" + e.UsagePoolId + ":", StringComparison.Ordinal));
                 if (enhancement != null)
                     text = enhancement.RemainingUses == 0
-                        ? "no uses remain for required " + enhancement.DisplayName
-                        : "not enough uses for required " + enhancement.DisplayName +
-                            "; earlier planned castings have first claim on this pool";
+                        ? PlannerText.Get("run.resource.enhancement.exhausted", enhancement.DisplayName)
+                        : PlannerText.Get("run.resource.enhancement.prior", enhancement.DisplayName);
             }
             _runReasons[key] = text;
             return text;
@@ -2089,7 +2128,7 @@ namespace KingmakerBuffPlanner.UI
                 value => value != null && string.Equals(value.CastingId, castingId,
                     StringComparison.Ordinal));
             if (casting == null) return castingId ?? string.Empty;
-            string spell = "Casting " + (casting.Order + 1);
+            string spell = PlannerText.Get("run.label.number", casting.Order + 1);
             if (_lastInputs != null && casting.Ability != null)
             {
                 ProviderPlanningOption option = _lastInputs.ProviderOptions.FirstOrDefault(
@@ -2101,7 +2140,7 @@ namespace KingmakerBuffPlanner.UI
             }
             string target = casting.TargetMode == CastingTargetMode.DirectTarget
                 ? UnitDisplayName(_lastInputs, casting.DirectTargetUnitId)
-                : "group";
+                : PlannerText.Get("workspace.card.group");
             if (casting.TargetMode != CastingTargetMode.DirectTarget && casting.Origin != null)
             {
                 string originId = casting.Origin.IsCasterCentered
@@ -2109,7 +2148,7 @@ namespace KingmakerBuffPlanner.UI
                 if (!string.IsNullOrEmpty(originId) && _lastInputs != null &&
                     _lastInputs.Snapshot != null && _lastInputs.Snapshot.Units.Any(unit =>
                         unit != null && string.Equals(unit.UnitId, originId, StringComparison.Ordinal)))
-                    target = "centered on " + UnitDisplayName(_lastInputs, originId);
+                    target = PlannerText.Get("authoring.session.run.centre", UnitDisplayName(_lastInputs, originId));
             }
             return spell + " (" + UnitDisplayName(_lastInputs, casting.CasterUnitId) +
                 " -> " + target + ")";
@@ -2183,7 +2222,7 @@ namespace KingmakerBuffPlanner.UI
                         .Distinct(StringComparer.Ordinal).ToList();
                     string owner;
                     if (owners.Count != 1 || !unitNames.TryGetValue(owners[0], out owner)) owner = null;
-                    string what = poolNames.Count == 1 ? poolNames[0] + " uses" : "enhancement uses";
+                    string what = poolNames.Count == 1 ? PlannerText.Get("authoring.session.pool.sourceUses", poolNames[0]) : PlannerText.Get("authoring.session.pool.enhanceUses");
                     enhancementLabels[pool.Key] = owner == null ? what : owner + ": " + what;
                 }
             }
@@ -2195,7 +2234,7 @@ namespace KingmakerBuffPlanner.UI
         // by owner and pool name, material components by kind.
         internal string BudgetLabel(CastingBudgetLine line)
         {
-            if (line == null) return "resource";
+            if (line == null) return PlannerText.Get("authoring.session.pool.generic");
             switch (line.Category)
             {
                 case CastingCostCategory.NativePool:
@@ -2203,16 +2242,16 @@ namespace KingmakerBuffPlanner.UI
                 case CastingCostCategory.EnhancementPool:
                     string label;
                     return line.PoolKey != null && _enhancementPoolLabels.TryGetValue(line.PoolKey, out label)
-                        ? label : "enhancement uses";
+                        ? label : PlannerText.Get("authoring.session.pool.enhanceUses");
                 default:
-                    return "material component";
+                    return PlannerText.Get("authoring.session.pool.material");
             }
         }
 
         internal string PoolLabel(string poolKey)
         {
             string label;
-            return poolKey != null && _poolLabels.TryGetValue(poolKey, out label) ? label : "resource";
+            return poolKey != null && _poolLabels.TryGetValue(poolKey, out label) ? label : PlannerText.Get("authoring.session.pool.generic");
         }
 
         internal string CostLabel(CastingCostLine line)
@@ -2223,11 +2262,11 @@ namespace KingmakerBuffPlanner.UI
                 case CastingCostCategory.NativePool:
                     return PoolLabel(line.PoolKey) + (line.Unlimited ? string.Empty : count);
                 case CastingCostCategory.Material:
-                    return "material component" + count;
+                    return PlannerText.Get("authoring.session.pool.material") + count;
                 default:
                     string label;
                     return (line.PoolKey != null && _enhancementPoolLabels.TryGetValue(line.PoolKey, out label)
-                        ? label : "enhancement use") + count;
+                        ? label : PlannerText.Get("authoring.session.pool.enhanceUse")) + count;
             }
         }
 
@@ -2236,6 +2275,7 @@ namespace KingmakerBuffPlanner.UI
             RoutineDefinition routine = _authoring.Document.Routines.FirstOrDefault(
                 value => value != null && string.Equals(value.RoutineId, routineId,
                     StringComparison.Ordinal));
+            if (routine != null && routine.HasDefaultCaption) return PlannerText.Routine(routine.RoutineId);
             if (routine != null && !string.IsNullOrWhiteSpace(routine.Name)) return routine.Name;
             return string.IsNullOrEmpty(routineId) ? PlannerText.Get("workspace.routine")
                 : (routineId == "long" || routineId == "short" || routineId == "important" ? PlannerText.Routine(routineId)
@@ -2400,9 +2440,7 @@ namespace KingmakerBuffPlanner.UI
                         .Where(unitId => !string.Equals(unitId, direct, StringComparison.Ordinal))
                         .Distinct(StringComparer.Ordinal).ToList();
                     if (dropped.Count != 0)
-                        return new AuthoringEditResult(true, "it no longer reaches " + string.Join(", ",
-                                dropped.Select(unitId => UnitDisplayName(_lastInputs, unitId)).ToArray()) +
-                            " - add a casting for each, or Undo", result.Scope, result.AffectedCastingIds);
+                        return new AuthoringEditResult(true, PlannerText.Get("authoring.target.dropped", string.Join(", ", dropped.Select(unitId => UnitDisplayName(_lastInputs, unitId)).ToArray())), result.Scope, result.AffectedCastingIds);
                 }
                 return result;
             }
@@ -2569,8 +2607,8 @@ namespace KingmakerBuffPlanner.UI
                     ";from=" + focused.Ability.SourceKind + ":" + focused.Ability.SpecialSourceId +
                     ";to=" + key.Ability.SpecialSourceId + ";live=" + key.SourceInstanceId);
             if (result.Applied && dropped.Count != 0)
-                return new AuthoringEditResult(true, "the new caster does not have " + string.Join(", ", dropped) +
-                    " (Undo restores " + (dropped.Count == 1 ? "it" : "them") + ")", result.Scope, result.AffectedCastingIds);
+                return new AuthoringEditResult(true, (dropped.Count == 1 ? PlannerText.Get("authoring.session.providerDropped.one", string.Join(", ", dropped))
+                    : PlannerText.Get("authoring.session.providerDropped.many", string.Join(", ", dropped))), result.Scope, result.AffectedCastingIds);
             return result;
         }
 
@@ -3059,15 +3097,15 @@ namespace KingmakerBuffPlanner.UI
                 switch (casting.TargetMode)
                 {
                     case CastingTargetMode.CasterCenteredOrigin:
-                        modeLabel = "Group · caster-centered";
+                        modeLabel = PlannerText.Get("authoring.session.mode.caster");
                         originLabel = "Origin: caster";
                         break;
                     case CastingTargetMode.AnchoredOrigin:
-                        modeLabel = "Group · anchored";
+                        modeLabel = PlannerText.Get("authoring.session.mode.anchor");
                         originLabel = "Origin: " + casting.Origin.AnchorUnitId;
                         break;
                     default:
-                        modeLabel = "Direct target";
+                        modeLabel = PlannerText.Get("authoring.session.mode.direct");
                         break;
                 }
                 cards.Add(new WorkspaceCastingCard(
@@ -3079,7 +3117,7 @@ namespace KingmakerBuffPlanner.UI
                     casting.CoverageGaps.Select(gap => gap.UnitId).ToList(),
                     casting.Enhancements
                         .Select(value => value.EnhancementId +
-                            (value.Required ? " (required)" : " (optional)"))
+                            (value.Required ? PlannerText.Get("authoring.session.required") : PlannerText.Get("authoring.session.optional")))
                         .ToList(),
                     casting.Cost.Select(CostLabel).ToList(),
                     casting.Readiness, casting.ReadinessReasons,
@@ -3107,9 +3145,9 @@ namespace KingmakerBuffPlanner.UI
             return new CastingPlanDocument(CampaignId,
                 new[]
                 {
-                    new RoutineDefinition("long", "Long"),
-                    new RoutineDefinition("important", "Important"),
-                    new RoutineDefinition("short", "Short")
+                    new RoutineDefinition("long", "Long", true),
+                    new RoutineDefinition("important", "Important", true),
+                    new RoutineDefinition("short", "Short", true)
                 },
                 new PlannedCasting[0]);
         }

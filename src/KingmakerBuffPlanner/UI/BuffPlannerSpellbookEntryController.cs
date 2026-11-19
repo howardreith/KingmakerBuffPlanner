@@ -371,10 +371,10 @@ namespace KingmakerBuffPlanner.UI
             var rect = go.AddComponent<RectTransform>();
             rect.SetParent(button, false);
             TextMeshProUGUI label = go.AddComponent<TextMeshProUGUI>();
-            label.font = PlannerText.Chinese && PlannerChineseFont.Primary != null ? PlannerChineseFont.Primary : native.font;
+            label.font = PlannerFontOwner.For(go, native.font);
             go.SetActive(true);
             KingmakerUiFactory.Stretch(rect, 0, 0, 0, 0);
-            label.font = PlannerText.Chinese && PlannerChineseFont.Primary != null ? PlannerChineseFont.Primary : native.font;
+            label.font = PlannerFontOwner.For(go, native.font);
             label.fontSharedMaterial = label.font == native.font ? native.fontSharedMaterial : label.font.material;
             label.enableAutoSizing = native.enableAutoSizing;
             label.fontSizeMin = native.fontSizeMin;

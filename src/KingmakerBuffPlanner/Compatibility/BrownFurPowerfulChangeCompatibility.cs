@@ -209,7 +209,7 @@ namespace KingmakerBuffPlanner.Compatibility
             IEnumerable<string> eligibleAbilityGuids)
         {
             string name = blueprint == null || string.IsNullOrWhiteSpace(
-                blueprint.Name) ? "Powerful Change: " + contract.Score :
+                blueprint.Name) ? PlannerText.Get("compat.powerful.fallback", PlannerText.Get("compat.powerful." + contract.Score)) :
                 blueprint.Name;
             string description = blueprint == null ? string.Empty :
                 blueprint.Description;
@@ -222,12 +222,12 @@ namespace KingmakerBuffPlanner.Compatibility
                 contract.ActivatableGuid, name, description,
                 CastEnhancementCategory.ClassFeature, 0, 0, remaining,
                 eligibleAbilityGuids,
-                "Powerful Change: " + contract.Score,
+                name,
                 new[] { BrownFurPowerfulChangeProfile.CastingSpellbookGuid },
                 BrownFurPowerfulChangeProfile.UsagePoolId(casterUnitId),
                 !direct,
                 "brown-fur-powerful-change", 1, false,
-                "brown-fur-powerful-change", "Arcane Reservoir",
+                "brown-fur-powerful-change", PlannerText.Get("compat.powerful.pool"),
                 direct ? BrownFurDirectCastCompatibility.ProviderId : null);
         }
 

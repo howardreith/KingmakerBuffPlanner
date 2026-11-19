@@ -380,18 +380,19 @@ namespace KingmakerBuffPlanner.Compatibility
             string directReason;
             bool direct = BrownFurDirectCastCompatibility
                 .TryValidateContract(out directReason);
+            string name = blueprint == null || string.IsNullOrWhiteSpace(blueprint.Name)
+                ? PlannerText.Get("compat.share.name") : blueprint.Name;
             return new CastEnhancementSnapshot(
                 BrownFurShareTransmutationProfile.EnhancementId(casterUnitId),
                 casterUnitId,
                 BrownFurShareTransmutationProfile.ActivatableGuid,
-                blueprint == null || string.IsNullOrWhiteSpace(blueprint.Name)
-                    ? "Share Transmutation" : blueprint.Name,
+                name,
                 blueprint == null ? string.Empty : blueprint.Description,
                 CastEnhancementCategory.ClassFeature, 0, 0, remaining,
-                abilities, "Share Transmutation", spellbooks,
+                abilities, name, spellbooks,
                 BrownFurShareTransmutationProfile.UsagePoolId(casterUnitId),
                 !direct, "brown-fur-share-transmutation", 1, true,
-                "brown-fur-share-transmutation", "Arcane Reservoir",
+                "brown-fur-share-transmutation", PlannerText.Get("compat.powerful.pool"),
                 direct ? BrownFurDirectCastCompatibility.ProviderId : null);
         }
 

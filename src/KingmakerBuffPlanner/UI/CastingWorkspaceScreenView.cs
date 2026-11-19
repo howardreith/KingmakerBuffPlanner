@@ -252,7 +252,8 @@ namespace KingmakerBuffPlanner.UI
         internal bool CanRefreshLanguage
         {
             get { return !ControllerBlockingOverlayOpen && !NativeDescriptionBlocksWorkspace &&
-                !_controllerNavigation.ModalOpen && !_buffSearch.isFocused && !PlannerImeGuard.Active; }
+                !_controllerNavigation.ModalOpen && !_buffSearch.isFocused && !PlannerImeGuard.Active &&
+                !_clearInput.BlocksBackground && !Input.GetMouseButton(0); }
         }
 
         internal CastingWorkspaceScreenView WithCurrentLanguage(Component host)
@@ -1431,7 +1432,7 @@ namespace KingmakerBuffPlanner.UI
                 CloseResources();
                 _lastView = view();
                 if (_description == null || !_description.Open(ability, exactVariant, casterUnitId))
-                    ShowNotice("No description is available for " + (string.IsNullOrEmpty(name) ? "this buff" : name) + ".");
+                    ShowNotice(string.IsNullOrEmpty(name) ? PlannerText.Get("workspace.noDescription.generic") : PlannerText.Get("workspace.noDescription.named", name));
             };
         }
 
@@ -1481,7 +1482,7 @@ namespace KingmakerBuffPlanner.UI
             _notice.gameObject.SetActive(false);
             // The notice can be longer than two lines; its full text is its tooltip.
             RegisterTooltip(_notice, "notice", null, () => new WorkspaceTooltipContent(string.Empty, _noticeText));
-            _noticeRecovery = _kit.Button(header, "SaveRecovery", WorkspaceFooterText.RetrySaveAction,
+            _noticeRecovery = _kit.Button(header, "SaveRecovery", WorkspaceFooterText.RecoveryCaption(WorkspaceFooterText.RetrySaveAction),
                 () => Command(RecoveryCommand), PlannerTextRole.Button, 15f);
             KingmakerUiFactory.SetAnchors(RectOf(_noticeRecovery), 0.6f, 0f, 0.6f, 1f);
             RectOf(_noticeRecovery).pivot = new Vector2(0f, 0.5f);
@@ -1882,7 +1883,7 @@ namespace KingmakerBuffPlanner.UI
             try { timing = RebuildResources(); }
             catch (Exception exception)
             {
-                Feedback("Resources could not be prepared: " + exception.Message, true);
+                Feedback(PlannerText.Get("workspace.notice.resourceOpen", exception.Message), true);
                 _log("[KBP-WORKSPACE] Resources refused: " + exception);
                 _log("[KBP-WORKSPACE-PERF] cause=resources-open;outcome=refused;handlerMs=" +
                     ElapsedMilliseconds(startedAt).ToString("F3") + ".");
@@ -1924,7 +1925,7 @@ namespace KingmakerBuffPlanner.UI
             catch (Exception exception)
             {
                 _resourceScope = prior;
-                Feedback("Resources could not change scope: " + exception.Message, true);
+                Feedback(PlannerText.Get("workspace.notice.resourceScope", exception.Message), true);
                 _log("[KBP-WORKSPACE] Resources scope refused: " + exception);
                 _log("[KBP-WORKSPACE-PERF] cause=resources-scope-" + scope +
                     ";outcome=refused;handlerMs=" + ElapsedMilliseconds(startedAt).ToString("F3") + ".");
@@ -1950,7 +1951,7 @@ namespace KingmakerBuffPlanner.UI
             _resourcesSaveStatus.text = saveProblem == null
                 ? string.Empty
                 : saveProblem + (recovery == null ? string.Empty
-                    : " Close Resources to " + recovery + ".");
+                    : PlannerText.Get("workspace.notice.resourceRecovery", WorkspaceFooterText.RecoveryCaption(recovery)));
             _resourcesSaveStatus.color = saveProblem == null
                 ? PlannerNativeKit.SecondaryInk : BlockedInk;
             _kit.SetSelected(_resourcesSelectedScopeButton,
@@ -2063,7 +2064,7 @@ namespace KingmakerBuffPlanner.UI
             if (_noticeRecovery != null)
             {
                 _noticeRecovery.gameObject.SetActive(action != null);
-                if (action != null) PlannerNativeKit.SetCaption(_noticeRecovery, action);
+                if (action != null) PlannerNativeKit.SetCaption(_noticeRecovery, WorkspaceFooterText.RecoveryCaption(action));
             }
             ShowStandingNotice(problem);
         }
@@ -2079,7 +2080,7 @@ namespace KingmakerBuffPlanner.UI
             if (action == WorkspaceFooterText.RetrySaveAction)
             {
                 bool saved = _session.RetryFailedSave();
-                Feedback(saved ? "Saved: your latest edit is on disk."
+                Feedback(saved ? PlannerText.Get("workspace.status.saveSuccess")
                     : WorkspaceFooterText.SaveProblem(_session.FooterSaveState), !saved);
             }
         }
@@ -2109,7 +2110,7 @@ namespace KingmakerBuffPlanner.UI
             if (!string.IsNullOrEmpty(removal))
                 return string.IsNullOrEmpty(_session.LastAttemptMessage) ||
                     _session.LastAttemptMessage.StartsWith(removal, StringComparison.Ordinal)
-                    ? removal : removal + " Last attempt: " + _session.LastAttemptMessage;
+                    ? removal : PlannerText.Get("workspace.notice.lastAttempt", removal, _session.LastAttemptMessage);
             if (_session.ProblemNavigation.Active && !string.IsNullOrEmpty(_session.LastAttemptMessage))
                 return _session.LastAttemptMessage;
             return _loadNote;
@@ -2143,8 +2144,8 @@ namespace KingmakerBuffPlanner.UI
             _headerStatus.text = WorkspaceHeaderText.Describe(view.SelectedRoutineName,
                 view.RoutineCastingCount, view.RoutineReadyCount) +
                 (!_session.SavesRefused ? string.Empty
-                    : _session.LegacyImportBlocked ? " · not saved: the classic plan could not be imported"
-                    : " · not saved: the plan file cannot be read");
+                    : _session.LegacyImportBlocked ? PlannerText.Get("workspace.status.importFile")
+                    : PlannerText.Get("workspace.status.readFile"));
             KingmakerUiFactory.DestroyChildren(_routineBar);
             TextMeshProUGUI label = _kit.Text(_routineBar, "RoutineLabel", PlannerText.Get("workspace.routine"), PlannerTextRole.Heading, 18f,
                 TextAlignmentOptions.MidlineLeft);
@@ -2236,7 +2237,7 @@ namespace KingmakerBuffPlanner.UI
             if (shown == 0)
             {
                 TextMeshProUGUI none = _kit.Text(_catalogueContent, "NoMatch",
-                    _buffQuery.Length == 0 ? PlannerText.Get("catalog.empty") : "No buff matches \"" + _buffQuery + "\".",
+                    _buffQuery.Length == 0 ? PlannerText.Get("catalog.empty") : PlannerText.Get("workspace.search.missing", _buffQuery),
                     PlannerTextRole.Secondary, 15f, TextAlignmentOptions.MidlineLeft);
                 KingmakerUiFactory.AddLayout(none.rectTransform, 30f);
             }
@@ -2249,9 +2250,8 @@ namespace KingmakerBuffPlanner.UI
             _bannerIcon.color = icon == null ? new Color(0f, 0f, 0f, 0f) : Color.white;
             _bannerTitle.text = view.SelectedSourceCaption;
             string kind = CastingGraphText.TargetingLabel(view.SelectedSourceIsGroup, view.SelectedSourceIsArea);
-            _bannerDetail.text = kind + " · " + view.Castings.Count + " in " + view.SelectedRoutineName +
-                (view.OtherRoutineCastings == 0 ? string.Empty
-                    : " · " + view.OtherRoutineCastings + " in other routines");
+            _bannerDetail.text = view.OtherRoutineCastings == 0 ? PlannerText.Get("workspace.banner.routine", kind, view.Castings.Count, view.SelectedRoutineName)
+                : PlannerText.Get("workspace.banner.other", kind, view.Castings.Count, view.SelectedRoutineName, view.OtherRoutineCastings);
             // The next step while adding; nothing while editing one casting
             // (the sidebar is about that casting then).
             CastingGraphCasterNode caster = view.CasterById(view.SelectedCasterUnitId);
@@ -2310,13 +2310,13 @@ namespace KingmakerBuffPlanner.UI
             RectTransform targets = Layer("Targets");
             if (view.Casters.Count == 0)
                 Hint(casters, "NoCaster", view.SelectedSourceId.Length == 0 ? string.Empty
-                    : "Nobody in the party can cast this buff now.", 6f, 10f, m.CasterLaneWidth - 12f);
+                    : PlannerText.Get("workspace.graph.noneParty"), 6f, 10f, m.CasterLaneWidth - 12f);
             foreach (CastingGraphCasterNode caster in view.Casters)
                 BuildCasterNode(casters, caster, layout, m);
             foreach (CastingGraphTargetNode target in view.Targets)
                 BuildTargetNode(targets, target, layout, m);
             if (view.Castings.Count == 0 && view.SelectedSourceId.Length != 0)
-                Hint(chips, "NoCasting", "No castings of this buff in " + view.SelectedRoutineName + " yet.",
+                Hint(chips, "NoCasting", PlannerText.Get("workspace.graph.emptyRoutine", view.SelectedRoutineName),
                     m.ChipLaneLeft + 16f, 40f, m.ChipLaneWidth - 32f);
             foreach (GraphConnection connection in layout.Connections)
             {
@@ -2449,7 +2449,7 @@ namespace KingmakerBuffPlanner.UI
                 label.overflowMode = TextOverflowModes.Ellipsis;
                 KingmakerUiFactory.Stretch(label.rectTransform, 10, 8, 19, 2);
                 TextMeshProUGUI count = _kit.Text(rect, "Capacity", CastingGraphText.SourceLine(row.Usable,
-                        row.BlockedReason, row.CapacityText, row.PoolLabel, row.SharedPoolWith),
+                        row.BlockedReason, row.CapacityText, row.PoolLabel, row.SharedPoolWith, row.Capacity != null && row.Capacity.Kind != CastingCapacityKind.Unknown),
                     PlannerTextRole.Small, 13f, TextAlignmentOptions.BottomLeft);
                 count.color = row.Usable ? LegalInk : BlockedInk;
                 count.enableAutoSizing = true;
@@ -2524,11 +2524,10 @@ namespace KingmakerBuffPlanner.UI
             AddSpellInspect(button, () => _session.BuildGraph(_inputs()),
                 casting.SpellAbility, true, casting.CasterUnitId, ChipInspectTitle(casting, _lastView));
             string status = (_session.ProblemNavigation.Active && casting.Selected
-                ? "Problem " + _session.ProblemNavigation.Position + " of " + _session.ProblemNavigation.Count +
-                    " · Not ready" : casting.StatusLabel) +
-                (casting.ShortInOnePass ? " · Short without rest" : string.Empty) +
-                (casting.RedundantInOnePass ? " · Covered earlier" : string.Empty) +
-                (casting.NeedsReview ? " · Review" : string.Empty);
+                ? PlannerText.Get("workspace.chip.problem", _session.ProblemNavigation.Position, _session.ProblemNavigation.Count) : casting.StatusLabel) +
+                (casting.ShortInOnePass ? PlannerText.Get("workspace.chip.short") : string.Empty) +
+                (casting.RedundantInOnePass ? PlannerText.Get("workspace.chip.covered") : string.Empty) +
+                (casting.NeedsReview ? PlannerText.Get("workspace.chip.review") : string.Empty);
             TextMeshProUGUI first = _kit.Text(rect, "Status", casting.OrderLabel + "  " + status,
                 PlannerTextRole.Strong, 15f, TextAlignmentOptions.TopLeft);
             first.color = blocked ? BlockedInk : casting.Selected ? PlannerNativeKit.Burgundy : PlannerNativeKit.BodyInk;
@@ -2538,7 +2537,7 @@ namespace KingmakerBuffPlanner.UI
             first.enableWordWrapping = false;
             first.overflowMode = TextOverflowModes.Ellipsis;
             var details = new List<string>();
-            if (casting.IsGroup) details.Add("Predicted reach: " + casting.Beneficiaries.Count);
+            if (casting.IsGroup) details.Add(PlannerText.Get("workspace.chip.reach", casting.Beneficiaries.Count));
             details.AddRange(casting.EnhancementBadges.Where(value => !string.IsNullOrEmpty(value)));
             if (details.Count == 0)
             {
@@ -2731,7 +2730,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 Line("SourceDetail", caster.DisplayName + " · " + row.Label, PlannerTextRole.Body, 15f, null);
                 Line("SourceCapacity", CastingGraphText.SourceLine(row.Usable, row.BlockedReason, row.CapacityText,
-                    row.PoolLabel, row.SharedPoolWith), PlannerTextRole.Small, 13f, row.Usable ? LegalInk : BlockedInk);
+                    row.PoolLabel, row.SharedPoolWith, row.Capacity != null && row.Capacity.Kind != CastingCapacityKind.Unknown), PlannerTextRole.Small, 13f, row.Usable ? LegalInk : BlockedInk);
             }
             // v1.2 §7 / E16: the Share control sits between the exact
             // source and the target click - the owner's authoring order.
@@ -2776,8 +2775,7 @@ namespace KingmakerBuffPlanner.UI
             bool unresolvedSource = chip != null && string.IsNullOrEmpty(chip.SourceProviderKey);
             if (problem)
             {
-                Line("ProblemPosition", inspector.RoutineName + " · Problem " + problems.Position +
-                    " of " + problems.Count, PlannerTextRole.Strong, 17f, PlannerNativeKit.Burgundy);
+                Line("ProblemPosition", PlannerText.Get("workspace.inspect.problem", inspector.RoutineName, problems.Position, problems.Count), PlannerTextRole.Strong, 17f, PlannerNativeKit.Burgundy);
                 Line("ProblemBuff", view.SelectedSourceCaption, PlannerTextRole.Strong, 16f, null);
             }
             else ActionButton("DoneEditing", PlannerText.Get("common.done"), () => _session.ClearGraphFocus(), 108f);
@@ -2789,7 +2787,7 @@ namespace KingmakerBuffPlanner.UI
                 Line("ItemSourceNote", inspector.ItemSourceNote, PlannerTextRole.Small, 13f,
                     chip != null && chip.NeedsItemSourceChoice ? BlockedInk : (Color?)null);
             if (unresolvedSource)
-                ActionButton("Remove", "Remove casting " + chip.OrderLabel, RemoveCastingCommand);
+                ActionButton("Remove", PlannerText.Get("workspace.inspect.remove", chip.OrderLabel), RemoveCastingCommand);
             RectTransform change = Row("ExplicitChange", 32f);
             RowButton(change, "ChangeRecipient",
                 _session.GraphEditIntent == CastingGraphEditIntent.ChangeRecipient
@@ -2811,7 +2809,7 @@ namespace KingmakerBuffPlanner.UI
                 problem || chip != null && chip.Readiness == ResolvedCastingReadiness.Blocked ? BlockedInk : LegalInk);
             foreach (string reason in problem ? problems.Current.Reasons.Select(WorkspaceReasonText.Describe)
                 : inspector.Reasons)
-                Line("Reason", (problem ? "Not ready: " : string.Empty) + reason, PlannerTextRole.Small, 14f, BlockedInk);
+                Line("Reason", problem ? PlannerText.Get("workspace.inspect.notReady", reason) : reason, PlannerTextRole.Small, 14f, BlockedInk);
             if (problem)
             {
                 Button previous = ActionButton("ProblemPrevious", PlannerText.Get("workspace.prevProblem"),
@@ -2829,7 +2827,7 @@ namespace KingmakerBuffPlanner.UI
                 Line("Redundant", PlannerText.Get("workspace.redundant"),
                     PlannerTextRole.Small, 14f, null);
             if (inspector.ExecutionLimitation.Length != 0)
-                Line("Limitation", "Cannot run in this version: " + inspector.ExecutionLimitation,
+                Line("Limitation", PlannerText.Get("authoring.inspector.limitation", inspector.ExecutionLimitation),
                     PlannerTextRole.Small, 14f, BlockedInk);
             if (inspector.ReviewItems.Count != 0)
             {
@@ -2865,7 +2863,7 @@ namespace KingmakerBuffPlanner.UI
                 foreach (CastingGraphTargetNode target in view.Targets)
                 {
                     string unit = target.UnitId;
-                    ActionButton("FocusedSingle." + unit, "Single target: " + target.DisplayName,
+                    ActionButton("FocusedSingle." + unit, PlannerText.Get("authoring.inspector.singleTarget", target.DisplayName),
                         () => Surface(_session.SetFocusedTargeting(CastingTargetMode.DirectTarget, unit, null, null),
                             "mode"));
                 }
@@ -2898,7 +2896,7 @@ namespace KingmakerBuffPlanner.UI
                 string id = option.EnhancementId;
                 bool usable = option.Selected || option.UnavailableReason.Length == 0;
                 Checkbox("Enhancement." + id, option.Name + (option.Selected && !option.Required
-                        ? " (optional, imported)" : string.Empty), option.Selected,
+                        ? PlannerText.Get("authoring.inspector.optional") : string.Empty), option.Selected,
                     () => Surface(_session.ToggleFocusedEnhancement(id, _inputs()), "enhancement"), usable);
                 var detail = new List<string>();
                 if (!string.IsNullOrEmpty(option.ExpectedEffect)) detail.Add(option.ExpectedEffect);
@@ -2917,13 +2915,12 @@ namespace KingmakerBuffPlanner.UI
             if (inspector.CostLines.Count == 0)
                 Line("NoCost", PlannerText.Get("workspace.free"), PlannerTextRole.Body, 15f, null);
             foreach (string cost in inspector.CostLines)
-                Line("Cost", (skipped ? "If cast: " : string.Empty) + cost, PlannerTextRole.Body, 15f, null);
+                Line("Cost", skipped ? PlannerText.Get("workspace.inspect.ifCast", cost) : cost, PlannerTextRole.Body, 15f, null);
             if (skipped)
                 Line("SkippedSpends", PlannerText.Get("workspace.skipSpends"), PlannerTextRole.Small, 13f, null);
             ActionButton("OpenResources", PlannerText.Get("workspace.resourceDetail"), ToggleResources, 170f);
             // Order within the routine (compact).
-            Line("RoutineLine", "Casting " + (inspector.Casting.Order + 1) + " of " + inspector.RoutineCount +
-                " in " + inspector.RoutineName, PlannerTextRole.Small, 14f, null);
+            Line("RoutineLine", PlannerText.Get("authoring.inspector.order", inspector.Casting.Order + 1, inspector.RoutineCount, inspector.RoutineName), PlannerTextRole.Small, 14f, null);
             RectTransform order = Row("Order", 30f);
             Button earlier = RowButton(order, "FocusedOrder.Earlier", PlannerText.Get("workspace.earlier"),
                 () => Surface(_session.MoveFocusedCastingWithinRoutine(-1), "move"), 0f, 0.5f);
@@ -2932,7 +2929,7 @@ namespace KingmakerBuffPlanner.UI
                 () => Surface(_session.MoveFocusedCastingWithinRoutine(1), "move"), 0.5f, 1f);
             PlannerNativeKit.SetEnabled(later, inspector.CanMoveLater);
             if (inspector.LastRun.Length != 0)
-                Line("LastRun", "Last run: " + inspector.LastRun, PlannerTextRole.Small, 13f, null);
+                Line("LastRun", PlannerText.Get("authoring.inspector.lastRun", inspector.LastRun), PlannerTextRole.Small, 13f, null);
             // WP3: a genuine Draft (an imported choice still to finish) can be
             // marked Ready. A Disabled record from an earlier version is shown
             // honestly - it is never cast and never blocks - and is removed,
@@ -2941,8 +2938,7 @@ namespace KingmakerBuffPlanner.UI
                 ActionButton("MarkReady", PlannerText.Get("workspace.ready"), () => Surface(_session.SetFocusedCastingState(
                     CastingAuthoringState.Ready), "mark ready"));
             if (inspector.Casting.State == CastingAuthoringState.Disabled)
-                Line("LegacyDisabled", "Disabled in an earlier version: it is not cast and blocks nothing. " +
-                    "Remove it if you no longer want it.", PlannerTextRole.Small, 14f, null);
+                Line("LegacyDisabled", PlannerText.Get("authoring.inspector.disabled"), PlannerTextRole.Small, 14f, null);
             // 7. Set apart: removal (unresolved sources offered it above).
             if (!unresolvedSource)
             {
@@ -2988,15 +2984,14 @@ namespace KingmakerBuffPlanner.UI
         {
             var detail = new List<string>();
             if (modifier.Detail.Length != 0) detail.Add(modifier.Detail);
-            if (modifier.CostText.Length != 0) detail.Add("Cost: " + modifier.CostText);
+            if (modifier.CostText.Length != 0) detail.Add(PlannerText.Get("authoring.inspector.modifierCost", modifier.CostText));
             if (detail.Count != 0)
                 Line(prefix + "Detail", string.Join(" · ", detail.ToArray()), PlannerTextRole.Small, 13f, null, 30f);
             // A saved choice that no longer applies stays visible as a
             // repair warning; untick it to repair the casting.
             if (modifier.UnavailableReason.Length != 0 && (modifier.Selected || prefix == "DraftModifier"))
-                Line(prefix + "Unavailable", (modifier.Selected ? "Chosen, but no longer available: " : string.Empty) +
-                    WorkspaceReasonText.DescribeNested(modifier.UnavailableReason) +
-                    (modifier.Selected ? " - untick it to repair this casting" : string.Empty),
+                Line(prefix + "Unavailable", (modifier.Selected ? PlannerText.Get("authoring.inspector.modifierUnavailable", WorkspaceReasonText.DescribeNested(modifier.UnavailableReason))
+                    : PlannerText.Get("authoring.inspector.modifierUnavailablePlain", WorkspaceReasonText.DescribeNested(modifier.UnavailableReason))),
                     PlannerTextRole.Small, 13f, BlockedInk, 30f);
         }
 
@@ -3004,15 +2999,15 @@ namespace KingmakerBuffPlanner.UI
         {
             IReadOnlyList<string> pending = _session.PendingImportNotices;
             if (pending.Count == 0) return;
-            Section("Imported plan-wide constraints (" + pending.Count + ")");
-            foreach (string notice in pending) Line("ImportNotice", "· " + notice, PlannerTextRole.Small, 13f, null);
+            Section(PlannerText.Get("authoring.inspector.constraints", pending.Count));
+            foreach (string notice in pending) Line("ImportNotice", "· " + _session.DescribeImportNotice(notice), PlannerTextRole.Small, 13f, null);
             Line("ImportNoticeRule", PlannerText.Get("workspace.ackNeeded"), PlannerTextRole.Small, 13f,
                 BlockedInk);
             ActionButton("AcknowledgeImportNotices", PlannerText.Get("workspace.ack"), () =>
             {
                 AuthoringEditResult result = _session.AcknowledgeImportNotices();
                 Surface(result, "acknowledge");
-                if (result.Applied) Feedback("Acknowledged (Undo reverts): " + result.Scope);
+                if (result.Applied) Feedback(PlannerText.Get("import.notice.acknowledged"));
             });
         }
 
@@ -3117,7 +3112,7 @@ namespace KingmakerBuffPlanner.UI
             catch (Exception exception)
             {
                 // A failed command is told, never swallowed into a stale view.
-                Feedback("That did not work: " + exception.Message, true);
+                Feedback(PlannerText.Get("workspace.notice.command", exception.Message), true);
                 Debug.LogError("[KBP-WORKSPACE] command failed: " + exception);
             }
             _nextCommandAndPersistenceMilliseconds = ElapsedMilliseconds(commandStarted);
@@ -3152,8 +3147,7 @@ namespace KingmakerBuffPlanner.UI
                     Feedback(PlannerText.Get("workspace.recentered"));
                     return;
                 case CastingGraphClickOutcome.ProviderChanged:
-                    Feedback("Caster changed" + (string.IsNullOrEmpty(result.Edit.Reason)
-                        ? string.Empty : ": " + result.Edit.Reason) + " (Undo restores the previous caster).");
+                    Feedback(string.IsNullOrEmpty(result.Edit.Reason) ? PlannerText.Get("workspace.caster.changed") : PlannerText.Get("workspace.caster.changeReason", result.Edit.Reason));
                     return;
                 case CastingGraphClickOutcome.DraftConfigured:
                     return;
@@ -3168,11 +3162,28 @@ namespace KingmakerBuffPlanner.UI
         private void Surface(AuthoringEditResult result, string action)
         {
             if (result == null) return;
+            string labelKey;
+            switch (action)
+            {
+                case "share": labelKey = "workspace.action.share"; break;
+                case "resolve review": labelKey = "workspace.action.resolve_review"; break;
+                case "recast": labelKey = "workspace.action.recast"; break;
+                case "mode": labelKey = "workspace.action.mode"; break;
+                case "enhancement": labelKey = "workspace.action.enhancement"; break;
+                case "move": labelKey = "workspace.action.move"; break;
+                case "mark ready": labelKey = "workspace.action.mark_ready"; break;
+                case "remove": labelKey = "workspace.action.remove"; break;
+                case "acknowledge": labelKey = "workspace.action.acknowledge"; break;
+                case "that click": labelKey = "workspace.action.that_click"; break;
+                case "change recipient": labelKey = "workspace.action.change_recipient"; break;
+                case "change caster/source": labelKey = "workspace.action.change_caster_source"; break;
+                default: labelKey = "workspace.action.edit"; break;
+            }
             if (!result.Applied)
-                Feedback(char.ToUpperInvariant(action[0]) + action.Substring(1) + " refused: " +
-                    WorkspaceRefusalText.Describe(result.Reason), true);
+                Feedback(PlannerText.Get("workspace.action.refused", PlannerText.Get(labelKey),
+                    WorkspaceRefusalText.Describe(result.Reason)), true);
             else if (!string.IsNullOrEmpty(result.Reason))
-                Feedback(char.ToUpperInvariant(action[0]) + action.Substring(1) + ": " + result.Reason);
+                Feedback(PlannerText.Get("workspace.action.note", PlannerText.Get(labelKey), result.Reason));
         }
 
         // The exceptional recovery action for a refused save (offered only
@@ -3184,8 +3195,7 @@ namespace KingmakerBuffPlanner.UI
             if (_session.IsDirty && Time.unscaledTime > _reloadArmedUntil)
             {
                 _reloadArmedUntil = Time.unscaledTime + 5f;
-                Feedback("Reload replaces this plan with the stored one, and edits that are not " +
-                    "saved can be lost. Press Reload again to continue.", true);
+                Feedback(PlannerText.Get("workspace.reload.confirm"), true);
                 return;
             }
             _reloadArmedUntil = 0f;
@@ -3201,14 +3211,14 @@ namespace KingmakerBuffPlanner.UI
                     _session.LoadSourcePath, _session.LoadWarning) ??
                   (_session.LastReloadNote == "kept-unsaved"
                       ? (keptSaved
-                          ? "No casting plan was stored yet; the castings you added were kept and are now saved."
+                          ? PlannerText.Get("workspace.reload.kept")
                           : WorkspaceFooterText.SaveProblem(_session.FooterSaveState))
                       : _session.LastReloadNote == "imported-into-unsaved"
-                          ? "Your classic plan was imported alongside your castings and saved."
+                          ? PlannerText.Get("workspace.reload.imported")
                           : _session.ImportReport != null ? DescribeImport(_session)
                           : status == CastingPlanLoadStatus.Absent
-                              ? "No casting plan is stored yet; your first edit saves one."
-                              : "Reloaded the stored casting plan."),
+                              ? PlannerText.Get("workspace.reload.new")
+                              : PlannerText.Get("workspace.reload.done")),
                 _session.LegacyImportBlocked || !keptSaved);
         }
 
@@ -3313,8 +3323,7 @@ namespace KingmakerBuffPlanner.UI
             catch (Exception exception)
             {
                 // Without fresh discovery nothing is submitted.
-                string refreshRefusal = name + " was not cast: the party state could not be refreshed (" +
-                    exception.Message + ").";
+                string refreshRefusal = PlannerText.Get("workspace.notice.refresh", name, exception.Message);
                 _session.ReportRunRefusal(refreshRefusal);
                 Feedback(refreshRefusal, true);
                 return;
@@ -3333,8 +3342,7 @@ namespace KingmakerBuffPlanner.UI
             Debug.Log("[KBP-CF-RUN] refused;reason=" + result.ReviewReason);
             if (result.Dispatch != null && !result.Dispatch.Submitted && result.Projection != null &&
                 result.Projection.Converted)
-                refusal += " Would run " + result.Projection.Plan.Steps.Count +
-                    (result.Projection.Plan.Steps.Count == 1 ? " cast" : " casts") + " in order.";
+                refusal += PlannerText.Get(result.Projection.Plan.Steps.Count == 1 ? "workspace.inspect.wouldCast.one" : "workspace.inspect.wouldCast.many", result.Projection.Plan.Steps.Count);
             Feedback(refusal, true);
         }
 
@@ -3362,19 +3370,14 @@ namespace KingmakerBuffPlanner.UI
             if (!string.IsNullOrEmpty(session.AvailabilityMigrationNotice))
                 return session.AvailabilityMigrationNotice;
             if (session.LegacyImportBlocked)
-                return "Your previous plan could not be imported (" + session.LegacyImportBlockReason +
-                    "). It was NOT replaced: saving and runs are blocked. Repair or restore that file, then press " +
-                    "Reload to retry.";
+                return PlannerText.Get("workspace.notice.importFailed", session.LegacyImportBlockReason);
             CastingImportReport report = session.ImportReport;
             if (report == null) return null;
-            return "Imported " + report.ResultingCastingCount +
-                (report.ResultingCastingCount == 1 ? " casting" : " castings") +
-                " from your previous plan: " + report.ReadyCount + " ready, " + report.DraftCount + " need review" +
-                (report.UnresolvedCasterCount == 0 ? string.Empty : ", " + report.UnresolvedCasterCount +
-                    " without a caster") +
-                (report.GroupReviewCount == 0 ? string.Empty : ", " + report.GroupReviewCount + " group(s) to confirm") +
-                (report.Warnings.Count == 0 ? string.Empty : " · " + report.Warnings.Count + " warning(s)") +
-                ". Your previous plan file was kept unchanged.";
+            return PlannerText.Get(report.ResultingCastingCount == 1 ? "workspace.import.summary.one" : "workspace.import.summary.many",
+                report.ResultingCastingCount, report.ReadyCount, report.DraftCount,
+                report.UnresolvedCasterCount == 0 ? string.Empty : PlannerText.Get("workspace.import.caster", report.UnresolvedCasterCount),
+                report.GroupReviewCount == 0 ? string.Empty : PlannerText.Get("workspace.import.group", report.GroupReviewCount),
+                report.Warnings.Count == 0 ? string.Empty : PlannerText.Get("workspace.import.warnings", report.Warnings.Count));
         }
     }
 }

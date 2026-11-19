@@ -706,7 +706,7 @@ namespace KingmakerBuffPlanner.UI
             return PlannerText.Get("hud.short");
         }
 
-        private void RefreshNativeTooltipText()
+        internal void RefreshNativeTooltipText()
         {
             for (int index = 0; index < _nativeTooltips.Length; index++)
             {
@@ -1095,7 +1095,7 @@ namespace KingmakerBuffPlanner.UI
                 }
                 if (casting != null) return casting;
             }
-            string name = char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
+            string name = PlannerText.Routine(routineId);
             if (_session.Model == null) return PlannerText.Get("hud.need.campaign", name);
             if (_session.IsExecuting)
                 return _session.ClassicRunHeld
@@ -1106,7 +1106,7 @@ namespace KingmakerBuffPlanner.UI
             if (routine == null || routine.Assignments.Count == 0)
                 return PlannerText.Get("hud.empty.routine", name);
             int targets = routine.Assignments.Sum(item => item.WantedTargetUnitIds.Count);
-            return PlannerText.Get("hud.routine.summary", name, routine.Assignments.Count, targets, _session.Model.Profile.Execution.Mode);
+            return PlannerText.Get("hud.routine.summary", name, routine.Assignments.Count, targets, PlannerText.Chinese ? PlannerText.Get(_session.Model.Profile.Execution.Mode == "instant" ? "classic.mode.instant" : "classic.mode.animated") : _session.Model.Profile.Execution.Mode);
         }
 
         // The owned glyph as a neutral alpha mask (64 x 64, white ink),

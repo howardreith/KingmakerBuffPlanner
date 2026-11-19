@@ -446,9 +446,11 @@ namespace KingmakerBuffPlanner.Tests
             })
                 Expect(view.IndexOf(retired, StringComparison.Ordinal) < 0,
                     "the reduced sidebar still contains: " + retired);
+            Expect(PlannerText.Get("workspace.enhancements") == "Enhancements" && PlannerText.Get("common.done") == "Done",
+                "The retained sidebar controls lost their English captions.");
             foreach (string kept in new[] { "\"Mode: \"", "ActionButton(\"Remove\"", "\"FocusedOrder.Earlier\"",
-                "\"FocusedOrder.Later\"", "Section(\"Enhancements\")", "Checkbox(\"FocusedRecastPolicy\"",
-                "Checkbox(\"DraftRecastPolicy\"", "ActionButton(\"DoneEditing\", \"Done\"" })
+                "\"FocusedOrder.Later\"", "Section(PlannerText.Get(\"workspace.enhancements\"))", "Checkbox(\"FocusedRecastPolicy\"",
+                "Checkbox(\"DraftRecastPolicy\"", "ActionButton(\"DoneEditing\", PlannerText.Get(\"common.done\")" })
                 Expect(view.IndexOf(kept, StringComparison.Ordinal) >= 0 ||
                     (kept == "\"Mode: \"" && (view.IndexOf("Mode: ", StringComparison.Ordinal) >= 0 ||
                         view.IndexOf("WorkspaceFooterTooltips.ModeCaption(", StringComparison.Ordinal) >= 0)),

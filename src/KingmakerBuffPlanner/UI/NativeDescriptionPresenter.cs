@@ -189,16 +189,16 @@ namespace KingmakerBuffPlanner.UI
 
         internal static string ControllerDescription(AbilityKey ability, bool exactVariant, string casterUnitId)
         {
-            if (ability == null) return "No spell is selected.";
+            if (ability == null) return PlannerText.Get("description.noSelection");
             try
             {
                 object subject = Resolve(ability, exactVariant, casterUnitId);
                 AbilityData data = subject as AbilityData;
                 BlueprintAbility blueprint = data == null ? subject as BlueprintAbility : data.Blueprint;
-                if (blueprint == null) return "The exact spell description is unavailable in the current campaign.";
+                if (blueprint == null) return PlannerText.Get("description.exactUnavailable");
                 return blueprint.Name + "\n\n" + blueprint.Description;
             }
-            catch (Exception exception) { return "Description unavailable: " + exception.Message; }
+            catch (Exception exception) { return PlannerText.Get("description.failed", exception.Message); }
         }
 
         // A titled text in the same native window (the runtime layout probe

@@ -288,6 +288,11 @@ namespace KingmakerBuffPlanner.UI
         internal static readonly string[] Keys = "abcdefghijklmnopqrstuvwxyz0123456789-'".Select(c => c.ToString())
             .Concat(new[] { "Space", "Delete", "Clear", "Apply", "Cancel" }).ToArray();
         internal const int Columns = 8;
+        internal static string Caption(int index)
+        {
+            string key = Keys[index];
+            return key.Length == 1 ? key : PlannerText.Get("classic.keyboard." + key);
+        }
         internal string Draft { get; private set; }
         internal int Focus { get; private set; }
         internal bool Finished { get; private set; }

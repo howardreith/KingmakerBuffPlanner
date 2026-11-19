@@ -161,7 +161,7 @@ namespace KingmakerBuffPlanner.Domain.Authoring
 
     public sealed class RoutineDefinition
     {
-        public RoutineDefinition(string routineId, string name)
+        public RoutineDefinition(string routineId, string name, bool hasDefaultCaption = false)
         {
             if (string.IsNullOrWhiteSpace(routineId))
                 throw new ArgumentException("Routine ID is required.", "routineId");
@@ -169,10 +169,12 @@ namespace KingmakerBuffPlanner.Domain.Authoring
                 throw new ArgumentException("Routine name is required.", "name");
             RoutineId = routineId;
             Name = name;
+            HasDefaultCaption = hasDefaultCaption;
         }
 
         public string RoutineId { get; private set; }
         public string Name { get; private set; }
+        public bool HasDefaultCaption { get; private set; }
     }
 
     // The canonical per-casting record. One Ready record means exactly one

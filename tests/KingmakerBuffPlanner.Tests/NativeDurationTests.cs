@@ -109,6 +109,17 @@ namespace KingmakerBuffPlanner.Tests
             ExpectDuration(spell, 12, DurationKind.PerCasterLevel, 120, true);
             branches.IfFalse = DurationList(fixedBuff);
             ExpectDuration(spell, 12, DurationKind.Unknown);
+            spell.AvailableMetamagic = Kingmaker.UnitLogic.Abilities.Metamagic.Extend;
+            ExpectDuration(spell, 12, DurationKind.Unknown, 0, true);
+            var unknownProvider = new ProviderSnapshot(new ProviderKey("unit-caster", "book",
+                new AbilityKey("spell", string.Empty, 0, SourceKind.Spellbook, string.Empty), "slot"),
+                "Spell", 2, "pool", 1, null, effectiveCasterLevel: 12,
+                duration: KingmakerDurationAdapter.Estimate(spell, 12));
+            var extendRod = new CastEnhancementSnapshot("rod", "unit-caster", "rod-id", "Extend", string.Empty,
+                CastEnhancementCategory.MetamagicRod, 8, 6, 3, null);
+            RepeatAssert(CastEnhancementRelevance.IsRelevantOffer(extendRod, unknownProvider),
+                "Native Extend permission must survive an unprovable duration.");
+            spell.AvailableMetamagic = 0;
             branches.IfFalse = DurationList();
             ExpectDuration(spell, 12, DurationKind.Unknown);
             ExpectDuration(DurationAbility(DurationList(fixedBuff, ranked)), 12, DurationKind.Unknown);

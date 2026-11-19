@@ -9,11 +9,12 @@ namespace KingmakerBuffPlanner.UI
     {
         internal readonly Func<KeyCode, bool> KeyDown, KeyHeld;
         internal readonly Func<bool> DescriptionOpen, Neutral;
+        internal Func<bool> CompositionActive = () => false;
         internal readonly Func<int> Frame;
 
         internal WorkspaceKeyboardInput()
             : this(Input.GetKeyDown, Input.GetKey, () => NativeDescriptionPresenter.IsOpen,
-                () => !Input.anyKey, () => Time.frameCount) { }
+                () => !Input.anyKey, () => Time.frameCount) { CompositionActive = () => PlannerImeGuard.Active; }
 
         internal WorkspaceKeyboardInput(Func<KeyCode, bool> keyDown, Func<KeyCode, bool> keyHeld,
             Func<bool> descriptionOpen, Func<bool> neutral, Func<int> frame)

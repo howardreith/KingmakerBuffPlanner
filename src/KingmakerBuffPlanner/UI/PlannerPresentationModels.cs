@@ -38,14 +38,14 @@ namespace KingmakerBuffPlanner.UI
         {
             RoutineId = routineId ?? string.Empty;
             Abbreviation = abbreviation ?? string.Empty;
-            Label = label ?? string.Empty;
+            Label = PlannerText.Chinese ? PlannerText.Routine(RoutineId) : label ?? string.Empty;
             IsActive = active;
-            Tooltip = (active ? "Configured in active " : "Also configured in ") +
-                Label + ".";
+            Tooltip = PlannerText.Get(active ? "classic.chip.active" : "classic.chip.other", Label);
         }
 
         public string RoutineId { get; private set; }
         public string Abbreviation { get; private set; }
+        internal string Caption { get { return PlannerText.Get("classic.chip." + RoutineId); } }
         public string Label { get; private set; }
         public bool IsActive { get; private set; }
         public string Tooltip { get; private set; }
@@ -59,12 +59,12 @@ namespace KingmakerBuffPlanner.UI
             if (source == null) throw new ArgumentNullException("source");
             if (model == null) throw new ArgumentNullException("model");
             SourceId = source.SourceId;
-            Name = string.IsNullOrWhiteSpace(source.DisplayName) ? "Unnamed buff" : source.DisplayName;
+            Name = string.IsNullOrWhiteSpace(source.DisplayName) ? PlannerText.Get("classic.unnamed") : source.DisplayName;
             Selected = selected;
             RoutineMemberships = BuildRoutineMemberships(model.Profile, source.SourceId,
                 activeRoutineId);
             RoutineBadge = string.Join(" ", RoutineMemberships.Select(value =>
-                value.Abbreviation).ToArray());
+                value.Caption).ToArray());
             RoutineProfile activeRoutine = model.Profile.Routines.First(routine =>
                 routine.RoutineId == activeRoutineId);
             SourceAssignmentProfile activeAssignment = activeRoutine.Assignments
@@ -74,8 +74,8 @@ namespace KingmakerBuffPlanner.UI
             Configured = requested != 0;
             bool available = model.IsSourceAvailable(source);
             Availability = BuildAvailability(source, model);
-            Configuration = requested == 0 ? "No targets selected" : requested == 1
-                ? "1 target selected" : requested + " targets selected";
+            Configuration = requested == 0 ? PlannerText.Get("classic.targets.none") : requested == 1
+                ? PlannerText.Get("classic.targets.one") : PlannerText.Get("classic.targets.many", requested);
             Status = requested == 0 ? PlannerPresentationStatus.Neutral :
                 BuildStatus(source, model, activeRoutineId, requested, available);
             SourceType = SourceSummary(source);
@@ -148,15 +148,15 @@ namespace KingmakerBuffPlanner.UI
             if (usable.Count == 0)
             {
                 string reason = PlayerReason(model.GetSourceUnavailableReason(source));
-                return string.IsNullOrWhiteSpace(reason) ? "Unavailable now" : reason;
+                return string.IsNullOrWhiteSpace(reason) ? PlannerText.Get("classic.availability.none") : reason;
             }
             if (usable.Any(provider => model.GetRemainingCasts(provider) == null))
-                return usable.Count > 1 ? "At will · multiple sources" : "At will";
+                return usable.Count > 1 ? PlannerText.Get("classic.availability.will.multi") : PlannerText.Get("classic.availability.will");
             int remaining = AvailableCastCount(usable, model);
             bool prepared = usable.Any(provider =>
                 model.GetResourcePool(provider).Kind == ResourcePoolKind.PreparedSlots);
-            if (remaining == 1) return prepared ? "1 prepared" : "1 available";
-            return remaining + (prepared ? " prepared" : " available");
+            if (remaining == 1) return prepared ? PlannerText.Get("classic.availability.prepared.one") : PlannerText.Get("classic.availability.one");
+            return PlannerText.Get(prepared ? "classic.available.prepared" : "classic.available.uses", remaining);
         }
 
         private static int RemainingForPool(IEnumerable<ProviderSnapshot> providers,
@@ -184,22 +184,22 @@ namespace KingmakerBuffPlanner.UI
 
         internal static string SourceSummary(SetupSourceRow source)
         {
-            string type = source.Abilities.Select(ability => ability.SourceKind).Distinct().Count() > 1
-                ? "Multiple sources" : PlayerSourceType(source.Ability.SourceKind);
+            bool mixed = source.Abilities.Select(ability => ability.SourceKind).Distinct().Count() > 1;
+            string type = mixed ? PlannerText.Get("classic.source.multiple") : PlayerSourceType(source.Ability.SourceKind);
             int providers = source.Providers.Select(provider => provider.Key.CasterUnitId)
                 .Distinct(StringComparer.Ordinal).Count();
-            return providers > 1 && type != "Multiple sources"
-                ? type + " · " + providers + " sources" : type;
+            return providers > 1 && !mixed
+                ? PlannerText.Get("classic.source.count", type, providers) : type;
         }
 
         internal static string PlayerSourceType(SourceKind kind)
         {
             switch (kind)
             {
-                case SourceKind.Spellbook: return "Spell";
+                case SourceKind.Spellbook: return PlannerText.Get("classic.source.spell");
                 case SourceKind.AbilityResource:
-                case SourceKind.Fact: return "Ability";
-                case SourceKind.Item: return "Other";
+                case SourceKind.Fact: return PlannerText.Get("classic.source.ability");
+                case SourceKind.Item: return PlannerText.Get("classic.source.other");
                 default: return "Other";
             }
         }
@@ -207,12 +207,12 @@ namespace KingmakerBuffPlanner.UI
         internal static string PlayerReason(string reason)
         {
             if (string.IsNullOrWhiteSpace(reason)) return string.Empty;
-            if (reason == "resource pool exhausted") return "No prepared slot remains.";
-            if (reason == "missing material component") return "Required item missing.";
+            if (reason == "resource pool exhausted") return PlannerText.Get("classic.reason.prepared");
+            if (reason == "missing material component") return PlannerText.Get("classic.reason.material");
             if (reason == "caster unavailable" || reason == "no available provider" ||
                 reason == "no provider option was normalized")
-                return "No eligible caster is currently available.";
-            if (reason == "no legal party or pet target") return "No legal target.";
+                return PlannerText.Get("classic.reason.caster");
+            if (reason == "no legal party or pet target") return PlannerText.Get("classic.reason.target");
             if (reason == "banned by profile") return "No eligible caster is currently available.";
             return "Unavailable now";
         }
@@ -301,21 +301,9 @@ namespace KingmakerBuffPlanner.UI
 
         private string BuildText()
         {
-            var builder = new System.Text.StringBuilder();
-            builder.Append(PoolLabel);
-            if (!string.IsNullOrEmpty(OwnerName))
-                builder.Append(" — ").Append(OwnerName);
-            builder.Append(": native now ").Append(NativeChargesNow);
-            builder.Append(" | ").Append(RoutineLabel).Append(": ")
-                .Append(RequestedUses).Append(" requested | ")
-                .Append(AllocatedUses).Append(" allocated | ")
-                .Append(UnmetUses).Append(" unmet");
-            builder.Append(" | projected after ").Append(RoutineLabel)
-                .Append(": ").Append(ProjectedRemaining);
-            if (AffectedLabels.Count != 0)
-                builder.Append(" | affected: ")
-                    .Append(string.Join("; ", AffectedLabels.ToArray()));
-            return builder.ToString();
+            string owner = string.IsNullOrEmpty(OwnerName) ? PoolLabel : PoolLabel + " — " + OwnerName;
+            string line = PlannerText.Get("classic.budget.line", owner, NativeChargesNow, RoutineLabel, RequestedUses, AllocatedUses, UnmetUses, ProjectedRemaining);
+            return AffectedLabels.Count == 0 ? line : PlannerText.Get("classic.budget.affected", line, string.Join("; ", AffectedLabels.ToArray()));
         }
     }
 
@@ -368,36 +356,21 @@ namespace KingmakerBuffPlanner.UI
                 .Where(line => line.RequestedUses != 0 || line.AllocatedUses != 0).ToList();
             if (demanded.Count == 0) return string.Empty;
             string routineLabel = RoutineLabel(routineId);
-            var builder = new System.Text.StringBuilder();
             int worstUnmet = demanded.Max(line => line.UnmetUses);
+            string summary;
             if (worstUnmet == 0)
-            {
-                builder.Append("Shared enhancement budgets (").Append(routineLabel)
-                    .Append("): all requested charges funded across ")
-                    .Append(demanded.Count)
-                    .Append(demanded.Count == 1 ? " pool. Editing never consumes charges." :
-                        " pools. Editing never consumes charges.")
-                    .Append(" Row tooltips and Assignments & Resources carry each pool's detail.");
-            }
+                summary = PlannerText.Get(demanded.Count == 1 ? "classic.budget.covered.one" : "classic.budget.covered.many",
+                    routineLabel, demanded.Count);
             else
             {
-                EnhancementBudgetLineViewModel worst = demanded
-                    .Where(line => line.UnmetUses == worstUnmet)
-                    .OrderByDescending(line => line.RequestedUses)
-                    .First();
-                builder.Append("Shared enhancement budgets (").Append(routineLabel)
-                    .Append("): ").Append(demanded.Count)
-                    .Append(demanded.Count == 1 ? " pool with demand; " : " pools with demand; ")
-                    .Append(worst.PoolLabel);
-                if (!string.IsNullOrEmpty(worst.OwnerName))
-                    builder.Append(" — ").Append(worst.OwnerName);
-                builder.Append(" is short ").Append(worst.UnmetUses)
-                    .Append(worst.UnmetUses == 1 ? " charge" : " charges")
-                    .Append(" of ").Append(worst.RequestedUses)
-                    .Append(" requested. Editing never consumes charges.")
-                    .Append(" Row tooltips and Assignments & Resources carry each pool's detail.");
+                EnhancementBudgetLineViewModel worst = demanded.Where(line => line.UnmetUses == worstUnmet)
+                    .OrderByDescending(line => line.RequestedUses).First();
+                string pool = string.IsNullOrEmpty(worst.OwnerName) ? worst.PoolLabel : worst.PoolLabel + " — " + worst.OwnerName;
+                string key = "classic.budget.short." + (demanded.Count == 1 ? "one." : "many.") +
+                    (worst.UnmetUses == 1 ? "one" : "many");
+                summary = PlannerText.Get(key, routineLabel, demanded.Count, pool, worst.UnmetUses, worst.RequestedUses);
             }
-            return BoundText(builder.ToString(), MaximumSummaryLength);
+            return BoundText(summary, MaximumSummaryLength);
         }
 
         // Row-level note for one enhancement choice, scoped to one spell (and
@@ -414,9 +387,7 @@ namespace KingmakerBuffPlanner.UI
             var parts = new List<string>();
             EnhancementBudgetLineViewModel line = LineFor(lines, enhancement.UsagePoolId);
             if (line != null && (line.RequestedUses != 0 || line.AllocatedUses != 0))
-                parts.Add(line.RoutineLabel + " pool: " + line.RequestedUses +
-                    " requested, " + line.AllocatedUses + " allocated" +
-                    (line.UnmetUses == 0 ? string.Empty : ", " + line.UnmetUses + " unmet"));
+                parts.Add(PlannerText.Get("classic.pool.request", line.RoutineLabel, line.RequestedUses, line.AllocatedUses, line.UnmetUses == 0 ? string.Empty : PlannerText.Get("classic.pool.unmet", line.UnmetUses)));
             if (selected && preview != null && model != null &&
                 !string.IsNullOrEmpty(sourceId))
             {
@@ -425,9 +396,7 @@ namespace KingmakerBuffPlanner.UI
                 parts.Add(coverage.Note);
             }            else if (enhancement.UsageUnitsPerCast > 0)
             {
-                parts.Add("selecting reserves " + enhancement.UsageUnitsPerCast +
-                    (enhancement.UsageUnitsPerCast == 1 ? " charge" : " charges") +
-                    " per enhanced cast");
+                parts.Add(PlannerText.Get(enhancement.UsageUnitsPerCast == 1 ? "classic.reserve.one" : "classic.reserve.many", enhancement.UsageUnitsPerCast));
             }
             return BoundText(string.Join(" | ", parts.ToArray()), MaximumNoteLength);
         }
@@ -443,35 +412,22 @@ namespace KingmakerBuffPlanner.UI
             internal int AllocatedCasts;
             internal int AllocatedCharges;
             internal bool Communal;
-            internal string ScopeLabel = "this spell";
+            internal string ScopeLabel = PlannerText.Get("classic.scope.spell");
 
             internal string Note
             {
                 get
                 {
-                    var builder = new System.Text.StringBuilder();
+                    string result;
                     if (Communal)
                     {
-                        builder.Append(ScopeLabel).Append(": ")
-                            .Append(AllocatedCasts)
-                            .Append(AllocatedCasts == 1 ? " communal cast covers its targets"
-                                : " communal casts cover their targets")
-                            .Append(" (").Append(AllocatedCharges)
-                            .Append(AllocatedCharges == 1 ? " charge" : " charges")
-                            .Append(" allocated)");
+                        string key = "classic.coverage." + (AllocatedCasts == 1 ? "one." : "many.") +
+                            (AllocatedCharges == 1 ? "one" : "many");
+                        result = PlannerText.Get(key, ScopeLabel, AllocatedCasts, AllocatedCharges);
                     }
                     else
-                    {
-                        builder.Append(ScopeLabel).Append(": ")
-                            .Append(FundedTargets).Append("/")
-                            .Append(RequestedTargets).Append(" targets funded")
-                            .Append(" (").Append(AllocatedCharges)
-                            .Append(AllocatedCharges == 1 ? " charge" : " charges")
-                            .Append(" allocated)");
-                    }
-                    if (SkippedTargets != 0)
-                        builder.Append("; ").Append(SkippedTargets).Append(" already active");
-                    return builder.ToString();
+                        result = PlannerText.Get(AllocatedCharges == 1 ? "classic.funded.one" : "classic.funded.many", ScopeLabel, FundedTargets, RequestedTargets, AllocatedCharges);
+                    return SkippedTargets == 0 ? result : PlannerText.Get("classic.coverage.active", result, SkippedTargets);
                 }
             }
 
@@ -481,7 +437,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 var coverage = new SpellCoverage();
                 coverage.ScopeLabel = string.IsNullOrEmpty(assignmentId)
-                    ? "this spell" : "this assignment";
+                    ? "this spell" : PlannerText.Get("classic.scope.assignment");
                 // Saved assignments may key on the ability's canonical id
                 // while the catalog row exposes the aggregate id; both refer
                 // to this spell, so coverage matches either identity.
@@ -616,7 +572,8 @@ namespace KingmakerBuffPlanner.UI
 
         internal static string RoutineLabel(string routineId)
         {
-            if (string.IsNullOrEmpty(routineId)) return "Routine";
+            if (string.IsNullOrEmpty(routineId)) return PlannerText.Get("classic.routine.default");
+            if (PlannerText.Chinese) return PlannerText.Routine(routineId);
             return char.ToUpperInvariant(routineId[0]) + routineId.Substring(1);
         }
 
@@ -650,14 +607,13 @@ namespace KingmakerBuffPlanner.UI
             SpellLevel = provider.SpellLevel;
             int? remaining = model.GetRemainingCasts(provider);
             Remaining = remaining == null ? "At will" :
-                remaining.Value + (remaining.Value == 1
-                    ? " cast remaining" : " casts remaining");
+                PlannerText.Get(remaining.Value == 1 ? "classic.left.one" : "classic.left.many", remaining.Value);
             string unavailable =
                 model.GetProviderTemporaryUnavailableReason(provider);
             UnavailableReason = unavailable == "resource pool exhausted" &&
                 model.GetResourcePool(provider).Kind !=
                     ResourcePoolKind.PreparedSlots
-                ? "No casts remain right now."
+                ? PlannerText.Get("classic.no.casts")
                 : BuffCardViewModel.PlayerReason(unavailable);
             Source = SourceDescription(provider);
             MaximumSelectable = Math.Max(6,
@@ -692,23 +648,21 @@ namespace KingmakerBuffPlanner.UI
         private static string SourceDescription(ProviderSnapshot provider)
         {
             if (provider.Key.Ability.SourceKind == SourceKind.Item)
-                return "Item: " + provider.SourceDisplayName;
+                return PlannerText.Get("classic.item", provider.SourceDisplayName);
             if (provider.Key.Ability.SourceKind == SourceKind.Spellbook)
             {
                 string book = provider.Key.SpellbookGuid;
                 if (book.Length > 8) book = book.Substring(0, 8);
-                return "Spellbook " + book +
-                    (provider.SpellLevel > 0 ? " | spell level " +
-                        provider.SpellLevel : " | cantrip") +
+                return (provider.SpellLevel > 0 ? PlannerText.Get("classic.book.level", book, provider.SpellLevel) : PlannerText.Get("classic.book.cantrip", book)) +
                     (string.IsNullOrWhiteSpace(provider.Key.SourceInstanceId)
                         ? string.Empty : " | " + provider.Key.SourceInstanceId);
             }
             string kind = provider.Key.Ability.SourceKind == SourceKind.AbilityResource
-                ? "Resource ability" :
+                ? PlannerText.Get("classic.source.ability.resource") :
                 provider.Key.Ability.SourceKind == SourceKind.Fact
-                    ? "Granted ability" :
+                    ? PlannerText.Get("classic.source.granted") :
                 provider.Key.Ability.SourceKind == SourceKind.Item
-                    ? "Item source" : "Ability source";
+                    ? PlannerText.Get("classic.source.item") : PlannerText.Get("classic.source.ability.kind");
             return kind + (string.IsNullOrWhiteSpace(provider.Key.SourceInstanceId)
                 ? string.Empty : " | " + provider.Key.SourceInstanceId);
         }
@@ -736,8 +690,8 @@ namespace KingmakerBuffPlanner.UI
         internal static CasterPolicyViewModel Empty()
         {
             return new CasterPolicyViewModel(
-                "Casters: None",
-                "Select a buff to choose its casters.",
+                PlannerText.Get("classic.caster.none"),
+                PlannerText.Get("classic.caster.choose"),
                 false,
                 new ProviderPolicyRowViewModel[0]);
         }
@@ -785,39 +739,38 @@ namespace KingmakerBuffPlanner.UI
                         " " + value.Count;
                 }).ToArray());
                 summary = counts.Count == 0
-                    ? "Planned casters: None"
-                    : "Planned casters: " + allocations;
+                    ? PlannerText.Get("classic.caster.planned.none")
+                    : PlannerText.Get("classic.caster.planned", allocations);
                 if (unfulfilled != 0)
-                    summary += " | " + unfulfilled + " unfulfilled";
+                    summary += PlannerText.Get("classic.demand.short", unfulfilled);
             }
             else
             {
                 bool automatic = rows.All(row => row.Enabled &&
                     row.Priority == null && row.MaximumCasts == null);
-                if (automatic) summary = "Casters: Automatic";
+                if (automatic) summary = PlannerText.Get("classic.caster.auto");
                 else
                 {
                     string configured = string.Join(", ", rows.Where(row => row.Enabled)
                         .Select(row => row.CasterName +
                             (row.MaximumCasts == null ? string.Empty :
-                                " (max " + row.MaximumCasts.Value + ")"))
+                                PlannerText.Get("classic.caster.max", row.MaximumCasts.Value)))
                         .ToArray());
                     summary = configured.Length == 0
-                        ? "Casters: None enabled" : "Casters: " + configured;
+                        ? PlannerText.Get("classic.caster.none.enabled") : PlannerText.Get("classic.caster.list", configured);
                     warning = configured.Length == 0;
                 }
             }
             string description = string.Join("\n", rows.Select(row =>
                 row.Order + ". " + row.CasterName + " | " + row.Source +
                 " | " + row.Remaining +
-                (row.Enabled ? string.Empty : " | Do not use") +
+                (row.Enabled ? string.Empty : PlannerText.Get("classic.caster.disabled")) +
                 (row.MaximumCasts == null ? string.Empty :
-                    " | maximum per run " + row.MaximumCasts.Value) +
+                    PlannerText.Get("classic.caster.cap", row.MaximumCasts.Value)) +
                 (string.IsNullOrWhiteSpace(row.UnavailableReason)
                     ? string.Empty : " | " + row.UnavailableReason)).ToArray());
             if (warning)
-                description = "Provider policy cannot cover every selected target.\n" +
-                    description;
+                description = PlannerText.Get("classic.provider.gap", description);
             return new CasterPolicyViewModel(
                 summary, description, warning, rows);
         }
@@ -882,8 +835,8 @@ namespace KingmakerBuffPlanner.UI
             string assignmentId)
         {
             if (source == null || model == null)
-                return new SelectedCastingViewModel("Caster: None", string.Empty,
-                    "Enhancement: None available", "Select a buff to choose an enhancement.",
+                return new SelectedCastingViewModel(PlannerText.Get("classic.caster.vacant"), string.Empty,
+                    PlannerText.Get("classic.enhancement.unavailable"), PlannerText.Get("classic.enhancement.choose"),
                     0, new string[0], new[] { NoneChoice(true) },
                     CasterPolicyViewModel.Empty(),
                     new EnhancementBudgetLineViewModel[0], string.Empty, false, null);
@@ -925,9 +878,8 @@ namespace KingmakerBuffPlanner.UI
                     unavailableId);
                 choices.Add(selected == null
                     ? new EnhancementChoiceViewModel(unavailableId,
-                        "Unavailable enhancement", "Unavailable",
-                        "Persisted enhancement source: " + unavailableId +
-                        ". Click to remove this persisted selection.",
+                        PlannerText.Get("classic.enhancement.missing"), PlannerText.Get("classic.unavailable"),
+                        PlannerText.Get("classic.enhance.persisted", unavailableId),
                         true, false, false, false, string.Empty,
                         false, true)
                     : Choice(selected, true, false, model, routineId,
@@ -950,9 +902,7 @@ namespace KingmakerBuffPlanner.UI
                         EnhancementBudgetModel.LineFor(budgetLines, selected.UsagePoolId);
                     if (line == null || line.UnmetUses <= 0) continue;
                     warning = true;
-                    label += " | " + line.UnmetUses +
-                        (line.UnmetUses == 1 ? " charge" : " charges") +
-                        " unmet in " + line.RoutineLabel;                }
+                    label += PlannerText.Get(line.UnmetUses == 1 ? "classic.enhance.unmet.one" : "classic.enhance.unmet.many", line.UnmetUses, line.RoutineLabel);                }
                 string budgetText = EnhancementBudgetModel.SummaryText(budgetLines, routineId);
                 if (!string.IsNullOrEmpty(budgetText))
                     description += "\n\n" + budgetText;
@@ -1007,8 +957,8 @@ namespace KingmakerBuffPlanner.UI
 
         private static EnhancementChoiceViewModel NoneChoice(bool selected)
         {
-            return new EnhancementChoiceViewModel(string.Empty, "None", "Unenhanced cast",
-                "Cast without a temporary casting enhancement.", selected, true);
+            return new EnhancementChoiceViewModel(string.Empty, PlannerText.Get("classic.enhance.none"), PlannerText.Get("classic.enhance.off"),
+                PlannerText.Get("classic.enhance.off.detail"), selected, true);
         }
 
         private static EnhancementChoiceViewModel Choice(CastEnhancementSnapshot value,
@@ -1017,23 +967,20 @@ namespace KingmakerBuffPlanner.UI
             IReadOnlyList<EnhancementBudgetLineViewModel> budgetLines, string sourceId,
             string assignmentId, Dictionary<string, bool> requiredBySelection)
         {
-            string uses = value.RemainingUses == null ? "Uses not limited" :
-                value.RemainingUses.Value + (value.RemainingUses.Value == 1 ? " use" : " uses");
+            string uses = value.RemainingUses == null ? PlannerText.Get("classic.enhance.unlimited") :
+                PlannerText.Get(value.RemainingUses.Value == 1 ? "classic.uses.one" : "classic.uses.many", value.RemainingUses.Value);
             string summary = PlannerSetupModel.EffectName(value) + " | " + uses;
             string owner = model.Snapshot.Units.FirstOrDefault(unit =>
                 unit.UnitId == value.CasterUnitId)?.DisplayName ?? value.CasterUnitId;
-            string description = "Owner: " + owner + "\nApplies " +
-                PlannerSetupModel.EffectName(value) + " to this cast." +
-                (value.Category == CastEnhancementCategory.MetamagicRod
-                    ? "\nSpell-level limit: " + value.MaximumSpellLevel
-                    : "\nRequires the matching live caster feature and spell qualification.") +
-                (string.IsNullOrWhiteSpace(value.Description)
-                    ? string.Empty : "\n" + value.Description);
+            string description = value.Category == CastEnhancementCategory.MetamagicRod
+                ? PlannerText.Get("classic.enhance.rod", owner, PlannerSetupModel.EffectName(value), value.MaximumSpellLevel)
+                : PlannerText.Get("classic.enhance.feature", owner, PlannerSetupModel.EffectName(value));
+            if (!string.IsNullOrWhiteSpace(value.Description)) description += "\n" + value.Description;
             EnhancementBudgetLineViewModel line = EnhancementBudgetModel.LineFor(
                 budgetLines, value.UsagePoolId);
             if (line != null && (line.RequestedUses != 0 || line.AllocatedUses != 0))
                 description += "\n" + line.Text;
-            if (!available) description = "Unavailable: " + description;
+            if (!available) description = PlannerText.Get("classic.enhance.unavailable.detail", description);
             string budgetNote = EnhancementBudgetModel.ChoiceNote(value, selected,
                 budgetLines, preview, model, routineId, sourceId, assignmentId);
             // Policy caption honesty: a targeting modifier can never be
@@ -1044,8 +991,8 @@ namespace KingmakerBuffPlanner.UI
             if (!requiredBySelection.TryGetValue(value.EnhancementId, out required))
                 required = true;
             string policyCaption = value.AffectsTargeting
-                ? "REQUIRED (targeting)"
-                : (required ? "REQUIRED" : "OPTIONAL");
+                ? PlannerText.Get("classic.enhance.required.targeting")
+                : (required ? PlannerText.Get("classic.enhance.required") : PlannerText.Get("classic.enhance.optional"));
             bool canTogglePolicy = !string.IsNullOrEmpty(assignmentId) && selected &&
                 !value.AffectsTargeting;
             return new EnhancementChoiceViewModel(value.EnhancementId, value.DisplayName,
@@ -1142,7 +1089,7 @@ namespace KingmakerBuffPlanner.UI
             string failureReason)
         {
             UnitId = unit.UnitId;
-            Name = string.IsNullOrWhiteSpace(unit.DisplayName) ? "Party member" : unit.DisplayName;
+            Name = string.IsNullOrWhiteSpace(unit.DisplayName) ? PlannerText.Get("classic.party.member") : unit.DisplayName;
             IsPet = unit.IsPet;
             Wanted = explicitlyRequested;
             Legal = state != TargetPortraitState.InvalidTarget;
@@ -1153,9 +1100,9 @@ namespace KingmakerBuffPlanner.UI
             IsFulfilled = fulfilled;
             FailureReason = failureReason ?? string.Empty;
             State = state;
-            DisplayLabel = state == TargetPortraitState.DirectSelectedAndCovered ? "SELECTED" :
-                state == TargetPortraitState.DirectSelectedButUnavailable ? "SELECTED !" :
-                state == TargetPortraitState.IndirectlyCovered ? "COVERED" : string.Empty;
+            DisplayLabel = state == TargetPortraitState.DirectSelectedAndCovered ? PlannerText.Get("classic.portrait.selected") :
+                state == TargetPortraitState.DirectSelectedButUnavailable ? PlannerText.Get("classic.portrait.selected.unavailable") :
+                state == TargetPortraitState.IndirectlyCovered ? PlannerText.Get("classic.portrait.covered") : string.Empty;
             Tooltip = BuildTooltip(state, FailureReason, castAnchor);
             Status = State == TargetPortraitState.InvalidTarget ? PlannerPresentationStatus.Failure :
                 State == TargetPortraitState.DirectSelectedAndCovered ||
@@ -1213,38 +1160,38 @@ namespace KingmakerBuffPlanner.UI
         private static string BuildTooltip(TargetPortraitState state, string reason, bool anchor)
         {
             if (state == TargetPortraitState.DirectSelectedAndCovered)
-                return anchor ? "Selected target and cast anchor. Covered by the planned cast." :
-                    "Selected target. Covered by the planned cast.";
+                return anchor ? PlannerText.Get("classic.target.anchor.covered") :
+                    PlannerText.Get("classic.target.covered");
             if (state == TargetPortraitState.IndirectlyCovered)
-                return anchor ? "Cast anchor. Also affected by the planned cast." :
-                    "Also affected by the planned cast.";
+                return anchor ? PlannerText.Get("classic.target.anchor") :
+                    PlannerText.Get("classic.target.affected");
             if (state == TargetPortraitState.DirectSelectedButUnavailable)
                 return string.IsNullOrWhiteSpace(reason) ?
-                    "Selected, but not covered by the current plan." : reason;
+                    PlannerText.Get("classic.target.uncovered") : reason;
             if (state == TargetPortraitState.InvalidTarget)
-                return string.IsNullOrWhiteSpace(reason) ? "This is not a legal target." : reason;
-            return "Valid target. Click to select.";
+                return string.IsNullOrWhiteSpace(reason) ? PlannerText.Get("classic.target.illegal") : reason;
+            return PlannerText.Get("classic.target.legal");
         }
 
         private static string PlayerFailureReason(string value)
         {
             if (string.IsNullOrWhiteSpace(value)) return string.Empty;
             if (value.EndsWith(":target-not-in-party", StringComparison.Ordinal))
-                return "This target is outside the supported cast plan.";
+                return PlannerText.Get("classic.target.unsupported");
             if (value.EndsWith(":target-currently-invalid", StringComparison.Ordinal))
-                return "This target cannot currently receive the effect.";
+                return PlannerText.Get("classic.target.invalid");
             if (value.EndsWith(":no-valid-provider-or-resource", StringComparison.Ordinal) ||
                 value.EndsWith(":no-valid-mass-provider-or-resource", StringComparison.Ordinal))
-                return "No eligible caster or cast resource is currently available.";
-            return "This target is not covered by the current plan.";
+                return PlannerText.Get("classic.target.no.caster");
+            return PlannerText.Get("classic.target.no.coverage");
         }
 
         private static string InvalidReason(UnitSnapshot unit)
         {
-            if (!unit.TargetValidation.Alive) return "This target is not alive.";
-            if (!unit.TargetValidation.Friendly) return "This effect requires a friendly target.";
-            if (!unit.TargetValidation.Targetable) return "This target cannot currently be targeted.";
-            return "This target is not legal for the selected effect.";
+            if (!unit.TargetValidation.Alive) return PlannerText.Get("classic.target.dead");
+            if (!unit.TargetValidation.Friendly) return PlannerText.Get("classic.target.friendly");
+            if (!unit.TargetValidation.Targetable) return PlannerText.Get("classic.target.untargetable");
+            return PlannerText.Get("classic.target.ineligible");
         }
     }
 
@@ -1257,8 +1204,8 @@ namespace KingmakerBuffPlanner.UI
             Fulfilled = fulfilled;
             Requested = requested;
             int issues = Math.Max(0, requested - fulfilled);
-            Label = name + "  " + fulfilled + " ready" +
-                (issues == 0 ? string.Empty : "  " + issues + (issues == 1 ? " issue" : " issues"));
+            Label = issues == 0 ? PlannerText.Get("classic.routine.ready", name, fulfilled) :
+                PlannerText.Get(issues == 1 ? "classic.routine.issues.one" : "classic.routine.issues.many", name, fulfilled, issues);
         }
 
         public string Id { get; private set; }
@@ -1287,13 +1234,11 @@ namespace KingmakerBuffPlanner.UI
                 .SelectMany(item => item.ExpectedRecipientUnitIds).Distinct(StringComparer.Ordinal)
                 .Count(id => !explicitIds.Contains(id));
             Availability = BuildAvailability(source, model);
-            Text = "Available: " + Availability + "\nPlanned: " + PlannedCasts +
-                (PlannedCasts == 1 ? " cast" : " casts");
+            Text = PlannerText.Get(PlannedCasts == 1 ? "classic.plan.cost.one" : "classic.plan.cost.many", Availability, PlannedCasts);
             if (SelectedTargets != 0 || AdditionalRecipients != 0)
-                Text += "   " + SelectedTargets + (SelectedTargets == 1 ? " selected target" :
-                    " selected targets") + (AdditionalRecipients == 0 ? string.Empty : "   " +
-                    AdditionalRecipients + (AdditionalRecipients == 1 ?
-                        " additional ally covered" : " additional allies covered"));
+                Text += PlannerText.Get(SelectedTargets == 1 ? "classic.selected.one" : "classic.selected.many", SelectedTargets);
+            if (AdditionalRecipients != 0)
+                Text += PlannerText.Get(AdditionalRecipients == 1 ? "classic.allies.one" : "classic.allies.many", AdditionalRecipients);
             Text += BuildEnhancementShortageText(preview, model, routineId);
         }
 
@@ -1314,12 +1259,10 @@ namespace KingmakerBuffPlanner.UI
                         EnhancementBudgetModel.PoolUsageId(allocation.PoolKey),
                         StringComparison.Ordinal));
                 if (representative == null) continue;
-                shortages.Add(representative.DisplayName + ": " + allocation.UnmetDemand +
-                    " of " + allocation.RequestedUsage + " requested charges unfunded in " +
-                    EnhancementBudgetModel.RoutineLabel(routineId));
+                shortages.Add(PlannerText.Get("classic.unfunded", representative.DisplayName, allocation.UnmetDemand, allocation.RequestedUsage, EnhancementBudgetModel.RoutineLabel(routineId)));
             }
             return shortages.Count == 0 ? string.Empty
-                : "\nUnmet enhancement demand — " + string.Join("; ", shortages.ToArray());
+                : PlannerText.Get("classic.unfunded.detail", string.Join("; ", shortages.ToArray()));
         }
 
         public string SourceId { get; private set; }
@@ -1340,8 +1283,8 @@ namespace KingmakerBuffPlanner.UI
                 .Distinct(StringComparer.Ordinal).Count();
             bool allPrepared = usable.All(provider =>
                 model.GetResourcePool(provider).Kind == ResourcePoolKind.PreparedSlots);
-            if (casters > 1) return casts + " casts across " + casters + " casters";
-            return casts + (allPrepared ? " prepared" : casts == 1 ? " cast" : " casts");
+            if (casters > 1) return PlannerText.Get("classic.caster.capacity", casts, casters);
+            return allPrepared ? PlannerText.Get("classic.available.prepared", casts) : PlannerText.Get(casts == 1 ? "classic.cast.count.one" : "classic.cast.count.many", casts);
         }
     }
 
@@ -1385,11 +1328,11 @@ namespace KingmakerBuffPlanner.UI
     {
         internal PlannerSettingsViewModel(BuffPlannerProfile profile)
         {
-            CastingMode = profile.Execution.Mode == "instant" ? "Instant" : "Animated";
+            CastingMode = profile.Execution.Mode == "instant" ? PlannerText.Get("classic.mode.instant") : PlannerText.Get("classic.mode.animated");
             // WP4 (0.4.0): enforced policy, no longer settings.
-            CombatUse = "Never during combat";
-            Fallback = "Off (Instant never animates)";
-            ExistingBuffs = profile.Execution.RecastExisting ? "Recast" : "Skip active";
+            CombatUse = PlannerText.Get("classic.combat.never");
+            Fallback = PlannerText.Get("classic.fallback.no");
+            ExistingBuffs = profile.Execution.RecastExisting ? PlannerText.Get("classic.policy.recast") : PlannerText.Get("classic.policy.skip");
             Hotkey = string.IsNullOrWhiteSpace(profile.Ui.Hotkey)
                 ? PlannerHotkeyText.Default : profile.Ui.Hotkey;
         }

@@ -240,10 +240,12 @@ $screenSource = Get-Content -LiteralPath (Join-Path $root 'src\KingmakerBuffPlan
 $englishCatalog = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\Localization\enGB.json') | ConvertFrom-Json
 $requiredCaptions = @{
     'classic.title' = 'BUFF PLANNER'
+    'classic.chip.other' = 'Also configured in {0}.'
     'classic.settings.mode' = 'Casting mode: {0}'
     'classic.selected.only' = 'Selected only'
     'classic.selected.hint' = 'Show buffs with one or more selected targets in the active routine.'
     'classic.caster.title' = 'CASTER POLICY'
+    'classic.caster.planned' = 'Planned casters: {0}'
     'classic.cap' = "MAX/RUN`n{0}"
     'classic.caster.disable' = 'DO NOT USE'
 }
@@ -327,7 +329,7 @@ $presentationSource = Get-Content -LiteralPath (Join-Path $root `
 foreach ($casterPolicyContract in @('SetProviderEnabled', 'SetProviderMaximumCasts',
         'MoveProviderEarlier', 'MoveProviderLater',
         'ResetSelectedSourceProvidersToAutomatic', 'PlannerText.Get("classic.caster.title")',
-        'PlannerText.Get("classic.cap",', 'PlannerText.Get("classic.caster.disable")', 'Planned casters:')) {
+        'PlannerText.Get("classic.cap",', 'PlannerText.Get("classic.caster.disable")', 'PlannerText.Get("classic.caster.planned",')) {
     if (-not ($setupModelSource.Contains($casterPolicyContract) -or
         $presentationSource.Contains($casterPolicyContract) -or
         $viewSource.Contains($casterPolicyContract))) {
@@ -521,7 +523,7 @@ $assertions++
 $routineMembershipSource = Get-Content -LiteralPath (Join-Path $root `
     'src\KingmakerBuffPlanner\UI\PlannerPresentationModels.cs') -Raw
 if (-not $routineMembershipSource.Contains('RoutineMembershipChipViewModel') -or
-    -not $routineMembershipSource.Contains('Also configured in ') -or
+    -not $routineMembershipSource.Contains('"classic.chip.other", Label') -or
     -not $viewSource.Contains('RoutineMembershipChipView') -or
     -not $screenSource.Contains('RoutineChipLegend')) {
     throw 'Routine membership chips must remain profile-derived, textually explained, and visibly legend-backed.'

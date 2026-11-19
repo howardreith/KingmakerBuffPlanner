@@ -743,11 +743,13 @@ namespace KingmakerBuffPlanner.Tests
             // Native UI finish (UI-07): the planner window is titled "Buff
             // Planner" alone - the development mode label is gone.
             Expect(!workspace.Contains("Planner: Casting-first") && !workspace.Contains("ModeLabel") &&
-                workspace.Contains("_kit.Text(header, \"Title\", \"Buff Planner\", PlannerTextRole.Title,"),
+                workspace.Contains("_kit.Text(header, \"Title\", PlannerText.Get(\"settings.heading\"), PlannerTextRole.Title,") &&
+                PlannerText.Get("settings.heading") == "Buff Planner",
                 "the casting-first workspace still shows a development label or another title");
-            Expect(classic.Contains("internal const string ModeLabel = \"Planner: Classic\";") &&
-                classic.Contains("KingmakerUiFactory.CreateText(\"PlannerMode\", header, _theme, ModeLabel,") &&
-                classic.Contains("\"SwitchToCastingFirst\""),
+            Expect(classic.Contains("KingmakerUiFactory.CreateText(\"PlannerMode\", header, _theme, PlannerText.Get(\"classic.mode\"),") &&
+                PlannerText.Get("classic.mode") == "Planner: Classic" &&
+                classic.Contains("CreateButton(\"SwitchToCastingFirst\", header, _theme, PlannerText.Get(\"classic.switch\"), () => _switchToCastingFirst())") &&
+                PlannerText.Get("classic.switch") == "Use the casting-first planner",
                 "the Classic screen does not state its mode or offer the casting-first route");
             Expect(root.Contains("() => SwitchPlannerFromScreen(PlannerMode.CastingFirst)") &&
                 root.Contains(": () => SwitchPlannerFromScreen(PlannerMode.Classic)"),

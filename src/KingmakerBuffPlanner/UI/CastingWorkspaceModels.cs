@@ -154,10 +154,12 @@ namespace KingmakerBuffPlanner.UI
             {
                 switch (Readiness)
                 {
-                    case ResolvedCastingReadiness.AlreadySatisfied: return "Already active";
+                    case ResolvedCastingReadiness.AlreadySatisfied: return PlannerText.Get("workspace.card.active");
                     case ResolvedCastingReadiness.Ready:
-                        return ExecutionLimitation == null ? "Ready" : "Ready - cannot run yet";
-                    default: return Readiness.ToString();
+                        return ExecutionLimitation == null ? PlannerText.Get("workspace.card.ready") : PlannerText.Get("workspace.card.wait");
+                    default: return (Readiness == ResolvedCastingReadiness.Blocked ? PlannerText.Get("workspace.card.blocked")
+                    : Readiness == ResolvedCastingReadiness.Draft ? PlannerText.Get("workspace.card.draft")
+                    : PlannerText.Get("workspace.card.disabled"));
                 }
             }
         }
@@ -181,17 +183,17 @@ namespace KingmakerBuffPlanner.UI
             get
             {
                 string caster = string.IsNullOrEmpty(CasterDisplayName)
-                    ? "Unresolved caster" : CasterDisplayName;
+                    ? PlannerText.Get("workspace.card.unresolvedCaster") : CasterDisplayName;
                 string target = DirectTargetUnitId != null
                     ? (DirectTargetDisplayName ?? DirectTargetUnitId)
-                    : (string.IsNullOrEmpty(OriginLabel) ? "group" : OriginLabel);
+                    : (string.IsNullOrEmpty(OriginLabel) ? PlannerText.Get("workspace.card.group") : OriginLabel);
                 return caster + " → " + target;
             }
         }
 
         public string Subtitle
         {
-            get { return "Casting " + (Order + 1) + " in " + (RoutineName ?? RoutineId); }
+            get { return PlannerText.Get("workspace.card.subtitle", Order + 1, RoutineName ?? RoutineId); }
         }
 
         // The routine display name (Long, Important, Short); null until the
@@ -210,9 +212,7 @@ namespace KingmakerBuffPlanner.UI
             get
             {
                 if (DirectTargetUnitId != null) return string.Empty;
-                return "coverage " + (PredictedBeneficiaryUnitIds == null ? 0
-                        : PredictedBeneficiaryUnitIds.Count) + "/" +
-                    (RequiredCoverageUnitIds == null ? 0 : RequiredCoverageUnitIds.Count);
+                return PlannerText.Get("workspace.card.coverage", PredictedBeneficiaryUnitIds == null ? 0 : PredictedBeneficiaryUnitIds.Count, RequiredCoverageUnitIds == null ? 0 : RequiredCoverageUnitIds.Count);
             }
         }
     }
@@ -224,7 +224,7 @@ namespace KingmakerBuffPlanner.UI
         internal WorkspaceBudgetRow(CastingBudgetLine line, string label = null)
         {
             PoolKey = line.PoolKey;
-            Label = string.IsNullOrWhiteSpace(label) ? "resource" : label;
+            Label = string.IsNullOrWhiteSpace(label) ? PlannerText.Get("workspace.pool.resource") : label;
             Category = line.Category;
             AvailableNow = line.AvailableNow;
             RequestedUsage = line.RequestedUsage;
@@ -247,11 +247,11 @@ namespace KingmakerBuffPlanner.UI
         {
             if (Unlimited)
                 return ResponsibleCastingIds.Count == 0 ? null
-                    : Label + " (" + ResponsibleCastingIds.Count + " cast" +
-                        (ResponsibleCastingIds.Count == 1 ? "" : "s") + ", nothing spent)";
+                    : (ResponsibleCastingIds.Count == 1 ? PlannerText.Get("workspace.budget.free.one", Label, ResponsibleCastingIds.Count)
+                    : PlannerText.Get("workspace.budget.free.many", Label, ResponsibleCastingIds.Count));
             if (UnmetDemand == 0 && RequestedUsage == 0) return null;
-            return Label + ": " + AllocatedUsage + " of " + RequestedUsage + " covered" +
-                (UnmetDemand == 0 ? string.Empty : ", short by " + UnmetDemand);
+            return (UnmetDemand != 0 ? PlannerText.Get("workspace.budget.short", Label, AllocatedUsage, RequestedUsage, UnmetDemand)
+                    : PlannerText.Get("workspace.budget.covered", Label, AllocatedUsage, RequestedUsage));
         }
 
         internal void ApplyLabel(string label)
@@ -294,8 +294,8 @@ namespace KingmakerBuffPlanner.UI
                 .GroupBy(value => value.Label, StringComparer.Ordinal))
             {
                 int casts = group.Sum(value => value.ResponsibleCastingIds.Count);
-                lines.Add(group.Key + " (" + casts + " cast" + (casts == 1 ? string.Empty : "s") +
-                    ", nothing spent)");
+                lines.Add((casts == 1 ? PlannerText.Get("workspace.budget.groupFree.one", group.Key, casts)
+                    : PlannerText.Get("workspace.budget.groupFree.many", group.Key, casts)));
             }
             return lines;
         }
@@ -508,8 +508,57 @@ namespace KingmakerBuffPlanner.UI
                     return PlannerText.Get("reason.refusal.last");
                 case "provider-not-pinnable":
                     return PlannerText.Get("reason.refusal.levelAmbiguous");
+                case "ability-targeting-unsupported": return PlannerText.Get("reason.ability-targeting-unsupported");
+                case "caster-not-capable": return PlannerText.Get("reason.caster-not-capable");
+                case "enhancement-changes-targeting": return PlannerText.Get("reason.enhancement-changes-targeting");
+                case "enhancement-incompatible": return PlannerText.Get("reason.enhancement-incompatible");
+                case "origin-anchor-illegal": return PlannerText.Get("reason.origin-anchor-illegal");
+                case "origin-caster-illegal": return PlannerText.Get("reason.origin-caster-illegal");
+                case "target-not-in-party": return PlannerText.Get("reason.target-not-in-party");
+                case "target-unreachable": return PlannerText.Get("reason.target-unreachable");
+                case "exact-source-ambiguous": return PlannerText.Get("reason.exact-source-ambiguous");
+                case "source-unresolved": return PlannerText.Get("reason.source-unresolvable");
+                case "targeting-modifier-unavailable": return WorkspaceReasonText.DescribeNested(code);
+                case "enhancement-unavailable": return PlannerText.Get("authoring.refused.enhancement-unavailable");
+                case "provider-invalid": return PlannerText.Get("authoring.refused.provider-invalid");
+                case "target-already-has-casting": return PlannerText.Get("authoring.refused.target-already-has-casting");
+                case "target-unchanged": return PlannerText.Get("authoring.refused.target-unchanged");
+                case "recipient-already-has-casting": return PlannerText.Get("authoring.refused.recipient-already-has-casting");
+                case "provider-cannot-reach-target": return PlannerText.Get("authoring.refused.provider-cannot-reach-target");
+                case "replacement-does-not-match-focus": return PlannerText.Get("authoring.refused.replacement-does-not-match-focus");
+                case "casting-id-collision": return PlannerText.Get("authoring.refused.casting-id-collision");
+                case "routine-change-requires-move": return PlannerText.Get("authoring.refused.routine-change-requires-move");
+                case "no-buff-selected": return PlannerText.Get("authoring.refused.no-buff-selected");
+                case "enhancement-not-applicable":
+                    switch (detail.Substring(detail.LastIndexOf(':') + 1))
+                    {
+                        case "caster-mismatch": return PlannerText.Get("graph.enhancement.owner");
+                        case "source-not-spellbook": return PlannerText.Get("graph.enhancement.spellOnly");
+                        case "spellbook-not-qualified": return PlannerText.Get("graph.enhancement.wrongBook");
+                        case "ability-not-qualified": return PlannerText.Get("graph.enhancement.wrongSpell");
+                        case "metamagic-already-applied": return PlannerText.Get("graph.enhancement.duplicate");
+                        case "spell-level-exceeds-limit": return PlannerText.Get("graph.enhancement.tooHigh");
+                        case "category-unsupported": return PlannerText.Get("graph.enhancement.unsupported");
+                        default: return PlannerText.Get("authoring.refused.inapplicable");
+                    }
+                case "enhancement-not-meaningful":
+                    switch (detail.Substring(detail.LastIndexOf(':') + 1))
+                    {
+                        case KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.PiercingReason: return PlannerText.Get("enhancement.relevance.piercing");
+                        case KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.PersistentReason: return PlannerText.Get("enhancement.relevance.persistent");
+                        case KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.SelectiveReason: return PlannerText.Get("enhancement.relevance.selective");
+                        case KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.QuickenReason: return PlannerText.Get("enhancement.relevance.quicken");
+                        case KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.ThrenodicReason: return PlannerText.Get("enhancement.relevance.threnodic");
+                        case KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.ExtendUnknownReason: return PlannerText.Get("enhancement.relevance.extendUnknown");
+                        case KingmakerBuffPlanner.Domain.Planning.CastEnhancementRelevance.ExtendUnsupportedReason: return PlannerText.Get("enhancement.relevance.extendUnsupported");
+                        default: return PlannerText.Get("authoring.refused.irrelevant");
+                    }
+                case "position-out-of-range": return PlannerText.Get("refusal.position-out-of-range");
+                case "no-castings": return PlannerText.Get("refusal.no-castings");
+                case "duplicate-casting-ids": return PlannerText.Get("refusal.duplicate-casting-ids");
+                case "disable-retired": return PlannerText.Get("refusal.disable-retired");
                 default:
-                    return head.Length == 0 ? PlannerText.Get("reason.refusal.unknown") : head.Replace('-', ' ') + ".";
+                    return head.Length == 0 ? PlannerText.Get("reason.refusal.unknown") : PlannerText.Get("refusal.detail", head.Replace('-', ' '));
             }
         }
 
@@ -555,8 +604,7 @@ namespace KingmakerBuffPlanner.UI
         public static string WholePlan(int shortCount)
         {
             if (shortCount <= 0) return string.Empty;
-            return "Running every routine in one pass leaves " + shortCount +
-                (shortCount == 1 ? " casting" : " castings") + " of this routine short of a resource.";
+            return PlannerText.Get(shortCount == 1 ? "footer.short.all.one" : "footer.short.all.many", shortCount);
         }
 
         // Everyday-use v1.2 §2/§5: the footer's standing line. Edits save
@@ -566,13 +614,12 @@ namespace KingmakerBuffPlanner.UI
         {
             string value = disposition ?? string.Empty;
             if (value == "native-casting-enabled")
-                return "Every edit is saved as you make it. Run " + routineName +
-                    " casts this routine now; the HUD moon button runs Long.";
+                return PlannerText.Get("footer.ready.autosave", routineName);
             if (value == "native-casting-busy")
-                return "A routine is running; press its HUD button again to stop it after the cast in progress.";
+                return PlannerText.Get("footer.busy.after");
             if (value.StartsWith("native-submission-disabled:runtime-test-session:", StringComparison.Ordinal))
-                return "Casting is disabled during this automated session.";
-            return "Native casting is not available in this session (" + value + ").";
+                return PlannerText.Get("footer.disabled.automation");
+            return PlannerText.Get("footer.native.unavailable", value);
         }
 
         // Native UI finish (UI-08): the footer's one line beside Run - what a
@@ -584,32 +631,30 @@ namespace KingmakerBuffPlanner.UI
         {
             string value = disposition ?? string.Empty;
             if (value == "native-casting-busy")
-                return "A routine is running; press its HUD button again to stop it.";
+                return PlannerText.Get("footer.busy.stop");
             if (value.StartsWith("native-submission-disabled:runtime-test-session:", StringComparison.Ordinal))
                 return "Casting is disabled during this automated session.";
             if (value != "native-casting-enabled")
-                return "Casting is unavailable in this session (" + value + ").";
-            if (castings == 0) return routineName + " has no castings yet.";
+                return PlannerText.Get("footer.session.unavailable", value);
+            if (castings == 0) return PlannerText.Get("footer.noCastings", routineName);
             if (notReady > 0)
-                return routineName + " cannot run: " + (notReady == 1 ? "1 casting is" : notReady + " castings are") +
-                    " not ready (marked in red)." +
-                    (executable > 0 ? " Switch to Plan: Cast available to run the other " + executable + "." : string.Empty);
+                return PlannerText.Get(notReady == 1 ? "footer.status.notReady.one" : "footer.status.notReady.many", routineName, notReady) +
+                    (executable > 0 ? PlannerText.Get("footer.status.runOther", executable) : string.Empty);
             if (!allowed)
-                return routineName + " cannot run: " + (string.IsNullOrEmpty(otherBlock) ? "see the marked castings" : otherBlock) + ".";
-            string shortage = shortInOnePass <= 0 ? string.Empty
-                : " " + (shortInOnePass == 1 ? "1 casting is" : shortInOnePass + " castings are") +
-                    " short if every routine runs without rest (see Resources).";
-            if (executable == 0) return castAvailable && omissions != 0
-                ? "Nothing available to cast in " + routineName + "; " + omissions +
-                    (omissions == 1 ? " saved casting is omitted." : " saved castings are omitted.") + shortage
-                : "Nothing to cast in " + routineName + ": every casting is already active." + shortage;
-            string omitted = !castAvailable || omissions == 0 ? string.Empty
-                : " " + omissions + (omissions == 1
-                    ? " saved casting will be omitted." : " saved castings will be omitted.");
-            string noun = castAvailable
-                ? (executable == 1 ? " available casting." : " available castings.")
-                : (executable == 1 ? " casting." : " castings.");
-            return PlannerText.Get("footer.run.title", routineName) + " casts " + executable + noun + omitted + shortage;
+                return PlannerText.Get("footer.status.blocked", routineName,
+                    string.IsNullOrEmpty(otherBlock) ? PlannerText.Get("footer.status.seeMarked") : otherBlock);
+            string shortage = shortInOnePass <= 0 ? string.Empty : PlannerText.Get(
+                shortInOnePass == 1 ? "footer.status.short.one" : "footer.status.short.many", shortInOnePass);
+            if (executable == 0)
+                return (castAvailable && omissions != 0
+                    ? PlannerText.Get(omissions == 1 ? "footer.status.omittedEmpty.one" : "footer.status.omittedEmpty.many", routineName, omissions)
+                    : PlannerText.Get("footer.status.active", routineName)) + shortage;
+            string omitted = !castAvailable || omissions == 0 ? string.Empty : PlannerText.Get(
+                omissions == 1 ? "footer.status.omits.one" : "footer.status.omits.many", omissions);
+            string runKey = castAvailable
+                ? (executable == 1 ? "footer.status.available.one" : "footer.status.available.many")
+                : (executable == 1 ? "footer.status.casts.one" : "footer.status.casts.many");
+            return PlannerText.Get(runKey, routineName, executable) + omitted + shortage;
         }
 
         // The Run button names the routine it runs: the selected one.
@@ -620,32 +665,35 @@ namespace KingmakerBuffPlanner.UI
 
         public static string RunBlocked(string routineName, int notReady)
         {
-            return routineName + " was not cast: " +
-                (notReady == 1 ? "1 casting is" : notReady + " castings are") +
-                " not ready (red lines and cards). Fix them, or switch to Plan: Cast available to run the ready ones.";
+            return PlannerText.Get(notReady == 1 ? "footer.status.fix.one" : "footer.status.fix.many", routineName, notReady);
         }
 
         // The mode change is an edit like any other: it saves itself, and
         // the save status beside it says whether that worked.
         public static string ModeChanged(string mode)
         {
-            return "Casting mode: " + (mode == "instant" ? "Instant" : "Animated") +
-                " (for every routine of this plan).";
+            return PlannerText.Get("footer.status.mode", PlannerText.Get(mode == "instant" ? "pad.mode.instant" : "pad.mode.animated"));
         }
 
         // A plan setting toggled: like every edit it saves itself.
         public static string SettingChanged(string setting, bool on)
         {
-            return setting + " " + (on ? "on" : "off") + " (for this plan).";
+            return PlannerText.Get(on ? "footer.setting.on" : "footer.setting.off", setting);
         }
 
-        // v1.2 §4: the passive save status. "Saved" only while the current
+        // v1.2 §4: the passive save status. PlannerText.Get("footer.saved") only while the current
         // revision is durable; anything else is named, never hidden.
         public const string RetrySaveAction = "Retry save";
         public const string ReloadAction = "Reload";
 
+        public static string RecoveryCaption(string action)
+        {
+            return action == ReloadAction ? PlannerText.Get("footer.recovery.caption.reload")
+                : action == RetrySaveAction ? PlannerText.Get("footer.recovery.caption.retry") : string.Empty;
+        }
+
         // The workspace's save indicator after the 0.6.11 refinement: empty
-        // while saved or saving (autosave is silent), "Not saved" otherwise.
+        // while saved or saving (autosave is silent), PlannerText.Get("footer.unsaved") otherwise.
         public static string SaveIndicator(string saveState)
         {
             string value = saveState ?? string.Empty;
@@ -656,7 +704,7 @@ namespace KingmakerBuffPlanner.UI
         {
             string value = saveState ?? string.Empty;
             if (value == "saved") return "Saved";
-            if (value == "saving") return "Saving...";
+            if (value == "saving") return PlannerText.Get("footer.saving");
             return "Not saved";
         }
 
@@ -667,18 +715,14 @@ namespace KingmakerBuffPlanner.UI
             string value = saveState ?? string.Empty;
             if (value == "saved" || value == "saving") return null;
             if (value == "migration-pending")
-                return "Policy upgrade not saved yet. The next edit, Retry save or Run will save it before casting.";
+                return PlannerText.Get("footer.upgrade.pending");
             if (value.StartsWith("save-failed:", StringComparison.Ordinal))
-                return "Edit not saved (" + value.Substring("save-failed:".Length) +
-                    "). Edit kept; file unchanged. Retry save before casting.";
+                return PlannerText.Get("footer.save.failed", value.Substring("save-failed:".Length));
             if (value == "save-refused:legacy-import")
-                return "Not saved: your previous plan could not be imported, and nothing is saved until " +
-                    "it is. Repair or restore that file, then press Reload.";
+                return PlannerText.Get("footer.save.import");
             if (value.StartsWith("save-refused", StringComparison.Ordinal))
-                return "Not saved: the saved casting plan file could not be read or comes from a newer " +
-                    "planner, so it is protected from being overwritten. Move it and its backups " +
-                    "(.bak1 to .bak3) out of UserSettings, then press Reload.";
-            return "Not saved (" + value + ").";
+                return PlannerText.Get("footer.save.protected");
+            return PlannerText.Get("footer.save.other", value);
         }
 
         // The exceptional recovery action for the save state, or null.
@@ -726,21 +770,21 @@ namespace KingmakerBuffPlanner.UI
             string label;
             if (!string.IsNullOrWhiteSpace(bookName))
             {
-                string slot = poolKind == ResourcePoolKind.Unlimited ? "free"
-                    : poolKind == ResourcePoolKind.PreparedSlots ? "prepared slot"
-                    : poolKind == ResourcePoolKind.SpontaneousLevel ? "spell slot" : "uses";
-                label = (string.IsNullOrEmpty(casterName) ? string.Empty : casterName + ": ") +
-                    bookName + " level " + spellLevel + " (" + slot + ")";
+                string slot = poolKind == ResourcePoolKind.Unlimited ? PlannerText.Get("workspace.pool.free")
+                    : poolKind == ResourcePoolKind.PreparedSlots ? PlannerText.Get("workspace.pool.prepared")
+                    : poolKind == ResourcePoolKind.SpontaneousLevel ? PlannerText.Get("workspace.pool.spontaneous") : PlannerText.Get("workspace.pool.uses");
+                label = (!string.IsNullOrEmpty(casterName) ? PlannerText.Get("workspace.provider.bookOwned", casterName, bookName, spellLevel, slot)
+                    : PlannerText.Get("workspace.provider.book", bookName, spellLevel, slot));
             }
             else
             {
-                string resource = string.IsNullOrWhiteSpace(resourceLabel) ? "resource" : resourceLabel;
+                string resource = string.IsNullOrWhiteSpace(resourceLabel) ? PlannerText.Get("workspace.pool.resource") : resourceLabel;
                 label = !string.IsNullOrEmpty(casterName) &&
                     !resource.StartsWith(casterName + ":", StringComparison.Ordinal)
                         ? casterName + ": " + resource : resource;
             }
-            if (casterLevel > 0) label += ", caster level " + casterLevel;
-            if (metamagicMask != 0) label += ", with metamagic";
+            if (casterLevel > 0) label += PlannerText.Get("workspace.provider.cl", casterLevel);
+            if (metamagicMask != 0) label += PlannerText.Get("workspace.provider.metamagic");
             return label;
         }
 
@@ -755,7 +799,7 @@ namespace KingmakerBuffPlanner.UI
             {
                 int index = 1;
                 foreach (WorkspaceProviderChoice choice in same)
-                    choice.Label += " (option " + index++ + ")";
+                    choice.Label += PlannerText.Get("workspace.provider.option", index++);
             }
         }
     }
@@ -833,7 +877,7 @@ namespace KingmakerBuffPlanner.UI
                 case "present-effect-not-sufficient": return PlannerText.Get("reason.present-effect-not-sufficient");
                 case CastingExecutionPolicy.InstantRouteUnavailable:
                     return PlannerText.Get("reason.instantUnavailable", InstantRouteCause(value));
-                default: return head.Length == 0 ? PlannerText.Get("reason.notReady") : head.Replace('-', ' ');
+                default: return head.Length == 0 ? PlannerText.Get("reason.notReady") : PlannerText.Get("reason.detail", head.Replace('-', ' '));
             }
         }
 
@@ -910,9 +954,9 @@ namespace KingmakerBuffPlanner.UI
         // (WorkspaceFooterText.RunStatus), never as a bare "Apply blocked".
         public static string Describe(string routineName, int castings, int ready)
         {
-            if (castings == 0) return routineName + " · no castings yet";
-            return routineName + " · " + ready + " of " + castings + " casting" +
-                (castings == 1 ? string.Empty : "s") + " ready";
+            if (castings == 0) return PlannerText.Get("workspace.header.empty", routineName);
+            return (castings == 1 ? PlannerText.Get("workspace.header.ready.one", routineName, ready, castings)
+                    : PlannerText.Get("workspace.header.ready.many", routineName, ready, castings));
         }
     }
 
@@ -925,14 +969,14 @@ namespace KingmakerBuffPlanner.UI
             string what;
             switch (kind)
             {
-                case ResourcePoolKind.Unlimited: what = "free"; break;
+                case ResourcePoolKind.Unlimited: what = PlannerText.Get("workspace.pool.free"); break;
                 case ResourcePoolKind.PreparedSlots:
-                    what = spellLevel == null ? "prepared slot" : "prepared level " + spellLevel + " slot"; break;
+                    what = spellLevel == null ? PlannerText.Get("workspace.pool.prepared") : PlannerText.Get("workspace.preparedLevel", spellLevel); break;
                 case ResourcePoolKind.SpontaneousLevel:
-                    what = spellLevel == null ? "spell slot" : "level " + spellLevel + " spell slot"; break;
+                    what = spellLevel == null ? PlannerText.Get("workspace.pool.spontaneous") : PlannerText.Get("workspace.slotLevel", spellLevel); break;
                 case ResourcePoolKind.AbilityResource:
-                    what = string.IsNullOrWhiteSpace(sourceName) ? "ability use" : sourceName + " uses"; break;
-                default: what = "item charge"; break;
+                    what = string.IsNullOrWhiteSpace(sourceName) ? PlannerText.Get("workspace.pool.ability") : PlannerText.Get("workspace.abilityUses", sourceName); break;
+                default: what = PlannerText.Get("workspace.pool.charge"); break;
             }
             return string.IsNullOrWhiteSpace(owner) ? what : owner + ": " + what;
         }
@@ -1038,8 +1082,8 @@ namespace KingmakerBuffPlanner.UI
                     string detail = chosen != null ? chosen(members[index])
                         : byKindAndCaster(members[index]);
                     if (chosen == null)
-                        detail = (detail.Length == 0 ? string.Empty : detail + " · ") +
-                            "source " + (index + 1);
+                        detail = (detail.Length != 0 ? PlannerText.Get("workspace.source.numberDetail", detail, index + 1)
+                    : PlannerText.Get("workspace.source.number", index + 1));
                     result[members[index].SourceId] = detail;
                 }
             }
@@ -1271,7 +1315,7 @@ namespace KingmakerBuffPlanner.UI
         {
             get
             {
-                if (SelectedSourceId.Length == 0) return "no buff selected";
+                if (SelectedSourceId.Length == 0) return PlannerText.Get("workspace.source.none");
                 WorkspaceSourceOption match = Draft == null ? null :
                     Draft.Sources.FirstOrDefault(source => source != null &&
                         string.Equals(source.SourceId, SelectedSourceId,
@@ -1279,7 +1323,7 @@ namespace KingmakerBuffPlanner.UI
                 if (match != null && !string.Equals(match.DisplayName,
                         match.SourceId, StringComparison.Ordinal))
                     return match.Label;
-                return "unnamed buff source";
+                return PlannerText.Get("workspace.source.unnamed");
             }
         }
 

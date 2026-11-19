@@ -628,12 +628,16 @@ namespace KingmakerBuffPlanner.Tests
 
         private static void TestNativeResourceViewContract()
         {
+            Expect(new[] { "resource.available", "resource.needed", "resource.spending", "resource.short" }
+                .Select(key => PlannerText.Get(key)).SequenceEqual(new[] { "Available now", "Saved need", "Would spend", "Short" }),
+                "The resource table must distinguish stock, saved demand, projected spend and deficit.");
             string source = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src",
                 "KingmakerBuffPlanner", "UI", "CastingWorkspaceScreenView.cs"));
             foreach (string required in new[]
             {
                 "CreateScrollView(\"Accounting\"", "WorkspaceResourceReport",
-                "\"Available now\"", "\"Saved need\"", "\"Would spend\"", "\"Short\"",
+                "PlannerText.Get(\"resource.available\")", "PlannerText.Get(\"resource.needed\")",
+                "PlannerText.Get(\"resource.spending\")", "PlannerText.Get(\"resource.short\")",
                 "_resourcesCloseButton", "CloseResources();", "SetResourceScope",
                 "row.gameObject.layer = _uiLayer", "text.gameObject.layer = _uiLayer",
                 "ResourcesVisibleAccountingCellsForRuntime", "ResourcesAccountingUsesNativeLayerForRuntime",
