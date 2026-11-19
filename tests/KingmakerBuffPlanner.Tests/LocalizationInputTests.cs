@@ -9,6 +9,7 @@ namespace KingmakerBuffPlanner.Tests
     {
         private static void RunLocalizationInputTests(string root)
         {
+            Run("localization-native-load-caption", TestLocalizedLoadButton);
             Run("localization-input-refresh-enabled", () => TestRefreshOwnership(root, true, null));
             Run("localization-input-refresh-disabled", () => TestRefreshOwnership(root, false, null));
             Run("localization-input-refresh-build-failure", () => TestRefreshOwnership(root, true, "build"));
@@ -21,6 +22,35 @@ namespace KingmakerBuffPlanner.Tests
 
         // Only construction of Unity's rendered hierarchy is substituted. Use the shipped
         // navigator, root's replacement/close paths and the installed EventSystem property.
+        private static void TestLocalizedLoadButton()
+        {
+            var match = ViewInputProduct().GetType("KingmakerBuffPlanner.RuntimeTesting.MainMenuLoadContracts", true)
+                .GetMethod("MatchesLoadButtonLabels", BindingFlags.Static | BindingFlags.NonPublic);
+            const string key = "aab6a4e1-1293-4689-ab1b-50d78134e567";
+            foreach (string locale in new[] { "enGB", "zhCN" })
+            {
+                string path = Path.Combine(Environment.GetEnvironmentVariable("KBP_TEST_GAME_PATH"),
+                    "Kingmaker_Data", "StreamingAssets", "Localization", locale + ".json");
+                var pack = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(path));
+                string caption = (string)System.Linq.Enumerable.Single(pack["strings"],
+                    entry => (string)entry["Key"] == key)["Value"];
+                string rich = "<font=\"Saber_Dist32\"><color=#983F1D><size=140%>" + caption[0] +
+                    "</size></color></font>" + caption.Substring(1);
+                var labels = new List<string>();
+                foreach (string member in new[] { "m_text", "old_text", "text" })
+                    labels.Add("TMPro.TextMeshProUGUI." + member + "=" + rich);
+                Expect((bool)match.Invoke(null, new object[] { labels, locale }), "Exact native load caption refused.");
+                Expect(!(bool)match.Invoke(null, new object[] { labels, locale == "zhCN" ? "enGB" : "zhCN" }),
+                    "Wrong-locale load caption admitted.");
+                for (int index = 0; index < labels.Count; index++)
+                {
+                    var stale = new List<string>(labels);
+                    stale[index] += "!";
+                    Expect(!(bool)match.Invoke(null, new object[] { stale, locale }), "Stale TMP identity admitted.");
+                }
+            }
+        }
+
         private static void TestRefreshOwnership(string root, bool initial, string failure)
         {
             var product = ViewInputProduct();

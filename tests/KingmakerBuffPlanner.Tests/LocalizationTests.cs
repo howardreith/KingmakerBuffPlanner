@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using KingmakerBuffPlanner.Domain.Authoring;
+using KingmakerBuffPlanner.Domain.Identity;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Persistence;
@@ -45,6 +46,16 @@ namespace KingmakerBuffPlanner.Tests
                 catch (ArgumentException) { rejected = true; }
                 Expect(rejected, "Duplicate English keys accepted.");
             });
+            Run("localization-duplicate-source-details", () => WithChinese(() =>
+            {
+                var options = new[] { SourceKind.Spellbook, SourceKind.Fact, SourceKind.AbilityResource, SourceKind.Item }
+                    .Select(kind => new WorkspaceSourceDescriptor(kind.ToString(), "Resistance", null,
+                        new[] { WorkspaceSourceLabels.KindName(kind) }, new[] { "Linzi" })).ToList();
+                var details = WorkspaceSourceLabels.Details(options);
+                Expect(options.Select(o => details[o.SourceId]).SequenceEqual(
+                    new[] { "法术 · Linzi", "特性 · Linzi", "能力 · Linzi", "物品 · Linzi" }),
+                    "A duplicate native name lost its translated source kind or literal caster name.");
+            }));
             Run("localization-counts-reasons-search", () => WithChinese(() =>
             {
                 foreach (int count in new[] { 0, 1, 7 })

@@ -92,6 +92,7 @@ namespace KingmakerBuffPlanner.UI
         // Catalogue.
         private TMP_InputField _buffSearch;
         private RectTransform _catalogueContent;
+        private TMP_Text _catalogueHint;
         private string _buffQuery = string.Empty;
         private PlannerSourceCategory _sourceCategory = PlannerSourceCategory.All;
         private readonly Dictionary<PlannerSourceCategory, Button> _categoryTabs =
@@ -579,6 +580,14 @@ namespace KingmakerBuffPlanner.UI
             float width = lane == null ? 0f : lane.rect.width;
             if (width <= 0f || Mathf.Abs(width - _sourceTabsWidth) < 0.5f) return;
             _sourceTabsWidth = width;
+            if (_catalogueHint != null && _catalogueContent != null)
+            {
+                float height = Mathf.Max(18f, Mathf.Ceil(_catalogueHint.GetPreferredValues(
+                    _catalogueHint.text, width, 0f).y));
+                _catalogueHint.rectTransform.sizeDelta = new Vector2(0f, height);
+                var scroll = RectOf(CatalogueScroll());
+                scroll.offsetMin = new Vector2(scroll.offsetMin.x, height + 2f);
+            }
             var measured = new float[_sourceTabCaptions.Count];
             for (int index = 0; index < measured.Length; index++)
             {
@@ -1513,6 +1522,7 @@ namespace KingmakerBuffPlanner.UI
             KingmakerUiFactory.SetAnchors(hint.rectTransform, 0f, 0f, 1f, 0f);
             hint.rectTransform.pivot = new Vector2(0.5f, 0f);
             hint.rectTransform.sizeDelta = new Vector2(0f, 18f);
+            _catalogueHint = hint;
             _buffSearch = _kit.InputField(lane, "BuffSearch", PlannerText.Get("workspace.search"));
             RectTransform search = RectOf(_buffSearch);
             KingmakerUiFactory.SetAnchors(search, 0f, 1f, 1f, 1f);
@@ -1589,7 +1599,7 @@ namespace KingmakerBuffPlanner.UI
             RectTransform banner = KingmakerUiFactory.CreateRect("Banner", area);
             KingmakerUiFactory.SetAnchors(banner, 0f, 1f, 1f, 1f);
             banner.pivot = new Vector2(0.5f, 1f);
-            banner.sizeDelta = new Vector2(0f, 74f);
+            banner.sizeDelta = new Vector2(0f, 78f);
             RectTransform icon = KingmakerUiFactory.CreateRect("Icon", banner);
             KingmakerUiFactory.SetAnchors(icon, 0f, 1f, 0f, 1f);
             icon.pivot = new Vector2(0f, 1f);
@@ -1608,23 +1618,23 @@ namespace KingmakerBuffPlanner.UI
             _bannerTitle.fontSizeMax = 24f;
             KingmakerUiFactory.SetAnchors(_bannerTitle.rectTransform, 0f, 1f, 1f, 1f);
             _bannerTitle.rectTransform.pivot = new Vector2(0f, 1f);
-            _bannerTitle.rectTransform.offsetMin = new Vector2(66f, -32f);
+            _bannerTitle.rectTransform.offsetMin = new Vector2(66f, -30f);
             _bannerTitle.rectTransform.offsetMax = new Vector2(-4f, 0f);
             _bannerDetail = _kit.Text(banner, "BuffDetail", string.Empty, PlannerTextRole.Secondary, 15f,
                 TextAlignmentOptions.TopLeft);
             _bannerDetail.enableWordWrapping = false;
             _bannerDetail.overflowMode = TextOverflowModes.Ellipsis;
             KingmakerUiFactory.SetAnchors(_bannerDetail.rectTransform, 0f, 1f, 1f, 1f);
-            _bannerDetail.rectTransform.offsetMin = new Vector2(66f, -52f);
-            _bannerDetail.rectTransform.offsetMax = new Vector2(-4f, -32f);
+            _bannerDetail.rectTransform.offsetMin = new Vector2(66f, -53f);
+            _bannerDetail.rectTransform.offsetMax = new Vector2(-4f, -30f);
             _guidance = _kit.Text(banner, "Guidance", string.Empty, PlannerTextRole.Strong, 16f,
                 TextAlignmentOptions.TopLeft);
             _guidance.color = PlannerNativeKit.HeadingInk;
             _guidance.enableWordWrapping = false;
             _guidance.overflowMode = TextOverflowModes.Ellipsis;
             KingmakerUiFactory.SetAnchors(_guidance.rectTransform, 0f, 1f, 1f, 1f);
-            _guidance.rectTransform.offsetMin = new Vector2(66f, -74f);
-            _guidance.rectTransform.offsetMax = new Vector2(-4f, -52f);
+            _guidance.rectTransform.offsetMin = new Vector2(66f, -78f);
+            _guidance.rectTransform.offsetMax = new Vector2(-4f, -53f);
             // Lane captions (UI-07: short headings).
             RectTransform captions = KingmakerUiFactory.CreateRect("LaneCaptions", area);
             KingmakerUiFactory.SetAnchors(captions, 0f, 1f, 1f, 1f);
@@ -2268,7 +2278,7 @@ namespace KingmakerBuffPlanner.UI
 
         private GraphLayoutMetrics MetricsFor(float width)
         {
-            var metrics = new GraphLayoutMetrics();
+            var metrics = new GraphLayoutMetrics { SourceRowHeight = 50f };
             float usable = Mathf.Max(600f, width);
             metrics.CasterLaneWidth = Mathf.Round(usable * 0.36f);
             metrics.TargetLaneWidth = Mathf.Round(usable * 0.24f);

@@ -520,6 +520,55 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             }
         }
 
+        private void ObserveLocalizedWorkspace(CastingWorkspaceScreenView view, CastingWorkspaceSession session)
+        {
+            var labels = view.RootObject.GetComponentsInChildren<TMP_Text>(false);
+            var checks = new JArray();
+            foreach (var label in labels.Where(text => text.name == "BuffDetail" || text.name == "Guidance" ||
+                (text.name == "Label" && text.transform.parent.name.StartsWith("Provider.", StringComparison.Ordinal))))
+            {
+                if (string.IsNullOrWhiteSpace(label.text)) continue;
+                label.ForceMeshUpdate();
+                bool visible = label.textInfo.characterInfo.Take(label.textInfo.characterCount).Any(c => c.isVisible);
+                checks.Add(new JObject { { "control", label.name }, { "text", label.text }, { "visible", visible } });
+                if (!visible) _nativeUi.Failures.Add("localized-label-invisible:" + label.name);
+            }
+            var hint = labels.Single(text => text.name == "InspectHint");
+            var scroll = hint.transform.parent.Find("Scroll").GetComponent<ScrollRect>();
+            float required = hint.GetPreferredValues(hint.text, hint.rectTransform.rect.width, 0f).y;
+            float height = hint.rectTransform.rect.height;
+            float viewportBottom = ((RectTransform)scroll.transform).offsetMin.y;
+            if (height + 0.1f < required || viewportBottom < height)
+                _nativeUi.Failures.Add("catalogue-inspection-hint-overlap");
+
+            var graph = session.BuildGraph(BuffPlannerUiRoot.CastingWorkspaceInputsForRuntime());
+            bool chineseGame = GameAdapters.KingmakerLanguage.Current == PlannerLanguage.Chinese;
+            var entry = graph.Catalogue.Select(row => row.Source).FirstOrDefault(source =>
+                !string.IsNullOrWhiteSpace(source.DisplayName) && (!chineseGame ||
+                source.DisplayName.Any(c => c >= '\u3400' && c <= '\u9fff')));
+            string query = entry == null ? null : entry.DisplayName;
+            string before = view.SearchTextForRuntime;
+            var original = view.CatalogueSourceIdsForRuntime;
+            string intent = session.DocumentIntentSignature();
+            string[] filtered;
+            try
+            {
+                view.RestoreSearchForRuntime(query);
+                filtered = view.CatalogueSourceIdsForRuntime;
+            }
+            finally { view.RestoreSearchForRuntime(before); }
+            bool found = entry != null && filtered.Contains(entry.SourceId) && filtered.Length < original.Length;
+            if (!found || !original.SequenceEqual(view.CatalogueSourceIdsForRuntime) ||
+                intent != session.DocumentIntentSignature())
+                _nativeUi.Failures.Add("localized-native-name-search");
+            NativeUiFacts.Write(_request.EvidenceDirectory, "nui-localization-layout-search.json", new JObject
+            {
+                { "labels", checks }, { "hintHeight", height }, { "hintPreferredHeight", required },
+                { "viewportBottom", viewportBottom }, { "nativeQuery", query }, { "queryFound", found },
+                { "beforeCount", original.Length }, { "filteredCount", filtered.Length }
+            });
+        }
+
         private bool NativeUiOpenedStep()
         {
             CastingWorkspaceScreenView view = BuffPlannerUiRoot.CastingWorkspaceViewForRuntime;
@@ -545,6 +594,8 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                         _nativeUi.PlannerVisibleLabels.AddRange(view.VisibleLabelsForRuntime().Distinct().Take(400));
                         _nativeUi.PlannerTextFonts = TextFontSummary(view.RootObject);
                         Canvas.ForceUpdateCanvases();
+                        if (_request.Parameters.ContainsKey("acceptanceGameLocale"))
+                            ObserveLocalizedWorkspace(view, session);
                         _nativeUi.SourceTabLayoutEvidence = view.SourceTabFitForRuntime;
                         foreach (TMP_Text caption in view.SourceTabCaptionsForRuntime)
                             _nativeUi.SourceTabs.Add(new NativeUiCaptionFit

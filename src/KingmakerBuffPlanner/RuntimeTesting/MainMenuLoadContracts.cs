@@ -37,14 +37,17 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             "UnityEngine.CanvasRenderer", "UnityEngine.RectTransform",
             "UnityEngine.UI.Button"
         };
-        private const string ExactLabel =
-            "<font=\"Saber_Dist32\"><color=#983F1D><size=140%>L</size></color></font>oad game";
-        private static readonly string[] ExactLabelIdentities =
+        // MainMenuButtons.SetupButtons formats UIStrings.MainMenu.LoadGame with GetSaberBookFormat.
+        // Pin the same three TMP identities for each qualified game locale.
+        internal static bool MatchesLoadButtonLabels(ICollection<string> labels, string gameLocale)
         {
-            "TMPro.TextMeshProUGUI.m_text=" + ExactLabel,
-            "TMPro.TextMeshProUGUI.old_text=" + ExactLabel,
-            "TMPro.TextMeshProUGUI.text=" + ExactLabel
-        };
+            const string prefix = "TMPro.TextMeshProUGUI.";
+            string caption = gameLocale == PlannerLanguage.Chinese
+                ? "<font=\"Saber_Dist32\"><color=#983F1D><size=140%>载</size></color></font>入游戏"
+                : "<font=\"Saber_Dist32\"><color=#983F1D><size=140%>L</size></color></font>oad game";
+            return labels.Contains(prefix + "m_text=" + caption) &&
+                labels.Contains(prefix + "old_text=" + caption) && labels.Contains(prefix + "text=" + caption);
+        }
 
         internal const BindingFlags AllInstance = BindingFlags.Instance |
             BindingFlags.Public | BindingFlags.NonPublic;
@@ -108,7 +111,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             if (!components.SequenceEqual(ExactComponents.OrderBy(value => value)))
                 return false;
             List<string> labels = SafeLabelIdentities(button.gameObject);
-            if (!ExactLabelIdentities.All(labels.Contains)) return false;
+            if (!MatchesLoadButtonLabels(labels, GameAdapters.KingmakerLanguage.Current)) return false;
             List<string> listeners = ListenerIdentities(button.onClick);
             bool persistent = listeners.Any(value =>
                 value.StartsWith("persistent;", StringComparison.Ordinal) &&

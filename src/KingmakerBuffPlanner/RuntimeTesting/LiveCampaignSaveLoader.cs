@@ -938,11 +938,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         private string DescribeButtonSearch()
         {
-            int activeButtons = Resources.FindObjectsOfTypeAll(typeof(Button))
-                .OfType<Button>().Count(button => button != null &&
-                    button.gameObject.activeInHierarchy);
-            return "activeButtons=" + activeButtons + ";expectedPath=" +
-                MainMenuLoadContracts.ButtonPath;
+            var active = Resources.FindObjectsOfTypeAll(typeof(Button)).OfType<Button>()
+                .Where(button => button != null && button.gameObject.activeInHierarchy).ToList();
+            var labels = active.Where(button => MainMenuLoadContracts.HierarchyPath(button.transform) ==
+                    MainMenuLoadContracts.ButtonPath)
+                .SelectMany(button => MainMenuLoadContracts.SafeLabelIdentities(button.gameObject))
+                .Where(value => value.StartsWith("TMPro.TextMeshProUGUI.", StringComparison.Ordinal));
+            return "activeButtons=" + active.Count + ";expectedPath=" + MainMenuLoadContracts.ButtonPath +
+                ";labelsAtPath=" + string.Join("|", labels.ToArray());
         }
 
         private bool IsWorking(object value)

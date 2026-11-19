@@ -938,17 +938,6 @@ namespace KingmakerBuffPlanner.UI
             return match == null || string.IsNullOrWhiteSpace(match.DisplayName) ? enhancementId : match.DisplayName;
         }
 
-        private static string SourceKindName(SourceKind kind)
-        {
-            switch (kind)
-            {
-                case SourceKind.Spellbook: return "spell";
-                case SourceKind.AbilityResource: return "ability";
-                case SourceKind.Item: return "item";
-                default: return "feature";
-            }
-        }
-
         private static string UnitDisplayName(CastingWorkspaceInputs inputs,
             string unitId)
         {
@@ -1409,7 +1398,7 @@ namespace KingmakerBuffPlanner.UI
                     descriptors.Add(new WorkspaceSourceDescriptor(sourceId,
                         string.IsNullOrWhiteSpace(display) ? sourceId : display,
                         serving.Select(value => value.Provider.DisplayName),
-                        serving.Select(value => SourceKindName(
+                        serving.Select(value => WorkspaceSourceLabels.KindName(
                             value.Provider.Key.Ability.SourceKind)),
                         serving.Select(value => UnitDisplayName(inputs,
                             value.Provider.Key.CasterUnitId))));

@@ -987,6 +987,17 @@ namespace KingmakerBuffPlanner.UI
     // only as a last resort an ordinal. Unique names get no detail.
     public static class WorkspaceSourceLabels
     {
+        internal static string KindName(SourceKind kind)
+        {
+            switch (kind)
+            {
+                case SourceKind.Spellbook: return PlannerText.Get("workspace.source.kind.spell");
+                case SourceKind.AbilityResource: return PlannerText.Get("workspace.source.kind.ability");
+                case SourceKind.Item: return PlannerText.Get("workspace.source.kind.item");
+                default: return PlannerText.Get("workspace.source.kind.feature");
+            }
+        }
+
         // The grid's order: alphabetical by display name, then the
         // disambiguating detail, then the source id (deterministic).
         internal static List<WorkspaceSourceOption> GridOrder(IEnumerable<WorkspaceSourceOption> sources)
