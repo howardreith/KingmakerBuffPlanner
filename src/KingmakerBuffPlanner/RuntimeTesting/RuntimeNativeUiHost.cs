@@ -176,8 +176,10 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     if (_request.Parameters.TryGetValue("acceptanceGameLocale", out expectedGame) &&
                         !string.Equals(expectedGame as string, GameAdapters.KingmakerLanguage.Current, StringComparison.OrdinalIgnoreCase))
                         return FinishNativeUi("acceptance-game-locale-mismatch");
-                    if (_request.Parameters.TryGetValue("acceptancePlannerLanguage", out expectedPlanner) &&
-                        !string.Equals(expectedPlanner as string, PlannerText.Language, StringComparison.OrdinalIgnoreCase))
+                    if (!_request.Parameters.TryGetValue("acceptancePlannerLanguage", out expectedPlanner))
+                        expectedPlanner = expectedGame;
+                    if (expectedPlanner != null && !string.Equals(expectedPlanner as string, PlannerText.Language,
+                        StringComparison.Ordinal))
                         return FinishNativeUi("acceptance-planner-language-mismatch");
                     _nativeUi.ScreenWidth = Screen.width;
                     _nativeUi.ScreenHeight = Screen.height;

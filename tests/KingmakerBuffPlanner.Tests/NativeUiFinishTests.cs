@@ -348,6 +348,40 @@ namespace KingmakerBuffPlanner.Tests
                 if (rejection.Length != 0)
                     throw new InvalidOperationException("A native UI request is rejected: " + rejection);
             }
+            foreach (string game in new[] { null, "enGB", "zhCN" })
+            foreach (string planner in new[] { null, "enGB", "zhCN" })
+            {
+                string rejection = admit(scenario, r =>
+                {
+                    r["parameters"]["expectedScreen"] = "1280x720";
+                    if (game != null) r["parameters"]["acceptanceGameLocale"] = game;
+                    if (planner != null) r["parameters"]["acceptancePlannerLanguage"] = planner;
+                });
+                Expect(rejection.Length == 0, "Controlled locale request rejected: " + game + "/" + planner + " " + rejection);
+            }
+            foreach (string field in new[] { "acceptanceGameLocale", "acceptancePlannerLanguage" })
+            {
+                foreach (JToken invalid in new JToken[] { "", "zhTW", true, 1, JValue.CreateNull() })
+                    Expect(admit(scenario, r =>
+                    {
+                        r["parameters"]["expectedScreen"] = "1280x720";
+                        r["parameters"][field] = invalid;
+                    }).Length != 0, "Invalid locale admitted: " + field + "/" + invalid);
+                Expect(admit(scenario, r => r["parameters"][field] = "enGB").Length != 0,
+                    "Locale admitted without a controlled display.");
+                Expect(admit("live-workspace-qual", r =>
+                {
+                    r["parameters"]["expectedScreen"] = "1280x720";
+                    r["parameters"][field] = "enGB";
+                }).Length != 0, "Locale admitted outside the native UI scenario.");
+            }
+            Expect(admit(scenario, r =>
+            {
+                r["parameters"]["expectedScreen"] = "1280x720";
+                r["parameters"]["acceptanceGameLocale"] = "enGB";
+                r["parameters"]["acceptancePlannerLanguage"] = "zhCN";
+                r["parameters"]["unknown"] = true;
+            }).Length != 0, "Locale request admitted an unrelated field.");
             var refused = new List<Tuple<string, string, Action<JObject>>>
             {
                 Tuple.Create<string, string, Action<JObject>>(scenario, "invalid-request:native-ui-stage-required",

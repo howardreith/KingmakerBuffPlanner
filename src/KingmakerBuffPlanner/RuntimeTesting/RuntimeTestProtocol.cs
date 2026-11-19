@@ -491,6 +491,18 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         private static void ValidateParameters(RuntimeTestRequest request)
         {
             if (request.Parameters == null) throw new InvalidDataException("parameters");
+            int localeFields = 0;
+            foreach (string name in new[] { "acceptanceGameLocale", "acceptancePlannerLanguage" })
+            {
+                object value;
+                if (!request.Parameters.TryGetValue(name, out value)) continue;
+                if (!IsNativeUiScenario(request.Scenario) || !request.Parameters.ContainsKey("expectedScreen"))
+                    throw new InvalidDataException("locale-requires-native-ui-display");
+                string locale = value as string;
+                if (locale != PlannerLanguage.English && locale != PlannerLanguage.Chinese)
+                    throw new InvalidDataException("acceptance-locale");
+                localeFields++;
+            }
             bool hasHeroismCondition = request.Parameters.ContainsKey("heroismCondition");
             if (IsHeroismFixtureScenario(request.Scenario))
             {
@@ -569,7 +581,7 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                     throw new InvalidDataException("native-ui-stage");
                 if (hasScreen && !IsScreenSize(request.Parameters["expectedScreen"] as string))
                     throw new InvalidDataException("expected-screen");
-                ValidateLiveSaveParameters(request, 10 + (hasScreen ? 1 : 0));
+                ValidateLiveSaveParameters(request, 10 + (hasScreen ? 1 : 0) + localeFields);
                 if (!string.Equals((string)request.Parameters["workingSaveName"], "KBP_AUTOMATION_WORKING",
                         StringComparison.Ordinal))
                     throw new InvalidDataException("native-ui-automation-fixture-only");

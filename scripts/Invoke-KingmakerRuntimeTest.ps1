@@ -147,7 +147,7 @@ $WhatIfPreference = $false
 # Review of f7726c9..1332ed8, P3-J: ValidateSet binds case-insensitively,
 # but every later comparison is case-sensitive; continue with the
 # canonical spelling of each value (for example -Scenario LIVE-CAST-QUAL).
-foreach ($canonicalName in @('Scenario', 'CompatibilityProfileId', 'ExecutionMode', 'FixtureFamily', 'QualificationRecipe', 'DisplayMode', 'NativeUiStage', 'HeroismCondition')) {
+foreach ($canonicalName in @('Scenario', 'CompatibilityProfileId', 'ExecutionMode', 'FixtureFamily', 'QualificationRecipe', 'DisplayMode', 'NativeUiStage', 'HeroismCondition', 'AcceptanceGameLocale', 'AcceptancePlannerLanguage')) {
     $bound = Get-Variable -Name $canonicalName -ValueOnly -ErrorAction SilentlyContinue
     if ([string]::IsNullOrEmpty([string]$bound)) { continue }
     $validSet = @((Get-Command -Name $PSCommandPath).Parameters[$canonicalName].Attributes |
