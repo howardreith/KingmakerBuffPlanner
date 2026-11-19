@@ -279,6 +279,14 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         public bool PlanningRestored { get; set; }
         public int RunsStarted { get; set; }
 
+        // The no-cast fixture compares the same native spell in the book and workspace.
+        internal const string ComparisonSpellGuid = "7bc8e27cba24f0e43ae64ed201ad5785";
+
+        internal static CastingGraphCatalogueEntry ComparisonSource(IEnumerable<CastingGraphCatalogueEntry> catalogue)
+        {
+            return catalogue.FirstOrDefault(row => row.SourceId == "ability|" + ComparisonSpellGuid);
+        }
+
         public static int PlanningSeedCastingCount(int legalRecipientCount)
         {
             if (legalRecipientCount < 3) return 0;

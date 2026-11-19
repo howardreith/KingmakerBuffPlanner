@@ -64,6 +64,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("native-ui-record-facts-judgement", TestNativeUiFactsJudgement);
             Run("native-ui-record-qualify-judgement", TestNativeUiQualifyJudgement);
             Run("native-ui-current-refusal-and-policy-states", TestNativeUiCurrentRefusal);
+            Run("native-ui-localized-comparison-source", TestNativeUiComparisonSource);
             Run("native-ui-planning-seed-reserves-two-recipients", TestNativeUiPlanningSeed);
             Run("native-window-takes-over-from-the-planner", TestNativeWindowTakeover);
             Run("native-ui-planner-copy", TestNativeUiPlannerCopy);
@@ -718,6 +719,20 @@ namespace KingmakerBuffPlanner.Tests
             record.FactsFiles.AddRange(new[] { "hud", "text", "spellbook", "native-popup" });
             record.Spellbooks.Add(new NativeUiSpellbookView { Unit = "Linzi", Shown = true });
             return record;
+        }
+
+        private static void TestNativeUiComparisonSource()
+        {
+            const string exactId = "ability|7bc8e27cba24f0e43ae64ed201ad5785";
+            foreach (string display in new[] { "Resistance", "提升抗力", "第三方文本" })
+            {
+                var decoy = new CastingGraphCatalogueEntry(new WorkspaceSourceOption("different", display, false, ""), 0, 0);
+                var first = new CastingGraphCatalogueEntry(new WorkspaceSourceOption("other", "光亮术", false, ""), 0, 0);
+                var exact = new CastingGraphCatalogueEntry(new WorkspaceSourceOption(exactId, display, false, ""), 0, 0);
+                Expect(NativeUiRecord.ComparisonSource(new[] { first, decoy, exact }) == exact &&
+                    NativeUiRecord.ComparisonSource(new[] { decoy, first }) == null,
+                    "The book comparison selected a different source after localization.");
+            }
         }
 
         private static void TestNativeUiPlanningSeed()
