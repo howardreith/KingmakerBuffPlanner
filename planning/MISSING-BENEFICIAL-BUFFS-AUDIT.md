@@ -302,7 +302,58 @@ added); explicit verify + candidate audit 3/0 (48 identical files, 58 types,
 Dance identical; 1,722 / 16 and 10,443 / 48; classifier
 `9e0c65a74c129ca6104f7c7787bec5477107ce07cd55060d4dbae7648ae66dce`, reports
 `175b90a3…b443` / `032fae87…1489`, changed rows identical apart from the
-header). Reproductions traced against `1bfc198`, not re-executed on it.
+header). Reproductions traced against `1bfc198`, not re-executed on it at the
+time; review round 4 executed them (below).
+
+## Review round 4
+
+Codex review of `bac569e` (decision `changes_required`, six findings). All are
+fixed in the round-4 corrections commit.
+
+| Finding | Correction | Regression |
+|---|---|---|
+| R4-F1 offensive branch admitted by the point-capable rule | `IsUnitAnchoredAlliedArea` also requires no offensive action anywhere in the graph (the check the ally-disposition waiver already used) | `…-offensive-branch-refuses-point-admission` (Mass Blessing with `ContextActionDealDamage` on its construct branch → excluded by discovery and provider admission; unmodified Mass Blessing still included) |
+| R4-F2 activation damage on an approved payload | The offensive-action check also reads every effect's recorded fact actions (`Offensive` of `AddFactContextActions` Activated/Deactivated/NewRound) | `…-payload-activation-damage-refuses-ally-exception` (GoodHopeBuff with activation damage: the exporter records it offensive; discovery and admission refuse) |
+| R4-F3 unaffected unit created a removal conflict | Options carry the FIXED recipient facts read for units inside their bursts (unit facts that are not buffs: creature types); conflict analysis in the compiler, the Classic planner and the Classic forecast binds them per unit (`ProviderPlanningOption.BindForRecipient`). Mutable facts (an opposing buff an earlier casting may add) stay unresolved, so every branch they could select is still analyzed | `…-unaffected-animal-creates-no-conflict` (Enlarge over h1 and Reduce over h2 overlapping only on an animal companion: both Ready, one slot each, own beneficiary; Classic plans both) |
+| R4-F4 blocked mixed casting still promised a cast | A blocked casting's `already-covered`, `already-covered-longer` and `existing-active-recast` notes become kept/removed notes like `already-active`; `existing-insufficient` / `existing-incomplete` become `existing-not-cast-blocked:` ("not cast on X (this casting is blocked and does not run)", enGB/zhCN); a `removes-planned-effect` block now passes the earlier-removed owners, and a unit not in them reads "still active" | `…-blocked-mixed-casting-notes-do-not-promise-a-cast` |
+| R4-F5 caster fact as the only gate ignored | With no recipient gate, coverage requires an application left after caster binding and no remaining caster gate: known false → no application; unread → withheld | `…-caster-only-gate-controls-area-coverage` (true → ally and caster, Ready, one slot; false or unread → no recipients, Blocked, zero cost) |
+| R4-F6 round-3 corrections lacked executed reproductions | Both baselines executed (below) | — |
+
+**Executed baselines** (R4-F6). Method: the production files touched by the
+round's corrections were replaced in the working tree by their content at the
+baseline commit (`git show <rev>:<path>`), keeping the current tests and the
+complete committed fixture subset (48 blueprints / 58 referenced types, so no
+regression failed for a missing fixture or a compile error); then
+`.\scripts\Test-Development.ps1 -Only 'missing-beneficial-buffs'`; then the
+files were restored.
+
+| Baseline | Result | Failed behavioral assertions |
+|---|---|---|
+| Round 3: production of `1bfc198` (DLL `86a53faf…`) | 25/5 | `…-ally-disposition-exception-is-evidence-bound`: "A Good Hope variant that damages an ally on its Despair branch was admitted" (R3-F2); `…-classic-picks-a-conflict-free-centre`: "A safe but unfunded Reduce centre was reported as a removal conflict: reduce:removes-planned-effect:enlarge:…:p" (R3-F5); `…-area-coverage-follows-recipient-conditions`: "coverage ignores recipient conditions (arcana=): caster,living,undead" (R2-F5, arcana unread); `…-removal-only-ally-is-counted`: "Mass Reduce undid Enlarge on a removal-only ally the routine keeps: Ready" (R3-F1); `…-classic-sequence-uses-bound-net-changes`: "A known-false removal erased E between Classic routines." (R3-F3) |
+| Round 4: production of `bac569e` (DLL `cf8b2335…`) | 30/5 | `…-offensive-branch-refuses-point-admission`: "A point-capable allied burst that damages constructs was admitted" (R4-F1); `…-payload-activation-damage-refuses-ally-exception`: "Good Hope was admitted although its buff damages its bearer on activation" (R4-F2); `…-unaffected-animal-creates-no-conflict`: "Blocked removes-planned-effect:enlarge:…:pet" (R4-F3); `…-blocked-mixed-casting-notes-do-not-promise-a-cast`: "already active on b (the cast goes ahead for the others)" (R4-F4); `…-caster-only-gate-controls-area-coverage`: "A known-false caster gate left beneficiaries or a cost: ally,caster Ready" (R4-F5) |
+
+Limits of the round-3 baseline: R3-F4 (the per-unit removal note) is asserted
+later in `…-removal-only-ally-is-counted`, after the R3-F1 assertion that
+already fails on `1bfc198`, so it is masked there and not separately observed.
+The R1-F8 spellbook correction is test evidence (fixture books and pool keys),
+so it passes on either production. To compile the current tests against
+`1bfc198`, the R3-F1 test asserts covered units behaviorally instead of
+through the later `AffectedTargetIdsForAnchor` accessor. In the first
+round-4 run, R4-F2's assertion sat behind R4-F1's in one test; it was split
+into its own test and the run repeated (30/5 above).
+
+Corrected results, final working tree before commit (DLL `29592555…`):
+`missing-beneficial-buffs` 35/0 (6.2 s); complete program 784/0 (34.9 s);
+explicit capture 1/0 (fixture subset unchanged, 48 / 58); explicit verify +
+candidate audit 3/0 (48 identical files, 58 types, Dance identical; 1,722 / 16
+and 10,443 / 48; classifier
+`1d2ec32d0c59932528e84ca64a1c2d680f1186a418f5fc9ca6a9de2308c175fd`, overrides
+`c462aeb4…`, reports `43458c22…8d98` / `d99e781a…7834`, changed rows identical
+apart from the header label).
+
+Native behavior that stays unverified: which unit facts are fixed is decided
+from the loaded blueprint type (`BlueprintUnitFact` that is not a
+`BlueprintBuff`); an unresolvable fact is treated as mutable (conservative).
 
 ## Rejected approaches
 

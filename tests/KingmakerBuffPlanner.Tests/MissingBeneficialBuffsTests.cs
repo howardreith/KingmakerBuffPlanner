@@ -97,6 +97,11 @@ namespace KingmakerBuffPlanner.Tests
             Mbb("missing-beneficial-buffs-area-coverage-follows-recipient-conditions", TestMbbRecipientConditions),
             Mbb("missing-beneficial-buffs-removal-only-ally-is-counted", TestMbbRemovalOnlyAllyCounted),
             Mbb("missing-beneficial-buffs-classic-sequence-uses-bound-net-changes", TestMbbClassicSequenceBoundRemoval),
+            Mbb("missing-beneficial-buffs-offensive-branch-refuses-point-admission", TestMbbOffensiveReachRefused),
+            Mbb("missing-beneficial-buffs-payload-activation-damage-refuses-ally-exception", TestMbbActivationDamageRefused),
+            Mbb("missing-beneficial-buffs-unaffected-animal-creates-no-conflict", TestMbbUnaffectedAnimalNoConflict),
+            Mbb("missing-beneficial-buffs-blocked-mixed-casting-notes-do-not-promise-a-cast", TestMbbBlockedMixedNotes),
+            Mbb("missing-beneficial-buffs-caster-only-gate-controls-area-coverage", TestMbbCasterOnlyGate),
             Mbb("missing-beneficial-buffs-point-capable-group-spells-unit-anchored", TestMbbPointGroupSpells),
             Mbb("missing-beneficial-buffs-point-group-unit-anchor-refused-fails-closed", TestMbbPointGroupAnchorFailsClosed),
             Mbb("missing-beneficial-buffs-nested-allied-burst-refused", TestMbbNestedBurstRefused),
@@ -521,7 +526,15 @@ namespace KingmakerBuffPlanner.Tests
                 .ToDictionary(id => id, id => false, StringComparer.Ordinal);
             ProviderTargetingDecision decision = ProviderTargetingPlanner.Decide(provider, expression, units, true,
                 false, area, nativeCanTarget, MbbDistance(positions), casterFacts,
-                (unit, fact) => unitHasFact != null && unitHasFact(unit, fact));
+                (unit, fact) => unitHasFact != null && unitHasFact(unit, fact),
+                // As the builder decides it: a recorded unit fact that is not
+                // a buff (a creature type) is fixed; anything else is not.
+                fact =>
+                {
+                    string type = NativeBlueprintDump.RecordedType(fact);
+                    return type != null && !type.StartsWith("Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff",
+                        StringComparison.Ordinal);
+                });
             return ProviderTargetingPlanner.BuildOption(provider, decision, CastExecutionStrategy.DirectRuleCast,
                 "ordinary-direct-rule-cast", casterFacts);
         }
@@ -1194,6 +1207,226 @@ namespace KingmakerBuffPlanner.Tests
                 "A routine containing only the switch was refused.");
         }
 
+        // Review R4-F1/R4-F2: an offensive action anywhere the cast reaches
+        // refuses the narrow admissions - damage on another branch of a
+        // point-capable allied burst (Mass Blessing's empty construct
+        // branch), and damage the approved Good Hope buff itself runs on its
+        // bearer when it activates. Unmodified spells stay admitted.
+        private static void TestMbbOffensiveReachRefused()
+        {
+            string blessing = MbbPointGroupSpells[0][1];
+            var burstDump = new NativeBlueprintDump(blessing, MbbPointGroupSpells[0][2]);
+            BlueprintAbility burst = burstDump.Get<BlueprintAbility>(blessing);
+            MbbExpect(MbbAppendToFirstConditionalTrue(burst,
+                    NativeObject<Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDamage>()),
+                "Mass Blessing's construct branch could not be extended.");
+            MbbDiscovery damagingBurst = MbbDiscover(burstDump, blessing);
+            var burstProviders = new List<ProviderSnapshot>();
+            ProviderSnapshot burstProvider = MbbAdmission(burstDump).AdmitSpell("caster", "book", false, "Book",
+                MbbRead(burstDump, blessing, blessing, SourceKind.Spellbook, 17), 6, 0, "pool", 1, new string[0],
+                burstProviders);
+            MbbExpect(damagingBurst.Scan.Diagnostics.Any(d => d.Code == "offensive-action") &&
+                damagingBurst.Repaired.Disposition == "exclude" && !damagingBurst.Included && burstProvider == null,
+                "A point-capable allied burst that damages constructs was admitted: " + damagingBurst.Repaired.Reason);
+            MbbExpect(MbbDiscover(new NativeBlueprintDump(blessing, MbbPointGroupSpells[0][2]), blessing).Included,
+                "Unmodified Mass Blessing is no longer admitted.");
+        }
+
+        private static void TestMbbActivationDamageRefused()
+        {
+            var buffDump = new NativeBlueprintDump(MbbGoodHope, MbbGoodHopeBuff);
+            var buff = buffDump.Get<Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff>(MbbGoodHopeBuff);
+            var activation = NativeObject<Kingmaker.UnitLogic.Mechanics.Components.AddFactContextActions>();
+            SetNative(activation, "Activated", new Kingmaker.ElementsSystem.ActionList
+            {
+                Actions = new Kingmaker.ElementsSystem.GameAction[]
+                {
+                    NativeObject<Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDamage>()
+                }
+            });
+            SetNative(activation, "Deactivated", new Kingmaker.ElementsSystem.ActionList
+            {
+                Actions = new Kingmaker.ElementsSystem.GameAction[0]
+            });
+            SetNative(activation, "NewRound", new Kingmaker.ElementsSystem.ActionList
+            {
+                Actions = new Kingmaker.ElementsSystem.GameAction[0]
+            });
+            SetNative(buff, "Components", (buff.ComponentsArray ?? new Kingmaker.Blueprints.BlueprintComponent[0])
+                .Concat(new Kingmaker.Blueprints.BlueprintComponent[] { activation }).ToArray());
+            MbbDiscovery selfHarm = MbbDiscover(buffDump, MbbGoodHope);
+            var hopeProviders = new List<ProviderSnapshot>();
+            ProviderSnapshot hopeProvider = MbbAdmission(buffDump).AdmitSpell("bard", MbbBardBook, false, "Bard",
+                MbbRead(buffDump, MbbGoodHope, "Good Hope", SourceKind.Spellbook, 7), 3, 0, "pool", 1,
+                new string[0], hopeProviders);
+            MbbExpect(selfHarm.Facts.Effects.Any(e4 => e4.EffectId == MbbGoodHopeBuff && e4.Harmful == false &&
+                    (e4.FactActions ?? new NativeCandidateFactActions[0]).Any(list =>
+                        list.List == "Activated" && (list.Offensive ?? new string[0]).Count != 0)),
+                "The exporter did not record the buff's activation damage.");
+            MbbExpect(selfHarm.Repaired.Disposition == "exclude" && !selfHarm.Included && hopeProvider == null,
+                "Good Hope was admitted although its buff damages its bearer on activation: " + selfHarm.Repaired.Reason);
+        }
+
+        // Review R4-F3: two bursts reach different humanoids and overlap
+        // only on an animal companion; neither Enlarge nor Reduce Person,
+        // Mass does anything to an animal (a fixed creature type), so both
+        // casts are planned, each with one slot and its own beneficiary.
+        private static void TestMbbUnaffectedAnimalNoConflict()
+        {
+            const string animalType = "a95311b3dc996964cbaa30ff9965aaf6";
+            string enlarge = MbbPointGroupSpells[4][1], reduce = MbbPointGroupSpells[5][1];
+            var dump = new NativeBlueprintDump(MbbPointGroupSpells.Skip(4).SelectMany(row => new[] { row[1], row[2] }).ToArray());
+            float r = 15f * 0.3048f;
+            var positions = new Dictionary<string, float>(StringComparer.Ordinal)
+            {
+                { "w", 10f * r }, { "h1", 0f }, { "pet", 0.8f * r }, { "h2", 1.6f * r }
+            };
+            MbbParty party = MbbMassParty(dump, new Dictionary<string, int> { { "w", 3 } },
+                new Dictionary<string, string[]> { { "w", new[] { enlarge, reduce } } }, positions, null,
+                (unit, fact) => unit == "pet" && fact == animalType);
+            AbilityKey enlargeKey = MbbSpellKey(enlarge), reduceKey = MbbSpellKey(reduce);
+            ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(CastingDocument(
+                    GroupCasting("enlarge", "long", "w", enlargeKey.Canonical, enlargeKey, new[] { "h1" },
+                        null, CastingTargetMode.AnchoredOrigin, "h1"),
+                    GroupCasting("reduce", "long", "w", reduceKey.Canonical, reduceKey, new[] { "h2" },
+                        null, CastingTargetMode.AnchoredOrigin, "h2")),
+                party.Snapshot, party.Options, party.Effects, new CastEnhancementSnapshot[0]);
+            ResolvedCasting first = plan.CastingById("enlarge"), second = plan.CastingById("reduce");
+            MbbExpect(first.Readiness == ResolvedCastingReadiness.Ready && first.Cost.Sum(c => c.Units) == 1 &&
+                first.PredictedBeneficiaryUnitIds.SequenceEqual(new[] { "h1" }) &&
+                second.Readiness == ResolvedCastingReadiness.Ready && second.Cost.Sum(c => c.Units) == 1 &&
+                second.PredictedBeneficiaryUnitIds.SequenceEqual(new[] { "h2" }),
+                "An unaffected animal companion created a false Enlarge/Reduce conflict: " + second.Readiness + " " +
+                string.Join(",", second.ReadinessReasons));
+            // Classic: the same two requests are both planned.
+            Func<string, string, string, int, BuffCastRequest> request = (guid, assignment, target, order) =>
+                new BuffCastRequest(new BuffSourceDefinition(assignment, MbbSpellKey(guid),
+                        party.Effects[MbbSpellKey(guid).Canonical], CastGroupingKind.MassConfiguredTargets),
+                    new[] { target }, ExistingEffectPolicy.Overwrite, null, new EnhancementRequest[0], assignment,
+                    null, null, null, order);
+            CastPlan classic = new CastPlanner().PlanRoutine(party.Snapshot, new[]
+                {
+                    request(enlarge, "enlarge", "h1", 0), request(reduce, "reduce", "h2", 1)
+                }, party.Options, new ProviderSelectionPolicy(null, null, null), new ActiveEffectSnapshot(null));
+            MbbExpect(classic.Steps.Count == 2 && classic.Outcomes.All(o => o.Kind == TargetOutcomeKind.Fulfilled),
+                "Classic refused a cast whose only overlap is an unaffected animal: " +
+                string.Join(",", classic.Outcomes.Select(o => o.Reason)));
+        }
+
+        // Review R4-F4: a mixed-coverage group casting blocked for a removal
+        // conflict no longer says it will run or may shorten an effect.
+        private static void TestMbbBlockedMixedNotes()
+        {
+            string enlarge = MbbPointGroupSpells[4][1], reduce = MbbPointGroupSpells[5][1];
+            string enlargeBuff = MbbPointGroupSpells[4][2], reduceBuff = MbbPointGroupSpells[5][2];
+            var dump = new NativeBlueprintDump(MbbPointGroupSpells.Skip(4).SelectMany(row => new[] { row[1], row[2] }).ToArray());
+            float r = 15f * 0.3048f;
+            var positions = new Dictionary<string, float>(StringComparer.Ordinal)
+            {
+                { "w", 10f * r }, { "x", -0.8f * r }, { "a", 0f }, { "b", 0.4f * r }, { "c", 0.6f * r }
+            };
+            Func<string, string, bool> facts = (unit, fact) =>
+                (fact == enlargeBuff && (unit == "x" || unit == "a")) || (fact == reduceBuff && unit == "b");
+            MbbParty party = MbbMassParty(dump, new Dictionary<string, int> { { "w", 3 } },
+                new Dictionary<string, string[]> { { "w", new[] { enlarge, reduce } } }, positions, null, facts);
+            var live = ActiveEffectSnapshot.FromInstances(new Dictionary<string, IEnumerable<ActiveEffectInstance>>
+            {
+                { "x", new[] { new ActiveEffectInstance(EffectKind.Buff, enlargeBuff, null, 9, 0) } },
+                { "a", new[] { new ActiveEffectInstance(EffectKind.Buff, enlargeBuff, null, 9, 0) } },
+                { "b", new[] { new ActiveEffectInstance(EffectKind.Buff, reduceBuff, null, 9, 0) } }
+            });
+            AbilityKey enlargeKey = MbbSpellKey(enlarge), reduceKey = MbbSpellKey(reduce);
+            ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(CastingDocument(
+                    GroupCasting("keep", "long", "w", enlargeKey.Canonical, enlargeKey, new[] { "x", "a" },
+                        null, CastingTargetMode.AnchoredOrigin, "x"),
+                    GroupCasting("reduce", "long", "w", reduceKey.Canonical, reduceKey, new[] { "b", "c" },
+                        null, CastingTargetMode.AnchoredOrigin, "b")),
+                party.Snapshot, party.Options, party.Effects, new CastEnhancementSnapshot[0], null, null, false, live);
+            ResolvedCasting blocked = plan.CastingById("reduce");
+            List<string> shown = blocked.ExistingEffectNotes.Select(note =>
+                CastingRunPresentation.DescribeExistingEffectNote(note)).ToList();
+            MbbExpect(blocked.Readiness == ResolvedCastingReadiness.Blocked && blocked.Cost.Count == 0 &&
+                blocked.ReadinessReasons.Contains(ExplicitCastingCompiler.RemovesPlannedEffect + ":keep:" +
+                    enlargeBuff + ":a"),
+                "The mixed Mass Reduce was not refused for removing the kept Enlarge: " + blocked.Readiness + " " +
+                string.Join(",", blocked.ReadinessReasons));
+            MbbExpect(shown.Contains(PlannerText.Get("run.effect.keptblocked", "b")) &&
+                !shown.Contains(PlannerText.Get("run.effect.covered", "b")) &&
+                !shown.Contains(PlannerText.Get("run.effect.longer", "b")) &&
+                !blocked.ExistingEffectNotes.Any(note => note.StartsWith("already-covered", StringComparison.Ordinal) ||
+                    note.StartsWith("existing-active-recast:", StringComparison.Ordinal) ||
+                    note.StartsWith("existing-insufficient:", StringComparison.Ordinal) ||
+                    note.StartsWith("existing-incomplete:", StringComparison.Ordinal)),
+                "The blocked casting's notes still promise a cast: " + string.Join(" | ", shown));
+        }
+
+        // Review R4-F5: a caster fact as the ONLY gate around an allied
+        // point-capable buff (native ContextConditionCasterHasFact wrapping
+        // Feather Step, Mass's application): known true keeps the in-radius
+        // allies; known false or unread yields no beneficiaries and a
+        // zero-cost refusal.
+        private static void TestMbbCasterOnlyGate()
+        {
+            string feather = MbbPointGroupSpells[1][1];
+            const string fact = "f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0";
+            var dump = new NativeBlueprintDump(feather, MbbPointGroupSpells[1][2]);
+            BlueprintAbility spell = dump.Get<BlueprintAbility>(feather);
+            var run = spell.ComponentsArray.OfType<Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction>().Single();
+            var feature = NativeObject<Kingmaker.Blueprints.Classes.BlueprintFeature>();
+            SetNative(feature, "m_AssetGuid", fact);
+            var condition = NativeObject<Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionCasterHasFact>();
+            SetNative(condition, "Fact", feature);
+            var gate = NativeObject<Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional>();
+            SetNative(gate, "ConditionsChecker", new Kingmaker.ElementsSystem.ConditionsChecker
+            {
+                Conditions = new Kingmaker.ElementsSystem.Condition[] { condition }
+            });
+            SetNative(gate, "IfTrue", new Kingmaker.ElementsSystem.ActionList { Actions = run.Actions.Actions });
+            SetNative(gate, "IfFalse", new Kingmaker.ElementsSystem.ActionList
+            {
+                Actions = new Kingmaker.ElementsSystem.GameAction[0]
+            });
+            run.Actions.Actions = new Kingmaker.ElementsSystem.GameAction[] { gate };
+            MbbDiscovery gated = MbbDiscover(dump, feather);
+            MbbExpect(gated.Included && MbbFind<ConditionalEffectExpression>(gated.Expression)
+                    .Any(c => c.CasterFactGate != null && c.CasterFactGate.Facts.Any(f => f.Key == fact)),
+                "The caster-gated Feather Step, Mass is not the intended admitted shape: " + gated.Reason);
+            float radius = 15f * 0.3048f;
+            var positions = new Dictionary<string, float>(StringComparer.Ordinal)
+            {
+                { "caster", 0f }, { "ally", radius * 0.5f }
+            };
+            MbbGroup group = MbbGroupCaster(dump, feather, positions, id => true);
+            ProviderSnapshot provider = group.Snapshot.Providers.Single();
+            AlliedAreaCoverage area = new KingmakerAreaCoverageResolver().Resolve(spell, spell);
+            foreach (bool? known in new bool?[] { true, false, null })
+            {
+                var casterFacts = known.HasValue ? new Dictionary<string, bool> { { fact, known.Value } }
+                    : new Dictionary<string, bool>();
+                ProviderTargetingDecision decision = ProviderTargetingPlanner.Decide(provider, gated.Expression,
+                    group.Snapshot.Units, true, false, area, id => true, MbbDistance(positions), casterFacts,
+                    (unit, f) => false);
+                ProviderPlanningOption option = ProviderTargetingPlanner.BuildOption(provider, decision,
+                    CastExecutionStrategy.DirectRuleCast, "ordinary-direct-rule-cast", casterFacts);
+                ResolvedCasting casting = new ExplicitCastingCompiler().Compile(CastingDocument(
+                        GroupCasting("step", "long", "caster", group.Ability.Canonical, group.Ability,
+                            new[] { "caster", "ally" })),
+                    group.Snapshot, new List<ProviderPlanningOption> { option }, group.Effects,
+                    new CastEnhancementSnapshot[0]).Castings.Single();
+                if (known == true)
+                    MbbExpect(decision.RecipientIdsByAnchor["caster"].SequenceEqual(new[] { "ally", "caster" }) &&
+                        casting.Readiness == ResolvedCastingReadiness.Ready && casting.Cost.Sum(c => c.Units) == 1,
+                        "A known-true caster gate lost its in-radius allies.");
+                else
+                    MbbExpect(decision.RecipientIdsByAnchor["caster"].Count() == 0 &&
+                        casting.Readiness == ResolvedCastingReadiness.Blocked && casting.Cost.Count == 0 &&
+                        casting.PredictedBeneficiaryUnitIds.Count == 0,
+                        "A " + (known == false ? "known-false" : "unread") +
+                        " caster gate left beneficiaries or a cost: " +
+                        string.Join(",", decision.RecipientIdsByAnchor["caster"]) + " " + casting.Readiness);
+            }
+        }
+
         // Review R3-F1: native Mass Reduce on an ally who has Enlarge only
         // removes Enlarge (its HasFact(EnlargePersonBuff) branch applies
         // nothing), so that ally is affected but not a beneficiary. A
@@ -1221,11 +1454,11 @@ namespace KingmakerBuffPlanner.Tests
             });
             AbilityKey enlargeKey = MbbSpellKey(enlarge), reduceKey = MbbSpellKey(reduce);
             ProviderPlanningOption reduceOption = party.Options.Single(o => o.Provider.Key.Ability.Equals(reduceKey));
-            MbbExpect(reduceOption.CoveredTargetIdsForAnchor("b").SequenceEqual(new[] { "b" }) &&
-                reduceOption.AffectedTargetIdsForAnchor("b").SequenceEqual(new[] { "a", "b" }),
-                "Mass Reduce's burst on b does not separate the removal-only ally a: covered " +
-                string.Join(",", reduceOption.CoveredTargetIdsForAnchor("b")) + " affected " +
-                string.Join(",", reduceOption.AffectedTargetIdsForAnchor("b")));
+            // The removal-only ally a is not a beneficiary (the conflict
+            // assertions below prove its removal is still analyzed).
+            MbbExpect(reduceOption.CoveredTargetIdsForAnchor("b").SequenceEqual(new[] { "b" }),
+                "Mass Reduce's burst on b claims the removal-only ally a: covered " +
+                string.Join(",", reduceOption.CoveredTargetIdsForAnchor("b")));
             PlannedCasting keep = GroupCasting("keep", "long", "w", enlargeKey.Canonical, enlargeKey, new[] { "x", "a" },
                 null, CastingTargetMode.AnchoredOrigin, "x");
             PlannedCasting strip = GroupCasting("reduce", "long", "w", reduceKey.Canonical, reduceKey, new[] { "b" },

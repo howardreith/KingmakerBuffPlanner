@@ -205,7 +205,9 @@ namespace KingmakerBuffPlanner.Domain.Planning
                     pair => (IEnumerable<string>)pair.Value,
                     StringComparer.Ordinal), option.CasterFacts, option.EffectsByTarget,
                 option.AffectedIdsByAnchor.ToDictionary(pair => pair.Key,
-                    pair => (IEnumerable<string>)pair.Value, StringComparer.Ordinal));
+                    pair => (IEnumerable<string>)pair.Value, StringComparer.Ordinal),
+                option.FixedRecipientFacts.ToDictionary(pair => pair.Key, pair => pair.Value,
+                    StringComparer.Ordinal));
         }
     }
 }

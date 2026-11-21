@@ -279,9 +279,16 @@ namespace KingmakerBuffPlanner.Domain.Planning
             IDictionary<string, IEnumerable<string>> recipientIdsByAnchor = null,
             IReadOnlyDictionary<string, bool> casterFacts = null,
             IReadOnlyDictionary<string, EffectExpression> effectsByTarget = null,
-            IDictionary<string, IEnumerable<string>> affectedIdsByAnchor = null)
+            IDictionary<string, IEnumerable<string>> affectedIdsByAnchor = null,
+            IDictionary<string, IReadOnlyDictionary<string, bool>> fixedRecipientFacts = null)
         {
             Provider = provider ?? throw new ArgumentNullException("provider");
+            FixedRecipientFacts = new ReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>(
+                (fixedRecipientFacts ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>())
+                    .Where(pair => pair.Key != null && pair.Value != null)
+                    .ToDictionary(pair => pair.Key, pair => (IReadOnlyDictionary<string, bool>)
+                        new ReadOnlyDictionary<string, bool>(pair.Value.ToDictionary(fact => fact.Key,
+                            fact => fact.Value, StringComparer.Ordinal)), StringComparer.Ordinal));
             // Missing-beneficial-buffs review R3-F1: every unit an anchor's
             // native actions reach (an ally inside the burst who only LOSES
             // an effect is not a beneficiary but is affected). Conflict
@@ -353,6 +360,28 @@ namespace KingmakerBuffPlanner.Domain.Planning
         }
 
         public IReadOnlyDictionary<string, IReadOnlyList<string>> AffectedIdsByAnchor { get; private set; }
+
+        // Review R4-F3: fixed facts (creature types, never a buff a casting
+        // can add or remove) read for units inside the option's bursts.
+        public IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>> FixedRecipientFacts { get; private set; }
+
+        // The expression as it acts on one recipient: the provider binding
+        // plus that recipient's fixed facts. Mutable facts (an opposing buff
+        // an earlier casting may add) stay unresolved, so conflict analysis
+        // keeps every branch they could select.
+        public EffectExpression BindForRecipient(EffectExpression expression, string recipient)
+        {
+            EffectExpression bound = BindEffects(expression, recipient);
+            IReadOnlyDictionary<string, bool> facts;
+            if (recipient == null || !FixedRecipientFacts.TryGetValue(recipient, out facts) || facts.Count == 0)
+                return bound;
+            bool unresolved;
+            return EffectRecipientFactBinding.Bind(bound, fact =>
+            {
+                bool value;
+                return facts.TryGetValue(fact, out value) ? value : (bool?)null;
+            }, out unresolved);
+        }
 
         // The units an anchor's native actions reach (beneficiaries and units
         // that only lose an effect); the covered units when not recorded.

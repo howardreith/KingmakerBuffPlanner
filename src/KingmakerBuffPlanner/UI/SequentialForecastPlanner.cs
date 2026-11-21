@@ -321,7 +321,7 @@ namespace KingmakerBuffPlanner.UI
                     .Distinct(StringComparer.Ordinal).ToList();
             return EffectChanges.Merge(recipients.Select(recipient =>
                 EffectChangeAnalysis.Analyze(option == null ? step.ExpectedEffects
-                    : option.BindEffects(step.ExpectedEffects, recipient),
+                    : option.BindForRecipient(step.ExpectedEffects, recipient),
                     step.Provider.CasterUnitId, recipient))).Removed;
         }
 

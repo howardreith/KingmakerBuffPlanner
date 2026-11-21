@@ -477,10 +477,17 @@ namespace KingmakerBuffPlanner.Discovery
             return effects.Count == 0 || !effects.All(e => IsProvenBeneficialDespiteAllyDisposition(e, facts));
         }
 
+        // An offensive action anywhere the cast reaches: the ability's own
+        // graph on any branch, or (review R4-F2) an applied buff's own
+        // automatic actions (AddFactContextActions Activated / NewRound /
+        // Deactivated) that the exporter recorded as offensive.
         private static bool HasOffensiveAction(NativeCandidateAuditFacts facts)
         {
             return (facts.Diagnostics ?? new NativeCandidateDiagnosticFacts[0]).Any(IsOffensive) ||
-                (facts.DiagnosticContracts ?? new string[0]).Any(IsOffensiveContract);
+                (facts.DiagnosticContracts ?? new string[0]).Any(IsOffensiveContract) ||
+                (facts.Effects ?? new NativeCandidateEffectFacts[0]).Any(effect => effect != null &&
+                    (effect.FactActions ?? new NativeCandidateFactActions[0]).Any(list =>
+                        (list.Offensive ?? new string[0]).Count != 0));
         }
 
         // Missing-beneficial-buffs mission §3.C: CanTargetPoint means the
@@ -497,8 +504,11 @@ namespace KingmakerBuffPlanner.Discovery
         private static bool IsUnitAnchoredAlliedArea(NativeCandidateAuditFacts facts,
             IReadOnlyList<NativeCandidateEffectFacts> effects, IReadOnlyList<string> components)
         {
+            // Review R4-F1: an allied burst that can damage an ally on any
+            // reachable branch (or through its payload's own actions) is not
+            // admitted on a unit anchor.
             return (facts.CanTargetSelf || facts.CanTargetFriends) && !facts.CanTargetEnemies &&
-                !facts.IsStickyTouch &&
+                !facts.IsStickyTouch && !HasOffensiveAction(facts) &&
                 components.Any(value => ShortName(value) == "AbilityTargetsAround") &&
                 effects.Count != 0 &&
                 effects.All(effect => effect != null && effect.Kind == "Buff" &&

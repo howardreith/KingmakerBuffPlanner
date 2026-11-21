@@ -161,6 +161,15 @@ namespace KingmakerBuffPlanner.Tests
             }
         }
 
+        // The recorded native type of any fixture blueprint (full or
+        // referenced), or null when the fixtures do not record it.
+        internal static string RecordedType(string guid)
+        {
+            Paths();
+            string type;
+            return guid != null && _types.TryGetValue(guid, out type) ? type : null;
+        }
+
         // The native type directory of a blueprint (full or referenced).
         private static string TypeName(string guid, string path)
         {

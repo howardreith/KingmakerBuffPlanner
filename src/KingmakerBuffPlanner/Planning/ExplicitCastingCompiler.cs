@@ -408,7 +408,8 @@ namespace KingmakerBuffPlanner.Planning
                     if (removalConflict != null)
                     {
                         finalized.Add(BlockForRemoval(casting, RemovesPlannedEffect + ":" +
-                            removalConflict, shape, diagnostics));
+                            removalConflict, shape, diagnostics,
+                            removalState.OwnersRemovedByEarlier(casting.RoutineId, changes)));
                         continue;
                     }
                     // An out-of-scope casting is not budget-checked in this
@@ -881,7 +882,7 @@ namespace KingmakerBuffPlanner.Planning
                         .Distinct(StringComparer.Ordinal).ToList();
             }
             return EffectChanges.Merge(reached.Select(recipient =>
-                EffectChangeAnalysis.Analyze(option.BindEffects(expression, recipient),
+                EffectChangeAnalysis.Analyze(option.BindForRecipient(expression, recipient),
                     casting.CasterUnitId, recipient)));
         }
 
@@ -893,14 +894,25 @@ namespace KingmakerBuffPlanner.Planning
             // active (skipped)". Only a recipient whose effect the earlier
             // casting removes is described as losing it; another recipient
             // is described as still active (the blocked casting does not run).
+            // Review R4-F4: the same holds for every note of a mixed group
+            // casting - none may still say the cast goes ahead, may shorten
+            // an effect, or will (re)cast.
             IReadOnlyList<string> notes = casting.ExistingEffectNotes.Select(note =>
             {
-                if (!note.StartsWith("already-active:", StringComparison.Ordinal)) return note;
-                string rest = note.Substring("already-active:".Length);
-                int split = rest.IndexOf(':');
-                string unit = split < 0 ? rest : rest.Substring(0, split);
-                return (removedOwners == null || removedOwners.Contains(unit)
-                    ? ExistingRemovedEarlierNote : ExistingKeptBlockedNote) + rest;
+                string present = new[] { "already-active:", "already-covered:", "already-covered-longer:",
+                    "existing-active-recast:" }.FirstOrDefault(prefix =>
+                        note.StartsWith(prefix, StringComparison.Ordinal));
+                if (present != null)
+                {
+                    string rest = note.Substring(present.Length);
+                    int split = rest.IndexOf(':');
+                    string unit = split < 0 ? rest : rest.Substring(0, split);
+                    return (removedOwners != null && removedOwners.Contains(unit)
+                        ? ExistingRemovedEarlierNote : ExistingKeptBlockedNote) + rest;
+                }
+                string partial = new[] { "existing-insufficient:", "existing-incomplete:" }.FirstOrDefault(prefix =>
+                    note.StartsWith(prefix, StringComparison.Ordinal));
+                return partial == null ? note : ExistingNotCastBlockedNote + note.Substring(partial.Length);
             }).ToList();
             return casting.WithBudgetResult(ResolvedCastingReadiness.Blocked,
                 casting.ReadinessReasons
@@ -916,6 +928,9 @@ namespace KingmakerBuffPlanner.Planning
         // Note of a recipient whose effect stays active while its blocked
         // group casting does not run: "existing-kept-blocked:<unit>[:detail]".
         public const string ExistingKeptBlockedNote = "existing-kept-blocked:";
+        // Note of a recipient whose effect is absent or insufficient while its
+        // blocked casting does not run: "existing-not-cast-blocked:<unit>[:detail]".
+        public const string ExistingNotCastBlockedNote = "existing-not-cast-blocked:";
 
         // R1-F4: a removal later in the one-pass sequence invalidates every
         // structural grant predicting the removed effect on that unit.

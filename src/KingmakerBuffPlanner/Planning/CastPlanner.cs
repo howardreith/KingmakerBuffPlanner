@@ -475,7 +475,7 @@ namespace KingmakerBuffPlanner.Planning
             IEnumerable<string> recipients)
         {
             return EffectChanges.Merge((recipients ?? new string[0]).Select(recipient =>
-                EffectChangeAnalysis.Analyze(option.BindEffects(request.Source.Effects, recipient),
+                EffectChangeAnalysis.Analyze(option.BindForRecipient(request.Source.Effects, recipient),
                     option.Provider.Key.CasterUnitId, recipient)));
         }
 

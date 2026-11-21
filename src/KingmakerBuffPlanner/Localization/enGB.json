@@ -809,6 +809,7 @@
   "run.effect.keptblocked": "still active on {0} (this casting is blocked and does not run)",
   "run.effect.longer": "already active on {0}, lasting longer than this cast (the cast goes ahead for the others and may shorten it)",
   "run.effect.metamagic": "without the planned metamagic",
+  "run.effect.notcast": "not cast on {0} (this casting is blocked and does not run)",
   "run.effect.recast": "active on {0} but set to always recast",
   "run.effect.recastexplain": "present on {0} but {1} (will recast)",
   "run.effect.removed": "active on {0} now, but an earlier casting in this routine removes it (not skipped, not cast)",

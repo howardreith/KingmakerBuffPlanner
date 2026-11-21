@@ -93,6 +93,13 @@ namespace KingmakerBuffPlanner.GameAdapters
                     {
                         UnitEntityData unit;
                         return liveUnits.TryGetValue(unitId, out unit) ? ReadUnitFact(unit, factId) : null;
+                    },
+                    // Review R4-F3: a unit fact that is not a buff (a creature
+                    // type feature) cannot be added or removed by a casting.
+                    factId =>
+                    {
+                        BlueprintUnitFact fact = ResourcesLibrary.TryGetBlueprint<BlueprintUnitFact>(factId);
+                        return fact != null && !(fact is Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff);
                     });
                 bool party = decision.Party;
                 bool areaRecipients = decision.AreaRecipients;

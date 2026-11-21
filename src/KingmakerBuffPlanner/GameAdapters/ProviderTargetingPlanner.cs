@@ -18,6 +18,9 @@ namespace KingmakerBuffPlanner.GameAdapters
         // Every unit an anchor's native actions reach (review R3-F1).
         internal Dictionary<string, IEnumerable<string>> AffectedIdsByAnchor =
             new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal);
+        // unit -> fixed recipient fact -> read value (review R4-F3).
+        internal Dictionary<string, Dictionary<string, bool>> FixedRecipientFacts =
+            new Dictionary<string, Dictionary<string, bool>>(StringComparer.Ordinal);
         internal bool Party;
         internal bool AreaRecipients;
         internal bool UnsafeArea;
@@ -47,7 +50,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             Func<string, bool> canTarget,
             Func<string, string, float?> distance,
             IReadOnlyDictionary<string, bool> casterFacts = null,
-            Func<string, string, bool?> unitHasFact = null)
+            Func<string, string, bool?> unitHasFact = null,
+            Func<string, bool> isFixedFact = null)
         {
             if (provider == null) throw new ArgumentNullException("provider");
             Func<string, bool> legal = canTarget ?? (id => false);
@@ -102,10 +106,15 @@ namespace KingmakerBuffPlanner.GameAdapters
                 // gets no definite coverage claim.
                 EffectExpression casterBound = EffectConditionBinding.Bind(expression, casterFacts);
                 bool gated = EffectRecipientFactBinding.HasGates(casterBound);
+                // Review R4-F5: with no recipient condition, a known-false
+                // caster gate that removed the only application, or an unread
+                // caster gate still controlling it, yields no beneficiaries.
+                bool casterPayload = EffectExpressionAnalysis.ContainsLeaf(casterBound) &&
+                    !HasCasterGate(casterBound);
                 Func<string, bool?> noFacts = id => null;
                 Func<UnitSnapshot, bool> eligible = unit =>
                 {
-                    if (!gated) return true;
+                    if (!gated) return casterPayload;
                     string unitId = unit.UnitId;
                     bool unresolved;
                     EffectExpression bound = EffectRecipientFactBinding.Bind(casterBound,
@@ -133,6 +142,25 @@ namespace KingmakerBuffPlanner.GameAdapters
                     decision.AffectedIdsByAnchor.Add(anchorId, inside.Select(unit => unit.UnitId).ToArray());
                     decision.RecipientIdsByAnchor.Add(anchorId, inside.Where(eligible)
                         .Select(unit => unit.UnitId).ToArray());
+                    // Review R4-F3: the FIXED recipient facts read for these
+                    // units (creature types; never a buff a casting can add
+                    // or remove) go with the option, so conflict analysis can
+                    // tell a unit the cast does nothing to (an animal under
+                    // Enlarge/Reduce Person, Mass) from one it may change.
+                    if (gated && unitHasFact != null && isFixedFact != null)
+                        foreach (UnitSnapshot unit in inside)
+                        {
+                            Dictionary<string, bool> known;
+                            if (!decision.FixedRecipientFacts.TryGetValue(unit.UnitId, out known))
+                                decision.FixedRecipientFacts[unit.UnitId] = known =
+                                    new Dictionary<string, bool>(StringComparer.Ordinal);
+                            foreach (string fact in EffectRecipientFactBinding.FactIds(casterBound))
+                            {
+                                if (!isFixedFact(fact)) continue;
+                                bool? has = unitHasFact(unit.UnitId, fact);
+                                if (has.HasValue) known[fact] = has.Value;
+                            }
+                        }
                 }
                 reachable = units.Where(unit => decision.RecipientIdsByAnchor.Values
                     .Any(recipients => recipients.Contains(unit.UnitId)));
@@ -164,7 +192,9 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             return new ProviderPlanningOption(provider, decision.ReachableIds, decision.Anchors,
                 provider.EffectiveCasterLevel, provider.ExpectedDurationRounds, strategy, strategyReason,
-                decision.RecipientIdsByAnchor, casterFacts, effectsByTarget, decision.AffectedIdsByAnchor);
+                decision.RecipientIdsByAnchor, casterFacts, effectsByTarget, decision.AffectedIdsByAnchor,
+                decision.FixedRecipientFacts.ToDictionary(pair => pair.Key,
+                    pair => (IReadOnlyDictionary<string, bool>)pair.Value, StringComparer.Ordinal));
         }
 
         private static bool HasCasterGate(EffectExpression expression)

@@ -309,7 +309,8 @@ namespace KingmakerBuffPlanner.UI
             if (unitName != null)
                 foreach (string prefix in new[] { "already-active:", "already-covered:", "already-covered-longer:",
                     "existing-active-recast:", "existing-insufficient:", "existing-incomplete:",
-                    ExistingRemovedEarlierPrefix, ExplicitCastingCompiler.ExistingKeptBlockedNote })
+                    ExistingRemovedEarlierPrefix, ExplicitCastingCompiler.ExistingKeptBlockedNote,
+                    ExplicitCastingCompiler.ExistingNotCastBlockedNote })
                     if (value.StartsWith(prefix, StringComparison.Ordinal))
                     {
                         string unit = FirstSegment(value, prefix);
@@ -323,6 +324,9 @@ namespace KingmakerBuffPlanner.UI
             if (value.StartsWith(ExplicitCastingCompiler.ExistingKeptBlockedNote, StringComparison.Ordinal))
                 return PlannerText.Get("run.effect.keptblocked",
                     FirstSegment(value, ExplicitCastingCompiler.ExistingKeptBlockedNote));
+            if (value.StartsWith(ExplicitCastingCompiler.ExistingNotCastBlockedNote, StringComparison.Ordinal))
+                return PlannerText.Get("run.effect.notcast",
+                    FirstSegment(value, ExplicitCastingCompiler.ExistingNotCastBlockedNote));
             if (value.StartsWith("already-active:", StringComparison.Ordinal))
                 return PlannerText.Get("run.effect.active", FirstSegment(value, "already-active:"));
             if (value.StartsWith("already-covered:", StringComparison.Ordinal))
