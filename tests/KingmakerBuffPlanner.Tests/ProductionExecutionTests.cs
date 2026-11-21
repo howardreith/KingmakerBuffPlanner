@@ -1857,8 +1857,14 @@ namespace KingmakerBuffPlanner.Tests
                 "GameAdapters", "KingmakerPartySnapshotBuilder.cs")).Replace("\r\n", "\n");
             string forecast = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
                 "UI", "SequentialForecastPlanner.cs")).Replace("\r\n", "\n");
-            if (!builder.Contains("duration, selection.SourceDisplayName, selection.VariantOrder,\n" +
-                    "                SpellbookName(spellbook), duration: estimate));") ||
+            // Missing-beneficial-buffs review R1-F8: the provider is created
+            // by the game-free PartyProviderAdmission from the name the
+            // builder reads (same contract, moved).
+            string admission = File.ReadAllText(Path.Combine(directory.FullName, "src", "KingmakerBuffPlanner",
+                "GameAdapters", "PartyProviderAdmission.cs")).Replace("\r\n", "\n");
+            if (!builder.Contains("!spellbook.Blueprint.Spontaneous, SpellbookName(spellbook),") ||
+                !admission.Contains("duration, read.SourceDisplayName, read.VariantOrder,\n" +
+                    "                spellbookName ?? string.Empty, duration: estimate);") ||
                 !builder.Contains("string name = spellbook.Blueprint.DisplayName;") ||
                 !builder.Contains("name = spellbook.Blueprint.CharacterClass.Name;") ||
                 !forecast.Contains("provider.VariantOrder, provider.SourceBookName, provider.EquippedSlotSelector, provider.Duration));"))
@@ -6915,10 +6921,12 @@ namespace KingmakerBuffPlanner.Tests
                 !resolve.Contains("SafeSpellbookBound(fact.Data), resource.Kind == SourceKind.AbilityResource, poolKey,\n                            SafeCasterLevel(selection.Concrete))") ||
                 !resolve.Contains(".OrderBy(value => value.Blueprint.AssetGuid, StringComparer.Ordinal))") ||
                 !resolve.Contains("(blueprint.Parent == null || blueprint.Parent.AssetGuid != provider.Ability.BaseAbilityGuid))") ||
-                !builder.Contains("existing.EffectiveCasterLevel != CasterLevel(data))") ||
-                !builder.Contains("_ambiguousFactKeys.Add(keyForProvider);") ||
+                // R1-F8: the admission rules moved to PartyProviderAdmission.
+                !source("PartyProviderAdmission.cs").Contains("existing.EffectiveCasterLevel != read.CasterLevel)") ||
+                !source("PartyProviderAdmission.cs").Contains("AmbiguousFactKeys.Add(key);") ||
                 !builder.Contains("KingmakerFactResources.TryRead(unit.UniqueId,") ||
-                !builder.Contains("ResourcePoolSnapshot pool = nativeResource.Pool;"))
+                !builder.Contains("resourceKnown, nativeResource, resourceRefusal, slotSelector, providers, pools, poolKeys);") ||
+                !source("PartyProviderAdmission.cs").Contains("ResourcePoolSnapshot pool = resource.Pool;"))
                 throw new InvalidOperationException("A fact casting is not bound to its kind and reserved pool.");
             // Review A7: an unread count is null, and the free check is the
             // Unity-free judgement in both paths.
@@ -8132,10 +8140,13 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException("A live adapter confirms by presence or without its read before submission.");
             // Re-review: a party effect that also reaches pets is planned as a
             // party effect, before the pet-only branch.
-            string optionBuilder = source("KingmakerProviderOptionBuilder.cs");
-            int partyAt = optionBuilder.IndexOf("                else if (party)\n", StringComparison.Ordinal);
-            int petAt = optionBuilder.IndexOf("                else if (EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Pet))", StringComparison.Ordinal);
-            if (partyAt < 0 || petAt < 0 || partyAt > petAt)
+            // Missing-beneficial-buffs review R1-F8: the option builder's
+            // targeting decisions moved to the game-free planner it calls.
+            string optionBuilder = source("ProviderTargetingPlanner.cs");
+            int partyAt = optionBuilder.IndexOf("            else if (decision.Party)\n", StringComparison.Ordinal);
+            int petAt = optionBuilder.IndexOf("            else if (EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Pet))", StringComparison.Ordinal);
+            if (partyAt < 0 || petAt < 0 || partyAt > petAt ||
+                !source("KingmakerProviderOptionBuilder.cs").Contains("ProviderTargetingDecision decision = ProviderTargetingPlanner.Decide("))
                 throw new InvalidOperationException("A party-and-pet effect is planned as pet-only.");
         }
 

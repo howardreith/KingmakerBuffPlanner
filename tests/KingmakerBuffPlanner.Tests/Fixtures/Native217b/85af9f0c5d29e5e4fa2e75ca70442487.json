@@ -1,0 +1,64 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "FxOnStart": "Resource::NULL",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [],
+  "m_DisplayName": "LocalizedString:053d5508-65f5-470f-b37e-3d92f824553e:Good Hope",
+  "m_Description": "LocalizedString:3b00cebe-39f7-46ca-b866-3ba9a1e92922:This spell instills powerful hope in the subjects. Each affected creature gains a +2 morale bonus on saving throws, attack rolls, ability checks, skill checks, and weapon damage rolls.[LONGSTART]\nGood hope dispels crushing despair.[LONGEND]",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "GoodHope"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddStatBonus, Assembly-CSharp",
+      "Descriptor": "Morale",
+      "Stat": "AdditionalAttackBonus",
+      "Value": 2,
+      "name": "$AddStatBonus$5f631768-71a3-4b48-b66c-260b47a9e2c4"
+    },
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.BuffAllSavesBonus, Assembly-CSharp",
+      "Descriptor": "Morale",
+      "Value": 2,
+      "name": "$BuffAllSavesBonus$00e05da1-e0d9-4eda-9959-52979140375d"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.BuffAllSkillsBonus, Assembly-CSharp",
+      "Descriptor": "Morale",
+      "Value": 2,
+      "Multiplier": {
+        "$id": "4",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+        "Value": 1
+      },
+      "name": "$BuffAllSkillsBonus$1ce4d527-a846-4782-94ee-5b1aa84ffba1"
+    },
+    {
+      "$id": "5",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.BuffAbilityRollsBonus, Assembly-CSharp",
+      "Value": 2,
+      "Descriptor": "Morale",
+      "AffectAllStats": true,
+      "Multiplier": {
+        "$id": "6",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+        "Value": 1
+      },
+      "name": "$BuffAbilityRollsBonus$3129282f-4732-4f85-aafa-6a7a609c5120"
+    },
+    {
+      "$id": "7",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddStatBonus, Assembly-CSharp",
+      "Descriptor": "Morale",
+      "Stat": "AdditionalDamage",
+      "Value": 2,
+      "name": "$AddStatBonus$fae01ae3-b550-4a93-8d5c-3ce074a1a702"
+    }
+  ],
+  "m_AssetGuid": "85af9f0c5d29e5e4fa2e75ca70442487",
+  "name": "GoodHopeBuff"
+}

@@ -1,0 +1,58 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "FxOnStart": "Resource:396af91a93f6e2b468f5fa1a944fae8a:Daze00_Cycle",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [
+    "396af91a93f6e2b468f5fa1a944fae8a"
+  ],
+  "m_DisplayName": "LocalizedString:09e2cdb8-1cf9-46bd-b7c0-95a81ba6d620:Daze",
+  "m_Description": "LocalizedString:00de71a0-c6f8-4bcc-95df-f6ded5f37239:The creature is unable to act normally. A dazed creature can take no actions, but has no penalty to AC.\nA dazed condition typically lasts 1 round.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "Daze"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.BuffStatusCondition, Assembly-CSharp",
+      "Condition": "Dazed",
+      "SaveType": "Will",
+      "name": "$BuffStatusCondition$6ad42df0-aa84-4bc4-8e7f-07bae7e6be70"
+    },
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent, Assembly-CSharp",
+      "Descriptor": "MindAffecting, Compulsion, Daze, Stun",
+      "name": "$SpellDescriptorComponent$ebb2cb32-d345-4771-8b39-e98ac6f09fbc"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.UnitLogic.Mechanics.Components.AddFactContextActions, Assembly-CSharp",
+      "Activated": {
+        "$id": "4",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "5",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionSpawnFx, Assembly-CSharp",
+            "PrefabLink": "Resource:28b3cd92c1fdc194d9ee1e378c23be6b:Daze00",
+            "name": "$ContextActionSpawnFx$56d9376d-ad0c-4a48-a1a0-5a3cc72308c0"
+          }
+        ]
+      },
+      "Deactivated": {
+        "$id": "6",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": []
+      },
+      "NewRound": {
+        "$id": "7",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": []
+      },
+      "name": "$AddFactContextActions$b00f03e5-6045-43b4-afda-4d583b34787c"
+    }
+  ],
+  "m_AssetGuid": "9934fedff1b14994ea90205d189c8759",
+  "name": "DazeBuff"
+}

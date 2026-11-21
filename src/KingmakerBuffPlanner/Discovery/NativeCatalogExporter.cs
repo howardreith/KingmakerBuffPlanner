@@ -119,7 +119,9 @@ namespace KingmakerBuffPlanner.Discovery
                                 overrideApplication.Entry.Reason,
                         RuntimeEvidence = new string[0]
                     };
-                    NativeCandidateAuditFacts facts = AuditFacts(ability, candidate, effects, scan.Diagnostics);
+                    IReadOnlyList<string> allyExceptions = _overrides.AllyDispositionExceptions(ability.AssetGuid);
+                    NativeCandidateAuditFacts facts = AuditFacts(ability, candidate, effects, scan.Diagnostics,
+                        allyExceptions);
                     NativeCandidateAuditDecision decision = classifier.Classify(facts);
                     entry.Disposition = decision.Disposition;
                     entry.SupportClass = decision.SupportClass;
@@ -131,7 +133,8 @@ namespace KingmakerBuffPlanner.Discovery
                     // the live scope is that classification, so sources the
                     // static index cannot reach (the Heal skill's Treat
                     // Affliction) are audited too.
-                    NativeCandidateAuditFacts live = AuditFacts(ability, true, effects, scan.Diagnostics);
+                    NativeCandidateAuditFacts live = AuditFacts(ability, true, effects, scan.Diagnostics,
+                        allyExceptions);
                     NativeCandidateAuditDecision liveDecision = classifier.Classify(live);
                     entry.LiveDisposition = liveDecision.Disposition;
                     entry.LiveDispositionReason = liveDecision.Reason;
@@ -263,12 +266,17 @@ namespace KingmakerBuffPlanner.Discovery
 
         // The classifier facts of one ability, shared by the catalogue export
         // and live discovery so both judge exactly the same facts.
+        // allyDispositionExceptions: the payloads an evidence-backed
+        // versioned entry exempts from the ability's misleading "harmful to
+        // allies" metadata (EffectOverrideRegistry.AllyDispositionExceptions).
         internal static NativeCandidateAuditFacts AuditFacts(BlueprintAbility ability, bool accessible,
-            IEnumerable<NativeEffectRecord> effects, IEnumerable<DiscoveryDiagnostic> diagnostics)
+            IEnumerable<NativeEffectRecord> effects, IEnumerable<DiscoveryDiagnostic> diagnostics,
+            IEnumerable<string> allyDispositionExceptions = null)
         {
             DiscoveryDiagnostic[] scanned = (diagnostics ?? new DiscoveryDiagnostic[0]).ToArray();
             return new NativeCandidateAuditFacts
             {
+                AllyDispositionExceptionEffectIds = (allyDispositionExceptions ?? new string[0]).ToArray(),
                 IsPlayerAccessible = accessible,
                 CanTargetSelf = ability.CanTargetSelf,
                 CanTargetFriends = ability.CanTargetFriends,

@@ -9634,6 +9634,24 @@ namespace KingmakerBuffPlanner.Tests
                 target: EffectTarget.CurrentTarget, sourceContract: "fixture");
         }
 
+        // Review R1-F9: an evidence check that needs external inputs (the lab
+        // blueprint dump, guarded in-game exports) runs ONLY when a selected
+        // prefix itself starts with "evidence-" and matches it. The no-prefix
+        // runner, single-letter selections and ordinary prefixes never reach
+        // it, so ordinary regressions keep no machine-specific prerequisite.
+        internal const string EvidencePrefix = "evidence-";
+
+        private static void RunExplicit(string name, Action action)
+        {
+            if (!name.StartsWith(EvidencePrefix, StringComparison.Ordinal))
+                throw new InvalidOperationException("Explicit evidence checks are named evidence-*: " + name);
+            if (_onlyPrefixes == null || !_onlyPrefixes.Any(prefix =>
+                    prefix.StartsWith(EvidencePrefix, StringComparison.Ordinal) &&
+                    name.StartsWith(prefix, StringComparison.Ordinal)))
+                return;
+            Run(name, action);
+        }
+
         private static void Run(string name, Action action)
         {
             if (_blockedNavigationOnly && !name.StartsWith("blocked-navigation-", StringComparison.Ordinal))

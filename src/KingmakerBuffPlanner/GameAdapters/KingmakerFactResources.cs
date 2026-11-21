@@ -96,21 +96,10 @@ namespace KingmakerBuffPlanner.GameAdapters
                     return true;
                 }
                 if (resource)
-                {
-                    int cost = concrete.ResourceCost;
-                    int remaining = concrete.Caster.Resources.GetResourceAmount(logic.RequiredResource);
-                    if (cost <= 0 || remaining < 0 || available.Value != remaining / cost)
-                        return Refuse("ability-resource-cost-or-count-mismatch", out refusal);
-                    result = new KingmakerFactResource
-                    {
-                        Kind = item == null ? SourceKind.AbilityResource : SourceKind.Item,
-                        InstanceId = instance, Selector = selector, Cost = cost,
-                        Pool = new ResourcePoolSnapshot(unitId + "|resource|" + logic.RequiredResource.AssetGuid,
-                            ResourcePoolKind.AbilityResource,
-                            Math.Max(remaining, logic.RequiredResource.GetMaxAmount(concrete.Caster)), remaining, null)
-                    };
-                    return true;
-                }
+                    return TryPriceAbilityResource(unitId, logic.RequiredResource.AssetGuid,
+                        concrete.ResourceCost, concrete.Caster.Resources.GetResourceAmount(logic.RequiredResource),
+                        () => logic.RequiredResource.GetMaxAmount(concrete.Caster), available.Value,
+                        item != null, instance, selector, out result, out refusal);
                 if (available.Value != -1)
                     return Refuse("finite-native-contract-unsupported:" + available.Value, out refusal);
                 result = new KingmakerFactResource
@@ -127,6 +116,28 @@ namespace KingmakerBuffPlanner.GameAdapters
             {
                 return Refuse("native-contract-unread:" + exception.GetType().Name, out refusal);
             }
+        }
+
+        // The native ability-resource contract from values read off the
+        // ability and its caster (game-free; review R1-F8): every ability
+        // spending one native resource shares that resource's single pool,
+        // and the native cost per cast must explain the native count.
+        internal static bool TryPriceAbilityResource(string unitId, string resourceGuid, int cost,
+            int remaining, Func<int> maxAmount, int available, bool item, string instance, string selector,
+            out KingmakerFactResource result, out string refusal)
+        {
+            result = null;
+            refusal = null;
+            if (cost <= 0 || remaining < 0 || available != remaining / cost)
+                return Refuse("ability-resource-cost-or-count-mismatch", out refusal);
+            result = new KingmakerFactResource
+            {
+                Kind = item ? SourceKind.Item : SourceKind.AbilityResource,
+                InstanceId = instance ?? string.Empty, Selector = selector ?? string.Empty, Cost = cost,
+                Pool = new ResourcePoolSnapshot(unitId + "|resource|" + resourceGuid,
+                    ResourcePoolKind.AbilityResource, Math.Max(remaining, maxAmount()), remaining, null)
+            };
+            return true;
         }
 
         internal static int? KingmakerCount(AbilityData ability)

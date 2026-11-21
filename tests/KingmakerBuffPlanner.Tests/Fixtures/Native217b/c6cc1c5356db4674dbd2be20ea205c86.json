@@ -1,0 +1,50 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "m_Flags": "IsFromSpell",
+  "FxOnStart": "Resource:8b495b6fbfd0d284e899a0e5ae45014a:FireBrand00",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [
+    "8b495b6fbfd0d284e899a0e5ae45014a"
+  ],
+  "m_DisplayName": "LocalizedString:6fc24cf6-8871-4ef8-b6a8-5acc467fc8c7:Firebrand",
+  "m_Description": "LocalizedString:3ec6b7dc-74ee-44e4-8aa6-26b31085ea62:While the firebrand burns, any creature it marks is immune to damage from any fire spell the caster of this firebrand casts. All of the target's weapons (both natural and manufactured) inflict +1d6 points of fire damage on a hit (this bonus fire damage stacks with any amount of fire damage a creature's weapons might already inflict). At any point during the spell's duration, a creature bearing a firebrand can launch a beam of fire at any target within 30 feet as a swift action. This ray requires a ranged touch attack to hit and deals 6d6 points of fire damage. Once a creature uses its firebrand to fire a ray in this manner, the effects of the spell end for that creature.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "Firebrand"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddFacts, Assembly-CSharp",
+      "Facts": [
+        "Blueprint:f1e7c4904e7db2d4082c4335d777d48f:FirebrandFireBeamAbility"
+      ],
+      "name": "$AddFacts$ed2aba35-1d27-4cb7-99f1-f283946ce3c6",
+      "m_AppliedFacts": []
+    },
+    {
+      "$id": "2",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddImmunityFirebrand, Assembly-CSharp",
+      "name": "$AddImmunityFirebrand$ca84131b-54e5-4a32-8c0d-c1497c56ac95"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Designers.Mechanics.Facts.ReplaceAbilityParamsWithContext, Assembly-CSharp",
+      "Ability": "Blueprint:f1e7c4904e7db2d4082c4335d777d48f:FirebrandFireBeamAbility",
+      "name": "$ReplaceAbilityParamsWithContext$c09c91e2-bde5-4369-a5b1-0bc69d917ee9"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.Designers.Mechanics.Facts.AdditionalDamageOnHit, Assembly-CSharp",
+      "EnergyDamageDice": {
+        "$id": "5",
+        "$type": "Kingmaker.RuleSystem.DiceFormula, Assembly-CSharp",
+        "m_Rolls": 1,
+        "m_Dice": "D6"
+      },
+      "name": "$AdditionalDamageOnHit$9ba202db-6450-4244-b89e-e2babbffaa14"
+    }
+  ],
+  "m_AssetGuid": "c6cc1c5356db4674dbd2be20ea205c86",
+  "name": "FirebrandBuff"
+}

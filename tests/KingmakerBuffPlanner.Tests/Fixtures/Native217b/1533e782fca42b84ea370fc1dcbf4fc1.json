@@ -1,0 +1,67 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "m_Flags": "IsFromSpell, StayOnDeath",
+  "FxOnStart": "Resource:1a36d2e3b70f70a4ca57fca372b2e6ed:FreedomOfMovement00_Cycle",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [
+    "1a36d2e3b70f70a4ca57fca372b2e6ed"
+  ],
+  "m_DisplayName": "LocalizedString:be1261fb-36bd-4309-a190-a7fd2cd9d99f:Freedom of Movement",
+  "m_Description": "LocalizedString:a5c4a34e-3454-493e-800b-62c6f8e2bfd2:This spell enables you or a creature you touch to move and attack normally for the duration of the spell, even under the influence of magic that usually impedes movement, such as paralysis, solid fog, slow, and web. All combat maneuver checks made to grapple the target automatically fail.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "FreedomOfMovement"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddConditionImmunity, Assembly-CSharp",
+      "Condition": "Paralyzed",
+      "name": "$AddConditionImmunity$a7d8f282-f7ba-4a40-bcf0-ba7e665dfbd8"
+    },
+    {
+      "$id": "2",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddConditionImmunity, Assembly-CSharp",
+      "Condition": "Entangled",
+      "name": "$AddConditionImmunity$239b195a-56b1-4c5f-bf1e-73e17b239947"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddConditionImmunity, Assembly-CSharp",
+      "Condition": "DifficultTerrain",
+      "name": "$AddConditionImmunity$167dc3eb-3a43-4bd5-a93d-ff4613fce4a6"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddConditionImmunity, Assembly-CSharp",
+      "Condition": "Slowed",
+      "name": "$AddConditionImmunity$54851ff3-4730-492c-9c8a-cb68fe04c059"
+    },
+    {
+      "$id": "5",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddConditionImmunity, Assembly-CSharp",
+      "Condition": "Staggered",
+      "name": "$AddConditionImmunity$fec5d08a-3f90-4ea3-baec-5c481c9223a1"
+    },
+    {
+      "$id": "6",
+      "$type": "Kingmaker.Designers.Mechanics.Facts.ManeuverImmunity, Assembly-CSharp",
+      "Type": "Grapple",
+      "name": "$ManeuverImmunity$1d7946f1-9f0c-4468-a931-2df394047585"
+    },
+    {
+      "$id": "7",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddConditionImmunity, Assembly-CSharp",
+      "Condition": "CantMove",
+      "name": "$AddConditionImmunity$495c6ec6-3744-4197-aafb-fb3ea5f0eb46"
+    },
+    {
+      "$id": "8",
+      "$type": "Kingmaker.UnitLogic.FactLogic.BuffDescriptorImmunity, Assembly-CSharp",
+      "Descriptor": "MovementImpairing",
+      "name": "$BuffDescriptorImmunity$2ba4e0e3-bf71-430b-a727-8b7893b15ab4"
+    }
+  ],
+  "m_AssetGuid": "1533e782fca42b84ea370fc1dcbf4fc1",
+  "name": "FreedomOfMovementBuff"
+}

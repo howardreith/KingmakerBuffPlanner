@@ -1,0 +1,158 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "Range": "Close",
+  "CanTargetFriends": true,
+  "CanTargetSelf": true,
+  "Animation": "Point",
+  "AnimationStyle": "CastActionPoint",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Quicken, Extend, Heighten, Reach",
+  "LocalizedDuration": "LocalizedString:6250ccf0-1ed0-460f-8ce7-094c2da7e198:1 round/level",
+  "LocalizedSavingThrow": "LocalizedString::",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "3cf0849b9b4e4344a8b528ff62b28d4b",
+    "91ef30ab58fa0d3449d4d2ccc20cb0f8"
+  ],
+  "m_DisplayName": "LocalizedString:90f2416a-6a46-4ae8-a3f2-6261acc14d19:Haste",
+  "m_Description": "LocalizedString:5ba63feb-296d-4ac6-b3f3-37eec78c301e:The transmuted creatures move and act more quickly than normal.[LONGSTART] This extra speed has several effects.[LONGEND]\nWhen making a full attack, a hasted creature may make one extra attack with its main weapon.[LONGSTART] The attack is made using the creature's full base attack bonus, plus any modifiers appropriate to the situation. (This effect is not cumulative with similar effects, such as that provided by a speed weapon, nor does it actually grant an extra action, so you can't use it to cast a second spell or otherwise take an extra action in the round.)[LONGEND]\nA hasted creature gains a +1 bonus on attack rolls and a +1 dodge bonus to AC and Reflex saves.[LONGSTART] Any condition that makes you lose your Dexterity bonus to Armor Class (if any) also makes you lose dodge bonuses.[LONGEND]\nA hasted creature's speed increases by 30 feet, to a maximum of twice the subject's normal speed.[LONGSTART] This increase counts as an enhancement bonus. Multiple haste effects don't stack. Haste dispels slow.[LONGEND]",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "Haste"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Transmutation",
+      "name": "$SpellComponent$bcbcd55b-7fde-4242-965b-693f8eebdaff"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:ba0401fdeb4062f40a7aa95b6f07fe89:WizardSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$33565aeb-e03c-480a-aedc-774d04b95e5f"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityTargetsAround, Assembly-CSharp",
+      "m_Radius": {
+        "$id": "5",
+        "$type": "Kingmaker.Utility.Feet, Assembly-CSharp",
+        "m_Value": 30.0
+      },
+      "m_TargetType": "Ally",
+      "m_Condition": {
+        "$id": "6",
+        "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+        "Conditions": []
+      },
+      "name": "$AbilityTargetsAround$86cd4210-f6dd-4e42-a1c9-a4944f5cb5ef"
+    },
+    {
+      "$id": "7",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "Actions": {
+        "$id": "8",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "9",
+            "$type": "Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional, Assembly-CSharp",
+            "Comment": "",
+            "ConditionsChecker": {
+              "$id": "10",
+              "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+              "Conditions": [
+                {
+                  "$id": "11",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasBuff, Assembly-CSharp",
+                  "Buff": "Blueprint:0bc608c3f2b548b44b7146b7530613ac:SlowBuff",
+                  "name": "$AbilityConditionHasBuff$89baa5ad-c025-48ed-a0ad-d079d9cf7541"
+                }
+              ]
+            },
+            "IfTrue": {
+              "$id": "12",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": [
+                {
+                  "$id": "13",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff, Assembly-CSharp",
+                  "Buff": "Blueprint:0bc608c3f2b548b44b7146b7530613ac:SlowBuff",
+                  "name": "$AbilityActionRemoveBuff$8996c78a-45bf-4b63-a520-de8659292cba"
+                }
+              ]
+            },
+            "IfFalse": {
+              "$id": "14",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": [
+                {
+                  "$id": "15",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+                  "Buff": "Blueprint:03464790f40c3c24aa684b57155f3280:HasteBuff",
+                  "DurationValue": {
+                    "$id": "16",
+                    "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+                    "m_IsExtendable": true,
+                    "DiceCountValue": {
+                      "$id": "17",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+                    },
+                    "BonusValue": {
+                      "$id": "18",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                      "ValueType": "Rank"
+                    }
+                  },
+                  "IsFromSpell": true,
+                  "name": "$AbilityActionApplyBuff$49d4a2f5-7b4c-4254-95f5-46e1951ec564"
+                }
+              ]
+            },
+            "name": "$Conditional$30fd578b-521c-4074-bb82-3469577f5799"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$3ae66b32-fe38-4ec5-a791-5d7b4d07c530"
+    },
+    {
+      "$id": "19",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx, Assembly-CSharp",
+      "PrefabLink": "Resource:3cf0849b9b4e4344a8b528ff62b28d4b:Haste00",
+      "Anchor": "SelectedTarget",
+      "PositionAnchor": "None",
+      "OrientationAnchor": "None",
+      "name": "$AbilitySpawnFx$e5aa26f5-e551-4ddc-aa4b-9b20083fa377"
+    },
+    {
+      "$id": "20",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:25a5013493bdcf74bb2424532214d0c8:BardSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$4689e0cc-d50d-4d78-99bf-ba96bb44d0e0"
+    },
+    {
+      "$id": "21",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:f60d0cd93edc65c42ad31e34a905fb2f:AlchemistSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$c6110021-9a0d-414e-b058-caa9c3d26120"
+    },
+    {
+      "$id": "22",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:4d72e1e7bd6bc4f4caaea7aa43a14639:MagusSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$3ab03db9-a8f2-45c9-81d6-c4f8cf10a621"
+    }
+  ],
+  "m_AssetGuid": "486eaff58293f6441a5c2759c4872f98",
+  "name": "Haste"
+}

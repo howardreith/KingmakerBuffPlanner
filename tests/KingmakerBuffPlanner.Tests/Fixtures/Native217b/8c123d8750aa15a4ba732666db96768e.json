@@ -1,0 +1,105 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "Type": "Extraordinary",
+  "Range": "Personal",
+  "CanTargetEnemies": true,
+  "CanTargetSelf": true,
+  "ActionBarAutoFillIgnored": true,
+  "EffectOnEnemy": "Harmful",
+  "Animation": "Omni",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Quicken, Heighten",
+  "LocalizedDuration": "LocalizedString::",
+  "LocalizedSavingThrow": "LocalizedString::",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "8475ed069cfb5ed4daedd2945d9d7555"
+  ],
+  "m_DisplayName": "LocalizedString:70dcedac-1df5-47fc-8ec6-129d714f14fb:Resistance — Sonic",
+  "m_Description": "LocalizedString:9d1cad2c-9769-48ce-b33b-94b12d8b0ff1:You gain resistance 5 to an energy type of your choice, chosen when you prepare spells. This resistance can be changed each day. At 11th level, this resistance increases to 10. At 20th level, this resistance changes to immunity to the chosen energy type.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "resist_energy_el_sonic_solo"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic, Assembly-CSharp",
+      "RequiredResource": "Blueprint:d16e573dc50e8b548b6e7e1044a21373:AbjurationResistanceResource",
+      "IsSpendResource": true,
+      "Amount": 1,
+      "ResourceCostIncreasingFacts": [],
+      "name": "$AbilityResourceLogic$38b8c789-6f4f-401e-b911-0d5009440690"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "Actions": {
+        "$id": "4",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "5",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+            "Buff": "Blueprint:63e2a6323c2bbff40a87fcd522778032:AbjurationResistanceSonicBuff",
+            "Permanent": true,
+            "DurationValue": {
+              "$id": "6",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+              "m_IsExtendable": true,
+              "DiceCountValue": {
+                "$id": "7",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              },
+              "BonusValue": {
+                "$id": "8",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              }
+            },
+            "AsChild": true,
+            "name": "$ContextActionApplyBuff$51d1e2dc-95d9-437d-b566-611e33d3e611"
+          },
+          {
+            "$id": "9",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff, Assembly-CSharp",
+            "Buff": "Blueprint:b87a0e8a961c63a44a952822fe975edb:AbjurationResistanceAcidBuff",
+            "name": "$ContextActionRemoveBuff$9c3f4fce-20fb-42d5-b86d-f7b5e411012e"
+          },
+          {
+            "$id": "10",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff, Assembly-CSharp",
+            "Buff": "Blueprint:90ce7dac4b9001e449eb44861397a65f:AbjurationResistanceColdBuff",
+            "name": "$ContextActionRemoveBuff$3bfcfb35-1cba-4897-bbab-8d9f7e6ab87f"
+          },
+          {
+            "$id": "11",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff, Assembly-CSharp",
+            "Buff": "Blueprint:453201f110f49714fb1d713c1f7bc06d:AbjurationResistanceElectricityBuff",
+            "name": "$ContextActionRemoveBuff$4743a479-463e-4952-b92a-1e7a2bed438c"
+          },
+          {
+            "$id": "12",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff, Assembly-CSharp",
+            "Buff": "Blueprint:b9ce1623447547946b8c58efd069f7c4:AbjurationResistanceFireBuff",
+            "name": "$ContextActionRemoveBuff$b3527c4a-7633-4e40-9622-a6d615d752e9"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$cd9f62de-2b7c-405f-ae68-5e15d82b752c"
+    },
+    {
+      "$id": "13",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx, Assembly-CSharp",
+      "PrefabLink": "Resource:8475ed069cfb5ed4daedd2945d9d7555:ProtectionFromEnergy00",
+      "PositionAnchor": "None",
+      "OrientationAnchor": "None",
+      "name": "$AbilitySpawnFx$bea34435-8968-4afe-a695-f2d156c7991b"
+    }
+  ],
+  "m_AssetGuid": "8c123d8750aa15a4ba732666db96768e",
+  "name": "AbjurationResistanceSonicAbility"
+}

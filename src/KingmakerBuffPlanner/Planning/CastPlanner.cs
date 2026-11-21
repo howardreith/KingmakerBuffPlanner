@@ -82,6 +82,10 @@ namespace KingmakerBuffPlanner.Planning
                 .ToDictionary(g => g.Key, g => g.Max(p => p.MaterialComponent.AvailableCount), StringComparer.Ordinal);
             var poolKinds = snapshot.ResourcePools.ToDictionary(p => p.PoolKey, p => p.Kind, StringComparer.Ordinal);
             var accounting = new AllocationAccounting(snapshot.ResourcePools, enhancementList);
+            // Review R1-F5: the retired Classic path applies the casting-first
+            // removal-conflict rule too (one routine = one state), so a saved
+            // Classic setup never claims two mutually exclusive choices.
+            var removals = new ExplicitCastingCompiler.RemovalConflictState();
             // Allocation order is the routine-wide explicit assignment order
             // with stable final tie-breakers; catalog sorting and dictionary
             // iteration order cannot influence it.
@@ -112,6 +116,21 @@ namespace KingmakerBuffPlanner.Planning
                             activeEffects.GetEffects(targetId), ignored);
                         if (presence.Kind == EffectPresenceKind.Complete)
                         {
+                            // A skip relying on an effect an earlier step of
+                            // this routine removes is not satisfied.
+                            EffectChanges kept = EffectChangeAnalysis.Analyze(request.Source.Effects,
+                                request.CasterUnitId, targetId);
+                            string removedBy = removals.RemovedByEarlier(string.Empty, kept);
+                            if (removedBy != null)
+                            {
+                                string refusal = ExplicitCastingCompiler.EffectRemovedByEarlierCasting +
+                                    ":" + removedBy;
+                                outcomes.Add(Unfulfilled(request, targetId, refusal));
+                                diagnostics.Add("unfulfilled:" + request.AssignmentId + ":" + targetId +
+                                    ":" + refusal);
+                                continue;
+                            }
+                            removals.Admit(string.Empty, request.AssignmentId, kept, false);
                             // Already-active skips never reserve or demand.
                             outcomes.Add(new TargetPlanOutcome(request.Source.SourceId,
                                 request.AssignmentId, targetId,
@@ -127,6 +146,7 @@ namespace KingmakerBuffPlanner.Planning
                 var context = new PlanContext(request, sourceOptions, selectionPolicy,
                     ledger, castsByProvider, poolKinds, materials, enhancementById,
                     enhancementRemaining, accounting, steps, outcomes, diagnostics);
+                context.Removals = removals;
                 if (request.Source.Grouping == CastGroupingKind.MassConfiguredTargets)
                     PlanMass(context, pending);
                 else
@@ -150,6 +170,10 @@ namespace KingmakerBuffPlanner.Planning
             internal readonly List<CastStep> Steps;
             internal readonly List<TargetPlanOutcome> Outcomes;
             internal readonly List<string> Diagnostics;
+            internal ExplicitCastingCompiler.RemovalConflictState Removals =
+                new ExplicitCastingCompiler.RemovalConflictState();
+            // The removal conflict that refused the last candidate, if any.
+            internal string RemovalConflict;
 
             internal PlanContext(BuffCastRequest request,
                 List<ProviderPlanningOption> options, ProviderSelectionPolicy policy,
@@ -183,10 +207,13 @@ namespace KingmakerBuffPlanner.Planning
             var remaining = pending.ToList();
             foreach (string targetId in remaining.ToArray())
             {
+                context.RemovalConflict = null;
                 Selection selection = SelectAndReserve(context, new[] { targetId }, remaining);
                 if (selection == null)
                 {
-                    string failure = request.EnhancementIds.Count == 0
+                    string failure = context.RemovalConflict != null
+                        ? ExplicitCastingCompiler.RemovesPlannedEffect + ":" + context.RemovalConflict
+                        : request.EnhancementIds.Count == 0
                         ? "no-valid-provider-or-resource" : "requested-enhancement-unavailable";
                     context.Outcomes.Add(Unfulfilled(request, targetId, failure));
                     context.Diagnostics.Add("unfulfilled:" + request.AssignmentId + ":" +
@@ -206,6 +233,8 @@ namespace KingmakerBuffPlanner.Planning
                     selection.AppliedEnhancementIds,
                     EnhancementUsage(selection.AppliedEnhancementIds, context.Enhancements),
                     selection.OmittedEnhancementIds));
+                context.Removals.Admit(string.Empty, request.AssignmentId,
+                    StepChanges(request, selection.Option, new[] { targetId }));
                 context.Outcomes.Add(new TargetPlanOutcome(request.Source.SourceId,
                     request.AssignmentId, targetId, TargetOutcomeKind.Fulfilled,
                     request.AssignmentId + ":planned" +
@@ -222,10 +251,13 @@ namespace KingmakerBuffPlanner.Planning
             var remaining = pending.ToList();
             while (remaining.Count != 0)
             {
+                context.RemovalConflict = null;
                 Selection selection = SelectAndReserve(context, remaining, remaining);
                 if (selection == null)
                 {
-                    string failure = request.EnhancementIds.Count == 0
+                    string failure = context.RemovalConflict != null
+                        ? ExplicitCastingCompiler.RemovesPlannedEffect + ":" + context.RemovalConflict
+                        : request.EnhancementIds.Count == 0
                         ? "no-valid-mass-provider-or-resource"
                         : "requested-enhancement-unavailable";
                     foreach (string targetId in remaining)
@@ -249,6 +281,8 @@ namespace KingmakerBuffPlanner.Planning
                     selection.AppliedEnhancementIds,
                     EnhancementUsage(selection.AppliedEnhancementIds, context.Enhancements),
                     selection.OmittedEnhancementIds));
+                context.Removals.Admit(string.Empty, request.AssignmentId, StepChanges(request,
+                    selection.Option, selection.Option.CoveredTargetIdsForAnchor(selection.Anchor)));
                 foreach (string targetId in covered)
                 {
                     context.Outcomes.Add(new TargetPlanOutcome(request.Source.SourceId,
@@ -339,6 +373,17 @@ namespace KingmakerBuffPlanner.Planning
                     .ThenBy(value => value, StringComparer.Ordinal)
                     .FirstOrDefault();
                 if (string.IsNullOrWhiteSpace(anchor)) continue;
+                // R1-F5: a candidate whose cast may remove an effect an
+                // earlier step of this routine provides is refused before
+                // anything is reserved.
+                string conflict = context.Removals.RemovesProvided(string.Empty, StepChanges(request, option,
+                    request.Source.Grouping == CastGroupingKind.MassConfiguredTargets
+                        ? option.CoveredTargetIdsForAnchor(anchor) : (IEnumerable<string>)required));
+                if (conflict != null)
+                {
+                    context.RemovalConflict = conflict;
+                    continue;
+                }
                 ResourceReservation reservation;
                 string reason;
                 // A candidate's full requirements — resource pool, material,
@@ -407,6 +452,16 @@ namespace KingmakerBuffPlanner.Planning
             CastEnhancementSnapshot enhancement;
             return context.Enhancements.TryGetValue(enhancementId, out enhancement) &&
                 enhancement.AffectsTargeting;
+        }
+
+        // What one Classic step may apply and realizably remove on its
+        // recipients, from the option's own binding (as execution uses).
+        private static EffectChanges StepChanges(BuffCastRequest request, ProviderPlanningOption option,
+            IEnumerable<string> recipients)
+        {
+            return EffectChanges.Merge((recipients ?? new string[0]).Select(recipient =>
+                EffectChangeAnalysis.Analyze(option.BindEffects(request.Source.Effects, recipient),
+                    option.Provider.Key.CasterUnitId, recipient)));
         }
 
         private static void RecordFailedDemand(PlanContext context)

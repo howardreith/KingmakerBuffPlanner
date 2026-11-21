@@ -1,0 +1,106 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "m_IsFullRoundAction": true,
+  "Range": "Close",
+  "CanTargetPoint": true,
+  "CanTargetFriends": true,
+  "CanTargetSelf": true,
+  "EffectOnAlly": "Helpful",
+  "Animation": "Point",
+  "AnimationStyle": "CastActionTouch",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Empower, Maximize, Quicken, Extend, Heighten, Reach",
+  "LocalizedDuration": "LocalizedString:9178f928-579f-43d0-bd80-e67e478c7bfc:10 minutes/level",
+  "LocalizedSavingThrow": "LocalizedString::",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "44295e9774b2864488f4a3790b8b0bcf"
+  ],
+  "m_DisplayName": "LocalizedString:8a80e246-f653-4460-9273-521b58b2be16:Heroic Invocation",
+  "m_Description": "LocalizedString:3cbee036-4b29-48c3-8158-f3438852f0f0:Using words of ancient power, you bestow heroic powers on all creatures subject to this spell. They gain a +4 morale bonus on attack and damage rolls, gain 2d8+4 temporary hit points, and become immune to both fear and charm effects for the spell's duration.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "HeroicInvocation"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Enchantment",
+      "name": "$SpellComponent$f31cab25-5807-4dfc-876a-9b6b3d95c015"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:ba0401fdeb4062f40a7aa95b6f07fe89:WizardSpellList",
+      "SpellLevel": 9,
+      "name": "$SpellListComponent$d4e812d1-c56e-45d5-bd07-4f63dd8b1066"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "Actions": {
+        "$id": "5",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "6",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+            "Buff": "Blueprint:fd8fb2c1d622556468a04bea949eb7da:HeroicInvocationBuff",
+            "DurationValue": {
+              "$id": "7",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+              "m_IsExtendable": true,
+              "Rate": "Minutes",
+              "DiceCountValue": {
+                "$id": "8",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              },
+              "BonusValue": {
+                "$id": "9",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                "ValueType": "Rank"
+              }
+            },
+            "IsFromSpell": true,
+            "name": "$ContextActionApplyBuff$9a0146e1-522e-4687-affd-6ec16076d218"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$6100937e-a2ac-46ab-9844-db04bc59fbfb"
+    },
+    {
+      "$id": "10",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityTargetsAround, Assembly-CSharp",
+      "m_Radius": {
+        "$id": "11",
+        "$type": "Kingmaker.Utility.Feet, Assembly-CSharp",
+        "m_Value": 30.0
+      },
+      "m_TargetType": "Ally",
+      "m_Condition": {
+        "$id": "12",
+        "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+        "Conditions": []
+      },
+      "name": "$AbilityTargetsAround$f721584d-22f4-4c72-bc5b-9142b080e1e1"
+    },
+    {
+      "$id": "13",
+      "$type": "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig, Assembly-CSharp",
+      "m_FeatureList": [],
+      "m_Progression": "MultiplyByModifier",
+      "m_CustomProgression": [],
+      "m_StepLevel": 10,
+      "m_Max": 20,
+      "m_Class": [],
+      "name": "$ContextRankConfig$91b640f3-fe0e-4185-b729-42a5f581751a"
+    }
+  ],
+  "m_AssetGuid": "43740dab07286fe4aa00a6ee104ce7c1",
+  "name": "HeroicInvocation"
+}

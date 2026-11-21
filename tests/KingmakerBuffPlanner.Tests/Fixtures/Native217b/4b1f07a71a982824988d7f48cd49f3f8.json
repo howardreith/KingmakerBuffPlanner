@@ -1,0 +1,32 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "FxOnStart": "Resource:ff26ee73fa464a44ca8bf20e858dc3bc:HideousLaughter00",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [
+    "ff26ee73fa464a44ca8bf20e858dc3bc"
+  ],
+  "m_DisplayName": "LocalizedString::",
+  "m_Description": "LocalizedString::",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "HideousLaughter"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.BuffStatusCondition, Assembly-CSharp",
+      "SaveEachRound": true,
+      "Condition": "Prone",
+      "SaveType": "Will",
+      "name": "$BuffStatusCondition$82ee5512-bd7b-4e5c-b6ba-36d0980e50bb"
+    },
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent, Assembly-CSharp",
+      "Descriptor": "MindAffecting, Compulsion",
+      "name": "$SpellDescriptorComponent$cfc8f7d3-ffba-49c9-a15f-8a111810f8a4"
+    }
+  ],
+  "m_AssetGuid": "4b1f07a71a982824988d7f48cd49f3f8",
+  "name": "HideousLaughterBuff"
+}

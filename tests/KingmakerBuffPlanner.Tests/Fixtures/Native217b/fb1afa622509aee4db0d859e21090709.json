@@ -1,0 +1,105 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "Type": "Extraordinary",
+  "Range": "Personal",
+  "CanTargetEnemies": true,
+  "CanTargetSelf": true,
+  "ActionBarAutoFillIgnored": true,
+  "EffectOnEnemy": "Harmful",
+  "Animation": "Omni",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Quicken, Heighten",
+  "LocalizedDuration": "LocalizedString::",
+  "LocalizedSavingThrow": "LocalizedString::",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "8475ed069cfb5ed4daedd2945d9d7555"
+  ],
+  "m_DisplayName": "LocalizedString:a8f5f5bb-ba16-4c26-80b5-cbbb84e8e3c5:Resistance — Cold",
+  "m_Description": "LocalizedString:9d1cad2c-9769-48ce-b33b-94b12d8b0ff1:You gain resistance 5 to an energy type of your choice, chosen when you prepare spells. This resistance can be changed each day. At 11th level, this resistance increases to 10. At 20th level, this resistance changes to immunity to the chosen energy type.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "resist_energy_el_cold_solo"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic, Assembly-CSharp",
+      "RequiredResource": "Blueprint:d16e573dc50e8b548b6e7e1044a21373:AbjurationResistanceResource",
+      "IsSpendResource": true,
+      "Amount": 1,
+      "ResourceCostIncreasingFacts": [],
+      "name": "$AbilityResourceLogic$38b8c789-6f4f-401e-b911-0d5009440690"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "Actions": {
+        "$id": "4",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "5",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+            "Buff": "Blueprint:90ce7dac4b9001e449eb44861397a65f:AbjurationResistanceColdBuff",
+            "Permanent": true,
+            "DurationValue": {
+              "$id": "6",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+              "m_IsExtendable": true,
+              "DiceCountValue": {
+                "$id": "7",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              },
+              "BonusValue": {
+                "$id": "8",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              }
+            },
+            "AsChild": true,
+            "name": "$ContextActionApplyBuff$cf0be52f-06a2-460a-8ac9-9451184c05b4"
+          },
+          {
+            "$id": "9",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff, Assembly-CSharp",
+            "Buff": "Blueprint:b87a0e8a961c63a44a952822fe975edb:AbjurationResistanceAcidBuff",
+            "name": "$ContextActionRemoveBuff$1b833daa-2506-4209-90f4-0e26e323659b"
+          },
+          {
+            "$id": "10",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff, Assembly-CSharp",
+            "Buff": "Blueprint:453201f110f49714fb1d713c1f7bc06d:AbjurationResistanceElectricityBuff",
+            "name": "$ContextActionRemoveBuff$e8ae3d6a-f152-41d8-a7cc-e5d9b81774e2"
+          },
+          {
+            "$id": "11",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff, Assembly-CSharp",
+            "Buff": "Blueprint:b9ce1623447547946b8c58efd069f7c4:AbjurationResistanceFireBuff",
+            "name": "$ContextActionRemoveBuff$1661b298-2932-4a7b-be65-5b8716b74264"
+          },
+          {
+            "$id": "12",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff, Assembly-CSharp",
+            "Buff": "Blueprint:63e2a6323c2bbff40a87fcd522778032:AbjurationResistanceSonicBuff",
+            "name": "$ContextActionRemoveBuff$a8763b06-62f2-48a4-a41c-5436aaea95aa"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$cd9f62de-2b7c-405f-ae68-5e15d82b752c"
+    },
+    {
+      "$id": "13",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx, Assembly-CSharp",
+      "PrefabLink": "Resource:8475ed069cfb5ed4daedd2945d9d7555:ProtectionFromEnergy00",
+      "PositionAnchor": "None",
+      "OrientationAnchor": "None",
+      "name": "$AbilitySpawnFx$bea34435-8968-4afe-a695-f2d156c7991b"
+    }
+  ],
+  "m_AssetGuid": "fb1afa622509aee4db0d859e21090709",
+  "name": "AbjurationResistanceColdAbility"
+}

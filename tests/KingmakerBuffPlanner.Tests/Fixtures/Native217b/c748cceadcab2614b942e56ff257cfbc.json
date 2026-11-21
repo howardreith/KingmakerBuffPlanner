@@ -1,0 +1,22 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "FxOnStart": "Resource::NULL",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [],
+  "m_DisplayName": "LocalizedString:012fc518-2ada-443b-b69b-bb9902ed41ce:Feather Step",
+  "m_Description": "LocalizedString:28f11c6f-1bb8-430e-9d26-73b6c732f0fe:For the duration of this spell, the subject ignores the adverse movement effects of difficult terrain.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "FeatherStep"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddConditionImmunity, Assembly-CSharp",
+      "Condition": "DifficultTerrain",
+      "name": "$AddConditionImmunity$70d085a9-9d2a-430b-bbb4-65bdcc106119"
+    }
+  ],
+  "m_AssetGuid": "c748cceadcab2614b942e56ff257cfbc",
+  "name": "FeatherStepBuff"
+}

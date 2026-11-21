@@ -1,0 +1,391 @@
+{
+  "abilityGuid": "7733b3550b4f03002c59bc590e07d9cc",
+  "parentGuid": "",
+  "variantGuids": [],
+  "internalName": "IrresistibleDanceAbilityCast",
+  "displayName": "Irresistible Dance",
+  "sourceAssembly": "Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null",
+  "ownership": "call-of-the-wild",
+  "isSpell": true,
+  "isCandidate": true,
+  "hasDetectedEffect": true,
+  "abilityType": "Spell",
+  "abilityComponentTypes": [
+    "Kingmaker.Blueprints.Classes.Spells.SpellComponent",
+    "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent",
+    "Kingmaker.Blueprints.Classes.Spells.SpellListComponent",
+    "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectStickyTouch"
+  ],
+  "actionType": "Standard",
+  "range": "Touch",
+  "effectOnAlly": "Harmful",
+  "effectOnEnemy": "Harmful",
+  "canTargetSelf": true,
+  "canTargetFriends": true,
+  "canTargetEnemies": true,
+  "canTargetPoint": false,
+  "isStickyTouch": true,
+  "isMass": false,
+  "isArea": false,
+  "accessibilitySources": [
+    "player-class:0df441ec2aa2407384ddd14e54a50d22/archetype:223bd3d8dc494891b978a8c41fc59fb0/level:1/selection:ca6986b3ce6045c38936505bc0453f04/progression:40eb72aded8c4dbfaf0ce4cf0fa79707/level:16/AddKnownSpell:714457ab80494ba9b0d0d99edb8713b8",
+    "player-class:0df441ec2aa2407384ddd14e54a50d22/progression:6973ab6ad02f4265888c3fdbe7e12921/level:1/selection:30f2f38633a144028aebecdd03391470/progression:40eb72aded8c4dbfaf0ce4cf0fa79707/level:16/AddKnownSpell:714457ab80494ba9b0d0d99edb8713b8",
+    "player-class:0df441ec2aa2407384ddd14e54a50d22/spell-list:422490cf62744e16a3e131efd94cf290/level:8",
+    "player-class:19c3cf3d51cf4cbf9a136a600c26585a/archetype:6ed134267c2f45debc77050d52581d01/level:1/selection:78f8b53b5c524051b2800a5347f1fa29/progression:252363458703f144788af49ef04d0803/level:1/AddSpecialSpellList:9e4c4799735ae9c45964e9113107ef02/spell-list:c72836bb669f0c04680c01d88d49bb0c/level:8",
+    "player-class:19c3cf3d51cf4cbf9a136a600c26585a/spell-list:ba0401fdeb4062f40a7aa95b6f07fe89/level:8",
+    "player-class:359bbaacabc445499049b59d295194cb/spell-list:d8eda7e863824c42b3329279cac4d92a/level:8",
+    "player-class:45a4607686d96a1498891b3286121780/archetype:d078b2ef073f2814c9e338a789d97b73/level:1/selection:24bef8d1bee12274686f6da6ccbc8914/progression:5d00a8c5c31234ea3f8afe922b8bab21/level:17/AddKnownSpell:df1b1eedae152b541bc1b09fd5041fe9",
+    "player-class:45a4607686d96a1498891b3286121780/archetype:d078b2ef073f2814c9e338a789d97b73/level:1/selection:24bef8d1bee12274686f6da6ccbc8914/progression:739c1e842bf77994baf963f4ad964379/level:17/AddKnownSpell:df1b1eedae152b541bc1b09fd5041fe9",
+    "player-class:45a4607686d96a1498891b3286121780/archetype:d078b2ef073f2814c9e338a789d97b73/level:1/selection:24bef8d1bee12274686f6da6ccbc8914/progression:c6d8e4174358892a0db14465f5ea32b0/level:17/AddKnownSpell:4a9a759a627a62541bea02a75017328a",
+    "player-class:45a4607686d96a1498891b3286121780/archetype:d078b2ef073f2814c9e338a789d97b73/level:1/selection:24bef8d1bee12274686f6da6ccbc8914/progression:e8445256abbdc45488c2d90373f7dae8/level:17/AddKnownSpell:4a9a759a627a62541bea02a75017328a",
+    "player-class:6b1d00511e824f0fbc27ec8f54b8edb2/spell-list:7113337f695742559ecdecc8905b132a/level:8",
+    "player-class:772c83a25e2268e448e841dcd548235f/spell-list:25a5013493bdcf74bb2424532214d0c8/level:6",
+    "player-class:83355c80b777402a97f303f8abf6df8d/spell-list:25a5013493bdcf74bb2424532214d0c8/level:6",
+    "player-class:b3a505fb61437dc4097f43c3f8f9a4cf/archetype:711d5024ecc75f346b9cda609c3a1f83/level:1/progression:a46d4bd93601427409d034a997673ece/level:17/AddKnownSpell:4a9a759a627a62541bea02a75017328a",
+    "player-class:b3a505fb61437dc4097f43c3f8f9a4cf/archetype:90c65278162e42f7af2ae7aebfc52e03/level:1/selection:4b6992670cf242f7a4e9291b04195636/progression:51c7a65693de8b09391a789da0d548cb/level:17/selection:79fee916ac56e15b35fe57a51021653a/AddKnownSpell:4a9a759a627a62541bea02a75017328a",
+    "player-class:b3a505fb61437dc4097f43c3f8f9a4cf/archetype:90c65278162e42f7af2ae7aebfc52e03/level:1/selection:4b6992670cf242f7a4e9291b04195636/progression:ca1fea84139436c90b21c26a7eb4d15a/level:17/selection:77a7ceb3e073159b07ee5f6a4b53d1c8/AddKnownSpell:df1b1eedae152b541bc1b09fd5041fe9",
+    "player-class:b3a505fb61437dc4097f43c3f8f9a4cf/archetype:90c65278162e42f7af2ae7aebfc52e03/level:1/selection:fbe881eb85294959a6b267f690b83029/progression:51c7a65693de8b09391a789da0d548cb/level:17/selection:79fee916ac56e15b35fe57a51021653a/AddKnownSpell:4a9a759a627a62541bea02a75017328a",
+    "player-class:b3a505fb61437dc4097f43c3f8f9a4cf/archetype:90c65278162e42f7af2ae7aebfc52e03/level:1/selection:fbe881eb85294959a6b267f690b83029/progression:ca1fea84139436c90b21c26a7eb4d15a/level:17/selection:77a7ceb3e073159b07ee5f6a4b53d1c8/AddKnownSpell:df1b1eedae152b541bc1b09fd5041fe9",
+    "player-class:b3a505fb61437dc4097f43c3f8f9a4cf/progression:997665565ca80a649aedd72455c4df1f/level:1/selection:24bef8d1bee12274686f6da6ccbc8914/progression:5d00a8c5c31234ea3f8afe922b8bab21/level:17/AddKnownSpell:df1b1eedae152b541bc1b09fd5041fe9",
+    "player-class:b3a505fb61437dc4097f43c3f8f9a4cf/progression:997665565ca80a649aedd72455c4df1f/level:1/selection:24bef8d1bee12274686f6da6ccbc8914/progression:739c1e842bf77994baf963f4ad964379/level:17/AddKnownSpell:df1b1eedae152b541bc1b09fd5041fe9",
+    "player-class:b3a505fb61437dc4097f43c3f8f9a4cf/progression:997665565ca80a649aedd72455c4df1f/level:1/selection:24bef8d1bee12274686f6da6ccbc8914/progression:c6d8e4174358892a0db14465f5ea32b0/level:17/AddKnownSpell:4a9a759a627a62541bea02a75017328a",
+    "player-class:b3a505fb61437dc4097f43c3f8f9a4cf/progression:997665565ca80a649aedd72455c4df1f/level:1/selection:24bef8d1bee12274686f6da6ccbc8914/progression:e8445256abbdc45488c2d90373f7dae8/level:17/AddKnownSpell:4a9a759a627a62541bea02a75017328a",
+    "player-class:b3a505fb61437dc4097f43c3f8f9a4cf/spell-list:ba0401fdeb4062f40a7aa95b6f07fe89/level:8",
+    "player-class:ba34257984f4c41408ce1dc2004e342e/archetype:55a8ce15e30d71547a44c69bb2e8a84f/level:1/selection:f431178ec0e2b4946a34ab504bb46285/AddFacts:e1ebc61a71c55054991863a5f6f6d2c2/AddSpecialSpellList:9e4c4799735ae9c45964e9113107ef02/spell-list:c72836bb669f0c04680c01d88d49bb0c/level:8",
+    "player-class:ba34257984f4c41408ce1dc2004e342e/archetype:55a8ce15e30d71547a44c69bb2e8a84f/level:1/selection:f431178ec0e2b4946a34ab504bb46285/AddFacts:e1ebc61a71c55054991863a5f6f6d2c2/progression:252363458703f144788af49ef04d0803/level:1/AddSpecialSpellList:9e4c4799735ae9c45964e9113107ef02/spell-list:c72836bb669f0c04680c01d88d49bb0c/level:8",
+    "player-class:ba34257984f4c41408ce1dc2004e342e/archetype:55a8ce15e30d71547a44c69bb2e8a84f/level:1/selection:f431178ec0e2b4946a34ab504bb46285/AddSpecialSpellList:e1ebc61a71c55054991863a5f6f6d2c2/spell-list:c72836bb669f0c04680c01d88d49bb0c/level:8",
+    "player-class:ba34257984f4c41408ce1dc2004e342e/archetype:5a4ee9a0e0d04d25a2467146fdd000ff/level:1/selection:3d46637fbbf249cd9c6ecc165ce88b20/LearnSpellList:d6a821942bba49d1ac0af9ba9afbb5d1/spell-list:604c5f4b15534ef4a328d6fae07411b8/level:8",
+    "player-class:ba34257984f4c41408ce1dc2004e342e/progression:02f3049806dbf62459259ea8cae8f715/level:1/selection:5f838049069f1ac4d804ce0862ab5110/progression:252363458703f144788af49ef04d0803/level:1/AddSpecialSpellList:9e4c4799735ae9c45964e9113107ef02/spell-list:c72836bb669f0c04680c01d88d49bb0c/level:8",
+    "player-class:ba34257984f4c41408ce1dc2004e342e/spell-list:ba0401fdeb4062f40a7aa95b6f07fe89/level:8"
+  ],
+  "spellLists": [
+    {
+      "spellListGuid": "25a5013493bdcf74bb2424532214d0c8",
+      "spellListName": "BardSpellList",
+      "level": 6,
+      "source": "player-class:772c83a25e2268e448e841dcd548235f"
+    },
+    {
+      "spellListGuid": "25a5013493bdcf74bb2424532214d0c8",
+      "spellListName": "BardSpellList",
+      "level": 6,
+      "source": "player-class:83355c80b777402a97f303f8abf6df8d"
+    },
+    {
+      "spellListGuid": "422490cf62744e16a3e131efd94cf290",
+      "spellListName": "WitchSpellList",
+      "level": 8,
+      "source": "player-class:0df441ec2aa2407384ddd14e54a50d22"
+    },
+    {
+      "spellListGuid": "604c5f4b15534ef4a328d6fae07411b8",
+      "spellListName": "PactWizardEnchantmentPatronSpellList",
+      "level": 8,
+      "source": "player-class:ba34257984f4c41408ce1dc2004e342e/archetype:5a4ee9a0e0d04d25a2467146fdd000ff/level:1/selection:3d46637fbbf249cd9c6ecc165ce88b20/LearnSpellList:d6a821942bba49d1ac0af9ba9afbb5d1"
+    },
+    {
+      "spellListGuid": "7113337f695742559ecdecc8905b132a",
+      "spellListName": "ShamanSpellList",
+      "level": 8,
+      "source": "player-class:6b1d00511e824f0fbc27ec8f54b8edb2"
+    },
+    {
+      "spellListGuid": "ba0401fdeb4062f40a7aa95b6f07fe89",
+      "spellListName": "WizardSpellList",
+      "level": 8,
+      "source": "player-class:19c3cf3d51cf4cbf9a136a600c26585a"
+    },
+    {
+      "spellListGuid": "ba0401fdeb4062f40a7aa95b6f07fe89",
+      "spellListName": "WizardSpellList",
+      "level": 8,
+      "source": "player-class:b3a505fb61437dc4097f43c3f8f9a4cf"
+    },
+    {
+      "spellListGuid": "ba0401fdeb4062f40a7aa95b6f07fe89",
+      "spellListName": "WizardSpellList",
+      "level": 8,
+      "source": "player-class:ba34257984f4c41408ce1dc2004e342e"
+    },
+    {
+      "spellListGuid": "c72836bb669f0c04680c01d88d49bb0c",
+      "spellListName": "WizardEnchantmentSpellList",
+      "level": 8,
+      "source": "player-class:19c3cf3d51cf4cbf9a136a600c26585a/archetype:6ed134267c2f45debc77050d52581d01/level:1/selection:78f8b53b5c524051b2800a5347f1fa29/progression:252363458703f144788af49ef04d0803/level:1/AddSpecialSpellList:9e4c4799735ae9c45964e9113107ef02"
+    },
+    {
+      "spellListGuid": "c72836bb669f0c04680c01d88d49bb0c",
+      "spellListName": "WizardEnchantmentSpellList",
+      "level": 8,
+      "source": "player-class:ba34257984f4c41408ce1dc2004e342e/archetype:55a8ce15e30d71547a44c69bb2e8a84f/level:1/selection:f431178ec0e2b4946a34ab504bb46285/AddFacts:e1ebc61a71c55054991863a5f6f6d2c2/AddSpecialSpellList:9e4c4799735ae9c45964e9113107ef02"
+    },
+    {
+      "spellListGuid": "c72836bb669f0c04680c01d88d49bb0c",
+      "spellListName": "WizardEnchantmentSpellList",
+      "level": 8,
+      "source": "player-class:ba34257984f4c41408ce1dc2004e342e/archetype:55a8ce15e30d71547a44c69bb2e8a84f/level:1/selection:f431178ec0e2b4946a34ab504bb46285/AddFacts:e1ebc61a71c55054991863a5f6f6d2c2/progression:252363458703f144788af49ef04d0803/level:1/AddSpecialSpellList:9e4c4799735ae9c45964e9113107ef02"
+    },
+    {
+      "spellListGuid": "c72836bb669f0c04680c01d88d49bb0c",
+      "spellListName": "WizardEnchantmentSpellList",
+      "level": 8,
+      "source": "player-class:ba34257984f4c41408ce1dc2004e342e/archetype:55a8ce15e30d71547a44c69bb2e8a84f/level:1/selection:f431178ec0e2b4946a34ab504bb46285/AddSpecialSpellList:e1ebc61a71c55054991863a5f6f6d2c2"
+    },
+    {
+      "spellListGuid": "c72836bb669f0c04680c01d88d49bb0c",
+      "spellListName": "WizardEnchantmentSpellList",
+      "level": 8,
+      "source": "player-class:ba34257984f4c41408ce1dc2004e342e/progression:02f3049806dbf62459259ea8cae8f715/level:1/selection:5f838049069f1ac4d804ce0862ab5110/progression:252363458703f144788af49ef04d0803/level:1/AddSpecialSpellList:9e4c4799735ae9c45964e9113107ef02"
+    },
+    {
+      "spellListGuid": "d8eda7e863824c42b3329279cac4d92a",
+      "spellListName": "PsychicSpellList",
+      "level": 8,
+      "source": "player-class:359bbaacabc445499049b59d295194cb"
+    }
+  ],
+  "resourceIds": [],
+  "materialItemGuid": "",
+  "materialCount": 0,
+  "recognizedActionContracts": [
+    "ContextActionApplyBuff"
+  ],
+  "effects": [
+    {
+      "kind": "Buff",
+      "effectGuid": "4d283e0b70fb489ba79e69387818c3f3",
+      "effectName": "IrresisitbleDanceBuff",
+      "target": "CurrentTarget",
+      "harmful": false,
+      "isHiddenInUi": false,
+      "isClassFeature": false,
+      "removeOnRest": false,
+      "stayOnDeath": false,
+      "componentTypes": [
+        "CallOfTheWild.ConfusionControl.ControlConfusionBuff",
+        "CallOfTheWild.NewMechanics.RemoveShieldACBonus",
+        "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent",
+        "Kingmaker.Designers.Mechanics.Buffs.BuffStatusCondition",
+        "Kingmaker.UnitLogic.FactLogic.AddStatBonus",
+        "Kingmaker.UnitLogic.Mechanics.Components.AddFactContextActions"
+      ],
+      "sourceContract": "ContextActionApplyBuff",
+      "actionPath": "7733b3550b4f03002c59bc590e07d9cc/0:fad6a06a3cb04fabaedf4d358c61880d/0:fad6a06a3cb04fabaedf4d358c61880d/0:ActionList/0:reflected:Kingmaker.UnitLogic.Mechanics.Actions.ContextActionConditionalSaved, Assembly-CSharp, Version=0.0.0.0/0:ActionList/0:ContextActionApplyBuff",
+      "grantedConditions": [
+        "Confusion"
+      ],
+      "factActions": [
+        {
+          "list": "NewRound",
+          "appliedEffects": [],
+          "restorative": [],
+          "offensive": [],
+          "unrecognized": [
+            "unknown-node:Kingmaker.UnitLogic.Mechanics.Actions.ContextActionProvokeAttackOfOpportunity, Assembly-CSharp, Version=0.0.0.0"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "Buff",
+      "effectGuid": "cdf2eafedeb7075c1bfc5fc051dcb2d8",
+      "effectName": "InfectiousCharmsIrresistibleDanceAbilityBuff",
+      "target": "Caster",
+      "harmful": false,
+      "isHiddenInUi": false,
+      "isClassFeature": false,
+      "removeOnRest": false,
+      "stayOnDeath": false,
+      "componentTypes": [
+        "Kingmaker.Designers.Mechanics.Facts.ReplaceAbilityParamsWithContext",
+        "Kingmaker.UnitLogic.Mechanics.Components.AddFactContextActions"
+      ],
+      "sourceContract": "ContextActionApplyBuff",
+      "actionPath": "7733b3550b4f03002c59bc590e07d9cc/0:fad6a06a3cb04fabaedf4d358c61880d/0:fad6a06a3cb04fabaedf4d358c61880d/0:ActionList/0:reflected:Kingmaker.UnitLogic.Mechanics.Actions.ContextActionConditionalSaved, Assembly-CSharp, Version=0.0.0.0/0:ActionList/1:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:ContextActionApplyBuff",
+      "grantedConditions": [],
+      "factActions": [
+        {
+          "list": "Deactivated",
+          "appliedEffects": [],
+          "restorative": [],
+          "offensive": [],
+          "unrecognized": [
+            "unknown-node:CallOfTheWild.BuffMechanics.RemoveStoredBuffs, CallOfTheWild, Version=1.0.0.0"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "Buff",
+      "effectGuid": "626a231ee96e00f62e4170b65c78f3f7",
+      "effectName": "InfectiousCharmsIrresistibleDanceAbilityTargetBuff",
+      "target": "CurrentTarget",
+      "harmful": false,
+      "isHiddenInUi": false,
+      "isClassFeature": false,
+      "removeOnRest": false,
+      "stayOnDeath": false,
+      "componentTypes": [
+        "CallOfTheWild.BuffMechanics.StoreBuff"
+      ],
+      "sourceContract": "ContextActionApplyBuff",
+      "actionPath": "7733b3550b4f03002c59bc590e07d9cc/0:fad6a06a3cb04fabaedf4d358c61880d/0:fad6a06a3cb04fabaedf4d358c61880d/0:ActionList/0:reflected:Kingmaker.UnitLogic.Mechanics.Actions.ContextActionConditionalSaved, Assembly-CSharp, Version=0.0.0.0/0:ActionList/1:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/1:reflected:CallOfTheWild.AoeMechanics.ApplyActionToTargetsInRange, CallOfTheWild, Version=1.0.0.0/0:ActionList/0:ContextActionApplyBuff",
+      "grantedConditions": [],
+      "factActions": []
+    },
+    {
+      "kind": "Buff",
+      "effectGuid": "4d283e0b70fb489ba79e69387818c3f3",
+      "effectName": "IrresisitbleDanceBuff",
+      "target": "CurrentTarget",
+      "harmful": false,
+      "isHiddenInUi": false,
+      "isClassFeature": false,
+      "removeOnRest": false,
+      "stayOnDeath": false,
+      "componentTypes": [
+        "CallOfTheWild.ConfusionControl.ControlConfusionBuff",
+        "CallOfTheWild.NewMechanics.RemoveShieldACBonus",
+        "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent",
+        "Kingmaker.Designers.Mechanics.Buffs.BuffStatusCondition",
+        "Kingmaker.UnitLogic.FactLogic.AddStatBonus",
+        "Kingmaker.UnitLogic.Mechanics.Components.AddFactContextActions"
+      ],
+      "sourceContract": "ContextActionApplyBuff",
+      "actionPath": "7733b3550b4f03002c59bc590e07d9cc/0:fad6a06a3cb04fabaedf4d358c61880d/0:fad6a06a3cb04fabaedf4d358c61880d/0:ActionList/0:reflected:Kingmaker.UnitLogic.Mechanics.Actions.ContextActionConditionalSaved, Assembly-CSharp, Version=0.0.0.0/1:ActionList/0:ContextActionApplyBuff",
+      "grantedConditions": [
+        "Confusion"
+      ],
+      "factActions": [
+        {
+          "list": "NewRound",
+          "appliedEffects": [],
+          "restorative": [],
+          "offensive": [],
+          "unrecognized": [
+            "unknown-node:Kingmaker.UnitLogic.Mechanics.Actions.ContextActionProvokeAttackOfOpportunity, Assembly-CSharp, Version=0.0.0.0"
+          ]
+        }
+      ]
+    }
+  ],
+  "restorativeActions": [],
+  "expression": {
+    "expressionType": "ability-reference",
+    "abilityId": "7733b3550b4f03002c59bc590e07d9cc",
+    "child": {
+      "expressionType": "sequence",
+      "children": [
+        {
+          "expressionType": "ability-reference",
+          "abilityId": "fad6a06a3cb04fabaedf4d358c61880d",
+          "child": {
+            "expressionType": "sequence",
+            "children": [
+              {
+                "expressionType": "ability-reference",
+                "abilityId": "fad6a06a3cb04fabaedf4d358c61880d",
+                "child": {
+                  "expressionType": "sequence",
+                  "children": [
+                    {
+                      "expressionType": "sequence",
+                      "children": [
+                        {
+                          "expressionType": "sequence",
+                          "children": [
+                            {
+                              "expressionType": "sequence",
+                              "children": [
+                                {
+                                  "expressionType": "leaf",
+                                  "kind": "Buff",
+                                  "effectId": "4d283e0b70fb489ba79e69387818c3f3",
+                                  "target": "CurrentTarget",
+                                  "sourceContract": "ContextActionApplyBuff",
+                                  "actionPath": "7733b3550b4f03002c59bc590e07d9cc/0:fad6a06a3cb04fabaedf4d358c61880d/0:fad6a06a3cb04fabaedf4d358c61880d/0:ActionList/0:reflected:Kingmaker.UnitLogic.Mechanics.Actions.ContextActionConditionalSaved, Assembly-CSharp, Version=0.0.0.0/0:ActionList/0:ContextActionApplyBuff"
+                                },
+                                {
+                                  "expressionType": "conditional",
+                                  "conditionContract": "And:Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionCasterHasFact",
+                                  "whenTrue": {
+                                    "expressionType": "sequence",
+                                    "children": [
+                                      {
+                                        "expressionType": "leaf",
+                                        "kind": "Buff",
+                                        "effectId": "cdf2eafedeb7075c1bfc5fc051dcb2d8",
+                                        "target": "Caster",
+                                        "sourceContract": "ContextActionApplyBuff",
+                                        "actionPath": "7733b3550b4f03002c59bc590e07d9cc/0:fad6a06a3cb04fabaedf4d358c61880d/0:fad6a06a3cb04fabaedf4d358c61880d/0:ActionList/0:reflected:Kingmaker.UnitLogic.Mechanics.Actions.ContextActionConditionalSaved, Assembly-CSharp, Version=0.0.0.0/0:ActionList/1:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/0:ContextActionApplyBuff"
+                                      },
+                                      {
+                                        "expressionType": "sequence",
+                                        "children": [
+                                          {
+                                            "expressionType": "sequence",
+                                            "children": [
+                                              {
+                                                "expressionType": "leaf",
+                                                "kind": "Buff",
+                                                "effectId": "626a231ee96e00f62e4170b65c78f3f7",
+                                                "target": "CurrentTarget",
+                                                "sourceContract": "ContextActionApplyBuff",
+                                                "actionPath": "7733b3550b4f03002c59bc590e07d9cc/0:fad6a06a3cb04fabaedf4d358c61880d/0:fad6a06a3cb04fabaedf4d358c61880d/0:ActionList/0:reflected:Kingmaker.UnitLogic.Mechanics.Actions.ContextActionConditionalSaved, Assembly-CSharp, Version=0.0.0.0/0:ActionList/1:Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional/true/1:reflected:CallOfTheWild.AoeMechanics.ApplyActionToTargetsInRange, CallOfTheWild, Version=1.0.0.0/0:ActionList/0:ContextActionApplyBuff"
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "whenFalse": {
+                                    "expressionType": "sequence",
+                                    "children": []
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "expressionType": "sequence",
+                              "children": [
+                                {
+                                  "expressionType": "leaf",
+                                  "kind": "Buff",
+                                  "effectId": "4d283e0b70fb489ba79e69387818c3f3",
+                                  "target": "CurrentTarget",
+                                  "sourceContract": "ContextActionApplyBuff",
+                                  "actionPath": "7733b3550b4f03002c59bc590e07d9cc/0:fad6a06a3cb04fabaedf4d358c61880d/0:fad6a06a3cb04fabaedf4d358c61880d/0:ActionList/0:reflected:Kingmaker.UnitLogic.Mechanics.Actions.ContextActionConditionalSaved, Assembly-CSharp, Version=0.0.0.0/1:ActionList/0:ContextActionApplyBuff"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "diagnostics": [],
+  "disposition": "exclude",
+  "supportClass": "excluded-by-definition",
+  "dispositionReason": "harmful-ally-disposition: No persistent beneficial payload has deterministic controllable-party targeting.",
+  "manualOverride": "",
+  "runtimeEvidence": [],
+  "qualificationStatus": "PASS-excluded-by-definition",
+  "dispositionBefore040": "exclude",
+  "liveDisposition": "exclude",
+  "liveDispositionReason": "harmful-ally-disposition: No persistent beneficial payload has deterministic controllable-party targeting.",
+  "liveDispositionBefore040": "exclude",
+  "payloads": [],
+  "selfGatedFactIds": [
+    "8728e884eeaa8b047be04197ecf1a0e4",
+    "fd389783027d63343b4a5634bd81645f"
+  ]
+}

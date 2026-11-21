@@ -1,0 +1,51 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "m_Flags": "RemoveOnRest",
+  "FxOnStart": "Resource::NULL",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [],
+  "m_DisplayName": "LocalizedString:8a489dae-ef21-48da-974f-32d5ccba5e9b:Firebelly",
+  "m_Description": "LocalizedString:1294a62e-a249-4ac1-9877-d712032adfb5:A magical fire warms your belly, granting you fire resistance 5 and making your gut hot to the touch (but not enough to damage you or anything else). As a standard action, you can breathe a 15-foot cone of flame that deals 1d4 points of fire damage (Reflex half, SR applies). Each time you use this breath weapon, the remaining duration of the spell is reduced by 1 minute.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "Firebelly"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddFacts, Assembly-CSharp",
+      "Facts": [
+        "Blueprint:5e5b663f988ece84b9346f6d7d541e66:FirebellyAbility"
+      ],
+      "name": "$AddFacts$23f9080e-16ec-4860-9b0e-5594bf8ad121",
+      "m_AppliedFacts": []
+    },
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Designers.Mechanics.Facts.ReplaceAbilityParamsWithContext, Assembly-CSharp",
+      "Ability": "Blueprint:5e5b663f988ece84b9346f6d7d541e66:FirebellyAbility",
+      "name": "$ReplaceAbilityParamsWithContext$9de0d2f5-a61d-4e57-a1be-936e6c858a50"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddDamageResistanceEnergy, Assembly-CSharp",
+      "ValueMultiplier": {
+        "$id": "4",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+      },
+      "Value": {
+        "$id": "5",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+        "Value": 5
+      },
+      "Pool": {
+        "$id": "6",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+        "Value": 12
+      },
+      "name": "$AddEnergyResistance$8c11904c-9c54-490e-b199-25826792123b"
+    }
+  ],
+  "m_AssetGuid": "7c33de68880aa444bbb916271b653016",
+  "name": "FirebellyBuff"
+}

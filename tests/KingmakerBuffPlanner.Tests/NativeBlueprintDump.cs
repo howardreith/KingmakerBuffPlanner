@@ -24,10 +24,55 @@ namespace KingmakerBuffPlanner.Tests
     // creature types, the buffs a condition reads). Unity assets (icons,
     // prefabs) and localized text are not materialized. No Unity native
     // constructor or live Game state is invoked (cf. NativeObject<T>).
+    //
+    // Review R1-F9: the ordinary regressions read a committed, faithful
+    // SUBSET of that dump (tests/KingmakerBuffPlanner.Tests/Fixtures/
+    // Native217b: "<guid>.json" byte-identical to the dump file, and
+    // index.tsv recording for every blueprint they resolve its native type
+    // directory, its dump file name, and whether it is loaded in full or
+    // only referenced; the flat layout keeps paths under MAX_PATH). They
+    // need no lab directory. The explicitly selected evidence check
+    // "evidence-native-fixtures-missing-beneficial-buffs-capture" re-reads
+    // the full dump (KBP_NATIVE_BLUEPRINT_DUMP or the lab default) while
+    // running the regressions and records exactly what they resolve; its
+    // "-verify" sibling proves every committed file still equals the dump.
     internal sealed class NativeBlueprintDump
     {
-        internal const string Root = @"C:\Dev\KingmakerBuffPlannerLab\native-blueprints-2.1.7b\extracted";
+        internal const string LabDumpRoot = @"C:\Dev\KingmakerBuffPlannerLab\native-blueprints-2.1.7b\extracted";
+        internal const string IndexFile = "index.tsv";
         private static Dictionary<string, string> _paths;
+        private static Dictionary<string, string> _types;
+        private static string _pathsRoot;
+
+        // Non-null while a capture runs: the full dump read instead of the
+        // fixtures, and every resolved blueprint recorded.
+        internal static string CaptureSource;
+        internal static readonly SortedDictionary<string, string> CapturedFull =
+            new SortedDictionary<string, string>(StringComparer.Ordinal);
+        internal static readonly SortedDictionary<string, string> CapturedReferences =
+            new SortedDictionary<string, string>(StringComparer.Ordinal);
+
+        internal static string FixtureRoot
+        {
+            get
+            {
+                DirectoryInfo directory = new DirectoryInfo(Environment.CurrentDirectory);
+                while (directory != null && !File.Exists(Path.Combine(directory.FullName, "KingmakerBuffPlanner.sln")))
+                    directory = directory.Parent;
+                if (directory == null) throw new InvalidOperationException("Repository root was not discoverable.");
+                return Path.Combine(directory.FullName, "tests", "KingmakerBuffPlanner.Tests", "Fixtures",
+                    "Native217b");
+            }
+        }
+
+        internal static string LabDump
+        {
+            get
+            {
+                string configured = Environment.GetEnvironmentVariable("KBP_NATIVE_BLUEPRINT_DUMP");
+                return string.IsNullOrWhiteSpace(configured) ? LabDumpRoot : configured;
+            }
+        }
 
         private readonly HashSet<string> _full;
         private readonly Dictionary<string, BlueprintScriptableObject> _loaded =
@@ -37,8 +82,6 @@ namespace KingmakerBuffPlanner.Tests
         {
             _full = new HashSet<string>(fullyLoadedGuids ?? new string[0], StringComparer.Ordinal);
         }
-
-        internal static bool Available { get { return Directory.Exists(Root); } }
 
         internal T Get<T>(string guid) where T : BlueprintScriptableObject
         {
@@ -65,17 +108,64 @@ namespace KingmakerBuffPlanner.Tests
 
         private static Dictionary<string, string> Paths()
         {
-            if (_paths != null) return _paths;
-            if (!Available)
-                throw new InvalidOperationException("The native 2.1.7b blueprint dump is absent: " + Root);
+            string root = CaptureSource ?? FixtureRoot;
+            if (_paths != null && string.Equals(_pathsRoot, root, StringComparison.Ordinal)) return _paths;
+            if (!Directory.Exists(root))
+                throw new InvalidOperationException(CaptureSource != null
+                    ? "The native 2.1.7b blueprint dump is absent: " + root
+                    : "The committed native blueprint fixtures are absent: " + root);
             var paths = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (string path in Directory.EnumerateFiles(Root, "*.json", SearchOption.AllDirectories))
-            {
-                string[] parts = Path.GetFileNameWithoutExtension(path).Split('.');
-                if (parts.Length >= 2 && parts[parts.Length - 1].Length == 32) paths[parts[parts.Length - 1]] = path;
-            }
+            var types = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (CaptureSource != null)
+                foreach (string path in Directory.EnumerateFiles(root, "*.json", SearchOption.AllDirectories))
+                {
+                    string[] parts = Path.GetFileNameWithoutExtension(path).Split('.');
+                    if (parts.Length < 2 || parts[parts.Length - 1].Length != 32) continue;
+                    paths[parts[parts.Length - 1]] = path;
+                    types[parts[parts.Length - 1]] = Path.GetFileName(Path.GetDirectoryName(path));
+                }
+            else
+                foreach (IndexEntry entry in ReadIndex(root))
+                {
+                    types[entry.Guid] = entry.Type;
+                    if (entry.Full) paths[entry.Guid] = Path.Combine(root, entry.Guid + ".json");
+                }
             _paths = paths;
+            _types = types;
+            _pathsRoot = root;
             return paths;
+        }
+
+        internal sealed class IndexEntry
+        {
+            internal string Guid;
+            internal string Type;
+            internal string FileName;
+            internal bool Full;
+        }
+
+        internal static IEnumerable<IndexEntry> ReadIndex(string root)
+        {
+            string index = Path.Combine(root, IndexFile);
+            if (!File.Exists(index))
+                throw new InvalidOperationException("The committed native blueprint fixture index is absent: " + index);
+            foreach (string line in File.ReadAllLines(index))
+            {
+                string[] columns = line.Split('\t');
+                if (columns.Length != 4 || columns[0].Length != 32 || (columns[3] != "full" && columns[3] != "ref"))
+                    throw new InvalidOperationException("Malformed fixture index line: " + line);
+                yield return new IndexEntry
+                {
+                    Guid = columns[0], Type = columns[1], FileName = columns[2], Full = columns[3] == "full"
+                };
+            }
+        }
+
+        // The native type directory of a blueprint (full or referenced).
+        private static string TypeName(string guid, string path)
+        {
+            string type;
+            return _types != null && _types.TryGetValue(guid, out type) ? type : null;
         }
 
         private object Resolve(string guid, Type declared)
@@ -85,13 +175,24 @@ namespace KingmakerBuffPlanner.Tests
             if (_loaded.TryGetValue(guid, out known)) return declared.IsInstanceOfType(known) ? known : null;
             string path;
             Paths().TryGetValue(guid, out path);
-            Type type = path == null ? declared : NativeType(Path.GetFileName(Path.GetDirectoryName(path)));
+            string typeName = TypeName(guid, path);
+            bool full = _full.Contains(guid);
+            if (full && path == null)
+                throw new InvalidOperationException("Native blueprint " + guid + " is not in the " +
+                    (CaptureSource != null ? "dump" : "committed fixtures; run the explicit " +
+                        "evidence-native-fixtures-missing-beneficial-buffs-capture check against the dump"));
+            if (CaptureSource != null)
+            {
+                if (full) CapturedFull[guid] = path;
+                else if (typeName != null && path != null) CapturedReferences[guid] = path;
+            }
+            Type type = typeName == null ? declared : NativeType(typeName);
             if (type == null || type.IsAbstract || !typeof(BlueprintScriptableObject).IsAssignableFrom(type) ||
                 !declared.IsAssignableFrom(type))
                 return null;
             var blueprint = (BlueprintScriptableObject)Detached(type);
             _loaded[guid] = blueprint;
-            if (path != null && _full.Contains(guid))
+            if (path != null && full)
                 Populate(blueprint, JObject.Parse(File.ReadAllText(path)), new Dictionary<string, object>(StringComparer.Ordinal));
             else
             {

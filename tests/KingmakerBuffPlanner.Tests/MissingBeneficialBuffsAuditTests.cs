@@ -28,16 +28,30 @@ namespace KingmakerBuffPlanner.Tests
         // SHA-256 of the classifier source it judged, so a baseline and a
         // repaired classifier produce two comparable files
         // (git diff --no-index). The exports live outside the repository
-        // (the lab's guarded runtime-evidence root); this prefix is an
-        // explicit evidence run, not part of the focused regression gate.
-        internal const string CandidateAuditEvidenceRoot = @"C:\Dev\KingmakerBuffPlannerLab\runtime-evidence";
+        // (the lab's guarded runtime-evidence root, or
+        // KBP_CANDIDATE_AUDIT_EVIDENCE_ROOT); review R1-F9: these are
+        // explicitly selected evidence checks (RunExplicit, "evidence-*"),
+        // never part of an ordinary or no-prefix run, and they fail with the
+        // missing path when a requested input is absent.
+        internal const string LabCandidateAuditEvidenceRoot = @"C:\Dev\KingmakerBuffPlannerLab\runtime-evidence";
+
+        internal static string CandidateAuditEvidenceRoot
+        {
+            get
+            {
+                string configured = Environment.GetEnvironmentVariable("KBP_CANDIDATE_AUDIT_EVIDENCE_ROOT");
+                return string.IsNullOrWhiteSpace(configured) ? LabCandidateAuditEvidenceRoot : configured;
+            }
+        }
+
+        internal const string FullUserExport = "kbp041-rel-catalog-full";
 
         private static void RunMissingBeneficialBuffsAuditTests()
         {
-            Run("candidate-audit-missing-beneficial-buffs-native-only", () => AuditCatalogExport(
+            RunExplicit("evidence-candidate-audit-missing-beneficial-buffs-native-only", () => AuditCatalogExport(
                 "native-only", Path.Combine(CandidateAuditEvidenceRoot, "kbp040-rc4p-catalog-native", "native-buff-catalog.json")));
-            Run("candidate-audit-missing-beneficial-buffs-full-user", () => AuditCatalogExport(
-                "full-user", Path.Combine(CandidateAuditEvidenceRoot, "kbp041-rel-catalog-full", "native-buff-catalog.json")));
+            RunExplicit("evidence-candidate-audit-missing-beneficial-buffs-full-user", () => AuditCatalogExport(
+                "full-user", Path.Combine(CandidateAuditEvidenceRoot, FullUserExport, "native-buff-catalog.json")));
         }
 
         private static string ClassifierSourceLabel()
@@ -55,7 +69,8 @@ namespace KingmakerBuffPlanner.Tests
         private static void AuditCatalogExport(string profile, string exportPath)
         {
             if (!File.Exists(exportPath))
-                throw new InvalidOperationException("Catalogue export absent (evidence run needs the lab): " + exportPath);
+                throw new InvalidOperationException("Requested evidence input absent (set " +
+                    "KBP_CANDIDATE_AUDIT_EVIDENCE_ROOT or run in the lab): " + exportPath);
             string label = ClassifierSourceLabel();
             string directory = Path.Combine(FindRepositoryRoot(), "artifacts", "candidate-audit");
             Directory.CreateDirectory(directory);
@@ -261,6 +276,10 @@ namespace KingmakerBuffPlanner.Tests
             JArray diagnostics = (JArray)entry["diagnostics"] ?? new JArray();
             return new NativeCandidateAuditFacts
             {
+                // The current versioned registry's evidence-backed
+                // ally-disposition exceptions, as live discovery applies them.
+                AllyDispositionExceptionEffectIds = MbbOverrides()
+                    .AllyDispositionExceptions((string)entry["abilityGuid"]),
                 IsPlayerAccessible = accessible,
                 CanTargetSelf = (bool?)entry["canTargetSelf"] ?? false,
                 CanTargetFriends = (bool?)entry["canTargetFriends"] ?? false,

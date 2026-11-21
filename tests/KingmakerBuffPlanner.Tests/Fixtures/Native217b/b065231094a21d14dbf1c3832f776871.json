@@ -1,0 +1,109 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "Range": "Personal",
+  "CanTargetFriends": true,
+  "CanTargetSelf": true,
+  "EffectOnAlly": "Harmful",
+  "EffectOnEnemy": "Harmful",
+  "Animation": "Point",
+  "AnimationStyle": "CastActionSelf",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Empower, Maximize, Quicken, Extend, Heighten",
+  "LocalizedDuration": "LocalizedString:00b2e4c2-aafe-487b-b890-d57473373da7:1 minute/level",
+  "LocalizedSavingThrow": "LocalizedString:dccd7029-0a51-4e5b-9cb2-7a2969b61516:Reflex half",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "316c51cc84afcfc4facc9ada44ff47c1"
+  ],
+  "m_DisplayName": "LocalizedString:8a489dae-ef21-48da-974f-32d5ccba5e9b:Firebelly",
+  "m_Description": "LocalizedString:1294a62e-a249-4ac1-9877-d712032adfb5:A magical fire warms your belly, granting you fire resistance 5 and making your gut hot to the touch (but not enough to damage you or anything else). As a standard action, you can breathe a 15-foot cone of flame that deals 1d4 points of fire damage (Reflex half, SR applies). Each time you use this breath weapon, the remaining duration of the spell is reduced by 1 minute.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "Firebelly"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Abjuration",
+      "name": "$SpellComponent$963fb46b-1056-41ec-9a0f-e38e805722f1"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "Actions": {
+        "$id": "4",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "5",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+            "Buff": "Blueprint:7c33de68880aa444bbb916271b653016:FirebellyBuff",
+            "DurationValue": {
+              "$id": "6",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+              "m_IsExtendable": true,
+              "Rate": "Minutes",
+              "DiceCountValue": {
+                "$id": "7",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              },
+              "BonusValue": {
+                "$id": "8",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                "ValueType": "Rank"
+              }
+            },
+            "IsFromSpell": true,
+            "ToCaster": true,
+            "name": "$ContextActionApplyBuff$e88271d3-7a86-4c1d-8cd9-500df2019879"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$6d3b3e83-c430-423e-a52d-7e20be5a6a70"
+    },
+    {
+      "$id": "9",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:bad8638d40639d04fa2f80a1cac67d6b:DruidSpellList",
+      "SpellLevel": 1,
+      "name": "$SpellListComponent$a15f0ff1-f830-483f-9ef5-f79309e518db"
+    },
+    {
+      "$id": "10",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:8443ce803d2d31347897a3d85cc32f53:ClericSpellList",
+      "SpellLevel": 1,
+      "name": "$SpellListComponent$e756b072-487e-48ec-9080-13206fc7b299"
+    },
+    {
+      "$id": "11",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:f60d0cd93edc65c42ad31e34a905fb2f:AlchemistSpellList",
+      "SpellLevel": 1,
+      "name": "$SpellListComponent$f4ed5dd8-4915-498c-b5b3-bd2a388a6542"
+    },
+    {
+      "$id": "12",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:9f5be2f7ea64fe04eb40878347b147bc:PaladinSpellList",
+      "SpellLevel": 1,
+      "name": "$SpellListComponent$10934f1a-97d2-4e5a-9780-def9f113f8ce"
+    },
+    {
+      "$id": "13",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx, Assembly-CSharp",
+      "PrefabLink": "Resource:316c51cc84afcfc4facc9ada44ff47c1:Fire00_CritHitSnap",
+      "Anchor": "SelectedTarget",
+      "PositionAnchor": "SelectedTarget",
+      "OrientationAnchor": "None",
+      "name": "$AbilitySpawnFx$70c8c6d8-da4e-4f48-8fdf-a2e671733c6b"
+    }
+  ],
+  "m_AssetGuid": "b065231094a21d14dbf1c3832f776871",
+  "name": "Firebelly"
+}

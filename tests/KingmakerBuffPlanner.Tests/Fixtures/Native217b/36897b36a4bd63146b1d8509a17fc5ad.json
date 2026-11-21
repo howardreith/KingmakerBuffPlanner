@@ -1,0 +1,97 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "FxOnStart": "Resource::NULL",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [],
+  "m_DisplayName": "LocalizedString:b552495b-c1f1-4cc9-8a06-69f6bb0921b8:Crushing Despair",
+  "m_Description": "LocalizedString:4b301c2b-3b50-4806-a9d7-d0989e659a9a:An invisible cone of despair causes great sadness in the subjects. Each affected creature takes a –2 penalty on attack rolls, saving throws, ability checks, skill checks, and weapon damage rolls.\nCrushing despair dispels good hope.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "CrushingDespair"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddStatBonus, Assembly-CSharp",
+      "Descriptor": "Penalty",
+      "Stat": "AdditionalAttackBonus",
+      "Value": -2,
+      "name": "$AddStatBonus$5f631768-71a3-4b48-b66c-260b47a9e2c4"
+    },
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.BuffAllSavesBonus, Assembly-CSharp",
+      "Descriptor": "Penalty",
+      "Value": -2,
+      "name": "$BuffAllSavesBonus$00e05da1-e0d9-4eda-9959-52979140375d"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.BuffAllSkillsBonus, Assembly-CSharp",
+      "Descriptor": "Penalty",
+      "Value": -2,
+      "Multiplier": {
+        "$id": "4",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+        "Value": 1
+      },
+      "name": "$BuffAllSkillsBonus$1ce4d527-a846-4782-94ee-5b1aa84ffba1"
+    },
+    {
+      "$id": "5",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.BuffAbilityRollsBonus, Assembly-CSharp",
+      "Value": -2,
+      "Descriptor": "Penalty",
+      "AffectAllStats": true,
+      "Multiplier": {
+        "$id": "6",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+        "Value": 1
+      },
+      "name": "$BuffAbilityRollsBonus$3129282f-4732-4f85-aafa-6a7a609c5120"
+    },
+    {
+      "$id": "7",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddStatBonus, Assembly-CSharp",
+      "Descriptor": "Penalty",
+      "Stat": "AdditionalDamage",
+      "Value": -2,
+      "name": "$AddStatBonus$fae01ae3-b550-4a93-8d5c-3ce074a1a702"
+    },
+    {
+      "$id": "8",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent, Assembly-CSharp",
+      "Descriptor": "MindAffecting, Compulsion, Emotion, NegativeEmotion",
+      "name": "$SpellDescriptorComponent$95f551d3-76c1-45e0-8aa7-0aa7e363d4e8"
+    },
+    {
+      "$id": "9",
+      "$type": "Kingmaker.UnitLogic.Mechanics.Components.AddFactContextActions, Assembly-CSharp",
+      "Activated": {
+        "$id": "10",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "11",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionSpawnFx, Assembly-CSharp",
+            "PrefabLink": "Resource:9a38d742801be084d89bd34318c600e8:InflictLightWounds00",
+            "name": "$ContextActionSpawnFx$83da41cb-061a-4e63-a679-f7e6e506fed3"
+          }
+        ]
+      },
+      "Deactivated": {
+        "$id": "12",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": []
+      },
+      "NewRound": {
+        "$id": "13",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": []
+      },
+      "name": "$AddFactContextActions$d9ad4257-9b50-49c9-bc8b-95c2567e7325"
+    }
+  ],
+  "m_AssetGuid": "36897b36a4bd63146b1d8509a17fc5ad",
+  "name": "CrushingDespairBuff"
+}

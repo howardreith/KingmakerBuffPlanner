@@ -660,6 +660,7 @@
   "reason.detail": "{0}",
   "reason.effect-owner-not-readable": "a required effect owner is outside the readable party and pets; this casting cannot be confirmed",
   "reason.effect-owner-unresolved": "a required effect owner could not be determined; refresh after nearby units move",
+  "reason.effect-removed-by-earlier-casting": "an earlier casting in this routine removes the effect this one relies on being active (these choices replace each other)",
   "reason.enhancement-balance-unknown": "the required enhancement's remaining uses could not be read",
   "reason.enhancement-changes-targeting": "an enhancement that changes whom the spell reaches (such as Share Transmutation) - remove it and use \"Share with an ally\" before choosing the target",
   "reason.enhancement-exhausted": "a required enhancement has no uses remaining",

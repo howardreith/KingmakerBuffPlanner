@@ -36,7 +36,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             // Every ability reaching live discovery belongs to a party member,
             // so it is reachable; the facts are the catalogue export's own.
             NativeCandidateAuditDecision decision = _classifier.Classify(NativeCatalogExporter.AuditFacts(
-                ability, true, NativeCatalogExporter.GetEffects(expression, _blueprints), scan.Diagnostics));
+                ability, true, NativeCatalogExporter.GetEffects(expression, _blueprints), scan.Diagnostics,
+                _overrides.AllyDispositionExceptions(ability.AssetGuid)));
             if (applied.Entry != null)
             {
                 if (applied.Entry.Disposition == "exclude" ||

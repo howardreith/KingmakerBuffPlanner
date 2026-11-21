@@ -1,0 +1,161 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "Range": "Projectile",
+  "CanTargetPoint": true,
+  "CanTargetEnemies": true,
+  "SpellResistance": true,
+  "EffectOnAlly": "Harmful",
+  "EffectOnEnemy": "Harmful",
+  "Animation": "Point",
+  "AnimationStyle": "CastActionDirectional",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Empower, Maximize, Quicken, Heighten",
+  "LocalizedDuration": "LocalizedString::",
+  "LocalizedSavingThrow": "LocalizedString:dccd7029-0a51-4e5b-9cb2-7a2969b61516:Reflex half",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "0a0fc3957d750cf43953df1c1c2d40d6",
+    "d77c04077f6a54f43bebab61035c1efc"
+  ],
+  "m_DisplayName": "LocalizedString:8a489dae-ef21-48da-974f-32d5ccba5e9b:Firebelly",
+  "m_Description": "LocalizedString:1294a62e-a249-4ac1-9877-d712032adfb5:A magical fire warms your belly, granting you fire resistance 5 and making your gut hot to the touch (but not enough to damage you or anything else). As a standard action, you can breathe a 15-foot cone of flame that deals 1d4 points of fire damage (Reflex half, SR applies). Each time you use this breath weapon, the remaining duration of the spell is reduced by 1 minute.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "Firebelly"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent, Assembly-CSharp",
+      "Descriptor": "Fire",
+      "name": "$SpellDescriptorComponent$4f70abe9-9926-4cf0-96e5-0c84bd7c465a"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Abjuration",
+      "name": "$SpellComponent$8838d22f-5459-4dee-83f2-bf2a44237e00"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "SavingThrowType": "Reflex",
+      "Actions": {
+        "$id": "5",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "6",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDamage, Assembly-CSharp",
+            "DamageType": {
+              "$id": "7",
+              "$type": "Kingmaker.RuleSystem.Rules.Damage.DamageTypeDescription, Assembly-CSharp",
+              "Type": "Energy",
+              "Common": {
+                "$id": "8",
+                "$type": "Kingmaker.RuleSystem.Rules.Damage.DamageTypeDescription+CommomData, Assembly-CSharp"
+              },
+              "Physical": {
+                "$id": "9",
+                "$type": "Kingmaker.RuleSystem.Rules.Damage.DamageTypeDescription+PhysicalData, Assembly-CSharp",
+                "Form": "Slashing"
+              }
+            },
+            "Duration": {
+              "$id": "10",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+              "m_IsExtendable": true,
+              "DiceCountValue": {
+                "$id": "11",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              },
+              "BonusValue": {
+                "$id": "12",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              }
+            },
+            "Value": {
+              "$id": "13",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextDiceValue, Assembly-CSharp",
+              "DiceType": "D4",
+              "DiceCountValue": {
+                "$id": "14",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                "Value": 1
+              },
+              "BonusValue": {
+                "$id": "15",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              }
+            },
+            "IsAoE": true,
+            "HalfIfSaved": true,
+            "name": "$ContextActionDealDamage$de660298-6d99-4127-a4ef-28cff220e16e"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$ea8b4a03-64a5-4b3f-a123-ceb3026c62c3"
+    },
+    {
+      "$id": "16",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityExecuteActionOnCast, Assembly-CSharp",
+      "Conditions": {
+        "$id": "17",
+        "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+        "Conditions": []
+      },
+      "Actions": {
+        "$id": "18",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "19",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionReduceBuffDuration, Assembly-CSharp",
+            "TargetBuff": "Blueprint:7c33de68880aa444bbb916271b653016:FirebellyBuff",
+            "DurationValue": {
+              "$id": "20",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+              "Rate": "Minutes",
+              "DiceCountValue": {
+                "$id": "21",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              },
+              "BonusValue": {
+                "$id": "22",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                "Value": 1
+              }
+            },
+            "name": "$ContextActionReduceBuffDuration$0f0c67f0-47ad-4b13-9f59-815582dcc60c"
+          }
+        ]
+      },
+      "name": "$AbilityExecuteActionOnCast$43c50f9b-1d4c-4270-b3a1-a9f2561dc9f5"
+    },
+    {
+      "$id": "23",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityDeliverProjectile, Assembly-CSharp",
+      "Projectiles": [
+        "Blueprint:6dfc5e4c7d9ae3048984744222dbd0fa:FireCone15Feet00"
+      ],
+      "Type": "Cone",
+      "Length": {
+        "$id": "24",
+        "$type": "Kingmaker.Utility.Feet, Assembly-CSharp",
+        "m_Value": 15.0
+      },
+      "LineWidth": {
+        "$id": "25",
+        "$type": "Kingmaker.Utility.Feet, Assembly-CSharp",
+        "m_Value": 5.0
+      },
+      "name": "$AbilityDeliverProjectile$60bd3731-4126-4125-99ce-d44913abcfb6"
+    }
+  ],
+  "m_AssetGuid": "5e5b663f988ece84b9346f6d7d541e66",
+  "name": "FirebellyAbility"
+}

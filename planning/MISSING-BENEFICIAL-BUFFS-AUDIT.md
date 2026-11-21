@@ -6,9 +6,11 @@ Mission: [planning/MISSING-BENEFICIAL-BUFFS-MISSION.md](MISSING-BENEFICIAL-BUFFS
 evidence baseline `dd3e997100916576a268b24e46d49b4db7c34481` (mission commit
 `a4ab152`). Product commit `e240d0a42e78af8539c79a3fbbeb4ab3878ad7b2`
 (source, tests and audit harness; this record and its evidence follow in the
-next commit). The final checkpoint after the owner addendum (mission §9) adds
-offline tests and records only; production source is unchanged since
-`e240d0a`. Version 0.6.19 unchanged (unreleased change). This record is
+next commit). The final checkpoint after the owner addendum (mission §9)
+(`76193a2`) added offline tests and records only. Review round 1 (nine
+findings, all fixed; see [Review round 1](#review-round-1)) changed production
+source again in the corrections commit that follows `76193a2`.
+Version 0.6.19 unchanged (unreleased change). This record is
 offline evidence only: **no native game check ran**, and by owner decision the
 in-game checks are owner acceptance (see
 [Native checks](#native-checks-owner-acceptance)).
@@ -42,9 +44,22 @@ in-game checks are owner acceptance (see
 - `Discovery/NativeCandidateClassifier.cs` (shared by live discovery, the
   catalogue export and both rule sets):
   - harmful-to-allies still vetoes every ability that can be aimed at a
-    hostile unit (`HarmfulToAlliesOfAHostileAbility`); it no longer vetoes an
-    ability with no enemy targeting, whose payload is still judged by every
-    harmful-buff, harmful-condition, offensive-carrier and marker rule;
+    hostile unit. After review R1-F6 it is overridden ONLY for an ability that
+    cannot be aimed at an enemy AND a payload named by an explicit,
+    evidence-backed versioned entry (`NativeEffectOverrides.json`, new
+    disposition `admit-despite-ally-disposition`, passed to the classifier in
+    `NativeCandidateAuditFacts.AllyDispositionExceptionEffectIds`), and only
+    when that payload blueprint was read (harmful flag and components
+    resolved). Enemy targeting alone is not proof of benefit: a friend-only
+    ability applying the native Crushing Despair buff (no `m_Harmful` flag)
+    would have passed the round-1 rule. The entry keeps the discovered graph
+    (unlike `include`), the payload is still judged by every harmful-buff,
+    harmful-condition, offensive-carrier and marker rule, and the classifier
+    source holds no spell names or identities (the source validator forbids
+    special-casing owner-reported spells there). Entries: native Good Hope →
+    `GoodHopeBuff`, native Firebelly → `FirebellyBuff`, and the Call of the
+    Wild / Kingmaker Gunslinger variants the full-user export shows applying
+    those same buffs, each with its evidence in the entry's reason;
   - `IsPersonalRange` / `CanBeAimedAtHostiles`: a Personal-range ability that
     can target itself is never "aimed at enemies" (hostile-current-target and
     hostile-ability-rider);
@@ -52,15 +67,31 @@ in-game checks are owner acceptance (see
     it may target self/friends, cannot target enemies, is not a sticky touch,
     and every persistent effect is a unit `Buff` reaching
     `AlliedAreaRecipients` through the ability's own first-child
-    `AbilityTargetsAround` transform. Everything else point-capable keeps
-    `point-target-without-placement`. No ground coordinate is invented: the
-    existing provider-option builder offers only units the native
-    `AbilityData.CanTarget` admits, and the existing allied-area geometry
-    predicts recipients from that unit.
-- No `NativeEffectOverrides.json` entry was added (the `include` shortcut
-  would replace Good Hope's discovered allied area and conditional branch).
-  The existing Freedom of Movement, True Seeing and Strength Surge overrides
-  are unchanged and regression-tested.
+    `AbilityTargetsAround` transform, with (review R1-F7) only action lists
+    and conditional branches between that selector and the applying
+    `ContextActionApplyBuff`: a nested cast, a second selector, a party/pet
+    transform or a reflected wrapper could select around each outer
+    recipient, which one anchor disk cannot represent, so it is refused.
+    Everything else point-capable keeps `point-target-without-placement`. No
+    ground coordinate is invented: the provider-option builder offers only
+    units the native `AbilityData.CanTarget` admits, and the existing
+    allied-area geometry predicts recipients from that unit.
+- No `include` override was added (it would replace Good Hope's discovered
+  allied area and conditional branch); the R1-F6 entries use the new
+  graph-preserving `admit-despite-ally-disposition` disposition. The existing
+  Freedom of Movement, True Seeing and Strength Surge overrides are unchanged
+  and regression-tested.
+- Review R1-F8: the decisions of the two Unity-bound builders were extracted
+  into game-free production code the builders now call, so offline tests
+  drive them with injected live reads: `GameAdapters/PartyProviderAdmission`
+  (discovery gate, spontaneous-level pools, provider keys, fact-provider
+  pools/costs, ambiguity rule) used by `KingmakerPartySnapshotBuilder`;
+  `KingmakerFactResources.TryPriceAbilityResource` (native resource pool and
+  cost) used by `TryRead`; `GameAdapters/ProviderTargetingPlanner` (reachable
+  units, legal anchors from the native `CanTarget` verdict, no caster fallback
+  for allied-area effects, per-anchor recipients from live distances, option
+  construction) used by `KingmakerProviderOptionBuilder`. Behavior is
+  unchanged; the builders only read live state.
 - Mutually exclusive selections are never planned as stackable:
   `KingmakerActionGraphAdapter` keeps which buff an exact
   `ContextActionRemoveBuff` removes (and from whom); the scanner carries it as
@@ -72,6 +103,17 @@ in-game checks are owner acceptance (see
   enGB and zhCN). It casts nothing and reserves nothing. Switching away from a
   resistance active before the run is the ordinary native switch and is not
   blocked; re-selecting the active one is already satisfied (no recast, no use).
+  After review round 1 the guard runs inside the budget pass in execution
+  order (R1-F1/F2/F3): only a casting finally admitted (funded and Ready, or an
+  already-satisfied skip that stays active) constrains later castings; a skip
+  whose effect an earlier admitted casting removes is no longer satisfied and
+  is Blocked (`effect-removed-by-earlier-casting:<earlier>:<effect>:<unit>`,
+  enGB/zhCN text); conflicts read each casting's provider-BOUND expression
+  (`EffectChangeAnalysis`: a removal counts on any branch binding leaves
+  possible, and only a certain later re-application on the same path cancels
+  it). The one-pass forecast forgets a structural grant whose effect a later
+  casting removes (R1-F4). The retired Classic planner (`CastPlanner`) applies
+  the same rule (R1-F5).
 - `NativeCatalogExporter` / `KingmakerBuffSourceDiscovery` take an explicit
   `NativeBlueprintLookup` (default: the loaded library, unchanged behavior) so
   the regression tests run the real adapter → scanner → exporter facts →
@@ -82,34 +124,46 @@ in-game checks are owner acceptance (see
 
 | Family | Status | Evidence |
 |---|---|---|
-| Good Hope (`a5e23522…`, buff `85af9f0c…`) | **Fixed; offline-verified; native NOT RUN** | Baseline `harmful-ally-disposition`, repaired `valid-beneficial-party-effect`; live discovery admits it; whole expression kept (allied area, HasBuff branch, Crushing Despair removal); 15-ft radius read natively; one mass cast, one slot, out-of-radius ally never predicted; existing-buff verdicts read `GoodHopeBuff`; despairing recipient never reported as receiving Good Hope; rediscovery identical. |
+| Good Hope (`a5e23522…`, buff `85af9f0c…`) | **Fixed; offline-verified; native NOT RUN** | Baseline `harmful-ally-disposition`, repaired `valid-beneficial-party-effect` through its evidence-backed versioned entry (without it: still excluded); live discovery admits it; production provider admission gives a bard who knows it a castable entry and one who does not none; whole expression kept (allied area, HasBuff branch, Crushing Despair removal); 15-ft radius read natively; production anchor coverage = units within 15 ft; one mass cast, one level-3 slot, out-of-radius ally never predicted; existing-buff verdicts read `GoodHopeBuff`; despairing recipient never reported as receiving Good Hope; rediscovery identical. Unread payload or a penalty payload on the same shape stays excluded. |
 | Haste (`486eaff5…`) | Unchanged (available before and after) | Same tests. |
-| Firebelly (`b0652310…`, buff `7c33de68…`) | **Fixed; offline-verified; native NOT RUN** | Baseline `harmful-ally-disposition`, repaired `valid-beneficial-self-effect` (Caster payload). The breath it grants (`5e5b663f…`, AddFacts) stays excluded (point-target, offensive). |
-| Abjuration Resistance — Acid/Cold/Electricity/Fire/Sonic | **Fixed; offline-verified; native NOT RUN** | Baseline hostile current target; repaired personal self buff, payload = own resistance; each removes exactly the other four; native cost `AbilityResourceLogic` 1 × `AbjurationResistanceResource`; no finite lifetime; Fire-then-Cold blocked as `removes-planned-effect`; active choice already satisfied; switching casts once. |
-| Blessing of Luck and Resolve Mass, Feather Step Mass, Firebrand, Heroic Invocation | **Fixed (unit-anchor path); offline-verified; native NOT RUN** | Baseline `point-target-without-placement`, repaired party effect via own allied selector; native radii 30/15/30/30 ft; anchored plan predicts only the anchor's in-radius allies; one cast, one slot, step anchored on a unit. Native `AbilityData.TargetAnchor` is `Point` for these spells, so the in-game legality of a unit target (native `CanTarget`) is **unverified** and left to owner acceptance (check 8). Everything depending on it fails closed, with offline coverage (`missing-beneficial-buffs-point-group-unit-anchor-refused-fails-closed`): no admitted unit → anchored and caster-centred castings Blocked (`origin-anchor-illegal` / `origin-caster-illegal`, worded), nothing reserved, no step; a refused authored anchor never falls back to another centre; an anchor refused at cast time is never submitted by either engine (`target-invalid`, no spend, no confirmation). Enlarge/Reduce Person, Mass planned together on the same allies: the later casting is Blocked (`removes-planned-effect`). |
-| Irresistible Dance (Call of the Wild) | Still excluded | Loaded-blueprint facts (0.4.1 full-user export): can target enemies, harmful to allies → `harmful-ally-disposition` under both rule sets. |
+| Firebelly (`b0652310…`, buff `7c33de68…`) | **Fixed; offline-verified; native NOT RUN** | Baseline `harmful-ally-disposition`, repaired `valid-beneficial-self-effect` (Caster payload) through its evidence-backed entry. The breath it grants (`5e5b663f…`, AddFacts) stays excluded (point-target, offensive). |
+| Abjuration Resistance — Acid/Cold/Electricity/Fire/Sonic | **Fixed; offline-verified; native NOT RUN** | Baseline hostile current target; repaired personal self buff, payload = own resistance; each removes exactly the other four; production pricing: all five share the one native pool `wizard|resource|d16e573d…` at 1 use each, personal (only the owner is a legal target); no finite lifetime; Fire-then-Cold blocked as `removes-planned-effect`; active choice already satisfied; switching casts once; with Fire active, Cold-then-Fire blocks the Fire skip (`effect-removed-by-earlier-casting`, R1-F1); Classic planner refuses the same combinations (R1-F5). |
+| Blessing of Luck and Resolve Mass, Feather Step Mass, Firebrand, Heroic Invocation | **Fixed (unit-anchor path); offline-verified; native NOT RUN** | Baseline `point-target-without-placement`, repaired party effect via own allied selector; native radii 30/15/30/30 ft; anchored plan predicts only the anchor's in-radius allies; one cast, one slot, step anchored on a unit. Native `AbilityData.TargetAnchor` is `Point` for these spells, so the in-game legality of a unit target (native `CanTarget`) is **unverified** and left to owner acceptance (check 8). Everything depending on it fails closed, with offline coverage (`missing-beneficial-buffs-point-group-unit-anchor-refused-fails-closed`): no admitted unit → anchored and caster-centred castings Blocked (`origin-anchor-illegal` / `origin-caster-illegal`, worded), nothing reserved, no step; a refused authored anchor never falls back to another centre; an anchor refused at cast time is never submitted by either engine (`target-invalid`, no spend, no confirmation). Since review round 1 the accepted and refused anchors come from the production `ProviderTargetingPlanner` under the injected native verdict (no caster fallback for these allied-area effects), and the provider/pool from `PartyProviderAdmission`. Enlarge/Reduce Person, Mass planned together on the same allies: the later casting is Blocked (`removes-planned-effect`); an unfunded one never blocks a funded alternative (R1-F2); the one-pass forecast recasts Enlarge after an intervening Reduce (R1-F4). A nested same-radius burst is refused (R1-F7). |
+| Irresistible Dance (Call of the Wild) | Still excluded | Loaded-blueprint facts (0.4.1 full-user export entry, committed verbatim as a fixture and proven identical by the explicit verify check): can target enemies, harmful to allies → `harmful-ally-disposition` under both rule sets. |
 | Negative controls | Still excluded | Hideous Laughter, Call Lightning (`harmful-ally-disposition`: it can target enemies), Firebelly's breath, Dazing Touch (harmful condition), Treat Affliction (restoration + cooldown marker), Good Hope (Troll Lair) point variant with an `Any` selector. |
 
 ## Candidate audit (§3.D)
 
-Method: `candidate-audit-missing-beneficial-buffs-*` streams every ability of a
-guarded in-game catalogue export, rebuilds the exact classifier facts the
-export recorded from the loaded blueprints, and judges them with the frozen
-baseline classifier and the repaired one, under **both** Current and Pre040 and
-in both live and static scope. Nothing is filtered (rows excluded under both
-rule sets are kept). The exports' historical dispositions are not read; the
-historical `planning/NATIVE-BUFF-CATALOG.json` labels are not used.
+Method: the explicitly selected evidence check
+`evidence-candidate-audit-missing-beneficial-buffs-*` (renamed from
+`candidate-audit-…` after review R1-F9; never part of an ordinary or
+no-prefix run; export root overridable with `KBP_CANDIDATE_AUDIT_EVIDENCE_ROOT`)
+streams every ability of a guarded in-game catalogue export, rebuilds the
+exact classifier facts the export recorded from the loaded blueprints (plus
+the current versioned ally-disposition entries, as live discovery applies
+them), and judges them with the frozen baseline classifier and the repaired
+one, under **both** Current and Pre040 and in both live and static scope.
+Nothing is filtered (rows excluded under both rule sets are kept). The
+exports' historical dispositions are not read; the historical
+`planning/NATIVE-BUFF-CATALOG.json` labels are not used.
 
-| Scope | Export (generator) | Abilities | Changed | Full report SHA-256 |
+| Scope | Export (generator) | Abilities | Changed | Full report SHA-256 (round 1) |
 |---|---|---|---|---|
-| native-only | `kbp040-rc4p-catalog-native` (`7ccf0c9`) | 1,722 | 16 | `40ca1ef8dfc263f2608841d0d6f681df641ed337c8e3feac32592fce1a249cec` |
-| full-user | `kbp041-rel-catalog-full` (`85e7410`) | 10,443 | 48 | `45cb68e5eecc015515cd68eda95ef1dcbc32ad915368c15669607f3578d08005` |
+| native-only | `kbp040-rc4p-catalog-native` (`7ccf0c9`) | 1,722 | 16 | `bb75bcc491a44184a403f2194fa5915fb6da71d856833396d88e58d4d39a915a` |
+| full-user | `kbp041-rel-catalog-full` (`85e7410`) | 10,443 | 48 | `2cdd2a56f9c7e5cc91b6ca6e6807cbcd078d797e0965edd33f64f68823aef7a5` |
 
-Judged by classifier source SHA-256
-`2ac1b4500994ec3afb212ba0de25862aa5e448b000fd18ef1305eafe3e45845f`. Changed
-rows: [native-only-changes.tsv](../docs/evidence/missing-beneficial-buffs-2026-11-21/native-only-changes.tsv)
-(`bb471ac3…9781`), [full-user-changes.tsv](../docs/evidence/missing-beneficial-buffs-2026-11-21/full-user-changes.tsv)
-(`a61d6064…0207`).
+Judged (review round 1) by classifier source SHA-256
+`95e923dce699566d6ff103f86c56b69e570eb419baafcde293c915f2f7ba5bb4` with
+`NativeEffectOverrides.json` `c462aeb401e413599bf610db6e287e029f80f67d70c59de76eece2bb266478d0`
+(working-tree bytes). Changed rows:
+[native-only-changes.tsv](../docs/evidence/missing-beneficial-buffs-2026-11-21/native-only-changes.tsv)
+(`ce707f14…39e7`), [full-user-changes.tsv](../docs/evidence/missing-beneficial-buffs-2026-11-21/full-user-changes.tsv)
+(`021ebe4d…83ce`). The changed rows are byte-identical to the round-1 files
+(classifier `2ac1b450…`, reports `40ca1ef8…` / `45cb68e5…`); only the header
+label differs. The narrowed ally-disposition rule and the nested-burst rule
+removed no audited row: every harmful-ally → include row applies
+`GoodHopeBuff` or `FirebellyBuff` and has an entry, and every admitted
+point-capable row is a direct allied burst.
 
 **Every changed native row** (live Current; all four scopes agree except the
 three Physical Enhancement rows, which the static index does not reach):
@@ -132,9 +186,9 @@ the other's buff, which the removal-conflict guard handles).
 full-user: the 48 rows are the families above plus their Call of the Wild
 variants (spell kenning, lore/wish manifestations, school understanding,
 Kindness, Twinned Eidolon, Infernal Arcana) and the Kingmaker Gunslinger
-Ifrit Lavasoul Firebelly ability. One row changed reason only: Shadow
-Evocation, Greater (Caustic Eruption) moves from harmful-ally-disposition to
-offensive-carrier-only (still excluded).
+Ifrit Lavasoul Firebelly ability. (Round 1 reported one reason-only change,
+Shadow Evocation, Greater, to offensive-carrier-only; with the narrowed rule
+its reason stays `harmful-ally-disposition`. It was and is excluded.)
 
 Reviewed and correctly still excluded: every remaining
 `harmful-ally-disposition` row can target enemies (Call Lightning, Call
@@ -178,14 +232,40 @@ Native behavior only the game can confirm, and how the code handles it:
 | Unverified native behavior | Code dependency | Handling |
 |---|---|---|
 | Native `CanTarget` admits a unit centre for the four point-capable group spells (native anchor `Point`) | Unit-anchored planning and casting | Fails closed at planning (no legal anchor, Blocked, worded reason) and at cast time (`target-invalid`, never submitted); offline-tested. Owner check 8. |
-| The loaded 2.1.7b blueprints match the dump/export facts (Good Hope, Firebelly, Abjuration, group spells) | Admission | A different loaded blueprint is judged by the same structural rules; nothing is assumed by name or GUID. Owner checks 1, 4, 5, 8. |
+| The loaded 2.1.7b blueprints match the dump/export facts (Good Hope, Firebelly, Abjuration, group spells) | Admission | A different loaded blueprint is judged by the same rules; the ally-disposition entries apply only to their named payload buffs, only when those buffs are read, and only on an ability that cannot be aimed at an enemy (otherwise excluded). Owner checks 1, 4, 5, 8. |
 | Personal-range selections are castable only on their owner | Abjuration options | Unchanged existing path: the option builder offers only units native `CanTarget` admits (the same path as already-qualified personal spells such as Mirror Image); none admitted → `target-unreachable`. Owner check 5. |
 | Native application/removal (Good Hope's Despair branch, resistance switching, area reach) | Confirmation and existing-effect decisions | Confirmation reads observed effects only; a recipient whose Despair was removed is never reported as receiving Good Hope (offline-tested). Owner checks 2, 3, 6, 7. |
 
+## Review round 1
+
+Codex review of `76193a2` (decision `changes_required`, nine findings). All
+fixed in the corrections commit after `76193a2`; regressions named in the
+validation table.
+
+| Finding | Correction | Regression |
+|---|---|---|
+| R1-F1 switch invalidates a later already-active skip (P1) | Skip blocked when an earlier admitted casting removes its effect (`effect-removed-by-earlier-casting`) | `…-switch-invalidates-a-later-already-active-skip` |
+| R1-F2 unfunded casting blocks a funded one | Conflicts judged in the budget pass; only finally admitted castings constrain | `…-unfunded-casting-does-not-block-a-funded-one` |
+| R1-F3 alternatives treated as running together | `EffectChangeAnalysis` on the provider-bound expression, branch- and order-aware | `…-removal-conflicts-follow-bound-branches` |
+| R1-F4 one-pass forecast keeps removed effects | Removal invalidates structural grants across the sequence | `…-one-pass-forecast-forgets-removed-grants` |
+| R1-F5 Classic planner bypasses the exclusion | Same rule in `CastPlanner.PlanRoutine` | `…-classic-planner-refuses-exclusive-choices` |
+| R1-F6 harmful-ally exception unproved (P1) | Evidence-backed graph-preserving registry entries; fail closed on unread payload | `…-ally-disposition-exception-is-evidence-bound` |
+| R1-F7 nested bursts with different centres | Whole recipient path checked | `…-nested-allied-burst-refused` |
+| R1-F8 tests supplied provider/anchor decisions (P1) | Decisions extracted to game-free production code; tests inject only live reads | `…-provider-admission-known-and-unknown-bard`, `…-abjuration-selections-share-the-native-pool`, rewritten area/anchor/fail-closed tests |
+| R1-F9 machine-specific test inputs | Committed faithful fixture subset + Dance entry; inventory replay and fixture refresh are explicit `evidence-*` checks with configurable inputs | ordinary run reads no lab path; explicit capture/verify/audit checks |
+
 ## Rejected approaches
 
-- Name/GUID allow-list or an override for Good Hope/Firebelly: rejected —
-  structural rule found; `include` overrides replace the discovered graph.
+- An `include` override for Good Hope/Firebelly: rejected — it replaces the
+  discovered graph (allied area, conditional branch).
+- The round-1 purely structural harmful-ally rule ("cannot target an
+  enemy"): superseded after review R1-F6 — it admitted unproved payloads (an
+  unread buff, a friend-only penalty buff with a clear harmful flag). Replaced
+  by the narrow evidence-backed, graph-preserving versioned entries.
+- A GUID list inside the classifier: rejected — the repository's source
+  validator forbids special-casing owner-reported spells in production
+  classification; proven exceptions belong in the versioned overrides file
+  (AGENTS.md).
 - Removing hostile/harmful checks broadly: rejected — Call Lightning and
   Irresistible Dance would enter under Pre040, and riders under Current.
 - Treating the remove/apply conditional as the cause: rejected — Haste has the
@@ -205,9 +285,14 @@ Native behavior only the game can confirm, and how the code handles it:
   no fresh current-stack export was made (it needs a guarded launch). Tabletop
   Added Rules was not in scope.
 
-- The retired Classic planner (honored only for an explicit legacy mode file)
-  does not have the removal-conflict guard; the casting-first planner (default,
-  the only authoring UI) does.
+- The retired Classic planner checks removal conflicts conservatively (its
+  candidate check binds with the option's own facts; a skip check without a
+  pinned caster cannot resolve caster-role owners and so does not see a
+  removal of a caster-role effect); round 1 closed the gap for the shapes in
+  this mission (R1-F5).
+- New ally-disposition exceptions are added only as evidence-backed entries in
+  `NativeEffectOverrides.json`; a future modded variant applying the same buff
+  under a new ability GUID stays excluded until it has an entry.
 - Abjuration and Physical Enhancement durations stay "unknown" in the
   duration estimate (the native application is `AsChild` beside removals);
   no finite duration is invented and an active selection with no expiry
@@ -238,6 +323,28 @@ The candidate audit reproduced unchanged (native-only 1,722 / 16 changed,
 full-user 10,443 / 48 changed, classifier `2ac1b450…`). The controller's
 `focused` gate receipt (`-Only missing-beneficial-buffs`) is bound to the
 committed candidate by the controller, not to this record.
+
+Review round 1 corrections, same entry point, final working tree before
+commit (DLL `741941be…` for that tree; Build.ps1 stamps HEAD, so the committed
+candidate's DLL hash differs and is recorded by the gate receipt):
+
+| Command (`-Only`) | Result | Duration |
+|---|---|---|
+| `missing-beneficial-buffs` (23 regressions, read only the committed fixtures) | 23/0 | 5.7 s |
+| baseline neighbor families + `effect-overrides,missing-beneficial-buffs` + the three moved source-contract tests (`provider-choices-name-the-book-and-refuse-twins`, `cantrips-cast-at-will-through-the-class-ability`, `confirmation-needs-an-instance-this-attempt-applied`) | 42/0 | 5.9 s |
+| all prefixes `a`…`z` (complete offline program; the two audit checks are now explicit, nine regressions were added) | 772/0 | 39.4 s |
+| explicit `evidence-native-fixtures-missing-beneficial-buffs-capture` (every regression re-run against the full lab dump; 45 blueprints in full, 50 referenced) | 1/0 | 8 s |
+| explicit `evidence-native-fixtures-missing-beneficial-buffs-verify` (45 files byte-identical to the dump, 50 reference types match, Dance entry identical to the export) | 1/0 | 5.4 s |
+| explicit `evidence-candidate-audit-missing-beneficial-buffs` (1,722 / 16 and 10,443 / 48) | 2/0 | 13.5 s |
+
+The first complete run after the extraction failed 769/3: three existing
+source-text contract tests pinned code that moved into
+`PartyProviderAdmission` / `ProviderTargetingPlanner`. Each assertion was
+moved to the new location with the same contract (none removed), then 3/0.
+Reproduction of the round-1 defects: the corresponding regressions were traced
+against the `76193a2` code (each counterexample in the review leads to the
+asserted wrong outcome there); the old production code was not re-executed
+with the new tests.
 
 Baseline reproduction: each regression judges the same native facts with the
 frozen `dd3e997` classifier and asserts the original exclusion before

@@ -1,0 +1,32 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "m_Flags": "RemoveOnRest",
+  "FxOnStart": "Resource::NULL",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [],
+  "m_DisplayName": "LocalizedString:b9b35c93-e33e-4ecc-b035-2b798dbb95dd:Call Lightning",
+  "m_Description": "LocalizedString:7a219b76-1d37-45d7-99a8-41e9e1d69854:This creature may call down lightning bolts.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "CallLightning"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddFacts, Assembly-CSharp",
+      "Facts": [
+        "Blueprint:0bd54216d38852947930320f6269a9d7:CallLightningAbility"
+      ],
+      "name": "$AddFacts$23f9080e-16ec-4860-9b0e-5594bf8ad121",
+      "m_AppliedFacts": []
+    },
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Designers.Mechanics.Facts.ReplaceAbilityParamsWithContext, Assembly-CSharp",
+      "Ability": "Blueprint:0bd54216d38852947930320f6269a9d7:CallLightningAbility",
+      "name": "$ReplaceAbilityParamsWithContext$9de0d2f5-a61d-4e57-a1be-936e6c858a50"
+    }
+  ],
+  "m_AssetGuid": "dd91a3c3df275984592edcadb8e90749",
+  "name": "CallLightningBuff"
+}

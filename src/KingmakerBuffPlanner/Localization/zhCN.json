@@ -660,6 +660,7 @@
   "reason.detail": "尚未就绪（{0}）",
   "reason.effect-owner-not-readable": "效果涉及队伍成员及其动物伙伴以外的单位，无法核实此次施法",
   "reason.effect-owner-unresolved": "无法确定效果应落在哪个单位身上；请在附近单位移动后刷新",
+  "reason.effect-removed-by-earlier-casting": "本流程中较早的施法会移除此条目所依赖的已生效效果（这些选择会互相替换）",
   "reason.enhancement-balance-unknown": "无法读取所需强化的剩余使用次数",
   "reason.enhancement-changes-targeting": "所选强化会改变施法目标（如“共享变化法术”）；请先移除此项，再选择“与队友共享”，然后指定目标",
   "reason.enhancement-exhausted": "一项必需的强化已用尽使用次数",

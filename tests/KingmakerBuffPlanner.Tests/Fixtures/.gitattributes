@@ -1,0 +1,4 @@
+# Faithful native fixtures: committed and checked out byte for byte, so the
+# explicit evidence-native-fixtures-missing-beneficial-buffs-verify check can
+# compare them with the Blueprints2.1.7b dump and the guarded export.
+* -text

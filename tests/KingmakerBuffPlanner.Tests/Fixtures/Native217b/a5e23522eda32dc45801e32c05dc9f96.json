@@ -1,0 +1,154 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "Range": "Medium",
+  "CanTargetFriends": true,
+  "CanTargetSelf": true,
+  "EffectOnAlly": "Harmful",
+  "EffectOnEnemy": "Harmful",
+  "Animation": "Omni",
+  "AnimationStyle": "CastActionOmni",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Quicken, Extend, Heighten, Reach",
+  "LocalizedDuration": "LocalizedString:00b2e4c2-aafe-487b-b890-d57473373da7:1 minute/level",
+  "LocalizedSavingThrow": "LocalizedString::",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "0c78f73f0b9b3134d880ad7dbde5304c",
+    "94708cc80dd5eb14a9a5ec04365a1fdc"
+  ],
+  "m_DisplayName": "LocalizedString:053d5508-65f5-470f-b37e-3d92f824553e:Good Hope",
+  "m_Description": "LocalizedString:3b00cebe-39f7-46ca-b866-3ba9a1e92922:This spell instills powerful hope in the subjects. Each affected creature gains a +2 morale bonus on saving throws, attack rolls, ability checks, skill checks, and weapon damage rolls.[LONGSTART]\nGood hope dispels crushing despair.[LONGEND]",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "GoodHope"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Enchantment",
+      "name": "$SpellComponent$5b77c4ff-8422-48c2-a3e6-20ad860fc4ab"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "Actions": {
+        "$id": "4",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "5",
+            "$type": "Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional, Assembly-CSharp",
+            "Comment": "",
+            "ConditionsChecker": {
+              "$id": "6",
+              "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+              "Conditions": [
+                {
+                  "$id": "7",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasBuff, Assembly-CSharp",
+                  "Buff": "Blueprint:36897b36a4bd63146b1d8509a17fc5ad:CrushingDespairBuff",
+                  "name": "$AbilityConditionHasBuff$fede5717-514c-4c10-a762-6da7ed25d8c5"
+                }
+              ]
+            },
+            "IfTrue": {
+              "$id": "8",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": [
+                {
+                  "$id": "9",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff, Assembly-CSharp",
+                  "Buff": "Blueprint:36897b36a4bd63146b1d8509a17fc5ad:CrushingDespairBuff",
+                  "name": "$AbilityActionRemoveBuff$3fc2eb63-7257-482c-ab2d-e378e37e8589"
+                }
+              ]
+            },
+            "IfFalse": {
+              "$id": "10",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": [
+                {
+                  "$id": "11",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+                  "Buff": "Blueprint:85af9f0c5d29e5e4fa2e75ca70442487:GoodHopeBuff",
+                  "DurationValue": {
+                    "$id": "12",
+                    "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+                    "m_IsExtendable": true,
+                    "Rate": "Minutes",
+                    "DiceCountValue": {
+                      "$id": "13",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+                    },
+                    "BonusValue": {
+                      "$id": "14",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                      "ValueType": "Rank"
+                    }
+                  },
+                  "IsFromSpell": true,
+                  "name": "$AbilityActionApplyBuff$a9002fd5-2633-4d85-8617-13b46f852b75"
+                }
+              ]
+            },
+            "name": "$Conditional$854a97ac-f710-4e51-853a-4e07b5eb783c"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$529488f4-532e-4726-a3a6-773b2f464128"
+    },
+    {
+      "$id": "15",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx, Assembly-CSharp",
+      "PrefabLink": "Resource:0c78f73f0b9b3134d880ad7dbde5304c:GoodHope00",
+      "Anchor": "SelectedTarget",
+      "PositionAnchor": "None",
+      "OrientationAnchor": "None",
+      "name": "$AbilitySpawnFx$797a5f27-ef7c-4689-a21b-b4647413265e"
+    },
+    {
+      "$id": "16",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx, Assembly-CSharp",
+      "PrefabLink": "Resource:94708cc80dd5eb14a9a5ec04365a1fdc:GoodHope00_Aoe",
+      "Anchor": "ClickedTarget",
+      "PositionAnchor": "None",
+      "OrientationAnchor": "None",
+      "name": "$AbilitySpawnFx$8106a4b0-7a8e-40a6-841c-25c260c123ef"
+    },
+    {
+      "$id": "17",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityTargetsAround, Assembly-CSharp",
+      "m_Radius": {
+        "$id": "18",
+        "$type": "Kingmaker.Utility.Feet, Assembly-CSharp",
+        "m_Value": 15.0
+      },
+      "m_TargetType": "Ally",
+      "m_Condition": {
+        "$id": "19",
+        "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+        "Conditions": []
+      },
+      "m_SpreadSpeed": {
+        "$id": "20",
+        "$type": "Kingmaker.Utility.Feet, Assembly-CSharp",
+        "m_Value": 11.0
+      },
+      "name": "$AbilityTargetsAround$2918bc52-0800-4841-8013-151a1953cfc9"
+    },
+    {
+      "$id": "21",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:25a5013493bdcf74bb2424532214d0c8:BardSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$b03c21f0-3134-41a6-8500-df7f3e290f78"
+    }
+  ],
+  "m_AssetGuid": "a5e23522eda32dc45801e32c05dc9f96",
+  "name": "GoodHope"
+}

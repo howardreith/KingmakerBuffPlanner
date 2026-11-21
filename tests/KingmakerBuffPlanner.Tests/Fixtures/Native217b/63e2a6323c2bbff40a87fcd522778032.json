@@ -1,0 +1,63 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "m_Flags": "StayOnDeath",
+  "IsClassFeature": true,
+  "FxOnStart": "Resource::NULL",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [],
+  "m_DisplayName": "LocalizedString:70dcedac-1df5-47fc-8ec6-129d714f14fb:Resistance — Sonic",
+  "m_Description": "LocalizedString:9d1cad2c-9769-48ce-b33b-94b12d8b0ff1:You gain resistance 5 to an energy type of your choice, chosen when you prepare spells. This resistance can be changed each day. At 11th level, this resistance increases to 10. At 20th level, this resistance changes to immunity to the chosen energy type.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "resist_energy_el_sonic_solo"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.WizardAbjurationResistance, Assembly-CSharp",
+      "Wizard": "Blueprint:ba34257984f4c41408ce1dc2004e342e:WizardClass",
+      "Type": "Sonic",
+      "ValueMultiplier": {
+        "$id": "2",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+      },
+      "Value": {
+        "$id": "3",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+        "ValueType": "Rank",
+        "Value": 5
+      },
+      "Pool": {
+        "$id": "4",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+        "Value": 12
+      },
+      "name": "$WizardAbjurationResistance$c7503c32-96e5-4100-a3bb-91634c6500cf"
+    },
+    {
+      "$id": "5",
+      "$type": "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig, Assembly-CSharp",
+      "m_FeatureList": [],
+      "m_Progression": "Custom",
+      "m_CustomProgression": [
+        {
+          "$id": "6",
+          "$type": "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig+CustomProgressionItem, Assembly-CSharp",
+          "BaseValue": 10,
+          "ProgressionValue": 5
+        },
+        {
+          "$id": "7",
+          "$type": "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig+CustomProgressionItem, Assembly-CSharp",
+          "BaseValue": 20,
+          "ProgressionValue": 10
+        }
+      ],
+      "m_Max": 20,
+      "m_Class": [],
+      "name": "$ContextRankConfig$82ad5791-b531-45fc-8f52-0d8cdfea4cf9"
+    }
+  ],
+  "m_AssetGuid": "63e2a6323c2bbff40a87fcd522778032",
+  "name": "AbjurationResistanceSonicBuff"
+}

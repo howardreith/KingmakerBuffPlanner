@@ -133,6 +133,123 @@ namespace KingmakerBuffPlanner.Domain.Effects
         }
     }
 
+    // What one casting's BOUND expression (caster facts and nearby
+    // recipients resolved as for execution) does to one primary recipient's
+    // scope, by owner unit: the effects it may apply, and the effects it may
+    // remove that are not guaranteed to be applied again later on the same
+    // path (review R1-F3). Branch semantics and action order are kept:
+    // - a removal counts on any branch the binding left possible (a
+    //   known-false branch is gone after binding; an unknown one may run);
+    // - a later application cancels an earlier removal only when it is
+    //   certain on that path (in a sequence after the removal, or on BOTH
+    //   alternatives of a later conditional); an application on an
+    //   alternative branch never proves the removed effect is restored.
+    public sealed class EffectChanges
+    {
+        internal EffectChanges(IEnumerable<KeyValuePair<string, string>> applied,
+            IEnumerable<KeyValuePair<string, string>> removed)
+        {
+            Applied = applied.Distinct().ToList().AsReadOnly();
+            Removed = removed.Distinct().ToList().AsReadOnly();
+        }
+
+        // owner unit id -> effect id the casting may apply there.
+        public IReadOnlyList<KeyValuePair<string, string>> Applied { get; private set; }
+        // owner unit id -> effect id the casting may remove there and does
+        // not certainly re-apply afterwards.
+        public IReadOnlyList<KeyValuePair<string, string>> Removed { get; private set; }
+
+        public static EffectChanges Merge(IEnumerable<EffectChanges> parts)
+        {
+            List<EffectChanges> list = (parts ?? new EffectChanges[0]).Where(p => p != null).ToList();
+            return new EffectChanges(list.SelectMany(p => p.Applied), list.SelectMany(p => p.Removed));
+        }
+    }
+
+    public static class EffectChangeAnalysis
+    {
+        private sealed class State
+        {
+            internal readonly HashSet<KeyValuePair<string, string>> Certain = new HashSet<KeyValuePair<string, string>>();
+            internal readonly HashSet<KeyValuePair<string, string>> Possible = new HashSet<KeyValuePair<string, string>>();
+            internal readonly HashSet<KeyValuePair<string, string>> Removed = new HashSet<KeyValuePair<string, string>>();
+        }
+
+        public static EffectChanges Analyze(EffectExpression boundExpression, string casterUnitId,
+            string recipientUnitId)
+        {
+            if (boundExpression == null) return new EffectChanges(new KeyValuePair<string, string>[0],
+                new KeyValuePair<string, string>[0]);
+            var scope = new EffectRecipientScope(boundExpression, casterUnitId, recipientUnitId);
+            State state = Visit(boundExpression, null, scope);
+            return new EffectChanges(state.Possible, state.Removed);
+        }
+
+        private static State Visit(EffectExpression expression, EffectTarget? outer, EffectRecipientScope scope)
+        {
+            var state = new State();
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null)
+            {
+                EffectTarget role = EffectRecipientScope.Resolve(leaf.Target, outer);
+                foreach (string owner in scope.PredictedOwners(leaf, role))
+                {
+                    var key = new KeyValuePair<string, string>(owner, leaf.EffectId);
+                    state.Possible.Add(key);
+                    // A natively selected owner is a prediction, never certain.
+                    if (leaf.SecondarySelection == null) state.Certain.Add(key);
+                }
+                return state;
+            }
+            var empty = expression as EmptyEffectExpression;
+            if (empty != null)
+            {
+                if (empty.Removal != null)
+                {
+                    string owner = scope.Owner(EffectRecipientScope.Resolve(empty.Removal.Target, outer));
+                    if (!string.IsNullOrEmpty(owner))
+                        state.Removed.Add(new KeyValuePair<string, string>(owner, empty.Removal.EffectId));
+                }
+                return state;
+            }
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+            {
+                foreach (EffectExpression child in sequence.Children)
+                {
+                    State next = Visit(child, outer, scope);
+                    // A later certain application restores an earlier
+                    // removal; a later removal undoes an earlier certainty.
+                    state.Removed.ExceptWith(next.Certain);
+                    state.Certain.ExceptWith(next.Removed);
+                    state.Removed.UnionWith(next.Removed);
+                    state.Certain.UnionWith(next.Certain);
+                    state.Possible.UnionWith(next.Possible);
+                }
+                return state;
+            }
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                State yes = Visit(conditional.WhenTrue, outer, scope);
+                State no = Visit(conditional.WhenFalse, outer, scope);
+                state.Certain.UnionWith(yes.Certain);
+                state.Certain.IntersectWith(no.Certain);
+                state.Possible.UnionWith(yes.Possible);
+                state.Possible.UnionWith(no.Possible);
+                state.Removed.UnionWith(yes.Removed);
+                state.Removed.UnionWith(no.Removed);
+                return state;
+            }
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null)
+                return Visit(targeted.Child, EffectRecipientScope.Resolve(targeted.Target, outer), scope);
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null) return Visit(reference.Child, outer, scope);
+            return state;
+        }
+    }
+
     public sealed class EffectLeafExpression : EffectExpression
     {
         public EffectLeafExpression(

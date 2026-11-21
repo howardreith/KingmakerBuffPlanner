@@ -25,6 +25,11 @@ namespace KingmakerBuffPlanner.Discovery
         // AbilityCasterHasNoFacts and Call of the Wild's
         // AbilityTargetHasNoFactUnlessBuffsFromCaster (rc4 review finding 1).
         public IReadOnlyList<string> SelfGatedFactIds { get; set; }
+        // Payload effects whose ability-level "harmful to allies" metadata an
+        // explicit, evidence-backed versioned override entry declares
+        // misleading (EffectOverrideRegistry, disposition
+        // "admit-despite-ally-disposition"; review R1-F6). Empty otherwise.
+        public IReadOnlyList<string> AllyDispositionExceptionEffectIds { get; set; }
     }
 
     // One action list of a buff's own AddFactContextActions (Activated,
@@ -44,7 +49,8 @@ namespace KingmakerBuffPlanner.Discovery
 
     public sealed class NativeCandidateEffectFacts
     {
-        // Identity for audit reports only; the rules never read it.
+        // Identity for audit reports; the rules compare it only with the
+        // facts' own self-gated and ally-disposition-exception lists.
         public string EffectId { get; set; }
         public string EffectName { get; set; }
         public string Kind { get; set; }
@@ -265,7 +271,7 @@ namespace KingmakerBuffPlanner.Discovery
                         ? "ambiguous-area-recipient" :
                     effects.Any(e => e.Harmful == true)
                         ? "harmful-only" :
-                    HarmfulToAlliesOfAHostileAbility(facts)
+                    HarmfulToAllies(facts)
                         ? "harmful-ally-disposition" : "no-persistent-beneficial-party-effect",
                     "No persistent beneficial payload has deterministic controllable-party targeting.");
 
@@ -359,17 +365,15 @@ namespace KingmakerBuffPlanner.Discovery
         {
             if (effect == null) return false;
             // Everyday-use v1.2 (the owner's Irresistible Dance report): an
-            // ability that can be aimed at enemies and is marked harmful to
-            // allies is never a beneficial party buff, even when its buff
-            // blueprint forgets m_Harmful. Missing-beneficial-buffs mission
-            // §3.A: that flag is authoritative only for an ability that can
-            // reach a hostile unit. Native 2.1.7b blueprints carry
-            // EffectOnAlly = Harmful on abilities that cannot target an
-            // enemy at all (a self/friend-only allied AbilityTargetsAround
-            // burst; a personal ToCaster buff); their payload is still judged
+            // ability marked harmful to allies is not a beneficial party
+            // buff, even when its buff blueprint forgets m_Harmful.
+            // Missing-beneficial-buffs mission §3.A / review R1-F6: the flag
+            // is overridden ONLY for an ability that cannot be aimed at a
+            // hostile unit AND a payload an evidence-backed versioned entry
+            // names (VetoedByAllyDisposition); that payload is still judged
             // by every harmful-buff, harmful-condition, offensive and marker
-            // rule below (planning/MISSING-BENEFICIAL-BUFFS-AUDIT.md).
-            if (HarmfulToAlliesOfAHostileAbility(facts))
+            // rule (planning/MISSING-BENEFICIAL-BUFFS-AUDIT.md).
+            if (VetoedByAllyDisposition(effect, facts))
                 return false;
             return effect.Target == "Caster" || effect.Target == "Pet" ||
                 effect.Target == "Party" || effect.Target == "AlliedAreaRecipients" ||
@@ -425,10 +429,41 @@ namespace KingmakerBuffPlanner.Discovery
             return facts.CanTargetEnemies && !IsPersonalRange(facts);
         }
 
-        private static bool HarmfulToAlliesOfAHostileAbility(NativeCandidateAuditFacts facts)
+        private static bool HarmfulToAllies(NativeCandidateAuditFacts facts)
         {
-            return string.Equals(facts.EffectOnAlly, "Harmful", StringComparison.Ordinal) &&
-                CanBeAimedAtHostiles(facts);
+            return string.Equals(facts.EffectOnAlly, "Harmful", StringComparison.Ordinal);
+        }
+
+        // Missing-beneficial-buffs mission §3.A, narrowed after review
+        // R1-F6. Native 2.1.7b blueprints mark some legitimate buffs harmful
+        // to allies although they cannot be aimed at an enemy, but enemy
+        // targeting alone does not prove a payload benefits its bearer (a
+        // friend-only ability applying a penalty buff whose own m_Harmful
+        // flag is clear would pass). The flag is therefore overridden only
+        // for an ability that cannot be aimed at a hostile unit AND a payload
+        // that an explicit, versioned, evidence-backed entry names
+        // (NativeEffectOverrides.json, disposition
+        // "admit-despite-ally-disposition", supplied through the facts; the
+        // classifier itself holds no names or identities). The entry keeps
+        // the discovered graph, the payload is still judged by every other
+        // rule, and the exception fails closed when the payload blueprint
+        // was not read (no harmful flag or components resolved).
+        private static bool IsProvenBeneficialDespiteAllyDisposition(NativeCandidateEffectFacts effect,
+            NativeCandidateAuditFacts facts)
+        {
+            return effect != null && effect.Kind == "Buff" && effect.Harmful == false &&
+                (effect.ComponentTypes ?? new string[0]).Count != 0 &&
+                (facts.AllyDispositionExceptionEffectIds ?? new string[0])
+                    .Contains(effect.EffectId ?? string.Empty, StringComparer.Ordinal);
+        }
+
+        private static bool VetoedByAllyDisposition(NativeCandidateEffectFacts effect,
+            NativeCandidateAuditFacts facts)
+        {
+            if (!HarmfulToAllies(facts)) return false;
+            // The everyday-use v1.2 rule: aimed at enemies, the flag stands.
+            if (CanBeAimedAtHostiles(facts)) return true;
+            return !IsProvenBeneficialDespiteAllyDisposition(effect, facts);
         }
 
         // Missing-beneficial-buffs mission §3.C: CanTargetPoint means the
@@ -455,11 +490,41 @@ namespace KingmakerBuffPlanner.Discovery
 
         // The scanner's action path is "<ability>/0:<first child>/...": the
         // ability's own AbilityTargetsAround transform is its first child.
+        // Review R1-F7: that selector must ALSO decide the final recipients.
+        // Between it and the applying ContextActionApplyBuff only action
+        // lists and conditional branches may appear (neither changes who is
+        // selected nor from where); a nested ContextActionCastSpell, a
+        // second selector, a party/pet transform or a reflected wrapper
+        // could select around each outer recipient, which the planner's
+        // single anchor disk cannot represent, so such a graph is refused.
         private static bool IsOwnAreaSelector(string actionPath)
         {
             string[] segments = (actionPath ?? string.Empty).Split('/');
-            return segments.Length > 2 &&
-                string.Equals(segments[1], "0:AbilityTargetsAround", StringComparison.Ordinal);
+            if (segments.Length < 3 ||
+                !string.Equals(segments[1], "0:AbilityTargetsAround", StringComparison.Ordinal) ||
+                !IsSegment(segments[segments.Length - 1], "ContextActionApplyBuff"))
+                return false;
+            for (int index = 2; index < segments.Length - 1; index++)
+            {
+                string segment = segments[index];
+                if (segment == "true" || segment == "false") continue;
+                if (IsSegment(segment, "ActionList")) continue;
+                if (IsSegment(segment, "Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional")) continue;
+                return false;
+            }
+            return true;
+        }
+
+        // "<index>:<identity>" with exactly this identity, optionally
+        // assembly-qualified ("<identity>, Assembly-CSharp, ...").
+        private static bool IsSegment(string segment, string identity)
+        {
+            int colon = (segment ?? string.Empty).IndexOf(':');
+            if (colon <= 0) return false;
+            for (int index = 0; index < colon; index++)
+                if (!char.IsDigit(segment[index])) return false;
+            string name = segment.Substring(colon + 1).Split(',')[0].Trim();
+            return string.Equals(name, identity, StringComparison.Ordinal);
         }
 
         // Kingmaker 2.1.7b UnitCondition values that only hinder their bearer.

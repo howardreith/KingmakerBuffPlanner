@@ -1,0 +1,133 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "Range": "Close",
+  "CanTargetPoint": true,
+  "CanTargetFriends": true,
+  "CanTargetSelf": true,
+  "EffectOnAlly": "Helpful",
+  "Animation": "Point",
+  "AnimationStyle": "CastActionOmni",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Quicken, Extend, Heighten, Reach",
+  "LocalizedDuration": "LocalizedString:9178f928-579f-43d0-bd80-e67e478c7bfc:10 minutes/level",
+  "LocalizedSavingThrow": "LocalizedString::",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "352469f228a3b1f4cb269c7ab0409b8e"
+  ],
+  "m_DisplayName": "LocalizedString:7637a5e6-fdee-4d17-9590-da38edffcca8:Feather Step, Mass",
+  "m_Description": "LocalizedString:d4972d74-f311-4f3f-9237-6a1e5e5eb42f:As feather step, except this spell affects multiple creatures.\nFeather Step: For the duration of this spell, the subject ignores the adverse movement effects of difficult terrain.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "FeatherStepMass"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Transmutation",
+      "name": "$SpellComponent$895e5cd6-67a3-40ae-a19b-5d1fa443309c"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:bad8638d40639d04fa2f80a1cac67d6b:DruidSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$932878fa-07d5-4220-8fcf-c5f05060bc42"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityTargetsAround, Assembly-CSharp",
+      "m_Radius": {
+        "$id": "5",
+        "$type": "Kingmaker.Utility.Feet, Assembly-CSharp",
+        "m_Value": 15.0
+      },
+      "m_TargetType": "Ally",
+      "m_Condition": {
+        "$id": "6",
+        "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+        "Conditions": []
+      },
+      "name": "$AbilityTargetsAround$6a277737-cc5d-460a-848d-47ce790e2409"
+    },
+    {
+      "$id": "7",
+      "$type": "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig, Assembly-CSharp",
+      "m_FeatureList": [],
+      "m_CustomProgression": [],
+      "m_Max": 20,
+      "m_Class": [],
+      "name": "$ContextRankConfig$e560f526-92ad-4a99-83b4-4da518cc2d9a"
+    },
+    {
+      "$id": "8",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "Actions": {
+        "$id": "9",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "10",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+            "Buff": "Blueprint:c748cceadcab2614b942e56ff257cfbc:FeatherStepBuff",
+            "DurationValue": {
+              "$id": "11",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+              "m_IsExtendable": true,
+              "Rate": "TenMinutes",
+              "DiceCountValue": {
+                "$id": "12",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              },
+              "BonusValue": {
+                "$id": "13",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                "ValueType": "Rank"
+              }
+            },
+            "IsFromSpell": true,
+            "name": "$ContextActionApplyBuff$84a4f17f-f5f1-4641-815f-295a01968bb7"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$134efde6-2995-466c-8067-e61ef0effe22"
+    },
+    {
+      "$id": "14",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:25a5013493bdcf74bb2424532214d0c8:BardSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$e3641694-290b-4da6-a416-ae9d65ce1b72"
+    },
+    {
+      "$id": "15",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:29f3c338532390546bc5347826a655c4:RangerSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$837bb3ba-ba23-42f2-88bc-59f985387ca9"
+    },
+    {
+      "$id": "16",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx, Assembly-CSharp",
+      "PrefabLink": "Resource:352469f228a3b1f4cb269c7ab0409b8e:CommonTransmutationBuff00",
+      "Anchor": "SelectedTarget",
+      "PositionAnchor": "None",
+      "OrientationAnchor": "None",
+      "name": "$AbilitySpawnFx$e1dbbd2d-2727-4d06-956a-210702e495f7"
+    },
+    {
+      "$id": "17",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:ab90308db82342f47bf0d636fe941434:TravelDomainSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$ed08d8d2-2b51-406a-bb5f-70353c6570c3"
+    }
+  ],
+  "m_AssetGuid": "d219494150ac1f24f9ce14a3d4f66d26",
+  "name": "FeatherStepMass"
+}
