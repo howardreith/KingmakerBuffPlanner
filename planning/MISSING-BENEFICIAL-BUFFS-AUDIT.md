@@ -511,6 +511,52 @@ and falls back to the caster-level comparison at or above its last
 breakpoint; the sequential state starts from the reads an option made (units
 outside every burst, or keys never read, stay unknown).
 
+## Review round 8
+
+Codex review of `6c4d9af` (decision `changes_required`). Verified: R7-F2 to
+R7-F6. Re-opened: R7-F1. New: R8-F1 to R8-F6. All are fixed in the round-8
+corrections commit (`2abe58c`).
+
+| Finding | Correction | Regression |
+|---|---|---|
+| R7-F1 incomplete scan authorized a cast | Both narrow exceptions refuse any scan diagnostic other than a recognized restoration or a presentation-only node (a traversal stopped at `maximum-depth`, a `cycle`, an unknown node), and an automatically applied buff whose own automatic actions the export did not read (an applied buff carrying `AddFactContextActions`: an uninspected chain) | `…-incomplete-scan-refuses-both-exceptions` (Good Hope with damage nested 70 empty conditionals deep on its Despair branch: `maximum-depth`, refused; Feather Step, Mass whose buff activates a second buff that damages its bearer: refused; unmodified spells admitted). The direct kill-action controls still pass |
+| R8-F1 another wizard's Firebrand satisfied a casting | Live instances carry their applying caster (`ActiveEffectInstance.CasterUnitId`, from the buff context's `MaybeCaster`). A leaf whose buff has a native caster-relative component (`AddImmunityFirebrand`; its IL compares the damage initiator with its own buff's `MaybeCaster`, pinned in the contract test) is `CasterRelative`: sufficiency needs the planned caster's instance (unread origin proves nothing); its one-pass structural grant key includes the caster; a Classic skip needs instance detail from that provider's caster | `…-firebrand-needs-its-own-caster` (wizard a's existing Firebrand: b's cast Ready, one slot; b's own: zero-cost skip; a funded earlier Firebrand from a: b Ready, one slot; a's own repeat: structural skip) |
+| R8-F2 a resistance leaf carried a harmful action | When Personal range rescues an enemy-flagged ability, the whole cast is judged: any application harming its bearer, or any unsafe or unread action, excludes it | `…-personal-rescue-judges-the-whole-cast` (Resistance — Fire keeping its resistance and adding Crushing Despair, or a `ContextActionKillTarget`: refused by discovery and fact-provider admission; five real selections admitted) |
+| R8-F3 no same-routine coverage gain | The sequential recipient state also exposes the routine's own earlier funded castings, in every view (independent previews reset per routine, one-pass sequences carry across); an empty burst is kept for re-evaluation in every view; a cast that would undo an earlier requested effect is checked for its removal conflict first | `…-same-routine-good-hope-gains-allies` (one routine, two slots: two funded casts, the second for the allies at 10 and 20 feet, in the plain compiler, the selected-run compiler (`budgetRoutineScope`) and the one-pass forecast; first disabled: second empty) |
+| R8-F4 Classic counted Prayer's penalty | `CastPlanner` resolves the applicable providers first and grants a skip only when every applicable provider's bound branch for the target is present | `…-classic-prayer-follows-the-friendly-branch` (RoutinePlanService, pinned caster: PrayerDebuff on the ally → one step; PrayerBuff on both → free skip) |
+| R8-F5 unreachable buff satisfied presence | `EffectPresenceEvaluator` (presence and confirmation) follows only an empty native checker's true branch; unknown conditions keep both alternatives | `…-empty-checker-presence-follows-the-true-branch` (only the false-branch buff active: one funded Feather Step; a fresh observation of only that buff does not confirm delivery) |
+| R8-F6 unreadable anchor inherited coverage | An area centre whose own position cannot be read is not a legal anchor | `…-unreadable-anchor-inherits-nothing` (two CanTarget-approved centres, one unreadable: no cast and no reservation there; the readable centre casts once for its own recipients) |
+
+**Executed reproductions** on the production of `6c4d9af` (twelve files
+swapped by `git show 6c4d9af:<path>`, current tests and the 51/61 fixtures;
+the Firebrand test's caster-relative metadata check and instance origins were
+stubbed for that run; everything restored from `2abe58c`):
+`missing-beneficial-buffs` 58/7 (DLL `d97dd442…`). Failures: incomplete scan
+"Good Hope with an unread action beyond the scan bound was admitted" (R7-F1);
+"Wizard a's Firebrand satisfied wizard b's casting: AlreadySatisfied" (R8-F1);
+"Resistance - Fire with Crushing Despair beside the resistance was admitted"
+(R8-F2); "compiler: … Blocked [] predicted-coverage-empty:f" (R8-F3);
+"ally=SkippedAlreadyActive,caster=SkippedAlreadyActive" (R8-F4); "An
+unreachable false-branch buff satisfied the empty-checker cast:
+AlreadySatisfied" (R8-F5); "An unreadable centre inherited coverage: Ready
+[ally,caster,near]" (R8-F6). Masked in that run: the point-chain case of
+R7-F1 and the kill-action variant of R8-F2 (each asserted after its first,
+failing, case).
+
+Corrected results (final tree): `missing-beneficial-buffs` 65/0; complete
+program 814/0 (40.2 s); explicit capture 1/0 (fixtures unchanged, 51 / 61);
+explicit verify + candidate audit 3/0 (51 identical files, 61 types, Dance
+identical; native-only 1,722 / 16 and full-user 10,443 / 38, rows identical
+apart from the header label; classifier
+`b29c098f96a0f6c15ffc24781d6a5981025c1b9e53299df025a69278dbdc4ff5`, overrides
+`c462aeb4…`, reports `559a2bc5…46ef` / `b3069d9a…0aaf`).
+
+Limits: caster-relative benefit is recognized only for the native components
+listed (`AddImmunityFirebrand`); a projected Classic marker carries no origin,
+so a caster-relative repeat in a Classic forecast casts again
+(conservative). Native behavior that stays unverified: the live
+`MaybeCaster` read of an existing buff's origin.
+
 ## Rejected approaches
 
 - An `include` override for Good Hope/Firebelly: rejected — it replaces the
