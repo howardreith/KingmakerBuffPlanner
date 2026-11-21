@@ -46,6 +46,116 @@
         { "kind": "UnitBuff", "guid": "94dfcf5f3a72ce8478c8de5db69e752b" }
       ],
       "reason": "Strength Surge has a proven friendly persistent buff despite allowing hostile targets and carrying harmful-enemy metadata."
+    },
+    {
+      "abilityGuid": "a5e23522eda32dc45801e32c05dc9f96",
+      "disposition": "admit-despite-ally-disposition",
+      "sourceAssembly": "native",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "85af9f0c5d29e5e4fa2e75ca70442487" }
+      ],
+      "reason": "Good Hope (native 2.1.7b) cannot target enemies (self/friend only) and applies only GoodHopeBuff through its own allied AbilityTargetsAround: +2 morale on attack, weapon damage, saves, skills and ability checks (AddStatBonus, BuffAllSavesBonus, BuffAllSkillsBonus, BuffAbilityRollsBonus). Its EffectOnAlly = Harmful metadata is misleading; the discovered graph (allied area, Crushing Despair removal branch) is kept."
+    },
+    {
+      "abilityGuid": "b065231094a21d14dbf1c3832f776871",
+      "disposition": "admit-despite-ally-disposition",
+      "sourceAssembly": "native",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "7c33de68880aa444bbb916271b653016" }
+      ],
+      "reason": "Firebelly (native 2.1.7b) is Personal and cannot target enemies; it applies only FirebellyBuff ToCaster: fire resistance (AddDamageResistanceEnergy Fire) and AddFacts granting the separate breath ability, which is itself excluded as offensive. Its EffectOnAlly = Harmful metadata is misleading."
+    },
+    {
+      "abilityGuid": "75f99291ceb26ec0e30fa23c9c5cbae2",
+      "disposition": "admit-despite-ally-disposition",
+      "sourceAssembly": "optional",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "85af9f0c5d29e5e4fa2e75ca70442487" }
+      ],
+      "reason": "Call of the Wild Good Hope variant (SkaldSpellKenningSkaldClassGoodHope): guarded 0.4.1 full-user export shows self/friend-only targeting and the native GoodHopeBuff as its only payload through its allied area; same misleading EffectOnAlly = Harmful."
+    },
+    {
+      "abilityGuid": "838ee2ea1c4844bfacffd804d0d61be9",
+      "disposition": "admit-despite-ally-disposition",
+      "sourceAssembly": "optional",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "85af9f0c5d29e5e4fa2e75ca70442487" }
+      ],
+      "reason": "Call of the Wild Good Hope variant (CharismaKindnessGoodHope): guarded 0.4.1 full-user export shows self/friend-only targeting and the native GoodHopeBuff as its only payload through its allied area; same misleading EffectOnAlly = Harmful."
+    },
+    {
+      "abilityGuid": "a2387c1ee2e66a05c051e560926e0759",
+      "disposition": "admit-despite-ally-disposition",
+      "sourceAssembly": "optional",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "85af9f0c5d29e5e4fa2e75ca70442487" }
+      ],
+      "reason": "Call of the Wild Good Hope variant (ShamanLoreManifestationWish3GoodHope): guarded 0.4.1 full-user export shows self/friend-only targeting and the native GoodHopeBuff as its only payload through its allied area; same misleading EffectOnAlly = Harmful."
+    },
+    {
+      "abilityGuid": "c1621530d4b943568968b084ad6f0650",
+      "disposition": "admit-despite-ally-disposition",
+      "sourceAssembly": "optional",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "85af9f0c5d29e5e4fa2e75ca70442487" }
+      ],
+      "reason": "Call of the Wild Good Hope variant (KindnessGoodHope): guarded 0.4.1 full-user export shows self/friend-only targeting and the native GoodHopeBuff as its only payload through its allied area; same misleading EffectOnAlly = Harmful."
+    },
+    {
+      "abilityGuid": "fca6137d9b616e91cd73e9cfd8cf2c9e",
+      "disposition": "admit-despite-ally-disposition",
+      "sourceAssembly": "optional",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "85af9f0c5d29e5e4fa2e75ca70442487" }
+      ],
+      "reason": "Call of the Wild Good Hope variant (SpiritWhispererLoreManifestationWish3GoodHope): guarded 0.4.1 full-user export shows self/friend-only targeting and the native GoodHopeBuff as its only payload through its allied area; same misleading EffectOnAlly = Harmful."
+    },
+    {
+      "abilityGuid": "974de016d6d558d06a3c40b894d3317e",
+      "disposition": "admit-despite-ally-disposition",
+      "sourceAssembly": "optional",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "7c33de68880aa444bbb916271b653016" }
+      ],
+      "reason": "Call of the Wild Firebelly variant (ShamanLoreManifestationWish1Firebelly): guarded 0.4.1 full-user export shows Personal range, no enemy targeting and the native FirebellyBuff as its only payload; same misleading EffectOnAlly = Harmful."
+    },
+    {
+      "abilityGuid": "a2e2afeee74a5c77475be7e883e7816c",
+      "disposition": "admit-despite-ally-disposition",
+      "sourceAssembly": "optional",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "7c33de68880aa444bbb916271b653016" }
+      ],
+      "reason": "Call of the Wild Firebelly variant (SpiritWhispererLoreManifestationWish1Firebelly): guarded 0.4.1 full-user export shows Personal range, no enemy targeting and the native FirebellyBuff as its only payload; same misleading EffectOnAlly = Harmful."
+    },
+    {
+      "abilityGuid": "e715879f7eb851936ef39a4b02336b29",
+      "disposition": "admit-despite-ally-disposition",
+      "sourceAssembly": "optional",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "7c33de68880aa444bbb916271b653016" }
+      ],
+      "reason": "Call of the Wild Firebelly variant (SkaldSpellKenningClericClassFirebelly): guarded 0.4.1 full-user export shows Personal range, no enemy targeting and the native FirebellyBuff as its only payload; same misleading EffectOnAlly = Harmful."
+    },
+    {
+      "abilityGuid": "e115e1e0a17a4aceb001000000000027",
+      "disposition": "admit-despite-ally-disposition",
+      "sourceAssembly": "optional",
+      "effectMode": "allOf",
+      "effects": [
+        { "kind": "UnitBuff", "guid": "7c33de68880aa444bbb916271b653016" }
+      ],
+      "reason": "Kingmaker Gunslinger Ifrit Lavasoul Firebelly (KMG_ElementalRaces_Ifrit_Lavasoul_FirebellyAbility): guarded 0.4.1 full-user export shows Personal range, no enemy targeting and the native FirebellyBuff as its only payload; same misleading EffectOnAlly = Harmful."
     }
   ]
 }

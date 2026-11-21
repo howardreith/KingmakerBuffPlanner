@@ -47,16 +47,214 @@ namespace KingmakerBuffPlanner.Domain.Effects
         // review of the next iteration: a damaging or removing action is not
         // a no-op). Used only to judge a plain buff; not part of any
         // serialized form or identity.
-        public EmptyEffectExpression(string unmodeledReason) : base("empty")
+        public EmptyEffectExpression(string unmodeledReason) : this(unmodeledReason, null) { }
+
+        // removal: the exact native ContextActionRemoveBuff this node stands
+        // for, when known (missing-beneficial-buffs mission §3.B). Like the
+        // unmodeled reason it is planning metadata only: never serialized
+        // and never part of a catalogue or saved identity
+        // (EffectAggregateIdentity describes every empty node as "empty").
+        public EmptyEffectExpression(string unmodeledReason, EffectRemoval removal) : base("empty")
         {
             UnmodeledReason = unmodeledReason;
+            Removal = removal;
         }
 
         public static EmptyEffectExpression NoAction() { return new EmptyEffectExpression(null); }
 
         [JsonIgnore] public string UnmodeledReason { get; private set; }
 
+        [JsonIgnore] public EffectRemoval Removal { get; private set; }
+
         [JsonIgnore] public bool IsNoAction { get { return UnmodeledReason == null; } }
+    }
+
+    // One buff a casting's own native actions remove, and whose (the
+    // removal's resolved recipient role, as for an effect leaf).
+    public sealed class EffectRemoval
+    {
+        public EffectRemoval(string effectId, EffectTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(effectId)) throw new ArgumentException("Effect ID is required.", "effectId");
+            EffectId = effectId;
+            Target = target;
+        }
+
+        public string EffectId { get; private set; }
+        public EffectTarget Target { get; private set; }
+    }
+
+    // Missing-beneficial-buffs mission §3.B: the buffs a casting removes
+    // (on any branch: a conditional removal can replace the application),
+    // each with its recipient role resolved through the enclosing target
+    // transforms. Mutually exclusive selections (the wizard's Abjuration
+    // resistances: each applies its own buff and removes the other four)
+    // are recognized from these native removals, never from names.
+    public static class EffectRemovals
+    {
+        public static IReadOnlyList<EffectRemoval> Collect(EffectExpression expression)
+        {
+            var removals = new List<EffectRemoval>();
+            Collect(expression, null, removals);
+            return removals.AsReadOnly();
+        }
+
+        private static void Collect(EffectExpression expression, EffectTarget? outer, List<EffectRemoval> removals)
+        {
+            var empty = expression as EmptyEffectExpression;
+            if (empty != null)
+            {
+                if (empty.Removal != null)
+                    removals.Add(new EffectRemoval(empty.Removal.EffectId,
+                        EffectRecipientScope.Resolve(empty.Removal.Target, outer)));
+                return;
+            }
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+            {
+                foreach (EffectExpression child in sequence.Children) Collect(child, outer, removals);
+                return;
+            }
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                Collect(conditional.WhenTrue, outer, removals);
+                Collect(conditional.WhenFalse, outer, removals);
+                return;
+            }
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null)
+            {
+                Collect(targeted.Child, EffectRecipientScope.Resolve(targeted.Target, outer), removals);
+                return;
+            }
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null) Collect(reference.Child, outer, removals);
+        }
+    }
+
+    // What one casting's BOUND expression (caster facts and nearby
+    // recipients resolved as for execution) does to one primary recipient's
+    // scope, by owner unit: the effects it may apply, and the effects it may
+    // remove that are not guaranteed to be applied again later on the same
+    // path (review R1-F3). Branch semantics and action order are kept:
+    // - a removal counts on any branch the binding left possible (a
+    //   known-false branch is gone after binding; an unknown one may run);
+    // - a later application cancels an earlier removal only when it is
+    //   certain on that path (in a sequence after the removal, or on BOTH
+    //   alternatives of a later conditional); an application on an
+    //   alternative branch never proves the removed effect is restored.
+    public sealed class EffectChanges
+    {
+        internal EffectChanges(IEnumerable<KeyValuePair<string, string>> applied,
+            IEnumerable<KeyValuePair<string, string>> removed,
+            IEnumerable<KeyValuePair<string, string>> guaranteed = null)
+        {
+            Applied = applied.Distinct().ToList().AsReadOnly();
+            Removed = removed.Distinct().ToList().AsReadOnly();
+            Guaranteed = (guaranteed ?? new KeyValuePair<string, string>[0]).Distinct().ToList().AsReadOnly();
+        }
+
+        // owner unit id -> effect id the casting may apply there.
+        public IReadOnlyList<KeyValuePair<string, string>> Applied { get; private set; }
+        // owner unit id -> effect id the casting may remove there and does
+        // not certainly re-apply afterwards.
+        public IReadOnlyList<KeyValuePair<string, string>> Removed { get; private set; }
+        // owner unit id -> effect id the casting certainly leaves applied at
+        // its end on every path (review R1-F3/R2-F1: only these restore an
+        // earlier removal or justify a structural "already granted").
+        public IReadOnlyList<KeyValuePair<string, string>> Guaranteed { get; private set; }
+
+        public static EffectChanges Merge(IEnumerable<EffectChanges> parts)
+        {
+            List<EffectChanges> list = (parts ?? new EffectChanges[0]).Where(p => p != null).ToList();
+            return new EffectChanges(list.SelectMany(p => p.Applied), list.SelectMany(p => p.Removed),
+                list.SelectMany(p => p.Guaranteed));
+        }
+    }
+
+    public static class EffectChangeAnalysis
+    {
+        private sealed class State
+        {
+            internal readonly HashSet<KeyValuePair<string, string>> Certain = new HashSet<KeyValuePair<string, string>>();
+            internal readonly HashSet<KeyValuePair<string, string>> Possible = new HashSet<KeyValuePair<string, string>>();
+            internal readonly HashSet<KeyValuePair<string, string>> Removed = new HashSet<KeyValuePair<string, string>>();
+        }
+
+        public static EffectChanges Analyze(EffectExpression boundExpression, string casterUnitId,
+            string recipientUnitId)
+        {
+            if (boundExpression == null) return new EffectChanges(new KeyValuePair<string, string>[0],
+                new KeyValuePair<string, string>[0]);
+            var scope = new EffectRecipientScope(boundExpression, casterUnitId, recipientUnitId);
+            State state = Visit(boundExpression, null, scope);
+            return new EffectChanges(state.Possible, state.Removed, state.Certain);
+        }
+
+        private static State Visit(EffectExpression expression, EffectTarget? outer, EffectRecipientScope scope)
+        {
+            var state = new State();
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null)
+            {
+                EffectTarget role = EffectRecipientScope.Resolve(leaf.Target, outer);
+                foreach (string owner in scope.PredictedOwners(leaf, role))
+                {
+                    var key = new KeyValuePair<string, string>(owner, leaf.EffectId);
+                    state.Possible.Add(key);
+                    // A natively selected owner is a prediction, never certain.
+                    if (leaf.SecondarySelection == null) state.Certain.Add(key);
+                }
+                return state;
+            }
+            var empty = expression as EmptyEffectExpression;
+            if (empty != null)
+            {
+                if (empty.Removal != null)
+                {
+                    string owner = scope.Owner(EffectRecipientScope.Resolve(empty.Removal.Target, outer));
+                    if (!string.IsNullOrEmpty(owner))
+                        state.Removed.Add(new KeyValuePair<string, string>(owner, empty.Removal.EffectId));
+                }
+                return state;
+            }
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+            {
+                foreach (EffectExpression child in sequence.Children)
+                {
+                    State next = Visit(child, outer, scope);
+                    // A later certain application restores an earlier
+                    // removal; a later removal undoes an earlier certainty.
+                    state.Removed.ExceptWith(next.Certain);
+                    state.Certain.ExceptWith(next.Removed);
+                    state.Removed.UnionWith(next.Removed);
+                    state.Certain.UnionWith(next.Certain);
+                    state.Possible.UnionWith(next.Possible);
+                }
+                return state;
+            }
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                State yes = Visit(conditional.WhenTrue, outer, scope);
+                State no = Visit(conditional.WhenFalse, outer, scope);
+                state.Certain.UnionWith(yes.Certain);
+                state.Certain.IntersectWith(no.Certain);
+                state.Possible.UnionWith(yes.Possible);
+                state.Possible.UnionWith(no.Possible);
+                state.Removed.UnionWith(yes.Removed);
+                state.Removed.UnionWith(no.Removed);
+                return state;
+            }
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null)
+                return Visit(targeted.Child, EffectRecipientScope.Resolve(targeted.Target, outer), scope);
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null) return Visit(reference.Child, outer, scope);
+            return state;
+        }
     }
 
     public sealed class EffectLeafExpression : EffectExpression
@@ -158,7 +356,8 @@ namespace KingmakerBuffPlanner.Domain.Effects
             {
                 EffectExpression yes = Durable(conditional.WhenTrue), no = Durable(conditional.WhenFalse);
                 return ReferenceEquals(yes, conditional.WhenTrue) && ReferenceEquals(no, conditional.WhenFalse) ? expression
-                    : new ConditionalEffectExpression(conditional.ConditionContract, yes, no, conditional.CasterFactGate);
+                    : new ConditionalEffectExpression(conditional.ConditionContract, yes, no, conditional.CasterFactGate,
+                        conditional.RecipientFactGate);
             }
             var targeted = expression as TargetedEffectExpression;
             if (targeted != null)
@@ -212,14 +411,20 @@ namespace KingmakerBuffPlanner.Domain.Effects
             string conditionContract,
             EffectExpression whenTrue,
             EffectExpression whenFalse,
-            CasterFactGate casterFactGate = null)
+            CasterFactGate casterFactGate = null,
+            RecipientFactGate recipientFactGate = null)
             : base("conditional")
         {
             ConditionContract = conditionContract ?? string.Empty;
             WhenTrue = whenTrue ?? throw new ArgumentNullException("whenTrue");
             WhenFalse = whenFalse ?? throw new ArgumentNullException("whenFalse");
             CasterFactGate = casterFactGate;
+            RecipientFactGate = recipientFactGate;
         }
+
+        // A condition on the recipient's own facts (review R2-F5). Planning
+        // metadata only: never serialized, never part of an identity.
+        [JsonIgnore] public RecipientFactGate RecipientFactGate { get; private set; }
 
         [JsonProperty("conditionContract", Order = 2)] public string ConditionContract { get; private set; }
         [JsonProperty("whenTrue", Order = 3)] public EffectExpression WhenTrue { get; private set; }
@@ -239,6 +444,112 @@ namespace KingmakerBuffPlanner.Domain.Effects
         [JsonProperty("any")] public bool Any { get; private set; }
         // Value is the native condition's Not flag.
         [JsonProperty("facts")] public IReadOnlyList<KeyValuePair<string, bool>> Facts { get; private set; }
+    }
+
+    // A conditional on facts of the unit the action runs on (native
+    // ContextConditionHasFact): Value is the condition's Not flag, as for
+    // CasterFactGate.
+    public sealed class RecipientFactGate
+    {
+        public RecipientFactGate(bool any, IEnumerable<KeyValuePair<string, bool>> facts)
+        {
+            Any = any;
+            Facts = new ReadOnlyCollection<KeyValuePair<string, bool>>(facts.ToList());
+        }
+        public bool Any { get; private set; }
+        public IReadOnlyList<KeyValuePair<string, bool>> Facts { get; private set; }
+    }
+
+    // Review R2-F5: resolves recipient-fact gates for one recipient. A gate
+    // whose facts are all read selects its branch; a gate with an unread
+    // fact stays and is reported (unresolved), so a consumer can withhold a
+    // definite coverage claim instead of guessing.
+    public static class EffectRecipientFactBinding
+    {
+        public static bool HasGates(EffectExpression expression)
+        {
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+                return conditional.RecipientFactGate != null || HasGates(conditional.WhenTrue) ||
+                    HasGates(conditional.WhenFalse);
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null) return sequence.Children.Any(HasGates);
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null) return HasGates(reference.Child);
+            var targeted = expression as TargetedEffectExpression;
+            return targeted != null && HasGates(targeted.Child);
+        }
+
+        public static EffectExpression Bind(EffectExpression expression, Func<string, bool?> recipientHasFact,
+            out bool unresolved)
+        {
+            bool open = false;
+            EffectExpression bound = Resolve(expression, recipientHasFact ?? (id => null), ref open);
+            unresolved = open;
+            return bound;
+        }
+
+        private static EffectExpression Resolve(EffectExpression expression, Func<string, bool?> hasFact, ref bool open)
+        {
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                RecipientFactGate gate = conditional.RecipientFactGate;
+                if (gate != null && gate.Facts.Count != 0)
+                {
+                    var values = gate.Facts.Select(f => new { f.Value, Has = hasFact(f.Key) }).ToList();
+                    if (values.All(v => v.Has.HasValue))
+                    {
+                        bool result = gate.Any ? values.Any(v => v.Has.Value != v.Value)
+                            : values.All(v => v.Has.Value != v.Value);
+                        return Resolve(result ? conditional.WhenTrue : conditional.WhenFalse, hasFact, ref open);
+                    }
+                    open = true;
+                }
+                EffectExpression yes = Resolve(conditional.WhenTrue, hasFact, ref open);
+                EffectExpression no = Resolve(conditional.WhenFalse, hasFact, ref open);
+                return ReferenceEquals(yes, conditional.WhenTrue) && ReferenceEquals(no, conditional.WhenFalse)
+                    ? expression : new ConditionalEffectExpression(conditional.ConditionContract, yes, no,
+                        conditional.CasterFactGate, gate);
+            }
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+            {
+                var children = new List<EffectExpression>();
+                foreach (EffectExpression child in sequence.Children) children.Add(Resolve(child, hasFact, ref open));
+                return children.SequenceEqual(sequence.Children) ? expression
+                    : new SequenceEffectExpression(children, sequence.NearbyRecipients);
+            }
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null)
+            {
+                EffectExpression child = Resolve(reference.Child, hasFact, ref open);
+                return ReferenceEquals(child, reference.Child) ? expression : new ReferencedAbilityExpression(reference.AbilityId, child);
+            }
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null)
+            {
+                EffectExpression child = Resolve(targeted.Child, hasFact, ref open);
+                return ReferenceEquals(child, targeted.Child) ? expression : new TargetedEffectExpression(targeted.Target, child);
+            }
+            return expression;
+        }
+
+        public static IEnumerable<string> FactIds(EffectExpression expression)
+        {
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+                return (conditional.RecipientFactGate == null ? new string[0]
+                        : conditional.RecipientFactGate.Facts.Select(f => f.Key))
+                    .Concat(FactIds(conditional.WhenTrue)).Concat(FactIds(conditional.WhenFalse))
+                    .Distinct(StringComparer.Ordinal);
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null) return sequence.Children.SelectMany(FactIds).Distinct(StringComparer.Ordinal);
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null) return FactIds(reference.Child);
+            var targeted = expression as TargetedEffectExpression;
+            return targeted == null ? new string[0] : FactIds(targeted.Child);
+        }
     }
 
     public static class EffectConditionBinding
@@ -263,7 +574,8 @@ namespace KingmakerBuffPlanner.Domain.Effects
                 EffectExpression whenTrue = Bind(conditional.WhenTrue, casterFacts);
                 EffectExpression whenFalse = Bind(conditional.WhenFalse, casterFacts);
                 return ReferenceEquals(whenTrue, conditional.WhenTrue) && ReferenceEquals(whenFalse, conditional.WhenFalse)
-                    ? expression : new ConditionalEffectExpression(conditional.ConditionContract, whenTrue, whenFalse, gate);
+                    ? expression : new ConditionalEffectExpression(conditional.ConditionContract, whenTrue, whenFalse, gate,
+                        conditional.RecipientFactGate);
             }
             var sequence = expression as SequenceEffectExpression;
             if (sequence != null)

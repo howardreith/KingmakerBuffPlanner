@@ -1,0 +1,247 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "m_IsFullRoundAction": true,
+  "Range": "Close",
+  "CanTargetPoint": true,
+  "CanTargetFriends": true,
+  "CanTargetSelf": true,
+  "SpellResistance": true,
+  "Animation": "Point",
+  "AnimationStyle": "CastActionPoint",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Quicken, Extend, Heighten, Reach",
+  "LocalizedDuration": "LocalizedString:00b2e4c2-aafe-487b-b890-d57473373da7:1 minute/level",
+  "LocalizedSavingThrow": "LocalizedString::",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "352469f228a3b1f4cb269c7ab0409b8e"
+  ],
+  "m_DisplayName": "LocalizedString:1c4400d3-91ff-4387-9419-ea1fea2ad64f:Reduce Person, Mass",
+  "m_Description": "LocalizedString:6a45d7fa-fcbf-4127-bb5d-f296542a8ba0:This spell causes instant diminution of all allied humanoid creatures, halving their height, length, and width and dividing their weight by 8. This decrease changes the creatures' size category to the next smaller one. The targets gain a +2 size bonus to Dexterity, a –2 size penalty to Strength (to a minimum of 1), and a +1 bonus on attack rolls and AC due to their reduced size. Melee and ranged weapons used by this creature deal less damage.[LONGSTART]\nA Small humanoid creature whose size decreases to Tiny has a space of 2.5 feet and a natural reach of 0 feet (meaning that it must enter an opponent's square to attack). A Large humanoid creature whose size decreases to Medium has a space of 5 feet and a natural reach of 5 feet. This spell doesn't change the target's speed.\nReduce person dispels enlarge person.[LONGEND]",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "ReducePerson"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Transmutation",
+      "name": "$SpellComponent$4a2bdbc8-7070-4b7a-94f6-8b4f53dad5d1"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:ba0401fdeb4062f40a7aa95b6f07fe89:WizardSpellList",
+      "SpellLevel": 4,
+      "name": "$SpellListComponent$1cdd9476-9482-4764-aa8b-3f2f94b19b46"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityTargetsAround, Assembly-CSharp",
+      "m_Radius": {
+        "$id": "5",
+        "$type": "Kingmaker.Utility.Feet, Assembly-CSharp",
+        "m_Value": 15.0
+      },
+      "m_TargetType": "Ally",
+      "m_Condition": {
+        "$id": "6",
+        "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+        "Conditions": []
+      },
+      "name": "$AbilityTargetsAround$c6d85892-4a9d-4a1a-934e-5cfb2d7e2101"
+    },
+    {
+      "$id": "7",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:4d72e1e7bd6bc4f4caaea7aa43a14639:MagusSpellList",
+      "SpellLevel": 4,
+      "name": "$SpellListComponent$298e34d3-5cb9-4362-b4ad-6c1aee9668be"
+    },
+    {
+      "$id": "8",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx, Assembly-CSharp",
+      "PrefabLink": "Resource:352469f228a3b1f4cb269c7ab0409b8e:CommonTransmutationBuff00",
+      "Anchor": "SelectedTarget",
+      "PositionAnchor": "None",
+      "OrientationAnchor": "None",
+      "name": "$AbilitySpawnFx$5f558e36-78b8-4838-a7b3-90dc0ac40049"
+    },
+    {
+      "$id": "9",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "Actions": {
+        "$id": "10",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "11",
+            "$type": "Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional, Assembly-CSharp",
+            "Comment": "",
+            "ConditionsChecker": {
+              "$id": "12",
+              "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+              "Conditions": [
+                {
+                  "$id": "13",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasFact, Assembly-CSharp",
+                  "Fact": "Blueprint:4f139d125bb602f48bfaec3d3e1937cb:EnlargePersonBuff",
+                  "name": "$ContextConditionHasFact$0a7dff3c-4887-4506-bea4-1dc85058aee9"
+                }
+              ]
+            },
+            "IfTrue": {
+              "$id": "14",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": [
+                {
+                  "$id": "15",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff, Assembly-CSharp",
+                  "Buff": "Blueprint:4f139d125bb602f48bfaec3d3e1937cb:EnlargePersonBuff",
+                  "name": "$ContextActionRemoveBuff$18dc7292-ddd1-43c2-97c5-f38c4f136b25"
+                }
+              ]
+            },
+            "IfFalse": {
+              "$id": "16",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": [
+                {
+                  "$id": "17",
+                  "$type": "Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional, Assembly-CSharp",
+                  "Comment": "",
+                  "ConditionsChecker": {
+                    "$id": "18",
+                    "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+                    "Conditions": [
+                      {
+                        "$id": "19",
+                        "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasFact, Assembly-CSharp",
+                        "Fact": "Blueprint:3bec99efd9a363242a6c8d9957b75e91:AberrationType",
+                        "Not": true,
+                        "name": "$ContextConditionHasFact$1f052ac9-80dc-42d7-82d6-9a2aeb0b917b"
+                      },
+                      {
+                        "$id": "20",
+                        "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasFact, Assembly-CSharp",
+                        "Fact": "Blueprint:a95311b3dc996964cbaa30ff9965aaf6:AnimalType",
+                        "Not": true,
+                        "name": "$ContextConditionHasFact$406787bb-d6fd-4a3c-a12c-3661d403d6d8"
+                      },
+                      {
+                        "$id": "21",
+                        "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasFact, Assembly-CSharp",
+                        "Fact": "Blueprint:fd389783027d63343b4a5634bd81645f:ConstructType",
+                        "Not": true,
+                        "name": "$ContextConditionHasFact$780f85b5-b287-4b10-8c05-243711caf462"
+                      },
+                      {
+                        "$id": "22",
+                        "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasFact, Assembly-CSharp",
+                        "Fact": "Blueprint:455ac88e22f55804ab87c2467deff1d6:DragonType",
+                        "Not": true,
+                        "name": "$ContextConditionHasFact$530cb2f2-c33c-4fcb-8a64-c7cb6ce52cf4"
+                      },
+                      {
+                        "$id": "23",
+                        "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasFact, Assembly-CSharp",
+                        "Fact": "Blueprint:018af8005220ac94a9a4f47b3e9c2b4e:FeyType",
+                        "Not": true,
+                        "name": "$ContextConditionHasFact$955a4042-ca1e-40b1-9d9e-42ba7db89415"
+                      },
+                      {
+                        "$id": "24",
+                        "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasFact, Assembly-CSharp",
+                        "Fact": "Blueprint:625827490ea69d84d8e599a33929fdc6:MagicalBeastType",
+                        "Not": true,
+                        "name": "$ContextConditionHasFact$15db0586-4010-434a-ada5-0f9edcb3d913"
+                      },
+                      {
+                        "$id": "25",
+                        "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasFact, Assembly-CSharp",
+                        "Fact": "Blueprint:57614b50e8d86b24395931fffc5e409b:MonstrousHumanoidType",
+                        "Not": true,
+                        "name": "$ContextConditionHasFact$51fbcc6f-70a1-43dd-a83a-3618695a3a34"
+                      },
+                      {
+                        "$id": "26",
+                        "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasFact, Assembly-CSharp",
+                        "Fact": "Blueprint:9054d3988d491d944ac144e27b6bc318:OutsiderType",
+                        "Not": true,
+                        "name": "$ContextConditionHasFact$d63f2007-20e4-448e-bf2f-4b30f66db1c0"
+                      },
+                      {
+                        "$id": "27",
+                        "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasFact, Assembly-CSharp",
+                        "Fact": "Blueprint:706e61781d692a042b35941f14bc41c5:PlantType",
+                        "Not": true,
+                        "name": "$ContextConditionHasFact$535b9415-934c-4493-ae97-a94aa1f8c3af"
+                      },
+                      {
+                        "$id": "28",
+                        "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasFact, Assembly-CSharp",
+                        "Fact": "Blueprint:09478937695300944a179530664e42ec:VerminType",
+                        "Not": true,
+                        "name": "$ContextConditionHasFact$a8a5d5c4-6efd-49be-b32e-84947267e69f"
+                      },
+                      {
+                        "$id": "29",
+                        "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHasFact, Assembly-CSharp",
+                        "Fact": "Blueprint:734a29b693e9ec346ba2951b27987e33:UndeadType",
+                        "Not": true,
+                        "name": "$ContextConditionHasFact$5f203b31-1af8-4e87-9d07-ace42f29522b"
+                      }
+                    ]
+                  },
+                  "IfTrue": {
+                    "$id": "30",
+                    "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+                    "Actions": [
+                      {
+                        "$id": "31",
+                        "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+                        "Buff": "Blueprint:b0793973c61a19744a8630468e8f4174:ReducePersonBuff",
+                        "DurationValue": {
+                          "$id": "32",
+                          "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+                          "m_IsExtendable": true,
+                          "Rate": "Minutes",
+                          "DiceCountValue": {
+                            "$id": "33",
+                            "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+                          },
+                          "BonusValue": {
+                            "$id": "34",
+                            "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                            "ValueType": "Rank"
+                          }
+                        },
+                        "IsFromSpell": true,
+                        "name": "$ContextActionApplyBuff$77001f3e-0a1c-4737-96ad-432887503447"
+                      }
+                    ]
+                  },
+                  "IfFalse": {
+                    "$id": "35",
+                    "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+                    "Actions": []
+                  },
+                  "name": "$Conditional$127bd6c0-d059-4a00-ba78-1bf35858ec3f"
+                }
+              ]
+            },
+            "name": "$Conditional$aa22d6fc-3bdc-466a-87a2-7eec4556b982"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$600886d1-6d99-4657-a7b0-f213c8a48865"
+    }
+  ],
+  "m_AssetGuid": "2427f2e3ca22ae54ea7337bbab555b16",
+  "name": "ReducePersonMass"
+}

@@ -1,0 +1,26 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "m_Flags": "IsFromSpell",
+  "Frequency": "Minutes",
+  "FxOnStart": "Resource:c388856d0e8855f429a83ccba67944ba:CommonDevinationBuff00",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [
+    "c388856d0e8855f429a83ccba67944ba"
+  ],
+  "m_DisplayName": "LocalizedString:c7a2b2be-7ee9-4769-bce7-5a8ac414793e:True Seeing",
+  "m_Description": "LocalizedString:88242d1d-b6ac-4fd7-9982-61f751bc43e1:This character has the ability to see all things as they actually are. They see through normal and magical darkness, notice secret doors hidden by magic, see the exact locations of creatures or objects under blur or displacement effects, see invisible creatures or objects normally, see through illusions, and see the true form of polymorphed, changed, or transmuted things.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "TrueSeeing"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddCondition, Assembly-CSharp",
+      "Condition": "TrueSeeing",
+      "name": "$AddCondition$d949a8ff-a428-48fe-b393-6affbbb410c5"
+    }
+  ],
+  "m_AssetGuid": "09b4b69169304474296484c74aa12027",
+  "name": "TrueSeeingBuff"
+}

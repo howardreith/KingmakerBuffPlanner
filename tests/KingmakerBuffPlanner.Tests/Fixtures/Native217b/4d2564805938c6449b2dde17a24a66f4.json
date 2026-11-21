@@ -1,0 +1,61 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "m_Flags": "IsFromSpell",
+  "Frequency": "Minutes",
+  "FxOnStart": "Resource::NULL",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [],
+  "m_DisplayName": "LocalizedString:846fe659-8818-47e4-b057-f113264b6746:Blessing Of Luck And Resolve",
+  "m_Description": "LocalizedString:1ea97bdf-c7f8-4518-9e62-26a529824f49:This creature has a +2 morale bonus on saving throws against fear effects. If it has the fearless racial trait, it is immune to fear instead. If the target fails a saving throw against fear, it rerolls the save with a +4 morale bonus and takes the new result, even if it is worse. After that the spell's effect ends.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "BlessingOfLuckAndResolve"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.Designers.Mechanics.Facts.SavingThrowBonusAgainstDescriptor, Assembly-CSharp",
+      "SpellDescriptor": "Fear, Shaken, Frightened",
+      "ModifierDescriptor": "Morale",
+      "Value": 2,
+      "Bonus": {
+        "$id": "2",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+      },
+      "name": "$SavingThrowBonusAgainstDescriptor$ff1636e3-57b6-4fe4-89e4-3759542664c0"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Designers.Mechanics.Facts.AddFeatureIfHasFact, Assembly-CSharp",
+      "CheckedFact": "Blueprint:39144c817b70467499cc32e3cff59d81:Fearless",
+      "Feature": "Blueprint:12a47d1d5d02fe34c8158ca58e0b3b60:ImmunityToFear",
+      "name": "$AddFeatureIfHasFact$47e5cd5a-da49-40a8-82ce-00b9926ffd0b"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.Designers.Mechanics.Facts.ModifyD20, Assembly-CSharp",
+      "m_SavingThrowType": "All",
+      "Rule": "SavingThrow",
+      "RollsAmount": 1,
+      "Chance": {
+        "$id": "5",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+      },
+      "RerollOnlyIfFailed": true,
+      "DispellOnRerollFinished": true,
+      "Skill": [],
+      "SpecificDescriptor": true,
+      "SpellDescriptor": "Fear",
+      "AddSavingThrowBonus": true,
+      "ModifierDescriptor": "Morale",
+      "Value": {
+        "$id": "6",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+        "Value": 4
+      },
+      "name": "$ModifyD20$e6f5b6c3-6b37-48f8-bf38-bfd883b644f3"
+    }
+  ],
+  "m_AssetGuid": "4d2564805938c6449b2dde17a24a66f4",
+  "name": "BlessingOfLuckAndResolveBuff"
+}

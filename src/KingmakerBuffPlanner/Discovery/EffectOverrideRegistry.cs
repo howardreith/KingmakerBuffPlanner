@@ -47,14 +47,19 @@ namespace KingmakerBuffPlanner.Discovery
                     (entry.SourceAssembly != "native" && entry.SourceAssembly != "optional"))
                     throw new InvalidDataException("invalid-override-entry");
                 if (!new[] { "include", "exclude", "replace-detected-effects",
-                    "augment-detected-effects", "unsupported-with-reason" }.Contains(entry.Disposition))
+                    "augment-detected-effects", "unsupported-with-reason",
+                    AdmitDespiteAllyDisposition }.Contains(entry.Disposition))
                     throw new InvalidDataException("invalid-override-disposition");
                 if (entry.EffectMode != "allOf" && entry.EffectMode != "anyOf")
                     throw new InvalidDataException("invalid-override-effect-mode");
                 if ((entry.Disposition == "include" ||
                     entry.Disposition == "replace-detected-effects" ||
-                    entry.Disposition == "augment-detected-effects") && entry.Effects.Length == 0)
+                    entry.Disposition == "augment-detected-effects" ||
+                    entry.Disposition == AdmitDespiteAllyDisposition) && entry.Effects.Length == 0)
                     throw new InvalidDataException("empty-override-effects");
+                if (entry.Disposition == AdmitDespiteAllyDisposition &&
+                    entry.Effects.Any(effect => effect == null || effect.Kind != "UnitBuff"))
+                    throw new InvalidDataException("invalid-ally-disposition-exception");
                 foreach (EffectOverrideEffect effect in entry.Effects)
                     if (effect == null || !IsGuid(effect.Guid) ||
                         !new[] { "UnitBuff", "AreaBuff", "PrimaryWeaponEnchant",
@@ -64,11 +69,32 @@ namespace KingmakerBuffPlanner.Discovery
             return new EffectOverrideRegistry(document.Entries);
         }
 
+        // Missing-beneficial-buffs mission §3.A, review R1-F6: an evidence-
+        // backed declaration that this ability's "harmful to allies"
+        // metadata is misleading for exactly the listed payload buffs. It
+        // never replaces the discovered graph (the conditional and area
+        // semantics stay), it is not an inclusion by itself: the classifier
+        // still judges the ability with the listed payloads exempted from
+        // that one flag, and only when it cannot be aimed at a hostile unit.
+        public const string AdmitDespiteAllyDisposition = "admit-despite-ally-disposition";
+
+        public IReadOnlyList<string> AllyDispositionExceptions(string abilityGuid)
+        {
+            EffectOverrideEntry entry;
+            if (abilityGuid == null || !_entries.TryGetValue(abilityGuid, out entry) ||
+                entry.Disposition != AdmitDespiteAllyDisposition)
+                return new string[0];
+            return entry.Effects.Select(effect => effect.Guid).ToArray();
+        }
+
         public EffectOverrideApplication Apply(string abilityGuid, EffectExpression detected)
         {
             EffectOverrideEntry entry;
             if (!_entries.TryGetValue(abilityGuid, out entry))
                 return new EffectOverrideApplication(detected, null);
+            // The discovered expression is kept whole; the classifier decides.
+            if (entry.Disposition == AdmitDespiteAllyDisposition)
+                return new EffectOverrideApplication(detected, null, entry);
             if (entry.Disposition == "exclude" || entry.Disposition == "unsupported-with-reason")
                 return new EffectOverrideApplication(new EmptyEffectExpression(), entry);
             EffectExpression replacement = BuildExpression(entry);
@@ -139,13 +165,20 @@ namespace KingmakerBuffPlanner.Discovery
 
     public sealed class EffectOverrideApplication
     {
-        internal EffectOverrideApplication(EffectExpression expression, EffectOverrideEntry entry)
+        internal EffectOverrideApplication(EffectExpression expression, EffectOverrideEntry entry,
+            EffectOverrideEntry classifierException = null)
         {
             Expression = expression;
             Entry = entry;
+            ClassifierException = classifierException;
         }
         public EffectExpression Expression { get; private set; }
+        // An override that decides the source itself (include, exclude,
+        // replace, augment, unsupported); null when the classifier decides.
         public EffectOverrideEntry Entry { get; private set; }
+        // An "admit-despite-ally-disposition" entry the classifier receives
+        // through its facts (the discovered graph is unchanged).
+        public EffectOverrideEntry ClassifierException { get; private set; }
     }
 
     public sealed class EffectOverrideDocument

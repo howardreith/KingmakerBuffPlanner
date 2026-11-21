@@ -6,6 +6,25 @@
 
 # Native Buff Coverage Matrix
 
+## Missing beneficial buffs (2026-11-21, unreleased)
+
+Current implementation (after review rounds 1 and 2). Abjuration Resistance
+(five selections), Physical Enhancement (three selections, live scope),
+Blessing of Luck and Resolve Mass, Feather Step Mass, Firebrand, Heroic
+Invocation and Enlarge/Reduce Person Mass are catalogued by structural rules
+(Personal-range anchoring; unit-anchored allied bursts whose own unconditioned
+selector decides the recipients). Good Hope and Firebelly are catalogued
+through narrow, evidence-backed, graph-preserving `admit-despite-ally-disposition`
+entries in `NativeEffectOverrides.json` (ability GUID + payload buff GUID; the
+classifier holds no names or identities; every payload of the ability must be
+an approved, read buff). Their Call of the Wild and Gunslinger variants are
+covered by their own entries. Mutually exclusive selections are refused as
+stackable inside the compiler's budget pass (execution order, bound
+expressions) and in the Classic planner and its sequence forecast; group
+coverage follows recipient-fact conditions. Offline only; native qualification
+**NOT_RUN**. Candidate audit, per-family status and
+evidence: [MISSING-BENEFICIAL-BUFFS-AUDIT.md](MISSING-BENEFICIAL-BUFFS-AUDIT.md).
+
 ## 0.5.1-rc3 preparation
 
 Discovery/classification and exact-variant/group coverage remain unchanged.

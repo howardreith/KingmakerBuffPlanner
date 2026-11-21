@@ -29,8 +29,6 @@ namespace KingmakerBuffPlanner.GameAdapters
             IDictionary<string, EffectExpression> effectsBySource)
         {
             _diagnostics.Clear();
-            var units = snapshot.Units.Where(u => u.TargetValidation.Alive &&
-                u.TargetValidation.Friendly && u.TargetValidation.Targetable).ToArray();
             Dictionary<string, UnitEntityData> liveUnits = KingmakerAnimatedCastAdapter.CollectUnits();
             var options = new List<ProviderPlanningOption>();
             foreach (ProviderSnapshot provider in snapshot.Providers)
@@ -66,85 +64,42 @@ namespace KingmakerBuffPlanner.GameAdapters
                 var areaResolver = new KingmakerAreaCoverageResolver();
                 AlliedAreaCoverage areaCoverage = blueprint == null
                     ? null : areaResolver.Resolve(blueprint, declaredSource);
-                bool party = EffectExpressionTargetAnalysis.Contains(
-                    expression, EffectTarget.Party);
-                bool areaRecipients = EffectExpressionTargetAnalysis.Contains(
-                    expression, EffectTarget.AlliedAreaRecipients);
-                bool unsafeArea = EffectExpressionTargetAnalysis.Contains(
-                        expression, EffectTarget.EnemyAreaRecipients) ||
-                    EffectExpressionTargetAnalysis.Contains(expression,
-                        EffectTarget.AmbiguousAreaRecipients);
                 bool infusedPersonal = EffectExpressionTargetAnalysis
                     .ContainsOnly(expression, EffectTarget.Caster) &&
                     ability != null && ability.IsAlchemistSpell &&
                     ability.AlchemistInfusion && ability.TargetAnchor ==
                         AbilityTargetAnchor.Unit;
-                IEnumerable<UnitSnapshot> reachable;
-                var recipientIdsByAnchor =
-                    new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal);
-                string[] anchors;
-                if (EffectExpressionTargetAnalysis.ContainsOnly(expression,
-                        EffectTarget.Caster) && !infusedPersonal)
-                {
-                    reachable = units.Where(u => u.UnitId == provider.Key.CasterUnitId);
-                    anchors = reachable.Select(u => u.UnitId).ToArray();
-                }
-                // Re-review: a party effect that also reaches pets is planned as
-                // a party effect (every unit, pets included, from a legal
-                // origin); only a pet-only effect is limited to the pet.
-                else if (party)
-                {
-                    reachable = units;
-                    anchors = LegalAnchorIds(targetingAbility, units, liveUnits);
-                    if (anchors.Length == 0 && units.Any(unit =>
-                        unit.UnitId == provider.Key.CasterUnitId))
-                        anchors = new[] { provider.Key.CasterUnitId };
-                    foreach (string anchor in anchors)
-                        recipientIdsByAnchor.Add(anchor,
-                            units.Select(unit => unit.UnitId).ToArray());
-                }
-                else if (EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.Pet))
-                {
-                    reachable = units.Where(u => u.IsPet && u.MasterUnitId == provider.Key.CasterUnitId);
-                    anchors = reachable.Select(u => u.UnitId).ToArray();
-                }
-                else if (areaRecipients && areaCoverage != null && caster != null)
-                {
-                    float radius = areaCoverage.Radius;
-                    anchors = LegalAnchorIds(targetingAbility, units, liveUnits);
-                    foreach (string anchorId in anchors)
-                    {
-                        UnitEntityData anchor;
-                        if (!liveUnits.TryGetValue(anchorId, out anchor)) continue;
-                        recipientIdsByAnchor.Add(anchorId, units.Where(unit =>
-                        {
-                            UnitEntityData target;
-                            return liveUnits.TryGetValue(unit.UnitId, out target) &&
-                                anchor.DistanceTo(target) <= radius + 0.01f;
-                        }).Select(unit => unit.UnitId).ToArray());
-                    }
-                    reachable = units.Where(unit => recipientIdsByAnchor.Values
-                        .Any(recipients => recipients.Contains(unit.UnitId)));
-                }
-                else if (areaRecipients || unsafeArea)
-                {
-                    reachable = new UnitSnapshot[0];
-                    anchors = new string[0];
-                }
-                else
-                {
-                    reachable = units.Where(u =>
+                // Review R1-F8: the decisions are game-free; this builder only
+                // supplies the native target verdict and live distances.
+                AbilityData verdictAbility = targetingAbility;
+                IReadOnlyDictionary<string, bool> facts = ReadCasterFacts(expression, caster);
+                ProviderTargetingDecision decision = ProviderTargetingPlanner.Decide(
+                    provider, expression, snapshot.Units, caster != null, infusedPersonal,
+                    areaCoverage,
+                    unitId =>
                     {
                         UnitEntityData target;
-                        return liveUnits.TryGetValue(u.UnitId, out target) &&
-                            KingmakerAnimatedCastAdapter.CanTarget(targetingAbility,
-                                new TargetWrapper(target));
+                        return liveUnits.TryGetValue(unitId, out target) &&
+                            KingmakerAnimatedCastAdapter.CanTarget(verdictAbility, new TargetWrapper(target));
+                    },
+                    (fromId, toId) =>
+                    {
+                        UnitEntityData from, to;
+                        return liveUnits.TryGetValue(fromId, out from) && liveUnits.TryGetValue(toId, out to)
+                            ? from.DistanceTo(to) : (float?)null;
+                    },
+                    facts,
+                    (unitId, factId) =>
+                    {
+                        UnitEntityData unit;
+                        return liveUnits.TryGetValue(unitId, out unit) ? ReadUnitFact(unit, factId) : null;
                     });
-                    anchors = reachable.Select(u => u.UnitId).ToArray();
-                }
-                string[] reachableIds = reachable.Select(u => u.UnitId)
-                    .Distinct(StringComparer.Ordinal).ToArray();
-                IReadOnlyDictionary<string, bool> facts = ReadCasterFacts(expression, caster);
+                bool party = decision.Party;
+                bool areaRecipients = decision.AreaRecipients;
+                bool unsafeArea = decision.UnsafeArea;
+                var recipientIdsByAnchor = decision.RecipientIdsByAnchor;
+                string[] anchors = decision.Anchors;
+                string[] reachableIds = decision.ReachableIds;
                 var effectsByTarget = new Dictionary<string, EffectExpression>(StringComparer.Ordinal);
                 EffectExpression applicable = EffectConditionBinding.Bind(expression, facts);
                 if (EffectRecipientBinding.ContainsNearby(applicable))
@@ -157,18 +112,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                                 NearbyRecipientCandidates(rule, caster, target, snapshot.Units
                                     .Select(unit => { UnitEntityData live; return liveUnits.TryGetValue(unit.UnitId, out live) ? live : null; }))));
                     }
-                options.Add(new ProviderPlanningOption(provider, reachableIds, anchors,
-                    provider.EffectiveCasterLevel, provider.ExpectedDurationRounds,
-                    executionCapability.Strategy,
-                    executionCapability.Reason,
-                    recipientIdsByAnchor, facts, effectsByTarget));
-                string targetClass = party ? "Party" : areaRecipients
-                    ? "AlliedAreaRecipients" : unsafeArea
-                        ? "UnsafeArea" : infusedPersonal
-                            ? "NativeAlchemistInfusion" :
-                            EffectExpressionTargetAnalysis.ContainsOnly(
-                                expression, EffectTarget.Caster)
-                                ? "Caster" : "Direct";
+                options.Add(ProviderTargetingPlanner.BuildOption(provider, decision,
+                    executionCapability.Strategy, executionCapability.Reason, facts, effectsByTarget));
+                string targetClass = decision.TargetClass;
                 string[] paths = NativeCatalogExporter.GetEffects(expression)
                     .Select(value => value.ActionPath)
                     .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -240,6 +186,19 @@ namespace KingmakerBuffPlanner.GameAdapters
             return facts;
         }
 
+        // Whether a live unit has a fact (a recipient-fact gate); null when
+        // it cannot be read, never false by default.
+        private static bool? ReadUnitFact(UnitEntityData unit, string factId)
+        {
+            try
+            {
+                var fact = ResourcesLibrary.TryGetBlueprint<BlueprintUnitFact>(factId);
+                if (fact == null || unit == null || unit.Descriptor == null) return null;
+                return unit.Descriptor.HasFact(fact);
+            }
+            catch (Exception) { return null; }
+        }
+
         private static IReadOnlyList<string> SelectNearbyRecipients(NearbyRecipientRule rule,
             UnitEntityData caster, UnitEntityData target)
         {
@@ -280,20 +239,6 @@ namespace KingmakerBuffPlanner.GameAdapters
                     .Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal).ToArray();
             }
             catch (Exception) { return new string[0]; }
-        }
-
-        private static string[] LegalAnchorIds(
-            AbilityData ability,
-            IEnumerable<UnitSnapshot> units,
-            IDictionary<string, UnitEntityData> liveUnits)
-        {
-            return (units ?? new UnitSnapshot[0]).Where(unit =>
-            {
-                UnitEntityData target;
-                return liveUnits != null && liveUnits.TryGetValue(unit.UnitId, out target) &&
-                    KingmakerAnimatedCastAdapter.CanTarget(ability, new TargetWrapper(target));
-            }).Select(unit => unit.UnitId).Distinct(StringComparer.Ordinal)
-                .OrderBy(unitId => unitId, StringComparer.Ordinal).ToArray();
         }
 
     }

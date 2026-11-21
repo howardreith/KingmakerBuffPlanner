@@ -1,0 +1,38 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "FxOnStart": "Resource::NULL",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [],
+  "m_DisplayName": "LocalizedString::",
+  "m_Description": "LocalizedString::",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "EnlargePerson"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.ChangeUnitSize, Assembly-CSharp",
+      "SizeDelta": 1,
+      "name": "$ChangeUnitSize$285fd461-72a9-47fe-b6f4-0797cbdc7cf9"
+    },
+    {
+      "$id": "2",
+      "$type": "Kingmaker.UnitLogic.Buffs.Components.AddGenericStatBonus, Assembly-CSharp",
+      "Descriptor": "Size",
+      "Stat": "Strength",
+      "Value": 2,
+      "name": "$AddGenericStatBonus$943890da-1629-4cf9-bb93-2484cee17270"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.UnitLogic.Buffs.Components.AddGenericStatBonus, Assembly-CSharp",
+      "Descriptor": "Size",
+      "Stat": "Dexterity",
+      "Value": -2,
+      "name": "$AddGenericStatBonus$ffb92d58-5718-4059-95df-49a0ac72ae28"
+    }
+  ],
+  "m_AssetGuid": "4f139d125bb602f48bfaec3d3e1937cb",
+  "name": "EnlargePersonBuff"
+}

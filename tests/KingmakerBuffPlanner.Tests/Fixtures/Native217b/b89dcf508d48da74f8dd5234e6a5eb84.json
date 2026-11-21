@@ -1,0 +1,18 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "m_Flags": "RemoveOnRest",
+  "IsClassFeature": true,
+  "Stacking": "Stack",
+  "FxOnStart": "Resource::NULL",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [],
+  "m_DisplayName": "LocalizedString:e99f255a-9668-4ed3-9fdb-06b5adf00d79:Treat Affliction",
+  "m_Description": "LocalizedString:eb3ea8cd-8723-43fe-9d9d-1a436cc4eb8d:To treat an affliction means to tend to a single diseased or poisoned character. Make a Lore (Religion) check. If your check exceeds the DC of the affliction, the affliction is removed. You can treat each character only once per day.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "CureLightWounds"
+  },
+  "Components": [],
+  "m_AssetGuid": "b89dcf508d48da74f8dd5234e6a5eb84",
+  "name": "LoreReligionCooldown"
+}

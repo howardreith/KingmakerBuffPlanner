@@ -1,0 +1,108 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "CanTargetEnemies": true,
+  "CanTargetFriends": true,
+  "CanTargetSelf": true,
+  "SpellResistance": true,
+  "EffectOnEnemy": "Harmful",
+  "Animation": "Self",
+  "AnimationStyle": "CastActionSelf",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Quicken, Extend, Heighten, Reach",
+  "LocalizedDuration": "LocalizedString:9178f928-579f-43d0-bd80-e67e478c7bfc:10 minutes/level",
+  "LocalizedSavingThrow": "LocalizedString::",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "7a401ecd81c12364c92b7b6551031cdb",
+    "1a36d2e3b70f70a4ca57fca372b2e6ed"
+  ],
+  "m_DisplayName": "LocalizedString:f9d59f46-64e9-4eb2-b219-6bec0337a32c:Freedom of Movement",
+  "m_Description": "LocalizedString:a5c4a34e-3454-493e-800b-62c6f8e2bfd2:This spell enables you or a creature you touch to move and attack normally for the duration of the spell, even under the influence of magic that usually impedes movement, such as paralysis, solid fog, slow, and web. All combat maneuver checks made to grapple the target automatically fail.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "FreedomOfMovement"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Abjuration",
+      "name": "$SpellComponent$4a106222-d22d-4fac-a2e1-50036ab334e9"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:8443ce803d2d31347897a3d85cc32f53:ClericSpellList",
+      "SpellLevel": 4,
+      "name": "$SpellListComponent$1cf0cdc3-ba5e-4081-991f-25e4737bdc64"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectStickyTouch, Assembly-CSharp",
+      "TouchDeliveryAbility": "Blueprint:4c349361d720e844e846ad8c19959b1e:FreedomOfMovement",
+      "name": "$AbilityEffectStickyTouch$f666d981-6269-43d9-b87d-ce5064951850"
+    },
+    {
+      "$id": "5",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:2ff9831eb262758449287f820108428d:ChaosDomainSpellList",
+      "SpellLevel": 4,
+      "name": "$SpellListComponent$43066a3a-9854-4b6b-9aca-6a615fcf0eef"
+    },
+    {
+      "$id": "6",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:25a5013493bdcf74bb2424532214d0c8:BardSpellList",
+      "SpellLevel": 4,
+      "name": "$SpellListComponent$94deec25-d742-490e-8434-e92d4ad43222"
+    },
+    {
+      "$id": "7",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:bad8638d40639d04fa2f80a1cac67d6b:DruidSpellList",
+      "SpellLevel": 4,
+      "name": "$SpellListComponent$18c20fc5-7ab8-4128-aadc-fd633c31c218"
+    },
+    {
+      "$id": "8",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:57c894665b7895c499b3dce058c284b3:InquisitorSpellList",
+      "SpellLevel": 4,
+      "name": "$SpellListComponent$da538e53-4b7c-4add-ab7b-93e80c3dfc2e"
+    },
+    {
+      "$id": "9",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:29f3c338532390546bc5347826a655c4:RangerSpellList",
+      "SpellLevel": 4,
+      "name": "$SpellListComponent$a0eea040-b1bb-4d57-a6b3-1bce9ee50950"
+    },
+    {
+      "$id": "10",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:f60d0cd93edc65c42ad31e34a905fb2f:AlchemistSpellList",
+      "SpellLevel": 4,
+      "name": "$SpellListComponent$4e42eb19-ebb6-46e1-a648-de082a367118"
+    },
+    {
+      "$id": "11",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:73406d3b9f6290e499c5fa3951a24234:LiberationDomainSpellList",
+      "SpellLevel": 4,
+      "name": "$SpellListComponent$59231e8a-9cbb-46ce-8a8b-b31238065dd7"
+    },
+    {
+      "$id": "12",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:35e15cd1b353e2d47b507c445d2f8c6f:WaterDomainSpellList",
+      "SpellLevel": 4,
+      "name": "$SpellListComponent$f4cfccdf-fbb1-4b13-b998-16ba20b86af8"
+    }
+  ],
+  "m_AssetGuid": "0087fc2d64b6095478bc7b8d7d512caf",
+  "name": "FreedomOfMovementCast"
+}

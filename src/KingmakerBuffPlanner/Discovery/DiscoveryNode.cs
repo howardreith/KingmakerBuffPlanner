@@ -34,8 +34,10 @@ namespace KingmakerBuffPlanner.Discovery
             string referencedAbilityId = null,
             CasterFactGate casterFactGate = null,
             NearbyRecipientRule nearbyRecipients = null,
-            float? maximumDurationSeconds = null)
+            float? maximumDurationSeconds = null,
+            RecipientFactGate recipientFactGate = null)
         {
+            RecipientFactGate = recipientFactGate;
             Kind = kind;
             Identity = identity ?? string.Empty;
             Children = new ReadOnlyCollection<DiscoveryNode>(
@@ -65,6 +67,8 @@ namespace KingmakerBuffPlanner.Discovery
         public string SourceContract { get; private set; }
         public string ReferencedAbilityId { get; private set; }
         public CasterFactGate CasterFactGate { get; private set; }
+        // A conditional on the recipient's own facts (planning metadata).
+        public RecipientFactGate RecipientFactGate { get; private set; }
         public NearbyRecipientRule NearbyRecipients { get; private set; }
         // Effect nodes: the longest native lifetime of the application when
         // it is structurally fixed (see EffectApplicationLifetime).

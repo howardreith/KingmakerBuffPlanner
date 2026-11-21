@@ -1,0 +1,59 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "FxOnStart": "Resource:91ef30ab58fa0d3449d4d2ccc20cb0f8:Haste00_Trail",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [
+    "91ef30ab58fa0d3449d4d2ccc20cb0f8"
+  ],
+  "m_AllowNonContextActions": true,
+  "m_DisplayName": "LocalizedString::",
+  "m_Description": "LocalizedString::",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "Haste03"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddStatBonus, Assembly-CSharp",
+      "Descriptor": "Dodge",
+      "Stat": "AC",
+      "Value": 1,
+      "name": "$AddStatBonus$904add4b-db59-4639-bc24-1a25f2cd3ced"
+    },
+    {
+      "$id": "2",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddStatBonus, Assembly-CSharp",
+      "Descriptor": "Dodge",
+      "Stat": "SaveReflex",
+      "Value": 1,
+      "name": "$AddStatBonus$48e82514-02f8-48d5-9d8c-6dc37cf84c82"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddStatBonus, Assembly-CSharp",
+      "Descriptor": "UntypedStackable",
+      "Stat": "AdditionalAttackBonus",
+      "Value": 1,
+      "name": "$AddStatBonus$114eb6ac-57d8-4087-a4e2-32e760feaed0"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.BuffExtraAttack, Assembly-CSharp",
+      "Number": 1,
+      "Haste": true,
+      "name": "$BuffExtraAttack$9807dff8-a694-45bf-9b62-fa41ca03f96d"
+    },
+    {
+      "$id": "5",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.BuffMovementSpeed, Assembly-CSharp",
+      "Descriptor": "Enhancement",
+      "Value": 30,
+      "CappedOnMultiplier": true,
+      "MultiplierCap": 2.0,
+      "name": "$BuffMovementSpeed$de38c0a5-8395-4f86-a22b-ccf869d155a2"
+    }
+  ],
+  "m_AssetGuid": "03464790f40c3c24aa684b57155f3280",
+  "name": "HasteBuff"
+}

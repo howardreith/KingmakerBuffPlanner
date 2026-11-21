@@ -1,0 +1,229 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "m_IsFullRoundAction": true,
+  "Range": "Medium",
+  "CanTargetEnemies": true,
+  "CanTargetFriends": true,
+  "CanTargetSelf": true,
+  "EffectOnAlly": "Harmful",
+  "EffectOnEnemy": "Harmful",
+  "Animation": "Point",
+  "AnimationStyle": "CastActionSelf",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Empower, Maximize, Quicken, Extend, Heighten, Reach",
+  "LocalizedDuration": "LocalizedString:00b2e4c2-aafe-487b-b890-d57473373da7:1 minute/level",
+  "LocalizedSavingThrow": "LocalizedString:dccd7029-0a51-4e5b-9cb2-7a2969b61516:Reflex half",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "503b78b507366cc4da0f462cb40131f6"
+  ],
+  "m_DisplayName": "LocalizedString:549638ac-0898-4d45-8deb-9358eb105c0c:Call Lightning",
+  "m_Description": "LocalizedString:89e8ae84-776b-4fdc-b005-7db3d5fb1f32:Immediately upon completion of the spell, and once per round thereafter, you may call down a 6-foot-wide, 30-foot-long, vertical bolt of lightning that deals 3d6 points of electricity damage. The bolt of lightning flashes down in a vertical stroke at whatever target point you choose within the spell's range (measured from your position at the time). Any creature in the target square or in the path of the bolt is affected. You need not call a bolt of lightning immediately; other actions, even spellcasting, can be performed first. Each round after the first you may use a standard action (concentrating on the spell) to call a bolt. Each time you cast a bolt, the spell's duration is reduced by one minute.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "CallLightning"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Evocation",
+      "name": "$SpellComponent$963fb46b-1056-41ec-9a0f-e38e805722f1"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "SavingThrowType": "Reflex",
+      "Actions": {
+        "$id": "4",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "5",
+            "$type": "Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional, Assembly-CSharp",
+            "Comment": "",
+            "ConditionsChecker": {
+              "$id": "6",
+              "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+              "Conditions": [
+                {
+                  "$id": "7",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionCasterHasFact, Assembly-CSharp",
+                  "Fact": "Blueprint:32e90ae6f8c7656448d9e80173222012:InsideTheStormBuff",
+                  "name": "$ContextConditionCasterHasFact$08c731de-f794-4da7-b1b1-e9deca78b974"
+                }
+              ]
+            },
+            "IfTrue": {
+              "$id": "8",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": [
+                {
+                  "$id": "9",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDamage, Assembly-CSharp",
+                  "DamageType": {
+                    "$id": "10",
+                    "$type": "Kingmaker.RuleSystem.Rules.Damage.DamageTypeDescription, Assembly-CSharp",
+                    "Type": "Energy",
+                    "Common": {
+                      "$id": "11",
+                      "$type": "Kingmaker.RuleSystem.Rules.Damage.DamageTypeDescription+CommomData, Assembly-CSharp"
+                    },
+                    "Physical": {
+                      "$id": "12",
+                      "$type": "Kingmaker.RuleSystem.Rules.Damage.DamageTypeDescription+PhysicalData, Assembly-CSharp",
+                      "Form": "Slashing"
+                    },
+                    "Energy": "Electricity"
+                  },
+                  "Duration": {
+                    "$id": "13",
+                    "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+                    "m_IsExtendable": true,
+                    "DiceCountValue": {
+                      "$id": "14",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+                    },
+                    "BonusValue": {
+                      "$id": "15",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+                    }
+                  },
+                  "Value": {
+                    "$id": "16",
+                    "$type": "Kingmaker.UnitLogic.Mechanics.ContextDiceValue, Assembly-CSharp",
+                    "DiceType": "D10",
+                    "DiceCountValue": {
+                      "$id": "17",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                      "Value": 3
+                    },
+                    "BonusValue": {
+                      "$id": "18",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+                    }
+                  },
+                  "HalfIfSaved": true,
+                  "name": "$ContextActionDealDamage$ba7af6d2-848f-4c72-b4d1-7a063f7593c1"
+                }
+              ]
+            },
+            "IfFalse": {
+              "$id": "19",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": [
+                {
+                  "$id": "20",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDamage, Assembly-CSharp",
+                  "DamageType": {
+                    "$id": "21",
+                    "$type": "Kingmaker.RuleSystem.Rules.Damage.DamageTypeDescription, Assembly-CSharp",
+                    "Type": "Energy",
+                    "Common": {
+                      "$id": "22",
+                      "$type": "Kingmaker.RuleSystem.Rules.Damage.DamageTypeDescription+CommomData, Assembly-CSharp"
+                    },
+                    "Physical": {
+                      "$id": "23",
+                      "$type": "Kingmaker.RuleSystem.Rules.Damage.DamageTypeDescription+PhysicalData, Assembly-CSharp",
+                      "Form": "Slashing"
+                    },
+                    "Energy": "Electricity"
+                  },
+                  "Duration": {
+                    "$id": "24",
+                    "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+                    "m_IsExtendable": true,
+                    "DiceCountValue": {
+                      "$id": "25",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+                    },
+                    "BonusValue": {
+                      "$id": "26",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+                    }
+                  },
+                  "Value": {
+                    "$id": "27",
+                    "$type": "Kingmaker.UnitLogic.Mechanics.ContextDiceValue, Assembly-CSharp",
+                    "DiceType": "D6",
+                    "DiceCountValue": {
+                      "$id": "28",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                      "Value": 3
+                    },
+                    "BonusValue": {
+                      "$id": "29",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+                    }
+                  },
+                  "HalfIfSaved": true,
+                  "name": "$ContextActionDealDamage$2a3438c2-ecea-478f-906a-72fbe6f8b963"
+                }
+              ]
+            },
+            "name": "$Conditional$34ade334-fada-4d32-a6da-5ae48599b6c7"
+          },
+          {
+            "$id": "30",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+            "Buff": "Blueprint:dd91a3c3df275984592edcadb8e90749:CallLightningBuff",
+            "DurationValue": {
+              "$id": "31",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+              "m_IsExtendable": true,
+              "Rate": "Minutes",
+              "DiceCountValue": {
+                "$id": "32",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              },
+              "BonusValue": {
+                "$id": "33",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                "ValueType": "Rank"
+              }
+            },
+            "ToCaster": true,
+            "name": "$ContextActionApplyBuff$e88271d3-7a86-4c1d-8cd9-500df2019879"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$6d3b3e83-c430-423e-a52d-7e20be5a6a70"
+    },
+    {
+      "$id": "34",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:bad8638d40639d04fa2f80a1cac67d6b:DruidSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$a15f0ff1-f830-483f-9ef5-f79309e518db"
+    },
+    {
+      "$id": "35",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx, Assembly-CSharp",
+      "PrefabLink": "Resource:503b78b507366cc4da0f462cb40131f6:CallLightning00",
+      "Anchor": "SelectedTarget",
+      "PositionAnchor": "None",
+      "OrientationAnchor": "None",
+      "name": "$AbilitySpawnFx$a428c83f-60e9-40fb-bac6-a2e2b610e38a"
+    },
+    {
+      "$id": "36",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent, Assembly-CSharp",
+      "Descriptor": "Electricity",
+      "name": "$SpellDescriptorComponent$57310539-8929-4f92-ba9c-67992f7eabf6"
+    },
+    {
+      "$id": "37",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:eba577470b8ee8443bb4552433451990:WeatherDomainSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$4f2a7e9c-fc16-4335-868d-d48884d029a5"
+    }
+  ],
+  "m_AssetGuid": "2a9ef0e0b5822a24d88b16673a267456",
+  "name": "CallLightning"
+}

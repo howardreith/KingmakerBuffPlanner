@@ -278,9 +278,19 @@ namespace KingmakerBuffPlanner.Domain.Planning
             string executionStrategyReason,
             IDictionary<string, IEnumerable<string>> recipientIdsByAnchor = null,
             IReadOnlyDictionary<string, bool> casterFacts = null,
-            IReadOnlyDictionary<string, EffectExpression> effectsByTarget = null)
+            IReadOnlyDictionary<string, EffectExpression> effectsByTarget = null,
+            IDictionary<string, IEnumerable<string>> affectedIdsByAnchor = null)
         {
             Provider = provider ?? throw new ArgumentNullException("provider");
+            // Missing-beneficial-buffs review R3-F1: every unit an anchor's
+            // native actions reach (an ally inside the burst who only LOSES
+            // an effect is not a beneficiary but is affected). Conflict
+            // analysis reads these; coverage claims read RecipientIdsByAnchor.
+            var affected = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, IEnumerable<string>> pair in affectedIdsByAnchor ??
+                new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal))
+                if (!string.IsNullOrWhiteSpace(pair.Key)) affected[pair.Key] = Sorted(pair.Value);
+            AffectedIdsByAnchor = new ReadOnlyDictionary<string, IReadOnlyList<string>>(affected);
             if (effectiveCasterLevel < 0) throw new ArgumentOutOfRangeException("effectiveCasterLevel");
             if (expectedDurationRounds < 0) throw new ArgumentOutOfRangeException("expectedDurationRounds");
             ReachableTargetIds = Sorted(reachableTargetIds);
@@ -340,6 +350,21 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 return ExecutionStrategy == CastExecutionStrategy.AnimatedFallback ||
                     ExecutionStrategy == CastExecutionStrategy.NativeCommandRequired;
             }
+        }
+
+        public IReadOnlyDictionary<string, IReadOnlyList<string>> AffectedIdsByAnchor { get; private set; }
+
+        // The units an anchor's native actions reach (beneficiaries and units
+        // that only lose an effect); the covered units when not recorded.
+        public IReadOnlyList<string> AffectedTargetIdsForAnchor(string anchorUnitId)
+        {
+            IReadOnlyList<string> affected;
+            IReadOnlyList<string> covered = CoveredTargetIdsForAnchor(anchorUnitId);
+            return !string.IsNullOrWhiteSpace(anchorUnitId) &&
+                AffectedIdsByAnchor.TryGetValue(anchorUnitId, out affected)
+                ? new ReadOnlyCollection<string>(affected.Concat(covered).Distinct(StringComparer.Ordinal)
+                    .OrderBy(v => v, StringComparer.Ordinal).ToList())
+                : covered;
         }
 
         public IReadOnlyList<string> CoveredTargetIdsForAnchor(string anchorUnitId)

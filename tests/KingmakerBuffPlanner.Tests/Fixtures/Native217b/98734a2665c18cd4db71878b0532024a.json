@@ -1,0 +1,111 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "Range": "Close",
+  "CanTargetPoint": true,
+  "CanTargetFriends": true,
+  "CanTargetSelf": true,
+  "EffectOnAlly": "Helpful",
+  "Animation": "Point",
+  "AnimationStyle": "CastActionTouch",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Empower, Maximize, Quicken, Extend, Heighten, Reach",
+  "LocalizedDuration": "LocalizedString:6250ccf0-1ed0-460f-8ce7-094c2da7e198:1 round/level",
+  "LocalizedSavingThrow": "LocalizedString::",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "8b495b6fbfd0d284e899a0e5ae45014a"
+  ],
+  "m_DisplayName": "LocalizedString:0d4525bb-ad1f-408c-a7bb-875338642e9b:Firebrand",
+  "m_Description": "LocalizedString:60ad6c70-59da-4240-b415-e2b2684739d5:You mark several allies with a flaming rune. This rune does not cause damage, and sheds light as if it were a torch. While the firebrand burns, any creature it marks is immune to damage from any fire spell you cast. All of the target's weapons (both natural and manufactured) inflict +1d6 points of fire damage on a hit (this bonus fire damage stacks with any amount of fire damage a creature's weapons might already inflict). At any point during the spell's duration, a creature bearing a firebrand can launch a beam of fire at any target within 30 feet as a swift action. This ray requires a ranged touch attack to hit and deals 6d6 points of fire damage. Once a creature uses its firebrand to fire a ray in this manner, the effects of the spell end for that creature.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "Firebrand"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Transmutation",
+      "name": "$SpellComponent$f31cab25-5807-4dfc-876a-9b6b3d95c015"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "Actions": {
+        "$id": "4",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "5",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+            "Buff": "Blueprint:c6cc1c5356db4674dbd2be20ea205c86:FirebrandBuff",
+            "DurationValue": {
+              "$id": "6",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+              "m_IsExtendable": true,
+              "DiceCountValue": {
+                "$id": "7",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              },
+              "BonusValue": {
+                "$id": "8",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                "ValueType": "Rank"
+              }
+            },
+            "IsFromSpell": true,
+            "name": "$ContextActionApplyBuff$9a0146e1-522e-4687-affd-6ec16076d218"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$6100937e-a2ac-46ab-9844-db04bc59fbfb"
+    },
+    {
+      "$id": "9",
+      "$type": "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig, Assembly-CSharp",
+      "m_FeatureList": [],
+      "m_CustomProgression": [],
+      "m_StepLevel": 10,
+      "m_Max": 20,
+      "m_Class": [],
+      "name": "$ContextRankConfig$91b640f3-fe0e-4185-b729-42a5f581751a"
+    },
+    {
+      "$id": "10",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityTargetsAround, Assembly-CSharp",
+      "m_Radius": {
+        "$id": "11",
+        "$type": "Kingmaker.Utility.Feet, Assembly-CSharp",
+        "m_Value": 30.0
+      },
+      "m_TargetType": "Ally",
+      "m_Condition": {
+        "$id": "12",
+        "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+        "Conditions": []
+      },
+      "name": "$AbilityTargetsAround$ac900b9f-9321-402c-9c1f-a720c9b22678"
+    },
+    {
+      "$id": "13",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:ba0401fdeb4062f40a7aa95b6f07fe89:WizardSpellList",
+      "SpellLevel": 7,
+      "name": "$SpellListComponent$02e7c8fa-8f36-4fb4-9560-ec87fe37901f"
+    },
+    {
+      "$id": "14",
+      "$type": "Kingmaker.Designers.Mechanics.Recommendations.RecommendationNoFeatFromGroup, Assembly-CSharp",
+      "Features": [
+        "Blueprint:e76a774cacfb092498177e6ca706064d:BloodlineInfernalProgression"
+      ],
+      "name": "$RecommendationNoFeatFromGroup$6f270246-962c-4036-b1a9-6abfc67a55aa"
+    }
+  ],
+  "m_AssetGuid": "98734a2665c18cd4db71878b0532024a",
+  "name": "Firebrand"
+}

@@ -1,0 +1,84 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "m_Flags": "IsFromSpell",
+  "FxOnStart": "Resource:44295e9774b2864488f4a3790b8b0bcf:Heroism00",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [],
+  "m_DisplayName": "LocalizedString:c07b433c-51ff-43de-9ff9-91e1498578e7:Heroic Invocation",
+  "m_Description": "LocalizedString:040db3e9-85a0-429b-9f84-4120251bd29b:This character has a morale bonus on attack and damage rolls, temporary hit points, and is immune to both fear and charm effects. At the end of the spell's duration, they will become fatigued.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "HeroicInvocation"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddStatBonus, Assembly-CSharp",
+      "Descriptor": "Morale",
+      "Stat": "AdditionalAttackBonus",
+      "Value": 4,
+      "name": "$AddStatBonus$110c7d83-de8b-422f-bddd-b456a6fb13a7"
+    },
+    {
+      "$id": "2",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddStatBonus, Assembly-CSharp",
+      "Descriptor": "Morale",
+      "Stat": "AdditionalDamage",
+      "Value": 4,
+      "name": "$AddStatBonus$ca3c2827-5840-4b06-9176-4d1865155b1c"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.TemporaryHitPointsFromAbilityValue, Assembly-CSharp",
+      "Value": {
+        "$id": "4",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+        "ValueType": "Shared",
+        "ValueShared": "StatBonus"
+      },
+      "name": "$TemporaryHitPointsFromAbilityValue$f0cefcd4-f500-40e5-bdb5-43fe443ff266"
+    },
+    {
+      "$id": "5",
+      "$type": "Kingmaker.UnitLogic.Mechanics.Components.ContextCalculateSharedValue, Assembly-CSharp",
+      "ValueType": "StatBonus",
+      "Value": {
+        "$id": "6",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextDiceValue, Assembly-CSharp",
+        "DiceType": "D8",
+        "DiceCountValue": {
+          "$id": "7",
+          "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+          "Value": 2
+        },
+        "BonusValue": {
+          "$id": "8",
+          "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+          "Value": 4
+        }
+      },
+      "Modifier": 1.0,
+      "name": "$ContextCalculateSharedValue$8656ff17-ac87-4d0d-b2ac-ebdfbc6cf533"
+    },
+    {
+      "$id": "9",
+      "$type": "Kingmaker.UnitLogic.FactLogic.BuffDescriptorImmunity, Assembly-CSharp",
+      "Descriptor": "Fear, Charm, Shaken, Frightened",
+      "name": "$BuffDescriptorImmunity$e1d6649e-2043-4ccf-9b9c-c3db8d3f64a3"
+    },
+    {
+      "$id": "10",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent, Assembly-CSharp",
+      "Descriptor": "TemporaryHP",
+      "name": "$SpellDescriptorComponent$2c865bee-4e3c-4e59-9409-57f6f1a9e55b"
+    },
+    {
+      "$id": "11",
+      "$type": "Kingmaker.UnitLogic.FactLogic.SpellImmunityToSpellDescriptor, Assembly-CSharp",
+      "Descriptor": "Fear, Charm, Shaken, Frightened",
+      "name": "$SpellImmunityToSpellDescriptor$d7e86d99-8614-4dfb-aa66-2bd3a4f11504"
+    }
+  ],
+  "m_AssetGuid": "fd8fb2c1d622556468a04bea949eb7da",
+  "name": "HeroicInvocationBuff"
+}

@@ -1,0 +1,148 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "Type": "SpellLike",
+  "CanTargetEnemies": true,
+  "CanTargetSelf": true,
+  "SpellResistance": true,
+  "EffectOnEnemy": "Harmful",
+  "Animation": "Touch",
+  "AnimationStyle": "CastActionTouch",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Quicken, Extend, Heighten, Reach",
+  "LocalizedDuration": "LocalizedString:62761fbe-42ce-4474-ae10-14f9024f4c57:1 round",
+  "LocalizedSavingThrow": "LocalizedString::",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "396af91a93f6e2b468f5fa1a944fae8a"
+  ],
+  "m_DisplayName": "LocalizedString:3e371db8-9d3d-4fba-ac72-8dd725757d49:Dazing Touch",
+  "m_Description": "LocalizedString:aa020a5c-6881-4fc1-a2b5-82f30f9cd479:You can cause a living creature to become dazed for 1 round as a melee touch attack. Creatures with more Hit Dice than your level in the class that gave you access to this domain are unaffected.[LONGSTART] You can use this ability a number of times per day equal to 3 + your Wisdom modifier.[LONGEND]",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "ChillTouch"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic, Assembly-CSharp",
+      "RequiredResource": "Blueprint:e3ec8bc31cab642488396d259a8ab0d9:CharmDomainBaseResource",
+      "IsSpendResource": true,
+      "Amount": 1,
+      "ResourceCostIncreasingFacts": [],
+      "name": "$AbilityResourceLogic$08569854-31ca-4212-b5f6-49b20b92dd44"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "Actions": {
+        "$id": "4",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          null,
+          {
+            "$id": "5",
+            "$type": "Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional, Assembly-CSharp",
+            "Comment": "",
+            "ConditionsChecker": {
+              "$id": "6",
+              "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+              "Conditions": [
+                {
+                  "$id": "7",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionHitDice, Assembly-CSharp",
+                  "AddSharedValue": true,
+                  "name": "$ContextConditionHitDice$0718d281-2632-4cae-a9e9-5ff358aba0bd"
+                }
+              ]
+            },
+            "IfTrue": {
+              "$id": "8",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": [
+                {
+                  "$id": "9",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+                  "Buff": "Blueprint:9934fedff1b14994ea90205d189c8759:DazeBuff",
+                  "DurationValue": {
+                    "$id": "10",
+                    "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+                    "m_IsExtendable": true,
+                    "DiceCountValue": {
+                      "$id": "11",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+                    },
+                    "BonusValue": {
+                      "$id": "12",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                      "Value": 1
+                    }
+                  },
+                  "AsChild": true,
+                  "name": "$ContextActionApplyBuff$aa14569c-674c-4cdc-bdb4-80ffc7a7d28f"
+                }
+              ]
+            },
+            "IfFalse": {
+              "$id": "13",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": []
+            },
+            "name": "$Conditional$a47c7ea3-d4e0-4a6a-aa94-84de67ec742d"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$f39cdc05-17ff-4a68-a743-4b85f42b01de"
+    },
+    {
+      "$id": "14",
+      "$type": "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig, Assembly-CSharp",
+      "m_BaseValueType": "ClassLevel",
+      "m_FeatureList": [],
+      "m_CustomProgression": [],
+      "m_Min": 1,
+      "m_Max": 20,
+      "m_Class": [
+        "Blueprint:67819271767a9dd4fbfd4ae700befea0:ClericClass",
+        "Blueprint:f1a70d9e1b0b41e49874e1fa9052a1ce:InquisitorClass"
+      ],
+      "name": "$ContextRankConfig$dc116410-a564-42c3-a5bd-2a518eb1624a"
+    },
+    {
+      "$id": "15",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Enchantment",
+      "name": "$SpellComponent$9c412990-e5b5-4053-bc11-aa421fae4f99"
+    },
+    {
+      "$id": "16",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityDeliverTouch, Assembly-CSharp",
+      "TouchWeapon": "Blueprint:bb337517547de1a4189518d404ec49d4:TouchItem",
+      "name": "$AbilityDeliverTouch$6d571f2e-d95e-4f02-b149-342f7c8e5f28"
+    },
+    {
+      "$id": "17",
+      "$type": "Kingmaker.UnitLogic.Mechanics.Components.ContextCalculateSharedValue, Assembly-CSharp",
+      "Value": {
+        "$id": "18",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextDiceValue, Assembly-CSharp",
+        "DiceCountValue": {
+          "$id": "19",
+          "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+        },
+        "BonusValue": {
+          "$id": "20",
+          "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+          "ValueType": "Rank"
+        }
+      },
+      "Modifier": 1.0,
+      "name": "$ContextCalculateSharedValue$d66a8fa5-728e-4ab9-bfd8-eaf83ef52b23"
+    }
+  ],
+  "m_AssetGuid": "84cd24a110af59140b066bc2c69619bd",
+  "name": "CharmDomainBaseAbility"
+}

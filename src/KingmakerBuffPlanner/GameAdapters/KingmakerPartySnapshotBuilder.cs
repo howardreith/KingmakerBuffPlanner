@@ -18,45 +18,36 @@ namespace KingmakerBuffPlanner.GameAdapters
 {
     internal sealed class KingmakerPartySnapshotBuilder
     {
-        private readonly KingmakerBuffSourceDiscovery _sourceDiscovery;
-        private readonly Dictionary<string, EffectExpression> _effectsBySource =
-            new Dictionary<string, EffectExpression>(StringComparer.Ordinal);
-        private readonly List<PartySourceDiscoveryTrace> _sourceTraces =
-            new List<PartySourceDiscoveryTrace>();
-        // Fact providers refused as ambiguous (one ability, one pool, two
-        // caster levels); later duplicates are refused too.
-        private readonly HashSet<ProviderKey> _ambiguousFactKeys = new HashSet<ProviderKey>();
+        // The game-free admission decisions (discovery gate, pools, provider
+        // keys and costs; review R1-F8). This builder only reads live state.
+        private readonly PartyProviderAdmission _admission;
+        private readonly List<PartySourceDiscoveryTrace> _sourceTraces;
         private readonly List<PartyVariantEligibilityTrace> _variantTraces =
             new List<PartyVariantEligibilityTrace>();
         private readonly List<PartySpellbookRoleTrace> _spellbookRoleTraces =
             new List<PartySpellbookRoleTrace>();
-        private int _rawCandidateCount;
-        private int _beneficialCandidateCount;
         private int _spellbookCount;
         private string _blessMaterialEvidence = string.Empty;
 
         internal KingmakerPartySnapshotBuilder(EffectOverrideRegistry overrides = null)
         {
-            _sourceDiscovery = new KingmakerBuffSourceDiscovery(overrides);
+            _admission = new PartyProviderAdmission(new KingmakerBuffSourceDiscovery(overrides));
+            _sourceTraces = _admission.Traces;
         }
 
         internal PartyCatalogDiscoveryDiagnostics Diagnostics { get; private set; }
         internal IDictionary<string, EffectExpression> EffectsBySource
         {
-            get { return new Dictionary<string, EffectExpression>(_effectsBySource, StringComparer.Ordinal); }
+            get { return new Dictionary<string, EffectExpression>(_admission.EffectsBySource, StringComparer.Ordinal); }
         }
 
         internal PartyProviderSnapshot Build()
         {
             if (Game.Instance == null || Game.Instance.Player == null)
                 throw new InvalidOperationException("Kingmaker player state is unavailable.");
-            _effectsBySource.Clear();
-            _sourceTraces.Clear();
-            _ambiguousFactKeys.Clear();
+            _admission.Clear();
             _variantTraces.Clear();
             _spellbookRoleTraces.Clear();
-            _rawCandidateCount = 0;
-            _beneficialCandidateCount = 0;
             _spellbookCount = 0;
             _blessMaterialEvidence = string.Empty;
             var units = CollectUnits(Game.Instance.Player.Party);
@@ -71,8 +62,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
             var snapshot = new PartyProviderSnapshot(unitSnapshots, providers, pools);
             Diagnostics = new PartyCatalogDiscoveryDiagnostics(
-                units.Count, _spellbookCount, _rawCandidateCount, _beneficialCandidateCount,
-                _effectsBySource.Count, providers.Count, _sourceTraces,
+                units.Count, _spellbookCount, _admission.RawCandidateCount, _admission.BeneficialCandidateCount,
+                _admission.EffectsBySource.Count, providers.Count, _sourceTraces,
                 _variantTraces, _spellbookRoleTraces, _blessMaterialEvidence);
             return snapshot;
         }
@@ -145,12 +136,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                     ScanSpontaneousLevelZero(unit, spellbook, providers, pools);
                     continue;
                 }
-                string poolKey = PoolKey(unit.UniqueId, spellbook.Blueprint.AssetGuid,
-                    "spontaneous-" + level);
-                int remaining = Math.Max(0, spellbook.GetSpontaneousSlots(level));
-                int capacity = Math.Max(remaining, spellbook.GetSpellsPerDay(level));
-                pools.Add(new ResourcePoolSnapshot(poolKey, ResourcePoolKind.SpontaneousLevel,
-                    capacity, remaining, null));
+                ResourcePoolSnapshot levelPool = PartyProviderAdmission.SpontaneousLevelPool(
+                    unit.UniqueId, spellbook.Blueprint.AssetGuid, level,
+                    spellbook.GetSpontaneousSlots(level), spellbook.GetSpellsPerDay(level));
+                string poolKey = levelPool.PoolKey;
+                pools.Add(levelPool);
                 foreach (KingmakerAbilitySelection selection in ExpandOwned(
                     spellbook.GetKnownSpells(level), unit, spellbook.Blueprint.AssetGuid))
                     AddSpellProvider(unit, spellbook, selection, poolKey, 1,
@@ -219,7 +209,7 @@ namespace KingmakerBuffPlanner.GameAdapters
         private void TraceUnresolvedCantrip(UnitEntityData unit, Spellbook spellbook,
             KingmakerAbilitySelection selection, string ambiguity)
         {
-            _rawCandidateCount++;
+            _admission.RawCandidateCount++;
             _sourceTraces.Add(new PartySourceDiscoveryTrace(
                 KingmakerAbilityVariants.ToAbilityKey(selection, SourceKind.Spellbook).Canonical,
                 selection.Concrete.Blueprint.AssetGuid, selection.DisplayName, unit.UniqueId,
@@ -228,7 +218,7 @@ namespace KingmakerBuffPlanner.GameAdapters
         }
 
         internal const string UnresolvedCantripPrefix = "unresolved-cantrip:";
-        internal const string UnresolvedFactPrefix = "unresolved-fact:";
+        internal const string UnresolvedFactPrefix = PartyProviderAdmission.UnresolvedFactPrefix;
 
         private void ScanPreparedSpellbook(
             UnitEntityData unit,
@@ -375,57 +365,29 @@ namespace KingmakerBuffPlanner.GameAdapters
                     ability.MetamagicMask, sourceKind,
                     ItemSourceSelector.ForDiscoveredItem(itemGuid, slot, copies));
             }
-            _rawCandidateCount++;
-            EffectExpression expression;
-            string reason;
-            bool beneficial = _sourceDiscovery.TryDiscover(
-                data.Blueprint, out expression, out reason);
-            _sourceTraces.Add(new PartySourceDiscoveryTrace(
-                ability.Canonical, data.Blueprint.AssetGuid, selection.DisplayName,
-                unit.UniqueId, string.Empty, false, beneficial, reason));
-            if (!beneficial) return;
-            _beneficialCandidateCount++;
-            _effectsBySource[ability.Canonical] = expression;
-            if (!resourceKnown)
+            _admission.AdmitFact(unit.UniqueId, Read(selection, ability,
+                    data.SourceItem == null ? selection.SourceDisplayName : data.SourceItem.Name),
+                resourceKnown, nativeResource, resourceRefusal, slotSelector, providers, pools, poolKeys);
+        }
+
+        // The live values one owned selection contributes (read lazily, only
+        // once discovery admits it).
+        private static ProviderAbilityRead Read(KingmakerAbilitySelection selection, AbilityKey ability,
+            string sourceDisplayName)
+        {
+            AbilityData data = selection.Concrete;
+            return new ProviderAbilityRead
             {
-                _sourceTraces.Add(new PartySourceDiscoveryTrace(
-                    ability.Canonical, data.Blueprint.AssetGuid, selection.DisplayName,
-                    unit.UniqueId, string.Empty, false, false, resourceRefusal));
-                return;
-            }
-            ResourcePoolSnapshot pool = nativeResource.Pool;
-            int cost = nativeResource.Cost;
-            if (poolKeys.Add(pool.PoolKey)) pools.Add(pool);
-            var keyForProvider = new ProviderKey(
-                unit.UniqueId, string.Empty, ability, nativeResource.InstanceId);
-            if (_ambiguousFactKeys.Contains(keyForProvider)) return;
-            ProviderSnapshot existing = providers.FirstOrDefault(provider => provider.Key.Equals(keyForProvider));
-            if (existing != null)
-            {
-                // Re-review of A4: the same ability from the same pool at two
-                // caster levels (one cantrip granted by two classes) is
-                // ambiguous; neither is offered, the refusal stays traced.
-                if (string.Equals(existing.ResourcePoolKey, pool.PoolKey, StringComparison.Ordinal) &&
-                    existing.EffectiveCasterLevel != CasterLevel(data))
-                {
-                    providers.Remove(existing);
-                    _ambiguousFactKeys.Add(keyForProvider);
-                    _sourceTraces.Add(new PartySourceDiscoveryTrace(
-                        ability.Canonical, data.Blueprint.AssetGuid, selection.DisplayName, unit.UniqueId,
-                        string.Empty, false, false, UnresolvedFactPrefix + "caster-levels:" +
-                        existing.EffectiveCasterLevel + "," + CasterLevel(data)));
-                }
-                return;
-            }
-            string duration = DurationText(selection);
-            int level = CasterLevel(data);
-            DurationEstimate estimate = KingmakerDurationAdapter.Estimate(data.Blueprint, level);
-            providers.Add(new ProviderSnapshot(keyForProvider, selection.DisplayName, 0,
-                pool.PoolKey, cost, null, ToMaterialRequirement(selection),
-                level, estimate.BaseRounds,
-                Description(selection), duration, data.SourceItem == null ? selection.SourceDisplayName :
-                    data.SourceItem.Name,
-                selection.VariantOrder, string.Empty, slotSelector, estimate));
+                Blueprint = data.Blueprint,
+                Ability = ability,
+                DisplayName = selection.DisplayName,
+                SourceDisplayName = sourceDisplayName,
+                VariantOrder = selection.VariantOrder,
+                CasterLevelRead = () => CasterLevel(data),
+                DescriptionRead = () => Description(selection),
+                DurationTextRead = () => DurationText(selection),
+                MaterialRead = () => ToMaterialRequirement(selection)
+            };
         }
 
         private void AddSpellProvider(
@@ -443,35 +405,13 @@ namespace KingmakerBuffPlanner.GameAdapters
                 _blessMaterialEvidence = DescribeMaterialComponent(data);
             AbilityKey ability = KingmakerAbilityVariants.ToAbilityKey(
                 selection, SourceKind.Spellbook);
-            _rawCandidateCount++;
-            EffectExpression expression;
-            string reason;
-            bool beneficial = _sourceDiscovery.TryDiscover(
-                data.Blueprint, out expression, out reason);
-            _sourceTraces.Add(new PartySourceDiscoveryTrace(
-                ability.Canonical, data.Blueprint.AssetGuid, selection.DisplayName,
-                unit.UniqueId, spellbook.Blueprint.AssetGuid,
-                !spellbook.Blueprint.Spontaneous, beneficial, reason));
-            if (!beneficial) return;
-            _beneficialCandidateCount++;
-            _effectsBySource[ability.Canonical] = expression;
             AbilityData source = selection.Source;
             int heighten = source.MetamagicData == null
                 ? 0 : source.MetamagicData.HeightenLevel;
-            string sourceInstance = "level-" + source.SpellLevel +
-                "|heighten-" + heighten;
-            var key = new ProviderKey(
-                unit.UniqueId, spellbook.Blueprint.AssetGuid, ability, sourceInstance);
-            if (providers.Any(p => p.Key.Equals(key))) return;
-            string duration = DurationText(selection);
-            int level = CasterLevel(data);
-            DurationEstimate estimate = KingmakerDurationAdapter.Estimate(data.Blueprint, level);
-            providers.Add(new ProviderSnapshot(key, selection.DisplayName,
-                source.SpellLevel, poolKey, cost, tokens,
-                ToMaterialRequirement(selection), level,
-                estimate.BaseRounds, Description(selection),
-                duration, selection.SourceDisplayName, selection.VariantOrder,
-                SpellbookName(spellbook), duration: estimate));
+            _admission.AdmitSpell(unit.UniqueId, spellbook.Blueprint.AssetGuid,
+                !spellbook.Blueprint.Spontaneous, SpellbookName(spellbook),
+                Read(selection, ability, selection.SourceDisplayName),
+                source.SpellLevel, heighten, poolKey, cost, tokens, providers);
         }
 
         // The spellbook as the game names it, else its class; empty when
@@ -561,7 +501,7 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         private static string PoolKey(string unitId, string spellbookGuid, string suffix)
         {
-            return unitId + "|spellbook|" + spellbookGuid + "|" + suffix;
+            return PartyProviderAdmission.PoolKey(unitId, spellbookGuid, suffix);
         }
 
         private static string SlotId(SpellSlot slot)
@@ -694,35 +634,4 @@ namespace KingmakerBuffPlanner.GameAdapters
         internal string Reason { get; private set; }
     }
 
-    internal sealed class PartySourceDiscoveryTrace
-    {
-        internal PartySourceDiscoveryTrace(
-            string sourceId,
-            string blueprintGuid,
-            string displayName,
-            string casterUnitId,
-            string spellbookGuid,
-            bool prepared,
-            bool beneficial,
-            string reason)
-        {
-            SourceId = sourceId ?? string.Empty;
-            BlueprintGuid = blueprintGuid ?? string.Empty;
-            DisplayName = displayName ?? string.Empty;
-            CasterUnitId = casterUnitId ?? string.Empty;
-            SpellbookGuid = spellbookGuid ?? string.Empty;
-            Prepared = prepared;
-            Beneficial = beneficial;
-            Reason = reason ?? string.Empty;
-        }
-
-        internal string SourceId { get; private set; }
-        internal string BlueprintGuid { get; private set; }
-        internal string DisplayName { get; private set; }
-        internal string CasterUnitId { get; private set; }
-        internal string SpellbookGuid { get; private set; }
-        internal bool Prepared { get; private set; }
-        internal bool Beneficial { get; private set; }
-        internal string Reason { get; private set; }
-    }
 }

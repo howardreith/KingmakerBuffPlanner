@@ -875,6 +875,9 @@ namespace KingmakerBuffPlanner.UI
                 case "import-review-unresolved": return PlannerText.Get("reason.import-review-unresolved");
                 case "already-active": return PlannerText.Get("reason.already-active");
                 case "present-effect-not-sufficient": return PlannerText.Get("reason.present-effect-not-sufficient");
+                case ExplicitCastingCompiler.RemovesPlannedEffect: return PlannerText.Get("reason.removes-planned-effect");
+                case ExplicitCastingCompiler.EffectRemovedByEarlierCasting:
+                    return PlannerText.Get("reason.effect-removed-by-earlier-casting");
                 case CastingExecutionPolicy.InstantRouteUnavailable:
                     return PlannerText.Get("reason.instantUnavailable", InstantRouteCause(value));
                 default: return head.Length == 0 ? PlannerText.Get("reason.notReady") : PlannerText.Get("reason.detail", head.Replace('-', ' '));

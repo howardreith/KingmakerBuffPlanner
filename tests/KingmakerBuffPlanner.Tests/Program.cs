@@ -489,6 +489,8 @@ namespace KingmakerBuffPlanner.Tests
                 RunNativeUiFinishTests(root);
                 RunHumanFeedbackRefinementTests(root);
                 RunControllerRoutineTests(root);
+                RunMissingBeneficialBuffsTests(root);
+                RunMissingBeneficialBuffsAuditTests();
             }
             finally
             {
@@ -818,27 +820,12 @@ namespace KingmakerBuffPlanner.Tests
                 throw new InvalidOperationException(
                     "Hostile current-target effect was mistaken for a self buff.");
 
-            // Everyday-use v1.2 §8: the game's own ally-disposition data is
-            // authoritative. An ability marked harmful to allies is never a
-            // beneficial party buff, even when the buff blueprint forgets
-            // m_Harmful (the owner's Irresistible Dance report) and even
-            // though it can technically target friends.
-            NativeCandidateAuditDecision harmfulAlly = classifier.Classify(new NativeCandidateAuditFacts
-            {
-                IsPlayerAccessible = true,
-                CanTargetSelf = true,
-                CanTargetFriends = true,
-                CanTargetEnemies = true,
-                EffectOnAlly = "Harmful",
-                EffectOnEnemy = "None",
-                Effects = new[] { CandidateEffect("Buff", "CurrentTarget", false,
-                    "ContextActionApplyBuff", "root") },
-                DiagnosticContracts = new string[0]
-            });
-            if (harmfulAlly.Disposition != "exclude" ||
-                !harmfulAlly.Reason.StartsWith("harmful-ally-disposition:", StringComparison.Ordinal))
-                throw new InvalidOperationException(
-                    "An ability the game marks harmful to allies entered the beneficial catalogue.");
+            // Everyday-use v1.2 §8's harmful-ally disposition is now judged on
+            // real blueprints, not restated here: the loaded Irresistible
+            // Dance facts stay excluded, the native Good Hope and Firebelly
+            // blueprints (harmful-to-allies metadata, no enemy targeting) are
+            // admitted, and Call Lightning stays excluded
+            // (MissingBeneficialBuffsTests: missing-beneficial-buffs-*).
 
             NativeCandidateAuditDecision point = classifier.Classify(new NativeCandidateAuditFacts
             {
@@ -9645,6 +9632,24 @@ namespace KingmakerBuffPlanner.Tests
             return new DiscoveryNode(DiscoveryNodeKind.Effect, id,
                 effectKind: EffectKind.Buff, effectId: id,
                 target: EffectTarget.CurrentTarget, sourceContract: "fixture");
+        }
+
+        // Review R1-F9: an evidence check that needs external inputs (the lab
+        // blueprint dump, guarded in-game exports) runs ONLY when a selected
+        // prefix itself starts with "evidence-" and matches it. The no-prefix
+        // runner, single-letter selections and ordinary prefixes never reach
+        // it, so ordinary regressions keep no machine-specific prerequisite.
+        internal const string EvidencePrefix = "evidence-";
+
+        private static void RunExplicit(string name, Action action)
+        {
+            if (!name.StartsWith(EvidencePrefix, StringComparison.Ordinal))
+                throw new InvalidOperationException("Explicit evidence checks are named evidence-*: " + name);
+            if (_onlyPrefixes == null || !_onlyPrefixes.Any(prefix =>
+                    prefix.StartsWith(EvidencePrefix, StringComparison.Ordinal) &&
+                    name.StartsWith(prefix, StringComparison.Ordinal)))
+                return;
+            Run(name, action);
         }
 
         private static void Run(string name, Action action)

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased - missing beneficial buffs
+
+- Good Hope and Firebelly appear among castable buffs again. Their game data marks them "harmful to allies" although they cannot target an enemy; evidence-backed entries in the override file now set that flag aside for exactly their own buffs (and the Call of the Wild / Gunslinger variants that apply them). Every other ability marked harmful to allies, including Irresistible Dance, stays excluded.
+- The wizard's Abjuration resistance selections (Acid, Cold, Electricity, Fire, Sonic) and the transmuter's Physical Enhancement selections are offered as personal buffs. Planning two of them in one routine is refused, because each choice replaces the others; re-selecting the active one is skipped, and a skip that an earlier switch in the same routine would undo is refused instead of being counted as covered. The older Classic planner applies the same rule.
+- Blessing of Luck and Resolve (Mass), Feather Step (Mass), Firebrand, Heroic Invocation and Enlarge/Reduce Person (Mass) can be planned as group casts centred on a party member. No ground point is ever chosen.
+- Not yet verified in a running game. [Record](planning/MISSING-BENEFICIAL-BUFFS-AUDIT.md).
+
 ## 0.6.19 - 2026-11-19 - Simplified Chinese planner
 
 - Added Automatic, English and 简体中文 preferences for planner text. Game-provided names follow the game language.

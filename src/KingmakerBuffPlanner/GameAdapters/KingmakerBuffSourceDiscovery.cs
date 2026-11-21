@@ -9,11 +9,20 @@ namespace KingmakerBuffPlanner.GameAdapters
     internal sealed class KingmakerBuffSourceDiscovery
     {
         private readonly EffectOverrideRegistry _overrides;
+        private readonly NativeBlueprintLookup _blueprints;
         private readonly NativeCandidateClassifier _classifier = new NativeCandidateClassifier();
 
         internal KingmakerBuffSourceDiscovery(EffectOverrideRegistry overrides)
+            : this(overrides, NativeBlueprintLookup.Loaded)
+        {
+        }
+
+        // The blueprint lookup is the loaded library in the game; the
+        // assembly-backed regression tests supply detached native blueprints.
+        internal KingmakerBuffSourceDiscovery(EffectOverrideRegistry overrides, NativeBlueprintLookup blueprints)
         {
             _overrides = overrides ?? EffectOverrideRegistry.Empty();
+            _blueprints = blueprints ?? NativeBlueprintLookup.Loaded;
         }
 
         internal bool TryDiscover(
@@ -27,7 +36,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             // Every ability reaching live discovery belongs to a party member,
             // so it is reachable; the facts are the catalogue export's own.
             NativeCandidateAuditDecision decision = _classifier.Classify(NativeCatalogExporter.AuditFacts(
-                ability, true, NativeCatalogExporter.GetEffects(expression), scan.Diagnostics));
+                ability, true, NativeCatalogExporter.GetEffects(expression, _blueprints), scan.Diagnostics,
+                _overrides.AllyDispositionExceptions(ability.AssetGuid)));
             if (applied.Entry != null)
             {
                 if (applied.Entry.Disposition == "exclude" ||

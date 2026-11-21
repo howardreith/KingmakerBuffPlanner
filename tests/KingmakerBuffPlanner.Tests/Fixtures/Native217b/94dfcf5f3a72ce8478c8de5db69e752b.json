@@ -1,0 +1,60 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "IsClassFeature": true,
+  "FxOnStart": "Resource:352469f228a3b1f4cb269c7ab0409b8e:CommonTransmutationBuff00",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [
+    "352469f228a3b1f4cb269c7ab0409b8e"
+  ],
+  "m_DisplayName": "LocalizedString:c6342fa8-2370-4ccb-a899-54c96abd7a10:Strength Surge",
+  "m_Description": "LocalizedString::",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "ForcePunch"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.Designers.Mechanics.Facts.AbilityScoreCheckBonus, Assembly-CSharp",
+      "Descriptor": "Enhancement",
+      "Bonus": {
+        "$id": "2",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+        "ValueType": "Rank"
+      },
+      "Stat": "SkillAthletics",
+      "name": "$AbilityScoreCheckBonus$a3d50398-ed09-4bce-8a2a-935b666dbeee"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Designers.Mechanics.Facts.AttackTypeAttackBonus, Assembly-CSharp",
+      "AttackBonus": 1,
+      "Descriptor": "Enhancement",
+      "Value": {
+        "$id": "4",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+        "ValueType": "Rank"
+      },
+      "name": "$AttackTypeAttackBonus$4daf7d6b-e11e-45e6-8e20-818e2fe2968f"
+    },
+    {
+      "$id": "5",
+      "$type": "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig, Assembly-CSharp",
+      "m_BaseValueType": "ClassLevel",
+      "m_FeatureList": [],
+      "m_Stat": "Wisdom",
+      "m_Progression": "Div2",
+      "m_CustomProgression": [],
+      "m_UseMin": true,
+      "m_Min": 1,
+      "m_Max": 20,
+      "m_Class": [
+        "Blueprint:67819271767a9dd4fbfd4ae700befea0:ClericClass",
+        "Blueprint:f1a70d9e1b0b41e49874e1fa9052a1ce:InquisitorClass"
+      ],
+      "name": "$ContextRankConfig$fa6b1445-5326-4623-b036-b25c54a09a6b"
+    }
+  ],
+  "m_AssetGuid": "94dfcf5f3a72ce8478c8de5db69e752b",
+  "name": "StrengthDomainBaseBuff"
+}

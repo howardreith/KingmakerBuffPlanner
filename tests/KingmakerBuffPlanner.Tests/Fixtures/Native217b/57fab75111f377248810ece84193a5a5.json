@@ -1,0 +1,14 @@
+{
+  "$type": "Kingmaker.Blueprints.Classes.Spells.BlueprintSpellbook, Assembly-CSharp",
+  "Name": "LocalizedString:9f1e330c-3948-43f3-bcf3-711efe8571ad:Inquisitor",
+  "SpellsPerDay": "Blueprint:83d3e15962e5d6949b90b5c226a2b487:InquisitorSpellSlotsTable",
+  "SpellsKnown": "Blueprint:c133d22305bab964c88a767cc69b1f9b:InquisitorSpellsKnownTable",
+  "SpellList": "Blueprint:57c894665b7895c499b3dce058c284b3:InquisitorSpellList",
+  "CharacterClass": "Blueprint:f1a70d9e1b0b41e49874e1fa9052a1ce:InquisitorClass",
+  "CastingAttribute": "Wisdom",
+  "Spontaneous": true,
+  "CantripsType": "Orisions",
+  "Components": [],
+  "m_AssetGuid": "57fab75111f377248810ece84193a5a5",
+  "name": "InquisitorSpellbook"
+}

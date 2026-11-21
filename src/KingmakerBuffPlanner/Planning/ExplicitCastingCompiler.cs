@@ -151,7 +151,8 @@ namespace KingmakerBuffPlanner.Planning
             ResolvedCastingReadiness readiness,
             IReadOnlyList<string> readinessReasons,
             IReadOnlyList<CastingCostLine> cost,
-            IReadOnlyList<string> costShape = null)
+            IReadOnlyList<string> costShape = null,
+            IReadOnlyList<string> existingEffectNotes = null)
         {
             return new ResolvedCasting(
                 CastingId, RoutineId, Order, SourceId, Ability, CasterUnitId,
@@ -160,7 +161,7 @@ namespace KingmakerBuffPlanner.Planning
                 TargetingModifiers, Enhancements, AppliedEnhancementIds,
                 OmittedEnhancementIds, ExistingEffectPolicy, IgnoredPresenceMarkers,
                 readiness, readinessReasons, CapableCasterUnitIds, Provenance, cost,
-                ExistingEffectNotes, costShape ?? CostShape, PreCoveredUnitIds,
+                existingEffectNotes ?? ExistingEffectNotes, costShape ?? CostShape, PreCoveredUnitIds,
                 ExecutionStrategy, ExecutionStrategyReason, RequiredItemSelector);
         }
 
@@ -296,20 +297,32 @@ namespace KingmakerBuffPlanner.Planning
             var modifierDemandsByCasting =
                 new Dictionary<string, List<ModifierUsageDemand>>(
                     StringComparer.Ordinal);
+            var resolvedOptions = new Dictionary<string, ProviderPlanningOption>(
+                StringComparer.Ordinal);
             foreach (PlannedCasting casting in document.Castings)
             {
                 List<CastEnhancementSnapshot> matched;
                 List<CastEnhancementSnapshot> intended;
                 ProviderSnapshot provider;
                 List<ModifierUsageDemand> modifierDemands;
+                ProviderPlanningOption resolvedOption;
                 castings.Add(CompileOne(casting, snapshot, options, effectsBySource,
                     enhancementList, modifierList, diagnostics, liveEffects, strictInstant,
-                    out matched, out intended, out provider, out modifierDemands));
+                    out matched, out intended, out provider, out modifierDemands,
+                    out resolvedOption));
                 matchedEnhancements[casting.CastingId] = matched;
                 intendedEnhancements[casting.CastingId] = intended;
                 providers[casting.CastingId] = provider;
                 modifierDemandsByCasting[casting.CastingId] = modifierDemands;
+                resolvedOptions[casting.CastingId] = resolvedOption;
             }
+            // Removal conflicts (missing-beneficial-buffs §3.B; review
+            // R1-F1/F2/F3) are judged inside the budget pass, in execution
+            // order, from each casting's BOUND expression: only a casting
+            // that is finally admitted (funded and Ready, or already
+            // satisfied and so staying active) constrains later castings of
+            // its routine.
+            var removalState = new RemovalConflictState();
             // Shared budget pass: every Ready casting reserves its complete
             // cost vector atomically in persisted order; a deficit blocks the
             // casting and reserves nothing anywhere. A routine scope limits
@@ -326,6 +339,9 @@ namespace KingmakerBuffPlanner.Planning
             // unknown that still casts.
             var ledger = new CastingBudgetLedger(snapshot, enhancementList);
             var grantedByUnit = new Dictionary<string, HashSet<string>>(
+                StringComparer.Ordinal);
+            // unit -> structural grant key -> the effect ids it predicts there.
+            var grantEffects = new Dictionary<string, Dictionary<string, HashSet<string>>>(
                 StringComparer.Ordinal);
             var finalized = new List<ResolvedCasting>();
             foreach (ResolvedCasting casting in castings)
@@ -349,22 +365,61 @@ namespace KingmakerBuffPlanner.Planning
                     : CostShapeOf(ledger.DemandsFor(provider,
                         casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied
                             ? intended : matched, modifierDemands));
-                if (casting.Readiness != ResolvedCastingReadiness.Ready ||
-                    (budgetRoutineScope != null &&
-                     casting.RoutineId != budgetRoutineScope))
+                ProviderPlanningOption resolved;
+                resolvedOptions.TryGetValue(casting.CastingId, out resolved);
+                EffectChanges changes = casting.Readiness == ResolvedCastingReadiness.Ready ||
+                    casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied
+                    ? ChangesFor(casting, resolved, effectsBySource) : null;
+                string removalConflict;
+                if (casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied)
                 {
-                    finalized.Add(casting.WithBudgetResult(casting.Readiness,
-                        casting.ReadinessReasons, casting.Cost, shape));
-                    continue;
+                    // R1-F1: a skip is only truthful while nothing admitted
+                    // earlier in the routine removes the effect it relies on.
+                    removalConflict = removalState.RemovedByEarlier(casting.RoutineId, changes);
+                    if (removalConflict != null)
+                    {
+                        finalized.Add(BlockForRemoval(casting, EffectRemovedByEarlierCasting +
+                            ":" + removalConflict, shape, diagnostics,
+                            removalState.OwnersRemovedByEarlier(casting.RoutineId, changes)));
+                        continue;
+                    }
+                    removalState.Admit(casting.RoutineId, casting.CastingId, changes, false);
                 }
-                if (projectEffects &&
+                bool outOfScope = budgetRoutineScope != null &&
+                    casting.RoutineId != budgetRoutineScope;
+                // A proven structural repeat (one-pass view) casts nothing:
+                // it is decided before any removal check and, like a live
+                // already-active skip, protects the effect it keeps for its
+                // routine (review R2-F2).
+                if (casting.Readiness == ResolvedCastingReadiness.Ready && !outOfScope && projectEffects &&
                     casting.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive &&
                     IsStructurallySatisfied(casting, matched, grantedByUnit))
                 {
+                    removalState.Admit(casting.RoutineId, casting.CastingId, changes, false);
                     finalized.Add(casting.WithBudgetResult(
                         ResolvedCastingReadiness.AlreadySatisfied,
                         new[] { "already-satisfied-structural" },
                         new CastingCostLine[0], shape));
+                    continue;
+                }
+                if (casting.Readiness == ResolvedCastingReadiness.Ready)
+                {
+                    removalConflict = removalState.RemovesProvided(casting.RoutineId, changes);
+                    if (removalConflict != null)
+                    {
+                        finalized.Add(BlockForRemoval(casting, RemovesPlannedEffect + ":" +
+                            removalConflict, shape, diagnostics));
+                        continue;
+                    }
+                    // An out-of-scope casting is not budget-checked in this
+                    // view; it keeps its compile-time readiness, so it
+                    // constrains the rest of its own routine provisionally.
+                    if (outOfScope) removalState.Admit(casting.RoutineId, casting.CastingId, changes);
+                }
+                if (casting.Readiness != ResolvedCastingReadiness.Ready || outOfScope)
+                {
+                    finalized.Add(casting.WithBudgetResult(casting.Readiness,
+                        casting.ReadinessReasons, casting.Cost, shape));
                     continue;
                 }
                 IReadOnlyList<CastingDemand> demands = ledger.DemandsFor(
@@ -376,8 +431,16 @@ namespace KingmakerBuffPlanner.Planning
                 {
                     finalized.Add(casting.WithBudgetResult(
                         casting.Readiness, casting.ReadinessReasons, cost, shape));
+                    // R1-F2: only a funded casting enters the routine's
+                    // removal state.
+                    removalState.Admit(casting.RoutineId, casting.CastingId, changes);
                     if (projectEffects)
-                        ProjectEffects(casting, matched, grantedByUnit);
+                    {
+                        // R1-F4: the one-pass sequence forgets a structural
+                        // grant whose effect this casting removes.
+                        InvalidateRemovedGrants(changes, grantedByUnit, grantEffects);
+                        ProjectEffects(casting, matched, grantedByUnit, changes, grantEffects);
+                    }
                     continue;
                 }
                 ledger.RecordUnfunded(casting.CastingId, demands);
@@ -406,7 +469,8 @@ namespace KingmakerBuffPlanner.Planning
             out List<CastEnhancementSnapshot> matchedEnhancements,
             out List<CastEnhancementSnapshot> intendedEnhancements,
             out ProviderSnapshot providerSnapshot,
-            out List<ModifierUsageDemand> modifierDemands)
+            out List<ModifierUsageDemand> modifierDemands,
+            out ProviderPlanningOption resolvedOption)
         {
             var reasons = new List<string>();
             string requiredItemSelector = ItemSourceResolution.RequiredSelector(casting.Ability);
@@ -597,6 +661,7 @@ namespace KingmakerBuffPlanner.Planning
             matchedEnhancements = matched;
             intendedEnhancements = intended;
             providerSnapshot = option == null ? null : option.Provider;
+            resolvedOption = option;
             return new ResolvedCasting(
                 casting.CastingId, casting.RoutineId, casting.Order, casting.SourceId,
                 casting.Ability, casting.CasterUnitId,
@@ -667,6 +732,214 @@ namespace KingmakerBuffPlanner.Planning
             return option;
         }
 
+        public const string RemovesPlannedEffect = "removes-planned-effect";
+
+        // A skip-if-active casting whose effect an earlier admitted casting
+        // of the same routine removes (review R1-F1).
+        public const string EffectRemovedByEarlierCasting = "effect-removed-by-earlier-casting";
+
+        // Missing-beneficial-buffs mission §3.B: mutually exclusive
+        // selections are never planned as stackable. A casting whose own
+        // native actions may remove an effect that an earlier ADMITTED
+        // casting of the same routine applies (or keeps active, as an
+        // already-satisfied skip) on the same unit would undo that casting's
+        // claimed coverage - the wizard's Abjuration resistances each apply
+        // their own buff and remove the other four; Enlarge and Reduce
+        // Person, Mass remove each other instead of applying. The later
+        // casting is blocked with the conflict named; it casts nothing and
+        // reserves nothing. Conversely a skip that relies on an effect an
+        // earlier admitted casting removes is no longer satisfied and is
+        // blocked with that conflict named (it is never silently counted as
+        // covered). Switching away from an effect active before the run is
+        // ordinary native behavior and is not blocked. Each routine is its
+        // own run, so the state is per routine. The analysis reads the
+        // casting's bound expression (EffectChangeAnalysis): only realizable
+        // removals count, and only a certain later re-application on the
+        // same path cancels one. The retired Classic planner shares it
+        // (review R1-F5).
+        internal sealed class RemovalConflictState
+        {
+            // routine -> unit -> effect -> earlier admitted casting providing it
+            private readonly Dictionary<string, Dictionary<string, Dictionary<string, string>>> _provided =
+                new Dictionary<string, Dictionary<string, Dictionary<string, string>>>(StringComparer.Ordinal);
+            // routine -> unit -> effect -> earlier admitted casting removing it
+            private readonly Dictionary<string, Dictionary<string, Dictionary<string, string>>> _removed =
+                new Dictionary<string, Dictionary<string, Dictionary<string, string>>>(StringComparer.Ordinal);
+
+            // "<earlier casting>:<effect>:<unit>" for the first removal by
+            // this casting of an effect an earlier admitted one provides.
+            internal string RemovesProvided(string routineId, EffectChanges changes)
+            {
+                return First(Map(_provided, routineId), changes == null ? null : changes.Removed);
+            }
+
+            // "<earlier casting>:<effect>:<unit>" for the first effect this
+            // casting relies on that an earlier admitted one removes.
+            internal string RemovedByEarlier(string routineId, EffectChanges changes)
+            {
+                return First(Map(_removed, routineId), changes == null ? null : changes.Applied);
+            }
+
+            // The units on which an earlier admitted casting removes an
+            // effect this casting relies on (review R3-F4).
+            internal HashSet<string> OwnersRemovedByEarlier(string routineId, EffectChanges changes)
+            {
+                Dictionary<string, Dictionary<string, string>> removed = Map(_removed, routineId);
+                var owners = new HashSet<string>(StringComparer.Ordinal);
+                foreach (KeyValuePair<string, string> key in changes == null
+                    ? new KeyValuePair<string, string>[0] : changes.Applied)
+                {
+                    Dictionary<string, string> effects;
+                    if (key.Key != null && removed.TryGetValue(key.Key, out effects) && effects.ContainsKey(key.Value))
+                        owners.Add(key.Key);
+                }
+                return owners;
+            }
+
+            // casts: false for an already-satisfied skip, which keeps its
+            // effect active but runs none of its actions (no removal).
+            internal void Admit(string routineId, string castingId, EffectChanges changes, bool casts = true)
+            {
+                if (changes == null) return;
+                Dictionary<string, Dictionary<string, string>> provided = Map(_provided, routineId);
+                Dictionary<string, Dictionary<string, string>> removed = Map(_removed, routineId);
+                foreach (KeyValuePair<string, string> removal in casts ? changes.Removed
+                    : new KeyValuePair<string, string>[0])
+                {
+                    Dictionary<string, string> effects;
+                    if (provided.TryGetValue(removal.Key, out effects)) effects.Remove(removal.Value);
+                    Set(removed, removal, castingId);
+                }
+                // Review R1-F3: only an application certain on every path
+                // restores an effect an earlier casting may have removed; a
+                // possible one (an alternative branch) does not.
+                foreach (KeyValuePair<string, string> application in changes.Guaranteed)
+                {
+                    Dictionary<string, string> effects;
+                    if (removed.TryGetValue(application.Key, out effects)) effects.Remove(application.Value);
+                }
+                foreach (KeyValuePair<string, string> application in changes.Applied)
+                    Set(provided, application, castingId);
+            }
+
+            private static string First(Dictionary<string, Dictionary<string, string>> state,
+                IEnumerable<KeyValuePair<string, string>> keys)
+            {
+                foreach (KeyValuePair<string, string> key in keys ?? new KeyValuePair<string, string>[0])
+                {
+                    Dictionary<string, string> effects;
+                    string casting;
+                    if (key.Key != null && state.TryGetValue(key.Key, out effects) &&
+                        effects.TryGetValue(key.Value, out casting))
+                        return casting + ":" + key.Value + ":" + key.Key;
+                }
+                return null;
+            }
+
+            private static void Set(Dictionary<string, Dictionary<string, string>> state,
+                KeyValuePair<string, string> key, string castingId)
+            {
+                if (key.Key == null) return;
+                Dictionary<string, string> effects;
+                if (!state.TryGetValue(key.Key, out effects))
+                    state[key.Key] = effects = new Dictionary<string, string>(StringComparer.Ordinal);
+                effects[key.Value] = castingId;
+            }
+
+            private static Dictionary<string, Dictionary<string, string>> Map(
+                Dictionary<string, Dictionary<string, Dictionary<string, string>>> all, string routineId)
+            {
+                Dictionary<string, Dictionary<string, string>> state;
+                if (!all.TryGetValue(routineId ?? string.Empty, out state))
+                    all[routineId ?? string.Empty] = state =
+                        new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+                return state;
+            }
+        }
+
+        // The effects a casting may apply and realizably remove on its
+        // predicted recipients, from the same provider binding execution
+        // uses (caster facts; nearby-recipient selection per target).
+        private static EffectChanges ChangesFor(ResolvedCasting casting, ProviderPlanningOption option,
+            IReadOnlyDictionary<string, EffectExpression> effectsBySource)
+        {
+            if (option == null) return null;
+            EffectExpression expression = DiscoveredEffectLookup.ForAbility(
+                effectsBySource, casting.Ability, casting.SourceId);
+            if (expression == null) return null;
+            // Review R3-F1: a group cast's native actions reach every unit
+            // inside its burst, including an ally that only LOSES an effect
+            // (Mass Reduce on an enlarged ally) and so is not a predicted
+            // beneficiary; its removals are analyzed too.
+            IEnumerable<string> reached = casting.PredictedBeneficiaryUnitIds;
+            if (casting.TargetMode != CastingTargetMode.DirectTarget)
+            {
+                string anchor = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
+                    ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
+                if (anchor != null && option.AffectedIdsByAnchor.ContainsKey(anchor))
+                    reached = reached.Concat(option.AffectedTargetIdsForAnchor(anchor))
+                        .Distinct(StringComparer.Ordinal).ToList();
+            }
+            return EffectChanges.Merge(reached.Select(recipient =>
+                EffectChangeAnalysis.Analyze(option.BindEffects(expression, recipient),
+                    casting.CasterUnitId, recipient)));
+        }
+
+        private static ResolvedCasting BlockForRemoval(ResolvedCasting casting, string reason,
+            IReadOnlyList<string> shape, List<string> diagnostics, ICollection<string> removedOwners = null)
+        {
+            diagnostics.Add(reason + ":by:" + casting.CastingId);
+            // Review R1-F1/R3-F4: an invalidated skip no longer says "already
+            // active (skipped)". Only a recipient whose effect the earlier
+            // casting removes is described as losing it; another recipient
+            // is described as still active (the blocked casting does not run).
+            IReadOnlyList<string> notes = casting.ExistingEffectNotes.Select(note =>
+            {
+                if (!note.StartsWith("already-active:", StringComparison.Ordinal)) return note;
+                string rest = note.Substring("already-active:".Length);
+                int split = rest.IndexOf(':');
+                string unit = split < 0 ? rest : rest.Substring(0, split);
+                return (removedOwners == null || removedOwners.Contains(unit)
+                    ? ExistingRemovedEarlierNote : ExistingKeptBlockedNote) + rest;
+            }).ToList();
+            return casting.WithBudgetResult(ResolvedCastingReadiness.Blocked,
+                casting.ReadinessReasons
+                    .Where(value => !value.StartsWith("already-active:", StringComparison.Ordinal))
+                    .Concat(new[] { reason }).Distinct(StringComparer.Ordinal)
+                    .OrderBy(value => value, StringComparer.Ordinal).ToList(),
+                new CastingCostLine[0], shape, notes);
+        }
+
+        // Existing-effect note of a skip an earlier casting invalidates:
+        // "existing-removed-earlier:<unit>[:detail]".
+        public const string ExistingRemovedEarlierNote = "existing-removed-earlier:";
+        // Note of a recipient whose effect stays active while its blocked
+        // group casting does not run: "existing-kept-blocked:<unit>[:detail]".
+        public const string ExistingKeptBlockedNote = "existing-kept-blocked:";
+
+        // R1-F4: a removal later in the one-pass sequence invalidates every
+        // structural grant predicting the removed effect on that unit.
+        private static void InvalidateRemovedGrants(EffectChanges changes,
+            Dictionary<string, HashSet<string>> grantedByUnit,
+            Dictionary<string, Dictionary<string, HashSet<string>>> grantEffects)
+        {
+            if (changes == null) return;
+            foreach (KeyValuePair<string, string> removal in changes.Removed)
+            {
+                Dictionary<string, HashSet<string>> grants;
+                HashSet<string> granted;
+                if (removal.Key == null || !grantEffects.TryGetValue(removal.Key, out grants) ||
+                    !grantedByUnit.TryGetValue(removal.Key, out granted))
+                    continue;
+                foreach (string key in grants.Where(pair => pair.Value.Contains(removal.Value))
+                    .Select(pair => pair.Key).ToList())
+                {
+                    granted.Remove(key);
+                    grants.Remove(key);
+                }
+            }
+        }
+
         // Structural satisfaction is only claimed for identical ability
         // identity with no strength-affecting enhancements requested or
         // granted: anything else is an unknown equivalence that must keep
@@ -701,19 +974,39 @@ namespace KingmakerBuffPlanner.Planning
         private static void ProjectEffects(
             ResolvedCasting casting,
             IReadOnlyList<CastEnhancementSnapshot> matchedEnhancements,
-            Dictionary<string, HashSet<string>> grantedByUnit)
+            Dictionary<string, HashSet<string>> grantedByUnit,
+            EffectChanges changes,
+            Dictionary<string, Dictionary<string, HashSet<string>>> grantEffects)
         {
             if (matchedEnhancements != null && matchedEnhancements.Count != 0)
                 return;
+            string key = StructuralGrantKey(casting);
             foreach (string unitId in casting.PredictedBeneficiaryUnitIds)
             {
+                // Review R2-F1: a funded cast grants a free structural repeat
+                // to a unit only when every effect it may apply there is
+                // certain on every path (Good Hope's Despair branch removes
+                // Despair and applies nothing; that is no grant).
+                if (changes == null) continue;
+                string unit = unitId;
+                var possible = changes.Applied.Where(pair => pair.Key == unit).ToList();
+                if (possible.Count == 0 || possible.Any(pair => !changes.Guaranteed.Contains(pair))) continue;
                 HashSet<string> granted;
                 if (!grantedByUnit.TryGetValue(unitId, out granted))
                 {
                     granted = new HashSet<string>(StringComparer.Ordinal);
                     grantedByUnit[unitId] = granted;
                 }
-                granted.Add(StructuralGrantKey(casting));
+                granted.Add(key);
+                // The effects this grant stands for on the unit (any owner
+                // the casting reaches from it is the unit's own scope).
+                Dictionary<string, HashSet<string>> grants;
+                if (!grantEffects.TryGetValue(unitId, out grants))
+                    grantEffects[unitId] = grants = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+                HashSet<string> effects;
+                if (!grants.TryGetValue(key, out effects))
+                    grants[key] = effects = new HashSet<string>(StringComparer.Ordinal);
+                foreach (KeyValuePair<string, string> applied in possible) effects.Add(applied.Value);
             }
         }
 

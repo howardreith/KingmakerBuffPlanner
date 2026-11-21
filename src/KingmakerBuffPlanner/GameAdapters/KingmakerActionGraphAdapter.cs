@@ -102,7 +102,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 return new DiscoveryNode(DiscoveryNodeKind.Conditional, action.GetType().FullName,
                     whenTrue: AdaptList(conditional.IfTrue), whenFalse: AdaptList(conditional.IfFalse),
                     conditionContract: DescribeConditions(conditional), sourceContract: "Conditional",
-                    casterFactGate: CasterGate(conditional));
+                    casterFactGate: CasterGate(conditional), recipientFactGate: RecipientGate(conditional));
             var cast = action as ContextActionCastSpell;
             if (cast != null && cast.Spell != null) return Reference(cast.Spell, "ContextActionCastSpell");
             var pet = action as ContextActionsOnPet;
@@ -125,6 +125,16 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (action is ContextActionSpawnMonster)
                 return new DiscoveryNode(DiscoveryNodeKind.Unknown,
                     DescribeType(action.GetType()), sourceContract: "excluded-summoning-action");
+            // Missing-beneficial-buffs mission §3.B: the exact native removal
+            // of one buff keeps which buff it removes and from whom, so the
+            // planner can recognize mutually exclusive selections (each
+            // applies its own buff and removes the others).
+            var remove = action as ContextActionRemoveBuff;
+            if (remove != null && action.GetType() == typeof(ContextActionRemoveBuff))
+                return new DiscoveryNode(DiscoveryNodeKind.RestorativeAction,
+                    DescribeType(action.GetType()), sourceContract: "restorative-action",
+                    effectId: remove.Buff == null ? null : remove.Buff.AssetGuid,
+                    target: remove.ToCaster ? EffectTarget.Caster : EffectTarget.CurrentTarget);
             if (IsRestorativeAction(action.GetType()))
                 return new DiscoveryNode(DiscoveryNodeKind.RestorativeAction,
                     DescribeType(action.GetType()), sourceContract: "restorative-action");
@@ -410,6 +420,27 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
             string operation = checker.Operation.ToString();
             return operation == "And" || operation == "Or" ? new CasterFactGate(operation == "Or", facts) : null;
+        }
+
+        // Missing-beneficial-buffs review R2-F5: a conditional whose every
+        // condition is the exact native ContextConditionHasFact (a fact of the
+        // unit the action runs on: Mass Blessing of Luck and Resolve skips
+        // constructs and undead this way) is a recipient-fact gate. Any other
+        // contract stays unresolved.
+        private static RecipientFactGate RecipientGate(Conditional conditional)
+        {
+            var checker = conditional.ConditionsChecker;
+            if (checker == null || checker.Conditions == null || checker.Conditions.Length == 0) return null;
+            var facts = new List<KeyValuePair<string, bool>>();
+            foreach (Condition condition in checker.Conditions)
+            {
+                var fact = condition as ContextConditionHasFact;
+                if (fact == null || fact.GetType() != typeof(ContextConditionHasFact) || fact.Fact == null ||
+                    string.IsNullOrWhiteSpace(fact.Fact.AssetGuid)) return null;
+                facts.Add(new KeyValuePair<string, bool>(fact.Fact.AssetGuid, fact.Not));
+            }
+            string operation = checker.Operation.ToString();
+            return operation == "And" || operation == "Or" ? new RecipientFactGate(operation == "Or", facts) : null;
         }
 
         private static string DescribeConditions(Conditional conditional)

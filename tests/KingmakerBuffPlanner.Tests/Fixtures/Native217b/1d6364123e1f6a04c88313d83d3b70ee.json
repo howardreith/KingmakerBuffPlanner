@@ -1,0 +1,108 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "Type": "SpellLike",
+  "CanTargetEnemies": true,
+  "CanTargetFriends": true,
+  "CanTargetSelf": true,
+  "SpellResistance": true,
+  "EffectOnEnemy": "Harmful",
+  "Animation": "Touch",
+  "AnimationStyle": "CastActionTouch",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Quicken, Extend, Heighten, Reach",
+  "LocalizedDuration": "LocalizedString::",
+  "LocalizedSavingThrow": "LocalizedString:16973828-0487-47ab-a317-379262effe94:None",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "352469f228a3b1f4cb269c7ab0409b8e"
+  ],
+  "m_DisplayName": "LocalizedString:3f900b67-8249-4987-b531-2ab48ea456bb:Strength Surge",
+  "m_Description": "LocalizedString:14593984-47b8-4145-ac6e-153247d38442:As a standard action, you can touch a creature to give it great strength. For 1 round, the target gains an enhancement bonus equal to 1/2 your level in the class that gave you access to this domain (minimum +1) to melee attacks and Athletics checks.[LONGSTART] You can use this ability a number of times per day equal to 3 + your Wisdom modifier.[LONGEND]",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "ForcePunch"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "Actions": {
+        "$id": "3",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "4",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+            "Buff": "Blueprint:94dfcf5f3a72ce8478c8de5db69e752b:StrengthDomainBaseBuff",
+            "DurationValue": {
+              "$id": "5",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+              "m_IsExtendable": true,
+              "DiceCountValue": {
+                "$id": "6",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              },
+              "BonusValue": {
+                "$id": "7",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                "Value": 1
+              }
+            },
+            "AsChild": true,
+            "name": "$ContextActionApplyBuff$989a5552-fbfd-4bc8-8110-382c16030572"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$a8b75347-d048-4289-bf47-4d9e947364b6"
+    },
+    {
+      "$id": "8",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityDeliverTouch, Assembly-CSharp",
+      "TouchWeapon": "Blueprint:bb337517547de1a4189518d404ec49d4:TouchItem",
+      "name": "$AbilityDeliverTouch$5e29f523-cd0d-4e56-b6c8-91e5ade4c1a3"
+    },
+    {
+      "$id": "9",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Abjuration",
+      "name": "$SpellComponent$cc23a5f8-a28e-4c27-bfd8-ab679e9c6b32"
+    },
+    {
+      "$id": "10",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent, Assembly-CSharp",
+      "name": "$SpellDescriptorComponent$bcffad33-f4e4-4578-9faf-c77d13db7080"
+    },
+    {
+      "$id": "11",
+      "$type": "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig, Assembly-CSharp",
+      "m_BaseValueType": "ClassLevel",
+      "m_FeatureList": [],
+      "m_Stat": "Wisdom",
+      "m_Progression": "Div2",
+      "m_CustomProgression": [],
+      "m_UseMin": true,
+      "m_Min": 1,
+      "m_Max": 20,
+      "m_Class": [
+        "Blueprint:67819271767a9dd4fbfd4ae700befea0:ClericClass",
+        "Blueprint:f1a70d9e1b0b41e49874e1fa9052a1ce:InquisitorClass"
+      ],
+      "name": "$ContextRankConfig$52f051b0-e3b0-44d0-8b36-34ffb79a57b2"
+    },
+    {
+      "$id": "12",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic, Assembly-CSharp",
+      "RequiredResource": "Blueprint:95525809d6e672a4880ea629ca5b58ab:StrengthDomainBaseResource",
+      "IsSpendResource": true,
+      "Amount": 1,
+      "ResourceCostIncreasingFacts": [],
+      "name": "$AbilityResourceLogic$bbee22f4-6c29-48b5-b682-d719cd459008"
+    }
+  ],
+  "m_AssetGuid": "1d6364123e1f6a04c88313d83d3b70ee",
+  "name": "StrengthDomainBaseAbility"
+}

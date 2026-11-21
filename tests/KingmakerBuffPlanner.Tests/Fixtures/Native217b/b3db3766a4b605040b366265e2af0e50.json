@@ -1,0 +1,14 @@
+{
+  "$type": "Kingmaker.Blueprints.Classes.Spells.BlueprintSpellbook, Assembly-CSharp",
+  "Name": "LocalizedString:e4f71e5c-403a-4883-b8ab-b0cefc034e89:Sorcerer",
+  "SpellsPerDay": "Blueprint:dbff16956df2eda48a1da5c9617cc836:SorcererSpellsDailyTable",
+  "SpellsKnown": "Blueprint:d232bc78d967a964bac4d4d38e7ca5f4:SorcererSpellsKnownTable",
+  "SpellList": "Blueprint:ba0401fdeb4062f40a7aa95b6f07fe89:WizardSpellList",
+  "CharacterClass": "Blueprint:b3a505fb61437dc4097f43c3f8f9a4cf:SorcererClass",
+  "CastingAttribute": "Charisma",
+  "Spontaneous": true,
+  "IsArcane": true,
+  "Components": [],
+  "m_AssetGuid": "b3db3766a4b605040b366265e2af0e50",
+  "name": "SorcererSpellbook"
+}

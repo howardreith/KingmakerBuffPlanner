@@ -1,0 +1,14 @@
+{
+  "$type": "Kingmaker.Blueprints.Classes.Spells.BlueprintSpellbook, Assembly-CSharp",
+  "Name": "LocalizedString:cb0cae0e-db93-4b55-b308-a0e94dee16ba:Bard",
+  "SpellsPerDay": "Blueprint:0a8eec9ca5c0dc64795243ab3c55d924:BardSpellSlotsTable",
+  "SpellsKnown": "Blueprint:90de6b4f591d1184497fbfbae6e16547:BardSpellsKnownTable",
+  "SpellList": "Blueprint:25a5013493bdcf74bb2424532214d0c8:BardSpellList",
+  "CharacterClass": "Blueprint:772c83a25e2268e448e841dcd548235f:BardClass",
+  "CastingAttribute": "Charisma",
+  "Spontaneous": true,
+  "IsArcane": true,
+  "Components": [],
+  "m_AssetGuid": "bc04fc157a8801d41b877ad0d9af03dd",
+  "name": "BardSpellbook"
+}

@@ -1,0 +1,155 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "Range": "Close",
+  "CanTargetEnemies": true,
+  "CanTargetSelf": true,
+  "SpellResistance": true,
+  "EffectOnEnemy": "Harmful",
+  "Animation": "Directional",
+  "AnimationStyle": "CastActionDirectional",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Quicken, Extend, Heighten, Reach",
+  "LocalizedDuration": "LocalizedString:d7cb2411-bd6e-4b59-a72d-43ea018de978:1 round/level, can save each round",
+  "LocalizedSavingThrow": "LocalizedString:7ac9f1bb-ab14-4d64-8543-4c97a64a71bd:Will negates",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "ff26ee73fa464a44ca8bf20e858dc3bc"
+  ],
+  "m_DisplayName": "LocalizedString:e7a1f254-57e7-4114-8d38-096cab9e678b:Hideous Laughter",
+  "m_Description": "LocalizedString:47b3bf1f-185c-4f88-9964-2dea1b846810:This spell afflicts the subject with uncontrollable laughter. It collapses into gales of manic laughter, falling prone. The subject can take no actions while laughing, but is not considered helpless. After the spell ends, it can act normally. On the creature's next turn, it may attempt a new saving throw to end the effect.[LONGSTART] A creature with an Intelligence score of 2 or lower is not affected.[LONGEND]",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "HideousLaughter"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:ba0401fdeb4062f40a7aa95b6f07fe89:WizardSpellList",
+      "SpellLevel": 2,
+      "name": "$SpellListComponent$8ba41eb3-1d6e-4dc8-8569-1e12e82a2137"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Enchantment",
+      "name": "$SpellComponent$be0e981b-6832-4557-80ea-b4a54e9f770e"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "SavingThrowType": "Will",
+      "Actions": {
+        "$id": "5",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "6",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionConditionalSaved, Assembly-CSharp",
+            "Succeed": {
+              "$id": "7",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": []
+            },
+            "Failed": {
+              "$id": "8",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": [
+                {
+                  "$id": "9",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+                  "Buff": "Blueprint:4b1f07a71a982824988d7f48cd49f3f8:HideousLaughterBuff",
+                  "DurationValue": {
+                    "$id": "10",
+                    "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+                    "m_IsExtendable": true,
+                    "DiceCountValue": {
+                      "$id": "11",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+                    },
+                    "BonusValue": {
+                      "$id": "12",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                      "ValueType": "Rank"
+                    }
+                  },
+                  "IsFromSpell": true,
+                  "name": "$AbilityActionApplyBuff$facc01a5-ab38-497f-aed9-1b2b90b5df48"
+                }
+              ]
+            },
+            "name": "$AbilityActionConditionalSaved$9084fbc1-50cc-40ce-ada7-c47de447194b"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$0ac965c6-da14-4b6b-9829-d2f111bd0f03"
+    },
+    {
+      "$id": "13",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.TargetCheckers.AbilityTargetStatCondition, Assembly-CSharp",
+      "Stat": "Intelligence",
+      "GreaterThan": 2,
+      "name": "$AbilityTargetStatCondition$047f20e8-aefb-4c99-9e10-bcc5143b76bd"
+    },
+    {
+      "$id": "14",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:25a5013493bdcf74bb2424532214d0c8:BardSpellList",
+      "SpellLevel": 1,
+      "name": "$SpellListComponent$62b5ca2d-4ffd-401a-9881-d7028e976af3"
+    },
+    {
+      "$id": "15",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellDescriptorComponent, Assembly-CSharp",
+      "Descriptor": "MindAffecting, Compulsion",
+      "name": "$SpellDescriptorComponent$e7fe920e-3707-4542-8b61-6f15b3ed82c1"
+    },
+    {
+      "$id": "16",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.TargetCheckers.AbilityTargetHasNoFactUnless, Assembly-CSharp",
+      "CheckedFacts": [
+        "Blueprint:a95311b3dc996964cbaa30ff9965aaf6:AnimalType",
+        "Blueprint:57614b50e8d86b24395931fffc5e409b:MonstrousHumanoidType",
+        "Blueprint:625827490ea69d84d8e599a33929fdc6:MagicalBeastType",
+        "Blueprint:09478937695300944a179530664e42ec:VerminType"
+      ],
+      "UnlessFact": "Blueprint:02707231be1d3a74ba7e38a426c8df37:BloodlineSerpentineArcana",
+      "name": "$AbilityTargetHasNoFactUnless$9cfbf3a3-94bf-46a9-b697-54d1a7ef1c22"
+    },
+    {
+      "$id": "17",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.TargetCheckers.AbilityTargetHasFact, Assembly-CSharp",
+      "CheckedFacts": [
+        "Blueprint:3bec99efd9a363242a6c8d9957b75e91:AberrationType",
+        "Blueprint:fd389783027d63343b4a5634bd81645f:ConstructType",
+        "Blueprint:455ac88e22f55804ab87c2467deff1d6:DragonType",
+        "Blueprint:018af8005220ac94a9a4f47b3e9c2b4e:FeyType",
+        "Blueprint:9054d3988d491d944ac144e27b6bc318:OutsiderType",
+        "Blueprint:706e61781d692a042b35941f14bc41c5:PlantType"
+      ],
+      "Inverted": true,
+      "name": "$AbilityTargetHasFact$64a5b478-a0f0-4012-8317-0ac06f74cc58"
+    },
+    {
+      "$id": "18",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:31c742d02fc33204cad4e02dddf028dd:CharmDomainSpellList",
+      "SpellLevel": 2,
+      "name": "$SpellListComponent$35ddd0ef-4e62-4ca4-ab2c-7d72fd787781"
+    },
+    {
+      "$id": "19",
+      "$type": "Kingmaker.Designers.Mechanics.Recommendations.RecommendationNoFeatFromGroup, Assembly-CSharp",
+      "Features": [
+        "Blueprint:e8445256abbdc45488c2d90373f7dae8:BloodlineFeyProgression"
+      ],
+      "name": "$RecommendationNoFeatFromGroup$6a390bf8-3646-4bda-8930-1d2630cd7cb2"
+    }
+  ],
+  "m_AssetGuid": "fd4d9fd7f87575d47aafe2a64a6e2d8d",
+  "name": "HideousLaughter"
+}

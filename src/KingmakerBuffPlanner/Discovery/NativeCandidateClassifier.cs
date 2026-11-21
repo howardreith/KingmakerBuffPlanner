@@ -25,6 +25,11 @@ namespace KingmakerBuffPlanner.Discovery
         // AbilityCasterHasNoFacts and Call of the Wild's
         // AbilityTargetHasNoFactUnlessBuffsFromCaster (rc4 review finding 1).
         public IReadOnlyList<string> SelfGatedFactIds { get; set; }
+        // Payload effects whose ability-level "harmful to allies" metadata an
+        // explicit, evidence-backed versioned override entry declares
+        // misleading (EffectOverrideRegistry, disposition
+        // "admit-despite-ally-disposition"; review R1-F6). Empty otherwise.
+        public IReadOnlyList<string> AllyDispositionExceptionEffectIds { get; set; }
     }
 
     // One action list of a buff's own AddFactContextActions (Activated,
@@ -44,7 +49,8 @@ namespace KingmakerBuffPlanner.Discovery
 
     public sealed class NativeCandidateEffectFacts
     {
-        // Identity for audit reports only; the rules never read it.
+        // Identity for audit reports; the rules compare it only with the
+        // facts' own self-gated and ally-disposition-exception lists.
         public string EffectId { get; set; }
         public string EffectName { get; set; }
         public string Kind { get; set; }
@@ -164,9 +170,9 @@ namespace KingmakerBuffPlanner.Discovery
             if (facts.HasVariants)
                 return Exclude("non-castable-variant-container",
                     "The parent is an unresolved choice container; independently eligible concrete children are cataloged instead.");
-            if (facts.CanTargetPoint)
+            if (facts.CanTargetPoint && !IsUnitAnchoredAlliedArea(facts, effects, abilityComponents))
                 return Exclude("point-target-without-placement",
-                    "Point-target abilities are excluded until a deterministic safe placement rule exists.");
+                    "Point-target abilities are excluded unless they may also be cast on a friendly unit anchor, can never target an enemy, and every persistent effect lands through their own allied AbilityTargetsAround selector; no ground placement is ever invented.");
             // rc4 (lead review, finding 1): the native AbilityTargetBreathOfLife
             // target check admits only a dead or dying party member (IsDead with
             // the recently-dead buff, or a death-door condition) or an undead to
@@ -193,9 +199,11 @@ namespace KingmakerBuffPlanner.Discovery
                 return Exclude("hostile-weapon-carrier",
                     "The caster-side marker belongs to a hostile weapon action, not a standalone beneficial cast.");
 
+            // A Personal-range ability's current target is its caster
+            // (IsPersonalRange): its enemy flags cannot aim it at anyone.
             bool hostileCurrentTarget = effects.Any(e =>
                     e.Target == "CurrentTarget") &&
-                facts.CanTargetEnemies &&
+                CanBeAimedAtHostiles(facts) &&
                 string.Equals(facts.EffectOnEnemy, "Harmful",
                     StringComparison.Ordinal) &&
                 !string.Equals(facts.EffectOnAlly, "Helpful",
@@ -263,7 +271,7 @@ namespace KingmakerBuffPlanner.Discovery
                         ? "ambiguous-area-recipient" :
                     effects.Any(e => e.Harmful == true)
                         ? "harmful-only" :
-                    string.Equals(facts.EffectOnAlly, "Harmful", StringComparison.Ordinal)
+                    HarmfulToAllies(facts)
                         ? "harmful-ally-disposition" : "no-persistent-beneficial-party-effect",
                     "No persistent beneficial payload has deterministic controllable-party targeting.");
 
@@ -356,11 +364,16 @@ namespace KingmakerBuffPlanner.Discovery
             NativeCandidateEffectFacts effect, NativeCandidateAuditFacts facts)
         {
             if (effect == null) return false;
-            // The game's own ally-disposition data is authoritative: an
-            // ability marked harmful to allies is never a beneficial party
-            // buff even when the buff blueprint itself forgets m_Harmful
-            // (everyday-use v1.2: the owner's Irresistible Dance report).
-            if (string.Equals(facts.EffectOnAlly, "Harmful", StringComparison.Ordinal))
+            // Everyday-use v1.2 (the owner's Irresistible Dance report): an
+            // ability marked harmful to allies is not a beneficial party
+            // buff, even when its buff blueprint forgets m_Harmful.
+            // Missing-beneficial-buffs mission §3.A / review R1-F6: the flag
+            // is overridden ONLY for an ability that cannot be aimed at a
+            // hostile unit AND a payload an evidence-backed versioned entry
+            // names (VetoedByAllyDisposition); that payload is still judged
+            // by every harmful-buff, harmful-condition, offensive and marker
+            // rule (planning/MISSING-BENEFICIAL-BUFFS-AUDIT.md).
+            if (VetoedByAllyDisposition(effect, facts))
                 return false;
             return effect.Target == "Caster" || effect.Target == "Pet" ||
                 effect.Target == "Party" || effect.Target == "AlliedAreaRecipients" ||
@@ -389,10 +402,146 @@ namespace KingmakerBuffPlanner.Discovery
 
         private static bool IsAimedAtEnemies(NativeCandidateAuditFacts facts)
         {
-            if (!facts.CanTargetEnemies) return false;
+            if (!CanBeAimedAtHostiles(facts)) return false;
             if (!facts.CanTargetFriends) return true;
             return string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal) &&
                 !string.Equals(facts.EffectOnAlly, "Helpful", StringComparison.Ordinal);
+        }
+
+        // Missing-beneficial-buffs mission §3.B: the native targeting
+        // contract of a Personal-range ability. Kingmaker 2.1.7b anchors it
+        // on its owner (AbilityData.TargetAnchor is Owner for
+        // AbilityRange.Personal; Share Transmutation patches exactly that
+        // anchor to reach another unit), so its current target is its
+        // caster whatever CanTargetEnemies / EffectOnEnemy say. The wizard's
+        // Abjuration resistance selections (AbjurationResistance{Element}
+        // Ability: Personal, CanTargetSelf, and also CanTargetEnemies with
+        // EffectOnEnemy = Harmful) are such personal buffs.
+        private static bool IsPersonalRange(NativeCandidateAuditFacts facts)
+        {
+            return string.Equals(facts.Range, "Personal", StringComparison.Ordinal) && facts.CanTargetSelf;
+        }
+
+        // Whether any native target the ability may be aimed at can be a
+        // hostile unit.
+        private static bool CanBeAimedAtHostiles(NativeCandidateAuditFacts facts)
+        {
+            return facts.CanTargetEnemies && !IsPersonalRange(facts);
+        }
+
+        private static bool HarmfulToAllies(NativeCandidateAuditFacts facts)
+        {
+            return string.Equals(facts.EffectOnAlly, "Harmful", StringComparison.Ordinal);
+        }
+
+        // Missing-beneficial-buffs mission §3.A, narrowed after review
+        // R1-F6. Native 2.1.7b blueprints mark some legitimate buffs harmful
+        // to allies although they cannot be aimed at an enemy, but enemy
+        // targeting alone does not prove a payload benefits its bearer (a
+        // friend-only ability applying a penalty buff whose own m_Harmful
+        // flag is clear would pass). The flag is therefore overridden only
+        // for an ability that cannot be aimed at a hostile unit AND a payload
+        // that an explicit, versioned, evidence-backed entry names
+        // (NativeEffectOverrides.json, disposition
+        // "admit-despite-ally-disposition", supplied through the facts; the
+        // classifier itself holds no names or identities). The entry keeps
+        // the discovered graph, the payload is still judged by every other
+        // rule, and the exception fails closed when the payload blueprint
+        // was not read (no harmful flag or components resolved).
+        private static bool IsProvenBeneficialDespiteAllyDisposition(NativeCandidateEffectFacts effect,
+            NativeCandidateAuditFacts facts)
+        {
+            return effect != null && effect.Kind == "Buff" && effect.Harmful == false &&
+                (effect.ComponentTypes ?? new string[0]).Count != 0 &&
+                (facts.AllyDispositionExceptionEffectIds ?? new string[0])
+                    .Contains(effect.EffectId ?? string.Empty, StringComparer.Ordinal);
+        }
+
+        private static bool VetoedByAllyDisposition(NativeCandidateEffectFacts effect,
+            NativeCandidateAuditFacts facts)
+        {
+            if (!HarmfulToAllies(facts)) return false;
+            // The everyday-use v1.2 rule: aimed at enemies, the flag stands.
+            if (CanBeAimedAtHostiles(facts)) return true;
+            // Review R2 (R1-F6): the flag is waived only when EVERY
+            // persistent effect the ability may apply, on any branch, is a
+            // proven payload; one unapproved or unread application anywhere
+            // keeps the veto for all of them (the whole graph is planned and
+            // executed). Removal actions are not applications and stay.
+            IReadOnlyList<NativeCandidateEffectFacts> effects = facts.Effects ?? new NativeCandidateEffectFacts[0];
+            // Review R3-F2: nor may any reachable action of the graph be
+            // offensive (damage or an attack on any branch, which leaves no
+            // persistent leaf). A buff the payload grants as a separate
+            // ability (Firebelly's breath) is not part of this graph.
+            if (HasOffensiveAction(facts)) return true;
+            return effects.Count == 0 || !effects.All(e => IsProvenBeneficialDespiteAllyDisposition(e, facts));
+        }
+
+        private static bool HasOffensiveAction(NativeCandidateAuditFacts facts)
+        {
+            return (facts.Diagnostics ?? new NativeCandidateDiagnosticFacts[0]).Any(IsOffensive) ||
+                (facts.DiagnosticContracts ?? new string[0]).Any(IsOffensiveContract);
+        }
+
+        // Missing-beneficial-buffs mission §3.C: CanTargetPoint means the
+        // player MAY click the ground, not that a point is required. An
+        // ability that may also be aimed at its caster or a friend, can never
+        // be aimed at an enemy, and whose every persistent effect is a unit
+        // buff landing through the ability's OWN allied AbilityTargetsAround
+        // selector (the selector wraps its run actions directly) is cast on a
+        // unit anchor that native AbilityData.CanTarget admits; the existing
+        // allied-area geometry (KingmakerAreaCoverageResolver) then predicts
+        // its recipients from that unit. No ground coordinate is invented and
+        // nothing else point-capable (spawned areas, enemy or ambiguous
+        // selectors, hostile-capable spells, nested casts) is admitted.
+        private static bool IsUnitAnchoredAlliedArea(NativeCandidateAuditFacts facts,
+            IReadOnlyList<NativeCandidateEffectFacts> effects, IReadOnlyList<string> components)
+        {
+            return (facts.CanTargetSelf || facts.CanTargetFriends) && !facts.CanTargetEnemies &&
+                !facts.IsStickyTouch &&
+                components.Any(value => ShortName(value) == "AbilityTargetsAround") &&
+                effects.Count != 0 &&
+                effects.All(effect => effect != null && effect.Kind == "Buff" &&
+                    effect.Target == "AlliedAreaRecipients" && IsOwnAreaSelector(effect.ActionPath));
+        }
+
+        // The scanner's action path is "<ability>/0:<first child>/...": the
+        // ability's own AbilityTargetsAround transform is its first child.
+        // Review R1-F7: that selector must ALSO decide the final recipients.
+        // Between it and the applying ContextActionApplyBuff only action
+        // lists and conditional branches may appear (neither changes who is
+        // selected nor from where); a nested ContextActionCastSpell, a
+        // second selector, a party/pet transform or a reflected wrapper
+        // could select around each outer recipient, which the planner's
+        // single anchor disk cannot represent, so such a graph is refused.
+        private static bool IsOwnAreaSelector(string actionPath)
+        {
+            string[] segments = (actionPath ?? string.Empty).Split('/');
+            if (segments.Length < 3 ||
+                !string.Equals(segments[1], "0:AbilityTargetsAround", StringComparison.Ordinal) ||
+                !IsSegment(segments[segments.Length - 1], "ContextActionApplyBuff"))
+                return false;
+            for (int index = 2; index < segments.Length - 1; index++)
+            {
+                string segment = segments[index];
+                if (segment == "true" || segment == "false") continue;
+                if (IsSegment(segment, "ActionList")) continue;
+                if (IsSegment(segment, "Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional")) continue;
+                return false;
+            }
+            return true;
+        }
+
+        // "<index>:<identity>" with exactly this identity, optionally
+        // assembly-qualified ("<identity>, Assembly-CSharp, ...").
+        private static bool IsSegment(string segment, string identity)
+        {
+            int colon = (segment ?? string.Empty).IndexOf(':');
+            if (colon <= 0) return false;
+            for (int index = 0; index < colon; index++)
+                if (!char.IsDigit(segment[index])) return false;
+            string name = segment.Substring(colon + 1).Split(',')[0].Trim();
+            return string.Equals(name, identity, StringComparison.Ordinal);
         }
 
         // Kingmaker 2.1.7b UnitCondition values that only hinder their bearer.

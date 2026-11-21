@@ -1,3 +1,28 @@
+## Missing beneficial buffs — owner in-game acceptance (pending)
+
+Draft PR #25, unreleased. By owner decision of 2026-11-21 (mission §9) these
+checks are the owner's; **none has been run** and no automated native check
+covers them. Offline evidence and the candidate audit:
+[record](../planning/MISSING-BENEFICIAL-BUFFS-AUDIT.md). Use a normal-play
+save with the PR build; note the party, positions and the run report text for
+any failure.
+
+| # | Check | Proves | A failure means |
+|---|---|---|---|
+| 1 | Level-7 bard who knows Good Hope and Haste: open the planner. Both appear among castable buffs. | The harmful-to-allies veto no longer hides Good Hope in the running game; Haste is unaffected. | Good Hope missing: the loaded blueprint differs from the 2.1.7b dump or another rule excludes it (send the planner diagnostics). Haste missing: regression. |
+| 2 | Plan Good Hope as a group cast on a legal target (the bard or an ally), with one ally standing more than 15 ft from that centre. The plan predicts only allies within 15 ft. Run it. | The native 15-ft allied area, one invocation and the planner's resource accounting match the game. | More than one cast, more than one level-3 spell use spent, Good Hope on (or claimed for) the distant ally, or an in-radius ally missing it: area/resource accounting is wrong. |
+| 3 | *If you can arrange it:* an ally under Crushing Despair is inside the Good Hope area. Run Good Hope. | The native branch (Despair removed, Good Hope not applied on that cast) is reported truthfully. | The report says that ally received Good Hope, or the run silently casts Good Hope again: confirmation is untruthful. A later run planning Good Hope for that ally is correct. |
+| 4 | A caster who knows Firebelly: Firebelly is listed (caster-only). After casting, the caster has Firebelly and its fire-breath ability; the breath is never listed as a planner buff. | The beneficial caster buff is admitted while its separately granted damaging breath stays excluded. | Firebelly missing: admission failed natively. Breath listed: an offensive ability leaked into the catalogue. |
+| 5 | Wizard with the Abjuration school: all five Resistance selections (Acid, Cold, Electricity, Fire, Sonic) are listed. Plan Fire alone and run it: one use of the 1-per-day resource, Fire resistance active. | Personal targeting and the native resource cost are honoured. | A selection missing, offered on another unit, or a different cost: the personal contract or resource is wrong. |
+| 6 | With Fire active, run a routine containing Fire again. | Re-selecting the current choice is already satisfied: no cast, no use. | A cast or a spent use: recast decisions ignore the permanent selection. |
+| 7 | With a use available (e.g. after rest) and Fire active, run a routine containing Cold. Then plan Fire and Cold together in one routine; and, with Fire active, Cold followed by Fire. | Switching casts once, spends one use and removes the previous resistance; the planner never treats the choices as stackable ("these choices replace each other"), and never counts Fire as already active after a planned switch to Cold. | Both resistances active, two uses spent, both castings Ready, or Fire shown as skipped after Cold: mutually exclusive selections are being stacked. |
+| 8 | Plan Feather Step, Mass (or Blessing of Luck and Resolve Mass, Firebrand, Heroic Invocation) centred on a party member, with another ally outside the radius (15 ft for Feather Step; 30 ft for the others). Run it. | Native `CanTarget` admits a unit centre for these point-capable spells (**unverified offline**), and the centre, radius, recipients and one-slot cost match the game. | The planner refuses every centre ("the group spell cannot be centred there") or the run fails with `target-invalid`: the game refuses a unit centre, so the planner correctly fails closed and the spell stays unplannable (report it; no ground point is ever chosen). Buff on the distant ally, a different centre, or more than one slot: geometry/resource bug. |
+| 9 | Close and reopen the planner, rest, then save and reload: entries 1–8 stay listed and saved plans keep their castings. | Discovery and persistence survive a refresh. | Entries disappear: refresh-dependent discovery. |
+
+Optional, same rules: Physical Enhancement selections (transmuter) behave like
+checks 5–7; Enlarge/Reduce Person, Mass behave like check 8, and planning both
+on the same allies in one routine is refused.
+
 Use the [Chinese-player review guide](LOCALIZATION.md#glossary-and-player-review) and [guarded candidate procedure](LOCALIZATION.md#runtime-acceptance) for localization acceptance.
 
 > **Durable item-source selection, 2026-11-08:** branch `codex/kingmaker-buff-planner-durable-item-source` from main `5122e3a`; product `472e2f5502ec798f3e86ef9a45aade2e21b77a0d`, version 0.6.13 unchanged (unreleased). Saved item castings now use an explicit equipped-item rule instead of a per-object session token. Reproduced before (0/1), source 47/0, complete offline 727/0, DLL `f7ca13e5...91e4`. Native NOT RUN. Next: owner review, then the native steps in the [checkpoint](DURABLE-ITEM-SOURCE-CHECKPOINT.md).

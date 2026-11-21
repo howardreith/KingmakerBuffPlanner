@@ -205,6 +205,8 @@
     <Compile Include="GameAdapters\KingmakerPowerfulChangeBlueprintAnalyzer.cs" />
     <Compile Include="GameAdapters\KingmakerInstantCastAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerPartySnapshotBuilder.cs" />
+    <Compile Include="GameAdapters\PartyProviderAdmission.cs" />
+    <Compile Include="GameAdapters\ProviderTargetingPlanner.cs" />
     <Compile Include="GameAdapters\KingmakerSpellbookRoleAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerSpellbookMembershipAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerProviderOptionBuilder.cs" />

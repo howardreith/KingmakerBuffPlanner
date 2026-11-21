@@ -1,0 +1,101 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "CanTargetEnemies": true,
+  "CanTargetFriends": true,
+  "CanTargetSelf": true,
+  "SpellResistance": true,
+  "EffectOnEnemy": "Harmful",
+  "Animation": "Self",
+  "AnimationStyle": "CastActionSelf",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Quicken, Extend, Heighten, Reach",
+  "LocalizedDuration": "LocalizedString:00b2e4c2-aafe-487b-b890-d57473373da7:1 minute/level",
+  "LocalizedSavingThrow": "LocalizedString::",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "c388856d0e8855f429a83ccba67944ba"
+  ],
+  "m_DisplayName": "LocalizedString:f1f7091c-c791-450e-8ea7-bc8d741f8da9:True Seeing",
+  "m_Description": "LocalizedString:bde0efa3-7640-45e9-ac6e-504ca3c031da:You confer on the subject the ability to see all things as they actually are. The subject sees the exact locations of creatures or objects under blur or displacement effects, sees invisible creatures normally.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "TrueSeeing"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Divination",
+      "name": "$SpellComponent$4a106222-d22d-4fac-a2e1-50036ab334e9"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:8443ce803d2d31347897a3d85cc32f53:ClericSpellList",
+      "SpellLevel": 5,
+      "name": "$SpellListComponent$1cf0cdc3-ba5e-4081-991f-25e4737bdc64"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectStickyTouch, Assembly-CSharp",
+      "TouchDeliveryAbility": "Blueprint:b3da3fbee6a751d4197e446c7e852bcb:TrueSeeing",
+      "name": "$AbilityEffectStickyTouch$f666d981-6269-43d9-b87d-ce5064951850"
+    },
+    {
+      "$id": "5",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:f60d0cd93edc65c42ad31e34a905fb2f:AlchemistSpellList",
+      "SpellLevel": 6,
+      "name": "$SpellListComponent$94deec25-d742-490e-8434-e92d4ad43222"
+    },
+    {
+      "$id": "6",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:bad8638d40639d04fa2f80a1cac67d6b:DruidSpellList",
+      "SpellLevel": 7,
+      "name": "$SpellListComponent$18c20fc5-7ab8-4128-aadc-fd633c31c218"
+    },
+    {
+      "$id": "7",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:57c894665b7895c499b3dce058c284b3:InquisitorSpellList",
+      "SpellLevel": 5,
+      "name": "$SpellListComponent$da538e53-4b7c-4add-ab7b-93e80c3dfc2e"
+    },
+    {
+      "$id": "8",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:4d72e1e7bd6bc4f4caaea7aa43a14639:MagusSpellList",
+      "SpellLevel": 6,
+      "name": "$SpellListComponent$a0eea040-b1bb-4d57-a6b3-1bce9ee50950"
+    },
+    {
+      "$id": "9",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:ba0401fdeb4062f40a7aa95b6f07fe89:WizardSpellList",
+      "SpellLevel": 6,
+      "name": "$SpellListComponent$4e42eb19-ebb6-46e1-a648-de082a367118"
+    },
+    {
+      "$id": "10",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:384627980c2a60a43800f14029fbb8a7:KnowledgeDomainSpellList",
+      "SpellLevel": 5,
+      "name": "$SpellListComponent$5c013f1a-d411-4a3b-9163-5842be9f112f"
+    },
+    {
+      "$id": "11",
+      "$type": "Kingmaker.Designers.Mechanics.Recommendations.RecommendationNoFeatFromGroup, Assembly-CSharp",
+      "Features": [
+        "Blueprint:4d491cf9631f7e9429444f4aed629791:BloodlineArcaneProgression"
+      ],
+      "name": "$RecommendationNoFeatFromGroup$02027af7-0ab2-4605-992e-a91e70b917af"
+    }
+  ],
+  "m_AssetGuid": "4cf3d0fae3239ec478f51e86f49161cb",
+  "name": "TrueSeeingCast"
+}
