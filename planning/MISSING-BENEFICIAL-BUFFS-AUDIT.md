@@ -557,6 +557,67 @@ so a caster-relative repeat in a Classic forecast casts again
 (conservative). Native behavior that stays unverified: the live
 `MaybeCaster` read of an existing buff's origin.
 
+## Review round 9
+
+Codex review of `4cda586` (decision `changes_required`). Verified: R8-F5.
+Re-opened: R7-F1, R8-F1, R8-F2, R8-F3, R8-F4, R8-F6. New: R9-F1 to R9-F6. The
+code findings are fixed in the round-9 corrections commit (`9b7dc1c`); R9-F6
+(the developer report) is corrected in the round-9 handoff.
+
+| Finding | Correction | Regression |
+|---|---|---|
+| R7-F1 an unread buff blueprint passed the point-target check | A buff record the exporter could not read (no harmful flag) refuses the whole-cast exceptions (unit-anchored bursts, ally-disposition waiver, Personal rescue), whether the cast applies it directly or an applied buff applies it on activation | `…-unread-buff-refuses-point-admission` (Feather Step, Mass with its direct buff withheld from `NativeBlueprintLookup`; with only the buff its buff applies on activation withheld: both refused by discovery and provider admission; resolved spell admitted) |
+| R8-F2 a caster-directed resistance bypassed whole-cast safety | The Personal-rescue whole-cast check (and the Personal penalty refusal) also covers an application explicitly directed to the caster (`ToCaster`) | `…-caster-directed-rescue-judges-the-whole-cast` (Resistance — Fire with `ToCaster` set and the native `ContextActionKillTarget`: refused by discovery and fact-provider admission; `ToCaster` alone admitted; the five real selections admitted, each removing the other four resistances) |
+| R8-F1 Firebrand forecast assumed both casters' protection survives | Whether a caster-relative buff from caster A stays effective after caster B applies the same buff is not established offline, so a funded caster-relative application by another caster invalidates the earlier casters' structural grants of that effect on every unit it may reach; the Classic sequential forecast likewise replaces other casters' instances with the applying caster's | `…-firebrand-other-caster-overlap-invalidates-grant` (one-pass a, b, a over the same allies: a's repeat Ready for one slot; disjoint bursts and the same overlap with b's casting disabled keep a's free structural repeat) |
+| R8-F3 an initially satisfied Good Hope ignored a newly eligible ally | The budget pass re-assesses an initially satisfied group casting (recipients, existing-effect verdict, notes, readiness) when earlier funded castings of the sequence change its beneficiaries; the Classic planner keeps a routine recipient state and recomputes later assignments' group coverage from it | `…-satisfied-good-hope-gains-a-newly-eligible-ally` (allies at 0/10/20 ft, the middle under Despair, the far with a sufficient Good Hope, two slots: plain and selected-run compilers fund the second cast for the middle ally; first disabled: free skip; a later Classic assignment for the middle ally is planned) |
+| R8-F4 a Classic Prayer skip protected the enemy penalty | A Classic skip relies on and protects only each applicable provider's bound branch; an unread relation (a target outside every measured disk) or a hostile one withholds a relation-dependent skip | `…-classic-prayer-skip-protects-its-branch` (after a friendly Prayer skip, a Feather Step, Mass that also removes PrayerDebuff is funded and one removing PrayerBuff is refused; a far friendly target with only PrayerDebuff and no recorded relation is not skipped) |
+| R8-F6 a failed second geometry read left an anchor without coverage | Legal area anchors are exactly the centres whose coverage was built, from one self read each; a failed or throwing live distance read is unavailable for that pair only (planner and production delegate) | `…-failed-geometry-read-keeps-anchors-separate` (a centre readable once then unavailable inherits nothing; a centre whose reads throw is no anchor, zero cost, no step; the readable centre keeps its own disk) |
+| R9-F1 a repeated resistance selection created a false shortage | A same-routine repeat of a payload whose every application is a permanent native application (`ContextActionApplyBuff.Permanent`, new leaf metadata) is structurally satisfied in every view; a timed effect's repeat keeps the existing contract (charged outside the one-pass view, which reports it redundant) | `…-repeated-resistance-selection-costs-one-use` (one daily use, Fire then Fire: one paid cast, one executable step, one reserved use, a free second row, in the selected-run and plain compilers; Fire then Cold keeps its removal conflict) |
+| R9-F2 another caster's Firebrand confirmed the submitted cast | Execution observations carry the applying caster (buff context `MaybeCaster`); a caster-relative leaf is confirmed only by an instance of the submitted caster, never by an unread origin; caster-less confirmation never proves one | `…-firebrand-confirmation-needs-the-submitted-caster` (b's group step: fresh Firebrand from a or of unread origin does not confirm; b's own does) |
+| R9-F3 Prayer's hostile branch counted as beneficial coverage | A unit the relation predicate reads as hostile to the caster is affected, never a beneficiary (area planner and sequential state); a group step's confirmation expects only the friendly branch | `…-prayer-hostile-member-is-no-beneficiary` (unmodified Prayer, an in-radius member with IsEnemy true: affected, not predicted; a fresh PrayerDebuff alone does not confirm, PrayerBuff does) |
+| R9-F4 an unreachable predicate suppressed coverage | Recipient binding and caster-gate inspection ignore a verified empty checker's never-run false branch (the expression is kept whole) | `…-empty-checker-unreachable-predicate-keeps-coverage` (unread HasFact only on the false branch: recipients kept, one slot; the same predicate gating the reachable application still fails closed) |
+| R9-F5 Classic Firebrand skips and forecasts discarded instance state | A Classic caster-relative skip needs a readable, unsuppressed instance of that caster; the Classic sequential forecast carries live instance detail until an admitted step changes it | `…-classic-firebrand-uses-effective-instances` (b pinned: a's active plus b's suppressed instance → one funded cast; b's effective instance → free skip, also in the first sequential-forecast occurrence) |
+| R9-F6 the checkpoint report misattributed validation | Corrected in the round-9 handoff (commands with their `-Only` selectors, commit identities, changed-disposition counts, evidence README path, one regression per disposition) | — |
+
+**Executed reproductions** on the production of `4cda586` (fifteen files
+swapped by `git show 4cda586:<path>`, current tests and the 51/61 fixtures; the
+Firebrand confirmation test's instance origin argument was stubbed for that
+run; everything restored from `9b7dc1c` and the tree verified clean):
+`missing-beneficial-buffs` 65/11 (DLL `8d9b5734…`). Every subcase runs and
+reports independently (no masking). Failures: R7-F1 both subcases ("…direct
+buff could not be read was admitted", "…applies an unread buff was
+admitted"); R8-F2 the kill subcase; R8-F1 "a's Firebrand stayed free …
+AlreadySatisfied already-satisfied-structural"; R8-F3 compiler, selected-run
+("AlreadySatisfied [f] already-active:f") and Classic ("later-middle:m=Unfulfilled");
+R8-F4 the penalty-removal and unread-relation subcases; R8-F6 both subcases
+(inherited "[ally,caster,near]"; the throwing read escaped as "position
+unreadable"); R9-F1 both views ("Blocked resource-pool-exhausted…0<1");
+R9-F2 the other-caster and unread-origin subcases; R9-F3 prediction
+("[ally,caster,turned]") and confirmation; R9-F4 the never-run-branch
+subcase ("Blocked [] predicted-coverage-empty:caster"); R9-F5 the suppressed
+and sequential subcases. Every control subcase passed on the baseline.
+
+The first complete run after the R9-F1 correction failed 822/3: a general
+same-routine structural grant changed three established contracts (an
+identical parallel timed casting is charged and reported redundant only in
+one pass; strict admission; a five-cast item routine). The rule was narrowed
+to permanent applications (above), not the contracts; then 825/0.
+
+Corrected results (committed source `9b7dc1c`): `missing-beneficial-buffs`
+76/0; complete program 825/0 (35.1 s); explicit capture 1/0 (fixtures
+unchanged, 51 / 61); explicit verify + candidate audit 3/0 (51 identical
+files, 61 types, Dance identical; native-only 1,722 / 16 and full-user
+10,443 / 38 changed dispositions, rows identical apart from the header label;
+classifier `7ce036b7f8529fa4c0b63cfc4f035a53a530aca78299f763a914f3f121346f27`,
+overrides `c462aeb4…`, full reports `803ad0e3…6be7` / `89a1ffe0…84bd`, tables
+`69de998e…3605` / `a5ac1b61…3a89`).
+
+Limits: the cross-caster rule is conservative (a coexisting instance would be
+an unneeded recast, never a false skip); the live existing-effect assessment
+of a skip is not re-checked against another caster's same-routine
+application. The applying caster of an observed instance and the native
+relation reads remain unverified in game (owner acceptance).
+
 ## Rejected approaches
 
 - An `include` override for Good Hope/Firebelly: rejected — it replaces the

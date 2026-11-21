@@ -26,7 +26,11 @@ Call of the Wild installed they are not offered: its patched buffs run an
 action the planner does not classify). After levelling within the same
 resistance tier, re-selecting the active Abjuration resistance costs no use.
 With two wizards, one wizard's active Firebrand never makes the other's
-Firebrand casting free (its immunity is to its own caster's fire). Prayer (an existing spell whose
+Firebrand casting free (its immunity is to its own caster's fire), and after
+the second wizard's Firebrand on the same allies the first wizard's repeat
+casts again; a run confirms a wizard's Firebrand only from that wizard's own
+instance. Selecting the same Abjuration resistance twice in one routine spends
+one use. Prayer (an existing spell whose
 coverage now reads the native ally/enemy check, review round 6): planned
 caster-centred, every in-radius party member is predicted and receives
 Prayer's buff, never its penalty; a failure means the native relation read
