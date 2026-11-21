@@ -474,7 +474,35 @@ namespace KingmakerBuffPlanner.Discovery
             // persistent leaf). A buff the payload grants as a separate
             // ability (Firebelly's breath) is not part of this graph.
             if (HasOffensiveAction(facts)) return true;
+            // Review R5-F2: nor may any applied effect harm its bearer, itself
+            // or through a buff its own automatic actions apply (a Daze the
+            // approved buff applies when it activates); an automatically
+            // applied buff whose blueprint was not read is unproved. A buff
+            // granted as a separate ability (Firebelly's breath, AddFacts)
+            // is not an automatic application.
+            if (effects.Any(e => ImposesHarm(e) || AppliesUnreadEffect(e))) return true;
             return effects.Count == 0 || !effects.All(e => IsProvenBeneficialDespiteAllyDisposition(e, facts));
+        }
+
+        // Review R5-F1/R5-F2: an effect that harms its bearer - explicitly
+        // harmful, a buff that only imposes a harmful condition, or a buff
+        // whose own automatic actions (AddFactContextActions Activated /
+        // NewRound / Deactivated) apply such a buff.
+        private static bool ImposesHarm(NativeCandidateEffectFacts effect)
+        {
+            if (effect == null) return false;
+            if (effect.Harmful == true || IsHarmfulCondition(effect)) return true;
+            return (effect.FactActions ?? new NativeCandidateFactActions[0])
+                .SelectMany(list => list.AppliedEffects ?? new NativeCandidateEffectFacts[0])
+                .Any(applied => applied != null && (applied.Harmful == true || IsHarmfulCondition(applied)));
+        }
+
+        private static bool AppliesUnreadEffect(NativeCandidateEffectFacts effect)
+        {
+            return effect != null && (effect.FactActions ?? new NativeCandidateFactActions[0])
+                .SelectMany(list => list.AppliedEffects ?? new NativeCandidateEffectFacts[0])
+                .Any(applied => applied == null || (applied.Harmful == null &&
+                    (applied.ComponentTypes ?? new string[0]).Count == 0));
         }
 
         // An offensive action anywhere the cast reaches: the ability's own
@@ -506,9 +534,12 @@ namespace KingmakerBuffPlanner.Discovery
         {
             // Review R4-F1: an allied burst that can damage an ally on any
             // reachable branch (or through its payload's own actions) is not
-            // admitted on a unit anchor.
+            // admitted on a unit anchor. Review R5-F1: nor one that applies,
+            // on any branch, an effect harming its bearer (a Daze beside the
+            // beneficial buff), although later rules would drop that leaf
+            // from the payload list - the cast still executes it.
             return (facts.CanTargetSelf || facts.CanTargetFriends) && !facts.CanTargetEnemies &&
-                !facts.IsStickyTouch && !HasOffensiveAction(facts) &&
+                !facts.IsStickyTouch && !HasOffensiveAction(facts) && !effects.Any(ImposesHarm) &&
                 components.Any(value => ShortName(value) == "AbilityTargetsAround") &&
                 effects.Count != 0 &&
                 effects.All(effect => effect != null && effect.Kind == "Buff" &&

@@ -654,6 +654,52 @@ namespace KingmakerBuffPlanner.Domain.Effects
             var referenced = expression as ReferencedAbilityExpression;
             return referenced != null && ContainsLeaf(referenced.Child);
         }
+
+        // Missing-beneficial-buffs review R5-F3: a leaf reached without
+        // passing an UNMODELLED conditional - one whose native checker has
+        // conditions but was expressed as neither a caster- nor a
+        // recipient-fact gate (a single checker mixing both predicate types,
+        // or any other contract). Such a leaf depends on a predicate the
+        // planner cannot evaluate, so it gives no definite coverage. A
+        // conditional with a gate is descended (its unresolved gates are the
+        // caller's to judge); one with no conditions always runs as before.
+        public static bool ContainsDefiniteLeaf(EffectExpression expression)
+        {
+            if (expression is EffectLeafExpression) return true;
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null) return sequence.Children.Any(ContainsDefiniteLeaf);
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+                return !IsUnmodelledConditional(conditional) &&
+                    (ContainsDefiniteLeaf(conditional.WhenTrue) || ContainsDefiniteLeaf(conditional.WhenFalse));
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null) return ContainsDefiniteLeaf(targeted.Child);
+            var referenced = expression as ReferencedAbilityExpression;
+            return referenced != null && ContainsDefiniteLeaf(referenced.Child);
+        }
+
+        public static bool IsUnmodelledConditional(ConditionalEffectExpression conditional)
+        {
+            if (conditional == null || conditional.CasterFactGate != null || conditional.RecipientFactGate != null)
+                return false;
+            string contract = conditional.ConditionContract ?? string.Empty;
+            return contract.Length != 0 && !contract.EndsWith(":", StringComparison.Ordinal);
+        }
+
+        // A caster-fact gate left anywhere in the expression (unread caster fact).
+        public static bool HasCasterGate(EffectExpression expression)
+        {
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+                return conditional.CasterFactGate != null || HasCasterGate(conditional.WhenTrue) ||
+                    HasCasterGate(conditional.WhenFalse);
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null) return sequence.Children.Any(HasCasterGate);
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null) return HasCasterGate(reference.Child);
+            var targeted = expression as TargetedEffectExpression;
+            return targeted != null && HasCasterGate(targeted.Child);
+        }
     }
 
     // A primary recipient is a spell target or one predicted group member.

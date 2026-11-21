@@ -109,8 +109,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                 // Review R4-F5: with no recipient condition, a known-false
                 // caster gate that removed the only application, or an unread
                 // caster gate still controlling it, yields no beneficiaries.
-                bool casterPayload = EffectExpressionAnalysis.ContainsLeaf(casterBound) &&
-                    !HasCasterGate(casterBound);
+                // Review R5-F3: an application behind an unmodelled
+                // conditional (one native checker mixing a caster and a
+                // recipient fact) is not unconditional either.
+                bool casterPayload = EffectExpressionAnalysis.ContainsDefiniteLeaf(casterBound) &&
+                    !EffectExpressionAnalysis.HasCasterGate(casterBound);
                 Func<string, bool?> noFacts = id => null;
                 Func<UnitSnapshot, bool> eligible = unit =>
                 {
@@ -124,8 +127,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                     // caster's Undead Arcana is unread) decides whether it
                     // receives anything: no definite coverage. A branch that
                     // never reads it (a living ally) stays covered.
-                    return !unresolved && EffectExpressionAnalysis.ContainsLeaf(bound) &&
-                        !HasCasterGate(bound);
+                    return !unresolved && EffectExpressionAnalysis.ContainsDefiniteLeaf(bound) &&
+                        !EffectExpressionAnalysis.HasCasterGate(bound);
                 };
                 foreach (string anchorId in anchors)
                 {
@@ -195,20 +198,6 @@ namespace KingmakerBuffPlanner.GameAdapters
                 decision.RecipientIdsByAnchor, casterFacts, effectsByTarget, decision.AffectedIdsByAnchor,
                 decision.FixedRecipientFacts.ToDictionary(pair => pair.Key,
                     pair => (IReadOnlyDictionary<string, bool>)pair.Value, StringComparer.Ordinal));
-        }
-
-        private static bool HasCasterGate(EffectExpression expression)
-        {
-            var conditional = expression as ConditionalEffectExpression;
-            if (conditional != null)
-                return conditional.CasterFactGate != null || HasCasterGate(conditional.WhenTrue) ||
-                    HasCasterGate(conditional.WhenFalse);
-            var sequence = expression as SequenceEffectExpression;
-            if (sequence != null) return sequence.Children.Any(HasCasterGate);
-            var reference = expression as ReferencedAbilityExpression;
-            if (reference != null) return HasCasterGate(reference.Child);
-            var targeted = expression as TargetedEffectExpression;
-            return targeted != null && HasCasterGate(targeted.Child);
         }
 
         private static string[] LegalAnchorIds(IEnumerable<UnitSnapshot> units, Func<string, bool> canTarget)

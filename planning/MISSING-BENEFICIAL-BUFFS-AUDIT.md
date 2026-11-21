@@ -334,7 +334,8 @@ files were restored.
 
 Limits of the round-3 baseline: R3-F4 (the per-unit removal note) is asserted
 later in `…-removal-only-ally-is-counted`, after the R3-F1 assertion that
-already fails on `1bfc198`, so it is masked there and not separately observed.
+already fails on `1bfc198`, so it is masked there and not separately observed
+(review round 5 observed it directly with an isolated reproduction, below).
 The R1-F8 spellbook correction is test evidence (fixture books and pool keys),
 so it passes on either production. To compile the current tests against
 `1bfc198`, the R3-F1 test asserts covered units behaviorally instead of
@@ -354,6 +355,53 @@ apart from the header label).
 Native behavior that stays unverified: which unit facts are fixed is decided
 from the loaded blueprint type (`BlueprintUnitFact` that is not a
 `BlueprintBuff`); an unresolvable fact is treated as mutable (conservative).
+
+## Review round 5
+
+Codex review of `1fa270d` (decision `changes_required`). Verified: R4-F1 to
+R4-F5. Re-opened: R4-F6. New: R5-F1 to R5-F6. All are fixed in the round-5
+corrections commit.
+
+| Finding | Correction | Regression |
+|---|---|---|
+| R4-F6 R3-F4 baseline still masked | An isolated synthetic reproduction (no fixture): a direct casting applies X and removes E on a; a later skip-if-active group casting relies on E on a and b. Executed on `1bfc198` (below) | `…-removed-earlier-note-names-only-the-affected-ally` |
+| R5-F1 harmful buff beside a valid one in a point-capable burst | `IsUnitAnchoredAlliedArea` also refuses any applied effect that harms its bearer (`m_Harmful`, a harmful-condition-only buff, or a buff whose own automatic actions apply one) | `…-point-burst-harmful-buff-refused` (Feather Step, Mass + the committed DazeBuff on its allied actions → excluded by discovery and admission; unmodified spell admitted) |
+| R5-F2 debuff applied on activation under the waiver | The ally-disposition waiver also refuses an effect that harms its bearer through its recorded automatic applications (`FactActions.AppliedEffects`: harmful flag or harmful condition), and an automatic application whose blueprint was not read. A separately granted ability (Firebelly's breath, `AddFacts`) is not an automatic application | `…-payload-activation-debuff-refuses-ally-exception` (GoodHopeBuff `Activated` applies DazeBuff to its bearer; the exporter records the nested `Dazed`; discovery and admission refuse; real Good Hope and Firebelly still admitted) |
+| R5-F3 mixed caster/recipient checker treated as unconditional | Area coverage counts only a leaf not behind an UNMODELLED conditional (non-empty native checker expressed as neither a caster- nor a recipient-fact gate). The exact native `ContextConditionHasBuff` is now modelled as a recipient-fact gate (read like `ContextConditionHasFact`); without that, the remove-opposing / otherwise-apply shape would lose all coverage. The mixed predicate itself is not evaluated: coverage is withheld also when both facts are true | `…-mixed-caster-recipient-condition-withholds-coverage` (arcana false and true → no recipients, Blocked, zero cost) |
+| R5-F4 skip protected an effect on a non-beneficiary | A skip (live or structural) enters conflict state with its beneficiaries' changes only; an executing cast is still analyzed over every unit it reaches | `…-skipped-mass-casting-protects-only-its-recipients` (skip Enlarge over e; Reduce over u, disks overlapping only on reduced h → Ready, one slot; control: a Reduce disk reaching e is refused naming e) |
+| R5-F5 sequential forecasts reused initial beneficiaries | `ProjectedEffectChanges` records each funded casting's/step's bound net changes; in a one-pass sequence a later routine's group beneficiary keeps its claim only if its payload still lands under every value an earlier routine may have left for its condition facts (more than one changed fact, or an unread one, withholds it); nobody left → `predicted-coverage-empty`. The Classic forecast narrows each later occurrence's options the same way. Same-routine changes are left to the removal-conflict guard; independent routine previews are unchanged | `…-sequential-forecast-follows-opposing-casts` (one-pass: Enlarge→a, Reduce→b only, one slot each; independent preview still a,b) and `…-classic-sequential-forecast-follows-opposing-casts` |
+| R5-F6 unfunded mixed casting promised a cast | The ledger refusal finalizes notes like a removal block (shared `BlockedNotes`) | `…-unfunded-mixed-casting-notes-do-not-promise-a-cast` (one slot, Haste first, Good Hope over a longer-buffed and an unbuffed ally → resource refusal, zero cost, "still active (this casting is blocked and does not run)") |
+
+**Executed reproductions.** Same method as round 4 (production files swapped
+by `git show <rev>:<path>`, current tests, complete committed fixtures, then
+restored from HEAD):
+
+| Baseline | Command (`-Only`) | Result | Failed behavioral assertions |
+|---|---|---|---|
+| Round-5 regressions on the production of `1fa270d` (DLL `83ebc6f8…`) | `missing-beneficial-buffs` | 36/7 | point burst + Daze: "admitted: valid-beneficial-party-effect…" (R5-F1); activation Daze: "Good Hope was admitted although its buff dazes its bearer on activation" (R5-F2); mixed condition: "(arcana=False) was treated as unconditional: caster,living,undead Ready 1" (R5-F3); skip: "AlreadySatisfied / Blocked removes-planned-effect:skip:…:h" (R5-F4); one-pass: "Ready a,b" (R5-F5); Classic: "a,b / a=Fulfilled,b=Fulfilled" (R5-F5); unfunded notes: "already active on ally-near (the cast goes ahead for the others)" (R5-F6) |
+| R3-F4 isolated, production of `1bfc198` (DLL `2ea03bb3…`) | `missing-beneficial-buffs-removed-earlier-note-names-only-the-affected-ally,missing-beneficial-buffs-removal-only-ally-is-counted` | 0/2 | isolated: the skip IS refused (first assertion passes), then "b note 'existing-removed-earlier:b:remaining-duration-not-compared' rendered 'active on b now, but an earlier casting in this routine removes it (not skipped, not cast)'" - the R3-F4 defect, observed directly; removal-only: "Ready" (R3-F1, as in round 4) |
+
+For the `1bfc198` run the test helper's `isFixedFact` argument (an API added in
+round 4) was removed temporarily so the tests compile; it was restored
+afterwards. The R5-F5 Classic assertion was split into its own test before the
+recorded run so that it is not masked by the one-pass assertion.
+
+Corrected results, final working tree before commit (DLL `6c04525d…`):
+`missing-beneficial-buffs` 43/0 (5.4 s); complete program 792/0 (35.5 s);
+explicit capture 1/0 (fixture subset unchanged, 48 / 58); explicit verify +
+candidate audit 3/0 (48 identical files, 58 types, Dance identical; 1,722 / 16
+and 10,443 / 48; classifier
+`ce8fadbdd47057367f17c7ca12e3e8b1035eb2fa5db3e53fe9ba41695b44328b`, overrides
+`c462aeb4…`, reports `b5b1a6d1…0d6d` / `0ba8cc7b…209b`, changed rows identical
+apart from the header label).
+
+Limits: the sequential narrowing applies to group castings; a direct-target
+casting keeps its explicit target (the removal-conflict guard protects it
+inside a routine). A mixed caster/recipient checker is never evaluated, so
+such a spell gets no coverage even when it would apply. Native behavior that
+stays unverified: that `ContextConditionHasBuff` is matched by the live
+`Descriptor.HasFact` read used for recipient facts (an unread unit gets no
+coverage claim).
 
 ## Rejected approaches
 

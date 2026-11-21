@@ -383,6 +383,19 @@ namespace KingmakerBuffPlanner.Domain.Planning
             }, out unresolved);
         }
 
+        // Review R5-F5: the same option with narrowed per-anchor beneficiaries
+        // (a sequential forecast's later routine); everything else unchanged.
+        public ProviderPlanningOption WithRecipientIdsByAnchor(
+            IDictionary<string, IEnumerable<string>> recipientIdsByAnchor)
+        {
+            return new ProviderPlanningOption(Provider, ReachableTargetIds, LegalAnchorIds, EffectiveCasterLevel,
+                ExpectedDurationRounds, ExecutionStrategy, ExecutionStrategyReason, recipientIdsByAnchor,
+                CasterFacts, EffectsByTarget,
+                AffectedIdsByAnchor.ToDictionary(pair => pair.Key, pair => (IEnumerable<string>)pair.Value,
+                    StringComparer.Ordinal),
+                FixedRecipientFacts.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+        }
+
         // The units an anchor's native actions reach (beneficiaries and units
         // that only lose an effect); the covered units when not recorded.
         public IReadOnlyList<string> AffectedTargetIdsForAnchor(string anchorUnitId)
@@ -409,6 +422,110 @@ namespace KingmakerBuffPlanner.Domain.Planning
             return new ReadOnlyCollection<string>((values ?? new string[0])
                 .Where(v => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.Ordinal)
                 .OrderBy(v => v, StringComparer.Ordinal).ToList());
+        }
+    }
+
+    // Missing-beneficial-buffs review R5-F5: what earlier castings of a
+    // sequential forecast may have done to each unit's effects (from their
+    // provider-bound net changes), and whether a later group casting's
+    // predicted beneficiary still receives its payload. A beneficiary was
+    // eligible with the starting value of every condition fact; an earlier
+    // casting can only have changed a fact to the values recorded here
+    // (possibly applied: true; possibly removed: false; certainly applied:
+    // only true). The unit keeps its coverage claim only if its payload still
+    // lands under every such value; a condition the projection cannot decide
+    // (more than one changed fact, or an unread one left on its path)
+    // withholds the claim. Only changes of EARLIER routines count: inside one
+    // routine the removal-conflict guard already refuses a casting that
+    // undoes an earlier one, with its more specific reason.
+    public sealed class ProjectedEffectChanges
+    {
+        private readonly List<KeyValuePair<string, EffectChanges>> _recorded =
+            new List<KeyValuePair<string, EffectChanges>>();
+
+        public void Record(EffectChanges changes, string routineId)
+        {
+            if (changes != null)
+                _recorded.Add(new KeyValuePair<string, EffectChanges>(routineId ?? string.Empty, changes));
+        }
+
+        // unit -> effect -> the values earlier routines may have left.
+        private Dictionary<string, Dictionary<string, HashSet<bool>>> ValuesBefore(string routineId)
+        {
+            var values = new Dictionary<string, Dictionary<string, HashSet<bool>>>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, EffectChanges> entry in _recorded)
+            {
+                if (string.Equals(entry.Key, routineId ?? string.Empty, StringComparison.Ordinal)) continue;
+                foreach (KeyValuePair<string, string> key in entry.Value.Applied) Values(values, key).Add(true);
+                foreach (KeyValuePair<string, string> key in entry.Value.Removed) Values(values, key).Add(false);
+                foreach (KeyValuePair<string, string> key in entry.Value.Guaranteed)
+                {
+                    HashSet<bool> set = Values(values, key);
+                    set.Clear();
+                    set.Add(true);
+                }
+            }
+            return values;
+        }
+
+        public bool KeepsCoverage(ProviderPlanningOption option, EffectExpression expression, string unit,
+            string routineId)
+        {
+            return KeepsCoverage(option, expression, unit, ValuesBefore(routineId));
+        }
+
+        private static bool KeepsCoverage(ProviderPlanningOption option, EffectExpression expression, string unit,
+            Dictionary<string, Dictionary<string, HashSet<bool>>> values)
+        {
+            Dictionary<string, HashSet<bool>> changed;
+            if (option == null || expression == null || unit == null || !values.TryGetValue(unit, out changed))
+                return true;
+            EffectExpression bound = option.BindForRecipient(expression, unit);
+            List<string> touched = EffectRecipientFactBinding.FactIds(bound).Where(changed.ContainsKey).ToList();
+            if (touched.Count == 0) return true;
+            if (touched.Count > 1) return false;
+            string fact = touched[0];
+            foreach (bool value in changed[fact])
+            {
+                bool unresolved;
+                EffectExpression selected = EffectRecipientFactBinding.Bind(bound,
+                    id => id == fact ? value : (bool?)null, out unresolved);
+                if (unresolved || !EffectExpressionAnalysis.ContainsDefiniteLeaf(selected) ||
+                    EffectExpressionAnalysis.HasCasterGate(selected))
+                    return false;
+            }
+            return true;
+        }
+
+        // The option with every anchor's beneficiaries narrowed to those that
+        // keep their coverage claim (the option itself when none changes).
+        public ProviderPlanningOption Narrow(ProviderPlanningOption option, EffectExpression expression,
+            string routineId)
+        {
+            if (option == null || expression == null || option.RecipientIdsByAnchor.Count == 0) return option;
+            Dictionary<string, Dictionary<string, HashSet<bool>>> values = ValuesBefore(routineId);
+            if (values.Count == 0) return option;
+            bool changedAny = false;
+            var narrowed = new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, IReadOnlyList<string>> pair in option.RecipientIdsByAnchor)
+            {
+                List<string> kept = pair.Value.Where(unit => KeepsCoverage(option, expression, unit, values)).ToList();
+                changedAny |= kept.Count != pair.Value.Count;
+                narrowed[pair.Key] = kept;
+            }
+            return changedAny ? option.WithRecipientIdsByAnchor(narrowed) : option;
+        }
+
+        private static HashSet<bool> Values(Dictionary<string, Dictionary<string, HashSet<bool>>> all,
+            KeyValuePair<string, string> key)
+        {
+            Dictionary<string, HashSet<bool>> effects;
+            if (!all.TryGetValue(key.Key ?? string.Empty, out effects))
+                all[key.Key ?? string.Empty] = effects = new Dictionary<string, HashSet<bool>>(StringComparer.Ordinal);
+            HashSet<bool> values;
+            if (!effects.TryGetValue(key.Value ?? string.Empty, out values))
+                effects[key.Value ?? string.Empty] = values = new HashSet<bool>();
+            return values;
         }
     }
 

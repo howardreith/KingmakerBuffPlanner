@@ -100,10 +100,24 @@ namespace KingmakerBuffPlanner.UI
             var optionsByProvider = new Dictionary<string, ProviderPlanningOption>(StringComparer.Ordinal);
             foreach (ProviderPlanningOption option in providerOptions ?? new ProviderPlanningOption[0])
                 if (option != null) optionsByProvider[option.Provider.Key.Canonical] = option;
+            // Missing-beneficial-buffs review R5-F5: what earlier occurrences'
+            // funded steps may have changed on each unit; a later occurrence's
+            // group beneficiaries are narrowed to those whose payload still
+            // lands (Mass Reduce on an ally an earlier Mass Enlarge reached
+            // removes Enlarge instead of applying Reduce).
+            var sequenceChanges = new ProjectedEffectChanges();
 
             foreach (string routineId in routineIdsInOrder
                 .Distinct(StringComparer.Ordinal))
             {
+                List<ProviderPlanningOption> occurrenceOptions = (providerOptions ?? new ProviderPlanningOption[0])
+                    .Where(option => option != null)
+                    .Select(option =>
+                    {
+                        EffectExpression payload;
+                        return effectsBySource.TryGetValue(option.Provider.Key.Ability.Canonical, out payload)
+                            ? sequenceChanges.Narrow(option, payload, routineId) : option;
+                    }).ToList();
                 PartyProviderSnapshot occurrenceSnapshot = BuildSnapshot(
                     snapshot, poolRemaining, poolTokens, materialRemaining,
                     enhancements, enhancementCharges);
@@ -116,7 +130,7 @@ namespace KingmakerBuffPlanner.UI
                 var service = new RoutinePlanService();
                 RoutinePlanResult result = service.Plan(profile, routineId,
                     occurrenceSnapshot, projectedActive, effectsBySource,
-                    providerOptions, BuildEnhancements(enhancements,
+                    occurrenceOptions, BuildEnhancements(enhancements,
                         enhancementCharges), targeting);
                 occurrences.Add(new Occurrence(routineId, result.Plan));
                 // Carry forward only what this occurrence actually committed.
@@ -183,7 +197,9 @@ namespace KingmakerBuffPlanner.UI
                     // no longer carried forward as active.
                     ProviderPlanningOption stepOption;
                     optionsByProvider.TryGetValue(step.Provider.Canonical, out stepOption);
-                    foreach (KeyValuePair<string, string> removal in ProjectRemovals(step, stepOption))
+                    EffectChanges stepChanges = StepChanges(step, stepOption);
+                    sequenceChanges.Record(stepChanges, routineId);
+                    foreach (KeyValuePair<string, string> removal in stepChanges.Removed)
                     {
                         HashSet<ActiveEffectMarker> markers;
                         if (carriedEffects.TryGetValue(removal.Key, out markers))
@@ -308,10 +324,10 @@ namespace KingmakerBuffPlanner.UI
         // their targeting structure names. Conditional alternatives and any
         // unrecognized node stay unproven — later demand for them remains a
         // conservative estimate instead of a free already-active skip.
-        // Owner unit -> effect pairs the step may remove (any realizable
+        // The step's provider-bound net changes: owner unit -> effect pairs it
+        // may apply, certainly leaves applied, and may remove (any realizable
         // branch; a certain later re-application on the same path cancels).
-        private static IEnumerable<KeyValuePair<string, string>> ProjectRemovals(CastStep step,
-            ProviderPlanningOption option)
+        private static EffectChanges StepChanges(CastStep step, ProviderPlanningOption option)
         {
             IEnumerable<string> recipients = step.ExpectedRecipientUnitIds.Count != 0
                 ? step.ExpectedRecipientUnitIds : step.TargetUnitIds;
@@ -322,7 +338,7 @@ namespace KingmakerBuffPlanner.UI
             return EffectChanges.Merge(recipients.Select(recipient =>
                 EffectChangeAnalysis.Analyze(option == null ? step.ExpectedEffects
                     : option.BindForRecipient(step.ExpectedEffects, recipient),
-                    step.Provider.CasterUnitId, recipient))).Removed;
+                    step.Provider.CasterUnitId, recipient)));
         }
 
         private static IEnumerable<ProjectedEffect> ProjectEffects(CastStep step)

@@ -425,8 +425,13 @@ namespace KingmakerBuffPlanner.GameAdapters
         // Missing-beneficial-buffs review R2-F5: a conditional whose every
         // condition is the exact native ContextConditionHasFact (a fact of the
         // unit the action runs on: Mass Blessing of Luck and Resolve skips
-        // constructs and undead this way) is a recipient-fact gate. Any other
-        // contract stays unresolved.
+        // constructs and undead this way) is a recipient-fact gate. Review
+        // R5-F3: so is the exact native ContextConditionHasBuff (a buff of
+        // that unit, such as an opposing debuff a spell removes), which the planner
+        // reads the same way; once unmodelled conditionals withhold coverage,
+        // leaving it unmodelled would deny every such remove-opposing /
+        // otherwise-apply spell its coverage. Any other contract (a checker
+        // mixing caster and recipient predicates included) stays unresolved.
         private static RecipientFactGate RecipientGate(Conditional conditional)
         {
             var checker = conditional.ConditionsChecker;
@@ -435,9 +440,20 @@ namespace KingmakerBuffPlanner.GameAdapters
             foreach (Condition condition in checker.Conditions)
             {
                 var fact = condition as ContextConditionHasFact;
-                if (fact == null || fact.GetType() != typeof(ContextConditionHasFact) || fact.Fact == null ||
-                    string.IsNullOrWhiteSpace(fact.Fact.AssetGuid)) return null;
-                facts.Add(new KeyValuePair<string, bool>(fact.Fact.AssetGuid, fact.Not));
+                if (fact != null && fact.GetType() == typeof(ContextConditionHasFact) && fact.Fact != null &&
+                    !string.IsNullOrWhiteSpace(fact.Fact.AssetGuid))
+                {
+                    facts.Add(new KeyValuePair<string, bool>(fact.Fact.AssetGuid, fact.Not));
+                    continue;
+                }
+                var buff = condition as ContextConditionHasBuff;
+                if (buff != null && buff.GetType() == typeof(ContextConditionHasBuff) && buff.Buff != null &&
+                    !string.IsNullOrWhiteSpace(buff.Buff.AssetGuid))
+                {
+                    facts.Add(new KeyValuePair<string, bool>(buff.Buff.AssetGuid, buff.Not));
+                    continue;
+                }
+                return null;
             }
             string operation = checker.Operation.ToString();
             return operation == "And" || operation == "Or" ? new RecipientFactGate(operation == "Or", facts) : null;

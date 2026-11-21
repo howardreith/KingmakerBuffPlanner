@@ -165,6 +165,22 @@ namespace KingmakerBuffPlanner.Planning
                 ExecutionStrategy, ExecutionStrategyReason, RequiredItemSelector);
         }
 
+        // Review R5-F5: the same casting with narrowed predicted beneficiaries
+        // (a sequential forecast found an earlier casting changes what the
+        // payload does to the others).
+        internal ResolvedCasting WithPredictedBeneficiaries(IReadOnlyList<string> beneficiaries)
+        {
+            return new ResolvedCasting(
+                CastingId, RoutineId, Order, SourceId, Ability, CasterUnitId,
+                Provider, TargetMode, DirectTargetUnitId, Origin,
+                RequiredCoverageUnitIds, new ReadOnlyCollection<string>(beneficiaries.ToList()), CoverageGaps,
+                TargetingModifiers, Enhancements, AppliedEnhancementIds,
+                OmittedEnhancementIds, ExistingEffectPolicy, IgnoredPresenceMarkers,
+                Readiness, ReadinessReasons, CapableCasterUnitIds, Provenance, Cost,
+                ExistingEffectNotes, CostShape, PreCoveredUnitIds,
+                ExecutionStrategy, ExecutionStrategyReason, RequiredItemSelector);
+        }
+
         public string CastingId { get; private set; }
         public string RoutineId { get; private set; }
         public int Order { get; private set; }
@@ -344,8 +360,14 @@ namespace KingmakerBuffPlanner.Planning
             var grantEffects = new Dictionary<string, Dictionary<string, HashSet<string>>>(
                 StringComparer.Ordinal);
             var finalized = new List<ResolvedCasting>();
-            foreach (ResolvedCasting casting in castings)
+            // Review R5-F5: what earlier funded castings may have changed on
+            // each unit. Read only in a one-pass sequence view, and only for
+            // earlier routines; an independent routine preview starts from its
+            // own snapshot.
+            var projection = new ProjectedEffectChanges();
+            foreach (ResolvedCasting compiled in castings)
             {
+                ResolvedCasting casting = compiled;
                 List<CastEnhancementSnapshot> matched;
                 matchedEnhancements.TryGetValue(casting.CastingId, out matched);
                 ProviderSnapshot provider;
@@ -367,9 +389,40 @@ namespace KingmakerBuffPlanner.Planning
                             ? intended : matched, modifierDemands));
                 ProviderPlanningOption resolved;
                 resolvedOptions.TryGetValue(casting.CastingId, out resolved);
+                // Review R5-F5: a group casting's predicted beneficiary keeps
+                // its claim only while its payload still lands under what
+                // earlier funded castings may have changed (Mass Reduce on an
+                // ally an earlier Mass Enlarge reached removes Enlarge
+                // instead). Nobody left: nothing to cast for.
+                if (projectEffects && casting.Readiness == ResolvedCastingReadiness.Ready &&
+                    casting.TargetMode != CastingTargetMode.DirectTarget && resolved != null)
+                {
+                    EffectExpression payload = DiscoveredEffectLookup.ForAbility(
+                        effectsBySource, casting.Ability, casting.SourceId);
+                    List<string> kept = casting.PredictedBeneficiaryUnitIds
+                        .Where(unit => projection.KeepsCoverage(resolved, payload, unit, casting.RoutineId)).ToList();
+                    if (kept.Count == 0 && casting.PredictedBeneficiaryUnitIds.Count != 0)
+                    {
+                        string anchor = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
+                            ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
+                        finalized.Add(casting.WithBudgetResult(ResolvedCastingReadiness.Blocked,
+                            casting.ReadinessReasons.Concat(new[] { "predicted-coverage-empty:" + anchor })
+                                .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)
+                                .ToList(),
+                            new CastingCostLine[0], shape, BlockedNotes(casting, null)));
+                        continue;
+                    }
+                    if (kept.Count != casting.PredictedBeneficiaryUnitIds.Count)
+                        casting = casting.WithPredictedBeneficiaries(kept);
+                }
+                // Review R5-F4: a skip changes nothing; it protects only the
+                // effects on the recipients its satisfaction rests on (its
+                // beneficiaries), not every unit inside its burst. A cast that
+                // executes is analyzed over every unit it reaches.
                 EffectChanges changes = casting.Readiness == ResolvedCastingReadiness.Ready ||
                     casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied
-                    ? ChangesFor(casting, resolved, effectsBySource) : null;
+                    ? ChangesFor(casting, resolved, effectsBySource,
+                        casting.Readiness == ResolvedCastingReadiness.Ready) : null;
                 string removalConflict;
                 if (casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied)
                 {
@@ -395,7 +448,9 @@ namespace KingmakerBuffPlanner.Planning
                     casting.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive &&
                     IsStructurallySatisfied(casting, matched, grantedByUnit))
                 {
-                    removalState.Admit(casting.RoutineId, casting.CastingId, changes, false);
+                    // R5-F4: like a live skip, only its beneficiaries' effects.
+                    removalState.Admit(casting.RoutineId, casting.CastingId,
+                        ChangesFor(casting, resolved, effectsBySource, false), false);
                     finalized.Add(casting.WithBudgetResult(
                         ResolvedCastingReadiness.AlreadySatisfied,
                         new[] { "already-satisfied-structural" },
@@ -415,7 +470,11 @@ namespace KingmakerBuffPlanner.Planning
                     // An out-of-scope casting is not budget-checked in this
                     // view; it keeps its compile-time readiness, so it
                     // constrains the rest of its own routine provisionally.
-                    if (outOfScope) removalState.Admit(casting.RoutineId, casting.CastingId, changes);
+                    if (outOfScope)
+                    {
+                        removalState.Admit(casting.RoutineId, casting.CastingId, changes);
+                        projection.Record(changes, casting.RoutineId);
+                    }
                 }
                 if (casting.Readiness != ResolvedCastingReadiness.Ready || outOfScope)
                 {
@@ -435,6 +494,7 @@ namespace KingmakerBuffPlanner.Planning
                     // R1-F2: only a funded casting enters the routine's
                     // removal state.
                     removalState.Admit(casting.RoutineId, casting.CastingId, changes);
+                    projection.Record(changes, casting.RoutineId);
                     if (projectEffects)
                     {
                         // R1-F4: the one-pass sequence forgets a structural
@@ -449,8 +509,12 @@ namespace KingmakerBuffPlanner.Planning
                     .Concat(new[] { reason })
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(value => value, StringComparer.Ordinal).ToList();
+                // Review R5-F6: a casting the shared ledger refuses does not
+                // run either; its notes say so (effects an earlier admitted
+                // casting removes are named as removed).
                 finalized.Add(casting.WithBudgetResult(
-                    ResolvedCastingReadiness.Blocked, reasons, new CastingCostLine[0], shape));
+                    ResolvedCastingReadiness.Blocked, reasons, new CastingCostLine[0], shape,
+                    BlockedNotes(casting, removalState.OwnersRemovedByEarlier(casting.RoutineId, changes))));
             }
             AddDuplicateRequestWarnings(finalized, diagnostics);
             return new ExplicitCastingPlan(finalized, diagnostics, ledger.BuildReport(),
@@ -862,7 +926,7 @@ namespace KingmakerBuffPlanner.Planning
         // predicted recipients, from the same provider binding execution
         // uses (caster facts; nearby-recipient selection per target).
         private static EffectChanges ChangesFor(ResolvedCasting casting, ProviderPlanningOption option,
-            IReadOnlyDictionary<string, EffectExpression> effectsBySource)
+            IReadOnlyDictionary<string, EffectExpression> effectsBySource, bool includeAffected = true)
         {
             if (option == null) return null;
             EffectExpression expression = DiscoveredEffectLookup.ForAbility(
@@ -871,9 +935,10 @@ namespace KingmakerBuffPlanner.Planning
             // Review R3-F1: a group cast's native actions reach every unit
             // inside its burst, including an ally that only LOSES an effect
             // (Mass Reduce on an enlarged ally) and so is not a predicted
-            // beneficiary; its removals are analyzed too.
+            // beneficiary; its removals are analyzed too. Review R5-F4: a
+            // skip runs nothing, so only its beneficiaries count.
             IEnumerable<string> reached = casting.PredictedBeneficiaryUnitIds;
-            if (casting.TargetMode != CastingTargetMode.DirectTarget)
+            if (includeAffected && casting.TargetMode != CastingTargetMode.DirectTarget)
             {
                 string anchor = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
                     ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
@@ -890,14 +955,27 @@ namespace KingmakerBuffPlanner.Planning
             IReadOnlyList<string> shape, List<string> diagnostics, ICollection<string> removedOwners = null)
         {
             diagnostics.Add(reason + ":by:" + casting.CastingId);
-            // Review R1-F1/R3-F4: an invalidated skip no longer says "already
-            // active (skipped)". Only a recipient whose effect the earlier
-            // casting removes is described as losing it; another recipient
-            // is described as still active (the blocked casting does not run).
-            // Review R4-F4: the same holds for every note of a mixed group
-            // casting - none may still say the cast goes ahead, may shorten
-            // an effect, or will (re)cast.
-            IReadOnlyList<string> notes = casting.ExistingEffectNotes.Select(note =>
+            return casting.WithBudgetResult(ResolvedCastingReadiness.Blocked,
+                casting.ReadinessReasons
+                    .Where(value => !value.StartsWith("already-active:", StringComparison.Ordinal))
+                    .Concat(new[] { reason }).Distinct(StringComparer.Ordinal)
+                    .OrderBy(value => value, StringComparer.Ordinal).ToList(),
+                new CastingCostLine[0], shape, BlockedNotes(casting, removedOwners));
+        }
+
+        // The existing-effect notes of a casting that does not run (blocked
+        // for a removal conflict, by the shared ledger, or with no
+        // beneficiary left).
+        // Review R1-F1/R3-F4: an invalidated skip no longer says "already
+        // active (skipped)". Only a recipient whose effect an earlier
+        // casting removes is described as losing it; another recipient is
+        // described as still active (the blocked casting does not run).
+        // Review R4-F4/R5-F6: the same holds for every note of a mixed group
+        // casting - none may still say the cast goes ahead, may shorten an
+        // effect, or will (re)cast.
+        private static IReadOnlyList<string> BlockedNotes(ResolvedCasting casting, ICollection<string> removedOwners)
+        {
+            return casting.ExistingEffectNotes.Select(note =>
             {
                 string present = new[] { "already-active:", "already-covered:", "already-covered-longer:",
                     "existing-active-recast:" }.FirstOrDefault(prefix =>
@@ -914,12 +992,6 @@ namespace KingmakerBuffPlanner.Planning
                     note.StartsWith(prefix, StringComparison.Ordinal));
                 return partial == null ? note : ExistingNotCastBlockedNote + note.Substring(partial.Length);
             }).ToList();
-            return casting.WithBudgetResult(ResolvedCastingReadiness.Blocked,
-                casting.ReadinessReasons
-                    .Where(value => !value.StartsWith("already-active:", StringComparison.Ordinal))
-                    .Concat(new[] { reason }).Distinct(StringComparer.Ordinal)
-                    .OrderBy(value => value, StringComparer.Ordinal).ToList(),
-                new CastingCostLine[0], shape, notes);
         }
 
         // Existing-effect note of a skip an earlier casting invalidates:
