@@ -399,3 +399,57 @@ The final report states:
 
 The endpoint is a reviewed draft PR awaiting owner review, or an accurately
 reported blocker with the work preserved.
+
+## 9. Owner addendum of 2026-11-21: in-game checks move to owner acceptance
+
+This addendum is an explicit owner decision. Where it conflicts with sections
+2, 5 or 8, this section governs.
+
+Background: the first enrollment of this mission stopped `BLOCKED` before any
+review because (1) the lab deployment lock is still held by transaction
+`zhcn19-zh-auto-01` in `ModsRestoredPendingDisplay` (display geometry
+mismatch), so every guarded launch refuses, and (2) the automation fixture
+party has none of the repaired spells, and the casting scenarios cannot select
+them. Offline work was committed at `9220f904def438ed809f9eeab3d78eb2b0d74e3c`.
+
+Decision (owner option B):
+
+1. **Automated native/in-game checks are not required for this mission.** The
+   owner will test the change in their own game after the independent reviewer
+   judges the code ready. Do not start guarded runtime launches, create
+   fixtures, extend the runtime harness, or touch the `zhcn19-zh-auto-01`
+   transaction, display recovery or launcher safeguards for this mission.
+2. **Everything else stays required.** The offline regression coverage of
+   section 4 (adapter → scanner → classifier → provider/catalog, faithful
+   blueprint fixtures with the misleading native flags retained, baseline
+   reproductions, negative controls), the candidate audit of section 3D, and
+   assembly-backed contract checks where available remain required in full.
+3. **Honesty about native behavior.** No document, report or test name may
+   claim in-game verification. Native behavior that only the game can confirm
+   (for example whether native `CanTarget` admits a unit target for the
+   point-anchored group spells) must be stated as unverified. Where the code
+   depends on such behavior, it must fail closed (refuse to plan or cast, with
+   a truthful reason) rather than assume success, and that fail-closed path
+   needs offline coverage.
+4. **Owner acceptance checklist.** Add a concise, specific in-game checklist
+   for this change to `docs/MANUAL-ACCEPTANCE.md`, covering at least: Good Hope
+   listed for a bard who knows it, cast on a legal target, one slot spent, the
+   buff only on in-radius allies, Crushing Despair branch behavior if the owner
+   can arrange it; Haste still listed; Firebelly listed and its breath not
+   listed; Abjuration resistance select, re-select (no cast) and switch (one
+   use, previous resistance removed; the native resource is 1 use per day);
+   Mass Feather Step (or another admitted point-capable group spell) planned on
+   a unit anchor with only in-radius allies covered; reopening the planner
+   keeps the entries. State what each check proves and what a failure would
+   mean.
+5. **Review bar.** The reviewer judges the code and offline evidence against
+   this amended contract. The absence of automated native evidence is, by this
+   owner decision, not by itself a readiness blocker; it is recorded as
+   remaining owner review. Unsupported claims of native verification, missing
+   fail-closed handling for unverified native contracts, or gaps in the
+   required offline coverage remain blocking. Agent agreement still does not
+   establish gameplay behavior; `AWAITING_OWNER_REVIEW` means "code reviewed,
+   in-game acceptance pending with the owner".
+6. Update the existing blocker/resume records so the native-check blocker for
+   this mission reads as superseded by this owner decision (the `zhcn19` lab
+   lock itself remains a separate, still-open lab item).
