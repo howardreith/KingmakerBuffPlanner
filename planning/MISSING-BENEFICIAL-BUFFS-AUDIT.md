@@ -673,6 +673,49 @@ read (`IsAlly` / `IsEnemy`), the applying caster of a buff, and cross-caster
 Firebrand coexistence stay unverified in game (owner acceptance), and every
 planner decision that depends on them fails closed.
 
+## Review round 11
+
+Codex review of `de20c98` (decision `changes_required`). Verified: R8-F2,
+R8-F3, R8-F6, R9-F1, R9-F3, R10-F2, R10-F4. Re-opened: R10-F1, R10-F3, R8-F1,
+R9-F4, R9-F5. New: R11-F1 to R11-F5. All are fixed in the round-11
+corrections commit (`c64a34f`).
+
+| Finding | Correction | Regression |
+|---|---|---|
+| R10-F1 an unread ally relation became definite after a funded cast | A unit an Ally-only selector may skip (relation not read as allied) gets only possible changes in the sequential recipient state (nothing definite); `EffectiveTargeting.WithStrategy` keeps `RequiresAllyRelation` | `…-unread-ally-relation-never-becomes-definite` (two bards; m under Despair, unread for A and allied for B: after A's funded cast B does not promise m; a strategy-changing copy (native-command rod) keeps the restriction when recomputed) |
+| R10-F3 the Firebelly test bypassed prepared slots | Test: the native prepared cleric spellbook (`4673d19a…`, captured into the fixtures) carries Firebelly at level 1; one memorized slot; the cast reserves that token; the breath's single trace is the discovery refusal (no beneficial trace, no effect entry) | `…-firebelly-reaches-the-castable-catalogue` (rewritten) |
+| R8-F1 Firebrand reassessment used the wrong units | Caster-relative invalidation uses each leaf's landing units (`EffectApplicationLifetime.CasterRelativeRoles`: the caster only for a caster-role leaf, otherwise the direct target or the selected disk); a Ready row resting on the same evidence is re-assessed too, refreshing its pre-covered credit and notes | `…-firebrand-reassessment-uses-landing-units` (b's remote ally anchor excludes b: a's skip on b stays free; a partially covered a row drops the pre-covered credit b's overlap may have replaced) |
+| R9-F4 a known outer condition left an unreachable relation veto | Relation eligibility follows the recipient's selected path (`HostileOnPath`: read non-relation gates select their branch first) in prediction, recomputation and Classic skips | `…-known-outer-condition-makes-relation-unreachable` (Prayer rebuilt with a fixed creature-fact outer condition: the hostile-read member with the fact keeps coverage, recomputed coverage, and a Classic skip) |
+| R9-F5 Classic kept another caster's Firebrand on a possibly reached unit | The Classic forecast voids other casters' carried caster-relative instances on every unit a step may reach, independently of projecting the step's benefit onto confirmed recipients | `…-classic-firebrand-possible-replacement-invalidates` (m's relation to b unread: a's next-routine request for m is paid; disjoint b disk: free) |
+| R11-F1 an independent on-cast action bypassed whole-cast safety | The shared facts report a non-trivial `AbilityExecuteActionOnCast` list (anything beyond presentation, or unreadable) as an `on-cast-action` diagnostic, which refuses the whole-cast exceptions; the discovered graph is unchanged | `…-on-cast-action-refuses-point-admission` (Feather Step, Mass plus a damaging on-cast list: refused by discovery and provider admission; original admitted) |
+| R11-F2 Classic spent two Good Hope slots where one centre covered both | Classic ranks legal, conflict-free mass centres by outstanding requested coverage; being requested only breaks ties | `…-classic-mass-centre-covers-most-requested` (allies at 0 and 20 ft, one slot: the 10-ft ally is the centre, one step, both fulfilled) |
+| R11-F3 a saved Prayer forecast applied its friendly branch to hostile members | The sequence forecast resolves the complete expression by the step's provider ability (`DiscoveredEffectLookup.ForAbility`), so a saved aggregate source id no longer falls back to the confirmation expression | `…-saved-prayer-forecast-uses-complete-expression` (catalogue-saved Prayer, canonical-keyed effects, a hostile-branch member; a later PrayerBuff-gated Feather Step does not reach it) |
+| R11-F4 Firebelly planning bypassed the live caster and owner verdict | A personal cast's owner is a legal anchor only with a readable live caster and native `CanTarget` admitting it | `…-personal-cast-needs-live-owner-verdict` (unreadable caster, refused owner: no anchor, no reservation, no step; accepted owner: one slot) |
+| R11-F5 area coverage accepted distances beyond the recorded radius | Coverage uses the recorded radius exactly (no margin without native evidence) and needs a finite, positive radius | `…-area-boundary-is-the-recorded-radius` (4.57 m in, 4.575 m out of the 4.572 m disk; infinite and NaN radius: no centre, no reservation) |
+
+**Executed reproductions** on the production of `de20c98` (eight files
+swapped by `git show de20c98:<path>`, current tests and the 52/62 fixtures;
+the new `OnCastActionCode` constant was replaced by its literal for that run;
+everything restored from `c64a34f` and the tree verified clean):
+`missing-beneficial-buffs` 87/9 (DLL `14addbf7…`). All nine new regressions
+failed on their target subcases (the prepared Firebelly test passes on the
+baseline: R10-F3 is an evidence gap); the on-cast subcase failed at its first
+assertion (the diagnostic), so its admission assertion was not reached there.
+Every control subcase passed.
+
+Corrected results (committed source `c64a34f`): `missing-beneficial-buffs`
+96/0; complete program 845/0 (37.2 s); explicit capture 1/0 (fixtures 52 /
+62: the cleric spellbook added in full, its spells table as a reference);
+explicit verify + candidate audit 3/0 (52 identical files, 62 types, Dance
+identical; native-only 16 of 1,722 and full-user 38 of 10,443 changed
+dispositions; classifier unchanged `7eb7fcf09bcc…`, tables unchanged).
+
+Limits: the historical exports predate the on-cast facts, so the R11-F1 rule
+cannot fire in the inventory audit; among the committed native fixtures only
+Firebelly's breath (excluded) carries `AbilityExecuteActionOnCast` (Physical
+Enhancement is not in the fixtures). The native selector boundary (any margin
+or corpulence term) is unverified, so the planner uses the recorded radius.
+
 ## Rejected approaches
 
 - An `include` override for Good Hope/Firebelly: rejected — it replaces the
