@@ -21,7 +21,11 @@ any failure.
 
 Optional, same rules: Physical Enhancement selections (transmuter) behave like
 checks 5–7; Enlarge/Reduce Person, Mass behave like check 8, and planning both
-on the same allies in one routine is refused.
+on the same allies in one routine is refused. Prayer (an existing spell whose
+coverage now reads the native ally/enemy check, review round 6): planned
+caster-centred, every in-radius party member is predicted and receives
+Prayer's buff, never its penalty; a failure means the native relation read
+differs from the offline model.
 
 Use the [Chinese-player review guide](LOCALIZATION.md#glossary-and-player-review) and [guarded candidate procedure](LOCALIZATION.md#runtime-acceptance) for localization acceptance.
 

@@ -401,7 +401,68 @@ inside a routine). A mixed caster/recipient checker is never evaluated, so
 such a spell gets no coverage even when it would apply. Native behavior that
 stays unverified: that `ContextConditionHasBuff` is matched by the live
 `Descriptor.HasFact` read used for recipient facts (an unread unit gets no
-coverage claim).
+coverage claim). (Superseded in review round 6: the buff predicate now uses
+its exact native read, assembly-backed.)
+
+## Review round 6
+
+Codex review of `0f253aa` (decision `changes_required`). Verified: R4-F6,
+R5-F3, R5-F4. Re-opened: R5-F1, R5-F2, R5-F5, R5-F6. New: R6-F1 to R6-F3. All
+are fixed in the round-6 corrections commit (`3b24210`).
+
+**Assembly-backed observations** (no game launch): the test
+`…-native-condition-contracts-pinned` decodes the IL of the referenced 2.1.7b
+`Assembly-CSharp` and asserts:
+
+| Native member | Observed check |
+|---|---|
+| `ContextConditionHasBuff.CheckCondition` | `Target.Unit.Descriptor.Buffs` → `FactCollection.HasFact(Buff)` |
+| `ContextConditionHasFact.CheckCondition` | `UnitHelper.HasFact(Target.Unit.Descriptor, Fact)` |
+| `ContextConditionIsEnemy` / `IsAlly.CheckCondition` | `Target.Unit.IsEnemy` / `IsAlly(Context.MaybeCaster)` |
+| `ConditionsChecker.Check` | `if (!HasConditions) return true;` first |
+
+and that the planner's live read `NativeRecipientFactRead.Read` (new, beside
+the adapter; the option builder calls it) makes exactly those calls.
+
+| Finding | Correction | Regression |
+|---|---|---|
+| R5-F1 penalty-only buff in a point-capable burst | The exporter records `modifierSigns` (per component with a native `ModifierDescriptor`: Penalty descriptor or constant negative value = penalty; constant positive = bonus; otherwise unknown). A buff whose every mechanic is a penalty modifier (bookkeeping and do-nothing actions aside) harms its bearer; point admission refuses it. Enlarge/Reduce (size change plus a +2) stay mixed | `…-point-burst-penalty-buff-refused` (Feather Step, Mass repointed to the committed Crushing Despair → refused by discovery and admission; Feather Step, Enlarge and Reduce Mass admitted) |
+| R5-F2 automatic penalty under the waiver | The waiver requires every automatic application of an approved buff to be an approved payload itself (a readable penalty included) | `…-payload-activation-penalty-refuses-ally-exception` (GoodHopeBuff activation applies Crushing Despair; exporter records it; discovery and admission refuse; Good Hope and Firebelly admitted) |
+| R5-F5 empty projection kept beneficiaries | The projected (empty) list is stored before the refusal | `…-sequential-forecast-empty-coverage-clears-beneficiaries` (fully overlapping disks: Reduce `[]`, `predicted-coverage-empty:b`, zero cost); the partial-overlap tests still pass |
+| R5-F6 initially exhausted pool kept the promise | A row that arrives already refused (Blocked / Disabled / Draft) gets the not-running notes | `…-exhausted-mixed-casting-notes-do-not-promise-a-cast` (zero slots: `resource-pool-exhausted`, zero cost, "still active (this casting is blocked and does not run)") |
+| R6-F1 Prayer lost its friendly recipients | `ContextConditionIsEnemy` / `ContextConditionIsAlly` are modelled recipient gates (relation keys), read live with the native `IsEnemy` / `IsAlly(caster)`; relation keys are fixed for conflict analysis. A checker mixing caster and recipient predicates stays unmodelled (R5-F3) | `…-prayer-friendly-recipients-keep-coverage` (native Prayer from the committed fixtures: one funded cast over caster and ally; the ally's bound branch applies PrayerBuff, never PrayerDebuff) |
+| R6-F2 Good Hope's buff lookup unverified | `ContextConditionHasBuff` keys are `buff-predicate:<guid>` and are read with `descriptor.Buffs.HasFact(buff)`, the observed native check; an unreadable unit, buff or caster is unknown (no coverage claim) | the contract test above, and `…-good-hope-despair-read-is-the-native-buff-check` (near ally's Despair present / absent / unreadable: the bard still receives Good Hope, one slot; the near ally only when Despair is known absent) |
+| R6-F3 unreachable alternative supplied coverage | An empty native checker establishes coverage only through its true branch (observed IL); an unknown checker (absent or unmodelled) only with a definite leaf on both branches | `…-empty-checker-follows-the-branch-that-runs` (application on the true branch: covered, one slot; only on the false branch: no recipients, Blocked, zero cost) |
+
+**Executed reproductions** on the production of `0f253aa` (seven files swapped
+by `git show 0f253aa:<path>`, current tests and the 51/61 fixtures; the
+contract test and one audit-reader line, which use APIs new in this round,
+were stubbed for that run; everything restored from `3b24210`):
+`missing-beneficial-buffs` 43/8 (DLL `cbfea135…`). Failures: contract (stub);
+penalty burst "admitted: valid-beneficial-party-effect…" (R5-F1); activation
+penalty "Good Hope was admitted although its buff applies Crushing Despair to
+its bearer" (R5-F2); "Blocked [a,b] predicted-coverage-empty:b" (R5-F5);
+"already active on ally-near (the cast goes ahead for the others)" (R5-F6);
+Prayer "Blocked [] predicted-coverage-empty:caster" (R6-F1); "Despair check is
+not keyed as the native buff predicate: 36897b36…" (R6-F2); "unreachable
+branch supplied coverage: Ready [ally,caster]" (R6-F3).
+
+Corrected results (final tree, DLL `687b9b0b…`): `missing-beneficial-buffs`
+51/0; complete program 800/0 (40.9 s); explicit capture 1/0 (fixture subset
+now 51 blueprints / 61 referenced types: Prayer, PrayerBuff, PrayerDebuff
+added from the lab dump); explicit verify + candidate audit 3/0 (51 identical
+files, 61 types, Dance identical; 1,722 / 16 and 10,443 / 48; classifier
+`a3b7bf88c2482cd3472e04a0caf5cc5fa6f72ed2d9aa9869d9de0d50957e6497`, overrides
+`c462aeb4…`, reports `5c343b98…a43e` / `59747898…338e35`, changed rows identical
+apart from the header label).
+
+Limits: the 0.4.0/0.4.1 exports predate `modifierSigns`, so the candidate
+audit cannot show the penalty rule (a fresh guarded export would). A modifier
+with a context-dependent value under a non-Penalty descriptor is "unknown" and
+never counts as a penalty. Native behavior that stays unverified in play:
+`IsEnemy` / `IsAlly` for every party member (a charmed or otherwise hostile
+member would read as an enemy and get no coverage claim); owner check added to
+[MANUAL-ACCEPTANCE.md](../docs/MANUAL-ACCEPTANCE.md).
 
 ## Rejected approaches
 
