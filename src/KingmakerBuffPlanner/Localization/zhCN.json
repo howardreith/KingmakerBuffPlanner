@@ -806,6 +806,7 @@
   "run.effect.expiring": "即将到期",
   "run.effect.incomplete": "{0}仅有部分效果（将施放）",
   "run.effect.insufficient": "未达到要求",
+  "run.effect.keptblocked": "{0}的效果仍然有效（此条目受阻，不会施放）",
   "run.effect.longer": "{0}的现有效果持续时间更长。仍将为其他目标施法，这可能会缩短该效果的持续时间",
   "run.effect.metamagic": "缺少计划所需的超魔效果",
   "run.effect.recast": "{0}已有效果，按设置仍将重新施放",

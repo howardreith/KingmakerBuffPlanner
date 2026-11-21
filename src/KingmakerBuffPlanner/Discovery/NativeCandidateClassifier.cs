@@ -469,7 +469,18 @@ namespace KingmakerBuffPlanner.Discovery
             // keeps the veto for all of them (the whole graph is planned and
             // executed). Removal actions are not applications and stay.
             IReadOnlyList<NativeCandidateEffectFacts> effects = facts.Effects ?? new NativeCandidateEffectFacts[0];
+            // Review R3-F2: nor may any reachable action of the graph be
+            // offensive (damage or an attack on any branch, which leaves no
+            // persistent leaf). A buff the payload grants as a separate
+            // ability (Firebelly's breath) is not part of this graph.
+            if (HasOffensiveAction(facts)) return true;
             return effects.Count == 0 || !effects.All(e => IsProvenBeneficialDespiteAllyDisposition(e, facts));
+        }
+
+        private static bool HasOffensiveAction(NativeCandidateAuditFacts facts)
+        {
+            return (facts.Diagnostics ?? new NativeCandidateDiagnosticFacts[0]).Any(IsOffensive) ||
+                (facts.DiagnosticContracts ?? new string[0]).Any(IsOffensiveContract);
         }
 
         // Missing-beneficial-buffs mission §3.C: CanTargetPoint means the

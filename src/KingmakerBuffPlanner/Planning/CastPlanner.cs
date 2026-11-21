@@ -172,8 +172,11 @@ namespace KingmakerBuffPlanner.Planning
             internal readonly List<string> Diagnostics;
             internal ExplicitCastingCompiler.RemovalConflictState Removals =
                 new ExplicitCastingCompiler.RemovalConflictState();
-            // The removal conflict that refused the last candidate, if any.
+            // The removal conflict that refused a candidate on every centre.
             internal string RemovalConflict;
+            // Whether some candidate had a conflict-free centre (then a
+            // refusal is reported as funding/provider, review R3-F5).
+            internal bool SafeCentreFound;
 
             internal PlanContext(BuffCastRequest request,
                 List<ProviderPlanningOption> options, ProviderSelectionPolicy policy,
@@ -208,10 +211,11 @@ namespace KingmakerBuffPlanner.Planning
             foreach (string targetId in remaining.ToArray())
             {
                 context.RemovalConflict = null;
+                context.SafeCentreFound = false;
                 Selection selection = SelectAndReserve(context, new[] { targetId }, remaining);
                 if (selection == null)
                 {
-                    string failure = context.RemovalConflict != null
+                    string failure = context.RemovalConflict != null && !context.SafeCentreFound
                         ? ExplicitCastingCompiler.RemovesPlannedEffect + ":" + context.RemovalConflict
                         : request.EnhancementIds.Count == 0
                         ? "no-valid-provider-or-resource" : "requested-enhancement-unavailable";
@@ -252,10 +256,11 @@ namespace KingmakerBuffPlanner.Planning
             while (remaining.Count != 0)
             {
                 context.RemovalConflict = null;
+                context.SafeCentreFound = false;
                 Selection selection = SelectAndReserve(context, remaining, remaining);
                 if (selection == null)
                 {
-                    string failure = context.RemovalConflict != null
+                    string failure = context.RemovalConflict != null && !context.SafeCentreFound
                         ? ExplicitCastingCompiler.RemovesPlannedEffect + ":" + context.RemovalConflict
                         : request.EnhancementIds.Count == 0
                         ? "no-valid-mass-provider-or-resource"
@@ -282,7 +287,7 @@ namespace KingmakerBuffPlanner.Planning
                     EnhancementUsage(selection.AppliedEnhancementIds, context.Enhancements),
                     selection.OmittedEnhancementIds));
                 context.Removals.Admit(string.Empty, request.AssignmentId, StepChanges(request,
-                    selection.Option, selection.Option.CoveredTargetIdsForAnchor(selection.Anchor)));
+                    selection.Option, selection.Option.AffectedTargetIdsForAnchor(selection.Anchor)));
                 foreach (string targetId in covered)
                 {
                     context.Outcomes.Add(new TargetPlanOutcome(request.Source.SourceId,
@@ -370,6 +375,7 @@ namespace KingmakerBuffPlanner.Planning
                 // is reserved, and only when every centre conflicts is the
                 // candidate refused (with the conflict named).
                 string anchor = null;
+                string firstConflict = null;
                 foreach (string candidate in option.LegalAnchorIds
                     .Where(value => option.CoveredTargetIdsForAnchor(value)
                         .Any(id => required.Contains(id)))
@@ -380,11 +386,19 @@ namespace KingmakerBuffPlanner.Planning
                 {
                     string conflict = context.Removals.RemovesProvided(string.Empty, StepChanges(request, option,
                         request.Source.Grouping == CastGroupingKind.MassConfiguredTargets
-                            ? option.CoveredTargetIdsForAnchor(candidate) : (IEnumerable<string>)required));
+                            ? option.AffectedTargetIdsForAnchor(candidate) : (IEnumerable<string>)required));
                     if (conflict == null) { anchor = candidate; break; }
-                    context.RemovalConflict = context.RemovalConflict ?? conflict;
+                    firstConflict = firstConflict ?? conflict;
                 }
-                if (string.IsNullOrWhiteSpace(anchor)) continue;
+                if (string.IsNullOrWhiteSpace(anchor))
+                {
+                    // Every centre of this candidate conflicts.
+                    context.RemovalConflict = context.RemovalConflict ?? firstConflict;
+                    continue;
+                }
+                // Review R3-F5: a safe centre exists, so a later refusal is a
+                // funding or provider problem, not a removal conflict.
+                context.SafeCentreFound = true;
                 ResourceReservation reservation;
                 string reason;
                 // A candidate's full requirements — resource pool, material,

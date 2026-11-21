@@ -97,6 +97,9 @@ namespace KingmakerBuffPlanner.UI
                     group => group.First().RemainingUses,
                     StringComparer.Ordinal);
             var carriedEffects = activeEffects.ToUnitMarkers();
+            var optionsByProvider = new Dictionary<string, ProviderPlanningOption>(StringComparer.Ordinal);
+            foreach (ProviderPlanningOption option in providerOptions ?? new ProviderPlanningOption[0])
+                if (option != null) optionsByProvider[option.Provider.Key.Canonical] = option;
 
             foreach (string routineId in routineIdsInOrder
                 .Distinct(StringComparer.Ordinal))
@@ -157,17 +160,6 @@ namespace KingmakerBuffPlanner.UI
                             materialRemaining[step.MaterialReservation.ItemGuid] =
                                 Math.Max(0, material - step.MaterialReservation.Count);
                     }
-                    // Missing-beneficial-buffs review R2-F3: what this step's
-                    // own native actions may remove from its recipients (a
-                    // resistance switch removes the previous choice) is no
-                    // longer carried forward as active.
-                    foreach (KeyValuePair<string, string> removal in ProjectRemovals(step))
-                    {
-                        HashSet<ActiveEffectMarker> markers;
-                        if (carriedEffects.TryGetValue(removal.Key, out markers))
-                            markers.RemoveWhere(marker => string.Equals(marker.EffectId, removal.Value,
-                                StringComparison.Ordinal));
-                    }
                     // Project granted effects forward so later routines skip
                     // already-covered targets for free — but only effects the
                     // forecast assumptions justify. Conditional alternatives
@@ -182,6 +174,21 @@ namespace KingmakerBuffPlanner.UI
                                 new HashSet<ActiveEffectMarker>();
                         markers.Add(new ActiveEffectMarker(projection.Kind,
                             projection.EffectId));
+                    }
+                    // Missing-beneficial-buffs review R2-F3/R3-F3: then the
+                    // step's NET removals, from the selected provider's bound
+                    // expression in action order (a known-false removal is
+                    // gone; a removal certainly followed by re-application is
+                    // not one; a later removal undoes an earlier grant), are
+                    // no longer carried forward as active.
+                    ProviderPlanningOption stepOption;
+                    optionsByProvider.TryGetValue(step.Provider.Canonical, out stepOption);
+                    foreach (KeyValuePair<string, string> removal in ProjectRemovals(step, stepOption))
+                    {
+                        HashSet<ActiveEffectMarker> markers;
+                        if (carriedEffects.TryGetValue(removal.Key, out markers))
+                            markers.RemoveWhere(marker => string.Equals(marker.EffectId, removal.Value,
+                                StringComparison.Ordinal));
                     }
                 }
             }
@@ -303,12 +310,19 @@ namespace KingmakerBuffPlanner.UI
         // conservative estimate instead of a free already-active skip.
         // Owner unit -> effect pairs the step may remove (any realizable
         // branch; a certain later re-application on the same path cancels).
-        private static IEnumerable<KeyValuePair<string, string>> ProjectRemovals(CastStep step)
+        private static IEnumerable<KeyValuePair<string, string>> ProjectRemovals(CastStep step,
+            ProviderPlanningOption option)
         {
             IEnumerable<string> recipients = step.ExpectedRecipientUnitIds.Count != 0
                 ? step.ExpectedRecipientUnitIds : step.TargetUnitIds;
+            // A group step also reaches allies that only lose an effect.
+            if (step.MassCast && option != null && !string.IsNullOrEmpty(step.AnchorUnitId))
+                recipients = recipients.Concat(option.AffectedTargetIdsForAnchor(step.AnchorUnitId))
+                    .Distinct(StringComparer.Ordinal).ToList();
             return EffectChanges.Merge(recipients.Select(recipient =>
-                EffectChangeAnalysis.Analyze(step.ExpectedEffects, step.Provider.CasterUnitId, recipient))).Removed;
+                EffectChangeAnalysis.Analyze(option == null ? step.ExpectedEffects
+                    : option.BindEffects(step.ExpectedEffects, recipient),
+                    step.Provider.CasterUnitId, recipient))).Removed;
         }
 
         private static IEnumerable<ProjectedEffect> ProjectEffects(CastStep step)

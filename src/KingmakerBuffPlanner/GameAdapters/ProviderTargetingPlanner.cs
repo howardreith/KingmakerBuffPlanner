@@ -15,6 +15,9 @@ namespace KingmakerBuffPlanner.GameAdapters
         internal string[] ReachableIds;
         internal string[] Anchors;
         internal Dictionary<string, IEnumerable<string>> RecipientIdsByAnchor;
+        // Every unit an anchor's native actions reach (review R3-F1).
+        internal Dictionary<string, IEnumerable<string>> AffectedIdsByAnchor =
+            new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal);
         internal bool Party;
         internal bool AreaRecipients;
         internal bool UnsafeArea;
@@ -107,17 +110,29 @@ namespace KingmakerBuffPlanner.GameAdapters
                     bool unresolved;
                     EffectExpression bound = EffectRecipientFactBinding.Bind(casterBound,
                         unitHasFact == null ? noFacts : fact => unitHasFact(unitId, fact), out unresolved);
-                    return !unresolved && EffectExpressionAnalysis.ContainsLeaf(bound);
+                    // Review R2 (R2-F5): a caster predicate left unresolved on
+                    // the recipient's own branch (an undead ally when the
+                    // caster's Undead Arcana is unread) decides whether it
+                    // receives anything: no definite coverage. A branch that
+                    // never reads it (a living ally) stays covered.
+                    return !unresolved && EffectExpressionAnalysis.ContainsLeaf(bound) &&
+                        !HasCasterGate(bound);
                 };
                 foreach (string anchorId in anchors)
                 {
                     if (!measure(anchorId, anchorId).HasValue) continue;
                     string id = anchorId;
-                    decision.RecipientIdsByAnchor.Add(anchorId, units.Where(unit =>
+                    UnitSnapshot[] inside = units.Where(unit =>
                     {
                         float? metres = measure(id, unit.UnitId);
-                        return metres.HasValue && metres.Value <= radius + 0.01f && eligible(unit);
-                    }).Select(unit => unit.UnitId).ToArray());
+                        return metres.HasValue && metres.Value <= radius + 0.01f;
+                    }).ToArray();
+                    // Review R3-F1: every unit inside the burst is affected
+                    // by the native actions (an ally that only loses an effect
+                    // included); only the eligible ones are beneficiaries.
+                    decision.AffectedIdsByAnchor.Add(anchorId, inside.Select(unit => unit.UnitId).ToArray());
+                    decision.RecipientIdsByAnchor.Add(anchorId, inside.Where(eligible)
+                        .Select(unit => unit.UnitId).ToArray());
                 }
                 reachable = units.Where(unit => decision.RecipientIdsByAnchor.Values
                     .Any(recipients => recipients.Contains(unit.UnitId)));
@@ -149,7 +164,21 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             return new ProviderPlanningOption(provider, decision.ReachableIds, decision.Anchors,
                 provider.EffectiveCasterLevel, provider.ExpectedDurationRounds, strategy, strategyReason,
-                decision.RecipientIdsByAnchor, casterFacts, effectsByTarget);
+                decision.RecipientIdsByAnchor, casterFacts, effectsByTarget, decision.AffectedIdsByAnchor);
+        }
+
+        private static bool HasCasterGate(EffectExpression expression)
+        {
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+                return conditional.CasterFactGate != null || HasCasterGate(conditional.WhenTrue) ||
+                    HasCasterGate(conditional.WhenFalse);
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null) return sequence.Children.Any(HasCasterGate);
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null) return HasCasterGate(reference.Child);
+            var targeted = expression as TargetedEffectExpression;
+            return targeted != null && HasCasterGate(targeted.Child);
         }
 
         private static string[] LegalAnchorIds(IEnumerable<UnitSnapshot> units, Func<string, bool> canTarget)

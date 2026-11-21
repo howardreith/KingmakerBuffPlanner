@@ -379,7 +379,8 @@ namespace KingmakerBuffPlanner.Planning
                     if (removalConflict != null)
                     {
                         finalized.Add(BlockForRemoval(casting, EffectRemovedByEarlierCasting +
-                            ":" + removalConflict, shape, diagnostics));
+                            ":" + removalConflict, shape, diagnostics,
+                            removalState.OwnersRemovedByEarlier(casting.RoutineId, changes)));
                         continue;
                     }
                     removalState.Admit(casting.RoutineId, casting.CastingId, changes, false);
@@ -779,6 +780,22 @@ namespace KingmakerBuffPlanner.Planning
                 return First(Map(_removed, routineId), changes == null ? null : changes.Applied);
             }
 
+            // The units on which an earlier admitted casting removes an
+            // effect this casting relies on (review R3-F4).
+            internal HashSet<string> OwnersRemovedByEarlier(string routineId, EffectChanges changes)
+            {
+                Dictionary<string, Dictionary<string, string>> removed = Map(_removed, routineId);
+                var owners = new HashSet<string>(StringComparer.Ordinal);
+                foreach (KeyValuePair<string, string> key in changes == null
+                    ? new KeyValuePair<string, string>[0] : changes.Applied)
+                {
+                    Dictionary<string, string> effects;
+                    if (key.Key != null && removed.TryGetValue(key.Key, out effects) && effects.ContainsKey(key.Value))
+                        owners.Add(key.Key);
+                }
+                return owners;
+            }
+
             // casts: false for an already-satisfied skip, which keeps its
             // effect active but runs none of its actions (no removal).
             internal void Admit(string routineId, string castingId, EffectChanges changes, bool casts = true)
@@ -850,21 +867,41 @@ namespace KingmakerBuffPlanner.Planning
             EffectExpression expression = DiscoveredEffectLookup.ForAbility(
                 effectsBySource, casting.Ability, casting.SourceId);
             if (expression == null) return null;
-            return EffectChanges.Merge(casting.PredictedBeneficiaryUnitIds.Select(recipient =>
+            // Review R3-F1: a group cast's native actions reach every unit
+            // inside its burst, including an ally that only LOSES an effect
+            // (Mass Reduce on an enlarged ally) and so is not a predicted
+            // beneficiary; its removals are analyzed too.
+            IEnumerable<string> reached = casting.PredictedBeneficiaryUnitIds;
+            if (casting.TargetMode != CastingTargetMode.DirectTarget)
+            {
+                string anchor = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
+                    ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
+                if (anchor != null && option.AffectedIdsByAnchor.ContainsKey(anchor))
+                    reached = reached.Concat(option.AffectedTargetIdsForAnchor(anchor))
+                        .Distinct(StringComparer.Ordinal).ToList();
+            }
+            return EffectChanges.Merge(reached.Select(recipient =>
                 EffectChangeAnalysis.Analyze(option.BindEffects(expression, recipient),
                     casting.CasterUnitId, recipient)));
         }
 
         private static ResolvedCasting BlockForRemoval(ResolvedCasting casting, string reason,
-            IReadOnlyList<string> shape, List<string> diagnostics)
+            IReadOnlyList<string> shape, List<string> diagnostics, ICollection<string> removedOwners = null)
         {
             diagnostics.Add(reason + ":by:" + casting.CastingId);
-            // Review R1-F1: an invalidated skip no longer says "already
-            // active (skipped)"; its note names the earlier removal instead.
+            // Review R1-F1/R3-F4: an invalidated skip no longer says "already
+            // active (skipped)". Only a recipient whose effect the earlier
+            // casting removes is described as losing it; another recipient
+            // is described as still active (the blocked casting does not run).
             IReadOnlyList<string> notes = casting.ExistingEffectNotes.Select(note =>
-                note.StartsWith("already-active:", StringComparison.Ordinal)
-                    ? ExistingRemovedEarlierNote + note.Substring("already-active:".Length)
-                    : note).ToList();
+            {
+                if (!note.StartsWith("already-active:", StringComparison.Ordinal)) return note;
+                string rest = note.Substring("already-active:".Length);
+                int split = rest.IndexOf(':');
+                string unit = split < 0 ? rest : rest.Substring(0, split);
+                return (removedOwners == null || removedOwners.Contains(unit)
+                    ? ExistingRemovedEarlierNote : ExistingKeptBlockedNote) + rest;
+            }).ToList();
             return casting.WithBudgetResult(ResolvedCastingReadiness.Blocked,
                 casting.ReadinessReasons
                     .Where(value => !value.StartsWith("already-active:", StringComparison.Ordinal))
@@ -876,6 +913,9 @@ namespace KingmakerBuffPlanner.Planning
         // Existing-effect note of a skip an earlier casting invalidates:
         // "existing-removed-earlier:<unit>[:detail]".
         public const string ExistingRemovedEarlierNote = "existing-removed-earlier:";
+        // Note of a recipient whose effect stays active while its blocked
+        // group casting does not run: "existing-kept-blocked:<unit>[:detail]".
+        public const string ExistingKeptBlockedNote = "existing-kept-blocked:";
 
         // R1-F4: a removal later in the one-pass sequence invalidates every
         // structural grant predicting the removed effect on that unit.

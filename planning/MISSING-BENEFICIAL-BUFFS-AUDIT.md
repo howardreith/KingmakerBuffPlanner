@@ -279,6 +279,31 @@ Consequence of R2-F5 for native behavior that stays unverified: unit facts
 in every case is an owner observation. Coverage is withheld rather than claimed
 when a fact cannot be read.
 
+## Review round 3
+
+Codex review of `1bfc198` (decision `changes_required`). Verified: R1-F1,
+R1-F3, R1-F6, R2-F1, R2-F2, R2-F3, R2-F4, R2-F6. Re-opened: R1-F8, R2-F5. New:
+R3-F1 to R3-F5. All are fixed in the round-3 corrections commit.
+
+| Finding | Correction | Regression |
+|---|---|---|
+| R1-F8 reservation against a spell-list ID | Each group spell is cast from a real native spontaneous `BlueprintSpellbook` whose `SpellList` equals one of the spell's own lists (Inquisitor 6, Bard 3, Sorcerer 7 / 9 / 4); the pool key is that book's GUID, as the snapshot builder keys it; plan cost, provider spellbook and converted step reservation asserted | `…-point-capable-group-spells-unit-anchored` |
+| R2-F5 unread caster fact still covered undead | After binding a recipient's branch, a remaining caster-fact gate withholds definite coverage | `…-area-coverage-follows-recipient-conditions` (arcana unread: undead not covered, living covered) |
+| R3-F1 Mass Reduce undid Enlarge on a removal-only ally | Options carry per-anchor affected units (every unit inside the burst) beside eligible recipients; both planners and the Classic forecast analyze removals over the affected units | `…-removal-only-ally-is-counted` (keep Enlarge on A → Reduce over A,B refused naming A, zero cost; without the keep: one cast, grant on B, removal on A accounted) |
+| R3-F2 damage on an alternative branch under the exception | The ally-disposition waiver also requires no offensive action anywhere in the graph | `…-ally-disposition-exception-is-evidence-bound` (Despair-branch `ContextActionDealDamage` → refused by discovery and provider admission) |
+| R3-F3 Classic projection lost branch and order | Grants first, then the step's NET removals from the selected provider's bound expression (affected units included) | `…-classic-sequence-uses-bound-net-changes` (gate false keeps E; gate true loses E; apply-then-remove leaves no E) |
+| R3-F4 removal note for every group recipient | Only units whose effect an earlier admitted casting removes get the removal note; others read "still active (this casting is blocked and does not run)" | `…-removal-only-ally-is-counted` (A removed, x still active) |
+| R3-F5 discarded centre's conflict reported over a funding failure | A removal conflict is reported only when no candidate had a conflict-free centre | `…-classic-picks-a-conflict-free-centre` (safe centre, empty pool → resource refusal) |
+
+Validation (final tree before commit, DLL `91eaa7c4…`): `missing-beneficial-buffs`
+30/0 (5.9 s); complete program 779/0 (37.8 s); explicit capture 1/0 (fixture
+subset now 48 blueprints / 58 referenced types: the three native spellbooks
+added); explicit verify + candidate audit 3/0 (48 identical files, 58 types,
+Dance identical; 1,722 / 16 and 10,443 / 48; classifier
+`9e0c65a74c129ca6104f7c7787bec5477107ce07cd55060d4dbae7648ae66dce`, reports
+`175b90a3…b443` / `032fae87…1489`, changed rows identical apart from the
+header). Reproductions traced against `1bfc198`, not re-executed on it.
+
 ## Rejected approaches
 
 - An `include` override for Good Hope/Firebelly: rejected — it replaces the

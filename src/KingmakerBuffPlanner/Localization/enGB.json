@@ -806,6 +806,7 @@
   "run.effect.expiring": "about to expire",
   "run.effect.incomplete": "partly present on {0} (will cast)",
   "run.effect.insufficient": "not sufficient",
+  "run.effect.keptblocked": "still active on {0} (this casting is blocked and does not run)",
   "run.effect.longer": "already active on {0}, lasting longer than this cast (the cast goes ahead for the others and may shorten it)",
   "run.effect.metamagic": "without the planned metamagic",
   "run.effect.recast": "active on {0} but set to always recast",
