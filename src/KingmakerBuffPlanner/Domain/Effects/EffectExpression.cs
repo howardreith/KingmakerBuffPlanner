@@ -670,7 +670,9 @@ namespace KingmakerBuffPlanner.Domain.Effects
         public static bool HostileRelation(EffectExpression expression, Func<string, bool?> read)
         {
             if (expression == null || read == null) return false;
-            foreach (string key in FactIds(expression))
+            // Review R10 (R9-F4): only predicates the native action can
+            // evaluate (not a verified empty checker's never-run branch).
+            foreach (string key in ReachableFactIds(expression))
             {
                 if (key == RecipientFactGate.EnemyOfCaster && read(key) == true) return true;
                 if (key == RecipientFactGate.AllyOfCaster && read(key) == false) return true;
@@ -688,6 +690,30 @@ namespace KingmakerBuffPlanner.Domain.Effects
             bool unresolved;
             return Bind(expression, key => key == RecipientFactGate.EnemyOfCaster ? false
                 : key == RecipientFactGate.AllyOfCaster ? true : (bool?)null, out unresolved);
+        }
+
+        // Review R10 (R9-F4): the recipient-fact keys the native action can
+        // read: as FactIds, but a verified empty checker (no gate, no
+        // conditions) contributes only its always-run true branch.
+        public static IEnumerable<string> ReachableFactIds(EffectExpression expression)
+        {
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                if (conditional.RecipientFactGate == null && conditional.CasterFactGate == null &&
+                    EffectExpressionAnalysis.IsEmptyChecker(conditional))
+                    return ReachableFactIds(conditional.WhenTrue);
+                return (conditional.RecipientFactGate == null ? new string[0]
+                        : conditional.RecipientFactGate.Facts.Select(f => f.Key))
+                    .Concat(ReachableFactIds(conditional.WhenTrue)).Concat(ReachableFactIds(conditional.WhenFalse))
+                    .Distinct(StringComparer.Ordinal);
+            }
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null) return sequence.Children.SelectMany(ReachableFactIds).Distinct(StringComparer.Ordinal);
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null) return ReachableFactIds(reference.Child);
+            var targeted = expression as TargetedEffectExpression;
+            return targeted == null ? new string[0] : ReachableFactIds(targeted.Child);
         }
 
         public static IEnumerable<string> FactIds(EffectExpression expression)

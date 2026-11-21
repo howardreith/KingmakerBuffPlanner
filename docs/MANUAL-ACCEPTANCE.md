@@ -32,9 +32,14 @@ casts again; a run confirms a wizard's Firebrand only from that wizard's own
 instance. Selecting the same Abjuration resistance twice in one routine spends
 one use. Prayer (an existing spell whose
 coverage now reads the native ally/enemy check, review round 6): planned
-caster-centred, every in-radius party member is predicted and receives
-Prayer's buff, never its penalty; a failure means the native relation read
-differs from the offline model.
+caster-centred, every in-radius party member friendly to the caster is
+predicted and receives Prayer's buff, never its penalty, and the run confirms
+delivery only from that buff. A party member the game treats as hostile to the
+caster (for example while confused or charmed) is affected by the penalty
+branch but is never predicted or confirmed as a beneficiary (review rounds 9
+and 10). A failure means the native relation read differs from the offline
+model. Ally-only bursts (Feather Step, Mass; Firebrand) likewise never predict
+a party member the game does not treat as allied to the caster.
 
 Use the [Chinese-player review guide](LOCALIZATION.md#glossary-and-player-review) and [guarded candidate procedure](LOCALIZATION.md#runtime-acceptance) for localization acceptance.
 

@@ -227,8 +227,12 @@ namespace KingmakerBuffPlanner.Discovery
             // current target AND one explicitly directed to the caster
             // (ToCaster): both land on the caster only because of Personal
             // range.
+            // Review R10 (R8-F2): the rescued set is every Personal ability the
+            // hostile-target rules would otherwise refuse - aimed at a
+            // harmful enemy target, OR able to target enemies but not friends
+            // (whatever its enemy disposition says).
             if (AuditRules && IsPersonalRange(facts) && facts.CanTargetEnemies &&
-                string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal) &&
+                (string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal) || !facts.CanTargetFriends) &&
                 effects.Any(e => e.Target == "CurrentTarget" || e.Target == "Caster") &&
                 (effects.Any(ImposesHarm) || HasUnsafeAction(facts)))
                 return Exclude("harmful-only",
@@ -418,7 +422,8 @@ namespace KingmakerBuffPlanner.Discovery
             // not a buff.
             if ((effect.Target == "CurrentTarget" || effect.Target == "Caster") && IsPersonalRange(facts) &&
                 facts.CanTargetEnemies &&
-                string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal) && ImposesHarm(effect))
+                (string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal) || !facts.CanTargetFriends) &&
+                ImposesHarm(effect))
                 return "harmful-condition";
             if ((effect.Target == "Caster" || effect.Target == "CurrentTarget") && IsAimedAtEnemies(facts))
                 return "hostile-ability-rider";
@@ -594,9 +599,12 @@ namespace KingmakerBuffPlanner.Discovery
         // not resolve (its record carries no harmful flag): its own automatic
         // actions are unknown, whether the cast applies it directly or an
         // applied buff applies it on activation.
+        // Review R10-F2: nor is an ability whose own delivery component is
+        // offensive (a weapon attack, projectile, chain or bomb delivery: the
+        // carrier evidence IsHostileCarrier uses), whatever its target flags.
         private static bool HasUnsafeAction(NativeCandidateAuditFacts facts)
         {
-            return HasOffensiveAction(facts) ||
+            return HasOffensiveDelivery(facts) || HasOffensiveAction(facts) ||
                 (facts.Diagnostics ?? new NativeCandidateDiagnosticFacts[0]).Any(diagnostic => diagnostic != null &&
                     !string.Equals(diagnostic.Code, "restorative-action", StringComparison.Ordinal) &&
                     !(string.Equals(diagnostic.Code, "unknown-node", StringComparison.Ordinal) &&
@@ -832,6 +840,16 @@ namespace KingmakerBuffPlanner.Discovery
                 Contains(value, "RemoveOnSave") ||
                 Contains(value, "RemoveBuff") ||
                 Contains(value, "ContextRankConfig"));
+        }
+
+        private static bool HasOffensiveDelivery(NativeCandidateAuditFacts facts)
+        {
+            return string.Equals(facts.Range, "Weapon", StringComparison.Ordinal) ||
+                (facts.AbilityComponentTypes ?? new string[0]).Any(value =>
+                    Contains(value, "AbilityDeliverProjectile") ||
+                    Contains(value, "AbilityDeliverAttackWithWeapon") ||
+                    Contains(value, "AbilityDeliverChain") ||
+                    Contains(value, "AbilityDeliverBomb"));
         }
 
         private static bool IsHostileCarrier(

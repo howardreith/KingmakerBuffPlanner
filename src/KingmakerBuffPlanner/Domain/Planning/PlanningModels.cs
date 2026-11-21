@@ -281,9 +281,11 @@ namespace KingmakerBuffPlanner.Domain.Planning
             IReadOnlyDictionary<string, EffectExpression> effectsByTarget = null,
             IDictionary<string, IEnumerable<string>> affectedIdsByAnchor = null,
             IDictionary<string, IReadOnlyDictionary<string, bool>> fixedRecipientFacts = null,
-            IDictionary<string, IReadOnlyDictionary<string, bool>> recipientFactReads = null)
+            IDictionary<string, IReadOnlyDictionary<string, bool>> recipientFactReads = null,
+            bool requiresAllyRelation = false)
         {
             Provider = provider ?? throw new ArgumentNullException("provider");
+            RequiresAllyRelation = requiresAllyRelation;
             FixedRecipientFacts = CopyFacts(fixedRecipientFacts);
             RecipientFactReads = CopyFacts(recipientFactReads);
             // Missing-beneficial-buffs review R3-F1: every unit an anchor's
@@ -367,6 +369,11 @@ namespace KingmakerBuffPlanner.Domain.Planning
         // absent). The starting state of a sequential forecast.
         public IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>> RecipientFactReads { get; private set; }
 
+        // Review R10-F1: the burst's native selector admits only units allied
+        // to the caster (AbilityTargetsAround TargetType.Ally); a recomputed
+        // beneficiary needs a read, allied relation.
+        public bool RequiresAllyRelation { get; private set; }
+
         public bool? RecipientFactRead(string unit, string key)
         {
             IReadOnlyDictionary<string, bool> facts;
@@ -408,8 +415,12 @@ namespace KingmakerBuffPlanner.Domain.Planning
         // (a sequential forecast's later routine); everything else unchanged.
         // Review R7-F6: a widened anchor may name a unit no anchor covered at
         // the start; it becomes reachable.
+        // Review R10 (R8-F3): optionally with the recipient fact reads the new
+        // map was computed from (the state earlier occurrences leave), so a
+        // later consumer recomputing coverage starts from that same state.
         public ProviderPlanningOption WithRecipientIdsByAnchor(
-            IDictionary<string, IEnumerable<string>> recipientIdsByAnchor)
+            IDictionary<string, IEnumerable<string>> recipientIdsByAnchor,
+            IDictionary<string, IReadOnlyDictionary<string, bool>> recipientFactReads = null)
         {
             IEnumerable<string> reachable = ReachableTargetIds.Concat((recipientIdsByAnchor ??
                     new Dictionary<string, IEnumerable<string>>()).Values.SelectMany(value => value ?? new string[0]));
@@ -419,7 +430,9 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 AffectedIdsByAnchor.ToDictionary(pair => pair.Key, pair => (IEnumerable<string>)pair.Value,
                     StringComparer.Ordinal),
                 FixedRecipientFacts.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
-                RecipientFactReads.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+                recipientFactReads ??
+                    RecipientFactReads.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
+                RequiresAllyRelation);
         }
 
         // The units an anchor's native actions reach (beneficiaries and units
@@ -514,6 +527,10 @@ namespace KingmakerBuffPlanner.Domain.Planning
 
         public bool Receives(ProviderPlanningOption option, EffectExpression expression, string unit)
         {
+            // Review R10-F1: an Ally-only native selector needs a read,
+            // allied relation.
+            if (option.RequiresAllyRelation &&
+                option.RecipientFactRead(unit, RecipientFactGate.AllyOfCaster) != true) return false;
             bool unresolved;
             EffectExpression bound = Bind(option, expression, unit, true, out unresolved);
             // Review R9-F3: a unit read as hostile to the caster is affected
@@ -595,16 +612,54 @@ namespace KingmakerBuffPlanner.Domain.Planning
         {
             if (!HasChanges || option == null || expression == null || option.RecipientIdsByAnchor.Count == 0)
                 return option;
-            bool changedAny = false;
             var map = new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal);
             foreach (KeyValuePair<string, IReadOnlyList<string>> pair in option.RecipientIdsByAnchor)
+                map[pair.Key] = Beneficiaries(option, expression, pair.Key);
+            // Review R10 (R8-F3): the returned option also carries the state
+            // as its recipient fact reads, so a consumer that starts its own
+            // state from the option (a later Classic routine's assignments)
+            // keeps what earlier occurrences changed.
+            return option.WithRecipientIdsByAnchor(map, StateReads(option, expression));
+        }
+
+        // The option's recipient fact reads with every recorded change applied
+        // (a known value replaces the read; an unknown one removes it).
+        private IDictionary<string, IReadOnlyDictionary<string, bool>> StateReads(ProviderPlanningOption option,
+            EffectExpression expression)
+        {
+            var keys = EffectRecipientFactBinding.FactIds(expression)
+                .Where(key => !RecipientFactGate.IsRelation(key)).ToList();
+            var units = new HashSet<string>(option.RecipientFactReads.Keys, StringComparer.Ordinal);
+            units.UnionWith(_committed.Keys);
+            units.UnionWith(_pending.Keys);
+            var result = new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal);
+            foreach (string unit in units)
             {
-                List<string> now = Beneficiaries(option, expression, pair.Key);
-                changedAny |= !now.OrderBy(v => v, StringComparer.Ordinal)
-                    .SequenceEqual(pair.Value.OrderBy(v => v, StringComparer.Ordinal));
-                map[pair.Key] = now;
+                IReadOnlyDictionary<string, bool> original;
+                var reads = option.RecipientFactReads.TryGetValue(unit, out original)
+                    ? original.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)
+                    : new Dictionary<string, bool>(StringComparer.Ordinal);
+                foreach (string key in keys)
+                {
+                    bool? value;
+                    string effect = RecipientFactGate.EffectIdOf(key);
+                    if (!TryGet(_pending, unit, effect, out value) && !TryGet(_committed, unit, effect, out value))
+                        continue;
+                    if (value.HasValue) reads[key] = value.Value;
+                    else reads.Remove(key);
+                }
+                if (reads.Count != 0) result[unit] = reads;
             }
-            return changedAny ? option.WithRecipientIdsByAnchor(map) : option;
+            return result;
+        }
+
+        // Review R10 (R9-F1): what earlier funded castings left certain about
+        // an effect on a unit (null: unknown or not recorded).
+        public bool? Known(string unit, string effect)
+        {
+            bool? value;
+            if (TryGet(_pending, unit, effect, out value) || TryGet(_committed, unit, effect, out value)) return value;
+            return null;
         }
     }
 

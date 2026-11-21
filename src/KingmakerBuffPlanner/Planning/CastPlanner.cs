@@ -92,6 +92,10 @@ namespace KingmakerBuffPlanner.Planning
             // Despair an earlier step cleared).
             var recipients = new SequentialRecipientState(false);
             recipients.EnterRoutine(string.Empty);
+            // Review R10 (R8-F1): "<unit>\u001f<effect>" -> the caster whose
+            // funded step in this routine applied that caster-relative effect
+            // there (a later skip on another caster's instance is withheld).
+            var overwritten = new Dictionary<string, string>(StringComparer.Ordinal);
             // Allocation order is the routine-wide explicit assignment order
             // with stable final tie-breakers; catalog sorting and dictionary
             // iteration order cannot influence it.
@@ -125,7 +129,7 @@ namespace KingmakerBuffPlanner.Planning
                     if (request.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive)
                     {
                         EffectPresenceResult presence = ClassicPresence(request, sourceOptions,
-                            activeEffects, targetId, ignored);
+                            activeEffects, targetId, ignored, recipients, overwritten);
                         if (presence.Kind == EffectPresenceKind.Complete)
                         {
                             // A skip relying on an effect an earlier step of
@@ -159,6 +163,7 @@ namespace KingmakerBuffPlanner.Planning
                     enhancementRemaining, accounting, steps, outcomes, diagnostics);
                 context.Removals = removals;
                 context.Recipients = recipients;
+                context.Overwritten = overwritten;
                 if (request.Source.Grouping == CastGroupingKind.MassConfiguredTargets)
                     PlanMass(context, pending);
                 else
@@ -175,9 +180,12 @@ namespace KingmakerBuffPlanner.Planning
         // (instance detail with a read origin); otherwise the skip is withheld.
         private EffectPresenceResult ClassicPresence(BuffCastRequest request,
             IReadOnlyList<ProviderPlanningOption> sourceOptions, ActiveEffectSnapshot activeEffects,
-            string targetId, ISet<string> ignored)
+            string targetId, ISet<string> ignored, SequentialRecipientState recipients,
+            IDictionary<string, string> overwritten)
         {
             ISet<ActiveEffectMarker> markers = activeEffects.GetEffects(targetId);
+            List<EffectLeafExpression> leaves = EffectApplicationLifetime.Leaves(request.Source.Effects).ToList();
+            bool permanentOnly = leaves.Count != 0 && leaves.All(leaf => leaf.PermanentApplication);
             IList<ProviderPlanningOption> candidates = sourceOptions.Count != 0
                 ? sourceOptions.ToList() : new List<ProviderPlanningOption> { null };
             EffectPresenceResult first = null;
@@ -190,16 +198,40 @@ namespace KingmakerBuffPlanner.Planning
                 // an unread relation (a target outside every measured disk) or a
                 // hostile one cannot establish the requested benefit (the raw
                 // alternatives would let Prayer's enemy penalty alone count).
-                if (EffectRecipientFactBinding.FactIds(bound).Any(RecipientFactGate.IsRelation) ||
+                // Review R10 (R9-F4): only relation predicates the native
+                // action can evaluate count (not a verified empty checker's
+                // never-run branch).
+                if (EffectRecipientFactBinding.ReachableFactIds(bound).Any(RecipientFactGate.IsRelation) ||
                     (option != null && EffectRecipientFactBinding.HostileRelation(request.Source.Effects,
                         key => option.RecipientFactRead(targetId, key))))
                     return new EffectPresenceResult(EffectPresenceKind.Absent, new string[0]);
-                string caster = option == null ? null : option.Provider.Key.CasterUnitId;
+                string caster = option == null ? request.CasterUnitId : option.Provider.Key.CasterUnitId;
                 EffectPresenceResult result = _presence.EvaluateScoped(bound, (leaf, role) =>
                 {
                     var marker = new ActiveEffectMarker(leaf.Kind, leaf.EffectId);
+                    string owner = role == EffectTarget.Caster ? caster : targetId;
+                    // Review R10 (R9-F1): an effect made only of permanent
+                    // native applications that an earlier funded step of this
+                    // routine certainly left on the unit (a resistance chosen
+                    // earlier, not removed since) is present: a repeat changes
+                    // nothing.
+                    if (permanentOnly && !leaf.CasterRelative && owner != null &&
+                        recipients.Known(owner, leaf.EffectId) == true)
+                        return true;
                     if (!markers.Contains(marker)) return false;
-                    if (!leaf.CasterRelative) return true;
+                    if (!leaf.CasterRelative)
+                        // Review R10-F4: with instance detail, only a readable,
+                        // effective (not suppressed) instance establishes it.
+                        return !activeEffects.HasInstanceDetail ||
+                            activeEffects.GetInstances(targetId).Any(instance => instance != null &&
+                                instance.Marker.Equals(marker) && instance.SuppressionReadable && !instance.Suppressed);
+                    // Review R10 (R8-F1): another caster's funded application
+                    // earlier in this routine may have replaced the instance
+                    // (coexistence unverified): no skip.
+                    string applier;
+                    if (overwritten.TryGetValue(targetId + "\u001f" + leaf.EffectId, out applier) &&
+                        !string.Equals(applier, caster, StringComparison.Ordinal))
+                        return false;
                     // Review R9-F5: and only a readable, effective (not
                     // suppressed) instance of that caster.
                     return caster != null && activeEffects.HasInstanceDetail &&
@@ -245,6 +277,7 @@ namespace KingmakerBuffPlanner.Planning
             internal ExplicitCastingCompiler.RemovalConflictState Removals =
                 new ExplicitCastingCompiler.RemovalConflictState();
             internal SequentialRecipientState Recipients = new SequentialRecipientState(false);
+            internal Dictionary<string, string> Overwritten = new Dictionary<string, string>(StringComparer.Ordinal);
             // The removal conflict that refused a candidate on every centre.
             internal string RemovalConflict;
             // Whether some candidate had a conflict-free centre (then a
@@ -275,6 +308,20 @@ namespace KingmakerBuffPlanner.Planning
                 Outcomes = outcomes;
                 Diagnostics = diagnostics;
             }
+        }
+
+        // Review R10 (R8-F1): a funded step's caster-relative applications,
+        // by unit, with the step's caster.
+        private static void RecordCasterRelative(PlanContext context, ProviderPlanningOption option,
+            IEnumerable<string> reached)
+        {
+            List<string> effects = EffectApplicationLifetime.Leaves(context.Request.Source.Effects)
+                .Where(leaf => leaf.CasterRelative).Select(leaf => leaf.EffectId)
+                .Distinct(StringComparer.Ordinal).ToList();
+            if (effects.Count == 0) return;
+            foreach (string unit in reached.Distinct(StringComparer.Ordinal))
+                foreach (string effect in effects)
+                    context.Overwritten[unit + "\u001f" + effect] = option.Provider.Key.CasterUnitId;
         }
 
         private static void PlanPerTarget(PlanContext context, IEnumerable<string> pending)
@@ -314,6 +361,7 @@ namespace KingmakerBuffPlanner.Planning
                     StepChanges(request, selection.Option, new[] { targetId }));
                 context.Recipients.Record(selection.Option, request.Source.Effects,
                     recipients.Concat(new[] { targetId }), selection.Option.Provider.Key.CasterUnitId);
+                RecordCasterRelative(context, selection.Option, recipients.Concat(new[] { targetId }));
                 context.Outcomes.Add(new TargetPlanOutcome(request.Source.SourceId,
                     request.AssignmentId, targetId, TargetOutcomeKind.Fulfilled,
                     request.AssignmentId + ":planned" +
@@ -353,10 +401,15 @@ namespace KingmakerBuffPlanner.Planning
                     .OrderBy(id => id, StringComparer.Ordinal).ToArray();
                 string[] recipients = ExpectedRecipients(request.Source.Effects, selection.Option,
                     selection.Anchor, covered);
+                // Review R10 (R9-F3): the step's predicted recipients are
+                // friendly to the caster by construction, so its confirmation
+                // expects only the beneficial branch of a relation predicate (a
+                // fresh enemy penalty never confirms); analysis keeps using the
+                // complete discovered expression.
                 context.Steps.Add(new CastStep(request.Source.SourceId, request.AssignmentId,
                     selection.Option.Provider.Key, selection.Anchor, covered, recipients,
                     selection.Reservation, selection.MaterialReservation,
-                    request.Source.Effects, true,
+                    EffectRecipientFactBinding.BindFriendlyRelation(request.Source.Effects), true,
                     selection.Option.ExecutionStrategy, selection.Option.ExecutionStrategyReason,
                     selection.AppliedEnhancementIds,
                     EnhancementUsage(selection.AppliedEnhancementIds, context.Enhancements),
@@ -368,6 +421,8 @@ namespace KingmakerBuffPlanner.Planning
                 context.Recipients.Record(selection.Option, request.Source.Effects,
                     recipients.Concat(selection.Option.AffectedTargetIdsForAnchor(selection.Anchor)),
                     selection.Option.Provider.Key.CasterUnitId);
+                RecordCasterRelative(context, selection.Option,
+                    recipients.Concat(selection.Option.AffectedTargetIdsForAnchor(selection.Anchor)));
                 foreach (string targetId in covered)
                 {
                     context.Outcomes.Add(new TargetPlanOutcome(request.Source.SourceId,

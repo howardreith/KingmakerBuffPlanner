@@ -27,6 +27,8 @@ namespace KingmakerBuffPlanner.GameAdapters
         internal bool Party;
         internal bool AreaRecipients;
         internal bool UnsafeArea;
+        // Review R10-F1: the native selector admits only allies of the caster.
+        internal bool RequiresAlly;
         internal bool InfusedPersonal;
         internal string TargetClass;
     }
@@ -61,10 +63,15 @@ namespace KingmakerBuffPlanner.GameAdapters
             Func<string, string, float?> raw = distance ?? ((a, b) => null);
             // Review R9 (R8-F6): a failed live distance read is unavailable
             // for that pair only; it never interrupts the other centres.
+            // Review R10 (R8-F6): a non-finite or negative reading is unusable
+            // geometry, the same as no reading.
             Func<string, string, float?> measure = (a, b) =>
             {
-                try { return raw(a, b); }
+                float? value;
+                try { value = raw(a, b); }
                 catch (Exception) { return null; }
+                return value.HasValue && !float.IsNaN(value.Value) && !float.IsInfinity(value.Value) &&
+                    value.Value >= 0f ? value : null;
             };
             UnitSnapshot[] units = (snapshotUnits ?? new UnitSnapshot[0]).Where(u => u.TargetValidation.Alive &&
                 u.TargetValidation.Friendly && u.TargetValidation.Targetable).ToArray();
@@ -106,6 +113,16 @@ namespace KingmakerBuffPlanner.GameAdapters
             else if (decision.AreaRecipients && areaCoverage != null && casterReadable)
             {
                 float radius = areaCoverage.Radius;
+                // Review R10-F1: an explicit native Ally selector
+                // (AbilityTargetsAround TargetType.Ally) selects only units
+                // allied to the caster, independently of the anchor's
+                // CanTarget. A unit read as not allied is not reached at all; a
+                // unit whose relation is unread may be reached (affected) but
+                // gets no coverage claim.
+                bool requiresAlly = areaCoverage.RequiresAlly;
+                decision.RequiresAlly = requiresAlly;
+                Func<string, bool?> allyRead = unitId => unitHasFact == null ? null
+                    : unitHasFact(unitId, RecipientFactGate.AllyOfCaster);
                 // Review R8-F6: a centre whose own position cannot be read has
                 // no measurable burst; it is not offered as a legal anchor (it
                 // could otherwise inherit coverage from other anchors).
@@ -133,6 +150,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 Func<string, bool?> noFacts = id => null;
                 Func<UnitSnapshot, bool> eligible = unit =>
                 {
+                    if (requiresAlly && allyRead(unit.UnitId) != true) return false;
                     if (!gated) return casterPayload;
                     string unitId = unit.UnitId;
                     bool unresolved;
@@ -161,10 +179,27 @@ namespace KingmakerBuffPlanner.GameAdapters
                     string id = anchorId;
                     UnitSnapshot[] inside = units.Where(unit =>
                     {
+                        if (requiresAlly && allyRead(unit.UnitId) == false) return false;
                         if (unit.UnitId == id) return true;
                         float? metres = measure(id, unit.UnitId);
                         return metres.HasValue && metres.Value <= radius + 0.01f;
                     }).ToArray();
+                    if (requiresAlly)
+                        foreach (UnitSnapshot unit in inside)
+                        {
+                            bool? ally = allyRead(unit.UnitId);
+                            if (!ally.HasValue) continue;
+                            Dictionary<string, bool> reads, known;
+                            if (!decision.RecipientFactReads.TryGetValue(unit.UnitId, out reads))
+                                decision.RecipientFactReads[unit.UnitId] = reads =
+                                    new Dictionary<string, bool>(StringComparer.Ordinal);
+                            reads[RecipientFactGate.AllyOfCaster] = ally.Value;
+                            if (isFixedFact == null || !isFixedFact(RecipientFactGate.AllyOfCaster)) continue;
+                            if (!decision.FixedRecipientFacts.TryGetValue(unit.UnitId, out known))
+                                decision.FixedRecipientFacts[unit.UnitId] = known =
+                                    new Dictionary<string, bool>(StringComparer.Ordinal);
+                            known[RecipientFactGate.AllyOfCaster] = ally.Value;
+                        }
                     // Review R3-F1: every unit inside the burst is affected
                     // by the native actions (an ally that only loses an effect
                     // included); only the eligible ones are beneficiaries.
@@ -233,7 +268,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 decision.FixedRecipientFacts.ToDictionary(pair => pair.Key,
                     pair => (IReadOnlyDictionary<string, bool>)pair.Value, StringComparer.Ordinal),
                 decision.RecipientFactReads.ToDictionary(pair => pair.Key,
-                    pair => (IReadOnlyDictionary<string, bool>)pair.Value, StringComparer.Ordinal));
+                    pair => (IReadOnlyDictionary<string, bool>)pair.Value, StringComparer.Ordinal),
+                decision.RequiresAlly);
         }
 
         private static string[] LegalAnchorIds(IEnumerable<UnitSnapshot> units, Func<string, bool> canTarget)

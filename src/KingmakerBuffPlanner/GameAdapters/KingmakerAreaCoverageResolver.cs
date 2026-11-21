@@ -72,8 +72,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (declaredSource != null && !ReferenceEquals(root,
                     declaredSource))
                 CollectAbility(declaredSource, active, candidates);
+            // Review R10-F1: the selector type is part of the contract; the
+            // same radius with different selectors is contradictory.
             AlliedAreaCoverage[] distinct = candidates
-                .GroupBy(value => value.Radius.ToString("R"), StringComparer.Ordinal)
+                .GroupBy(value => value.Radius.ToString("R") + "|" + value.RequiresAlly, StringComparer.Ordinal)
                 .Select(group => group.First()).ToArray();
             if (_selectorFilter != null)
             {
@@ -125,7 +127,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                         ability.CanTargetFriends, ability.CanTargetEnemies,
                         ability.CanTargetPoint))
                         candidates.Add(new AlliedAreaCoverage(
-                            around.AoERadius.Meters, ability.AssetGuid));
+                            around.AoERadius.Meters, ability.AssetGuid,
+                            around.TargetType == Kingmaker.UnitLogic.Abilities.Components.TargetType.Ally));
                     else _ambiguous = true;
                 }
 
@@ -209,13 +212,17 @@ namespace KingmakerBuffPlanner.GameAdapters
 
     internal sealed class AlliedAreaCoverage
     {
-        internal AlliedAreaCoverage(float radius, string sourceAbilityGuid)
+        internal AlliedAreaCoverage(float radius, string sourceAbilityGuid, bool requiresAlly = false)
         {
             Radius = radius;
             SourceAbilityGuid = sourceAbilityGuid ?? string.Empty;
+            RequiresAlly = requiresAlly;
         }
 
         internal float Radius { get; private set; }
+        // Review R10-F1: the native selector is TargetType.Ally (only units
+        // allied to the caster are selected); Any selects every unit.
+        internal bool RequiresAlly { get; private set; }
         internal string SourceAbilityGuid { get; private set; }
     }
 }

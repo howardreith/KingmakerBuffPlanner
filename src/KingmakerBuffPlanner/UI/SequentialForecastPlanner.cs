@@ -227,8 +227,16 @@ namespace KingmakerBuffPlanner.UI
                     // no longer carried forward as active.
                     ProviderPlanningOption stepOption;
                     optionsByProvider.TryGetValue(step.Provider.Canonical, out stepOption);
-                    EffectChanges stepChanges = StepChanges(step, stepOption);
-                    sequenceChanges.Record(stepOption, step.ExpectedEffects, StepReached(step, stepOption),
+                    // Missing-beneficial-buffs review R10 (R9-F3): a group
+                    // step's expected effects are its beneficiaries' friendly
+                    // branch (confirmation); its changes on every unit it
+                    // reaches are analyzed from the complete discovered
+                    // expression of its source.
+                    EffectExpression analyzed;
+                    if (!effectsBySource.TryGetValue(step.SourceId ?? string.Empty, out analyzed) || analyzed == null)
+                        analyzed = step.ExpectedEffects;
+                    EffectChanges stepChanges = StepChanges(step, stepOption, analyzed);
+                    sequenceChanges.Record(stepOption, analyzed, StepReached(step, stepOption),
                         step.Provider.CasterUnitId);
                     foreach (KeyValuePair<string, string> removal in stepChanges.Removed)
                     {
@@ -363,11 +371,12 @@ namespace KingmakerBuffPlanner.UI
         // The step's provider-bound net changes: owner unit -> effect pairs it
         // may apply, certainly leaves applied, and may remove (any realizable
         // branch; a certain later re-application on the same path cancels).
-        private static EffectChanges StepChanges(CastStep step, ProviderPlanningOption option)
+        private static EffectChanges StepChanges(CastStep step, ProviderPlanningOption option,
+            EffectExpression analyzed)
         {
             return EffectChanges.Merge(StepReached(step, option).Select(recipient =>
-                EffectChangeAnalysis.Analyze(option == null ? step.ExpectedEffects
-                    : option.BindForRecipient(step.ExpectedEffects, recipient),
+                EffectChangeAnalysis.Analyze(option == null ? analyzed
+                    : option.BindForRecipient(analyzed, recipient),
                     step.Provider.CasterUnitId, recipient)));
         }
 
@@ -385,17 +394,21 @@ namespace KingmakerBuffPlanner.UI
         private static IEnumerable<ProjectedEffect> ProjectEffects(CastStep step)
         {
             var projections = new List<ProjectedEffect>();
-            CollectJustified(step.ExpectedEffects, step, projections);
+            CollectJustified(step.ExpectedEffects, step, projections, null);
             return projections;
         }
 
         private static void CollectJustified(EffectExpression expression,
-            CastStep step, List<ProjectedEffect> projections)
+            CastStep step, List<ProjectedEffect> projections, EffectTarget? outer)
         {
             var leaf = expression as EffectLeafExpression;
             if (leaf != null)
             {
-                if (leaf.Target == EffectTarget.Caster)
+                // Review R10 (R9-F5): the leaf's role under its wrappers (a
+                // leaf inside a group step's allied-area selector lands on the
+                // step's predicted recipients).
+                EffectTarget role = EffectRecipientScope.Resolve(leaf.Target, outer);
+                if (role == EffectTarget.Caster)
                 {
                     // A caster-directed effect lands on the actual planned
                     // caster, never on the cast anchor (an ally anchor with a
@@ -407,7 +420,7 @@ namespace KingmakerBuffPlanner.UI
                         RecipientUnitId = step.Provider.CasterUnitId
                     });
                 }
-                else if (leaf.Target == EffectTarget.CurrentTarget && step.TargetUnitIds.Count == 1)
+                else if (role == EffectTarget.CurrentTarget && step.TargetUnitIds.Count == 1)
                 {
                     projections.Add(new ProjectedEffect
                     {
@@ -415,8 +428,8 @@ namespace KingmakerBuffPlanner.UI
                         RecipientUnitId = step.TargetUnitIds[0]
                     });
                 }
-                else if (leaf.Target == EffectTarget.Party ||
-                    leaf.Target == EffectTarget.AlliedAreaRecipients)
+                else if (role == EffectTarget.Party ||
+                    role == EffectTarget.AlliedAreaRecipients)
                 {
                     foreach (string candidate in step.ExpectedRecipientUnitIds)
                         projections.Add(new ProjectedEffect
@@ -431,7 +444,7 @@ namespace KingmakerBuffPlanner.UI
             if (sequence != null)
             {
                 foreach (EffectExpression child in sequence.Children)
-                    CollectJustified(child, step, projections);
+                    CollectJustified(child, step, projections, outer);
                 return;
             }
             var targeted = expression as TargetedEffectExpression;
@@ -439,14 +452,20 @@ namespace KingmakerBuffPlanner.UI
             {
                 // A target wrapper re-scopes its child; without a proven
                 // recipient mapping for the wrapper's target we project
-                // nothing rather than invent coverage.
+                // nothing rather than invent coverage. Review R10 (R9-F5): a
+                // group step's verified allied-area (or party) selector maps
+                // to the step's predicted recipients.
                 if (targeted.Target == EffectTarget.CurrentTarget &&
                     step.TargetUnitIds.Count == 1)
-                    CollectJustified(targeted.Child, step, projections);
+                    CollectJustified(targeted.Child, step, projections, outer);
+                else if (step.MassCast && (targeted.Target == EffectTarget.AlliedAreaRecipients ||
+                    targeted.Target == EffectTarget.Party))
+                    CollectJustified(targeted.Child, step, projections,
+                        EffectRecipientScope.Resolve(targeted.Target, outer));
                 return;
             }
             var referenced = expression as ReferencedAbilityExpression;
-            if (referenced != null) { CollectJustified(referenced.Child, step, projections); return; }
+            if (referenced != null) { CollectJustified(referenced.Child, step, projections, outer); return; }
             // ConditionalEffectExpression and unknown nodes: no projection.
         }
     }

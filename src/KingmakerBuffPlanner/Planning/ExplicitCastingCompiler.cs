@@ -375,6 +375,14 @@ namespace KingmakerBuffPlanner.Planning
             // effect (see the structural check below); grants of earlier
             // routines only in a one-pass sequence.
             string grantRoutine = null;
+            // Review R10 (R8-F1): the live evidence still standing after the
+            // funded castings so far. A funded caster-relative application by
+            // one caster may replace another caster's instance of that effect
+            // on the units it reaches (coexistence unverified), so those
+            // instances no longer prove anything; "<unit>\u001f<effect>" ->
+            // the applying caster. Same scope as the structural grants.
+            ActiveEffectSnapshot standingLive = liveEffects;
+            var casterRelativeApplied = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (ResolvedCasting compiled in castings)
             {
                 ResolvedCasting casting = compiled;
@@ -383,6 +391,8 @@ namespace KingmakerBuffPlanner.Planning
                 {
                     grantedByUnit.Clear();
                     grantEffects.Clear();
+                    standingLive = liveEffects;
+                    casterRelativeApplied.Clear();
                 }
                 grantRoutine = casting.RoutineId;
                 List<CastEnhancementSnapshot> matched;
@@ -413,6 +423,22 @@ namespace KingmakerBuffPlanner.Planning
                 // ally's Despair): recipients, existing-effect verdict, notes
                 // and readiness are recomputed before the budget decides.
                 PlannedCasting planned;
+                // Review R10 (R8-F1): a skip resting on a live caster-relative
+                // instance that another caster's funded application may since
+                // have replaced is re-assessed against the standing evidence.
+                if (casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied && liveEffects != null &&
+                    casterRelativeApplied.Count != 0 && plannedById.TryGetValue(casting.CastingId, out planned) &&
+                    ReplacedByOtherCaster(casting, effectsBySource, casterRelativeApplied))
+                {
+                    casting = CompileOne(planned, snapshot, options, effectsBySource, enhancementList,
+                        modifierList, new List<string>(), standingLive, strictInstant, out matched,
+                        out intended, out provider, out modifierDemands, out resolved, true);
+                    shape = provider == null
+                        ? new string[0]
+                        : CostShapeOf(ledger.DemandsFor(provider,
+                            casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied
+                                ? intended : matched, modifierDemands));
+                }
                 if (projection.HasChanges && resolved != null &&
                     casting.TargetMode != CastingTargetMode.DirectTarget &&
                     casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied &&
@@ -427,7 +453,7 @@ namespace KingmakerBuffPlanner.Planning
                             casting.PredictedBeneficiaryUnitIds.OrderBy(v => v, StringComparer.Ordinal)))
                     {
                         casting = CompileOne(planned, snapshot, options, effectsBySource, enhancementList,
-                            modifierList, new List<string>(), liveEffects, strictInstant, out matched,
+                            modifierList, new List<string>(), standingLive, strictInstant, out matched,
                             out intended, out provider, out modifierDemands, out resolved, true, now);
                         shape = provider == null
                             ? new string[0]
@@ -557,6 +583,8 @@ namespace KingmakerBuffPlanner.Planning
                     {
                         removalState.Admit(casting.RoutineId, casting.CastingId, changes);
                         RecordSequential(projection, casting, resolved, effectsBySource);
+                        standingLive = RecordCasterRelative(casting, resolved, effectsBySource, standingLive,
+                            casterRelativeApplied);
                     }
                 }
                 if (casting.Readiness != ResolvedCastingReadiness.Ready || outOfScope)
@@ -584,6 +612,8 @@ namespace KingmakerBuffPlanner.Planning
                     // removal state.
                     removalState.Admit(casting.RoutineId, casting.CastingId, changes);
                     RecordSequential(projection, casting, resolved, effectsBySource);
+                    standingLive = RecordCasterRelative(casting, resolved, effectsBySource, standingLive,
+                        casterRelativeApplied);
                     {
                         // R1-F4: the one-pass sequence forgets a structural
                         // grant whose effect this casting removes (review
@@ -1146,6 +1176,68 @@ namespace KingmakerBuffPlanner.Planning
                     grants.Remove(key);
                 }
             }
+        }
+
+        // Review R10 (R8-F1): a funded casting's caster-relative applications
+        // on every unit it reaches; other casters' live instances of those
+        // effects there stop counting as evidence.
+        private static ActiveEffectSnapshot RecordCasterRelative(ResolvedCasting casting,
+            ProviderPlanningOption option, IReadOnlyDictionary<string, EffectExpression> effectsBySource,
+            ActiveEffectSnapshot standing, Dictionary<string, string> applied)
+        {
+            EffectExpression payload = DiscoveredEffectLookup.ForAbility(
+                effectsBySource, casting.Ability, casting.SourceId);
+            List<string> effects = payload == null ? new List<string>() : EffectApplicationLifetime.Leaves(payload)
+                .Where(leaf => leaf.CasterRelative).Select(leaf => leaf.EffectId)
+                .Distinct(StringComparer.Ordinal).ToList();
+            if (effects.Count == 0) return standing;
+            IEnumerable<string> reached = casting.TargetMode == CastingTargetMode.DirectTarget
+                ? new[] { casting.DirectTargetUnitId, casting.CasterUnitId }
+                : casting.PredictedBeneficiaryUnitIds.Concat(new[] { casting.CasterUnitId });
+            if (casting.TargetMode != CastingTargetMode.DirectTarget && option != null)
+            {
+                string anchor = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
+                    ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
+                if (anchor != null) reached = reached.Concat(option.AffectedTargetIdsForAnchor(anchor));
+            }
+            var keys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string unit in reached.Where(value => !string.IsNullOrEmpty(value)))
+                foreach (string effect in effects)
+                {
+                    applied[unit + "\u001f" + effect] = casting.CasterUnitId;
+                    keys.Add(unit + "\u001f" + effect);
+                }
+            if (standing == null || !standing.HasInstanceDetail) return standing;
+            var filtered = new Dictionary<string, IEnumerable<ActiveEffectInstance>>(StringComparer.Ordinal);
+            foreach (string unit in standing.ToUnitMarkers().Keys)
+                filtered[unit] = standing.GetInstances(unit).Where(instance =>
+                    !keys.Contains(unit + "\u001f" + instance.EffectId) ||
+                    string.Equals(instance.CasterUnitId, casting.CasterUnitId, StringComparison.Ordinal)).ToList();
+            return ActiveEffectSnapshot.FromInstances(filtered);
+        }
+
+        // Whether a skip's caster-relative effect was applied, on one of the
+        // units it rests on, by another caster's funded casting.
+        private static bool ReplacedByOtherCaster(ResolvedCasting casting,
+            IReadOnlyDictionary<string, EffectExpression> effectsBySource, Dictionary<string, string> applied)
+        {
+            EffectExpression payload = DiscoveredEffectLookup.ForAbility(
+                effectsBySource, casting.Ability, casting.SourceId);
+            if (payload == null) return false;
+            List<string> effects = EffectApplicationLifetime.Leaves(payload).Where(leaf => leaf.CasterRelative)
+                .Select(leaf => leaf.EffectId).Distinct(StringComparer.Ordinal).ToList();
+            IEnumerable<string> units = casting.TargetMode == CastingTargetMode.DirectTarget
+                ? new[] { casting.DirectTargetUnitId, casting.CasterUnitId }
+                : casting.PredictedBeneficiaryUnitIds.Concat(new[] { casting.CasterUnitId });
+            foreach (string unit in units.Where(value => !string.IsNullOrEmpty(value)))
+                foreach (string effect in effects)
+                {
+                    string applier;
+                    if (applied.TryGetValue(unit + "\u001f" + effect, out applier) &&
+                        !string.Equals(applier, casting.CasterUnitId, StringComparison.Ordinal))
+                        return true;
+                }
+            return false;
         }
 
         // Review R9 (R8-F1): whether a caster-relative buff (Firebrand) from
