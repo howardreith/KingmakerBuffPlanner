@@ -21,6 +21,9 @@ namespace KingmakerBuffPlanner.GameAdapters
         // unit -> fixed recipient fact -> read value (review R4-F3).
         internal Dictionary<string, Dictionary<string, bool>> FixedRecipientFacts =
             new Dictionary<string, Dictionary<string, bool>>(StringComparer.Ordinal);
+        // unit -> every recipient-fact gate key -> read value (review R7-F6).
+        internal Dictionary<string, Dictionary<string, bool>> RecipientFactReads =
+            new Dictionary<string, Dictionary<string, bool>>(StringComparer.Ordinal);
         internal bool Party;
         internal bool AreaRecipients;
         internal bool UnsafeArea;
@@ -150,18 +153,25 @@ namespace KingmakerBuffPlanner.GameAdapters
                     // or remove) go with the option, so conflict analysis can
                     // tell a unit the cast does nothing to (an animal under
                     // Enlarge/Reduce Person, Mass) from one it may change.
-                    if (gated && unitHasFact != null && isFixedFact != null)
+                    // Review R7-F6: and every read (fixed or not), the starting
+                    // state of a sequential forecast.
+                    if (gated && unitHasFact != null)
                         foreach (UnitSnapshot unit in inside)
                         {
-                            Dictionary<string, bool> known;
-                            if (!decision.FixedRecipientFacts.TryGetValue(unit.UnitId, out known))
-                                decision.FixedRecipientFacts[unit.UnitId] = known =
+                            Dictionary<string, bool> known, reads;
+                            if (!decision.RecipientFactReads.TryGetValue(unit.UnitId, out reads))
+                                decision.RecipientFactReads[unit.UnitId] = reads =
                                     new Dictionary<string, bool>(StringComparer.Ordinal);
                             foreach (string fact in EffectRecipientFactBinding.FactIds(casterBound))
                             {
-                                if (!isFixedFact(fact)) continue;
                                 bool? has = unitHasFact(unit.UnitId, fact);
-                                if (has.HasValue) known[fact] = has.Value;
+                                if (!has.HasValue) continue;
+                                reads[fact] = has.Value;
+                                if (isFixedFact == null || !isFixedFact(fact)) continue;
+                                if (!decision.FixedRecipientFacts.TryGetValue(unit.UnitId, out known))
+                                    decision.FixedRecipientFacts[unit.UnitId] = known =
+                                        new Dictionary<string, bool>(StringComparer.Ordinal);
+                                known[fact] = has.Value;
                             }
                         }
                 }
@@ -197,6 +207,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 provider.EffectiveCasterLevel, provider.ExpectedDurationRounds, strategy, strategyReason,
                 decision.RecipientIdsByAnchor, casterFacts, effectsByTarget, decision.AffectedIdsByAnchor,
                 decision.FixedRecipientFacts.ToDictionary(pair => pair.Key,
+                    pair => (IReadOnlyDictionary<string, bool>)pair.Value, StringComparer.Ordinal),
+                decision.RecipientFactReads.ToDictionary(pair => pair.Key,
                     pair => (IReadOnlyDictionary<string, bool>)pair.Value, StringComparer.Ordinal));
         }
 

@@ -96,7 +96,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (apply != null && apply.Buff != null)
                 return Effect(EffectKind.Buff, apply.Buff.AssetGuid,
                     apply.ToCaster ? EffectTarget.Caster : EffectTarget.CurrentTarget,
-                    "ContextActionApplyBuff", MaximumDurationSeconds(apply));
+                    "ContextActionApplyBuff", MaximumDurationSeconds(apply), CasterLevelStrengthOf(apply.Buff));
             var conditional = action as Conditional;
             if (conditional != null)
                 return new DiscoveryNode(DiscoveryNodeKind.Conditional, action.GetType().FullName,
@@ -292,11 +292,91 @@ namespace KingmakerBuffPlanner.GameAdapters
         }
 
         private static DiscoveryNode Effect(EffectKind kind, string id, EffectTarget target, string contract,
-            float? maximumDurationSeconds = null)
+            float? maximumDurationSeconds = null, CasterLevelStrength casterLevelStrength = null)
         {
             return new DiscoveryNode(DiscoveryNodeKind.Effect, contract, effectKind: kind,
                 effectId: id, target: target, sourceContract: contract,
-                maximumDurationSeconds: maximumDurationSeconds);
+                maximumDurationSeconds: maximumDurationSeconds, casterLevelStrength: casterLevelStrength);
+        }
+
+        // Missing-beneficial-buffs review R7-F3: the buff's caster-level
+        // strength, recorded only when it is provably a single native
+        // ContextRankConfig (m_BaseValueType CasterLevel, m_Progression
+        // Custom) and every ContextValue of every component is a constant or
+        // that rank; anything else (another value source, a nested value
+        // container, a second rank config, an unreadable field) leaves it
+        // null and the plain caster-level comparison applies.
+        internal static CasterLevelStrength CasterLevelStrengthOf(Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff buff)
+        {
+            try
+            {
+                BlueprintComponent[] components = buff == null ? null : buff.ComponentsArray;
+                if (components == null) return null;
+                var configs = components.OfType<Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig>().ToList();
+                if (configs.Count != 1) return null;
+                object config = configs[0];
+                if (NamedValue(config, "m_BaseValueType") != "CasterLevel" ||
+                    NamedValue(config, "m_Progression") != "Custom")
+                    return null;
+                object rankType = FieldValue(config, "m_Type");
+                var progression = FieldValue(config, "m_CustomProgression") as Array;
+                if (rankType == null || progression == null || progression.Length == 0) return null;
+                var items = new List<KeyValuePair<int, int>>();
+                foreach (object item in progression)
+                {
+                    object baseValue = FieldValue(item, "BaseValue"), value = FieldValue(item, "ProgressionValue");
+                    if (!(baseValue is int) || !(value is int)) return null;
+                    items.Add(new KeyValuePair<int, int>((int)baseValue, (int)value));
+                }
+                for (int index = 1; index < items.Count; index++)
+                    if (items[index].Key <= items[index - 1].Key) return null;
+                foreach (BlueprintComponent component in components)
+                {
+                    if (component == null || ReferenceEquals(component, config)) continue;
+                    for (Type type = component.GetType(); type != null && type != typeof(BlueprintComponent);
+                        type = type.BaseType)
+                        foreach (FieldInfo field in type.GetFields(BindingFlags.Instance | BindingFlags.Public |
+                            BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+                        {
+                            Type fieldType = field.FieldType;
+                            if (fieldType == typeof(ContextValue))
+                            {
+                                var value = (ContextValue)field.GetValue(component);
+                                if (value == null || value.ValueType == ContextValueType.Simple) continue;
+                                if (value.ValueType != ContextValueType.Rank ||
+                                    !Equals(FieldValue(value, "ValueRank"), rankType))
+                                    return null;
+                                continue;
+                            }
+                            if ((fieldType.IsArray && fieldType.GetElementType().Namespace != null &&
+                                    fieldType.GetElementType().Namespace.StartsWith("Kingmaker.UnitLogic.Mechanics",
+                                        StringComparison.Ordinal)) ||
+                                (fieldType.Namespace != null && fieldType.Namespace.StartsWith(
+                                    "Kingmaker.UnitLogic.Mechanics", StringComparison.Ordinal) &&
+                                    !fieldType.IsEnum))
+                                return null;
+                        }
+                }
+                return new CasterLevelStrength(items);
+            }
+            catch (Exception) { return null; }
+        }
+
+        private static object FieldValue(object target, string name)
+        {
+            for (Type type = target == null ? null : target.GetType(); type != null; type = type.BaseType)
+            {
+                FieldInfo field = type.GetField(name, BindingFlags.Instance | BindingFlags.Public |
+                    BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                if (field != null) return field.GetValue(target);
+            }
+            return null;
+        }
+
+        private static string NamedValue(object target, string name)
+        {
+            object value = FieldValue(target, name);
+            return value == null ? null : value.ToString();
         }
 
         // H1 (0.6.11 review): the exact installed ContextActionApplyBuff

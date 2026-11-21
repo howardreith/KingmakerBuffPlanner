@@ -35,9 +35,11 @@ namespace KingmakerBuffPlanner.Discovery
             CasterFactGate casterFactGate = null,
             NearbyRecipientRule nearbyRecipients = null,
             float? maximumDurationSeconds = null,
-            RecipientFactGate recipientFactGate = null)
+            RecipientFactGate recipientFactGate = null,
+            CasterLevelStrength casterLevelStrength = null)
         {
             RecipientFactGate = recipientFactGate;
+            CasterLevelStrength = casterLevelStrength;
             Kind = kind;
             Identity = identity ?? string.Empty;
             Children = new ReadOnlyCollection<DiscoveryNode>(
@@ -73,5 +75,7 @@ namespace KingmakerBuffPlanner.Discovery
         // Effect nodes: the longest native lifetime of the application when
         // it is structurally fixed (see EffectApplicationLifetime).
         public float? MaximumDurationSeconds { get; private set; }
+        // Effect nodes: review R7-F3 caster-level strength (planning metadata).
+        public CasterLevelStrength CasterLevelStrength { get; private set; }
     }
 }

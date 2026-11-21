@@ -148,12 +148,18 @@ namespace KingmakerBuffPlanner.Domain.Effects
     {
         internal EffectChanges(IEnumerable<KeyValuePair<string, string>> applied,
             IEnumerable<KeyValuePair<string, string>> removed,
-            IEnumerable<KeyValuePair<string, string>> guaranteed = null)
+            IEnumerable<KeyValuePair<string, string>> guaranteed = null,
+            IEnumerable<KeyValuePair<string, string>> certainlyRemoved = null)
         {
             Applied = applied.Distinct().ToList().AsReadOnly();
             Removed = removed.Distinct().ToList().AsReadOnly();
             Guaranteed = (guaranteed ?? new KeyValuePair<string, string>[0]).Distinct().ToList().AsReadOnly();
+            CertainlyRemoved = (certainlyRemoved ?? new KeyValuePair<string, string>[0]).Distinct().ToList().AsReadOnly();
         }
+
+        // Review R7-F6: owner unit -> effect id the casting removes on every
+        // path and does not apply again afterwards (a subset of Removed).
+        public IReadOnlyList<KeyValuePair<string, string>> CertainlyRemoved { get; private set; }
 
         // owner unit id -> effect id the casting may apply there.
         public IReadOnlyList<KeyValuePair<string, string>> Applied { get; private set; }
@@ -169,7 +175,7 @@ namespace KingmakerBuffPlanner.Domain.Effects
         {
             List<EffectChanges> list = (parts ?? new EffectChanges[0]).Where(p => p != null).ToList();
             return new EffectChanges(list.SelectMany(p => p.Applied), list.SelectMany(p => p.Removed),
-                list.SelectMany(p => p.Guaranteed));
+                list.SelectMany(p => p.Guaranteed), list.SelectMany(p => p.CertainlyRemoved));
         }
     }
 
@@ -180,6 +186,7 @@ namespace KingmakerBuffPlanner.Domain.Effects
             internal readonly HashSet<KeyValuePair<string, string>> Certain = new HashSet<KeyValuePair<string, string>>();
             internal readonly HashSet<KeyValuePair<string, string>> Possible = new HashSet<KeyValuePair<string, string>>();
             internal readonly HashSet<KeyValuePair<string, string>> Removed = new HashSet<KeyValuePair<string, string>>();
+            internal readonly HashSet<KeyValuePair<string, string>> CertainRemoved = new HashSet<KeyValuePair<string, string>>();
         }
 
         public static EffectChanges Analyze(EffectExpression boundExpression, string casterUnitId,
@@ -189,7 +196,7 @@ namespace KingmakerBuffPlanner.Domain.Effects
                 new KeyValuePair<string, string>[0]);
             var scope = new EffectRecipientScope(boundExpression, casterUnitId, recipientUnitId);
             State state = Visit(boundExpression, null, scope);
-            return new EffectChanges(state.Possible, state.Removed, state.Certain);
+            return new EffectChanges(state.Possible, state.Removed, state.Certain, state.CertainRemoved);
         }
 
         private static State Visit(EffectExpression expression, EffectTarget? outer, EffectRecipientScope scope)
@@ -215,7 +222,10 @@ namespace KingmakerBuffPlanner.Domain.Effects
                 {
                     string owner = scope.Owner(EffectRecipientScope.Resolve(empty.Removal.Target, outer));
                     if (!string.IsNullOrEmpty(owner))
+                    {
                         state.Removed.Add(new KeyValuePair<string, string>(owner, empty.Removal.EffectId));
+                        state.CertainRemoved.Add(new KeyValuePair<string, string>(owner, empty.Removal.EffectId));
+                    }
                 }
                 return state;
             }
@@ -228,8 +238,10 @@ namespace KingmakerBuffPlanner.Domain.Effects
                     // A later certain application restores an earlier
                     // removal; a later removal undoes an earlier certainty.
                     state.Removed.ExceptWith(next.Certain);
+                    state.CertainRemoved.ExceptWith(next.Possible);
                     state.Certain.ExceptWith(next.Removed);
                     state.Removed.UnionWith(next.Removed);
+                    state.CertainRemoved.UnionWith(next.CertainRemoved);
                     state.Certain.UnionWith(next.Certain);
                     state.Possible.UnionWith(next.Possible);
                 }
@@ -238,6 +250,13 @@ namespace KingmakerBuffPlanner.Domain.Effects
             var conditional = expression as ConditionalEffectExpression;
             if (conditional != null)
             {
+                // Review R7-F5: a conditional whose native checker has no
+                // conditions always runs its true branch (the verified 2.1.7b
+                // result, see EffectExpressionAnalysis.IsEmptyChecker): its
+                // false branch neither applies nor removes anything.
+                if (conditional.CasterFactGate == null && conditional.RecipientFactGate == null &&
+                    EffectExpressionAnalysis.IsEmptyChecker(conditional))
+                    return Visit(conditional.WhenTrue, outer, scope);
                 State yes = Visit(conditional.WhenTrue, outer, scope);
                 State no = Visit(conditional.WhenFalse, outer, scope);
                 state.Certain.UnionWith(yes.Certain);
@@ -246,6 +265,8 @@ namespace KingmakerBuffPlanner.Domain.Effects
                 state.Possible.UnionWith(no.Possible);
                 state.Removed.UnionWith(yes.Removed);
                 state.Removed.UnionWith(no.Removed);
+                state.CertainRemoved.UnionWith(yes.CertainRemoved);
+                state.CertainRemoved.IntersectWith(no.CertainRemoved);
                 return state;
             }
             var targeted = expression as TargetedEffectExpression;
@@ -267,10 +288,12 @@ namespace KingmakerBuffPlanner.Domain.Effects
             string actionPath,
             string recipientUnitId = null,
             float? maximumDurationSeconds = null,
-            NearbySelectionBinding secondarySelection = null)
+            NearbySelectionBinding secondarySelection = null,
+            CasterLevelStrength casterLevelStrength = null)
             : base("leaf")
         {
             if (string.IsNullOrWhiteSpace(effectId)) throw new ArgumentException("Effect ID is required.", "effectId");
+            CasterLevelStrength = casterLevelStrength;
             Kind = kind;
             EffectId = effectId;
             Target = target;
@@ -287,8 +310,15 @@ namespace KingmakerBuffPlanner.Domain.Effects
         internal EffectLeafExpression WithOwner(string recipientUnitId, NearbySelectionBinding secondarySelection)
         {
             return new EffectLeafExpression(Kind, EffectId, Target, SourceContract, ActionPath,
-                recipientUnitId, MaximumDurationSeconds, secondarySelection ?? SecondarySelection);
+                recipientUnitId, MaximumDurationSeconds, secondarySelection ?? SecondarySelection,
+                CasterLevelStrength);
         }
+
+        // Review R7-F3: how the applied buff's strength depends on caster
+        // level, when that is proven to be only through one native custom
+        // rank progression; null otherwise (the plain caster-level
+        // comparison applies). Inspection metadata, not identity.
+        [JsonIgnore] public CasterLevelStrength CasterLevelStrength { get; private set; }
 
         [JsonProperty("kind", Order = 2)] public EffectKind Kind { get; private set; }
         [JsonProperty("effectId", Order = 3)] public string EffectId { get; private set; }
@@ -308,6 +338,43 @@ namespace KingmakerBuffPlanner.Domain.Effects
         // when it runs (see EffectRecipientBinding).
         [JsonProperty("secondarySelection", Order = 9, NullValueHandling = NullValueHandling.Ignore)]
         public NearbySelectionBinding SecondarySelection { get; private set; }
+    }
+
+    // Missing-beneficial-buffs review R7-F3: a buff whose only caster-level
+    // dependence is one native ContextRankConfig with a Custom progression
+    // based on caster level (the Abjuration resistances: resistance 5 up to
+    // level 10, 10 up to level 20). Items are (BaseValue, ProgressionValue)
+    // in native order; the value at a level is the first item whose
+    // BaseValue is at least that level (verified against the native
+    // progression in the regression). Strength is compared by that value
+    // strictly below the last BaseValue; at or above it (where other native
+    // components may change behavior, e.g. immunity at wizard level 20) the
+    // plain caster-level comparison applies.
+    public sealed class CasterLevelStrength
+    {
+        public CasterLevelStrength(IEnumerable<KeyValuePair<int, int>> items)
+        {
+            Items = new ReadOnlyCollection<KeyValuePair<int, int>>((items ?? new KeyValuePair<int, int>[0]).ToList());
+            if (Items.Count == 0) throw new ArgumentException("A custom progression needs items.", "items");
+        }
+
+        public IReadOnlyList<KeyValuePair<int, int>> Items { get; private set; }
+
+        public int ValueAt(int level)
+        {
+            foreach (KeyValuePair<int, int> item in Items)
+                if (level <= item.Key) return item.Value;
+            return Items[Items.Count - 1].Value;
+        }
+
+        // Whether an instance from existingLevel is at least as strong as a
+        // casting at plannedLevel.
+        public bool AtLeastAsStrong(int existingLevel, int plannedLevel)
+        {
+            int last = Items.Max(item => item.Key);
+            if (existingLevel >= last || plannedLevel >= last) return existingLevel >= plannedLevel;
+            return ValueAt(existingLevel) >= ValueAt(plannedLevel);
+        }
     }
 
     // H1 (0.6.11 review): an application whose native lifetime is

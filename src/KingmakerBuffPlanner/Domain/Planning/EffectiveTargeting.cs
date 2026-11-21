@@ -207,6 +207,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 option.AffectedIdsByAnchor.ToDictionary(pair => pair.Key,
                     pair => (IEnumerable<string>)pair.Value, StringComparer.Ordinal),
                 option.FixedRecipientFacts.ToDictionary(pair => pair.Key, pair => pair.Value,
+                    StringComparer.Ordinal),
+                option.RecipientFactReads.ToDictionary(pair => pair.Key, pair => pair.Value,
                     StringComparer.Ordinal));
         }
     }

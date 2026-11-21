@@ -396,6 +396,14 @@ namespace KingmakerBuffPlanner.Discovery
         {
             if (!AuditRules || effect == null) return null;
             if (IsHarmfulCondition(effect)) return "harmful-condition";
+            // Review R7-F2: when Personal range is what rescues an ability
+            // whose flags aim it at a harmful enemy target (§3.B), that only
+            // settles WHO receives the payload: one that harms its bearer (a
+            // proven penalty-only buff, or one applying such a buff) is still
+            // not a buff.
+            if (effect.Target == "CurrentTarget" && IsPersonalRange(facts) && facts.CanTargetEnemies &&
+                string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal) && ImposesHarm(effect))
+                return "harmful-condition";
             if ((effect.Target == "Caster" || effect.Target == "CurrentTarget") && IsAimedAtEnemies(facts))
                 return "hostile-ability-rider";
             if (Contains(effect.ActionPath, "ContextActionSavingThrow") ||
@@ -477,7 +485,7 @@ namespace KingmakerBuffPlanner.Discovery
             // offensive (damage or an attack on any branch, which leaves no
             // persistent leaf). A buff the payload grants as a separate
             // ability (Firebelly's breath) is not part of this graph.
-            if (HasOffensiveAction(facts)) return true;
+            if (HasUnsafeAction(facts)) return true;
             // Review R5-F2: nor may any applied effect harm its bearer, itself
             // or through a buff its own automatic actions apply (a Daze the
             // approved buff applies when it activates); an automatically
@@ -552,6 +560,30 @@ namespace KingmakerBuffPlanner.Discovery
                         (list.Offensive ?? new string[0]).Count != 0));
         }
 
+        // Review R7-F1: the two narrow exceptions (unit-anchored allied
+        // bursts, the ally-disposition waiver) need EVERY reachable action to
+        // be understood: an offensive action, or any gameplay action the
+        // adapter could not classify (an unknown node such as the native
+        // ContextActionKillTarget, on any branch, or an unrecognized action
+        // in an applied buff's own lists) refuses them. Only presentation
+        // (ContextActionSpawnFx) is a known harmless adjunct.
+        private static bool HasUnsafeAction(NativeCandidateAuditFacts facts)
+        {
+            return HasOffensiveAction(facts) ||
+                (facts.Diagnostics ?? new NativeCandidateDiagnosticFacts[0]).Any(diagnostic => diagnostic != null &&
+                    string.Equals(diagnostic.Code, "unknown-node", StringComparison.Ordinal) &&
+                    !IsPresentationOnly(diagnostic.Contract)) ||
+                (facts.Effects ?? new NativeCandidateEffectFacts[0]).Any(effect => effect != null &&
+                    (effect.FactActions ?? new NativeCandidateFactActions[0]).Any(list =>
+                        (list.Unrecognized ?? new string[0]).Count != 0));
+        }
+
+        private static bool IsPresentationOnly(string identity)
+        {
+            return (identity ?? string.Empty).StartsWith(
+                "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionSpawnFx,", StringComparison.Ordinal);
+        }
+
         // Missing-beneficial-buffs mission §3.C: CanTargetPoint means the
         // player MAY click the ground, not that a point is required. An
         // ability that may also be aimed at its caster or a friend, can never
@@ -573,7 +605,7 @@ namespace KingmakerBuffPlanner.Discovery
             // beneficial buff), although later rules would drop that leaf
             // from the payload list - the cast still executes it.
             return (facts.CanTargetSelf || facts.CanTargetFriends) && !facts.CanTargetEnemies &&
-                !facts.IsStickyTouch && !HasOffensiveAction(facts) && !effects.Any(ImposesHarm) &&
+                !facts.IsStickyTouch && !HasUnsafeAction(facts) && !effects.Any(ImposesHarm) &&
                 components.Any(value => ShortName(value) == "AbilityTargetsAround") &&
                 effects.Count != 0 &&
                 effects.All(effect => effect != null && effect.Kind == "Buff" &&

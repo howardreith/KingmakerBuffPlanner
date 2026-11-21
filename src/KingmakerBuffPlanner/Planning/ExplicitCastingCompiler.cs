@@ -325,7 +325,7 @@ namespace KingmakerBuffPlanner.Planning
                 castings.Add(CompileOne(casting, snapshot, options, effectsBySource,
                     enhancementList, modifierList, diagnostics, liveEffects, strictInstant,
                     out matched, out intended, out provider, out modifierDemands,
-                    out resolvedOption));
+                    out resolvedOption, projectEffects));
                 matchedEnhancements[casting.CastingId] = matched;
                 intendedEnhancements[casting.CastingId] = intended;
                 providers[casting.CastingId] = provider;
@@ -364,10 +364,12 @@ namespace KingmakerBuffPlanner.Planning
             // each unit. Read only in a one-pass sequence view, and only for
             // earlier routines; an independent routine preview starts from its
             // own snapshot.
-            var projection = new ProjectedEffectChanges();
+            // Review R7-F6: the full recipient state (SequentialRecipientState).
+            var projection = new SequentialRecipientState();
             foreach (ResolvedCasting compiled in castings)
             {
                 ResolvedCasting casting = compiled;
+                projection.EnterRoutine(casting.RoutineId);
                 List<CastEnhancementSnapshot> matched;
                 matchedEnhancements.TryGetValue(casting.CastingId, out matched);
                 ProviderSnapshot provider;
@@ -394,29 +396,40 @@ namespace KingmakerBuffPlanner.Planning
                 // earlier funded castings may have changed (Mass Reduce on an
                 // ally an earlier Mass Enlarge reached removes Enlarge
                 // instead). Nobody left: nothing to cast for.
-                if (projectEffects && casting.Readiness == ResolvedCastingReadiness.Ready &&
-                    casting.TargetMode != CastingTargetMode.DirectTarget && resolved != null)
+                // Review R7-F6: likewise a casting refused at compile time ONLY
+                // because its burst reached nobody eligible is re-evaluated: an
+                // earlier routine may have made its allies eligible (Good Hope
+                // after an earlier Good Hope removed their Despair).
+                bool deferredEmpty = projectEffects && casting.Readiness == ResolvedCastingReadiness.Blocked &&
+                    casting.ReadinessReasons.Count != 0 && casting.ReadinessReasons.All(code =>
+                        code.StartsWith(PredictedCoverageEmpty, StringComparison.Ordinal));
+                if (projectEffects && projection.HasChanges && resolved != null &&
+                    casting.TargetMode != CastingTargetMode.DirectTarget &&
+                    (casting.Readiness == ResolvedCastingReadiness.Ready || deferredEmpty))
                 {
                     EffectExpression payload = DiscoveredEffectLookup.ForAbility(
                         effectsBySource, casting.Ability, casting.SourceId);
-                    List<string> kept = casting.PredictedBeneficiaryUnitIds
-                        .Where(unit => projection.KeepsCoverage(resolved, payload, unit, casting.RoutineId)).ToList();
-                    if (kept.Count == 0 && casting.PredictedBeneficiaryUnitIds.Count != 0)
+                    string anchor = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
+                        ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
+                    List<string> now = projection.Beneficiaries(resolved, payload, anchor);
+                    if (now.Count == 0)
                     {
-                        string anchor = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
-                            ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
                         // Review R6 (R5-F5): the stored prediction is the
                         // projected one - nobody.
-                        casting = casting.WithPredictedBeneficiaries(kept);
+                        casting = casting.WithPredictedBeneficiaries(now);
                         finalized.Add(casting.WithBudgetResult(ResolvedCastingReadiness.Blocked,
-                            casting.ReadinessReasons.Concat(new[] { "predicted-coverage-empty:" + anchor })
+                            casting.ReadinessReasons.Concat(new[] { PredictedCoverageEmpty + anchor })
                                 .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)
                                 .ToList(),
                             new CastingCostLine[0], shape, BlockedNotes(casting, null)));
                         continue;
                     }
-                    if (kept.Count != casting.PredictedBeneficiaryUnitIds.Count)
-                        casting = casting.WithPredictedBeneficiaries(kept);
+                    if (deferredEmpty)
+                        casting = casting.WithBudgetResult(ResolvedCastingReadiness.Ready, new string[0],
+                            new CastingCostLine[0], shape);
+                    if (!now.OrderBy(v => v, StringComparer.Ordinal).SequenceEqual(
+                            casting.PredictedBeneficiaryUnitIds.OrderBy(v => v, StringComparer.Ordinal)))
+                        casting = casting.WithPredictedBeneficiaries(now);
                 }
                 // Review R5-F4: a skip changes nothing; it protects only the
                 // effects on the recipients its satisfaction rests on (its
@@ -476,7 +489,7 @@ namespace KingmakerBuffPlanner.Planning
                     if (outOfScope)
                     {
                         removalState.Admit(casting.RoutineId, casting.CastingId, changes);
-                        projection.Record(changes, casting.RoutineId);
+                        RecordSequential(projection, casting, resolved, effectsBySource);
                     }
                 }
                 if (casting.Readiness != ResolvedCastingReadiness.Ready || outOfScope)
@@ -503,7 +516,7 @@ namespace KingmakerBuffPlanner.Planning
                     // R1-F2: only a funded casting enters the routine's
                     // removal state.
                     removalState.Admit(casting.RoutineId, casting.CastingId, changes);
-                    projection.Record(changes, casting.RoutineId);
+                    RecordSequential(projection, casting, resolved, effectsBySource);
                     if (projectEffects)
                     {
                         // R1-F4: the one-pass sequence forgets a structural
@@ -544,7 +557,8 @@ namespace KingmakerBuffPlanner.Planning
             out List<CastEnhancementSnapshot> intendedEnhancements,
             out ProviderSnapshot providerSnapshot,
             out List<ModifierUsageDemand> modifierDemands,
-            out ProviderPlanningOption resolvedOption)
+            out ProviderPlanningOption resolvedOption,
+            bool deferEmptyGroupCoverage = false)
         {
             var reasons = new List<string>();
             string requiredItemSelector = ItemSourceResolution.RequiredSelector(casting.Ability);
@@ -587,7 +601,7 @@ namespace KingmakerBuffPlanner.Planning
                 HasSpendableResources(option, snapshot, resourceReasons);
             if (option != null)
             {
-                predicted = ResolveTargeting(casting, option, snapshot, gaps, reasons);
+                predicted = ResolveTargeting(casting, option, snapshot, gaps, reasons, deferEmptyGroupCoverage);
                 if (predicted == null)
                 {
                     predicted = new string[0];
@@ -934,6 +948,27 @@ namespace KingmakerBuffPlanner.Planning
         // The effects a casting may apply and realizably remove on its
         // predicted recipients, from the same provider binding execution
         // uses (caster facts; nearby-recipient selection per target).
+        public const string PredictedCoverageEmpty = "predicted-coverage-empty:";
+
+        // Review R7-F6: a funded casting's changes enter the sequential state
+        // for every unit it reaches (beneficiaries and units inside its burst).
+        private static void RecordSequential(SequentialRecipientState state, ResolvedCasting casting,
+            ProviderPlanningOption option, IReadOnlyDictionary<string, EffectExpression> effectsBySource)
+        {
+            if (option == null) return;
+            EffectExpression expression = DiscoveredEffectLookup.ForAbility(
+                effectsBySource, casting.Ability, casting.SourceId);
+            IEnumerable<string> reached = casting.TargetMode == CastingTargetMode.DirectTarget
+                ? new[] { casting.DirectTargetUnitId } : casting.PredictedBeneficiaryUnitIds;
+            if (casting.TargetMode != CastingTargetMode.DirectTarget)
+            {
+                string anchor = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
+                    ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
+                if (anchor != null) reached = reached.Concat(option.AffectedTargetIdsForAnchor(anchor));
+            }
+            state.Record(option, expression, reached, casting.CasterUnitId);
+        }
+
         private static EffectChanges ChangesFor(ResolvedCasting casting, ProviderPlanningOption option,
             IReadOnlyDictionary<string, EffectExpression> effectsBySource, bool includeAffected = true)
         {
@@ -1231,11 +1266,12 @@ namespace KingmakerBuffPlanner.Planning
             ProviderPlanningOption option,
             PartyProviderSnapshot snapshot,
             List<CoverageGap> gaps,
-            List<string> reasons)
+            List<string> reasons,
+            bool deferEmptyGroupCoverage = false)
         {
             if (casting.TargetMode == CastingTargetMode.DirectTarget)
                 return ResolveDirectTarget(casting, option, snapshot, reasons);
-            return ResolveGroupOrigin(casting, option, gaps, reasons);
+            return ResolveGroupOrigin(casting, option, gaps, reasons, deferEmptyGroupCoverage);
         }
 
         private static IReadOnlyList<string> ResolveDirectTarget(
@@ -1274,7 +1310,8 @@ namespace KingmakerBuffPlanner.Planning
             PlannedCasting casting,
             ProviderPlanningOption option,
             List<CoverageGap> gaps,
-            List<string> reasons)
+            List<string> reasons,
+            bool deferEmptyGroupCoverage = false)
         {
             string anchorId = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
                 ? casting.CasterUnitId
@@ -1305,8 +1342,11 @@ namespace KingmakerBuffPlanner.Planning
             {
                 // Final review A2: nobody is predicted to be reached, so there
                 // is nothing to cast for and nothing a run could confirm.
-                reasons.Add("predicted-coverage-empty:" + anchorId);
-                return null;
+                reasons.Add(PredictedCoverageEmpty + anchorId);
+                // Review R7-F6: a one-pass sequence keeps the resolved option,
+                // so its budget pass can re-evaluate the burst after earlier
+                // routines (the casting stays refused otherwise).
+                return deferEmptyGroupCoverage ? new ReadOnlyCollection<string>(new string[0]) : null;
             }
             return predicted;
         }
@@ -1419,8 +1459,11 @@ namespace KingmakerBuffPlanner.Planning
             bool allSufficient = true;
             foreach (string unitId in recipients)
             {
+                // Review R7-F4: the recipient's own branch (its fixed facts,
+                // the caster relation included): an enemy-only Prayer penalty
+                // never satisfies a friendly recipient's Prayer.
                 ExistingEffectRecipientAssessment assessment = ExistingEffectSufficiency.AssessScoped(
-                    casting.CasterUnitId, unitId, option.BindEffects(expression, unitId), owner => InstancesFor(liveEffects, owner), ignored, requirement);
+                    casting.CasterUnitId, unitId, option.BindForRecipient(expression, unitId), owner => InstancesFor(liveEffects, owner), ignored, requirement);
                 string detail = assessment.Reasons.Count == 0 ? string.Empty
                     : ":" + string.Join("|", assessment.Reasons.ToArray());
                 switch (assessment.Verdict)
@@ -1459,8 +1502,8 @@ namespace KingmakerBuffPlanner.Planning
                         string rest = notes[index].Substring("already-active:".Length);
                         int split = rest.IndexOf(':');
                         string unit = split < 0 ? rest : rest.Substring(0, split);
-                        notes[index] = CoveredNotePrefix(InstancesFor(liveEffects, unit), expression,
-                            requirement) + rest;
+                        notes[index] = CoveredNotePrefix(InstancesFor(liveEffects, unit),
+                            option.BindForRecipient(expression, unit), requirement) + rest;
                     }
                 foreach (string unitId in predicted)
                 {
@@ -1472,10 +1515,11 @@ namespace KingmakerBuffPlanner.Planning
                     }
                     if (recipients.Contains(unitId)) continue;
                     ExistingEffectRecipientAssessment extra = ExistingEffectSufficiency.AssessScoped(
-                        casting.CasterUnitId, unitId, option.BindEffects(expression, unitId), owner => InstancesFor(liveEffects, owner), ignored, requirement);
+                        casting.CasterUnitId, unitId, option.BindForRecipient(expression, unitId), owner => InstancesFor(liveEffects, owner), ignored, requirement);
                     if (extra.Verdict != ExistingEffectVerdict.Sufficient) continue;
                     preCoveredUnitIds.Add(unitId);
-                    notes.Add(CoveredNotePrefix(InstancesFor(liveEffects, unitId), expression, requirement) +
+                    notes.Add(CoveredNotePrefix(InstancesFor(liveEffects, unitId),
+                        option.BindForRecipient(expression, unitId), requirement) +
                         unitId + (extra.Reasons.Count == 0 ? string.Empty
                             : ":" + string.Join("|", extra.Reasons.ToArray())));
                 }

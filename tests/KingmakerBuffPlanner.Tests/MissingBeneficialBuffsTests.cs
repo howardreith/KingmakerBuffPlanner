@@ -128,6 +128,15 @@ namespace KingmakerBuffPlanner.Tests
             Mbb("missing-beneficial-buffs-prayer-friendly-recipients-keep-coverage", TestMbbPrayerFriendlyCoverage),
             Mbb("missing-beneficial-buffs-good-hope-despair-read-is-the-native-buff-check", TestMbbGoodHopeDespairRead),
             Mbb("missing-beneficial-buffs-empty-checker-follows-the-branch-that-runs", TestMbbEmptyCheckerBranch),
+            Mbb("missing-beneficial-buffs-kill-action-refuses-both-exceptions", TestMbbKillActionRefused),
+            Mbb("missing-beneficial-buffs-personal-penalty-payload-refused", TestMbbPersonalPenaltyRefused),
+            Mbb("missing-beneficial-buffs-resistance-reselect-in-tier-is-free", TestMbbResistanceReselectInTier),
+            Mbb("missing-beneficial-buffs-prayer-penalty-never-covers-a-friendly-ally", TestMbbPrayerPenaltyNotCoverage),
+            Mbb("missing-beneficial-buffs-empty-checker-unreachable-removal-is-no-conflict",
+                TestMbbEmptyCheckerRemovalNoConflict),
+            Mbb("missing-beneficial-buffs-sequential-good-hope-gains-allies", TestMbbSequentialGoodHopeGainsAllies),
+            Mbb("missing-beneficial-buffs-classic-sequential-good-hope-gains-allies",
+                TestMbbClassicSequentialGoodHopeGainsAllies),
             Mbb("missing-beneficial-buffs-point-capable-group-spells-unit-anchored", TestMbbPointGroupSpells),
             Mbb("missing-beneficial-buffs-point-group-unit-anchor-refused-fails-closed", TestMbbPointGroupAnchorFailsClosed),
             Mbb("missing-beneficial-buffs-nested-allied-burst-refused", TestMbbNestedBurstRefused),
@@ -2004,6 +2013,329 @@ namespace KingmakerBuffPlanner.Tests
                 noteB != null && noteB.StartsWith("existing-kept-blocked:b", StringComparison.Ordinal),
                 "The inspector reports removal for an unaffected ally: b note '" + noteB + "' rendered '" +
                 (noteB == null ? string.Empty : CastingRunPresentation.DescribeExistingEffectNote(noteB)) + "'");
+        }
+
+        // A bard who knows Good Hope, with explicit positions, injected live
+        // recipient facts and remaining level-3 slots.
+        private static MbbParty MbbGoodHopeParty(NativeBlueprintDump dump, IDictionary<string, float> positions,
+            Func<string, string, bool> unitHasFact, int remainingSlots, Func<string, bool> canTarget)
+        {
+            List<UnitSnapshot> units = MbbUnits(positions.Keys);
+            PartyProviderAdmission admission = MbbAdmission(dump);
+            ResourcePoolSnapshot pool = PartyProviderAdmission.SpontaneousLevelPool("bard", MbbBardBook, 3,
+                remainingSlots, Math.Max(2, remainingSlots));
+            var providers = new List<ProviderSnapshot>();
+            admission.AdmitSpell("bard", MbbBardBook, false, "Bard",
+                MbbRead(dump, MbbGoodHope, "Good Hope", SourceKind.Spellbook, 7), 3, 0, pool.PoolKey, 1,
+                new string[0], providers);
+            var party = new MbbParty
+            {
+                Effects = new Dictionary<string, EffectExpression>(admission.EffectsBySource, StringComparer.Ordinal),
+                Admission = admission
+            };
+            foreach (ProviderSnapshot provider in providers)
+                party.Abilities[provider.Key.Ability.BaseAbilityGuid] = provider.Key.Ability;
+            party.Options = providers.Select(provider => MbbOption(dump, provider,
+                party.Effects[provider.Key.Ability.Canonical], units, canTarget, positions, unitHasFact)).ToList();
+            party.Snapshot = new PartyProviderSnapshot(units, providers, new[] { pool });
+            return party;
+        }
+
+        // Review R7-F1: a native ContextActionKillTarget (an action the adapter
+        // cannot classify) on Mass Blessing's construct branch, and on Good
+        // Hope's Despair branch, refuses both narrow exceptions through
+        // discovery and provider admission; the unmodified spells stay.
+        private static void TestMbbKillActionRefused()
+        {
+            string blessing = MbbPointGroupSpells[0][1];
+            var burstDump = new NativeBlueprintDump(blessing, MbbPointGroupSpells[0][2]);
+            MbbExpect(MbbAppendToFirstConditionalTrue(burstDump.Get<BlueprintAbility>(blessing),
+                    NativeObject<Kingmaker.UnitLogic.Mechanics.Actions.ContextActionKillTarget>()),
+                "Mass Blessing's construct branch could not be extended.");
+            MbbDiscovery killingBurst = MbbDiscover(burstDump, blessing);
+            var burstProviders = new List<ProviderSnapshot>();
+            ProviderSnapshot burstProvider = MbbAdmission(burstDump).AdmitSpell("caster", "book", false, "Book",
+                MbbRead(burstDump, blessing, blessing, SourceKind.Spellbook, 17), 6, 0, "pool", 1, new string[0],
+                burstProviders);
+            MbbExpect(killingBurst.Scan.Diagnostics.Any(d => d.NodeIdentity.Contains("ContextActionKillTarget")) &&
+                !killingBurst.Included && burstProvider == null,
+                "A point-capable allied burst that can kill a construct was admitted: " + killingBurst.Repaired.Reason);
+            var hopeDump = new NativeBlueprintDump(MbbGoodHope, MbbGoodHopeBuff);
+            MbbExpect(MbbAppendToFirstConditionalTrue(hopeDump.Get<BlueprintAbility>(MbbGoodHope),
+                    NativeObject<Kingmaker.UnitLogic.Mechanics.Actions.ContextActionKillTarget>()),
+                "Good Hope's Despair branch could not be extended.");
+            MbbDiscovery killingHope = MbbDiscover(hopeDump, MbbGoodHope);
+            var hopeProviders = new List<ProviderSnapshot>();
+            ProviderSnapshot hopeProvider = MbbAdmission(hopeDump).AdmitSpell("bard", MbbBardBook, false, "Bard",
+                MbbRead(hopeDump, MbbGoodHope, "Good Hope", SourceKind.Spellbook, 7), 3, 0, "pool", 1,
+                new string[0], hopeProviders);
+            MbbExpect(!killingHope.Included && hopeProvider == null,
+                "Good Hope with a kill action on its Despair branch was admitted: " + killingHope.Repaired.Reason);
+            MbbExpect(MbbDiscover(new NativeBlueprintDump(blessing, MbbPointGroupSpells[0][2]), blessing).Included &&
+                MbbDiscover(new NativeBlueprintDump(MbbGoodHope, MbbGoodHopeBuff), MbbGoodHope).Included,
+                "Unmodified Mass Blessing or Good Hope is no longer admitted.");
+        }
+
+        // Review R7-F2: the native Resistance - Fire selection (Personal,
+        // self, enemy and harmful-enemy flags, its native resource) with its
+        // sole application repointed to the committed Crushing Despair. The
+        // personal targeting rescue no longer admits the penalty; the five
+        // real selections stay admitted.
+        private static void TestMbbPersonalPenaltyRefused()
+        {
+            string fire = MbbAbjuration[3][1];
+            var all = MbbAbjuration.SelectMany(row => new[] { row[1], row[2] }).ToList();
+            var dump = new NativeBlueprintDump(all.Concat(new[] { MbbCrushingDespairBuff }).ToArray());
+            BlueprintAbility ability = dump.Get<BlueprintAbility>(fire);
+            var despair = dump.Get<Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff>(MbbCrushingDespairBuff);
+            MbbExpect(MbbReplaceApplications(ability, apply => SetNative(apply, "Buff", despair)) == 1,
+                "Resistance - Fire's application could not be repointed.");
+            MbbDiscovery penalty = MbbDiscover(dump, fire);
+            PartyProviderAdmission admission = MbbAdmission(dump);
+            var logic = ability.ComponentsArray.OfType<Kingmaker.UnitLogic.Abilities.Components.AbilityResourceLogic>()
+                .Single();
+            KingmakerFactResource resource;
+            string refusal;
+            bool known = KingmakerFactResources.TryPriceAbilityResource("wizard", logic.RequiredResource.AssetGuid,
+                logic.Amount, 1, () => 1, 1, false, string.Empty, string.Empty, out resource, out refusal);
+            var providers = new List<ProviderSnapshot>();
+            admission.AdmitFact("wizard", MbbRead(dump, fire, "Resistance - Fire", SourceKind.AbilityResource, 7),
+                known, resource, refusal, string.Empty, providers, new List<ResourcePoolSnapshot>(),
+                new HashSet<string>(StringComparer.Ordinal));
+            MbbExpect(penalty.Facts.Range == "Personal" && penalty.Facts.CanTargetEnemies &&
+                penalty.Facts.Effects.Any(e => e.EffectId == MbbCrushingDespairBuff),
+                "The repointed selection is not the intended Personal shape.");
+            MbbExpect(!penalty.Included && penalty.Repaired.Disposition == "exclude" && providers.Count == 0,
+                "A Personal selection applying only penalties to its caster was admitted: " + penalty.Repaired.Reason);
+            var real = new NativeBlueprintDump(all.ToArray());
+            MbbExpect(MbbAbjuration.All(row => MbbDiscover(real, row[1]).Included),
+                "A real Abjuration resistance selection is no longer admitted.");
+        }
+
+        // Review R7-F3: Abjuration resistance strength depends on caster level
+        // only through its native custom rank progression (5 up to level 10,
+        // 10 up to level 20). A permanent Fire recorded at level 6 satisfies
+        // the level-7 wizard's Fire for free; Cold still switches for one use.
+        // Tier transitions and the native progression are checked separately.
+        private static void TestMbbResistanceReselectInTier()
+        {
+            var dump = new NativeBlueprintDump(MbbAbjuration.SelectMany(row => new[] { row[1], row[2] }).ToArray());
+            MbbParty party = MbbWizardParty(dump, 1);
+            AbilityKey fire = party.Abilities["Fire"], cold = party.Abilities["Cold"];
+            string fireBuff = MbbAbjuration[3][2];
+            var live = ActiveEffectSnapshot.FromInstances(new Dictionary<string, IEnumerable<ActiveEffectInstance>>
+            {
+                { "wizard", new[] { new ActiveEffectInstance(EffectKind.Buff, fireBuff, null, 6, 0) } }
+            });
+            ResolvedCasting reselect = new ExplicitCastingCompiler().Compile(CastingDocument(
+                    DirectCasting("fire", "long", "wizard", "wizard", fire.Canonical, fire)),
+                party.Snapshot, party.Options, party.Effects, new CastEnhancementSnapshot[0], null, null, false, live)
+                .CastingById("fire");
+            ResolvedCasting change = new ExplicitCastingCompiler().Compile(CastingDocument(
+                    DirectCasting("cold", "long", "wizard", "wizard", cold.Canonical, cold)),
+                party.Snapshot, party.Options, party.Effects, new CastEnhancementSnapshot[0], null, null, false, live)
+                .CastingById("cold");
+            MbbExpect(reselect.Readiness == ResolvedCastingReadiness.AlreadySatisfied && reselect.Cost.Count == 0 &&
+                change.Readiness == ResolvedCastingReadiness.Ready && change.Cost.Sum(c => c.Units) == 1,
+                "Reselecting Fire from level 6 at level 7: " + reselect.Readiness + " " +
+                string.Join(",", reselect.ReadinessReasons) + " / Cold " + change.Readiness);
+            EffectLeafExpression leaf = EffectApplicationLifetime.Leaves(party.Effects[fire.Canonical])
+                .Single(l => l.EffectId == fireBuff);
+            MbbExpect(leaf.CasterLevelStrength != null &&
+                leaf.CasterLevelStrength.Items.SequenceEqual(new[]
+                {
+                    new KeyValuePair<int, int>(10, 5), new KeyValuePair<int, int>(20, 10)
+                }),
+                "Resistance - Fire's native custom progression was not recorded.");
+            // The native progression itself (ContextRankConfig's own method on
+            // the detached native component) agrees below the last breakpoint.
+            var config = dump.Get<Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff>(fireBuff).ComponentsArray
+                .OfType<Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig>().Single();
+            System.Reflection.MethodInfo progression = typeof(Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig)
+                .GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Public)
+                .FirstOrDefault(m => m.Name == "ApplyProgression" && m.ReturnType == typeof(int) &&
+                    m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(int));
+            MbbExpect(progression != null, "ContextRankConfig has no ApplyProgression(int): " + string.Join(",",
+                typeof(Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig).GetMethods(
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.DeclaredOnly)
+                    .Select(m => m.Name + "(" + string.Join(",", m.GetParameters().Select(p => p.ParameterType.Name)) + ")")));
+            for (int level = 1; level < 20; level++)
+            {
+                int native = (int)progression.Invoke(config, new object[] { level });
+                MbbExpect(native == leaf.CasterLevelStrength.ValueAt(level),
+                    "Level " + level + ": native progression " + native + " vs modelled " +
+                    leaf.CasterLevelStrength.ValueAt(level));
+            }
+            Func<int, int, ExistingEffectVerdict> verdict = (existing, planned) => ExistingEffectSufficiency.Assess(
+                "wizard", party.Effects[fire.Canonical],
+                new[] { new ActiveEffectInstance(EffectKind.Buff, fireBuff, null, existing, 0) }, null,
+                new ExistingEffectRequirement(planned, 0, 0, false)).Verdict;
+            MbbExpect(verdict(6, 7) == ExistingEffectVerdict.Sufficient &&
+                verdict(10, 11) == ExistingEffectVerdict.Insufficient &&
+                verdict(19, 20) == ExistingEffectVerdict.Insufficient &&
+                verdict(12, 19) == ExistingEffectVerdict.Sufficient,
+                "Tier transitions: 6/7 " + verdict(6, 7) + ", 10/11 " + verdict(10, 11) + ", 19/20 " +
+                verdict(19, 20) + ", 12/19 " + verdict(12, 19));
+        }
+
+        // Review R7-F4: native Prayer with skip-if-active. A sufficient
+        // PrayerBuff on the caster and only a sufficient enemy PrayerDebuff on
+        // the friendly ally: one funded cast and no already-covered note for
+        // the ally. PrayerBuff on both: a zero-cost skip.
+        private static void TestMbbPrayerPenaltyNotCoverage()
+        {
+            var dump = new NativeBlueprintDump(MbbPrayer, MbbPrayerBuff, MbbPrayerDebuff);
+            float radius = 40f * 0.3048f;
+            var positions = new Dictionary<string, float>(StringComparer.Ordinal)
+            {
+                { "caster", 0f }, { "ally", radius * 0.5f }
+            };
+            MbbGroup group = MbbGroupCaster(dump, MbbPrayer, positions, id => id == "caster");
+            Func<string, ActiveEffectSnapshot> live = allyEffect => ActiveEffectSnapshot.FromInstances(
+                new Dictionary<string, IEnumerable<ActiveEffectInstance>>
+                {
+                    { "caster", new[] { new ActiveEffectInstance(EffectKind.Buff, MbbPrayerBuff, 5000, 20, 0) } },
+                    { "ally", new[] { new ActiveEffectInstance(EffectKind.Buff, allyEffect, 5000, 20, 0) } }
+                });
+            Func<ActiveEffectSnapshot, ResolvedCasting> compile = effects => new ExplicitCastingCompiler().Compile(
+                    CastingDocument(GroupCasting("prayer", "long", "caster", group.Ability.Canonical, group.Ability,
+                        new[] { "caster", "ally" })),
+                    group.Snapshot, group.Options, group.Effects, new CastEnhancementSnapshot[0], null, null, false,
+                    effects).Castings.Single();
+            ResolvedCasting penalized = compile(live(MbbPrayerDebuff));
+            MbbExpect(penalized.Readiness == ResolvedCastingReadiness.Ready && penalized.Cost.Sum(c => c.Units) == 1 &&
+                !penalized.ExistingEffectNotes.Any(note => note.StartsWith("already-", StringComparison.Ordinal) &&
+                    note.Contains(":ally")),
+                "Prayer's enemy penalty satisfied a friendly ally: " + penalized.Readiness + " " +
+                string.Join(" | ", penalized.ExistingEffectNotes));
+            ResolvedCasting covered = compile(live(MbbPrayerBuff));
+            MbbExpect(covered.Readiness == ResolvedCastingReadiness.AlreadySatisfied && covered.Cost.Count == 0,
+                "Prayer on both was not a zero-cost skip: " + covered.Readiness);
+        }
+
+        // Review R7-F5: Mass Blessing is funded first; then Feather Step,
+        // Mass whose application sits on an EMPTY native checker's true branch
+        // and whose false branch (never run) removes Mass Blessing's buff. The
+        // second casting is Ready for one slot with no removal conflict; with
+        // the removal on the true branch it is refused.
+        private static void TestMbbEmptyCheckerRemovalNoConflict()
+        {
+            string blessing = MbbPointGroupSpells[0][1], blessingBuff = MbbPointGroupSpells[0][2];
+            string feather = MbbPointGroupSpells[1][1], featherBuff = MbbPointGroupSpells[1][2];
+            var positions = new Dictionary<string, float>(StringComparer.Ordinal) { { "w", 0f }, { "ally", 1f } };
+            foreach (bool reachable in new[] { false, true })
+            {
+                var dump = new NativeBlueprintDump(blessing, blessingBuff, feather, featherBuff);
+                BlueprintAbility spell = dump.Get<BlueprintAbility>(feather);
+                var run = spell.ComponentsArray.OfType<Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction>().Single();
+                var remove = NativeObject<Kingmaker.UnitLogic.Mechanics.Actions.ContextActionRemoveBuff>();
+                SetNative(remove, "Buff", dump.Get<Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff>(blessingBuff));
+                var gate = NativeObject<Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional>();
+                SetNative(gate, "ConditionsChecker", new Kingmaker.ElementsSystem.ConditionsChecker
+                {
+                    Conditions = new Kingmaker.ElementsSystem.Condition[0]
+                });
+                var applications = run.Actions.Actions;
+                SetNative(gate, "IfTrue", new Kingmaker.ElementsSystem.ActionList
+                {
+                    Actions = reachable ? applications.Concat(new Kingmaker.ElementsSystem.GameAction[] { remove })
+                        .ToArray() : applications
+                });
+                SetNative(gate, "IfFalse", new Kingmaker.ElementsSystem.ActionList
+                {
+                    Actions = reachable ? new Kingmaker.ElementsSystem.GameAction[0]
+                        : new Kingmaker.ElementsSystem.GameAction[] { remove }
+                });
+                run.Actions.Actions = new Kingmaker.ElementsSystem.GameAction[] { gate };
+                MbbParty party = MbbMassParty(dump, new Dictionary<string, int> { { "w", 3 } },
+                    new Dictionary<string, string[]> { { "w", new[] { blessing, feather } } }, positions);
+                AbilityKey blessingKey = MbbSpellKey(blessing), featherKey = MbbSpellKey(feather);
+                ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(CastingDocument(
+                        GroupCasting("bless", "long", "w", blessingKey.Canonical, blessingKey, new[] { "w", "ally" }),
+                        GroupCasting("step", "long", "w", featherKey.Canonical, featherKey, new[] { "w", "ally" })),
+                    party.Snapshot, party.Options, party.Effects, new CastEnhancementSnapshot[0]);
+                ResolvedCasting first = plan.CastingById("bless"), second = plan.CastingById("step");
+                if (!reachable)
+                    MbbExpect(first.Readiness == ResolvedCastingReadiness.Ready &&
+                        second.Readiness == ResolvedCastingReadiness.Ready && second.Cost.Sum(c => c.Units) == 1 &&
+                        !second.ReadinessReasons.Any(r => r.StartsWith(ExplicitCastingCompiler.RemovesPlannedEffect,
+                            StringComparison.Ordinal)),
+                        "An empty checker's unreachable removal blocked the casting: " + second.Readiness + " " +
+                        string.Join(",", second.ReadinessReasons));
+                else
+                    MbbExpect(second.Readiness == ResolvedCastingReadiness.Blocked && second.Cost.Count == 0 &&
+                        second.ReadinessReasons.Any(r => r.StartsWith(ExplicitCastingCompiler.RemovesPlannedEffect +
+                            ":bless:" + blessingBuff, StringComparison.Ordinal)),
+                        "A reachable removal of the planned Mass Blessing was not refused: " + second.Readiness + " " +
+                        string.Join(",", second.ReadinessReasons));
+            }
+        }
+
+        // Review R7-F6: allies at 0, 10 and 20 feet; the latter two under
+        // Crushing Despair. Good Hope centred at 10 feet (first routine)
+        // benefits the ally at 0 and clears both Despairs; Good Hope centred
+        // at 20 feet (next routine) then benefits the allies at 10 and 20 for
+        // its own slot. Previewed alone, the second routine has nobody.
+        private static void TestMbbSequentialGoodHopeGainsAllies()
+        {
+            var dump = new NativeBlueprintDump(MbbGoodHope, MbbGoodHopeBuff);
+            string despair = "buff-predicate:" + MbbCrushingDespairBuff;
+            var positions = new Dictionary<string, float>(StringComparer.Ordinal)
+            {
+                { "bard", 30f }, { "a", 0f }, { "m", 10f * 0.3048f }, { "f", 20f * 0.3048f }
+            };
+            MbbParty party = MbbGoodHopeParty(dump, positions,
+                (unit, fact) => fact == despair && (unit == "m" || unit == "f"), 2, id => id == "m" || id == "f");
+            AbilityKey hope = party.Abilities[MbbGoodHope];
+            PlannedCasting second = GroupCasting("second", "important", "bard", hope.Canonical, hope,
+                new[] { "m", "f" }, null, CastingTargetMode.AnchoredOrigin, "f");
+            CastingForecast onePass = new CastingForecastService().ForecastOnePass(CastingDocument(
+                    GroupCasting("first", "long", "bard", hope.Canonical, hope, new[] { "a" }, null,
+                        CastingTargetMode.AnchoredOrigin, "m"), second),
+                party.Snapshot, party.Options, party.Effects);
+            ResolvedCasting first = onePass.Plan.CastingById("first"), later = onePass.Plan.CastingById("second");
+            MbbExpect(first.Readiness == ResolvedCastingReadiness.Ready && first.Cost.Sum(c => c.Units) == 1 &&
+                first.PredictedBeneficiaryUnitIds.SequenceEqual(new[] { "a" }) &&
+                later.Readiness == ResolvedCastingReadiness.Ready && later.Cost.Sum(c => c.Units) == 1 &&
+                later.PredictedBeneficiaryUnitIds.OrderBy(v => v, StringComparer.Ordinal).SequenceEqual(new[] { "f", "m" }),
+                "The sequential Good Hope did not gain the allies whose Despair was removed: " + later.Readiness +
+                " [" + string.Join(",", later.PredictedBeneficiaryUnitIds) + "] " + string.Join(",", later.ReadinessReasons));
+            ResolvedCasting alone = new ExplicitCastingCompiler().Compile(CastingDocument(second), party.Snapshot,
+                party.Options, party.Effects, new CastEnhancementSnapshot[0]).Castings.Single();
+            MbbExpect(alone.Readiness == ResolvedCastingReadiness.Blocked && alone.Cost.Count == 0 &&
+                alone.PredictedBeneficiaryUnitIds.Count == 0,
+                "The second routine previewed alone no longer starts from its own snapshot: " + alone.Readiness);
+        }
+
+        // The Classic sequential forecast of the same two routines.
+        private static void TestMbbClassicSequentialGoodHopeGainsAllies()
+        {
+            var dump = new NativeBlueprintDump(MbbGoodHope, MbbGoodHopeBuff);
+            string despair = "buff-predicate:" + MbbCrushingDespairBuff;
+            var positions = new Dictionary<string, float>(StringComparer.Ordinal)
+            {
+                { "bard", 30f }, { "a", 0f }, { "m", 10f * 0.3048f }, { "f", 20f * 0.3048f }
+            };
+            MbbParty party = MbbGoodHopeParty(dump, positions,
+                (unit, fact) => fact == despair && (unit == "m" || unit == "f"), 2, id => id == "m" || id == "f");
+            AbilityKey hope = party.Abilities[MbbGoodHope];
+            BuffPlannerProfile profile = BuffPlannerProfile.CreateDefault("mbb-sequential-good-hope");
+            profile.Routines.First(rt => rt.RoutineId == "long").Assignments.Add(Assignment(
+                hope.Canonical, hope, new[] { "a" }));
+            profile.Routines.First(rt => rt.RoutineId == "short").Assignments.Add(Assignment(
+                hope.Canonical, hope, new[] { "m", "f" }));
+            SequentialForecastPlanner.Result classic = SequentialForecastPlanner.Compute(profile,
+                new[] { "long", "short" }, party.Snapshot, new ActiveEffectSnapshot(null), party.Effects,
+                party.Options, new CastEnhancementSnapshot[0]);
+            CastStep later = classic.Occurrences[1].Plan.Steps.SingleOrDefault();
+            MbbExpect(classic.Occurrences[0].Plan.Steps.Count == 1 && later != null &&
+                later.Reservation.Units == 1 && later.ExpectedRecipientUnitIds.Contains("m") &&
+                later.ExpectedRecipientUnitIds.Contains("f"),
+                "The Classic sequential Good Hope did not gain the allies whose Despair was removed: " +
+                (later == null ? "no step" : string.Join(",", later.ExpectedRecipientUnitIds)) + " / " +
+                string.Join(",", classic.Occurrences[1].Plan.Outcomes.Select(o => o.UnitId + "=" + o.Kind)));
         }
 
         // GoodHopeBuff gains an AddFactContextActions whose Activated list

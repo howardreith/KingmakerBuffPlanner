@@ -119,7 +119,7 @@ namespace KingmakerBuffPlanner.Planning
                     bool found = false;
                     foreach (ActiveEffectInstance instance in values.Where(value => value.Marker.Equals(new ActiveEffectMarker(leaf.Kind, leaf.EffectId))))
                     {
-                        string failure = strength ? Failure(instance, requirement) : null;
+                        string failure = strength ? Failure(instance, requirement, leaf.CasterLevelStrength) : null;
                         if (failure == null) found = true;
                         else failures.Add(failure + ":" + owner + ":" + leaf.EffectId);
                     }
@@ -197,9 +197,17 @@ namespace KingmakerBuffPlanner.Planning
             var reasons = new List<string>();
             var relevant = new HashSet<string>(all.PresentMarkers, StringComparer.Ordinal);
             var sufficient = new HashSet<ActiveEffectMarker>();
+            // Review R7-F3: each effect's caster-level strength, when proven
+            // for every application of it in the expression.
+            Dictionary<string, CasterLevelStrength> strengths = EffectApplicationLifetime.Leaves(expression)
+                .GroupBy(leaf => leaf.EffectId, StringComparer.Ordinal)
+                .Where(group => group.All(leaf => leaf.CasterLevelStrength != null))
+                .ToDictionary(group => group.Key, group => group.First().CasterLevelStrength, StringComparer.Ordinal);
             foreach (ActiveEffectInstance instance in live)
             {
-                string failure = Failure(instance, requirement);
+                CasterLevelStrength strength;
+                strengths.TryGetValue(instance.EffectId ?? string.Empty, out strength);
+                string failure = Failure(instance, requirement, strength);
                 if (failure == null) sufficient.Add(instance.Marker);
                 else if (relevant.Contains(instance.EffectId))
                     reasons.Add(failure + ":" + instance.EffectId);
@@ -219,7 +227,7 @@ namespace KingmakerBuffPlanner.Planning
         // Null when the instance is at least as strong as the planned
         // casting and has enough duration left; otherwise the reason.
         internal static string Failure(ActiveEffectInstance instance,
-            ExistingEffectRequirement requirement)
+            ExistingEffectRequirement requirement, CasterLevelStrength strength = null)
         {
             if (requirement.StrengthUnprovableReason != null)
                 return "equivalence-unproven:" + requirement.StrengthUnprovableReason;
@@ -228,7 +236,13 @@ namespace KingmakerBuffPlanner.Planning
             if (!instance.SuppressionReadable) return "suppression-unreadable";
             if (requirement.PlannedCasterLevel <= 0) return "caster-level-unverified:planned";
             if (instance.CasterLevel == null) return "caster-level-unverified";
-            if (instance.CasterLevel.Value < requirement.PlannedCasterLevel)
+            // Review R7-F3: an effect whose strength depends on caster level
+            // only through a native custom rank progression is compared by
+            // that strength (a permanent Abjuration resistance from level 6
+            // equals one from level 7); every other effect by caster level.
+            if (instance.CasterLevel.Value < requirement.PlannedCasterLevel &&
+                (strength == null || !strength.AtLeastAsStrong(instance.CasterLevel.Value,
+                    requirement.PlannedCasterLevel)))
                 return "weaker-caster-level:" + instance.CasterLevel.Value + "<" +
                     requirement.PlannedCasterLevel;
             int plannedStrength = requirement.PlannedMetamagicMask & StrengthMetamagicMask;

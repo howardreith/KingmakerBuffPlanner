@@ -100,23 +100,25 @@ namespace KingmakerBuffPlanner.UI
             var optionsByProvider = new Dictionary<string, ProviderPlanningOption>(StringComparer.Ordinal);
             foreach (ProviderPlanningOption option in providerOptions ?? new ProviderPlanningOption[0])
                 if (option != null) optionsByProvider[option.Provider.Key.Canonical] = option;
-            // Missing-beneficial-buffs review R5-F5: what earlier occurrences'
-            // funded steps may have changed on each unit; a later occurrence's
-            // group beneficiaries are narrowed to those whose payload still
-            // lands (Mass Reduce on an ally an earlier Mass Enlarge reached
-            // removes Enlarge instead of applying Reduce).
-            var sequenceChanges = new ProjectedEffectChanges();
+            // Missing-beneficial-buffs review R5-F5 / R7-F6: the recipient
+            // state earlier occurrences' funded steps leave; a later
+            // occurrence's group beneficiaries are recomputed from it -
+            // narrowed (Mass Reduce on an ally an earlier Mass Enlarge reached
+            // removes Enlarge instead) or widened (Good Hope on allies whose
+            // Despair an earlier Good Hope removed).
+            var sequenceChanges = new SequentialRecipientState();
 
             foreach (string routineId in routineIdsInOrder
                 .Distinct(StringComparer.Ordinal))
             {
+                sequenceChanges.EnterRoutine(routineId);
                 List<ProviderPlanningOption> occurrenceOptions = (providerOptions ?? new ProviderPlanningOption[0])
                     .Where(option => option != null)
                     .Select(option =>
                     {
                         EffectExpression payload;
                         return effectsBySource.TryGetValue(option.Provider.Key.Ability.Canonical, out payload)
-                            ? sequenceChanges.Narrow(option, payload, routineId) : option;
+                            ? sequenceChanges.Reevaluate(option, payload) : option;
                     }).ToList();
                 PartyProviderSnapshot occurrenceSnapshot = BuildSnapshot(
                     snapshot, poolRemaining, poolTokens, materialRemaining,
@@ -198,7 +200,8 @@ namespace KingmakerBuffPlanner.UI
                     ProviderPlanningOption stepOption;
                     optionsByProvider.TryGetValue(step.Provider.Canonical, out stepOption);
                     EffectChanges stepChanges = StepChanges(step, stepOption);
-                    sequenceChanges.Record(stepChanges, routineId);
+                    sequenceChanges.Record(stepOption, step.ExpectedEffects, StepReached(step, stepOption),
+                        step.Provider.CasterUnitId);
                     foreach (KeyValuePair<string, string> removal in stepChanges.Removed)
                     {
                         HashSet<ActiveEffectMarker> markers;
@@ -329,16 +332,21 @@ namespace KingmakerBuffPlanner.UI
         // branch; a certain later re-application on the same path cancels).
         private static EffectChanges StepChanges(CastStep step, ProviderPlanningOption option)
         {
-            IEnumerable<string> recipients = step.ExpectedRecipientUnitIds.Count != 0
-                ? step.ExpectedRecipientUnitIds : step.TargetUnitIds;
-            // A group step also reaches allies that only lose an effect.
-            if (step.MassCast && option != null && !string.IsNullOrEmpty(step.AnchorUnitId))
-                recipients = recipients.Concat(option.AffectedTargetIdsForAnchor(step.AnchorUnitId))
-                    .Distinct(StringComparer.Ordinal).ToList();
-            return EffectChanges.Merge(recipients.Select(recipient =>
+            return EffectChanges.Merge(StepReached(step, option).Select(recipient =>
                 EffectChangeAnalysis.Analyze(option == null ? step.ExpectedEffects
                     : option.BindForRecipient(step.ExpectedEffects, recipient),
                     step.Provider.CasterUnitId, recipient)));
+        }
+
+        // Every unit a step reaches: its recipients and, for a group step,
+        // the allies inside its burst that only lose an effect.
+        private static List<string> StepReached(CastStep step, ProviderPlanningOption option)
+        {
+            IEnumerable<string> recipients = step.ExpectedRecipientUnitIds.Count != 0
+                ? step.ExpectedRecipientUnitIds : step.TargetUnitIds;
+            if (step.MassCast && option != null && !string.IsNullOrEmpty(step.AnchorUnitId))
+                recipients = recipients.Concat(option.AffectedTargetIdsForAnchor(step.AnchorUnitId));
+            return recipients.Distinct(StringComparer.Ordinal).ToList();
         }
 
         private static IEnumerable<ProjectedEffect> ProjectEffects(CastStep step)
