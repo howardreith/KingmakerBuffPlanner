@@ -15,10 +15,11 @@ namespace KingmakerBuffPlanner.Execution
     public sealed class ObservedEffectInstance
     {
         public ObservedEffectInstance(EffectKind kind, string effectId, string instanceKey,
-            long endTimeTicks, bool suppressed, string diagnosticContext = null)
+            long endTimeTicks, bool suppressed, string diagnosticContext = null, string casterUnitId = null)
         {
             if (string.IsNullOrWhiteSpace(effectId))
                 throw new ArgumentException("Effect ID is required.", "effectId");
+            CasterUnitId = string.IsNullOrWhiteSpace(casterUnitId) ? null : casterUnitId;
             Kind = kind;
             EffectId = effectId;
             InstanceKey = instanceKey ?? string.Empty;
@@ -34,6 +35,10 @@ namespace KingmakerBuffPlanner.Execution
         public bool Suppressed { get; private set; }
         // Native context is diagnostic only; never proof of application or equivalence.
         public string DiagnosticContext { get; private set; }
+        // Review R9-F2: the unit whose cast applied the instance (the buff
+        // context's caster); null when unread. A caster-relative leaf
+        // (Firebrand) is confirmed only by an instance of the submitted caster.
+        public string CasterUnitId { get; private set; }
 
         internal string Identity
         {
@@ -253,7 +258,11 @@ namespace KingmakerBuffPlanner.Execution
                 string owner = scope.Owner(leaf, role);
                 List<ObservedEffectInstance> instances;
                 if (owner == null || !after.TryGetValue(owner, out instances)) return false;
-                Func<ObservedEffectInstance, bool> matches = value => value.Kind == leaf.Kind && value.EffectId == leaf.EffectId;
+                // Review R9-F2: a caster-relative leaf counts only from an
+                // instance the submitted caster applied (an unread origin, or
+                // another caster's, confirms nothing).
+                Func<ObservedEffectInstance, bool> matches = value => value.Kind == leaf.Kind &&
+                    value.EffectId == leaf.EffectId && FromCaster(leaf, value, caster);
                 var matching = instances.Where(matches).ToList();
                 if (transient)
                 {
@@ -278,9 +287,22 @@ namespace KingmakerBuffPlanner.Execution
                 {
                     IReadOnlyList<ObservedEffectInstance> prior;
                     return before.TryGetValue(owner, out prior) && prior.Any(value =>
-                        !value.Suppressed && value.Kind == leaf.Kind && value.EffectId == leaf.EffectId);
+                        !value.Suppressed && value.Kind == leaf.Kind && value.EffectId == leaf.EffectId &&
+                        FromCaster(leaf, value, caster));
                 });
             }, null).Kind == EffectPresenceKind.Complete;
+        }
+
+        private static bool FromCaster(EffectLeafExpression leaf, ObservedEffectInstance value, string caster)
+        {
+            return !leaf.CasterRelative || (caster != null && value.CasterUnitId != null &&
+                string.Equals(value.CasterUnitId, caster, StringComparison.Ordinal));
+        }
+
+        // Without a submitted caster a caster-relative leaf is never proven.
+        private static bool HasCasterRelativeLeaf(EffectExpression expected)
+        {
+            return EffectApplicationLifetime.Leaves(expected).Any(leaf => leaf.CasterRelative);
         }
 
         // H2 (0.6.11 review, corrected after two PR #21 reviews): the native
@@ -367,6 +389,7 @@ namespace KingmakerBuffPlanner.Execution
             IEnumerable<ObservedEffectInstance> after)
         {
             if (expected == null || before == null || after == null) return false;
+            if (HasCasterRelativeLeaf(expected)) return false;
             List<ObservedEffectInstance> live = after
                 .Where(value => value != null && !value.Suppressed).ToList();
             var markers = new HashSet<ActiveEffectMarker>(live.Select(value =>
@@ -498,7 +521,7 @@ namespace KingmakerBuffPlanner.Execution
         public static bool StillCovered(EffectExpression expected,
             IEnumerable<ObservedEffectInstance> before, IEnumerable<ObservedEffectInstance> after)
         {
-            return expected != null && before != null && after != null &&
+            return expected != null && before != null && after != null && !HasCasterRelativeLeaf(expected) &&
                 Complete(expected, before) && Complete(expected, after);
         }
 

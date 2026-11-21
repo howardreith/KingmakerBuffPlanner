@@ -97,6 +97,19 @@ namespace KingmakerBuffPlanner.UI
                     group => group.First().RemainingUses,
                     StringComparer.Ordinal);
             var carriedEffects = activeEffects.ToUnitMarkers();
+            // Missing-beneficial-buffs review R9-F5: known live instance detail
+            // (applying caster, suppression) is carried, not reduced to
+            // markers, until an admitted step changes that effect on the unit:
+            // a removal drops it; a projected application adds an instance of
+            // the step's caster (for a caster-relative effect it replaces the
+            // other casters' instances, whose survival is unverified).
+            Dictionary<string, List<ActiveEffectInstance>> carriedInstances = null;
+            if (activeEffects.HasInstanceDetail)
+            {
+                carriedInstances = new Dictionary<string, List<ActiveEffectInstance>>(StringComparer.Ordinal);
+                foreach (string unit in carriedEffects.Keys)
+                    carriedInstances[unit] = activeEffects.GetInstances(unit).ToList();
+            }
             var optionsByProvider = new Dictionary<string, ProviderPlanningOption>(StringComparer.Ordinal);
             foreach (ProviderPlanningOption option in providerOptions ?? new ProviderPlanningOption[0])
                 if (option != null) optionsByProvider[option.Provider.Key.Canonical] = option;
@@ -127,8 +140,10 @@ namespace KingmakerBuffPlanner.UI
                     StringComparer.Ordinal);
                 foreach (KeyValuePair<string, HashSet<ActiveEffectMarker>> pair in carriedEffects)
                     occurrenceEffects[pair.Key] = pair.Value;
-                ActiveEffectSnapshot projectedActive =
-                    ActiveEffectSnapshot.FromTypedEffects(occurrenceEffects);
+                ActiveEffectSnapshot projectedActive = carriedInstances == null
+                    ? ActiveEffectSnapshot.FromTypedEffects(occurrenceEffects)
+                    : ActiveEffectSnapshot.FromInstances(carriedInstances.ToDictionary(pair => pair.Key,
+                        pair => (IEnumerable<ActiveEffectInstance>)pair.Value.ToList(), StringComparer.Ordinal));
                 var service = new RoutinePlanService();
                 RoutinePlanResult result = service.Plan(profile, routineId,
                     occurrenceSnapshot, projectedActive, effectsBySource,
@@ -190,6 +205,19 @@ namespace KingmakerBuffPlanner.UI
                                 new HashSet<ActiveEffectMarker>();
                         markers.Add(new ActiveEffectMarker(projection.Kind,
                             projection.EffectId));
+                        if (carriedInstances != null)
+                        {
+                            List<ActiveEffectInstance> instances;
+                            if (!carriedInstances.TryGetValue(projection.RecipientUnitId, out instances))
+                                carriedInstances[projection.RecipientUnitId] = instances =
+                                    new List<ActiveEffectInstance>();
+                            var marker = new ActiveEffectMarker(projection.Kind, projection.EffectId);
+                            if (projection.CasterRelative)
+                                instances.RemoveAll(instance => instance.Marker.Equals(marker));
+                            if (projection.CasterRelative || !instances.Any(instance => instance.Marker.Equals(marker)))
+                                instances.Add(new ActiveEffectInstance(projection.Kind, projection.EffectId,
+                                    null, null, null, false, true, step.Provider.CasterUnitId));
+                        }
                     }
                     // Missing-beneficial-buffs review R2-F3/R3-F3: then the
                     // step's NET removals, from the selected provider's bound
@@ -207,6 +235,10 @@ namespace KingmakerBuffPlanner.UI
                         HashSet<ActiveEffectMarker> markers;
                         if (carriedEffects.TryGetValue(removal.Key, out markers))
                             markers.RemoveWhere(marker => string.Equals(marker.EffectId, removal.Value,
+                                StringComparison.Ordinal));
+                        List<ActiveEffectInstance> instances;
+                        if (carriedInstances != null && carriedInstances.TryGetValue(removal.Key, out instances))
+                            instances.RemoveAll(instance => string.Equals(instance.EffectId, removal.Value,
                                 StringComparison.Ordinal));
                     }
                 }
@@ -320,6 +352,7 @@ namespace KingmakerBuffPlanner.UI
             internal string EffectId;
             internal EffectKind Kind;
             internal string RecipientUnitId;
+            internal bool CasterRelative;
         }
 
         // Effects justified under "successful cast" assumptions only:
@@ -370,7 +403,7 @@ namespace KingmakerBuffPlanner.UI
                     // the ally in the forecast).
                     projections.Add(new ProjectedEffect
                     {
-                        EffectId = leaf.EffectId, Kind = leaf.Kind,
+                        EffectId = leaf.EffectId, Kind = leaf.Kind, CasterRelative = leaf.CasterRelative,
                         RecipientUnitId = step.Provider.CasterUnitId
                     });
                 }
@@ -378,7 +411,7 @@ namespace KingmakerBuffPlanner.UI
                 {
                     projections.Add(new ProjectedEffect
                     {
-                        EffectId = leaf.EffectId, Kind = leaf.Kind,
+                        EffectId = leaf.EffectId, Kind = leaf.Kind, CasterRelative = leaf.CasterRelative,
                         RecipientUnitId = step.TargetUnitIds[0]
                     });
                 }
@@ -388,7 +421,7 @@ namespace KingmakerBuffPlanner.UI
                     foreach (string candidate in step.ExpectedRecipientUnitIds)
                         projections.Add(new ProjectedEffect
                         {
-                            EffectId = leaf.EffectId, Kind = leaf.Kind,
+                            EffectId = leaf.EffectId, Kind = leaf.Kind, CasterRelative = leaf.CasterRelative,
                             RecipientUnitId = candidate
                         });
                 }

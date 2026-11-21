@@ -97,7 +97,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 return Effect(EffectKind.Buff, apply.Buff.AssetGuid,
                     apply.ToCaster ? EffectTarget.Caster : EffectTarget.CurrentTarget,
                     "ContextActionApplyBuff", MaximumDurationSeconds(apply), CasterLevelStrengthOf(apply.Buff),
-                    IsCasterRelative(apply.Buff));
+                    IsCasterRelative(apply.Buff), apply.Permanent);
             var conditional = action as Conditional;
             if (conditional != null)
                 return new DiscoveryNode(DiscoveryNodeKind.Conditional, action.GetType().FullName,
@@ -294,12 +294,12 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         private static DiscoveryNode Effect(EffectKind kind, string id, EffectTarget target, string contract,
             float? maximumDurationSeconds = null, CasterLevelStrength casterLevelStrength = null,
-            bool casterRelative = false)
+            bool casterRelative = false, bool permanentApplication = false)
         {
             return new DiscoveryNode(DiscoveryNodeKind.Effect, contract, effectKind: kind,
                 effectId: id, target: target, sourceContract: contract,
                 maximumDurationSeconds: maximumDurationSeconds, casterLevelStrength: casterLevelStrength,
-                casterRelative: casterRelative);
+                casterRelative: casterRelative, permanentApplication: permanentApplication);
         }
 
         // Review R8-F1: native buff components whose benefit is relative to

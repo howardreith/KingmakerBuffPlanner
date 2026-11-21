@@ -516,8 +516,11 @@ namespace KingmakerBuffPlanner.Domain.Planning
         {
             bool unresolved;
             EffectExpression bound = Bind(option, expression, unit, true, out unresolved);
+            // Review R9-F3: a unit read as hostile to the caster is affected
+            // by the enemy branch, never a beneficiary.
             return !unresolved && EffectExpressionAnalysis.ContainsDefiniteLeaf(bound) &&
-                !EffectExpressionAnalysis.HasCasterGate(bound);
+                !EffectExpressionAnalysis.HasCasterGate(bound) &&
+                !EffectRecipientFactBinding.HostileRelation(expression, key => option.RecipientFactRead(unit, key));
         }
 
         // One funded casting's changes on the units it reaches (its own

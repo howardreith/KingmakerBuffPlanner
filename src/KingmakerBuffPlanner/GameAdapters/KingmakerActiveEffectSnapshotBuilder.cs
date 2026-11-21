@@ -94,7 +94,7 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         // Review R8-F1: the applying caster (the buff context's MaybeCaster);
         // null when unreadable.
-        private static string CasterId(Buff buff)
+        internal static string CasterId(Buff buff)
         {
             try
             {

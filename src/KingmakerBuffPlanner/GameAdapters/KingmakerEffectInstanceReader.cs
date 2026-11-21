@@ -196,7 +196,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                     string.IsNullOrWhiteSpace(buff.SourceAreaEffectId)
                         ? EffectKind.Buff : EffectKind.AreaBuff,
                     buff.Blueprint.AssetGuid, Key(buff), buff.EndTime.Ticks, suppressed,
-                    "suppression-readable=" + suppressionReadable + ":" + ContextDetail(buff)));
+                    "suppression-readable=" + suppressionReadable + ":" + ContextDetail(buff),
+                    // Review R9-F2: the applying caster (null when unread).
+                    KingmakerActiveEffectSnapshotBuilder.CasterId(buff)));
             }
             foreach (ItemSlot slot in unit.Descriptor.Body.CurrentEquipmentSlots)
             {

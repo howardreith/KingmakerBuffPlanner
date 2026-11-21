@@ -82,11 +82,17 @@ namespace KingmakerBuffPlanner.GameAdapters
                         return liveUnits.TryGetValue(unitId, out target) &&
                             KingmakerAnimatedCastAdapter.CanTarget(verdictAbility, new TargetWrapper(target));
                     },
+                    // Review R9 (R8-F6): a failed live read is unavailable for
+                    // that pair only (the planner also contains it).
                     (fromId, toId) =>
                     {
                         UnitEntityData from, to;
-                        return liveUnits.TryGetValue(fromId, out from) && liveUnits.TryGetValue(toId, out to)
-                            ? from.DistanceTo(to) : (float?)null;
+                        try
+                        {
+                            return liveUnits.TryGetValue(fromId, out from) && liveUnits.TryGetValue(toId, out to)
+                                ? from.DistanceTo(to) : (float?)null;
+                        }
+                        catch (Exception) { return null; }
                     },
                     facts,
                     // Review R6-F1/R6-F2: each gate key read with the exact

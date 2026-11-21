@@ -208,6 +208,12 @@ namespace KingmakerBuffPlanner.Planning
                     default:
                         return ExplicitStepConversion.Refuse("target-mode-unsupported:" + castingId);
                 }
+                // Review R9-F3: a group step's predicted beneficiaries are
+                // friendly to the caster by construction (a unit read as
+                // hostile is never one), so its confirmation expects only the
+                // beneficial branch of a relation predicate: a fresh enemy
+                // penalty (PrayerDebuff) never confirms delivery.
+                if (mass) expected = EffectRecipientFactBinding.BindFriendlyRelation(expected);
                 // Final review A2: a step with no expected recipient could
                 // never be confirmed; it is never executed.
                 if (recipients == null || !recipients.Any(value => !string.IsNullOrWhiteSpace(value)))

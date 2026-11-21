@@ -223,9 +223,13 @@ namespace KingmakerBuffPlanner.Discovery
             // caster receives the WHOLE cast: any application that harms its
             // bearer, or any unsafe or unread action, excludes the ability
             // (dropping only the harmful leaf would still execute it).
+            // Review R9 (R8-F2): the rescue covers an application to the
+            // current target AND one explicitly directed to the caster
+            // (ToCaster): both land on the caster only because of Personal
+            // range.
             if (AuditRules && IsPersonalRange(facts) && facts.CanTargetEnemies &&
                 string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal) &&
-                effects.Any(e => e.Target == "CurrentTarget") &&
+                effects.Any(e => e.Target == "CurrentTarget" || e.Target == "Caster") &&
                 (effects.Any(ImposesHarm) || HasUnsafeAction(facts)))
                 return Exclude("harmful-only",
                     "A Personal-range ability flagged against enemies also harms its own caster (a harmful or penalty-only application, or an unsafe or unread action).");
@@ -412,7 +416,8 @@ namespace KingmakerBuffPlanner.Discovery
             // settles WHO receives the payload: one that harms its bearer (a
             // proven penalty-only buff, or one applying such a buff) is still
             // not a buff.
-            if (effect.Target == "CurrentTarget" && IsPersonalRange(facts) && facts.CanTargetEnemies &&
+            if ((effect.Target == "CurrentTarget" || effect.Target == "Caster") && IsPersonalRange(facts) &&
+                facts.CanTargetEnemies &&
                 string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal) && ImposesHarm(effect))
                 return "harmful-condition";
             if ((effect.Target == "Caster" || effect.Target == "CurrentTarget") && IsAimedAtEnemies(facts))
@@ -585,6 +590,10 @@ namespace KingmakerBuffPlanner.Discovery
         // applied buff whose own automatic actions were not read (the export
         // reads one level of applied buffs; a nested AddFactContextActions is
         // an uninspected chain).
+        // Review R9 (R7-F1): nor is a buff whose blueprint the lookup could
+        // not resolve (its record carries no harmful flag): its own automatic
+        // actions are unknown, whether the cast applies it directly or an
+        // applied buff applies it on activation.
         private static bool HasUnsafeAction(NativeCandidateAuditFacts facts)
         {
             return HasOffensiveAction(facts) ||
@@ -592,12 +601,21 @@ namespace KingmakerBuffPlanner.Discovery
                     !string.Equals(diagnostic.Code, "restorative-action", StringComparison.Ordinal) &&
                     !(string.Equals(diagnostic.Code, "unknown-node", StringComparison.Ordinal) &&
                         IsPresentationOnly(diagnostic.Contract))) ||
-                (facts.Effects ?? new NativeCandidateEffectFacts[0]).Any(effect => effect != null &&
+                (facts.Effects ?? new NativeCandidateEffectFacts[0]).Any(effect => effect == null ||
+                    IsUnreadBuff(effect) ||
                     (effect.FactActions ?? new NativeCandidateFactActions[0]).Any(list =>
                         (list.Unrecognized ?? new string[0]).Count != 0 ||
                         (list.AppliedEffects ?? new NativeCandidateEffectFacts[0]).Any(applied => applied == null ||
+                            IsUnreadBuff(applied) ||
                             (applied.ComponentTypes ?? new string[0]).Any(type =>
                                 ShortName(type) == "AddFactContextActions"))));
+        }
+
+        // The exporter records a resolved buff's harmful flag (true or
+        // false); a buff record without one was not read.
+        private static bool IsUnreadBuff(NativeCandidateEffectFacts effect)
+        {
+            return effect != null && (effect.Kind == "Buff" || effect.Kind == "AreaBuff") && effect.Harmful == null;
         }
 
         private static bool IsPresentationOnly(string identity)

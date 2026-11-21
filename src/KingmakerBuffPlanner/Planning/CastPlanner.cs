@@ -86,6 +86,12 @@ namespace KingmakerBuffPlanner.Planning
             // removal-conflict rule too (one routine = one state), so a saved
             // Classic setup never claims two mutually exclusive choices.
             var removals = new ExplicitCastingCompiler.RemovalConflictState();
+            // Review R9 (R8-F3): the recipient state this routine's earlier
+            // steps leave (one routine = one state); a later assignment's group
+            // coverage is recomputed from it (Good Hope on an ally whose
+            // Despair an earlier step cleared).
+            var recipients = new SequentialRecipientState(false);
+            recipients.EnterRoutine(string.Empty);
             // Allocation order is the routine-wide explicit assignment order
             // with stable final tie-breakers; catalog sorting and dictionary
             // iteration order cannot influence it.
@@ -100,7 +106,8 @@ namespace KingmakerBuffPlanner.Planning
                 // a skip is judged on each provider's bound branch for the
                 // target (its fixed facts: Prayer's friendly branch).
                 List<ProviderPlanningOption> sourceOptions = _targeting.Resolve(
-                    snapshot, request, options, enhancementList).ToList();
+                    snapshot, request, options, enhancementList)
+                    .Select(option => recipients.Reevaluate(option, request.Source.Effects)).ToList();
                 foreach (string targetId in request.TargetUnitIds)
                 {
                     UnitSnapshot unit;
@@ -123,8 +130,9 @@ namespace KingmakerBuffPlanner.Planning
                         {
                             // A skip relying on an effect an earlier step of
                             // this routine removes is not satisfied.
-                            EffectChanges kept = EffectChangeAnalysis.Analyze(request.Source.Effects,
-                                request.CasterUnitId, targetId);
+                            // Review R9 (R8-F4): it relies on (and protects)
+                            // exactly the branch that established it.
+                            EffectChanges kept = ClassicKept(request, sourceOptions, targetId);
                             string removedBy = removals.RemovedByEarlier(string.Empty, kept);
                             if (removedBy != null)
                             {
@@ -150,6 +158,7 @@ namespace KingmakerBuffPlanner.Planning
                     ledger, castsByProvider, poolKinds, materials, enhancementById,
                     enhancementRemaining, accounting, steps, outcomes, diagnostics);
                 context.Removals = removals;
+                context.Recipients = recipients;
                 if (request.Source.Grouping == CastGroupingKind.MassConfiguredTargets)
                     PlanMass(context, pending);
                 else
@@ -176,21 +185,46 @@ namespace KingmakerBuffPlanner.Planning
             {
                 EffectExpression bound = option == null ? request.Source.Effects
                     : option.BindForRecipient(request.Source.Effects, targetId);
+                // Review R9 (R8-F4): a skip that depends on the target's
+                // relation to the caster needs that relation read and friendly;
+                // an unread relation (a target outside every measured disk) or a
+                // hostile one cannot establish the requested benefit (the raw
+                // alternatives would let Prayer's enemy penalty alone count).
+                if (EffectRecipientFactBinding.FactIds(bound).Any(RecipientFactGate.IsRelation) ||
+                    (option != null && EffectRecipientFactBinding.HostileRelation(request.Source.Effects,
+                        key => option.RecipientFactRead(targetId, key))))
+                    return new EffectPresenceResult(EffectPresenceKind.Absent, new string[0]);
                 string caster = option == null ? null : option.Provider.Key.CasterUnitId;
                 EffectPresenceResult result = _presence.EvaluateScoped(bound, (leaf, role) =>
                 {
                     var marker = new ActiveEffectMarker(leaf.Kind, leaf.EffectId);
                     if (!markers.Contains(marker)) return false;
                     if (!leaf.CasterRelative) return true;
+                    // Review R9-F5: and only a readable, effective (not
+                    // suppressed) instance of that caster.
                     return caster != null && activeEffects.HasInstanceDetail &&
                         activeEffects.GetInstances(targetId).Any(instance => instance != null &&
                             instance.Marker.Equals(marker) && string.Equals(instance.CasterUnitId, caster,
-                                StringComparison.Ordinal));
+                                StringComparison.Ordinal) && instance.SuppressionReadable && !instance.Suppressed);
                 }, ignored);
                 if (result.Kind != EffectPresenceKind.Complete) return result;
                 if (first == null) first = result;
             }
             return first;
+        }
+
+        // Review R9 (R8-F4): what a Classic skip relies on and protects - the
+        // branch each applicable provider binds for the target (Prayer's
+        // PrayerBuff on a friendly ally, never its enemy PrayerDebuff); with
+        // no provider resolved, the discovered expression as before.
+        private static EffectChanges ClassicKept(BuffCastRequest request,
+            IReadOnlyList<ProviderPlanningOption> sourceOptions, string targetId)
+        {
+            if (sourceOptions.Count == 0)
+                return EffectChangeAnalysis.Analyze(request.Source.Effects, request.CasterUnitId, targetId);
+            return EffectChanges.Merge(sourceOptions.Select(option => EffectChangeAnalysis.Analyze(
+                option.BindForRecipient(request.Source.Effects, targetId), option.Provider.Key.CasterUnitId,
+                targetId)));
         }
 
         private sealed class PlanContext
@@ -210,6 +244,7 @@ namespace KingmakerBuffPlanner.Planning
             internal readonly List<string> Diagnostics;
             internal ExplicitCastingCompiler.RemovalConflictState Removals =
                 new ExplicitCastingCompiler.RemovalConflictState();
+            internal SequentialRecipientState Recipients = new SequentialRecipientState(false);
             // The removal conflict that refused a candidate on every centre.
             internal string RemovalConflict;
             // Whether some candidate had a conflict-free centre (then a
@@ -277,6 +312,8 @@ namespace KingmakerBuffPlanner.Planning
                     selection.OmittedEnhancementIds));
                 context.Removals.Admit(string.Empty, request.AssignmentId,
                     StepChanges(request, selection.Option, new[] { targetId }));
+                context.Recipients.Record(selection.Option, request.Source.Effects,
+                    recipients.Concat(new[] { targetId }), selection.Option.Provider.Key.CasterUnitId);
                 context.Outcomes.Add(new TargetPlanOutcome(request.Source.SourceId,
                     request.AssignmentId, targetId, TargetOutcomeKind.Fulfilled,
                     request.AssignmentId + ":planned" +
@@ -326,6 +363,11 @@ namespace KingmakerBuffPlanner.Planning
                     selection.OmittedEnhancementIds));
                 context.Removals.Admit(string.Empty, request.AssignmentId, StepChanges(request,
                     selection.Option, selection.Option.AffectedTargetIdsForAnchor(selection.Anchor)));
+                // Review R9 (R8-F3): every unit the step reaches enters the
+                // routine's recipient state.
+                context.Recipients.Record(selection.Option, request.Source.Effects,
+                    recipients.Concat(selection.Option.AffectedTargetIdsForAnchor(selection.Anchor)),
+                    selection.Option.Provider.Key.CasterUnitId);
                 foreach (string targetId in covered)
                 {
                     context.Outcomes.Add(new TargetPlanOutcome(request.Source.SourceId,

@@ -290,12 +290,14 @@ namespace KingmakerBuffPlanner.Domain.Effects
             float? maximumDurationSeconds = null,
             NearbySelectionBinding secondarySelection = null,
             CasterLevelStrength casterLevelStrength = null,
-            bool casterRelative = false)
+            bool casterRelative = false,
+            bool permanentApplication = false)
             : base("leaf")
         {
             if (string.IsNullOrWhiteSpace(effectId)) throw new ArgumentException("Effect ID is required.", "effectId");
             CasterLevelStrength = casterLevelStrength;
             CasterRelative = casterRelative;
+            PermanentApplication = permanentApplication;
             Kind = kind;
             EffectId = effectId;
             Target = target;
@@ -313,8 +315,13 @@ namespace KingmakerBuffPlanner.Domain.Effects
         {
             return new EffectLeafExpression(Kind, EffectId, Target, SourceContract, ActionPath,
                 recipientUnitId, MaximumDurationSeconds, secondarySelection ?? SecondarySelection,
-                CasterLevelStrength, CasterRelative);
+                CasterLevelStrength, CasterRelative, PermanentApplication);
         }
+
+        // Review R9-F1: the native application is permanent (no expiry), so
+        // a repeat of it has no duration to refresh. Inspection metadata, not
+        // identity.
+        [JsonIgnore] public bool PermanentApplication { get; private set; }
 
         // Review R8-F1: the buff's benefit depends on who cast it (native
         // AddImmunityFirebrand: immunity to the fire spells of that caster),
@@ -618,7 +625,17 @@ namespace KingmakerBuffPlanner.Domain.Effects
                     open = true;
                 }
                 EffectExpression yes = Resolve(conditional.WhenTrue, hasFact, ref open);
-                EffectExpression no = Resolve(conditional.WhenFalse, hasFact, ref open);
+                // Review R9-F4: a verified empty checker (no gate, no
+                // conditions) always runs its true branch; a predicate only
+                // the never-run false branch reads leaves nothing unresolved.
+                // The false branch is kept (resolved as far as its reads go)
+                // so the expression's structure is preserved for diagnostics.
+                bool unreachable = gate == null && conditional.CasterFactGate == null &&
+                    EffectExpressionAnalysis.IsEmptyChecker(conditional);
+                bool ignoredOpen = false;
+                EffectExpression no = unreachable
+                    ? Resolve(conditional.WhenFalse, hasFact, ref ignoredOpen)
+                    : Resolve(conditional.WhenFalse, hasFact, ref open);
                 return ReferenceEquals(yes, conditional.WhenTrue) && ReferenceEquals(no, conditional.WhenFalse)
                     ? expression : new ConditionalEffectExpression(conditional.ConditionContract, yes, no,
                         conditional.CasterFactGate, gate);
@@ -644,6 +661,33 @@ namespace KingmakerBuffPlanner.Domain.Effects
                 return ReferenceEquals(child, targeted.Child) ? expression : new TargetedEffectExpression(targeted.Target, child);
             }
             return expression;
+        }
+
+        // Review R9-F3: a unit the expression's own relation predicate reads
+        // as hostile to the caster (native IsEnemy true, or IsAlly false) is
+        // reached by the branch meant for enemies (Prayer's PrayerDebuff): it
+        // is affected, never a beneficiary.
+        public static bool HostileRelation(EffectExpression expression, Func<string, bool?> read)
+        {
+            if (expression == null || read == null) return false;
+            foreach (string key in FactIds(expression))
+            {
+                if (key == RecipientFactGate.EnemyOfCaster && read(key) == true) return true;
+                if (key == RecipientFactGate.AllyOfCaster && read(key) == false) return true;
+            }
+            return false;
+        }
+
+        // The expression as it acts on a unit friendly to the caster (only its
+        // relation predicates resolved): a group step's predicted
+        // beneficiaries are friendly by construction, so its confirmation
+        // expects the beneficial branch only.
+        public static EffectExpression BindFriendlyRelation(EffectExpression expression)
+        {
+            if (expression == null) return null;
+            bool unresolved;
+            return Bind(expression, key => key == RecipientFactGate.EnemyOfCaster ? false
+                : key == RecipientFactGate.AllyOfCaster ? true : (bool?)null, out unresolved);
         }
 
         public static IEnumerable<string> FactIds(EffectExpression expression)
@@ -819,6 +863,10 @@ namespace KingmakerBuffPlanner.Domain.Effects
         public static bool HasCasterGate(EffectExpression expression)
         {
             var conditional = expression as ConditionalEffectExpression;
+            // Review R9-F4: a verified empty checker's false branch never runs.
+            if (conditional != null && conditional.CasterFactGate == null && conditional.RecipientFactGate == null &&
+                IsEmptyChecker(conditional))
+                return HasCasterGate(conditional.WhenTrue);
             if (conditional != null)
                 return conditional.CasterFactGate != null || HasCasterGate(conditional.WhenTrue) ||
                     HasCasterGate(conditional.WhenFalse);

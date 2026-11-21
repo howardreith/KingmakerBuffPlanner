@@ -58,7 +58,14 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             if (provider == null) throw new ArgumentNullException("provider");
             Func<string, bool> legal = canTarget ?? (id => false);
-            Func<string, string, float?> measure = distance ?? ((a, b) => null);
+            Func<string, string, float?> raw = distance ?? ((a, b) => null);
+            // Review R9 (R8-F6): a failed live distance read is unavailable
+            // for that pair only; it never interrupts the other centres.
+            Func<string, string, float?> measure = (a, b) =>
+            {
+                try { return raw(a, b); }
+                catch (Exception) { return null; }
+            };
             UnitSnapshot[] units = (snapshotUnits ?? new UnitSnapshot[0]).Where(u => u.TargetValidation.Alive &&
                 u.TargetValidation.Friendly && u.TargetValidation.Targetable).ToArray();
             string casterId = provider.Key.CasterUnitId;
@@ -102,7 +109,10 @@ namespace KingmakerBuffPlanner.GameAdapters
                 // Review R8-F6: a centre whose own position cannot be read has
                 // no measurable burst; it is not offered as a legal anchor (it
                 // could otherwise inherit coverage from other anchors).
-                anchors = LegalAnchorIds(units, legal).Where(id => measure(id, id).HasValue).ToArray();
+                // Review R9 (R8-F6): the legal anchors are exactly the centres
+                // whose coverage was completely built below (one self read
+                // per centre, at the moment its disk is measured).
+                var completed = new List<string>();
                 // Review R2-F5: inside the burst is not the same as eligible.
                 // Recipient-fact conditions (Mass Blessing of Luck and Resolve
                 // skips constructs, and undead unless the caster has Undead
@@ -133,15 +143,25 @@ namespace KingmakerBuffPlanner.GameAdapters
                     // caster's Undead Arcana is unread) decides whether it
                     // receives anything: no definite coverage. A branch that
                     // never reads it (a living ally) stays covered.
+                    // Review R9-F3: a unit the relation predicate reads as
+                    // hostile to the caster gets the enemy branch (Prayer's
+                    // penalty): affected, not a beneficiary.
                     return !unresolved && EffectExpressionAnalysis.ContainsDefiniteLeaf(bound) &&
-                        !EffectExpressionAnalysis.HasCasterGate(bound);
+                        !EffectExpressionAnalysis.HasCasterGate(bound) &&
+                        !EffectRecipientFactBinding.HostileRelation(casterBound,
+                            unitHasFact == null ? noFacts : fact => unitHasFact(unitId, fact));
                 };
-                foreach (string anchorId in anchors)
+                foreach (string anchorId in LegalAnchorIds(units, legal))
                 {
+                    // The centre's own position is read once; that read places
+                    // it inside its own burst. Another unit is inside only on a
+                    // successful read of its own distance from this centre.
                     if (!measure(anchorId, anchorId).HasValue) continue;
+                    completed.Add(anchorId);
                     string id = anchorId;
                     UnitSnapshot[] inside = units.Where(unit =>
                     {
+                        if (unit.UnitId == id) return true;
                         float? metres = measure(id, unit.UnitId);
                         return metres.HasValue && metres.Value <= radius + 0.01f;
                     }).ToArray();
@@ -178,6 +198,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                             }
                         }
                 }
+                anchors = completed.ToArray();
                 reachable = units.Where(unit => decision.RecipientIdsByAnchor.Values
                     .Any(recipients => recipients.Contains(unit.UnitId)));
             }

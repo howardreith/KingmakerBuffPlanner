@@ -90,7 +90,8 @@ namespace KingmakerBuffPlanner.Discovery
                             path,
                             maximumDurationSeconds: node.MaximumDurationSeconds,
                             casterLevelStrength: node.CasterLevelStrength,
-                            casterRelative: node.CasterRelative);
+                            casterRelative: node.CasterRelative,
+                            permanentApplication: node.PermanentApplication);
                     case DiscoveryNodeKind.OffensiveAction:
                         diagnostics.Add(new DiscoveryDiagnostic(
                             "offensive-action", node.Identity, node.SourceContract, path));
