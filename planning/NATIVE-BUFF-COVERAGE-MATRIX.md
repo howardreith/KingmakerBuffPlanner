@@ -6,6 +6,17 @@
 
 # Native Buff Coverage Matrix
 
+## Missing beneficial buffs (2026-11-21, unreleased)
+
+Classifier coverage changed structurally (no name/GUID exception): Good Hope,
+Firebelly, Abjuration Resistance (five selections), Physical Enhancement
+(three selections, live scope), Blessing of Luck and Resolve Mass, Feather
+Step Mass, Firebrand, Heroic Invocation and Enlarge/Reduce Person Mass are now
+catalogued, with their Call of the Wild and Gunslinger variants. Mutually
+exclusive selections are refused as stackable at planning time. Offline only;
+native qualification **NOT_RUN**. Candidate audit, per-family status and
+evidence: [MISSING-BENEFICIAL-BUFFS-AUDIT.md](MISSING-BENEFICIAL-BUFFS-AUDIT.md).
+
 ## 0.5.1-rc3 preparation
 
 Discovery/classification and exact-variant/group coverage remain unchanged.
