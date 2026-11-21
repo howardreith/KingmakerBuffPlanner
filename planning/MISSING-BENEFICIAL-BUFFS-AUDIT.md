@@ -254,6 +254,31 @@ validation table.
 | R1-F8 tests supplied provider/anchor decisions (P1) | Decisions extracted to game-free production code; tests inject only live reads | `…-provider-admission-known-and-unknown-bard`, `…-abjuration-selections-share-the-native-pool`, rewritten area/anchor/fail-closed tests |
 | R1-F9 machine-specific test inputs | Committed faithful fixture subset + Dance entry; inventory replay and fixture refresh are explicit `evidence-*` checks with configurable inputs | ordinary run reads no lab path; explicit capture/verify/audit checks |
 
+## Review round 2
+
+Codex review of `9296fbb` (decision `changes_required`). Verified: R1-F2,
+R1-F4, R1-F5, R1-F7, R1-F9. Re-opened: R1-F1, R1-F3, R1-F6, R1-F8. New:
+R2-F1 to R2-F6. All are fixed in the round-2 corrections commit.
+
+| Finding | Correction | Regression |
+|---|---|---|
+| R1-F1 invalidated skip still noted "skipped" | Blocked skip's `already-active:` notes become `existing-removed-earlier:` ("active now, but an earlier casting in this routine removes it"), enGB/zhCN | `…-switch-invalidates-a-later-already-active-skip` (asserts the inspector text) |
+| R1-F3 possible re-application cleared a removal | `EffectChanges.Guaranteed`; only guaranteed applications clear recorded removals | `…-removal-conflicts-follow-bound-branches` (reversed order: alternative then skip-if-active E → blocked; certain re-application → kept) |
+| R1-F6 approved leaf admitted an unapproved branch | Exception requires EVERY persistent payload of the ability to be an approved, read buff | `…-ally-disposition-exception-is-evidence-bound` (Good Hope + Crushing Despair branch; + unread branch → excluded) |
+| R1-F8 wrong slot level for three group spells | Fixture book and level from each blueprint's first native SpellListComponent (paladin 4, druid 3, wizard 7, wizard 9; Enlarge/Reduce wizard 4); plan cost, provider and converted step reservation asserted | `…-point-capable-group-spells-unit-anchored` |
+| R2-F1 Despair removal treated as a Good Hope grant | One-pass structural grant only when every effect the cast may apply to the unit is guaranteed | `…-one-pass-grants-only-guaranteed-effects` (Good Hope twice → second casts; Feather Step Mass repeat → free) |
+| R2-F2 structural skip left its effect unprotected | A proven structural repeat is decided first and admitted as a kept effect | `…-structural-skip-protects-its-effect` |
+| R2-F3 Classic sequence carried Fire after a Cold switch | `SequentialForecastPlanner` drops each funded step's removals before projecting grants | `…-classic-sequence-forecast-applies-removals` |
+| R2-F4 Classic rejected a provider before trying another centre | Removal conflicts evaluated per legal centre in preference order | `…-classic-picks-a-conflict-free-centre` |
+| R2-F5 Mass Blessing coverage ignored recipient conditions | Recipient-fact gates (`ContextConditionHasFact`, planning metadata) bound per unit from the caster's and the unit's live facts; an unread fact withholds coverage; a point-capable selector with its own or an unread `m_Condition` yields no coverage (`KingmakerAreaCoverageResolver`) | `…-area-coverage-follows-recipient-conditions` |
+| R2-F6 stale durable records | Coverage matrix and resource/casting inventory describe the registry entries and budget-order conflict check | text check below |
+
+Consequence of R2-F5 for native behavior that stays unverified: unit facts
+(creature types, buffs used as conditions) are read live with
+`Descriptor.HasFact`; whether that read matches native `ContextConditionHasFact`
+in every case is an owner observation. Coverage is withheld rather than claimed
+when a fact cannot be read.
+
 ## Rejected approaches
 
 - An `include` override for Good Hope/Firebelly: rejected — it replaces the
@@ -336,6 +361,22 @@ candidate's DLL hash differs and is recorded by the gate receipt):
 | explicit `evidence-native-fixtures-missing-beneficial-buffs-capture` (every regression re-run against the full lab dump; 45 blueprints in full, 50 referenced) | 1/0 | 8 s |
 | explicit `evidence-native-fixtures-missing-beneficial-buffs-verify` (45 files byte-identical to the dump, 50 reference types match, Dance entry identical to the export) | 1/0 | 5.4 s |
 | explicit `evidence-candidate-audit-missing-beneficial-buffs` (1,722 / 16 and 10,443 / 48) | 2/0 | 13.5 s |
+
+Review round 2 corrections, final working tree before commit (DLL
+`ffc38327…` for that tree):
+
+| Command (`-Only`) | Result | Duration |
+|---|---|---|
+| `missing-beneficial-buffs` (28 regressions, committed fixtures only) | 28/0 | 5.9 s |
+| all prefixes `a`…`z` (complete offline program; includes every neighbor family above) | 777/0 | 34.6 s |
+| explicit `evidence-native-fixtures-missing-beneficial-buffs-capture` (all 28 against the full dump; fixture subset unchanged, 45 / 50) | 1/0 | 7.7 s |
+| explicit `…-verify` + `evidence-candidate-audit-missing-beneficial-buffs` (45 identical files, 50 types, Dance identical; 1,722 / 16 and 10,443 / 48) | 3/0 | 14 s |
+
+The round-2 audit judged with classifier `9f6ba19b9089aad37a38e251b00eccc83c60704c1a6ba5dd4aae8bf39c459970`
+(reports `d4b69b2805ba5416eac829db996382b7b596966dc7a2cb918a3c4403713d8f50` /
+`351b1ee7d6c51427777b387b8b9575e49e9aa30003cd22f923502843cbbf871d`); the changed
+rows are again identical, header label only. Round-2 reproductions were traced
+against `9296fbb`, not re-executed on it.
 
 The first complete run after the extraction failed 769/3: three existing
 source-text contract tests pinned code that moved into

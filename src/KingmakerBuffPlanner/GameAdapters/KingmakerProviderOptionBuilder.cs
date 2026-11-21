@@ -72,6 +72,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 // Review R1-F8: the decisions are game-free; this builder only
                 // supplies the native target verdict and live distances.
                 AbilityData verdictAbility = targetingAbility;
+                IReadOnlyDictionary<string, bool> facts = ReadCasterFacts(expression, caster);
                 ProviderTargetingDecision decision = ProviderTargetingPlanner.Decide(
                     provider, expression, snapshot.Units, caster != null, infusedPersonal,
                     areaCoverage,
@@ -86,6 +87,12 @@ namespace KingmakerBuffPlanner.GameAdapters
                         UnitEntityData from, to;
                         return liveUnits.TryGetValue(fromId, out from) && liveUnits.TryGetValue(toId, out to)
                             ? from.DistanceTo(to) : (float?)null;
+                    },
+                    facts,
+                    (unitId, factId) =>
+                    {
+                        UnitEntityData unit;
+                        return liveUnits.TryGetValue(unitId, out unit) ? ReadUnitFact(unit, factId) : null;
                     });
                 bool party = decision.Party;
                 bool areaRecipients = decision.AreaRecipients;
@@ -93,7 +100,6 @@ namespace KingmakerBuffPlanner.GameAdapters
                 var recipientIdsByAnchor = decision.RecipientIdsByAnchor;
                 string[] anchors = decision.Anchors;
                 string[] reachableIds = decision.ReachableIds;
-                IReadOnlyDictionary<string, bool> facts = ReadCasterFacts(expression, caster);
                 var effectsByTarget = new Dictionary<string, EffectExpression>(StringComparer.Ordinal);
                 EffectExpression applicable = EffectConditionBinding.Bind(expression, facts);
                 if (EffectRecipientBinding.ContainsNearby(applicable))
@@ -178,6 +184,19 @@ namespace KingmakerBuffPlanner.GameAdapters
                 catch (Exception) { /* Unreadable is unknown, never false. */ }
             }
             return facts;
+        }
+
+        // Whether a live unit has a fact (a recipient-fact gate); null when
+        // it cannot be read, never false by default.
+        private static bool? ReadUnitFact(UnitEntityData unit, string factId)
+        {
+            try
+            {
+                var fact = ResourcesLibrary.TryGetBlueprint<BlueprintUnitFact>(factId);
+                if (fact == null || unit == null || unit.Descriptor == null) return null;
+                return unit.Descriptor.HasFact(fact);
+            }
+            catch (Exception) { return null; }
         }
 
         private static IReadOnlyList<string> SelectNearbyRecipients(NearbyRecipientRule rule,

@@ -96,7 +96,8 @@ namespace KingmakerBuffPlanner.Domain.Effects
                 EffectExpression yes = Bind(conditional.WhenTrue, select, currentOwner, secondary),
                     no = Bind(conditional.WhenFalse, select, currentOwner, secondary);
                 return ReferenceEquals(yes, conditional.WhenTrue) && ReferenceEquals(no, conditional.WhenFalse) ? expression :
-                    new ConditionalEffectExpression(conditional.ConditionContract, yes, no, conditional.CasterFactGate);
+                    new ConditionalEffectExpression(conditional.ConditionContract, yes, no, conditional.CasterFactGate,
+                        conditional.RecipientFactGate);
             }
             var reference = expression as ReferencedAbilityExpression;
             if (reference != null)

@@ -290,6 +290,10 @@ namespace KingmakerBuffPlanner.UI
             return value;
         }
 
+        // A live "already active" verdict an earlier casting of the same
+        // routine invalidates (missing-beneficial-buffs review R1-F1).
+        internal const string ExistingRemovedEarlierPrefix = ExplicitCastingCompiler.ExistingRemovedEarlierNote;
+
         // One live existing-effect verdict in words.
         internal static string DescribeExistingEffectNote(string note)
         {
@@ -304,7 +308,8 @@ namespace KingmakerBuffPlanner.UI
             string value = note ?? string.Empty;
             if (unitName != null)
                 foreach (string prefix in new[] { "already-active:", "already-covered:", "already-covered-longer:",
-                    "existing-active-recast:", "existing-insufficient:", "existing-incomplete:" })
+                    "existing-active-recast:", "existing-insufficient:", "existing-incomplete:",
+                    ExistingRemovedEarlierPrefix })
                     if (value.StartsWith(prefix, StringComparison.Ordinal))
                     {
                         string unit = FirstSegment(value, prefix);
@@ -313,6 +318,8 @@ namespace KingmakerBuffPlanner.UI
                             value = prefix + name + value.Substring(prefix.Length + unit.Length);
                         break;
                     }
+            if (value.StartsWith(ExistingRemovedEarlierPrefix, StringComparison.Ordinal))
+                return PlannerText.Get("run.effect.removed", FirstSegment(value, ExistingRemovedEarlierPrefix));
             if (value.StartsWith("already-active:", StringComparison.Ordinal))
                 return PlannerText.Get("run.effect.active", FirstSegment(value, "already-active:"));
             if (value.StartsWith("already-covered:", StringComparison.Ordinal))

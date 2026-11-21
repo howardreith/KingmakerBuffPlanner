@@ -364,26 +364,27 @@ namespace KingmakerBuffPlanner.Planning
                 EnhancementSetResolution enhancements = ResolveEnhancementSet(context, option);
                 if (!enhancements.Available)
                     continue;
-                string anchor = option.LegalAnchorIds
+                // R1-F5 / review R2-F4: the best legal centre whose cast
+                // does NOT remove an effect an earlier step of this routine
+                // provides; a conflicting centre is skipped before anything
+                // is reserved, and only when every centre conflicts is the
+                // candidate refused (with the conflict named).
+                string anchor = null;
+                foreach (string candidate in option.LegalAnchorIds
                     .Where(value => option.CoveredTargetIdsForAnchor(value)
                         .Any(id => required.Contains(id)))
                     .OrderByDescending(value => required.Contains(value))
                     .ThenByDescending(value => option.CoveredTargetIdsForAnchor(value)
                         .Count(id => allRemaining.Contains(id)))
-                    .ThenBy(value => value, StringComparer.Ordinal)
-                    .FirstOrDefault();
-                if (string.IsNullOrWhiteSpace(anchor)) continue;
-                // R1-F5: a candidate whose cast may remove an effect an
-                // earlier step of this routine provides is refused before
-                // anything is reserved.
-                string conflict = context.Removals.RemovesProvided(string.Empty, StepChanges(request, option,
-                    request.Source.Grouping == CastGroupingKind.MassConfiguredTargets
-                        ? option.CoveredTargetIdsForAnchor(anchor) : (IEnumerable<string>)required));
-                if (conflict != null)
+                    .ThenBy(value => value, StringComparer.Ordinal))
                 {
-                    context.RemovalConflict = conflict;
-                    continue;
+                    string conflict = context.Removals.RemovesProvided(string.Empty, StepChanges(request, option,
+                        request.Source.Grouping == CastGroupingKind.MassConfiguredTargets
+                            ? option.CoveredTargetIdsForAnchor(candidate) : (IEnumerable<string>)required));
+                    if (conflict == null) { anchor = candidate; break; }
+                    context.RemovalConflict = context.RemovalConflict ?? conflict;
                 }
+                if (string.IsNullOrWhiteSpace(anchor)) continue;
                 ResourceReservation reservation;
                 string reason;
                 // A candidate's full requirements — resource pool, material,

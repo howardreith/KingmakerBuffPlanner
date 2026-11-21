@@ -810,6 +810,7 @@
   "run.effect.metamagic": "缺少计划所需的超魔效果",
   "run.effect.recast": "{0}已有效果，按设置仍将重新施放",
   "run.effect.recastexplain": "{0}已有效果，但{1}（将重新施放）",
+  "run.effect.removed": "{0}目前已有效果，但本流程中较早的施法会将其移除（不跳过，也不施放）",
   "run.effect.suppressed": "可能受到压制",
   "run.effect.unproven": "无法确认强度是否足够",
   "run.effect.weak": "较弱（施法者等级较低）",

@@ -22,6 +22,29 @@ namespace KingmakerBuffPlanner.GameAdapters
         private static readonly Dictionary<Type, MemberInfo[]> ActionListMembers =
             new Dictionary<Type, MemberInfo[]>();
         private bool _ambiguous;
+        private string _selectorFilter;
+
+        internal const string ConditionedPointSelector = "point-area-selector-has-own-condition";
+        internal const string UnreadPointSelector = "point-area-selector-condition-unread";
+
+        // Missing-beneficial-buffs review R2-F5: a point-capable ability is
+        // planned on a unit anchor with one disk of allied recipients; its
+        // own AbilityTargetsAround condition (m_Condition) would filter that
+        // disk in ways the planner does not model, so a non-empty or unread
+        // condition yields no coverage (the casting cannot be planned).
+        private static readonly FieldInfo SelectorCondition = typeof(AbilityTargetsAround).GetField(
+            "m_Condition", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+
+        private static string PointSelectorFilter(AbilityTargetsAround around)
+        {
+            try
+            {
+                var checker = SelectorCondition == null ? null : SelectorCondition.GetValue(around) as ConditionsChecker;
+                if (checker == null) return UnreadPointSelector;
+                return checker.Conditions == null || checker.Conditions.Length == 0 ? null : ConditionedPointSelector;
+            }
+            catch (Exception) { return UnreadPointSelector; }
+        }
 
         internal string LastFailureReason { get; private set; }
 
@@ -30,6 +53,7 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             LastFailureReason = string.Empty;
             _ambiguous = false;
+            _selectorFilter = null;
             if (root == null)
             {
                 LastFailureReason = "ability-missing";
@@ -51,6 +75,11 @@ namespace KingmakerBuffPlanner.GameAdapters
             AlliedAreaCoverage[] distinct = candidates
                 .GroupBy(value => value.Radius.ToString("R"), StringComparer.Ordinal)
                 .Select(group => group.First()).ToArray();
+            if (_selectorFilter != null)
+            {
+                LastFailureReason = _selectorFilter;
+                return null;
+            }
             if (_ambiguous)
             {
                 LastFailureReason = "conflicting-or-unreadable-area-contract";
@@ -89,6 +118,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 AbilityTargetsAround around = ability.GetComponent<AbilityTargetsAround>();
                 if (around != null)
                 {
+                    if (ability.CanTargetPoint && _selectorFilter == null)
+                        _selectorFilter = PointSelectorFilter(around);
                     if (AreaRecipientSemantics.IsAllied(
                         AreaSelection(around.TargetType),
                         ability.CanTargetFriends, ability.CanTargetEnemies,

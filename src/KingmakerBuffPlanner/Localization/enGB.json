@@ -810,6 +810,7 @@
   "run.effect.metamagic": "without the planned metamagic",
   "run.effect.recast": "active on {0} but set to always recast",
   "run.effect.recastexplain": "present on {0} but {1} (will recast)",
+  "run.effect.removed": "active on {0} now, but an earlier casting in this routine removes it (not skipped, not cast)",
   "run.effect.suppressed": "possibly suppressed",
   "run.effect.unproven": "not provably as strong",
   "run.effect.weak": "weaker (lower caster level)",

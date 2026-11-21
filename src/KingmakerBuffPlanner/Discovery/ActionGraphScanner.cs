@@ -108,7 +108,7 @@ namespace KingmakerBuffPlanner.Discovery
                             node.ConditionContract,
                             Visit(node.WhenTrue, depth + 1, active, diagnostics, targetOverride, path + "/true"),
                             Visit(node.WhenFalse, depth + 1, active, diagnostics, targetOverride, path + "/false"),
-                            node.CasterFactGate);
+                            node.CasterFactGate, node.RecipientFactGate);
                     case DiscoveryNodeKind.TargetTransform:
                         EffectTarget transformedTarget = ComposeTarget(
                             targetOverride, node.Target);

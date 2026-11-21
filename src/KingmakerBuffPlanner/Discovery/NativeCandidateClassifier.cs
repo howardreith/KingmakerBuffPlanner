@@ -463,7 +463,13 @@ namespace KingmakerBuffPlanner.Discovery
             if (!HarmfulToAllies(facts)) return false;
             // The everyday-use v1.2 rule: aimed at enemies, the flag stands.
             if (CanBeAimedAtHostiles(facts)) return true;
-            return !IsProvenBeneficialDespiteAllyDisposition(effect, facts);
+            // Review R2 (R1-F6): the flag is waived only when EVERY
+            // persistent effect the ability may apply, on any branch, is a
+            // proven payload; one unapproved or unread application anywhere
+            // keeps the veto for all of them (the whole graph is planned and
+            // executed). Removal actions are not applications and stay.
+            IReadOnlyList<NativeCandidateEffectFacts> effects = facts.Effects ?? new NativeCandidateEffectFacts[0];
+            return effects.Count == 0 || !effects.All(e => IsProvenBeneficialDespiteAllyDisposition(e, facts));
         }
 
         // Missing-beneficial-buffs mission §3.C: CanTargetPoint means the

@@ -151,7 +151,8 @@ namespace KingmakerBuffPlanner.Planning
             ResolvedCastingReadiness readiness,
             IReadOnlyList<string> readinessReasons,
             IReadOnlyList<CastingCostLine> cost,
-            IReadOnlyList<string> costShape = null)
+            IReadOnlyList<string> costShape = null,
+            IReadOnlyList<string> existingEffectNotes = null)
         {
             return new ResolvedCasting(
                 CastingId, RoutineId, Order, SourceId, Ability, CasterUnitId,
@@ -160,7 +161,7 @@ namespace KingmakerBuffPlanner.Planning
                 TargetingModifiers, Enhancements, AppliedEnhancementIds,
                 OmittedEnhancementIds, ExistingEffectPolicy, IgnoredPresenceMarkers,
                 readiness, readinessReasons, CapableCasterUnitIds, Provenance, cost,
-                ExistingEffectNotes, costShape ?? CostShape, PreCoveredUnitIds,
+                existingEffectNotes ?? ExistingEffectNotes, costShape ?? CostShape, PreCoveredUnitIds,
                 ExecutionStrategy, ExecutionStrategyReason, RequiredItemSelector);
         }
 
@@ -385,6 +386,21 @@ namespace KingmakerBuffPlanner.Planning
                 }
                 bool outOfScope = budgetRoutineScope != null &&
                     casting.RoutineId != budgetRoutineScope;
+                // A proven structural repeat (one-pass view) casts nothing:
+                // it is decided before any removal check and, like a live
+                // already-active skip, protects the effect it keeps for its
+                // routine (review R2-F2).
+                if (casting.Readiness == ResolvedCastingReadiness.Ready && !outOfScope && projectEffects &&
+                    casting.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive &&
+                    IsStructurallySatisfied(casting, matched, grantedByUnit))
+                {
+                    removalState.Admit(casting.RoutineId, casting.CastingId, changes, false);
+                    finalized.Add(casting.WithBudgetResult(
+                        ResolvedCastingReadiness.AlreadySatisfied,
+                        new[] { "already-satisfied-structural" },
+                        new CastingCostLine[0], shape));
+                    continue;
+                }
                 if (casting.Readiness == ResolvedCastingReadiness.Ready)
                 {
                     removalConflict = removalState.RemovesProvided(casting.RoutineId, changes);
@@ -403,16 +419,6 @@ namespace KingmakerBuffPlanner.Planning
                 {
                     finalized.Add(casting.WithBudgetResult(casting.Readiness,
                         casting.ReadinessReasons, casting.Cost, shape));
-                    continue;
-                }
-                if (projectEffects &&
-                    casting.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive &&
-                    IsStructurallySatisfied(casting, matched, grantedByUnit))
-                {
-                    finalized.Add(casting.WithBudgetResult(
-                        ResolvedCastingReadiness.AlreadySatisfied,
-                        new[] { "already-satisfied-structural" },
-                        new CastingCostLine[0], shape));
                     continue;
                 }
                 IReadOnlyList<CastingDemand> demands = ledger.DemandsFor(
@@ -787,12 +793,16 @@ namespace KingmakerBuffPlanner.Planning
                     if (provided.TryGetValue(removal.Key, out effects)) effects.Remove(removal.Value);
                     Set(removed, removal, castingId);
                 }
-                foreach (KeyValuePair<string, string> application in changes.Applied)
+                // Review R1-F3: only an application certain on every path
+                // restores an effect an earlier casting may have removed; a
+                // possible one (an alternative branch) does not.
+                foreach (KeyValuePair<string, string> application in changes.Guaranteed)
                 {
                     Dictionary<string, string> effects;
                     if (removed.TryGetValue(application.Key, out effects)) effects.Remove(application.Value);
-                    Set(provided, application, castingId);
                 }
+                foreach (KeyValuePair<string, string> application in changes.Applied)
+                    Set(provided, application, castingId);
             }
 
             private static string First(Dictionary<string, Dictionary<string, string>> state,
@@ -849,13 +859,23 @@ namespace KingmakerBuffPlanner.Planning
             IReadOnlyList<string> shape, List<string> diagnostics)
         {
             diagnostics.Add(reason + ":by:" + casting.CastingId);
+            // Review R1-F1: an invalidated skip no longer says "already
+            // active (skipped)"; its note names the earlier removal instead.
+            IReadOnlyList<string> notes = casting.ExistingEffectNotes.Select(note =>
+                note.StartsWith("already-active:", StringComparison.Ordinal)
+                    ? ExistingRemovedEarlierNote + note.Substring("already-active:".Length)
+                    : note).ToList();
             return casting.WithBudgetResult(ResolvedCastingReadiness.Blocked,
                 casting.ReadinessReasons
                     .Where(value => !value.StartsWith("already-active:", StringComparison.Ordinal))
                     .Concat(new[] { reason }).Distinct(StringComparer.Ordinal)
                     .OrderBy(value => value, StringComparer.Ordinal).ToList(),
-                new CastingCostLine[0], shape);
+                new CastingCostLine[0], shape, notes);
         }
+
+        // Existing-effect note of a skip an earlier casting invalidates:
+        // "existing-removed-earlier:<unit>[:detail]".
+        public const string ExistingRemovedEarlierNote = "existing-removed-earlier:";
 
         // R1-F4: a removal later in the one-pass sequence invalidates every
         // structural grant predicting the removed effect on that unit.
@@ -923,6 +943,14 @@ namespace KingmakerBuffPlanner.Planning
             string key = StructuralGrantKey(casting);
             foreach (string unitId in casting.PredictedBeneficiaryUnitIds)
             {
+                // Review R2-F1: a funded cast grants a free structural repeat
+                // to a unit only when every effect it may apply there is
+                // certain on every path (Good Hope's Despair branch removes
+                // Despair and applies nothing; that is no grant).
+                if (changes == null) continue;
+                string unit = unitId;
+                var possible = changes.Applied.Where(pair => pair.Key == unit).ToList();
+                if (possible.Count == 0 || possible.Any(pair => !changes.Guaranteed.Contains(pair))) continue;
                 HashSet<string> granted;
                 if (!grantedByUnit.TryGetValue(unitId, out granted))
                 {
@@ -938,9 +966,7 @@ namespace KingmakerBuffPlanner.Planning
                 HashSet<string> effects;
                 if (!grants.TryGetValue(key, out effects))
                     grants[key] = effects = new HashSet<string>(StringComparer.Ordinal);
-                if (changes != null)
-                    foreach (KeyValuePair<string, string> applied in changes.Applied)
-                        if (applied.Key == unitId) effects.Add(applied.Value);
+                foreach (KeyValuePair<string, string> applied in possible) effects.Add(applied.Value);
             }
         }
 

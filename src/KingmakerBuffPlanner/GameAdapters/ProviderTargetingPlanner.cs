@@ -42,7 +42,9 @@ namespace KingmakerBuffPlanner.GameAdapters
             bool infusedPersonal,
             AlliedAreaCoverage areaCoverage,
             Func<string, bool> canTarget,
-            Func<string, string, float?> distance)
+            Func<string, string, float?> distance,
+            IReadOnlyDictionary<string, bool> casterFacts = null,
+            Func<string, string, bool?> unitHasFact = null)
         {
             if (provider == null) throw new ArgumentNullException("provider");
             Func<string, bool> legal = canTarget ?? (id => false);
@@ -88,6 +90,25 @@ namespace KingmakerBuffPlanner.GameAdapters
             {
                 float radius = areaCoverage.Radius;
                 anchors = LegalAnchorIds(units, legal);
+                // Review R2-F5: inside the burst is not the same as eligible.
+                // Recipient-fact conditions (Mass Blessing of Luck and Resolve
+                // skips constructs, and undead unless the caster has Undead
+                // Arcana) are resolved per unit from the caster's facts and
+                // the unit's own facts; a unit whose bound payload applies
+                // nothing is not covered, and one whose facts cannot be read
+                // gets no definite coverage claim.
+                EffectExpression casterBound = EffectConditionBinding.Bind(expression, casterFacts);
+                bool gated = EffectRecipientFactBinding.HasGates(casterBound);
+                Func<string, bool?> noFacts = id => null;
+                Func<UnitSnapshot, bool> eligible = unit =>
+                {
+                    if (!gated) return true;
+                    string unitId = unit.UnitId;
+                    bool unresolved;
+                    EffectExpression bound = EffectRecipientFactBinding.Bind(casterBound,
+                        unitHasFact == null ? noFacts : fact => unitHasFact(unitId, fact), out unresolved);
+                    return !unresolved && EffectExpressionAnalysis.ContainsLeaf(bound);
+                };
                 foreach (string anchorId in anchors)
                 {
                     if (!measure(anchorId, anchorId).HasValue) continue;
@@ -95,7 +116,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     decision.RecipientIdsByAnchor.Add(anchorId, units.Where(unit =>
                     {
                         float? metres = measure(id, unit.UnitId);
-                        return metres.HasValue && metres.Value <= radius + 0.01f;
+                        return metres.HasValue && metres.Value <= radius + 0.01f && eligible(unit);
                     }).Select(unit => unit.UnitId).ToArray());
                 }
                 reachable = units.Where(unit => decision.RecipientIdsByAnchor.Values

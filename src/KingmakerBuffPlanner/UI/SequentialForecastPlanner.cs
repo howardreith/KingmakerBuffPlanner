@@ -157,6 +157,17 @@ namespace KingmakerBuffPlanner.UI
                             materialRemaining[step.MaterialReservation.ItemGuid] =
                                 Math.Max(0, material - step.MaterialReservation.Count);
                     }
+                    // Missing-beneficial-buffs review R2-F3: what this step's
+                    // own native actions may remove from its recipients (a
+                    // resistance switch removes the previous choice) is no
+                    // longer carried forward as active.
+                    foreach (KeyValuePair<string, string> removal in ProjectRemovals(step))
+                    {
+                        HashSet<ActiveEffectMarker> markers;
+                        if (carriedEffects.TryGetValue(removal.Key, out markers))
+                            markers.RemoveWhere(marker => string.Equals(marker.EffectId, removal.Value,
+                                StringComparison.Ordinal));
+                    }
                     // Project granted effects forward so later routines skip
                     // already-covered targets for free — but only effects the
                     // forecast assumptions justify. Conditional alternatives
@@ -290,6 +301,16 @@ namespace KingmakerBuffPlanner.UI
         // their targeting structure names. Conditional alternatives and any
         // unrecognized node stay unproven — later demand for them remains a
         // conservative estimate instead of a free already-active skip.
+        // Owner unit -> effect pairs the step may remove (any realizable
+        // branch; a certain later re-application on the same path cancels).
+        private static IEnumerable<KeyValuePair<string, string>> ProjectRemovals(CastStep step)
+        {
+            IEnumerable<string> recipients = step.ExpectedRecipientUnitIds.Count != 0
+                ? step.ExpectedRecipientUnitIds : step.TargetUnitIds;
+            return EffectChanges.Merge(recipients.Select(recipient =>
+                EffectChangeAnalysis.Analyze(step.ExpectedEffects, step.Provider.CasterUnitId, recipient))).Removed;
+        }
+
         private static IEnumerable<ProjectedEffect> ProjectEffects(CastStep step)
         {
             var projections = new List<ProjectedEffect>();
