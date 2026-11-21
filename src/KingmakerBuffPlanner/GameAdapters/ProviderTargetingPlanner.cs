@@ -90,7 +90,11 @@ namespace KingmakerBuffPlanner.GameAdapters
             bool personal = EffectExpressionTargetAnalysis.ContainsOnly(expression, EffectTarget.Caster);
             if (personal && !infusedPersonal)
             {
-                reachable = units.Where(u => u.UnitId == casterId);
+                // Review R11-F4: the owner is a legal anchor only when the
+                // live caster is readable and native CanTarget admits it (a
+                // lost live ability or a refused owner target offers nothing
+                // to reserve).
+                reachable = units.Where(u => u.UnitId == casterId && casterReadable && legal(u.UnitId));
                 anchors = reachable.Select(u => u.UnitId).ToArray();
             }
             // Re-review: a party effect that also reaches pets is planned as
@@ -110,7 +114,10 @@ namespace KingmakerBuffPlanner.GameAdapters
                 reachable = units.Where(u => u.IsPet && u.MasterUnitId == casterId);
                 anchors = reachable.Select(u => u.UnitId).ToArray();
             }
-            else if (decision.AreaRecipients && areaCoverage != null && casterReadable)
+            // Review R11-F5: a non-finite or non-positive radius is no usable
+            // disk; no centre is offered.
+            else if (decision.AreaRecipients && areaCoverage != null && casterReadable &&
+                !float.IsNaN(areaCoverage.Radius) && !float.IsInfinity(areaCoverage.Radius) && areaCoverage.Radius > 0f)
             {
                 float radius = areaCoverage.Radius;
                 // Review R10-F1: an explicit native Ally selector
@@ -166,7 +173,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     // penalty): affected, not a beneficiary.
                     return !unresolved && EffectExpressionAnalysis.ContainsDefiniteLeaf(bound) &&
                         !EffectExpressionAnalysis.HasCasterGate(bound) &&
-                        !EffectRecipientFactBinding.HostileRelation(casterBound,
+                        !EffectRecipientFactBinding.HostileOnPath(casterBound,
                             unitHasFact == null ? noFacts : fact => unitHasFact(unitId, fact));
                 };
                 foreach (string anchorId in LegalAnchorIds(units, legal))
@@ -181,8 +188,10 @@ namespace KingmakerBuffPlanner.GameAdapters
                     {
                         if (requiresAlly && allyRead(unit.UnitId) == false) return false;
                         if (unit.UnitId == id) return true;
+                        // Review R11-F5: the recorded radius exactly (no
+                        // margin without native evidence for one).
                         float? metres = measure(id, unit.UnitId);
-                        return metres.HasValue && metres.Value <= radius + 0.01f;
+                        return metres.HasValue && metres.Value <= radius;
                     }).ToArray();
                     if (requiresAlly)
                         foreach (UnitSnapshot unit in inside)

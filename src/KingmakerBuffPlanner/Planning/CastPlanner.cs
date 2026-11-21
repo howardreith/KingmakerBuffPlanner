@@ -202,8 +202,10 @@ namespace KingmakerBuffPlanner.Planning
                 // action can evaluate count (not a verified empty checker's
                 // never-run branch).
                 if (EffectRecipientFactBinding.ReachableFactIds(bound).Any(RecipientFactGate.IsRelation) ||
-                    (option != null && EffectRecipientFactBinding.HostileRelation(request.Source.Effects,
-                        key => option.RecipientFactRead(targetId, key))))
+                    (option != null && EffectRecipientFactBinding.HostileOnPath(
+                        option.BindEffects(request.Source.Effects, targetId),
+                        key => RecipientFactGate.IsRelation(key) ? option.RecipientFactRead(targetId, key)
+                            : FixedFact(option, targetId, key))))
                     return new EffectPresenceResult(EffectPresenceKind.Absent, new string[0]);
                 string caster = option == null ? request.CasterUnitId : option.Provider.Key.CasterUnitId;
                 EffectPresenceResult result = _presence.EvaluateScoped(bound, (leaf, role) =>
@@ -243,6 +245,16 @@ namespace KingmakerBuffPlanner.Planning
                 if (first == null) first = result;
             }
             return first;
+        }
+
+        // A fixed recipient fact the option read for the unit (creature type,
+        // relation), or null.
+        private static bool? FixedFact(ProviderPlanningOption option, string unit, string key)
+        {
+            IReadOnlyDictionary<string, bool> facts;
+            bool value;
+            return unit != null && option.FixedRecipientFacts.TryGetValue(unit, out facts) &&
+                facts.TryGetValue(key, out value) ? value : (bool?)null;
         }
 
         // Review R9 (R8-F4): what a Classic skip relies on and protects - the
@@ -514,9 +526,13 @@ namespace KingmakerBuffPlanner.Planning
                 foreach (string candidate in option.LegalAnchorIds
                     .Where(value => option.CoveredTargetIdsForAnchor(value)
                         .Any(id => required.Contains(id)))
-                    .OrderByDescending(value => required.Contains(value))
-                    .ThenByDescending(value => option.CoveredTargetIdsForAnchor(value)
+                    // Review R11-F2: the centre covering the most outstanding
+                    // requested recipients wins; being requested itself only
+                    // breaks ties (an unrequested ally midway between two
+                    // requested ones covers both with one cast).
+                    .OrderByDescending(value => option.CoveredTargetIdsForAnchor(value)
                         .Count(id => allRemaining.Contains(id)))
+                    .ThenByDescending(value => required.Contains(value))
                     .ThenBy(value => value, StringComparer.Ordinal))
                 {
                     string conflict = context.Removals.RemovesProvided(string.Empty, StepChanges(request, option,

@@ -426,7 +426,10 @@ namespace KingmakerBuffPlanner.Planning
                 // Review R10 (R8-F1): a skip resting on a live caster-relative
                 // instance that another caster's funded application may since
                 // have replaced is re-assessed against the standing evidence.
-                if (casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied && liveEffects != null &&
+                // Review R11 (R8-F1): a Ready row too (its per-recipient
+                // pre-covered credit and notes rest on the same evidence).
+                if ((casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied ||
+                        casting.Readiness == ResolvedCastingReadiness.Ready) && liveEffects != null &&
                     casterRelativeApplied.Count != 0 && plannedById.TryGetValue(casting.CastingId, out planned) &&
                     ReplacedByOtherCaster(casting, effectsBySource, casterRelativeApplied))
                 {
@@ -1187,25 +1190,29 @@ namespace KingmakerBuffPlanner.Planning
         {
             EffectExpression payload = DiscoveredEffectLookup.ForAbility(
                 effectsBySource, casting.Ability, casting.SourceId);
-            List<string> effects = payload == null ? new List<string>() : EffectApplicationLifetime.Leaves(payload)
-                .Where(leaf => leaf.CasterRelative).Select(leaf => leaf.EffectId)
-                .Distinct(StringComparer.Ordinal).ToList();
-            if (effects.Count == 0) return standing;
-            IEnumerable<string> reached = casting.TargetMode == CastingTargetMode.DirectTarget
-                ? new[] { casting.DirectTargetUnitId, casting.CasterUnitId }
-                : casting.PredictedBeneficiaryUnitIds.Concat(new[] { casting.CasterUnitId });
+            IList<KeyValuePair<string, bool>> roles = payload == null ? new List<KeyValuePair<string, bool>>()
+                : EffectApplicationLifetime.CasterRelativeRoles(payload);
+            if (roles.Count == 0) return standing;
+            // Review R11 (R8-F1): only where each leaf can land - the caster
+            // for a caster-role leaf; otherwise the direct target, or every
+            // unit the group cast's selected disk may reach.
+            IEnumerable<string> recipients = casting.TargetMode == CastingTargetMode.DirectTarget
+                ? new[] { casting.DirectTargetUnitId } : casting.PredictedBeneficiaryUnitIds;
             if (casting.TargetMode != CastingTargetMode.DirectTarget && option != null)
             {
                 string anchor = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
                     ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
-                if (anchor != null) reached = reached.Concat(option.AffectedTargetIdsForAnchor(anchor));
+                if (anchor != null) recipients = recipients.Concat(option.AffectedTargetIdsForAnchor(anchor));
             }
+            List<string> reached = recipients.Where(value => !string.IsNullOrEmpty(value))
+                .Distinct(StringComparer.Ordinal).ToList();
             var keys = new HashSet<string>(StringComparer.Ordinal);
-            foreach (string unit in reached.Where(value => !string.IsNullOrEmpty(value)))
-                foreach (string effect in effects)
+            foreach (KeyValuePair<string, bool> role in roles)
+                foreach (string unit in role.Value ? new[] { casting.CasterUnitId } : (IEnumerable<string>)reached)
                 {
-                    applied[unit + "\u001f" + effect] = casting.CasterUnitId;
-                    keys.Add(unit + "\u001f" + effect);
+                    if (string.IsNullOrEmpty(unit)) continue;
+                    applied[unit + "\u001f" + role.Key] = casting.CasterUnitId;
+                    keys.Add(unit + "\u001f" + role.Key);
                 }
             if (standing == null || !standing.HasInstanceDetail) return standing;
             var filtered = new Dictionary<string, IEnumerable<ActiveEffectInstance>>(StringComparer.Ordinal);
@@ -1224,16 +1231,13 @@ namespace KingmakerBuffPlanner.Planning
             EffectExpression payload = DiscoveredEffectLookup.ForAbility(
                 effectsBySource, casting.Ability, casting.SourceId);
             if (payload == null) return false;
-            List<string> effects = EffectApplicationLifetime.Leaves(payload).Where(leaf => leaf.CasterRelative)
-                .Select(leaf => leaf.EffectId).Distinct(StringComparer.Ordinal).ToList();
-            IEnumerable<string> units = casting.TargetMode == CastingTargetMode.DirectTarget
-                ? new[] { casting.DirectTargetUnitId, casting.CasterUnitId }
-                : casting.PredictedBeneficiaryUnitIds.Concat(new[] { casting.CasterUnitId });
-            foreach (string unit in units.Where(value => !string.IsNullOrEmpty(value)))
-                foreach (string effect in effects)
+            IEnumerable<string> recipients = casting.TargetMode == CastingTargetMode.DirectTarget
+                ? new[] { casting.DirectTargetUnitId } : casting.PredictedBeneficiaryUnitIds;
+            foreach (KeyValuePair<string, bool> role in EffectApplicationLifetime.CasterRelativeRoles(payload))
+                foreach (string unit in role.Value ? new[] { casting.CasterUnitId } : recipients)
                 {
                     string applier;
-                    if (applied.TryGetValue(unit + "\u001f" + effect, out applier) &&
+                    if (!string.IsNullOrEmpty(unit) && applied.TryGetValue(unit + "\u001f" + role.Key, out applier) &&
                         !string.Equals(applier, casting.CasterUnitId, StringComparison.Ordinal))
                         return true;
                 }

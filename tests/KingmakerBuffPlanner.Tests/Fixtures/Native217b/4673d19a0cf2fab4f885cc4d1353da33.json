@@ -1,0 +1,13 @@
+{
+  "$type": "Kingmaker.Blueprints.Classes.Spells.BlueprintSpellbook, Assembly-CSharp",
+  "Name": "LocalizedString:a0d1a48d-7120-4875-8a17-b42db4e7c1f1:Cleric",
+  "SpellsPerDay": "Blueprint:fb5ef8ddad475284c82257b79bf1749e:ClericSpellLevels",
+  "SpellList": "Blueprint:8443ce803d2d31347897a3d85cc32f53:ClericSpellList",
+  "CharacterClass": "Blueprint:67819271767a9dd4fbfd4ae700befea0:ClericClass",
+  "CastingAttribute": "Wisdom",
+  "AllSpellsKnown": true,
+  "CantripsType": "Orisions",
+  "Components": [],
+  "m_AssetGuid": "4673d19a0cf2fab4f885cc4d1353da33",
+  "name": "ClericSpellbook"
+}

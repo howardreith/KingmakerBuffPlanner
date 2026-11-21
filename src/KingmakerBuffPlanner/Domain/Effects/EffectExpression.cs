@@ -469,6 +469,50 @@ namespace KingmakerBuffPlanner.Domain.Effects
             var reference = expression as ReferencedAbilityExpression;
             return reference == null ? new EffectLeafExpression[0] : Leaves(reference.Child);
         }
+
+        // Missing-beneficial-buffs review R11 (R8-F1/R9-F5): every
+        // caster-relative leaf with whether it lands on the caster (its role
+        // under its wrappers is Caster) or on the cast's recipients.
+        public static IList<KeyValuePair<string, bool>> CasterRelativeRoles(EffectExpression expression)
+        {
+            var result = new List<KeyValuePair<string, bool>>();
+            CollectCasterRelative(expression, null, result);
+            return result.Distinct().ToList();
+        }
+
+        private static void CollectCasterRelative(EffectExpression expression, EffectTarget? outer,
+            List<KeyValuePair<string, bool>> result)
+        {
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null)
+            {
+                if (leaf.CasterRelative)
+                    result.Add(new KeyValuePair<string, bool>(leaf.EffectId,
+                        EffectRecipientScope.Resolve(leaf.Target, outer) == EffectTarget.Caster));
+                return;
+            }
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+            {
+                foreach (EffectExpression child in sequence.Children) CollectCasterRelative(child, outer, result);
+                return;
+            }
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                CollectCasterRelative(conditional.WhenTrue, outer, result);
+                CollectCasterRelative(conditional.WhenFalse, outer, result);
+                return;
+            }
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null)
+            {
+                CollectCasterRelative(targeted.Child, EffectRecipientScope.Resolve(targeted.Target, outer), result);
+                return;
+            }
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null) CollectCasterRelative(reference.Child, outer, result);
+        }
     }
 
     public sealed class SequenceEffectExpression : EffectExpression
@@ -678,6 +722,20 @@ namespace KingmakerBuffPlanner.Domain.Effects
                 if (key == RecipientFactGate.AllyOfCaster && read(key) == false) return true;
             }
             return false;
+        }
+
+        // Review R11 (R9-F4): HostileRelation along the recipient's selected
+        // path: every non-relation gate whose facts are read selects its
+        // branch first (an outer creature-fact condition makes its other
+        // branch unreachable), then only the relation predicates still
+        // reachable count.
+        public static bool HostileOnPath(EffectExpression expression, Func<string, bool?> read)
+        {
+            if (expression == null || read == null) return false;
+            bool unresolved;
+            EffectExpression path = Bind(expression,
+                key => RecipientFactGate.IsRelation(key) ? null : read(key), out unresolved);
+            return HostileRelation(path, read);
         }
 
         // The expression as it acts on a unit friendly to the caster (only its

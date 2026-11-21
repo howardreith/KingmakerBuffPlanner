@@ -10,6 +10,7 @@ using Kingmaker.ElementsSystem;
 using Kingmaker.UnitLogic.Buffs.Blueprints;
 using Kingmaker.UnitLogic.FactLogic;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
+using Kingmaker.UnitLogic.Abilities.Components;
 using Kingmaker.UnitLogic.Abilities.Components.CasterCheckers;
 using Kingmaker.UnitLogic.Abilities.Components.TargetCheckers;
 using Kingmaker.UnitLogic.Mechanics.Components;
@@ -299,8 +300,52 @@ namespace KingmakerBuffPlanner.Discovery
                     Contract = d.NodeIdentity,
                     Detail = d.Detail,
                     ActionPath = d.ActionPath
-                }).ToArray()
+                }).Concat(OnCastDiagnostics(ability)).ToArray()
             };
+        }
+
+        internal const string OnCastActionCode = "on-cast-action";
+
+        // Missing-beneficial-buffs review R11-F1: the native
+        // AbilityExecuteActionOnCast component runs its own action list when
+        // the ability is cast, outside the run-action graph the adapter reads.
+        // A non-empty list that does anything beyond presentation (or cannot be
+        // read) is reported, so the whole-cast exceptions refuse the ability;
+        // the discovered graph itself is unchanged.
+        private static IEnumerable<NativeCandidateDiagnosticFacts> OnCastDiagnostics(BlueprintAbility ability)
+        {
+            var result = new List<NativeCandidateDiagnosticFacts>();
+            foreach (BlueprintComponent component in ability.ComponentsArray ?? new BlueprintComponent[0])
+            {
+                var onCast = component as AbilityExecuteActionOnCast;
+                if (onCast == null) continue;
+                string detail;
+                try
+                {
+                    if (onCast.Actions == null || onCast.Actions.Actions == null || onCast.Actions.Actions.Length == 0)
+                        continue;
+                    DiscoveryScanResult scan = new ActionGraphScanner().Scan(
+                        new KingmakerActionGraphAdapter().AdaptActions(onCast.Actions));
+                    string[] unsafeDiagnostics = scan.Diagnostics
+                        .Where(d => !IsPresentationOnly(d.NodeIdentity))
+                        .Select(d => d.Code + ":" + d.NodeIdentity).Distinct(StringComparer.Ordinal).ToArray();
+                    bool applies = EffectExpressionAnalysis.ContainsLeaf(scan.Expression);
+                    if (unsafeDiagnostics.Length == 0 && !applies) continue;
+                    detail = string.Join(",", unsafeDiagnostics) + (applies ? ";applies-effects" : string.Empty);
+                }
+                catch (Exception exception)
+                {
+                    detail = "unreadable:" + exception.GetType().Name;
+                }
+                result.Add(new NativeCandidateDiagnosticFacts
+                {
+                    Code = OnCastActionCode,
+                    Contract = typeof(AbilityExecuteActionOnCast).FullName,
+                    Detail = detail,
+                    ActionPath = "on-cast"
+                });
+            }
+            return result;
         }
 
         private static NativeCandidateEffectFacts EffectFacts(NativeEffectRecord e)

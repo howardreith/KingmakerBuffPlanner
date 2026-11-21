@@ -537,7 +537,8 @@ namespace KingmakerBuffPlanner.Domain.Planning
             // by the enemy branch, never a beneficiary.
             return !unresolved && EffectExpressionAnalysis.ContainsDefiniteLeaf(bound) &&
                 !EffectExpressionAnalysis.HasCasterGate(bound) &&
-                !EffectRecipientFactBinding.HostileRelation(expression, key => option.RecipientFactRead(unit, key));
+                !EffectRecipientFactBinding.HostileOnPath(option.BindEffects(expression, unit),
+                    Reader(option, unit, true));
         }
 
         // One funded casting's changes on the units it reaches (its own
@@ -551,8 +552,16 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 bool unresolved;
                 EffectChanges changes = EffectChangeAnalysis.Analyze(
                     Bind(option, expression, unit, true, out unresolved), casterUnitId, unit);
-                var guaranteed = new HashSet<KeyValuePair<string, string>>(changes.Guaranteed);
-                var certainlyRemoved = new HashSet<KeyValuePair<string, string>>(changes.CertainlyRemoved);
+                // Review R11 (R10-F1): a unit an Ally-only selector may skip
+                // (relation to the caster not read as allied) is only
+                // possibly reached: nothing becomes definite on it (a
+                // possible change makes the state unknown unless it agrees).
+                bool possiblyReached = option.RequiresAllyRelation &&
+                    option.RecipientFactRead(unit, RecipientFactGate.AllyOfCaster) != true;
+                var guaranteed = new HashSet<KeyValuePair<string, string>>(possiblyReached
+                    ? new KeyValuePair<string, string>[0] : changes.Guaranteed);
+                var certainlyRemoved = new HashSet<KeyValuePair<string, string>>(possiblyReached
+                    ? new KeyValuePair<string, string>[0] : changes.CertainlyRemoved);
                 foreach (KeyValuePair<string, string> key in changes.Applied.Where(k => !guaranteed.Contains(k)))
                     Set(_pending, key.Key, key.Value, Current(option, key.Key, key.Value) == true ? true : (bool?)null);
                 foreach (KeyValuePair<string, string> key in changes.Removed.Where(k => !certainlyRemoved.Contains(k)))
@@ -566,7 +575,14 @@ namespace KingmakerBuffPlanner.Domain.Planning
             bool includePending, out bool unresolved)
         {
             EffectExpression bound = option.BindForRecipient(expression, unit);
-            return EffectRecipientFactBinding.Bind(bound, key =>
+            return EffectRecipientFactBinding.Bind(bound, Reader(option, unit, includePending), out unresolved);
+        }
+
+        // A recipient-fact read under the state: relations from the option's
+        // live read; effects from a recorded change, else the option's read.
+        private Func<string, bool?> Reader(ProviderPlanningOption option, string unit, bool includePending)
+        {
+            return key =>
             {
                 if (RecipientFactGate.IsRelation(key)) return option.RecipientFactRead(unit, key);
                 bool? value;
@@ -574,7 +590,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 if (includePending && TryGet(_pending, unit, effect, out value)) return value;
                 if (TryGet(_committed, unit, effect, out value)) return value;
                 return option.RecipientFactRead(unit, key);
-            }, out unresolved);
+            };
         }
 
         // An effect's value on a unit so far: a recorded change, else the

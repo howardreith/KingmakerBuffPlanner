@@ -97,6 +97,7 @@ namespace KingmakerBuffPlanner.UI
                     group => group.First().RemainingUses,
                     StringComparer.Ordinal);
             var carriedEffects = activeEffects.ToUnitMarkers();
+            var readOnlyEffects = new ReadOnlyDictionary<string, EffectExpression>(effectsBySource);
             // Missing-beneficial-buffs review R9-F5: known live instance detail
             // (applying caster, suppression) is carried, not reduced to
             // markers, until an admitted step changes that effect on the unit:
@@ -231,10 +232,26 @@ namespace KingmakerBuffPlanner.UI
                     // step's expected effects are its beneficiaries' friendly
                     // branch (confirmation); its changes on every unit it
                     // reaches are analyzed from the complete discovered
-                    // expression of its source.
-                    EffectExpression analyzed;
-                    if (!effectsBySource.TryGetValue(step.SourceId ?? string.Empty, out analyzed) || analyzed == null)
-                        analyzed = step.ExpectedEffects;
+                    // expression. Review R11-F3: resolved by the selected
+                    // provider's ability identity (a saved catalogue entry's
+                    // source id is an aggregate id, not a discovery key).
+                    EffectExpression analyzed = DiscoveredEffectLookup.ForAbility(
+                        readOnlyEffects, step.Provider.Ability, step.SourceId) ?? step.ExpectedEffects;
+                    // Review R11 (R9-F5): another caster's caster-relative
+                    // application may replace a carried instance on every unit
+                    // the step may reach (not only its confirmed recipients):
+                    // those instances no longer prove anything.
+                    if (carriedInstances != null)
+                        foreach (KeyValuePair<string, bool> role in EffectApplicationLifetime.CasterRelativeRoles(analyzed))
+                            foreach (string unit in role.Value ? new List<string> { step.Provider.CasterUnitId }
+                                : StepReached(step, stepOption))
+                            {
+                                List<ActiveEffectInstance> instances;
+                                if (unit != null && carriedInstances.TryGetValue(unit, out instances))
+                                    instances.RemoveAll(instance => string.Equals(instance.EffectId, role.Key,
+                                        StringComparison.Ordinal) && !string.Equals(instance.CasterUnitId,
+                                        step.Provider.CasterUnitId, StringComparison.Ordinal));
+                            }
                     EffectChanges stepChanges = StepChanges(step, stepOption, analyzed);
                     sequenceChanges.Record(stepOption, analyzed, StepReached(step, stepOption),
                         step.Provider.CasterUnitId);
