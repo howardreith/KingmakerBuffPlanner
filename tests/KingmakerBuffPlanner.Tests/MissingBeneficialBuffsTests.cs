@@ -83,6 +83,7 @@ namespace KingmakerBuffPlanner.Tests
             Run("missing-beneficial-buffs-abjuration-selections-discoverable-and-personal", TestMbbAbjurationDiscovery);
             Run("missing-beneficial-buffs-abjuration-selections-replace-not-stack", TestMbbAbjurationPlanning);
             Run("missing-beneficial-buffs-point-capable-group-spells-unit-anchored", TestMbbPointGroupSpells);
+            Run("missing-beneficial-buffs-point-group-unit-anchor-refused-fails-closed", TestMbbPointGroupAnchorFailsClosed);
             Run("missing-beneficial-buffs-negative-controls-stay-excluded", TestMbbNegativeControls);
             Run("missing-beneficial-buffs-irresistible-dance-loaded-facts-stay-excluded", TestMbbIrresistibleDance);
             Run("missing-beneficial-buffs-native-target-anchor-contract", TestMbbTargetAnchorContract);
@@ -650,6 +651,214 @@ namespace KingmakerBuffPlanner.Tests
             MbbExpect(EffectRemovals.Collect(MbbDiscover(dump, enlarge).Expression).Any(r => r.EffectId == MbbPointGroupSpells[5][2]) &&
                 EffectRemovals.Collect(MbbDiscover(dump, reduce).Expression).Any(r => r.EffectId == MbbPointGroupSpells[4][2]),
                 "Enlarge/Reduce Person, Mass lost their native mutual removal.");
+            // Planned on the same anchor in one routine, the later casting
+            // would strip the earlier one's buff from the shared recipients:
+            // it is blocked (removal of an allied-area recipient's effect),
+            // reserves nothing, and the earlier casting stays Ready.
+            float massRadius = 15f * 0.3048f;
+            var massPositions = new Dictionary<string, float>(StringComparer.Ordinal)
+            {
+                { "caster", 0f }, { "ally", massRadius * 0.5f }, { "far", massRadius * 4f }
+            };
+            var massUnits = massPositions.Keys.Select(id => new UnitSnapshot(id, id, false, string.Empty,
+                new TargetValidationSnapshot(true, true, true, true))).ToList();
+            var massPool = new ResourcePoolSnapshot("caster|slots", ResourcePoolKind.SpontaneousLevel, 4, 4, null);
+            var massProviders = new List<ProviderSnapshot>();
+            var massOptions = new List<ProviderPlanningOption>();
+            var massEffects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal);
+            var massAbilities = new List<AbilityKey>();
+            foreach (string guid in new[] { enlarge, reduce })
+            {
+                var key = new AbilityKey(guid, string.Empty, 0, SourceKind.Spellbook, string.Empty);
+                massAbilities.Add(key);
+                var provider = new ProviderSnapshot(new ProviderKey("caster", "book", key, "level-5|heighten-0"),
+                    guid, 5, massPool.PoolKey, 1, null, null, 9, 90, "fixture", "9 minutes", "Caster", 0, "Book");
+                massProviders.Add(provider);
+                massEffects[key.Canonical] = MbbDiscover(dump, guid).Expression;
+                Dictionary<string, IEnumerable<string>> covered = MbbRecipients(massPositions, massRadius);
+                massOptions.Add(new ProviderPlanningOption(provider, covered.Values.SelectMany(v => v).Distinct().ToArray(),
+                    massPositions.Keys.ToArray(), 9, 90, CastExecutionStrategy.DirectRuleCast, "direct", covered));
+            }
+            ExplicitCastingPlan opposed = new ExplicitCastingCompiler().Compile(CastingDocument(
+                    GroupCasting("enlarge", "long", "caster", massAbilities[0].Canonical, massAbilities[0],
+                        new[] { "caster", "ally" }),
+                    GroupCasting("reduce", "long", "caster", massAbilities[1].Canonical, massAbilities[1],
+                        new[] { "caster", "ally" })),
+                new PartyProviderSnapshot(massUnits, massProviders, new[] { massPool }), massOptions, massEffects,
+                new CastEnhancementSnapshot[0]);
+            ResolvedCasting enlarged = opposed.Castings.Single(c => c.CastingId == "enlarge");
+            ResolvedCasting reduced = opposed.Castings.Single(c => c.CastingId == "reduce");
+            MbbExpect(enlarged.Readiness == ResolvedCastingReadiness.Ready &&
+                enlarged.PredictedBeneficiaryUnitIds.OrderBy(v => v, StringComparer.Ordinal)
+                    .SequenceEqual(new[] { "ally", "caster" }) &&
+                reduced.Readiness == ResolvedCastingReadiness.Blocked &&
+                reduced.ReadinessReasons.Any(r => r.StartsWith(ExplicitCastingCompiler.RemovesPlannedEffect +
+                    ":enlarge:" + MbbPointGroupSpells[4][2] + ":", StringComparison.Ordinal)) &&
+                opposed.Castings.Where(c => c.Readiness == ResolvedCastingReadiness.Ready)
+                    .SelectMany(c => c.Cost).Sum(c => c.Units) == 1,
+                "Enlarge and Reduce Person, Mass were planned together on the same allies: " + reduced.Readiness + " " +
+                string.Join(",", reduced.ReadinessReasons));
+        }
+
+        // Owner addendum §9.3: whether native AbilityData.CanTarget admits a
+        // unit target for these point-anchored spells (their native
+        // TargetAnchor is Point) is NOT verified in game. Everything that
+        // depends on it fails closed. The provider option builder offers only
+        // the units native CanTarget admits (LegalAnchorIds; an allied-area
+        // effect has no caster fallback), so a refusal leaves no anchor, no
+        // recipients and no reachable unit - the exact option shape below.
+        // The compiler then refuses with a worded reason and reserves nothing,
+        // and a step whose anchor the native check refuses at cast time is
+        // never submitted by either execution engine (the adapters' Validate
+        // re-checks CanTarget on the step's AnchorUnitId: "target-invalid").
+        private static void TestMbbPointGroupAnchorFailsClosed()
+        {
+            var dump = new NativeBlueprintDump(MbbPointGroupSpells.Take(4)
+                .SelectMany(row => new[] { row[1], row[2] }).ToArray());
+            foreach (string[] row in MbbPointGroupSpells.Take(4))
+            {
+                MbbDiscovery spell = MbbDiscover(dump, row[1]);
+                MbbExpect(spell.Included, row[0] + " is not discovered: " + spell.Reason);
+                float radius = float.Parse(row[3]) * 0.3048f;
+                var positions = new Dictionary<string, float>(StringComparer.Ordinal)
+                {
+                    { "caster", 0f }, { "anchor", radius * 2f }, { "beside", radius * 2.5f }
+                };
+                var units = positions.Keys.Select(id => new UnitSnapshot(id, id, false, string.Empty,
+                    new TargetValidationSnapshot(true, true, true, true))).ToList();
+                var pool = new ResourcePoolSnapshot("caster|slots", ResourcePoolKind.SpontaneousLevel, 3, 3, null);
+                var ability = new AbilityKey(row[1], string.Empty, 0, SourceKind.Spellbook, string.Empty);
+                var provider = new ProviderSnapshot(new ProviderKey("caster", "book", ability, "level-6|heighten-0"),
+                    row[0], 6, pool.PoolKey, 1, null, null, 15, 150, "fixture", "15 minutes", "Caster", 0, "Book");
+                var snapshot = new PartyProviderSnapshot(units, new[] { provider }, new[] { pool });
+                var effects = new Dictionary<string, EffectExpression>(StringComparer.Ordinal)
+                {
+                    { ability.Canonical, spell.Expression }
+                };
+                Func<IEnumerable<string>, ProviderPlanningOption> optionFor = legal =>
+                {
+                    Dictionary<string, IEnumerable<string>> all = MbbRecipients(positions, radius);
+                    var admitted = legal.ToDictionary(id => id, id => all[id], StringComparer.Ordinal);
+                    return new ProviderPlanningOption(provider,
+                        admitted.Values.SelectMany(v => v).Distinct().ToArray(), admitted.Keys.ToArray(), 15, 150,
+                        CastExecutionStrategy.DirectRuleCast, "direct", admitted);
+                };
+                Func<ProviderPlanningOption, PlannedCasting, ExplicitCastingPlan> compile = (option, casting) =>
+                    new ExplicitCastingCompiler().Compile(CastingDocument(casting), snapshot,
+                        new List<ProviderPlanningOption> { option }, effects, new CastEnhancementSnapshot[0]);
+
+                // 1. Native CanTarget admits no unit: neither an anchored nor a
+                // caster-centred casting is planned, nothing is reserved,
+                // nobody is claimed and no step is produced.
+                ProviderPlanningOption none = optionFor(new string[0]);
+                foreach (PlannedCasting casting in new[]
+                {
+                    GroupCasting("group", "long", "caster", ability.Canonical, ability, new[] { "anchor" },
+                        null, CastingTargetMode.AnchoredOrigin, "anchor"),
+                    GroupCasting("group", "long", "caster", ability.Canonical, ability, new[] { "caster" })
+                })
+                {
+                    ExplicitCastingPlan plan = compile(none, casting);
+                    ResolvedCasting resolved = plan.Castings.Single();
+                    string expected = casting.TargetMode == CastingTargetMode.AnchoredOrigin
+                        ? "origin-anchor-illegal:anchor" : "origin-caster-illegal:caster";
+                    MbbExpect(resolved.Readiness == ResolvedCastingReadiness.Blocked && resolved.Cost.Count == 0 &&
+                        resolved.PredictedBeneficiaryUnitIds.Count == 0 &&
+                        resolved.ReadinessReasons.Contains(expected),
+                        row[0] + " was planned although native targeting admitted no unit: " + resolved.Readiness + " " +
+                        string.Join(",", resolved.ReadinessReasons));
+                    string reasonCode = expected.Substring(0, expected.IndexOf(':'));
+                    MbbExpect(WorkspaceReasonText.Describe(expected) == PlannerText.Get("reason." + reasonCode),
+                        row[0] + "'s refusal has no truthful player wording: " + WorkspaceReasonText.Describe(expected));
+                    CastingApplyDecision decision = new CastingExecutionGate().Evaluate(plan, CastingApplyMode.Ordinary, "long");
+                    ExplicitStepConversion steps = ExplicitCastingStepConverter.Convert(plan, decision,
+                        new List<ProviderPlanningOption> { none }, effects);
+                    MbbExpect(!steps.Converted || steps.Plan.Steps.Count == 0,
+                        row[0] + " produced a cast step without a native-legal anchor.");
+                }
+
+                // 2. Native CanTarget admits only the caster: the authored
+                // anchor stays refused (no fallback to another centre); a
+                // caster-centred casting covers only the caster's own radius.
+                ProviderPlanningOption casterOnly = optionFor(new[] { "caster" });
+                ResolvedCasting refused = compile(casterOnly, GroupCasting("group", "long", "caster", ability.Canonical,
+                    ability, new[] { "anchor" }, null, CastingTargetMode.AnchoredOrigin, "anchor")).Castings.Single();
+                ResolvedCasting centred = compile(casterOnly, GroupCasting("group", "long", "caster", ability.Canonical,
+                    ability, new[] { "caster", "anchor" })).Castings.Single();
+                MbbExpect(refused.Readiness == ResolvedCastingReadiness.Blocked && refused.Cost.Count == 0 &&
+                    refused.ReadinessReasons.Contains("origin-anchor-illegal:anchor"),
+                    row[0] + " fell back to another centre for a refused anchor: " +
+                    string.Join(",", refused.ReadinessReasons));
+                MbbExpect(centred.Readiness == ResolvedCastingReadiness.Ready &&
+                    centred.PredictedBeneficiaryUnitIds.SequenceEqual(new[] { "caster" }) &&
+                    centred.Cost.Sum(c => c.Units) == 1,
+                    row[0] + "'s caster-centred casting claimed out-of-radius allies: " +
+                    string.Join(",", centred.PredictedBeneficiaryUnitIds));
+
+                // 3. Legal while planning, refused by native CanTarget at cast
+                // time: both engines record the refusal and never submit the
+                // cast, spend nothing and confirm nothing.
+                ProviderPlanningOption anchored = optionFor(positions.Keys);
+                ExplicitCastingPlan ready = compile(anchored, GroupCasting("group", "long", "caster", ability.Canonical,
+                    ability, new[] { "anchor", "beside" }, null, CastingTargetMode.AnchoredOrigin, "anchor"));
+                CastingApplyDecision go = new CastingExecutionGate().Evaluate(ready, CastingApplyMode.Ordinary, "long");
+                ExplicitStepConversion converted = ExplicitCastingStepConverter.Convert(ready, go,
+                    new List<ProviderPlanningOption> { anchored }, effects);
+                MbbExpect(converted.Converted && converted.Plan.Steps.Count == 1 &&
+                    converted.Plan.Steps[0].MassCast && converted.Plan.Steps[0].AnchorUnitId == "anchor",
+                    row[0] + " did not convert to one anchored mass step: " + converted.Refusal);
+                var instant = new MbbRefusingRuntime();
+                var instantReport = new ExecutionReport(converted.Plan);
+                MbbDrain(new InstantCastExecutor(instant, true).Execute(converted.Plan, instantReport));
+                var animated = new MbbRefusingRuntime();
+                var animatedReport = new ExecutionReport(converted.Plan);
+                MbbDrain(new AnimatedCastExecutor(animated, true).Execute(converted.Plan, animatedReport));
+                foreach (var engine in new[]
+                {
+                    new KeyValuePair<MbbRefusingRuntime, ExecutionReport>(instant, instantReport),
+                    new KeyValuePair<MbbRefusingRuntime, ExecutionReport>(animated, animatedReport)
+                })
+                {
+                    MbbExpect(engine.Key.ValidatedAnchors.SequenceEqual(new[] { "anchor" }) &&
+                        engine.Key.Submissions == 0 && engine.Value.ResourcesSpent == 0 &&
+                        engine.Value.Confirmed == 0 &&
+                        engine.Value.Records.Any(r => r.Status == CastExecutionStatus.FailedValidation &&
+                            r.Detail == "target-invalid") &&
+                        !engine.Value.Records.Any(r => r.Status == CastExecutionStatus.Submitted ||
+                            r.Status == CastExecutionStatus.CastStarted || r.Status == CastExecutionStatus.Queued),
+                        row[0] + " was cast although native targeting refused its unit anchor.");
+                }
+            }
+        }
+
+        private static void MbbDrain(System.Collections.IEnumerator run)
+        {
+            int moves = 0;
+            while (run.MoveNext())
+                if (++moves > 50) throw new InvalidOperationException("Executor did not terminate.");
+        }
+
+        // Stands in for the Kingmaker adapters when native AbilityData.CanTarget
+        // refuses the resolved anchor: their Validate returns "target-invalid"
+        // for a non-sticky step (KingmakerAnimatedCastAdapter.Validate,
+        // KingmakerInstantCastAdapter.Validate).
+        private sealed class MbbRefusingRuntime : ICastRuntimeAdapter, IInstantCastRuntimeAdapter
+        {
+            internal readonly List<string> ValidatedAnchors = new List<string>();
+            internal int Submissions;
+            public bool IsInCombat { get { return false; } }
+            public CastRuntimeValidation Validate(CastStep step)
+            {
+                ValidatedAnchors.Add(step.MassCast ? step.AnchorUnitId : step.TargetUnitIds.FirstOrDefault());
+                return CastRuntimeValidation.Fail("target-invalid");
+            }
+            public IAnimatedCastOperation StartAnimated(CastStep step) { Submissions++; return null; }
+            public InstantCastResult Fire(CastStep step) { Submissions++; return null; }
+            public bool EffectsObserved(CastStep step) { return false; }
+            public InstantCastCompletion InspectCompletion(CastStep step)
+            { return InstantCastCompletion.Settled("fixture"); }
+            public InstantCastCompletion Cleanup(CastStep step)
+            { return InstantCastCompletion.Settled("fixture"); }
         }
 
         private static void TestMbbNegativeControls()

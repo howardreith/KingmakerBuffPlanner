@@ -6,9 +6,12 @@ Mission: [planning/MISSING-BENEFICIAL-BUFFS-MISSION.md](MISSING-BENEFICIAL-BUFFS
 evidence baseline `dd3e997100916576a268b24e46d49b4db7c34481` (mission commit
 `a4ab152`). Product commit `e240d0a42e78af8539c79a3fbbeb4ab3878ad7b2`
 (source, tests and audit harness; this record and its evidence follow in the
-next commit). Version 0.6.19 unchanged (unreleased change). This record is
-offline evidence only: **no native game check ran** (see
-[Native checks](#native-checks-blocked)).
+next commit). The final checkpoint after the owner addendum (mission §9) adds
+offline tests and records only; production source is unchanged since
+`e240d0a`. Version 0.6.19 unchanged (unreleased change). This record is
+offline evidence only: **no native game check ran**, and by owner decision the
+in-game checks are owner acceptance (see
+[Native checks](#native-checks-owner-acceptance)).
 
 ## Root causes
 
@@ -83,7 +86,7 @@ offline evidence only: **no native game check ran** (see
 | Haste (`486eaff5…`) | Unchanged (available before and after) | Same tests. |
 | Firebelly (`b0652310…`, buff `7c33de68…`) | **Fixed; offline-verified; native NOT RUN** | Baseline `harmful-ally-disposition`, repaired `valid-beneficial-self-effect` (Caster payload). The breath it grants (`5e5b663f…`, AddFacts) stays excluded (point-target, offensive). |
 | Abjuration Resistance — Acid/Cold/Electricity/Fire/Sonic | **Fixed; offline-verified; native NOT RUN** | Baseline hostile current target; repaired personal self buff, payload = own resistance; each removes exactly the other four; native cost `AbilityResourceLogic` 1 × `AbjurationResistanceResource`; no finite lifetime; Fire-then-Cold blocked as `removes-planned-effect`; active choice already satisfied; switching casts once. |
-| Blessing of Luck and Resolve Mass, Feather Step Mass, Firebrand, Heroic Invocation | **Fixed (unit-anchor path); offline-verified; native NOT RUN** | Baseline `point-target-without-placement`, repaired party effect via own allied selector; native radii 30/15/30/30 ft; anchored plan predicts only the anchor's in-radius allies; one cast, one slot, step anchored on a unit. Native `AbilityData.TargetAnchor` is `Point` for these spells, so the in-game legality of a unit target (native `CanTarget`) is exactly what the blocked native check must confirm; until then the provider option builder fails closed (no legal anchor, no option). |
+| Blessing of Luck and Resolve Mass, Feather Step Mass, Firebrand, Heroic Invocation | **Fixed (unit-anchor path); offline-verified; native NOT RUN** | Baseline `point-target-without-placement`, repaired party effect via own allied selector; native radii 30/15/30/30 ft; anchored plan predicts only the anchor's in-radius allies; one cast, one slot, step anchored on a unit. Native `AbilityData.TargetAnchor` is `Point` for these spells, so the in-game legality of a unit target (native `CanTarget`) is **unverified** and left to owner acceptance (check 8). Everything depending on it fails closed, with offline coverage (`missing-beneficial-buffs-point-group-unit-anchor-refused-fails-closed`): no admitted unit → anchored and caster-centred castings Blocked (`origin-anchor-illegal` / `origin-caster-illegal`, worded), nothing reserved, no step; a refused authored anchor never falls back to another centre; an anchor refused at cast time is never submitted by either engine (`target-invalid`, no spend, no confirmation). Enlarge/Reduce Person, Mass planned together on the same allies: the later casting is Blocked (`removes-planned-effect`). |
 | Irresistible Dance (Call of the Wild) | Still excluded | Loaded-blueprint facts (0.4.1 full-user export): can target enemies, harmful to allies → `harmful-ally-disposition` under both rule sets. |
 | Negative controls | Still excluded | Hideous Laughter, Call Lightning (`harmful-ally-disposition`: it can target enemies), Firebelly's breath, Dazing Touch (harmful condition), Treat Affliction (restoration + cooldown marker), Good Hope (Troll Lair) point variant with an `Any` selector. |
 
@@ -152,28 +155,32 @@ present** (no local copy). This is not full current installed-stack coverage:
 a fresh guarded `native-buff-catalog` export per profile is the native
 confirmation and is blocked (below).
 
-## Native checks (blocked)
+## Native checks (owner acceptance)
 
-Not run; no transaction was started. Blockers, re-verified 2026-11-21:
+**Not run; no runtime transaction was started for this mission.** The first
+enrollment stopped `BLOCKED` on two facts (re-verified 2026-11-21): the lab
+deployment lock is still owned by transaction `zhcn19-zh-auto-01` in
+`ModsRestoredPendingDisplay`, so every guarded launch refuses; and the
+automation fixture party (Hedwirg; Linzi, spontaneous bard with
+Heroism/Mirror Image/Resistance/Light; Tartuccio, sorcerer CL1) has none of the
+repaired spells, which the casting scenarios cannot select.
 
-1. The lab's deployment lock is still owned by transaction
-   `zhcn19-zh-auto-01` in `ModsRestoredPendingDisplay` (display restoration to
-   the original single 1920×1080 desktop outstanding); every guarded launch,
-   including `-WhatIf` preflight, refuses while it is unresolved
-   ([AUTONOMOUS-BLOCKERS.md](../AUTONOMOUS-BLOCKERS.md)).
-2. The automation fixture party (Hedwirg; Linzi, spontaneous bard with
-   Heroism/Mirror Image/Resistance/Light; Tartuccio, sorcerer CL1) has none of
-   the repaired spells or abilities, and the runtime casting scenarios cannot
-   select an arbitrary ability or caster.
+**Superseded by owner decision of 2026-11-21 (mission §9, option B):** the
+automated native/in-game checks are not required for this mission. The owner
+tests the change in their own game; the exact checklist, what each check proves
+and what a failure means is in
+[MANUAL-ACCEPTANCE.md](../docs/MANUAL-ACCEPTANCE.md#missing-beneficial-buffs--owner-in-game-acceptance-pending).
+The `zhcn19-zh-auto-01` lock itself remains a separate, still-open lab item and
+was not touched; no fixture, harness or launcher change was made.
 
-Exact remaining native evidence: (a) fresh guarded `native-buff-catalog`
-exports (native-only, call-of-the-wild, full-user) showing the repaired
-dispositions on currently loaded blueprints; (b) on a fixture that has them,
-a real Good Hope cast (listing, legal target, one slot spent, Good Hope on
-in-radius allies only, Crushing Despair branch), Firebelly (caster buff,
-breath not listed), an Abjuration selection plus a switch (one resource use,
-previous resistance removed), and one point-capable group spell cast on a unit
-anchor (native `CanTarget` admits the unit, recipients, slot).
+Native behavior only the game can confirm, and how the code handles it:
+
+| Unverified native behavior | Code dependency | Handling |
+|---|---|---|
+| Native `CanTarget` admits a unit centre for the four point-capable group spells (native anchor `Point`) | Unit-anchored planning and casting | Fails closed at planning (no legal anchor, Blocked, worded reason) and at cast time (`target-invalid`, never submitted); offline-tested. Owner check 8. |
+| The loaded 2.1.7b blueprints match the dump/export facts (Good Hope, Firebelly, Abjuration, group spells) | Admission | A different loaded blueprint is judged by the same structural rules; nothing is assumed by name or GUID. Owner checks 1, 4, 5, 8. |
+| Personal-range selections are castable only on their owner | Abjuration options | Unchanged existing path: the option builder offers only units native `CanTarget` admits (the same path as already-qualified personal spells such as Mirror Image); none admitted → `target-unreachable`. Owner check 5. |
+| Native application/removal (Good Hope's Despair branch, resistance switching, area reach) | Confirmation and existing-effect decisions | Confirmation reads observed effects only; a recipient whose Despair was removed is never reported as receiving Good Hope (offline-tested). Owner checks 2, 3, 6, 7. |
 
 ## Rejected approaches
 
@@ -188,6 +195,15 @@ anchor (native `CanTarget` admits the unit, recipients, slot).
   Transmutation's retargeting.
 
 ## Remaining limitations
+
+- In-game behavior is unverified (owner acceptance pending, see
+  [Native checks](#native-checks-owner-acceptance)); in particular native
+  `CanTarget` for a unit centre of the four point-capable group spells. If the
+  game refuses it, those spells stay unplannable (fail closed) and a separate
+  targeting extension would be needed.
+- The candidate audit reads the guarded 0.4.0/0.4.1 loaded-blueprint exports;
+  no fresh current-stack export was made (it needs a guarded launch). Tabletop
+  Added Rules was not in scope.
 
 - The retired Classic planner (honored only for an explicit legacy mode file)
   does not have the removal-conflict guard; the casting-first planner (default,
@@ -208,6 +224,20 @@ Windows PowerShell 5.1, `scripts/Test-Development.ps1` (source validation
 | `missing-beneficial-buffs` | 13/0 | 6.8 s |
 | `candidate-audit-missing-beneficial-buffs` | 2/0 | 7.9 s |
 | all prefixes `a`…`z` (complete offline program, final working tree) | 764/0 | 37.5 s |
+
+Final checkpoint (owner addendum §9; tests and records only, production
+source unchanged), same entry point, on the final working tree before commit:
+
+| Command (`-Only`) | Result | Duration |
+|---|---|---|
+| `missing-beneficial-buffs` (adds `…-point-group-unit-anchor-refused-fails-closed` and the Enlarge/Reduce Mass planning conflict) | 14/0 | 6.5 s |
+| the eight baseline neighbor families above plus `missing-beneficial-buffs,candidate-audit-missing-beneficial-buffs` | 31/0 | 8.9 s |
+| all prefixes `a`…`z` (complete offline program) | 765/0 | 39 s |
+
+The candidate audit reproduced unchanged (native-only 1,722 / 16 changed,
+full-user 10,443 / 48 changed, classifier `2ac1b450…`). The controller's
+`focused` gate receipt (`-Only missing-beneficial-buffs`) is bound to the
+committed candidate by the controller, not to this record.
 
 Baseline reproduction: each regression judges the same native facts with the
 frozen `dd3e997` classifier and asserts the original exclusion before
