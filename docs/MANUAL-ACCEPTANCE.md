@@ -20,8 +20,11 @@ any failure.
 | 9 | Close and reopen the planner, rest, then save and reload: entries 1–8 stay listed and saved plans keep their castings. | Discovery and persistence survive a refresh. | Entries disappear: refresh-dependent discovery. |
 
 Optional, same rules: Physical Enhancement selections (transmuter) behave like
-checks 5–7; Enlarge/Reduce Person, Mass behave like check 8, and planning both
-on the same allies in one routine is refused. Prayer (an existing spell whose
+checks 5–7; Enlarge/Reduce Person, Mass behave like check 8 on an unmodded
+game, and planning both on the same allies in one routine is refused (with
+Call of the Wild installed they are not offered: its patched buffs run an
+action the planner does not classify). After levelling within the same
+resistance tier, re-selecting the active Abjuration resistance costs no use. Prayer (an existing spell whose
 coverage now reads the native ally/enemy check, review round 6): planned
 caster-centred, every in-radius party member is predicted and receives
 Prayer's buff, never its penalty; a failure means the native relation read

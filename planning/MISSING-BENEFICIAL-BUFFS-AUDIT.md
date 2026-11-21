@@ -150,7 +150,7 @@ exports' historical dispositions are not read; the historical
 | Scope | Export (generator) | Abilities | Changed | Full report SHA-256 (round 1) |
 |---|---|---|---|---|
 | native-only | `kbp040-rc4p-catalog-native` (`7ccf0c9`) | 1,722 | 16 | `bb75bcc491a44184a403f2194fa5915fb6da71d856833396d88e58d4d39a915a` |
-| full-user | `kbp041-rel-catalog-full` (`85e7410`) | 10,443 | 48 | `2cdd2a56f9c7e5cc91b6ca6e6807cbcd078d797e0965edd33f64f68823aef7a5` |
+| full-user | `kbp041-rel-catalog-full` (`85e7410`) | 10,443 | 48 (38 since review round 7, see there) | `2cdd2a56f9c7e5cc91b6ca6e6807cbcd078d797e0965edd33f64f68823aef7a5` |
 
 Judged (review round 1) by classifier source SHA-256
 `95e923dce699566d6ff103f86c56b69e570eb419baafcde293c915f2f7ba5bb4` with
@@ -463,6 +463,53 @@ never counts as a penalty. Native behavior that stays unverified in play:
 `IsEnemy` / `IsAlly` for every party member (a charmed or otherwise hostile
 member would read as an enemy and get no coverage claim); owner check added to
 [MANUAL-ACCEPTANCE.md](../docs/MANUAL-ACCEPTANCE.md).
+
+## Review round 7
+
+Codex review of `bead27a` (decision `changes_required`). Verified: R5-F1,
+R5-F2, R5-F5, R5-F6, R6-F1, R6-F2, R6-F3. New: R7-F1 to R7-F6, all fixed in the
+round-7 corrections commit (`a9bac29`).
+
+| Finding | Correction | Regression |
+|---|---|---|
+| R7-F1 kill action passed both exceptions | Both narrow exceptions (unit-anchored allied bursts, the ally-disposition waiver) refuse any reachable offensive action and any gameplay action the adapter could not classify (an `unknown-node`, e.g. native `ContextActionKillTarget`, on any branch, or an unrecognized action in an applied buff's own lists); presentation (`ContextActionSpawnFx`) stays a harmless adjunct | `…-kill-action-refuses-both-exceptions` (Mass Blessing construct branch and Good Hope Despair branch with `ContextActionKillTarget` → refused by discovery and admission; unmodified spells admitted) |
+| R7-F2 penalty rescued by Personal range | When Personal range rescues an enemy-flagged ability (§3.B), a current-target payload that harms its bearer (penalty-only, harmful condition, or applying one) is still refused | `…-personal-penalty-payload-refused` (native Resistance — Fire repointed to the committed Crushing Despair → refused by discovery and fact-provider admission; the five real selections admitted) |
+| R7-F3 reselection after levelling spent the daily use | The adapter records a buff's `CasterLevelStrength` when its only caster-level dependence is one native `ContextRankConfig` (CasterLevel base, Custom progression) and every other value is constant or that rank; sufficiency then compares the progression value strictly below the last breakpoint (at or above it - wizard-level-20 immunity - the plain caster-level comparison stays). Every other effect keeps the caster-level comparison | `…-resistance-reselect-in-tier-is-free` (level-7 wizard, one use, permanent Fire from level 6: AlreadySatisfied, zero cost; Cold: Ready, one use. The modelled values equal the native `ContextRankConfig.ApplyProgression` for levels 1-19, invoked on the detached native component; 6/7 sufficient, 10/11 and 19/20 insufficient, 12/19 sufficient) |
+| R7-F4 Prayer's penalty satisfied a friend | Existing-effect sufficiency and mixed-coverage notes bind each recipient's fixed facts (`BindForRecipient`, the caster relation included) | `…-prayer-penalty-never-covers-a-friendly-ally` (PrayerBuff on the caster, only PrayerDebuff on the ally: Ready, one slot, no already-covered note for the ally; PrayerBuff on both: zero-cost skip) |
+| R7-F5 unreachable removal blocked a cast | Change analysis follows only the true branch of an empty native checker (applications, guaranteed applications and removals) | `…-empty-checker-unreachable-removal-is-no-conflict` (Mass Blessing funded, then Feather Step with its buff on the empty checker's true branch and a removal of Mass Blessing's buff on the false branch: Ready, one slot; control with the removal on the true branch: refused naming the planned Mass Blessing) |
+| R7-F6 later Good Hope could not gain allies | `SequentialRecipientState`: options record every live read of their recipient-fact gates; each funded casting's changes, bound under the state so far, update it (certain application → present, certain removal → absent, possible → unknown unless already agreeing; `EffectChanges.CertainlyRemoved` added). A later routine's group beneficiaries are recomputed from it - narrowed or widened - in the one-pass compiler (a casting with an empty burst is kept, not dropped, so it can be re-evaluated) and the Classic forecast; unread or unknown conditions withhold the claim; independent previews unchanged | `…-sequential-good-hope-gains-allies` (allies at 0/10/20 ft, Despair on the latter two; Good Hope at 10 ft then at 20 ft: one slot each, the second benefits the allies at 10 and 20; the second routine previewed alone: empty, refused) and `…-classic-sequential-good-hope-gains-allies` |
+
+**Executed reproductions** on the production of `bead27a` (eleven files
+swapped by `git show bead27a:<path>`, current tests and the 51/61 fixtures; the
+R7-F3 test's checks of the new strength model were stubbed for that run;
+everything restored from `a9bac29`): `missing-beneficial-buffs` 51/7 (DLL
+`849962ea…`). Failures: kill action "admitted: valid-beneficial-party-effect…"
+(R7-F1); Personal penalty "admitted: valid-beneficial-self-effect…" (R7-F2);
+"Reselecting Fire from level 6 at level 7: Ready" (R7-F3); "AlreadySatisfied
+already-active:ally" (R7-F4); "Blocked removes-planned-effect:bless:…:ally"
+(R7-F5); one-pass "Blocked [] predicted-coverage-empty:f" and Classic "no step
+/ f=Unfulfilled,m=Unfulfilled" (R7-F6).
+
+Corrected results (final tree): `missing-beneficial-buffs` 58/0; complete
+program 807/0 (35.6 s); explicit capture 1/0 (fixtures unchanged, 51 / 61);
+explicit verify + candidate audit 3/0 (51 identical files, 61 types, Dance
+identical; classifier
+`3b11c7871d3d179e1960a709e91080f2673008b2cdf9626d40710ff777066ebf`, overrides
+`c462aeb4…`, reports `82a83ffd…73d2` / `decdd0f7…c690`). Native-only 1,722 / 16
+changed, rows identical apart from the header label. **Full-user 10,443 / 38**
+(48 before): the R7-F1 rule refuses the ten Enlarge / Reduce Person, Mass rows
+(native and Call of the Wild variants) because under Call of the Wild their
+buffs run `CallOfTheWild.NewMechanics.ContextActionRemoveBuffs` on activation,
+an action the adapter does not classify; the other 38 rows are unchanged. The
+four mission group spells remain admitted in both scopes; Enlarge/Reduce were
+audit-found extras and stay admitted for an unmodded 2.1.7b (native-only
+export, detached fixtures).
+
+Limits: an unclassified mod action is refused rather than modelled; the
+`CasterLevelStrength` rule covers only a single Custom CasterLevel progression
+and falls back to the caster-level comparison at or above its last
+breakpoint; the sequential state starts from the reads an option made (units
+outside every burst, or keys never read, stay unknown).
 
 ## Rejected approaches
 
