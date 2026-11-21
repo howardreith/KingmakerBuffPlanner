@@ -310,6 +310,7 @@ namespace KingmakerBuffPlanner.Planning
                 providers[casting.CastingId] = provider;
                 modifierDemandsByCasting[casting.CastingId] = modifierDemands;
             }
+            castings = BlockRemovalConflicts(castings, effectsBySource, diagnostics);
             // Shared budget pass: every Ready casting reserves its complete
             // cost vector atomically in persisted order; a deficit blocks the
             // casting and reserves nothing anywhere. A routine scope limits
@@ -665,6 +666,97 @@ namespace KingmakerBuffPlanner.Planning
             foreach (ICastingTargetingModifier modifier in applied)
                 modifierDemands.AddRange(modifier.UsageDemands(casting, option));
             return option;
+        }
+
+        public const string RemovesPlannedEffect = "removes-planned-effect";
+
+        // Missing-beneficial-buffs mission §3.B: mutually exclusive
+        // selections are never planned as stackable. A casting whose own
+        // native actions remove an effect that an earlier casting of the same
+        // routine applies (or already keeps active) on the same unit would
+        // undo that casting's claimed coverage - the wizard's Abjuration
+        // resistances each apply their own buff and remove the other four;
+        // Enlarge and Reduce Person, Mass remove each other instead of
+        // applying. The later casting is blocked with the conflict named, so
+        // the plan never claims both; it casts nothing and reserves nothing.
+        // Switching away from an effect active before the run is ordinary
+        // native behavior and is not blocked. A removal of an effect the
+        // same casting applies again itself is not a conflict.
+        private static List<ResolvedCasting> BlockRemovalConflicts(
+            List<ResolvedCasting> castings,
+            IReadOnlyDictionary<string, EffectExpression> effectsBySource,
+            List<string> diagnostics)
+        {
+            var blocked = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (IGrouping<string, ResolvedCasting> routine in castings
+                .Select((casting, index) => new { casting, index })
+                .OrderBy(value => value.casting.Order).ThenBy(value => value.index)
+                .Select(value => value.casting)
+                .GroupBy(casting => casting.RoutineId ?? string.Empty, StringComparer.Ordinal))
+            {
+                // unit -> effect -> the earlier casting that provides it
+                var provided = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+                foreach (ResolvedCasting casting in routine)
+                {
+                    if (casting.Readiness != ResolvedCastingReadiness.Ready &&
+                        casting.Readiness != ResolvedCastingReadiness.AlreadySatisfied)
+                        continue;
+                    EffectExpression expression = DiscoveredEffectLookup.ForAbility(
+                        effectsBySource, casting.Ability, casting.SourceId);
+                    if (expression == null) continue;
+                    var applies = new List<KeyValuePair<string, string>>();
+                    var removes = new List<KeyValuePair<string, string>>();
+                    foreach (string recipient in casting.PredictedBeneficiaryUnitIds)
+                    {
+                        var scope = new EffectRecipientScope(expression, casting.CasterUnitId, recipient);
+                        new EffectPresenceEvaluator().EvaluateScoped(expression, (leaf, role) =>
+                        {
+                            string owner = scope.Owner(leaf, role);
+                            if (owner != null) applies.Add(new KeyValuePair<string, string>(owner, leaf.EffectId));
+                            return true;
+                        }, null);
+                        foreach (EffectRemoval removal in EffectRemovals.Collect(expression))
+                            removes.Add(new KeyValuePair<string, string>(scope.Owner(removal.Target), removal.EffectId));
+                    }
+                    if (casting.Readiness == ResolvedCastingReadiness.Ready)
+                    {
+                        KeyValuePair<string, string> conflict = removes
+                            .Where(removal => !applies.Contains(removal))
+                            .FirstOrDefault(removal =>
+                            {
+                                Dictionary<string, string> effects;
+                                return removal.Key != null && provided.TryGetValue(removal.Key, out effects) &&
+                                    effects.ContainsKey(removal.Value);
+                            });
+                        if (conflict.Key != null)
+                        {
+                            string earlier = provided[conflict.Key][conflict.Value];
+                            blocked[casting.CastingId] = RemovesPlannedEffect + ":" + earlier + ":" +
+                                conflict.Value + ":" + conflict.Key;
+                            diagnostics.Add(RemovesPlannedEffect + ":" + casting.CastingId + ":" + earlier +
+                                ":" + conflict.Value + ":" + conflict.Key);
+                            continue;
+                        }
+                    }
+                    foreach (KeyValuePair<string, string> application in applies)
+                    {
+                        Dictionary<string, string> effects;
+                        if (!provided.TryGetValue(application.Key, out effects))
+                            provided[application.Key] = effects = new Dictionary<string, string>(StringComparer.Ordinal);
+                        effects[application.Value] = casting.CastingId;
+                    }
+                }
+            }
+            if (blocked.Count == 0) return castings;
+            return castings.Select(casting =>
+            {
+                string reason;
+                if (!blocked.TryGetValue(casting.CastingId, out reason)) return casting;
+                return casting.WithBudgetResult(ResolvedCastingReadiness.Blocked,
+                    casting.ReadinessReasons.Concat(new[] { reason }).Distinct(StringComparer.Ordinal)
+                        .OrderBy(value => value, StringComparer.Ordinal).ToList(),
+                    casting.Cost, casting.CostShape);
+            }).ToList();
         }
 
         // Structural satisfaction is only claimed for identical ability

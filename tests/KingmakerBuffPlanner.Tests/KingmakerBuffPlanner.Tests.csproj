@@ -65,6 +65,15 @@
     <Compile Include="DirectManipulationTests.cs" />
     <Compile Include="CatalogAuditTests.cs" />
     <Compile Include="CatalogAdjudicationTests.cs" />
+    <Compile Include="MissingBeneficialBuffsAuditTests.cs" />
+    <Compile Include="BaselineNativeCandidateClassifier.cs" />
+    <Compile Include="NativeBlueprintDump.cs" />
+    <Compile Include="MissingBeneficialBuffsTests.cs" />
+    <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\KingmakerActionGraphAdapter.cs"><Link>GameAdapters\KingmakerActionGraphAdapter.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\KingmakerBuffSourceDiscovery.cs"><Link>GameAdapters\KingmakerBuffSourceDiscovery.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\KingmakerAreaCoverageResolver.cs"><Link>GameAdapters\KingmakerAreaCoverageResolver.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\NativeCatalogExporter.cs"><Link>Discovery\NativeCatalogExporter.cs</Link></Compile>
+    <Compile Include="..\..\src\KingmakerBuffPlanner\Discovery\NativeAccessibilityIndex.cs"><Link>Discovery\NativeAccessibilityIndex.cs</Link></Compile>
     <Compile Include="PolicyAuthoringPhysicalTests.cs" />
     <Compile Include="AutosaveLifecycleTests.cs" />
     <Compile Include="ClearPlanTests.cs" />

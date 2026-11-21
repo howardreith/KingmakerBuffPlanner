@@ -47,16 +47,90 @@ namespace KingmakerBuffPlanner.Domain.Effects
         // review of the next iteration: a damaging or removing action is not
         // a no-op). Used only to judge a plain buff; not part of any
         // serialized form or identity.
-        public EmptyEffectExpression(string unmodeledReason) : base("empty")
+        public EmptyEffectExpression(string unmodeledReason) : this(unmodeledReason, null) { }
+
+        // removal: the exact native ContextActionRemoveBuff this node stands
+        // for, when known (missing-beneficial-buffs mission §3.B). Like the
+        // unmodeled reason it is planning metadata only: never serialized
+        // and never part of a catalogue or saved identity
+        // (EffectAggregateIdentity describes every empty node as "empty").
+        public EmptyEffectExpression(string unmodeledReason, EffectRemoval removal) : base("empty")
         {
             UnmodeledReason = unmodeledReason;
+            Removal = removal;
         }
 
         public static EmptyEffectExpression NoAction() { return new EmptyEffectExpression(null); }
 
         [JsonIgnore] public string UnmodeledReason { get; private set; }
 
+        [JsonIgnore] public EffectRemoval Removal { get; private set; }
+
         [JsonIgnore] public bool IsNoAction { get { return UnmodeledReason == null; } }
+    }
+
+    // One buff a casting's own native actions remove, and whose (the
+    // removal's resolved recipient role, as for an effect leaf).
+    public sealed class EffectRemoval
+    {
+        public EffectRemoval(string effectId, EffectTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(effectId)) throw new ArgumentException("Effect ID is required.", "effectId");
+            EffectId = effectId;
+            Target = target;
+        }
+
+        public string EffectId { get; private set; }
+        public EffectTarget Target { get; private set; }
+    }
+
+    // Missing-beneficial-buffs mission §3.B: the buffs a casting removes
+    // (on any branch: a conditional removal can replace the application),
+    // each with its recipient role resolved through the enclosing target
+    // transforms. Mutually exclusive selections (the wizard's Abjuration
+    // resistances: each applies its own buff and removes the other four)
+    // are recognized from these native removals, never from names.
+    public static class EffectRemovals
+    {
+        public static IReadOnlyList<EffectRemoval> Collect(EffectExpression expression)
+        {
+            var removals = new List<EffectRemoval>();
+            Collect(expression, null, removals);
+            return removals.AsReadOnly();
+        }
+
+        private static void Collect(EffectExpression expression, EffectTarget? outer, List<EffectRemoval> removals)
+        {
+            var empty = expression as EmptyEffectExpression;
+            if (empty != null)
+            {
+                if (empty.Removal != null)
+                    removals.Add(new EffectRemoval(empty.Removal.EffectId,
+                        EffectRecipientScope.Resolve(empty.Removal.Target, outer)));
+                return;
+            }
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null)
+            {
+                foreach (EffectExpression child in sequence.Children) Collect(child, outer, removals);
+                return;
+            }
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                Collect(conditional.WhenTrue, outer, removals);
+                Collect(conditional.WhenFalse, outer, removals);
+                return;
+            }
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null)
+            {
+                Collect(targeted.Child, EffectRecipientScope.Resolve(targeted.Target, outer), removals);
+                return;
+            }
+            var reference = expression as ReferencedAbilityExpression;
+            if (reference != null) Collect(reference.Child, outer, removals);
+        }
     }
 
     public sealed class EffectLeafExpression : EffectExpression

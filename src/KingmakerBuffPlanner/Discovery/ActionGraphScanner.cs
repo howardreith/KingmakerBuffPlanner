@@ -96,7 +96,11 @@ namespace KingmakerBuffPlanner.Discovery
                     case DiscoveryNodeKind.RestorativeAction:
                         diagnostics.Add(new DiscoveryDiagnostic(
                             "restorative-action", node.Identity, node.SourceContract, path));
-                        return new EmptyEffectExpression("restorative-action:" + node.Identity);
+                        // An exact buff removal keeps which buff it removes
+                        // and from whom (planning metadata; see EffectRemoval).
+                        return new EmptyEffectExpression("restorative-action:" + node.Identity,
+                            string.IsNullOrEmpty(node.EffectId) ? null : new EffectRemoval(node.EffectId,
+                                ResolveLeafTarget(targetOverride, node.Target)));
                     case DiscoveryNodeKind.Sequence:
                         return VisitSequence(node, depth, active, diagnostics, targetOverride, path);
                     case DiscoveryNodeKind.Conditional:

@@ -723,6 +723,7 @@
   "reason.refusal.unavailableProvider": "该角色已无法以此方式施放该增益。",
   "reason.refusal.unknown": "当前无法执行此操作。",
   "reason.refusal.unusable": "该角色无法施放此增益。",
+  "reason.removes-planned-effect": "它会移除本流程中较早施法提供的效果（这些选择会互相替换）",
   "reason.resource-pool-exhausted": "施放次数已用尽",
   "reason.resource-pool-unknown": "找不到施法所需的资源",
   "reason.share-feature-unavailable": "施法者没有“共享变化法术”能力",

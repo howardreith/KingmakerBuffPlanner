@@ -723,6 +723,7 @@
   "reason.refusal.unavailableProvider": "that character can no longer cast this buff that way.",
   "reason.refusal.unknown": "not possible right now.",
   "reason.refusal.unusable": "that character cannot cast this buff.",
+  "reason.removes-planned-effect": "it would remove an effect an earlier casting in this routine provides (these choices replace each other)",
   "reason.resource-pool-exhausted": "no casts left",
   "reason.resource-pool-unknown": "its resource was not found",
   "reason.share-feature-unavailable": "the caster does not have Share Transmutation",

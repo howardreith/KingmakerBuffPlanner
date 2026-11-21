@@ -376,21 +376,21 @@ namespace KingmakerBuffPlanner.Discovery
         // What a buff's own AddFactContextActions do, read by the exact
         // action graph adapter (rc4 review finding 1). Only the lists that do
         // something are recorded.
-        private static NativeFactActionsRecord[] FactActions(BlueprintBuff buff)
+        private static NativeFactActionsRecord[] FactActions(BlueprintBuff buff, NativeBlueprintLookup lookup)
         {
             var records = new List<NativeFactActionsRecord>();
             foreach (AddFactContextActions component in (buff.ComponentsArray ?? new BlueprintComponent[0])
                 .OfType<AddFactContextActions>())
             {
-                records.Add(FactActionList("Activated", component.Activated));
-                records.Add(FactActionList("NewRound", component.NewRound));
-                records.Add(FactActionList("Deactivated", component.Deactivated));
+                records.Add(FactActionList("Activated", component.Activated, lookup));
+                records.Add(FactActionList("NewRound", component.NewRound, lookup));
+                records.Add(FactActionList("Deactivated", component.Deactivated, lookup));
             }
             return records.Where(record => record.AppliedEffects.Length != 0 || record.Restorative.Length != 0 ||
                 record.Offensive.Length != 0 || record.Unrecognized.Length != 0).ToArray();
         }
 
-        private static NativeFactActionsRecord FactActionList(string name, ActionList list)
+        private static NativeFactActionsRecord FactActionList(string name, ActionList list, NativeBlueprintLookup lookup)
         {
             DiscoveryScanResult scan = new ActionGraphScanner().Scan(
                 new KingmakerActionGraphAdapter().AdaptActions(list));
@@ -400,7 +400,7 @@ namespace KingmakerBuffPlanner.Discovery
             return new NativeFactActionsRecord
             {
                 List = name,
-                AppliedEffects = GetEffects(scan.Expression, false),
+                AppliedEffects = GetEffects(scan.Expression, false, lookup),
                 Restorative = identities("restorative-action"),
                 Offensive = identities("offensive-action"),
                 Unrecognized = scan.Diagnostics
@@ -413,10 +413,35 @@ namespace KingmakerBuffPlanner.Discovery
 
         internal static NativeEffectRecord[] GetEffects(EffectExpression expression)
         {
-            return GetEffects(expression, true);
+            return GetEffects(expression, true, NativeBlueprintLookup.Loaded);
         }
 
-        private static NativeEffectRecord[] GetEffects(EffectExpression expression, bool withFactActions)
+        // The same records read through an explicit blueprint lookup (the
+        // loaded library in production; detached native blueprints in the
+        // assembly-backed regression tests).
+        internal static NativeEffectRecord[] GetEffects(EffectExpression expression, NativeBlueprintLookup lookup)
+        {
+            return GetEffects(expression, true, lookup ?? NativeBlueprintLookup.Loaded);
+        }
+
+        // Report identity only (EffectName); the classifier never reads it.
+        // Outside a running Unity player (the detached-blueprint regression
+        // tests) the native name getter cannot even be compiled, so it lives
+        // in its own non-inlined method and an unreadable name is empty.
+        private static string NameOf(UnityEngine.Object value)
+        {
+            try { return NativeName(value); }
+            catch (Exception) { return string.Empty; }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static string NativeName(UnityEngine.Object value)
+        {
+            return value.name ?? string.Empty;
+        }
+
+        private static NativeEffectRecord[] GetEffects(EffectExpression expression, bool withFactActions,
+            NativeBlueprintLookup lookup)
         {
             var leaves = new List<EffectLeafExpression>();
             CollectLeaves(expression, leaves);
@@ -433,11 +458,11 @@ namespace KingmakerBuffPlanner.Discovery
                 NativeFactActionsRecord[] factActions = new NativeFactActionsRecord[0];
                 if (leaf.Kind == EffectKind.Buff || leaf.Kind == EffectKind.AreaBuff)
                 {
-                    var buff = ResourcesLibrary.TryGetBlueprint<BlueprintBuff>(leaf.EffectId);
+                    BlueprintBuff buff = lookup.Buff(leaf.EffectId);
                     if (buff != null)
                     {
                         harmful = buff.Harmful;
-                        name = buff.name ?? string.Empty;
+                        name = NameOf(buff);
                         componentTypes = (buff.ComponentsArray ?? new BlueprintComponent[0])
                             .Where(c => c != null).Select(c => c.GetType().FullName)
                             .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToArray();
@@ -450,15 +475,15 @@ namespace KingmakerBuffPlanner.Discovery
                         classFeature = buff.IsClassFeature;
                         removeOnRest = buff.RemoveOnRest;
                         stayOnDeath = buff.StayOnDeath;
-                        if (withFactActions) factActions = FactActions(buff);
+                        if (withFactActions) factActions = FactActions(buff, lookup);
                     }
                 }
                 else if (leaf.Kind == EffectKind.WornItemEnchantment)
                 {
-                    var enchantment = ResourcesLibrary.TryGetBlueprint<BlueprintItemEnchantment>(leaf.EffectId);
+                    BlueprintItemEnchantment enchantment = lookup.Enchantment(leaf.EffectId);
                     if (enchantment != null)
                     {
-                        name = enchantment.name ?? string.Empty;
+                        name = NameOf(enchantment);
                         componentTypes = (enchantment.ComponentsArray ?? new BlueprintComponent[0])
                             .Where(c => c != null).Select(c => c.GetType().FullName)
                             .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToArray();
@@ -647,6 +672,30 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("restorative", Order = 3)] public string[] Restorative { get; set; }
         [JsonProperty("offensive", Order = 4)] public string[] Offensive { get; set; }
         [JsonProperty("unrecognized", Order = 5)] public string[] Unrecognized { get; set; }
+    }
+
+    // How the exporter and live discovery resolve an effect's blueprint
+    // (missing-beneficial-buffs mission §4): the loaded library in the game;
+    // an explicit set of detached native blueprints in the assembly-backed
+    // regression tests, so they run the same adapter -> scanner -> facts ->
+    // classifier path with real Kingmaker objects instead of restated facts.
+    internal sealed class NativeBlueprintLookup
+    {
+        internal static readonly NativeBlueprintLookup Loaded = new NativeBlueprintLookup(
+            id => ResourcesLibrary.TryGetBlueprint<BlueprintBuff>(id),
+            id => ResourcesLibrary.TryGetBlueprint<BlueprintItemEnchantment>(id));
+
+        internal NativeBlueprintLookup(Func<string, BlueprintBuff> buff,
+            Func<string, BlueprintItemEnchantment> enchantment)
+        {
+            if (buff == null) throw new ArgumentNullException("buff");
+            if (enchantment == null) throw new ArgumentNullException("enchantment");
+            Buff = buff;
+            Enchantment = enchantment;
+        }
+
+        internal Func<string, BlueprintBuff> Buff { get; private set; }
+        internal Func<string, BlueprintItemEnchantment> Enchantment { get; private set; }
     }
 
     internal sealed class NativeActionRecord

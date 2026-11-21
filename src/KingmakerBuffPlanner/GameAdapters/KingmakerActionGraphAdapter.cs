@@ -125,6 +125,16 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (action is ContextActionSpawnMonster)
                 return new DiscoveryNode(DiscoveryNodeKind.Unknown,
                     DescribeType(action.GetType()), sourceContract: "excluded-summoning-action");
+            // Missing-beneficial-buffs mission §3.B: the exact native removal
+            // of one buff keeps which buff it removes and from whom, so the
+            // planner can recognize mutually exclusive selections (each
+            // applies its own buff and removes the others).
+            var remove = action as ContextActionRemoveBuff;
+            if (remove != null && action.GetType() == typeof(ContextActionRemoveBuff))
+                return new DiscoveryNode(DiscoveryNodeKind.RestorativeAction,
+                    DescribeType(action.GetType()), sourceContract: "restorative-action",
+                    effectId: remove.Buff == null ? null : remove.Buff.AssetGuid,
+                    target: remove.ToCaster ? EffectTarget.Caster : EffectTarget.CurrentTarget);
             if (IsRestorativeAction(action.GetType()))
                 return new DiscoveryNode(DiscoveryNodeKind.RestorativeAction,
                     DescribeType(action.GetType()), sourceContract: "restorative-action");
