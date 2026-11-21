@@ -618,6 +618,61 @@ of a skip is not re-checked against another caster's same-routine
 application. The applying caster of an observed instance and the native
 relation reads remain unverified in game (owner acceptance).
 
+## Review round 10
+
+Codex review of `6d6acc3` (decision `changes_required`). Verified: R7-F1,
+R8-F4, R9-F2, R9-F6. Re-opened: R8-F1, R8-F2, R8-F3, R8-F6, R9-F1, R9-F3,
+R9-F4, R9-F5. New: R10-F1 to R10-F4. All are fixed in the round-10
+corrections commit (`3df014f`).
+
+| Finding | Correction | Regression |
+|---|---|---|
+| R10-F1 Ally-only bursts counted members the selector excludes | `AlliedAreaCoverage` carries the native `AbilityTargetsAround` selector type; for `TargetType.Ally` a unit read as not allied to the caster is not reached, and one with an unread relation is affected but never a beneficiary; the option keeps the restriction (`RequiresAllyRelation`) for recomputed coverage. Prayer's Any selector is unchanged. Test fact readers that call the planner directly now answer the relation as the production reader does (friendly party members) | `…-ally-selector-honours-the-caster-relation` (unmodified Feather Step, Mass, one legal centre: affected {caster, friend, unread}, predicted {caster, friend}, one slot; recomputed coverage keeps the restriction; Prayer's selector read as Any) |
+| R10-F2 a friend-only weapon delivery passed the point-target exception | An offensive ability-level delivery component (weapon attack, projectile, chain, bomb; `Weapon` range) refuses the whole-cast exceptions | `…-weapon-delivery-refuses-point-admission` (Feather Step, Mass plus native `AbilityDeliverAttackWithWeapon`: refused by discovery and provider admission; original admitted) |
+| R10-F3 Firebelly coverage ended before the catalogue | Test only | `…-firebelly-reaches-the-castable-catalogue` (Firebelly via production spell admission, targeting and `PlannerSetupModel`: one caster-only entry; the granted breath through fact admission: no provider, no entry) |
+| R10-F4 Classic treated a suppressed Good Hope as coverage | With instance detail, a Classic skip needs a readable, unsuppressed instance of an ordinary buff too | `…-classic-suppressed-good-hope-is-no-coverage` (suppressed, unread suppression: no skip; effective: skip) |
+| R8-F1 a live Firebrand skip survived another caster's application | The budget pass keeps the standing live evidence: a funded caster-relative application voids other casters' live instances of that effect on the units it reaches, and a skip resting on them is re-assessed (readiness, notes, cost, step); the Classic routine withholds such a skip | `…-firebrand-live-skip-after-other-caster-recasts` (selected run, a's Firebrand live on the disk, b funded over it, then a: paid, two executable steps; b disabled or a disjoint disk: a's free skip) |
+| R8-F2 neutral enemy disposition bypassed Personal whole-cast safety | The whole-cast check covers every Personal ability the hostile rules would refuse: harmful enemy disposition, or enemy-capable without friend targeting | `…-personal-neutral-disposition-rescue-is-whole-cast` (caster-directed Resistance — Fire with `EffectOnEnemy = None`, `CanTargetFriends = false` and the native kill action: refused by the frozen baseline, discovery and fact admission; without the kill admitted) |
+| R8-F3 a later Classic routine lost a newly eligible ally | A re-evaluated option carries the sequential state as its recipient fact reads, so a routine's own state starts from what earlier occurrences changed | `…-classic-sequence-keeps-inherited-coverage` (first routine clears Despair; second funds Haste, then Good Hope keeps the allies and reserves one slot) |
+| R9-F1 Classic charged twice for the same permanent resistance | A Classic repeat of an all-permanent payload that an earlier step of the routine certainly left on the unit (per-routine recipient state) is skipped | `…-classic-repeated-resistance-costs-one-use` (two saved Fire assignments, one use: one step, one reservation, the second skipped; Fire then Cold refused as a removal) |
+| R9-F3 Classic Prayer confirmed from its penalty | A Classic mass step's expected effects are the friendly relation branch (confirmation); the sequence forecast analyzes the complete expression of the step's source; the owner checklist distinguishes friendly and hostile members | `…-classic-prayer-confirmation-needs-the-friendly-buff` (RoutinePlanService step: PrayerDebuff alone does not confirm, PrayerBuff does) |
+| R9-F4 an unreachable relation predicate vetoed a benefit | Relation checks (beneficiary prediction, Classic skip) use only reachable predicates (`ReachableFactIds`) | `…-empty-checker-unreachable-relation-keeps-coverage` (Prayer rebuilt with an empty checker: a hostile-read member still predicted; an unread-relation Classic target with an effective buff skipped) |
+| R9-F5 Classic carried stale Firebrand instances | The Classic forecast projects leaves through a group step's allied-area (or party) wrapper onto its recipients, so an overlapping Firebrand replaces other casters' carried instances | `…-classic-sequence-firebrand-replaces-other-caster` (a's live instances, b funded in the first routine, a requested in the second: paid; disjoint: free) |
+| R8-F6 a non-finite self-distance admitted an anchor | A non-finite or negative reading is unusable geometry | `…-failed-geometry-read-keeps-anchors-separate` extended (NaN and +∞ self-distance: zero cost, no step; the finite centre keeps its disk) |
+
+**Executed reproductions** on the production of `6d6acc3` (eight files
+swapped by `git show 6d6acc3:<path>`, current tests and the 51/61 fixtures;
+the two `RequiresAlly` reads in the R10-F1 test were stubbed for that run, so
+its "selector contract" subcase failed by construction; everything restored
+from `3df014f` and the tree verified clean): `missing-beneficial-buffs` 76/11
+(DLL `ecbe6cae…`). Every new regression failed on its target subcases except
+`…-firebelly-reaches-the-castable-catalogue`, which passes on the baseline
+(R10-F3 was an evidence gap, not a defect). Failures included: the
+NaN/+∞ centres "Ready [flaky]"; the Ally burst "affected
+[caster,friend,hostile,unread] predicted [caster,friend,hostile,unread]";
+the weapon delivery admitted; suppressed and unread-suppression Good Hope
+skipped; "a's live Firebrand skip survived b's overlapping cast:
+AlreadySatisfied"; the neutral-disposition kill variant admitted; the
+inherited Good Hope "f=Unfulfilled, m=Unfulfilled"; the repeated Classic Fire
+"z-fire-again … no-valid-provider-or-resource"; Classic PrayerDebuff
+confirmation; the unreachable relation "[caster]" and "far=Unfulfilled"; the
+Classic Firebrand "a=SkippedAlreadyActive". Every control subcase passed.
+
+Corrected results (committed source `3df014f`): `missing-beneficial-buffs`
+87/0; complete program 836/0 (39.5 s); explicit capture 1/0 (fixtures
+unchanged, 51 / 61); explicit verify + candidate audit 3/0 (51 identical
+files, 61 types, Dance identical; native-only 16 of 1,722 and full-user 38
+of 10,443 changed dispositions, rows identical apart from the header label;
+classifier `7eb7fcf09bcc28bc26d5f460b1937adcf5d1edb01857369a513499e8654e433d`,
+full reports `e86d93ce…0601` / `f6e8d8b6…1df2`, tables `8f126085…0fa8` /
+`1d569b25…86bc`).
+
+Limits: the Firebelly regression uses the spontaneous-level pool shape for
+the cleric book (slot accounting is covered elsewhere); the native relation
+read (`IsAlly` / `IsEnemy`), the applying caster of a buff, and cross-caster
+Firebrand coexistence stay unverified in game (owner acceptance), and every
+planner decision that depends on them fails closed.
+
 ## Rejected approaches
 
 - An `include` override for Good Hope/Firebelly: rejected — it replaces the
