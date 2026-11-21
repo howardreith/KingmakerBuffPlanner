@@ -96,7 +96,8 @@ namespace KingmakerBuffPlanner.GameAdapters
             if (apply != null && apply.Buff != null)
                 return Effect(EffectKind.Buff, apply.Buff.AssetGuid,
                     apply.ToCaster ? EffectTarget.Caster : EffectTarget.CurrentTarget,
-                    "ContextActionApplyBuff", MaximumDurationSeconds(apply), CasterLevelStrengthOf(apply.Buff));
+                    "ContextActionApplyBuff", MaximumDurationSeconds(apply), CasterLevelStrengthOf(apply.Buff),
+                    IsCasterRelative(apply.Buff));
             var conditional = action as Conditional;
             if (conditional != null)
                 return new DiscoveryNode(DiscoveryNodeKind.Conditional, action.GetType().FullName,
@@ -292,11 +293,33 @@ namespace KingmakerBuffPlanner.GameAdapters
         }
 
         private static DiscoveryNode Effect(EffectKind kind, string id, EffectTarget target, string contract,
-            float? maximumDurationSeconds = null, CasterLevelStrength casterLevelStrength = null)
+            float? maximumDurationSeconds = null, CasterLevelStrength casterLevelStrength = null,
+            bool casterRelative = false)
         {
             return new DiscoveryNode(DiscoveryNodeKind.Effect, contract, effectKind: kind,
                 effectId: id, target: target, sourceContract: contract,
-                maximumDurationSeconds: maximumDurationSeconds, casterLevelStrength: casterLevelStrength);
+                maximumDurationSeconds: maximumDurationSeconds, casterLevelStrength: casterLevelStrength,
+                casterRelative: casterRelative);
+        }
+
+        // Review R8-F1: native buff components whose benefit is relative to
+        // the buff's caster (AddImmunityFirebrand grants immunity to that
+        // caster's fire spells; its reads of the context caster are pinned
+        // in the native contract regression).
+        internal static readonly string[] CasterRelativeComponents =
+        {
+            "Kingmaker.UnitLogic.FactLogic.AddImmunityFirebrand"
+        };
+
+        internal static bool IsCasterRelative(Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff buff)
+        {
+            try
+            {
+                return buff != null && (buff.ComponentsArray ?? new BlueprintComponent[0])
+                    .Any(component => component != null &&
+                        CasterRelativeComponents.Contains(component.GetType().FullName));
+            }
+            catch (Exception) { return false; }
         }
 
         // Missing-beneficial-buffs review R7-F3: the buff's caster-level

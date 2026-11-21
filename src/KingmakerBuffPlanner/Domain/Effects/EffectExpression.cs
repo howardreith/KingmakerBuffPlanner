@@ -289,11 +289,13 @@ namespace KingmakerBuffPlanner.Domain.Effects
             string recipientUnitId = null,
             float? maximumDurationSeconds = null,
             NearbySelectionBinding secondarySelection = null,
-            CasterLevelStrength casterLevelStrength = null)
+            CasterLevelStrength casterLevelStrength = null,
+            bool casterRelative = false)
             : base("leaf")
         {
             if (string.IsNullOrWhiteSpace(effectId)) throw new ArgumentException("Effect ID is required.", "effectId");
             CasterLevelStrength = casterLevelStrength;
+            CasterRelative = casterRelative;
             Kind = kind;
             EffectId = effectId;
             Target = target;
@@ -311,8 +313,14 @@ namespace KingmakerBuffPlanner.Domain.Effects
         {
             return new EffectLeafExpression(Kind, EffectId, Target, SourceContract, ActionPath,
                 recipientUnitId, MaximumDurationSeconds, secondarySelection ?? SecondarySelection,
-                CasterLevelStrength);
+                CasterLevelStrength, CasterRelative);
         }
+
+        // Review R8-F1: the buff's benefit depends on who cast it (native
+        // AddImmunityFirebrand: immunity to the fire spells of that caster),
+        // so an instance from another caster does not provide it.
+        // Inspection metadata, not identity.
+        [JsonIgnore] public bool CasterRelative { get; private set; }
 
         // Review R7-F3: how the applied buff's strength depends on caster
         // level, when that is proven to be only through one native custom

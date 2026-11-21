@@ -218,6 +218,17 @@ namespace KingmakerBuffPlanner.Discovery
             if (hostileCurrentTarget)
                 return Exclude("no-persistent-beneficial-party-effect",
                     "The current-target payload has harmful enemy disposition and no exact beneficial-party branch.");
+            // Review R8-F2: when Personal range is what rescues an ability
+            // aimed (by its flags) at a harmful enemy target (§3.B), the
+            // caster receives the WHOLE cast: any application that harms its
+            // bearer, or any unsafe or unread action, excludes the ability
+            // (dropping only the harmful leaf would still execute it).
+            if (AuditRules && IsPersonalRange(facts) && facts.CanTargetEnemies &&
+                string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal) &&
+                effects.Any(e => e.Target == "CurrentTarget") &&
+                (effects.Any(ImposesHarm) || HasUnsafeAction(facts)))
+                return Exclude("harmful-only",
+                    "A Personal-range ability flagged against enemies also harms its own caster (a harmful or penalty-only application, or an unsafe or unread action).");
 
             if (effects.All(e => e.Target == "EnemyAreaRecipients"))
                 return Exclude("enemy-only-area",
@@ -567,15 +578,26 @@ namespace KingmakerBuffPlanner.Discovery
         // ContextActionKillTarget, on any branch, or an unrecognized action
         // in an applied buff's own lists) refuses them. Only presentation
         // (ContextActionSpawnFx) is a known harmless adjunct.
+        // Review R8 (R7-F1): an incomplete read is no proof of safety either -
+        // any scan diagnostic other than a recognized restoration or a
+        // presentation-only node (a traversal stopped at maximum-depth, a
+        // cycle, an unknown node) refuses, and so does an automatically
+        // applied buff whose own automatic actions were not read (the export
+        // reads one level of applied buffs; a nested AddFactContextActions is
+        // an uninspected chain).
         private static bool HasUnsafeAction(NativeCandidateAuditFacts facts)
         {
             return HasOffensiveAction(facts) ||
                 (facts.Diagnostics ?? new NativeCandidateDiagnosticFacts[0]).Any(diagnostic => diagnostic != null &&
-                    string.Equals(diagnostic.Code, "unknown-node", StringComparison.Ordinal) &&
-                    !IsPresentationOnly(diagnostic.Contract)) ||
+                    !string.Equals(diagnostic.Code, "restorative-action", StringComparison.Ordinal) &&
+                    !(string.Equals(diagnostic.Code, "unknown-node", StringComparison.Ordinal) &&
+                        IsPresentationOnly(diagnostic.Contract))) ||
                 (facts.Effects ?? new NativeCandidateEffectFacts[0]).Any(effect => effect != null &&
                     (effect.FactActions ?? new NativeCandidateFactActions[0]).Any(list =>
-                        (list.Unrecognized ?? new string[0]).Count != 0));
+                        (list.Unrecognized ?? new string[0]).Count != 0 ||
+                        (list.AppliedEffects ?? new NativeCandidateEffectFacts[0]).Any(applied => applied == null ||
+                            (applied.ComponentTypes ?? new string[0]).Any(type =>
+                                ShortName(type) == "AddFactContextActions"))));
         }
 
         private static bool IsPresentationOnly(string identity)

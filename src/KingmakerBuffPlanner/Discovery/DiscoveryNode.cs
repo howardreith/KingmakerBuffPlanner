@@ -36,10 +36,12 @@ namespace KingmakerBuffPlanner.Discovery
             NearbyRecipientRule nearbyRecipients = null,
             float? maximumDurationSeconds = null,
             RecipientFactGate recipientFactGate = null,
-            CasterLevelStrength casterLevelStrength = null)
+            CasterLevelStrength casterLevelStrength = null,
+            bool casterRelative = false)
         {
             RecipientFactGate = recipientFactGate;
             CasterLevelStrength = casterLevelStrength;
+            CasterRelative = casterRelative;
             Kind = kind;
             Identity = identity ?? string.Empty;
             Children = new ReadOnlyCollection<DiscoveryNode>(
@@ -77,5 +79,7 @@ namespace KingmakerBuffPlanner.Discovery
         public float? MaximumDurationSeconds { get; private set; }
         // Effect nodes: review R7-F3 caster-level strength (planning metadata).
         public CasterLevelStrength CasterLevelStrength { get; private set; }
+        // Effect nodes: review R8-F1 caster-relative benefit (planning metadata).
+        public bool CasterRelative { get; private set; }
     }
 }

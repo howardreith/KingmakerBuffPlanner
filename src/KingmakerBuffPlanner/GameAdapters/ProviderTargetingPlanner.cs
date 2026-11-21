@@ -99,7 +99,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             else if (decision.AreaRecipients && areaCoverage != null && casterReadable)
             {
                 float radius = areaCoverage.Radius;
-                anchors = LegalAnchorIds(units, legal);
+                // Review R8-F6: a centre whose own position cannot be read has
+                // no measurable burst; it is not offered as a legal anchor (it
+                // could otherwise inherit coverage from other anchors).
+                anchors = LegalAnchorIds(units, legal).Where(id => measure(id, id).HasValue).ToArray();
                 // Review R2-F5: inside the burst is not the same as eligible.
                 // Recipient-fact conditions (Mass Blessing of Luck and Resolve
                 // skips constructs, and undead unless the caster has Undead

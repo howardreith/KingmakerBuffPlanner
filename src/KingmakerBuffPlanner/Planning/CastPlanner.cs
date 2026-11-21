@@ -96,6 +96,11 @@ namespace KingmakerBuffPlanner.Planning
             {
                 var pending = new List<string>();
                 var ignored = new HashSet<string>(request.IgnoredEffectIds, StringComparer.Ordinal);
+                // Review R8-F4: the applicable providers are resolved first, so
+                // a skip is judged on each provider's bound branch for the
+                // target (its fixed facts: Prayer's friendly branch).
+                List<ProviderPlanningOption> sourceOptions = _targeting.Resolve(
+                    snapshot, request, options, enhancementList).ToList();
                 foreach (string targetId in request.TargetUnitIds)
                 {
                     UnitSnapshot unit;
@@ -112,8 +117,8 @@ namespace KingmakerBuffPlanner.Planning
                     }
                     if (request.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive)
                     {
-                        EffectPresenceResult presence = _presence.EvaluateTyped(request.Source.Effects,
-                            activeEffects.GetEffects(targetId), ignored);
+                        EffectPresenceResult presence = ClassicPresence(request, sourceOptions,
+                            activeEffects, targetId, ignored);
                         if (presence.Kind == EffectPresenceKind.Complete)
                         {
                             // A skip relying on an effect an earlier step of
@@ -141,8 +146,6 @@ namespace KingmakerBuffPlanner.Planning
                     }
                     pending.Add(targetId);
                 }
-                List<ProviderPlanningOption> sourceOptions = _targeting.Resolve(
-                    snapshot, request, options, enhancementList).ToList();
                 var context = new PlanContext(request, sourceOptions, selectionPolicy,
                     ledger, castsByProvider, poolKinds, materials, enhancementById,
                     enhancementRemaining, accounting, steps, outcomes, diagnostics);
@@ -153,6 +156,41 @@ namespace KingmakerBuffPlanner.Planning
                     PlanPerTarget(context, pending);
             }
             return new CastPlan(steps, outcomes, diagnostics, accounting.Build());
+        }
+
+        // Review R8-F4: a Classic skip holds only when EVERY applicable
+        // provider's bound branch for the target is present (evidence common
+        // to the providers that may cast it; with none resolved, the
+        // discovered expression as before). Review R8-F1: a caster-relative
+        // effect counts only from an instance that provider's caster applied
+        // (instance detail with a read origin); otherwise the skip is withheld.
+        private EffectPresenceResult ClassicPresence(BuffCastRequest request,
+            IReadOnlyList<ProviderPlanningOption> sourceOptions, ActiveEffectSnapshot activeEffects,
+            string targetId, ISet<string> ignored)
+        {
+            ISet<ActiveEffectMarker> markers = activeEffects.GetEffects(targetId);
+            IList<ProviderPlanningOption> candidates = sourceOptions.Count != 0
+                ? sourceOptions.ToList() : new List<ProviderPlanningOption> { null };
+            EffectPresenceResult first = null;
+            foreach (ProviderPlanningOption option in candidates)
+            {
+                EffectExpression bound = option == null ? request.Source.Effects
+                    : option.BindForRecipient(request.Source.Effects, targetId);
+                string caster = option == null ? null : option.Provider.Key.CasterUnitId;
+                EffectPresenceResult result = _presence.EvaluateScoped(bound, (leaf, role) =>
+                {
+                    var marker = new ActiveEffectMarker(leaf.Kind, leaf.EffectId);
+                    if (!markers.Contains(marker)) return false;
+                    if (!leaf.CasterRelative) return true;
+                    return caster != null && activeEffects.HasInstanceDetail &&
+                        activeEffects.GetInstances(targetId).Any(instance => instance != null &&
+                            instance.Marker.Equals(marker) && string.Equals(instance.CasterUnitId, caster,
+                                StringComparison.Ordinal));
+                }, ignored);
+                if (result.Kind != EffectPresenceKind.Complete) return result;
+                if (first == null) first = result;
+            }
+            return first;
         }
 
         private sealed class PlanContext

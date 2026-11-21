@@ -325,7 +325,7 @@ namespace KingmakerBuffPlanner.Planning
                 castings.Add(CompileOne(casting, snapshot, options, effectsBySource,
                     enhancementList, modifierList, diagnostics, liveEffects, strictInstant,
                     out matched, out intended, out provider, out modifierDemands,
-                    out resolvedOption, projectEffects));
+                    out resolvedOption, true));
                 matchedEnhancements[casting.CastingId] = matched;
                 intendedEnhancements[casting.CastingId] = intended;
                 providers[casting.CastingId] = provider;
@@ -365,7 +365,9 @@ namespace KingmakerBuffPlanner.Planning
             // earlier routines; an independent routine preview starts from its
             // own snapshot.
             // Review R7-F6: the full recipient state (SequentialRecipientState).
-            var projection = new SequentialRecipientState();
+            // Review R8-F3: the routine's own earlier funded castings count in
+            // every view; earlier routines only in a one-pass sequence.
+            var projection = new SequentialRecipientState(projectEffects);
             foreach (ResolvedCasting compiled in castings)
             {
                 ResolvedCasting casting = compiled;
@@ -400,10 +402,10 @@ namespace KingmakerBuffPlanner.Planning
                 // because its burst reached nobody eligible is re-evaluated: an
                 // earlier routine may have made its allies eligible (Good Hope
                 // after an earlier Good Hope removed their Despair).
-                bool deferredEmpty = projectEffects && casting.Readiness == ResolvedCastingReadiness.Blocked &&
+                bool deferredEmpty = casting.Readiness == ResolvedCastingReadiness.Blocked &&
                     casting.ReadinessReasons.Count != 0 && casting.ReadinessReasons.All(code =>
                         code.StartsWith(PredictedCoverageEmpty, StringComparison.Ordinal));
-                if (projectEffects && projection.HasChanges && resolved != null &&
+                if (projection.HasChanges && resolved != null &&
                     casting.TargetMode != CastingTargetMode.DirectTarget &&
                     (casting.Readiness == ResolvedCastingReadiness.Ready || deferredEmpty))
                 {
@@ -412,6 +414,20 @@ namespace KingmakerBuffPlanner.Planning
                     string anchor = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
                         ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
                     List<string> now = projection.Beneficiaries(resolved, payload, anchor);
+                    if (now.Count == 0 && casting.Readiness == ResolvedCastingReadiness.Ready)
+                    {
+                        // Review R8-F3: a cast that would undo an earlier
+                        // requested effect keeps its specific refusal.
+                        string conflict = removalState.RemovesProvided(casting.RoutineId,
+                            ChangesFor(casting, resolved, effectsBySource, true));
+                        if (conflict != null)
+                        {
+                            finalized.Add(BlockForRemoval(casting, RemovesPlannedEffect + ":" + conflict, shape,
+                                diagnostics, removalState.OwnersRemovedByEarlier(casting.RoutineId,
+                                    ChangesFor(casting, resolved, effectsBySource, true))));
+                            continue;
+                        }
+                    }
                     if (now.Count == 0)
                     {
                         // Review R6 (R5-F5): the stored prediction is the
@@ -462,7 +478,8 @@ namespace KingmakerBuffPlanner.Planning
                 // routine (review R2-F2).
                 if (casting.Readiness == ResolvedCastingReadiness.Ready && !outOfScope && projectEffects &&
                     casting.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive &&
-                    IsStructurallySatisfied(casting, matched, grantedByUnit))
+                    IsStructurallySatisfied(casting, matched, grantedByUnit,
+                        HasCasterRelativePayload(casting, effectsBySource)))
                 {
                     // R5-F4: like a live skip, only its beneficiaries' effects.
                     removalState.Admit(casting.RoutineId, casting.CastingId,
@@ -522,7 +539,8 @@ namespace KingmakerBuffPlanner.Planning
                         // R1-F4: the one-pass sequence forgets a structural
                         // grant whose effect this casting removes.
                         InvalidateRemovedGrants(changes, grantedByUnit, grantEffects);
-                        ProjectEffects(casting, matched, grantedByUnit, changes, grantEffects);
+                        ProjectEffects(casting, matched, grantedByUnit, changes, grantEffects,
+                            HasCasterRelativePayload(casting, effectsBySource));
                     }
                     continue;
                 }
@@ -1078,7 +1096,8 @@ namespace KingmakerBuffPlanner.Planning
         private static bool IsStructurallySatisfied(
             ResolvedCasting casting,
             IReadOnlyList<CastEnhancementSnapshot> matchedEnhancements,
-            Dictionary<string, HashSet<string>> grantedByUnit)
+            Dictionary<string, HashSet<string>> grantedByUnit,
+            bool casterRelative)
         {
             if (matchedEnhancements != null && matchedEnhancements.Count != 0)
                 return false;
@@ -1088,7 +1107,7 @@ namespace KingmakerBuffPlanner.Planning
             {
                 HashSet<string> granted;
                 if (!grantedByUnit.TryGetValue(unitId, out granted) ||
-                    !granted.Contains(StructuralGrantKey(casting)))
+                    !granted.Contains(StructuralGrantKey(casting, casterRelative)))
                     return false;
             }
             return true;
@@ -1096,10 +1115,21 @@ namespace KingmakerBuffPlanner.Planning
 
         // An item rule is shared by every copy of the type, but one copy's
         // casting never makes another copy's casting (and charges) redundant.
-        private static string StructuralGrantKey(ResolvedCasting casting)
+        // Review R8-F1: neither does another caster's casting of a payload
+        // whose benefit depends on its caster (Firebrand).
+        private static string StructuralGrantKey(ResolvedCasting casting, bool casterRelative)
         {
-            return casting.Ability.SourceKind == SourceKind.Item && casting.Provider != null
+            string key = casting.Ability.SourceKind == SourceKind.Item && casting.Provider != null
                 ? casting.Provider.Canonical : casting.Ability.Canonical;
+            return casterRelative ? key + "|caster:" + casting.CasterUnitId : key;
+        }
+
+        private static bool HasCasterRelativePayload(ResolvedCasting casting,
+            IReadOnlyDictionary<string, EffectExpression> effectsBySource)
+        {
+            EffectExpression payload = DiscoveredEffectLookup.ForAbility(
+                effectsBySource, casting.Ability, casting.SourceId);
+            return payload != null && EffectApplicationLifetime.Leaves(payload).Any(leaf => leaf.CasterRelative);
         }
 
         private static void ProjectEffects(
@@ -1107,11 +1137,12 @@ namespace KingmakerBuffPlanner.Planning
             IReadOnlyList<CastEnhancementSnapshot> matchedEnhancements,
             Dictionary<string, HashSet<string>> grantedByUnit,
             EffectChanges changes,
-            Dictionary<string, Dictionary<string, HashSet<string>>> grantEffects)
+            Dictionary<string, Dictionary<string, HashSet<string>>> grantEffects,
+            bool casterRelative)
         {
             if (matchedEnhancements != null && matchedEnhancements.Count != 0)
                 return;
-            string key = StructuralGrantKey(casting);
+            string key = StructuralGrantKey(casting, casterRelative);
             foreach (string unitId in casting.PredictedBeneficiaryUnitIds)
             {
                 // Review R2-F1: a funded cast grants a free structural repeat
@@ -1600,7 +1631,7 @@ namespace KingmakerBuffPlanner.Planning
             return new ExistingEffectRequirement(provider.EffectiveCasterLevel, mask,
                 provider.ExpectedDurationRounds,
                 provider.Duration.Kind == DurationKind.PerCasterLevel,
-                unprovable, provider.Duration.Extendable);
+                unprovable, provider.Duration.Extendable, provider.Key.CasterUnitId);
         }
 
         private static IReadOnlyList<string> CostShapeOf(IEnumerable<CastingDemand> demands)

@@ -80,6 +80,14 @@ namespace KingmakerBuffPlanner.Planning
             var sequence = expression as SequenceEffectExpression;
             if (sequence != null) return AllOf(sequence.Children.Select(e => Visit(e, active, ignored, outer)));
             var conditional = expression as ConditionalEffectExpression;
+            // Missing-beneficial-buffs review R8-F5: a conditional whose
+            // native checker has no conditions always runs its true branch
+            // (verified 2.1.7b result; EffectExpressionAnalysis.IsEmptyChecker):
+            // only that branch can be present or confirmed. A condition whose
+            // result is unknown keeps both alternatives.
+            if (conditional != null && conditional.CasterFactGate == null && conditional.RecipientFactGate == null &&
+                EffectExpressionAnalysis.IsEmptyChecker(conditional))
+                return Visit(conditional.WhenTrue, active, ignored, outer);
             if (conditional != null) return AnyOf(new[]
             {
                 Visit(conditional.WhenTrue, active, ignored, outer),

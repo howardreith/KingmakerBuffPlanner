@@ -42,8 +42,10 @@ namespace KingmakerBuffPlanner.Planning
     {
         public ExistingEffectRequirement(int plannedCasterLevel,
             int plannedMetamagicMask, int plannedExpectedRounds,
-            bool durationComparable, string strengthUnprovableReason = null, bool extendable = true)
+            bool durationComparable, string strengthUnprovableReason = null, bool extendable = true,
+            string plannedCasterUnitId = null)
         {
+            PlannedCasterUnitId = string.IsNullOrWhiteSpace(plannedCasterUnitId) ? null : plannedCasterUnitId;
             if (plannedCasterLevel < 0) throw new ArgumentOutOfRangeException("plannedCasterLevel");
             if (plannedMetamagicMask < 0) throw new ArgumentOutOfRangeException("plannedMetamagicMask");
             if (plannedExpectedRounds < 0) throw new ArgumentOutOfRangeException("plannedExpectedRounds");
@@ -72,6 +74,9 @@ namespace KingmakerBuffPlanner.Planning
         // existing instance at all (for example an applied class-feature
         // enhancement whose effect the planner does not model).
         public string StrengthUnprovableReason { get; private set; }
+        // Review R8-F1: the planned casting's caster (null when unknown); a
+        // caster-relative effect is satisfied only by that caster's instance.
+        public string PlannedCasterUnitId { get; private set; }
     }
 
     // The casting-first existing-effect policy (legacy parity plus the
@@ -119,7 +124,8 @@ namespace KingmakerBuffPlanner.Planning
                     bool found = false;
                     foreach (ActiveEffectInstance instance in values.Where(value => value.Marker.Equals(new ActiveEffectMarker(leaf.Kind, leaf.EffectId))))
                     {
-                        string failure = strength ? Failure(instance, requirement, leaf.CasterLevelStrength) : null;
+                        string failure = strength ? Failure(instance, requirement, leaf.CasterLevelStrength,
+                            leaf.CasterRelative) : null;
                         if (failure == null) found = true;
                         else failures.Add(failure + ":" + owner + ":" + leaf.EffectId);
                     }
@@ -203,11 +209,14 @@ namespace KingmakerBuffPlanner.Planning
                 .GroupBy(leaf => leaf.EffectId, StringComparer.Ordinal)
                 .Where(group => group.All(leaf => leaf.CasterLevelStrength != null))
                 .ToDictionary(group => group.Key, group => group.First().CasterLevelStrength, StringComparer.Ordinal);
+            var casterRelative = new HashSet<string>(EffectApplicationLifetime.Leaves(expression)
+                .Where(leaf => leaf.CasterRelative).Select(leaf => leaf.EffectId), StringComparer.Ordinal);
             foreach (ActiveEffectInstance instance in live)
             {
                 CasterLevelStrength strength;
                 strengths.TryGetValue(instance.EffectId ?? string.Empty, out strength);
-                string failure = Failure(instance, requirement, strength);
+                string failure = Failure(instance, requirement, strength,
+                    casterRelative.Contains(instance.EffectId ?? string.Empty));
                 if (failure == null) sufficient.Add(instance.Marker);
                 else if (relevant.Contains(instance.EffectId))
                     reasons.Add(failure + ":" + instance.EffectId);
@@ -227,13 +236,21 @@ namespace KingmakerBuffPlanner.Planning
         // Null when the instance is at least as strong as the planned
         // casting and has enough duration left; otherwise the reason.
         internal static string Failure(ActiveEffectInstance instance,
-            ExistingEffectRequirement requirement, CasterLevelStrength strength = null)
+            ExistingEffectRequirement requirement, CasterLevelStrength strength = null, bool casterRelative = false)
         {
             if (requirement.StrengthUnprovableReason != null)
                 return "equivalence-unproven:" + requirement.StrengthUnprovableReason;
             // Review of rc4: what cannot be read never establishes that an
             // existing effect is sufficient; the casting keeps its step.
             if (!instance.SuppressionReadable) return "suppression-unreadable";
+            // Review R8-F1: a caster-relative effect (Firebrand's immunity to
+            // its own caster's fire) is provided only by the planned caster's
+            // instance; another or an unread origin proves nothing.
+            if (casterRelative && (requirement.PlannedCasterUnitId == null || instance.CasterUnitId == null))
+                return "caster-origin-unverified";
+            if (casterRelative && !string.Equals(instance.CasterUnitId, requirement.PlannedCasterUnitId,
+                    StringComparison.Ordinal))
+                return "other-caster:" + instance.CasterUnitId;
             if (requirement.PlannedCasterLevel <= 0) return "caster-level-unverified:planned";
             if (instance.CasterLevel == null) return "caster-level-unverified";
             // Review R7-F3: an effect whose strength depends on caster level

@@ -462,9 +462,11 @@ namespace KingmakerBuffPlanner.Domain.Planning
     // definitely lands under that state - narrowed (Mass Reduce on an ally an
     // earlier Mass Enlarge reached) or widened (Good Hope on allies whose
     // Despair an earlier Good Hope removed); an unknown or unread condition
-    // withholds the claim. Only changes of EARLIER routines are visible:
-    // inside one routine the removal-conflict guard decides, with its more
-    // specific reason (castings are grouped by routine in sequence order).
+    // withholds the claim. Every earlier funded casting of the same routine
+    // is visible (review R8-F3), and in a one-pass sequence those of earlier
+    // routines too (castings are grouped by routine in sequence order); a
+    // casting that would undo an earlier requested effect keeps its specific
+    // removal-conflict refusal (the compiler checks it first).
     public sealed class SequentialRecipientState
     {
         private readonly Dictionary<string, Dictionary<string, bool?>> _committed =
@@ -472,19 +474,31 @@ namespace KingmakerBuffPlanner.Domain.Planning
         private readonly Dictionary<string, Dictionary<string, bool?>> _pending =
             new Dictionary<string, Dictionary<string, bool?>>(StringComparer.Ordinal);
         private string _routine;
+        private readonly bool _acrossRoutines;
 
-        // Whether any earlier routine changed anything.
-        public bool HasChanges { get { return _committed.Count != 0; } }
+        // Review R8-F3: the routine's own earlier funded castings always
+        // count (they run first); earlier routines only in a one-pass
+        // sequence (acrossRoutines) - an independent routine preview starts
+        // from its own snapshot.
+        public SequentialRecipientState(bool acrossRoutines = true)
+        {
+            _acrossRoutines = acrossRoutines;
+        }
 
-        // Called for every casting in sequence order: a new routine makes the
-        // previous routine's changes visible.
+        // Whether anything earlier changed anything.
+        public bool HasChanges { get { return _committed.Count != 0 || _pending.Count != 0; } }
+
+        // Called for every casting in sequence order.
         public void EnterRoutine(string routineId)
         {
             routineId = routineId ?? string.Empty;
             if (_routine != null && string.Equals(_routine, routineId, StringComparison.Ordinal)) return;
-            foreach (KeyValuePair<string, Dictionary<string, bool?>> unit in _pending)
-                foreach (KeyValuePair<string, bool?> effect in unit.Value)
-                    Set(_committed, unit.Key, effect.Key, effect.Value);
+            if (_acrossRoutines)
+                foreach (KeyValuePair<string, Dictionary<string, bool?>> unit in _pending)
+                    foreach (KeyValuePair<string, bool?> effect in unit.Value)
+                        Set(_committed, unit.Key, effect.Key, effect.Value);
+            else
+                _committed.Clear();
             _pending.Clear();
             _routine = routineId;
         }
@@ -501,7 +515,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
         public bool Receives(ProviderPlanningOption option, EffectExpression expression, string unit)
         {
             bool unresolved;
-            EffectExpression bound = Bind(option, expression, unit, false, out unresolved);
+            EffectExpression bound = Bind(option, expression, unit, true, out unresolved);
             return !unresolved && EffectExpressionAnalysis.ContainsDefiniteLeaf(bound) &&
                 !EffectExpressionAnalysis.HasCasterGate(bound);
         }
@@ -621,10 +635,11 @@ namespace KingmakerBuffPlanner.Domain.Planning
     {
         public ActiveEffectInstance(EffectKind kind, string effectId,
             double? remainingRounds, int? casterLevel, int? metamagicMask,
-            bool suppressed = false, bool suppressionReadable = true)
+            bool suppressed = false, bool suppressionReadable = true, string casterUnitId = null)
         {
             if (string.IsNullOrWhiteSpace(effectId))
                 throw new ArgumentException("Effect ID is required.", "effectId");
+            CasterUnitId = string.IsNullOrWhiteSpace(casterUnitId) ? null : casterUnitId;
             if (remainingRounds != null &&
                 (double.IsNaN(remainingRounds.Value) || remainingRounds.Value < 0))
                 throw new ArgumentOutOfRangeException("remainingRounds");
@@ -651,6 +666,9 @@ namespace KingmakerBuffPlanner.Domain.Planning
         // instance still shows as present, but it never proves an existing
         // effect sufficient (review of rc4).
         public bool SuppressionReadable { get; private set; }
+        // Review R8-F1: the unit whose cast applied the instance (null when
+        // unread); a caster-relative effect is only proven for that caster.
+        public string CasterUnitId { get; private set; }
 
         public ActiveEffectMarker Marker
         {

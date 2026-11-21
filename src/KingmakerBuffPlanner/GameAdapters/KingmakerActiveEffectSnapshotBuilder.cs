@@ -42,7 +42,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                         bool suppressed = Suppressed(buff, out suppressionReadable);
                         instances.Add(new ActiveEffectInstance(kind, buff.Blueprint.AssetGuid,
                             RemainingRounds(buff), CasterLevel(buff), Metamagic(buff),
-                            suppressed, suppressionReadable));
+                            suppressed, suppressionReadable, CasterId(buff)));
                     }
                     foreach (ItemSlot slot in unit.Descriptor.Body.CurrentEquipmentSlots)
                     {
@@ -88,6 +88,19 @@ namespace KingmakerBuffPlanner.GameAdapters
                 MechanicsContext context = buff.Context;
                 AbilityParams parameters = context == null ? null : context.Params;
                 return parameters == null ? (int?)null : Math.Max(0, parameters.CasterLevel);
+            }
+            catch (Exception) { return null; }
+        }
+
+        // Review R8-F1: the applying caster (the buff context's MaybeCaster);
+        // null when unreadable.
+        private static string CasterId(Buff buff)
+        {
+            try
+            {
+                MechanicsContext context = buff.Context;
+                UnitEntityData caster = context == null ? null : context.MaybeCaster;
+                return caster == null ? null : caster.UniqueId;
             }
             catch (Exception) { return null; }
         }
