@@ -481,11 +481,13 @@ namespace KingmakerBuffPlanner.Domain.Planning
             if (option == null || expression == null || unit == null || !values.TryGetValue(unit, out changed))
                 return true;
             EffectExpression bound = option.BindForRecipient(expression, unit);
-            List<string> touched = EffectRecipientFactBinding.FactIds(bound).Where(changed.ContainsKey).ToList();
+            // A buff predicate's key observes its buff (review R6-F2).
+            List<string> touched = EffectRecipientFactBinding.FactIds(bound)
+                .Where(id => changed.ContainsKey(RecipientFactGate.EffectIdOf(id))).ToList();
             if (touched.Count == 0) return true;
             if (touched.Count > 1) return false;
             string fact = touched[0];
-            foreach (bool value in changed[fact])
+            foreach (bool value in changed[RecipientFactGate.EffectIdOf(fact)])
             {
                 bool unresolved;
                 EffectExpression selected = EffectRecipientFactBinding.Bind(bound,

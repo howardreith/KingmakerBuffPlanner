@@ -321,6 +321,8 @@ namespace KingmakerBuffPlanner.Tests
                 StayOnDeath = (bool?)effect["stayOnDeath"] ?? false,
                 ComponentTypes = Strings(effect["componentTypes"]),
                 GrantedConditions = Strings(effect["grantedConditions"]),
+                // Absent from the 0.4.0/0.4.1 exports (review R6): empty.
+                ModifierSigns = Strings(effect["modifierSigns"]),
                 SourceContract = (string)effect["sourceContract"] ?? string.Empty,
                 ActionPath = (string)effect["actionPath"] ?? string.Empty,
                 FactActions = (((JArray)effect["factActions"]) ?? new JArray()).OfType<JObject>()

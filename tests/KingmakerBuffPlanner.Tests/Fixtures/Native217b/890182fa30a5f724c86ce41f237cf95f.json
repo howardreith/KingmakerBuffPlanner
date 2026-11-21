@@ -1,0 +1,51 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "FxOnStart": "Resource::NULL",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [],
+  "m_DisplayName": "LocalizedString:aeb2ca76-4024-4bbe-a3fa-af58ba98d3d2:Prayer (Enemies)",
+  "m_Description": "LocalizedString::",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "PrayerDebuff"
+  },
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddStatBonus, Assembly-CSharp",
+      "Descriptor": "UntypedStackable",
+      "Stat": "AdditionalAttackBonus",
+      "Value": -1,
+      "name": "$AddStatBonus$5f631768-71a3-4b48-b66c-260b47a9e2c4"
+    },
+    {
+      "$id": "2",
+      "$type": "Kingmaker.UnitLogic.FactLogic.AddStatBonus, Assembly-CSharp",
+      "Descriptor": "UntypedStackable",
+      "Stat": "AdditionalDamage",
+      "Value": -1,
+      "name": "$AddStatBonus$2f5ec9b9-69b7-4fd2-9907-1b135d7b04ad"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.BuffAllSavesBonus, Assembly-CSharp",
+      "Descriptor": "UntypedStackable",
+      "Value": -1,
+      "name": "$BuffAllSavesBonus$bb5f1481-54ce-476e-92b0-b29243c5246f"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.Designers.Mechanics.Buffs.BuffAllSkillsBonus, Assembly-CSharp",
+      "Descriptor": "UntypedStackable",
+      "Value": -1,
+      "Multiplier": {
+        "$id": "5",
+        "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+        "Value": 1
+      },
+      "name": "$BuffAllSkillsBonus$ed854bc5-0e20-424c-8892-321d09809e49"
+    }
+  ],
+  "m_AssetGuid": "890182fa30a5f724c86ce41f237cf95f",
+  "name": "PrayerDebuff"
+}

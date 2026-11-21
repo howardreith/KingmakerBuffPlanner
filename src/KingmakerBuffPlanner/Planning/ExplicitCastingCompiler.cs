@@ -405,6 +405,9 @@ namespace KingmakerBuffPlanner.Planning
                     {
                         string anchor = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
                             ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
+                        // Review R6 (R5-F5): the stored prediction is the
+                        // projected one - nobody.
+                        casting = casting.WithPredictedBeneficiaries(kept);
                         finalized.Add(casting.WithBudgetResult(ResolvedCastingReadiness.Blocked,
                             casting.ReadinessReasons.Concat(new[] { "predicted-coverage-empty:" + anchor })
                                 .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)
@@ -478,8 +481,14 @@ namespace KingmakerBuffPlanner.Planning
                 }
                 if (casting.Readiness != ResolvedCastingReadiness.Ready || outOfScope)
                 {
+                    // Review R6 (R5-F6): a row that arrives already refused
+                    // (an initially exhausted pool, a disabled or draft row)
+                    // does not run either; its notes say so.
+                    bool runs = casting.Readiness == ResolvedCastingReadiness.Ready ||
+                        casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied;
                     finalized.Add(casting.WithBudgetResult(casting.Readiness,
-                        casting.ReadinessReasons, casting.Cost, shape));
+                        casting.ReadinessReasons, casting.Cost, shape,
+                        runs ? null : BlockedNotes(casting, null)));
                     continue;
                 }
                 IReadOnlyList<CastingDemand> demands = ledger.DemandsFor(

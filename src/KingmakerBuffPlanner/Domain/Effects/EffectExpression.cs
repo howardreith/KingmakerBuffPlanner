@@ -446,11 +446,22 @@ namespace KingmakerBuffPlanner.Domain.Effects
         [JsonProperty("facts")] public IReadOnlyList<KeyValuePair<string, bool>> Facts { get; private set; }
     }
 
-    // A conditional on facts of the unit the action runs on (native
-    // ContextConditionHasFact): Value is the condition's Not flag, as for
-    // CasterFactGate.
+    // A conditional on facts of the unit the action runs on: Value is the
+    // condition's Not flag, as for CasterFactGate. A fact key is the
+    // predicate's own identity, so the live read can use the exact native
+    // check (missing-beneficial-buffs review R6-F1/R6-F2):
+    // - a blueprint GUID: native ContextConditionHasFact
+    //   (UnitHelper.HasFact(descriptor, fact));
+    // - BuffPredicatePrefix + GUID: native ContextConditionHasBuff
+    //   (descriptor.Buffs.HasFact(buff));
+    // - EnemyOfCaster / AllyOfCaster: native ContextConditionIsEnemy /
+    //   ContextConditionIsAlly (target.IsEnemy / IsAlly(caster)).
     public sealed class RecipientFactGate
     {
+        public const string BuffPredicatePrefix = "buff-predicate:";
+        public const string EnemyOfCaster = "relation:enemy-of-caster";
+        public const string AllyOfCaster = "relation:ally-of-caster";
+
         public RecipientFactGate(bool any, IEnumerable<KeyValuePair<string, bool>> facts)
         {
             Any = any;
@@ -458,6 +469,31 @@ namespace KingmakerBuffPlanner.Domain.Effects
         }
         public bool Any { get; private set; }
         public IReadOnlyList<KeyValuePair<string, bool>> Facts { get; private set; }
+
+        public static string BuffPredicate(string buffId)
+        {
+            return BuffPredicatePrefix + buffId;
+        }
+
+        public static bool TryBuffPredicate(string factKey, out string buffId)
+        {
+            bool buff = factKey != null && factKey.StartsWith(BuffPredicatePrefix, StringComparison.Ordinal);
+            buffId = buff ? factKey.Substring(BuffPredicatePrefix.Length) : null;
+            return buff;
+        }
+
+        // A relation to the caster: no buff casting changes it.
+        public static bool IsRelation(string factKey)
+        {
+            return factKey == EnemyOfCaster || factKey == AllyOfCaster;
+        }
+
+        // The effect a fact key observes (the buff of a buff predicate).
+        public static string EffectIdOf(string factKey)
+        {
+            string buffId;
+            return TryBuffPredicate(factKey, out buffId) ? buffId : factKey;
+        }
     }
 
     // Review R2-F5: resolves recipient-fact gates for one recipient. A gate
@@ -663,6 +699,12 @@ namespace KingmakerBuffPlanner.Domain.Effects
         // planner cannot evaluate, so it gives no definite coverage. A
         // conditional with a gate is descended (its unresolved gates are the
         // caller's to judge); one with no conditions always runs as before.
+        // Review R6-F3: a conditional whose native checker has NO conditions
+        // always runs its true branch (2.1.7b ConditionsChecker.Check returns
+        // true when !HasConditions, observed in its IL), so only that branch
+        // can establish coverage. A conditional whose result is unknown (an
+        // unmodelled or absent checker) establishes coverage only with a
+        // definite leaf on BOTH branches.
         public static bool ContainsDefiniteLeaf(EffectExpression expression)
         {
             if (expression is EffectLeafExpression) return true;
@@ -670,8 +712,12 @@ namespace KingmakerBuffPlanner.Domain.Effects
             if (sequence != null) return sequence.Children.Any(ContainsDefiniteLeaf);
             var conditional = expression as ConditionalEffectExpression;
             if (conditional != null)
-                return !IsUnmodelledConditional(conditional) &&
-                    (ContainsDefiniteLeaf(conditional.WhenTrue) || ContainsDefiniteLeaf(conditional.WhenFalse));
+            {
+                if (conditional.CasterFactGate != null || conditional.RecipientFactGate != null)
+                    return ContainsDefiniteLeaf(conditional.WhenTrue) || ContainsDefiniteLeaf(conditional.WhenFalse);
+                if (IsEmptyChecker(conditional)) return ContainsDefiniteLeaf(conditional.WhenTrue);
+                return ContainsDefiniteLeaf(conditional.WhenTrue) && ContainsDefiniteLeaf(conditional.WhenFalse);
+            }
             var targeted = expression as TargetedEffectExpression;
             if (targeted != null) return ContainsDefiniteLeaf(targeted.Child);
             var referenced = expression as ReferencedAbilityExpression;
@@ -680,10 +726,18 @@ namespace KingmakerBuffPlanner.Domain.Effects
 
         public static bool IsUnmodelledConditional(ConditionalEffectExpression conditional)
         {
-            if (conditional == null || conditional.CasterFactGate != null || conditional.RecipientFactGate != null)
-                return false;
-            string contract = conditional.ConditionContract ?? string.Empty;
-            return contract.Length != 0 && !contract.EndsWith(":", StringComparison.Ordinal);
+            return conditional != null && conditional.CasterFactGate == null &&
+                conditional.RecipientFactGate == null && !IsEmptyChecker(conditional);
+        }
+
+        // The adapter describes a checker as "<Operation>:<condition types>";
+        // an existing checker with no conditions is "And:" / "Or:". An absent
+        // checker is described as "" and stays unknown.
+        public static bool IsEmptyChecker(ConditionalEffectExpression conditional)
+        {
+            string contract = conditional == null ? string.Empty : conditional.ConditionContract ?? string.Empty;
+            return contract.Length > 1 && contract.EndsWith(":", StringComparison.Ordinal) &&
+                contract.IndexOf(':') == contract.Length - 1;
         }
 
         // A caster-fact gate left anywhere in the expression (unread caster fact).

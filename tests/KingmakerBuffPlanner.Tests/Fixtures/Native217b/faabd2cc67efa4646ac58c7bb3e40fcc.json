@@ -1,0 +1,197 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "Range": "Personal",
+  "CanTargetFriends": true,
+  "CanTargetSelf": true,
+  "SpellResistance": true,
+  "Animation": "Omni",
+  "AnimationStyle": "CastActionOmni",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Quicken, Extend, Heighten",
+  "LocalizedDuration": "LocalizedString:6250ccf0-1ed0-460f-8ce7-094c2da7e198:1 round/level",
+  "LocalizedSavingThrow": "LocalizedString::",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "e5b78b0ec59e47045a4569cfc2002b4e"
+  ],
+  "m_DisplayName": "LocalizedString:964951b1-ed67-47ba-8f3f-52004f34aa49:Prayer",
+  "m_Description": "LocalizedString:1a6703bc-cac6-41ed-844f-974832f8296e:You bring special favor upon yourself and your allies while bringing disfavor to your enemies. You and each of your allies gain a +1 luck bonus on attack rolls, weapon damage rolls, saves, and skill checks, while each of your foes takes a –1 penalty on such rolls.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "PrayerBuff"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Enchantment",
+      "name": "$SpellComponent$0e7f1c94-5ca8-42a6-9aa0-c4c411542fc2"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:8443ce803d2d31347897a3d85cc32f53:ClericSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$57b4dac9-3261-498a-ba48-ab5b0558cd17"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityTargetsAround, Assembly-CSharp",
+      "m_Radius": {
+        "$id": "5",
+        "$type": "Kingmaker.Utility.Feet, Assembly-CSharp",
+        "m_Value": 40.0
+      },
+      "m_TargetType": "Any",
+      "m_Condition": {
+        "$id": "6",
+        "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+        "Conditions": []
+      },
+      "name": "$AbilityTargetsAround$755ba157-576c-4aa7-b3b0-c85ecfa99cf7"
+    },
+    {
+      "$id": "7",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx, Assembly-CSharp",
+      "PrefabLink": "Resource:e5b78b0ec59e47045a4569cfc2002b4e:Prayer_Aoe00",
+      "PositionAnchor": "None",
+      "OrientationAnchor": "None",
+      "name": "$AbilitySpawnFx$6d084ed4-c467-4931-baa8-125633928741"
+    },
+    {
+      "$id": "8",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "Actions": {
+        "$id": "9",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "10",
+            "$type": "Kingmaker.Designers.EventConditionActionSystem.Actions.Conditional, Assembly-CSharp",
+            "Comment": "",
+            "ConditionsChecker": {
+              "$id": "11",
+              "$type": "Kingmaker.ElementsSystem.ConditionsChecker, Assembly-CSharp",
+              "Conditions": [
+                {
+                  "$id": "12",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Conditions.ContextConditionIsEnemy, Assembly-CSharp",
+                  "name": "$AbilityConditionIsEnemy$43d694f4-f8eb-4be0-bd69-6454f4330d8c"
+                }
+              ]
+            },
+            "IfTrue": {
+              "$id": "13",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": [
+                {
+                  "$id": "14",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+                  "Buff": "Blueprint:890182fa30a5f724c86ce41f237cf95f:PrayerDebuff",
+                  "DurationValue": {
+                    "$id": "15",
+                    "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+                    "m_IsExtendable": true,
+                    "DiceCountValue": {
+                      "$id": "16",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+                    },
+                    "BonusValue": {
+                      "$id": "17",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                      "ValueType": "Rank"
+                    }
+                  },
+                  "IsFromSpell": true,
+                  "name": "$AbilityActionApplyBuff$d6323047-7c55-4f5c-a054-333498fba09f"
+                },
+                {
+                  "$id": "18",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionSpawnFx, Assembly-CSharp",
+                  "PrefabLink": "Resource:dc41ce9fbc811194abad15f2e7db6f53:Prayer_Debuff00",
+                  "name": "$AbilityActionSpawnFx$11c25389-f4e0-49b7-9d45-a2bcdcf37e30"
+                }
+              ]
+            },
+            "IfFalse": {
+              "$id": "19",
+              "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+              "Actions": [
+                {
+                  "$id": "20",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+                  "Buff": "Blueprint:789bae3802e7b6b4c8097aaf566a1cf5:PrayerBuff",
+                  "DurationValue": {
+                    "$id": "21",
+                    "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+                    "m_IsExtendable": true,
+                    "DiceCountValue": {
+                      "$id": "22",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+                    },
+                    "BonusValue": {
+                      "$id": "23",
+                      "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                      "ValueType": "Rank"
+                    }
+                  },
+                  "IsFromSpell": true,
+                  "name": "$AbilityActionApplyBuff$ccb00472-cd78-4481-baf1-1ae0db185cfc"
+                },
+                {
+                  "$id": "24",
+                  "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionSpawnFx, Assembly-CSharp",
+                  "PrefabLink": "Resource:8bd36267b09ec344f9ab532a20b6bbf1:Prayer_Buff00",
+                  "name": "$AbilityActionSpawnFx$30e05aa9-7f23-4862-adcd-98014a6c12ce"
+                }
+              ]
+            },
+            "name": "$Conditional$eab9dd0d-4673-4cae-8f20-8448e20a7cc1"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$c01dc895-eef8-43c8-ade7-c592f5460a89"
+    },
+    {
+      "$id": "25",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:dc242eb60eed94a4eb0640d773780090:GoodDomainSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$196efa25-cf59-4972-bc13-731a3c9be591"
+    },
+    {
+      "$id": "26",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:57c894665b7895c499b3dce058c284b3:InquisitorSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$57fd3d56-d194-4e27-a9c9-e13c9a8eac90"
+    },
+    {
+      "$id": "27",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:9f5be2f7ea64fe04eb40878347b147bc:PaladinSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$3178c83d-b02a-4d15-85e2-0008c293243f"
+    },
+    {
+      "$id": "28",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:75576ed8cab010644a11f9ecd512a7f9:CommunityDomainSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$1812867a-ff41-4e4f-8ad9-2031b92348e0"
+    },
+    {
+      "$id": "29",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:57b0bbdc1114ee846945f1808b13cff7:LawDomainSpellList",
+      "SpellLevel": 3,
+      "name": "$SpellListComponent$cdb15a36-fe02-431d-b8e7-ddd61249aaf3"
+    }
+  ],
+  "m_AssetGuid": "faabd2cc67efa4646ac58c7bb3e40fcc",
+  "name": "Prayer"
+}

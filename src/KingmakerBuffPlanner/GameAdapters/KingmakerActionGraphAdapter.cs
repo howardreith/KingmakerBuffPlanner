@@ -446,11 +446,27 @@ namespace KingmakerBuffPlanner.GameAdapters
                     facts.Add(new KeyValuePair<string, bool>(fact.Fact.AssetGuid, fact.Not));
                     continue;
                 }
+                // Review R6-F2: a buff predicate keeps its own key, so the
+                // live read uses the native buff check (Buffs.HasFact).
                 var buff = condition as ContextConditionHasBuff;
                 if (buff != null && buff.GetType() == typeof(ContextConditionHasBuff) && buff.Buff != null &&
                     !string.IsNullOrWhiteSpace(buff.Buff.AssetGuid))
                 {
-                    facts.Add(new KeyValuePair<string, bool>(buff.Buff.AssetGuid, buff.Not));
+                    facts.Add(new KeyValuePair<string, bool>(RecipientFactGate.BuffPredicate(buff.Buff.AssetGuid),
+                        buff.Not));
+                    continue;
+                }
+                // Review R6-F1: the recipient's relation to the caster (Prayer
+                // routes a friendly recipient past ContextConditionIsEnemy to
+                // its buff), read live with the native IsEnemy / IsAlly.
+                if (condition != null && condition.GetType() == typeof(ContextConditionIsEnemy))
+                {
+                    facts.Add(new KeyValuePair<string, bool>(RecipientFactGate.EnemyOfCaster, condition.Not));
+                    continue;
+                }
+                if (condition != null && condition.GetType() == typeof(ContextConditionIsAlly))
+                {
+                    facts.Add(new KeyValuePair<string, bool>(RecipientFactGate.AllyOfCaster, condition.Not));
                     continue;
                 }
                 return null;
@@ -471,6 +487,55 @@ namespace KingmakerBuffPlanner.GameAdapters
         {
             return type.FullName + ", " + type.Assembly.GetName().Name +
                 ", Version=" + type.Assembly.GetName().Version;
+        }
+    }
+
+    // Missing-beneficial-buffs review R6-F1/R6-F2: the live read of one
+    // recipient-fact gate key, with the exact check the native predicate
+    // makes (observed in the 2.1.7b IL, pinned by
+    // missing-beneficial-buffs-native-condition-contracts-pinned):
+    // ContextConditionHasFact -> UnitHelper.HasFact(descriptor, fact);
+    // ContextConditionHasBuff -> descriptor.Buffs.HasFact(buff);
+    // ContextConditionIsEnemy / IsAlly -> target.IsEnemy / IsAlly(caster).
+    // Null when the read cannot be made (unknown, never false by default).
+    internal static class NativeRecipientFactRead
+    {
+        internal static bool? Read(Kingmaker.EntitySystem.Entities.UnitEntityData unit,
+            Kingmaker.EntitySystem.Entities.UnitEntityData caster, string factKey)
+        {
+            try
+            {
+                if (unit == null || string.IsNullOrEmpty(factKey)) return null;
+                if (factKey == RecipientFactGate.EnemyOfCaster)
+                    return caster == null ? (bool?)null : unit.IsEnemy(caster);
+                if (factKey == RecipientFactGate.AllyOfCaster)
+                    return caster == null ? (bool?)null : unit.IsAlly(caster);
+                if (unit.Descriptor == null) return null;
+                string buffId;
+                if (RecipientFactGate.TryBuffPredicate(factKey, out buffId))
+                {
+                    var buff = ResourcesLibrary.TryGetBlueprint<Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff>(buffId);
+                    return buff == null ? (bool?)null : unit.Descriptor.Buffs.HasFact(buff);
+                }
+                var fact = ResourcesLibrary.TryGetBlueprint<Kingmaker.Blueprints.Facts.BlueprintUnitFact>(factKey);
+                return fact == null ? (bool?)null : Kingmaker.UnitLogic.UnitHelper.HasFact(unit.Descriptor, fact);
+            }
+            catch (Exception) { return null; }
+        }
+
+        // Review R4-F3: a key no buff casting can change - a relation to the
+        // caster, or a unit fact that is not a buff (a creature type).
+        internal static bool IsFixed(string factKey)
+        {
+            if (RecipientFactGate.IsRelation(factKey)) return true;
+            string buffId;
+            if (RecipientFactGate.TryBuffPredicate(factKey, out buffId)) return false;
+            try
+            {
+                var fact = ResourcesLibrary.TryGetBlueprint<Kingmaker.Blueprints.Facts.BlueprintUnitFact>(factKey);
+                return fact != null && !(fact is Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff);
+            }
+            catch (Exception) { return false; }
         }
     }
 }

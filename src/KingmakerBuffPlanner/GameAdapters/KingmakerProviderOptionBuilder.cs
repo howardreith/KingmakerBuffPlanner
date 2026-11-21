@@ -89,18 +89,17 @@ namespace KingmakerBuffPlanner.GameAdapters
                             ? from.DistanceTo(to) : (float?)null;
                     },
                     facts,
+                    // Review R6-F1/R6-F2: each gate key read with the exact
+                    // native predicate (NativeRecipientFactRead).
                     (unitId, factId) =>
                     {
                         UnitEntityData unit;
-                        return liveUnits.TryGetValue(unitId, out unit) ? ReadUnitFact(unit, factId) : null;
+                        return liveUnits.TryGetValue(unitId, out unit)
+                            ? NativeRecipientFactRead.Read(unit, caster, factId) : null;
                     },
-                    // Review R4-F3: a unit fact that is not a buff (a creature
-                    // type feature) cannot be added or removed by a casting.
-                    factId =>
-                    {
-                        BlueprintUnitFact fact = ResourcesLibrary.TryGetBlueprint<BlueprintUnitFact>(factId);
-                        return fact != null && !(fact is Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff);
-                    });
+                    // Review R4-F3: a relation to the caster or a unit fact
+                    // that is not a buff cannot be changed by a casting.
+                    NativeRecipientFactRead.IsFixed);
                 bool party = decision.Party;
                 bool areaRecipients = decision.AreaRecipients;
                 bool unsafeArea = decision.UnsafeArea;
@@ -191,19 +190,6 @@ namespace KingmakerBuffPlanner.GameAdapters
                 catch (Exception) { /* Unreadable is unknown, never false. */ }
             }
             return facts;
-        }
-
-        // Whether a live unit has a fact (a recipient-fact gate); null when
-        // it cannot be read, never false by default.
-        private static bool? ReadUnitFact(UnitEntityData unit, string factId)
-        {
-            try
-            {
-                var fact = ResourcesLibrary.TryGetBlueprint<BlueprintUnitFact>(factId);
-                if (fact == null || unit == null || unit.Descriptor == null) return null;
-                return unit.Descriptor.HasFact(fact);
-            }
-            catch (Exception) { return null; }
         }
 
         private static IReadOnlyList<string> SelectNearbyRecipients(NearbyRecipientRule rule,

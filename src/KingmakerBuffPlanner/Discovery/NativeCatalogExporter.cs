@@ -318,6 +318,7 @@ namespace KingmakerBuffPlanner.Discovery
                 StayOnDeath = e.StayOnDeath,
                 ComponentTypes = e.ComponentTypes,
                 GrantedConditions = e.GrantedConditions,
+                ModifierSigns = e.ModifierSigns ?? new string[0],
                 SourceContract = e.SourceContract,
                 ActionPath = e.ActionPath,
                 FactActions = (e.FactActions ?? new NativeFactActionsRecord[0]).Select(list =>
@@ -365,6 +366,49 @@ namespace KingmakerBuffPlanner.Discovery
                 }
             }
             return ids.ToArray();
+        }
+
+        // Missing-beneficial-buffs review R5-F1/R5-F2: for every component
+        // that adjusts a value through a native ModifierDescriptor field
+        // ("Descriptor": AddStatBonus, AddGenericStatBonus, BuffAllSavesBonus,
+        // BuffAllSkillsBonus, BuffAbilityRollsBonus, AddContextStatBonus,
+        // ...), its sign: "penalty" when the descriptor is Penalty (and the
+        // value is not a known positive) or the constant value times a
+        // constant multiplier is negative; "bonus" when that product is
+        // positive under another descriptor; "unknown" otherwise
+        // (context-dependent values).
+        internal static string[] ModifierSigns(IEnumerable<BlueprintComponent> components)
+        {
+            var signs = new List<string>();
+            foreach (BlueprintComponent component in components ?? new BlueprintComponent[0])
+            {
+                if (component == null) continue;
+                Type type = component.GetType();
+                FieldInfo descriptor = type.GetField("Descriptor", BindingFlags.Instance | BindingFlags.Public);
+                if (descriptor == null || descriptor.FieldType.Name != "ModifierDescriptor") continue;
+                object descriptorValue = descriptor.GetValue(component);
+                bool penaltyDescriptor = descriptorValue != null && descriptorValue.ToString() == "Penalty";
+                int? value = ConstantOf(type.GetField("Value", BindingFlags.Instance | BindingFlags.Public), component);
+                FieldInfo multiplierField = type.GetField("Multiplier", BindingFlags.Instance | BindingFlags.Public);
+                int? multiplier = multiplierField == null ? 1 : ConstantOf(multiplierField, component);
+                int? product = value.HasValue && multiplier.HasValue ? value.Value * multiplier.Value : (int?)null;
+                string sign = penaltyDescriptor
+                    ? (product.HasValue && product.Value > 0 ? "unknown" : "penalty")
+                    : !product.HasValue || product.Value == 0 ? "unknown"
+                    : product.Value < 0 ? "penalty" : "bonus";
+                signs.Add(type.FullName + ":" + sign);
+            }
+            return signs.OrderBy(v => v, StringComparer.Ordinal).ToArray();
+        }
+
+        private static int? ConstantOf(FieldInfo field, object component)
+        {
+            if (field == null) return null;
+            object value = field.GetValue(component);
+            if (value is int) return (int)value;
+            var context = value as Kingmaker.UnitLogic.Mechanics.ContextValue;
+            return context != null && context.ValueType == Kingmaker.UnitLogic.Mechanics.ContextValueType.Simple
+                ? context.Value : (int?)null;
         }
 
         private static void AddFacts(ISet<string> ids, IEnumerable<BlueprintUnitFact> facts)
@@ -459,6 +503,7 @@ namespace KingmakerBuffPlanner.Discovery
                 string name = string.Empty;
                 string[] componentTypes = new string[0];
                 string[] grantedConditions = new string[0];
+                string[] modifierSigns = new string[0];
                 bool hidden = false;
                 bool classFeature = false;
                 bool removeOnRest = false;
@@ -479,6 +524,7 @@ namespace KingmakerBuffPlanner.Discovery
                                 : c is BuffStatusCondition ? ((BuffStatusCondition)c).Condition.ToString() : null)
                             .Where(v => v != null).Distinct(StringComparer.Ordinal)
                             .OrderBy(v => v, StringComparer.Ordinal).ToArray();
+                        modifierSigns = ModifierSigns(buff.ComponentsArray);
                         hidden = buff.IsHiddenInUI;
                         classFeature = buff.IsClassFeature;
                         removeOnRest = buff.RemoveOnRest;
@@ -510,6 +556,7 @@ namespace KingmakerBuffPlanner.Discovery
                     StayOnDeath = stayOnDeath,
                     ComponentTypes = componentTypes,
                     GrantedConditions = grantedConditions,
+                    ModifierSigns = modifierSigns,
                     SourceContract = leaf.SourceContract,
                     ActionPath = leaf.ActionPath,
                     FactActions = factActions
@@ -671,6 +718,9 @@ namespace KingmakerBuffPlanner.Discovery
         [JsonProperty("grantedConditions", Order = 13)] public string[] GrantedConditions { get; set; }
         // rc4 (review finding 1): what the buff's own AddFactContextActions do.
         [JsonProperty("factActions", Order = 14)] public NativeFactActionsRecord[] FactActions { get; set; }
+        // Missing-beneficial-buffs review R5-F1/R5-F2: the sign of each
+        // component that adjusts a value through a native ModifierDescriptor.
+        [JsonProperty("modifierSigns", Order = 15)] public string[] ModifierSigns { get; set; }
     }
 
     internal sealed class NativeFactActionsRecord

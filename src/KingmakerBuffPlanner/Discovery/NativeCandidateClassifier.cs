@@ -64,6 +64,10 @@ namespace KingmakerBuffPlanner.Discovery
         // The UnitCondition names the buff grants its bearer (AddCondition,
         // BuffStatusCondition), read from the blueprint (0.4.0).
         public IReadOnlyList<string> GrantedConditions { get; set; }
+        // Review R5-F1/R5-F2: "<component type>:penalty|bonus|unknown" for
+        // every component adjusting a value through a native
+        // ModifierDescriptor (empty when unread or in an older export).
+        public IReadOnlyList<string> ModifierSigns { get; set; }
         public string SourceContract { get; set; }
         public string ActionPath { get; set; }
         // What the buff's own AddFactContextActions do (rc4).
@@ -481,20 +485,50 @@ namespace KingmakerBuffPlanner.Discovery
             // granted as a separate ability (Firebelly's breath, AddFacts)
             // is not an automatic application.
             if (effects.Any(e => ImposesHarm(e) || AppliesUnreadEffect(e))) return true;
+            // Review R6 (R5-F2): the waiver's own safety decision applies to
+            // every automatic application too - receiving the approved buff
+            // must not apply anything that is not itself an approved payload
+            // (a readable penalty such as Crushing Despair included).
+            if (effects.Any(e => (e == null ? new NativeCandidateFactActions[0] :
+                    e.FactActions ?? new NativeCandidateFactActions[0])
+                .SelectMany(list => list.AppliedEffects ?? new NativeCandidateEffectFacts[0])
+                .Any(applied => !IsProvenBeneficialDespiteAllyDisposition(applied, facts))))
+                return true;
             return effects.Count == 0 || !effects.All(e => IsProvenBeneficialDespiteAllyDisposition(e, facts));
         }
 
         // Review R5-F1/R5-F2: an effect that harms its bearer - explicitly
-        // harmful, a buff that only imposes a harmful condition, or a buff
-        // whose own automatic actions (AddFactContextActions Activated /
-        // NewRound / Deactivated) apply such a buff.
+        // harmful, a buff that only imposes a harmful condition, a proven
+        // penalty-only buff (review R6), or a buff whose own automatic
+        // actions (AddFactContextActions Activated / NewRound / Deactivated)
+        // apply such a buff.
         private static bool ImposesHarm(NativeCandidateEffectFacts effect)
         {
             if (effect == null) return false;
-            if (effect.Harmful == true || IsHarmfulCondition(effect)) return true;
+            if (effect.Harmful == true || IsHarmfulCondition(effect) || IsPenaltyOnly(effect)) return true;
             return (effect.FactActions ?? new NativeCandidateFactActions[0])
                 .SelectMany(list => list.AppliedEffects ?? new NativeCandidateEffectFacts[0])
-                .Any(applied => applied != null && (applied.Harmful == true || IsHarmfulCondition(applied)));
+                .Any(applied => applied != null &&
+                    (applied.Harmful == true || IsHarmfulCondition(applied) || IsPenaltyOnly(applied)));
+        }
+
+        // Review R6 (R5-F1): a buff whose every mechanic is a native modifier
+        // proven to be a penalty (descriptor Penalty or a constant negative
+        // value: Crushing Despair's -2 attack, damage, saves, skills and
+        // ability checks), beside bookkeeping only and actions that do
+        // nothing recorded. A buff with any bonus, an unknown sign, or any
+        // other mechanic (a size change: Enlarge / Reduce Person) is not.
+        private static bool IsPenaltyOnly(NativeCandidateEffectFacts effect)
+        {
+            IReadOnlyList<string> signs = effect.ModifierSigns ?? new string[0];
+            if (signs.Count == 0 || signs.Any(sign => !sign.EndsWith(":penalty", StringComparison.Ordinal)))
+                return false;
+            var adjusting = new HashSet<string>(signs.Select(sign => sign.Substring(0, sign.LastIndexOf(':'))),
+                StringComparer.Ordinal);
+            bool actionsDoNothing = (effect.FactActions ?? new NativeCandidateFactActions[0]).Count == 0;
+            return (effect.ComponentTypes ?? new string[0]).All(type => adjusting.Contains(type) ||
+                BookkeepingComponents.Contains(ShortName(type)) ||
+                (ShortName(type) == "AddFactContextActions" && actionsDoNothing));
         }
 
         private static bool AppliesUnreadEffect(NativeCandidateEffectFacts effect)
