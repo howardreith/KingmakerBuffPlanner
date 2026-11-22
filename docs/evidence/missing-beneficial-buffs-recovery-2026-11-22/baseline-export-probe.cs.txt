@@ -1,0 +1,71 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Kingmaker.UnitLogic.Abilities.Blueprints;
+using KingmakerBuffPlanner.Discovery;
+using KingmakerBuffPlanner.GameAdapters;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+namespace KingmakerBuffPlanner.Tests
+{
+    // Baseline-only probe for R12-F1 (executed on fb075cb; not part of the
+    // candidate). NativeCatalogExporter.Export() needs the loaded game
+    // library, so this composes the two production halves it joins at
+    // fb075cb: the live classifier input (NativeCatalogExporter.AuditFacts,
+    // which appends the on-cast diagnostic) and the serialized entry's
+    // diagnostics field exactly as Export() fills it at fb075cb
+    // (NativeCatalogExporter.cs:117, "Diagnostics = scan.Diagnostics.ToArray()"),
+    // serialized with the runtime host's settings and read back by the
+    // production audit reader (AuditFactsFromExport).
+    internal static partial class Program
+    {
+        private static void RunMbrBaselineExportProbe()
+        {
+            Run("missing-beneficial-buffs-recovery-r12f1-baseline-export-probe", () =>
+            {
+                string feather = MbbPointGroupSpells[1][1], featherBuff = MbbPointGroupSpells[1][2];
+                var dump = new NativeBlueprintDump(feather, featherBuff);
+                BlueprintAbility spell = dump.Get<BlueprintAbility>(feather);
+                var onCast = NativeObject<Kingmaker.UnitLogic.Abilities.Components.AbilityExecuteActionOnCast>();
+                SetNative(onCast, "Actions", new Kingmaker.ElementsSystem.ActionList
+                {
+                    Actions = new Kingmaker.ElementsSystem.GameAction[]
+                    {
+                        NativeObject<Kingmaker.UnitLogic.Mechanics.Actions.ContextActionDealDamage>()
+                    }
+                });
+                SetNative(spell, "Components", spell.ComponentsArray.Concat(
+                    new Kingmaker.Blueprints.BlueprintComponent[] { onCast }).ToArray());
+                DiscoveryScanResult scan = new ActionGraphScanner().Scan(new KingmakerActionGraphAdapter().Adapt(spell));
+                NativeEffectRecord[] effects = NativeCatalogExporter.GetEffects(scan.Expression, dump.Lookup);
+                NativeCandidateAuditFacts live = NativeCatalogExporter.AuditFacts(spell, true, effects, scan.Diagnostics,
+                    MbbOverrides().AllyDispositionExceptions(feather));
+                NativeCandidateAuditDecision liveDecision = new NativeCandidateClassifier().Classify(live);
+                var entry = new NativeCatalogEntry
+                {
+                    AbilityGuid = feather, CanTargetSelf = spell.CanTargetSelf, CanTargetFriends = spell.CanTargetFriends,
+                    CanTargetEnemies = spell.CanTargetEnemies, CanTargetPoint = spell.CanTargetPoint,
+                    IsStickyTouch = false, VariantGuids = new string[0], EffectOnAlly = spell.EffectOnAlly.ToString(),
+                    EffectOnEnemy = spell.EffectOnEnemy.ToString(), Range = spell.Range.ToString(),
+                    AbilityComponentTypes = live.AbilityComponentTypes.ToArray(), Effects = effects,
+                    SelfGatedFactIds = new string[0],
+                    Diagnostics = scan.Diagnostics.ToArray()
+                };
+                string json = JsonConvert.SerializeObject(entry, Formatting.Indented, new JsonSerializerSettings
+                {
+                    TypeNameHandling = TypeNameHandling.None,
+                    Converters = new List<JsonConverter> { new Newtonsoft.Json.Converters.StringEnumConverter() }
+                });
+                NativeCandidateAuditFacts replay = AuditFactsFromExport(JObject.Parse(json), true);
+                NativeCandidateAuditDecision replayDecision = new NativeCandidateClassifier().Classify(replay);
+                bool onCastSerialized = ((JArray)JObject.Parse(json)["diagnostics"]).OfType<JObject>()
+                    .Any(d => (string)d["code"] == NativeCatalogExporter.OnCastActionCode);
+                MbbExpect(liveDecision.Disposition == "exclude" && onCastSerialized &&
+                    replayDecision.Disposition == liveDecision.Disposition,
+                    "fb075cb: live=" + liveDecision.Disposition + " (" + liveDecision.Reason + ") onCastSerialized=" +
+                    onCastSerialized + " replay=" + replayDecision.Disposition + " (" + replayDecision.Reason + ")");
+            });
+        }
+    }
+}

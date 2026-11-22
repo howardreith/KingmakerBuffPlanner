@@ -10,7 +10,11 @@ next commit). The final checkpoint after the owner addendum (mission §9)
 (`76193a2`) added offline tests and records only. Review round 1 (nine
 findings, all fixed; see [Review round 1](#review-round-1)) changed production
 source again in the corrections commit that follows `76193a2`.
-Version 0.6.19 unchanged (unreleased change). This record is
+Version 0.6.19 unchanged (unreleased change). After review round 12 the owner
+switched to direct implementation with manual review (mission §10); the
+recovery of all twelve open findings is
+[below](#direct-implementation-recovery-after-review-round-12) (product
+`75e5f41`). This record is
 offline evidence only: **no native game check ran**, and by owner decision the
 in-game checks are owner acceptance (see
 [Native checks](#native-checks-owner-acceptance)).
@@ -716,6 +720,38 @@ Firebelly's breath (excluded) carries `AbilityExecuteActionOnCast` (Physical
 Enhancement is not in the fixtures). The native selector boundary (any margin
 or corpulence term) is unverified, so the planner uses the recorded radius.
 
+## Direct-implementation recovery (after review round 12)
+
+Owner instruction of 2026-11-22 (mission §10): the controller enrollment was
+cancelled while idle, and the twelve findings left open by review round 12
+were reproduced and repaired directly. The ledger, with each finding's
+trigger, path, origin, example kind, baseline failure, repair, corrected
+result and controls, is
+[MISSING-BENEFICIAL-BUFFS-RECOVERY-LEDGER.md](MISSING-BENEFICIAL-BUFFS-RECOVERY-LEDGER.md).
+Summary:
+
+| Finding | Correction (product `75e5f41`) | Regression (`missing-beneficial-buffs-recovery-…`) |
+|---|---|---|
+| R8-F1 invalidated Firebrand evidence revived by the original caster | Monotonic caster-relative invalidation (own caster included); the funded application is the only new evidence, with its strength, where it certainly lands | `r8f1-…` (native) |
+| R10-F1 a possible reapplication cleared a recorded removal | Possibly reached units contribute possible changes only (explicit, Classic, forecast) | `r10f1-…` (unread) |
+| R9-F5 an unread distance was treated as measured exclusion | Unmeasured units are affected and uncertain, never covered (`UncertainIdsByAnchor`, `ReachesDefinitely`) | `r9f5-…` (unread) |
+| R9-F4 Classic ignored a known mutable outer condition | Classic presence and kept effects bind the known routine-point state | `r9f4-…` (modified) |
+| R12-F2 a narrowed Ready group row kept its opening verdict | A changed Ready or deferred row is recompiled for its new beneficiaries before conflicts and reservation | `r12f2-…` (native Mass Enlarge/Reduce) |
+| R12-F3 a banned caster vetoed a skip | Bans apply before the existing-effect decision and kept effects | `r12f3-…` (native) |
+| R11-F2 provider ranking before comparing centres | Best feasible single cast per permitted provider before reservation | `r11f2-…` (native Good Hope) |
+| R11-F1 nested on-cast gameplay passed as presentation | On-cast references and referenced abilities' own on-cast lists need positive evidence (refused otherwise) | `r11f1-…` (modified) |
+| R12-F1 a fresh export dropped the on-cast fact | `BuildEntry` serializes the diagnostics classification consumed, marked `onCastFactsRecorded`; the reader labels historical exports | `r12f1-…-survives-export-and-replay` (modified + native control) |
+| R12-F4 Good Hope skipped the selector-condition check | The contract applies to every allied area (codes `area-selector-…`) | `r12f4-…` (modified) |
+| R12-F5 a benefit hid a directly imposed Daze | Whole-cast admissions refuse a directly imposed harmful condition | `r12f5-…` (modified) |
+| R12-F6 an automatic removal escaped the effect model | Whole-cast admissions refuse automatic restorative actions in an applied buff | `r12f6-…` (modified) |
+
+Baseline: 0/12 on `fb075cb` (isolated worktree; every failure on the asserted
+behavior; controls passed). Corrected: `missing-beneficial-buffs` 108/0,
+recovery 12/0, complete program 857/0, explicit audit 2/0 (16 / 38 changed,
+rows byte-identical to round 10/11; header now states
+`onCastFacts=absent-in-<all>`), DLL `405da354…`. Native checks: NOT RUN (owner
+acceptance, mission §9).
+
 ## Rejected approaches
 
 - An `include` override for Good Hope/Firebelly: rejected — it replaces the
@@ -759,6 +795,20 @@ or corpulence term) is unverified, so the planner uses the recorded radius.
   duration estimate (the native application is `AsChild` beside removals);
   no finite duration is invented and an active selection with no expiry
   satisfies a re-selection.
+- Recovery after round 12 (deliberately conservative):
+  - An unmeasured distance can make a removal conflict, refusing a cast that
+    might not have reached that ally.
+  - An allied selector with its own condition (modded content) plans no disk.
+  - An automatic heal in an applied buff's own lists refuses the whole-cast
+    admissions as a removal does.
+  - The Classic provider comparison is per single cast, not a global
+    optimum.
+  - The audit exports predate the on-cast facts, so those verdicts are not
+    reconstructed from them.
+- Observed by source inspection only (not executed, pre-existing on `main`,
+  outside the round-12 findings): an earlier funded weaker cast of a
+  non-caster-relative effect followed by a stronger skip row still trusts
+  the opening live instance in the explicit planner.
 
 ## Validation (offline)
 
@@ -827,3 +877,15 @@ with the new tests.
 Baseline reproduction: each regression judges the same native facts with the
 frozen `dd3e997` classifier and asserts the original exclusion before
 asserting the repair. Native/purity/release coverage is deferred.
+
+Recovery after review round 12, committed product `75e5f41` (clean `src` and
+`tests`, DLL `405da354…`; logs in
+[docs/evidence/missing-beneficial-buffs-recovery-2026-11-22](../docs/evidence/missing-beneficial-buffs-recovery-2026-11-22/)):
+
+| Command (`-Only`) | Result | Duration |
+|---|---|---|
+| baseline `missing-beneficial-buffs-recovery` on `fb075cb` (isolated worktree, same test file `197b602f…` + baseline R12-F1 probe) | 0/12 (all on the asserted behavior) | ~9 s |
+| `missing-beneficial-buffs` | 108/0 | 9 s |
+| `missing-beneficial-buffs-recovery` | 12/0 | 8 s |
+| explicit `evidence-candidate-audit-missing-beneficial-buffs` (1,722 / 16 and 10,443 / 38; classifier `45c651c4a98d…`) | 2/0 | 18 s |
+| every registered prefix (complete offline program) | 857/0 | 44 s |

@@ -1,0 +1,18 @@
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-MBB\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=405da354ad1f064dd4e73f514cbe5b995c7d8f0ef370ab1d27de18b88213e601
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-MBB\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-MBB\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+CANDIDATE-AUDIT native-only abilities=1722 changed=16 withoutOnCastFacts=1722 report=C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-MBB\artifacts\candidate-audit\classifier-45c651c4a98d-native-only-all.tsv changes=C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-MBB\artifacts\candidate-audit\classifier-45c651c4a98d-native-only-changes.tsv
+CANDIDATE-AUDIT native-only live-current:exclude:harmful-ally-disposition>include:valid-beneficial-party-effect=1
+CANDIDATE-AUDIT native-only live-current:exclude:harmful-ally-disposition>include:valid-beneficial-self-effect=1
+CANDIDATE-AUDIT native-only live-current:exclude:no-persistent-beneficial-party-effect>include:valid-beneficial-self-effect=8
+CANDIDATE-AUDIT native-only live-current:exclude:point-target-without-placement>include:valid-beneficial-party-effect=6
+CANDIDATE-AUDIT full-user abilities=10443 changed=38 withoutOnCastFacts=10443 report=C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-MBB\artifacts\candidate-audit\classifier-45c651c4a98d-full-user-all.tsv changes=C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-MBB\artifacts\candidate-audit\classifier-45c651c4a98d-full-user-changes.tsv
+CANDIDATE-AUDIT full-user live-current:exclude:harmful-ally-disposition>include:valid-beneficial-party-effect=11
+CANDIDATE-AUDIT full-user live-current:exclude:no-persistent-beneficial-party-effect>include:valid-beneficial-self-effect=13
+CANDIDATE-AUDIT full-user live-current:exclude:point-target-without-placement>include:valid-beneficial-party-effect=14
+Protocol tests: PASS=2 FAIL=0
+DEVELOPMENT PASS=2 FAIL=0 prefixes=evidence-candidate-audit-missing-beneficial-buffs seconds=18.5; native/purity/release coverage deferred.

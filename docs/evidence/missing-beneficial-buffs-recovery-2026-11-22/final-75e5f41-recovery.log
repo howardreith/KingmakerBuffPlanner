@@ -1,0 +1,9 @@
+Source validation: PASS=47 FAIL=0
+
+  KingmakerBuffPlanner -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-MBB\artifacts\build\Release\KingmakerBuffPlanner.dll
+Build: PASS=1 FAIL=0 configuration=Release sha256=405da354ad1f064dd4e73f514cbe5b995c7d8f0ef370ab1d27de18b88213e601
+C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-MBB\artifacts\build\Release\KingmakerBuffPlanner.dll
+
+  KingmakerBuffPlanner.Tests -> C:\Dev\KingmakerBuffPlannerLab\repo\KingmakerBuffPlanner-MBB\artifacts\tests\KingmakerBuffPlanner.Tests.exe
+Protocol tests: PASS=12 FAIL=0
+DEVELOPMENT PASS=12 FAIL=0 prefixes=missing-beneficial-buffs-recovery seconds=7.6; native/purity/release coverage deferred.

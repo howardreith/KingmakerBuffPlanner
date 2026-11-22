@@ -7,6 +7,19 @@ covers them. Offline evidence and the candidate audit:
 save with the PR build; note the party, positions and the run report text for
 any failure.
 
+Status 2026-11-22: implementation updated after review round 12 (product
+`75e5f41`, direct implementation, owner instruction; all twelve open findings
+repaired with offline evidence, see the
+[recovery ledger](../planning/MISSING-BENEFICIAL-BUFFS-RECOVERY-LEDGER.md)).
+**Ready for manual code review; in-game acceptance pending.** None of the
+checks below has run. What changed for them:
+
+- Good Hope plans no area when its selector has a condition of its own (the
+  native one has none).
+- An ally whose distance cannot be read is never claimed as covered.
+- A second caster's Firebrand, or a weaker recast, makes a later Firebrand
+  request cast again unless a sufficient replacement was planned.
+
 | # | Check | Proves | A failure means |
 |---|---|---|---|
 | 1 | Level-7 bard who knows Good Hope and Haste: open the planner. Both appear among castable buffs. | The harmful-to-allies veto no longer hides Good Hope in the running game; Haste is unaffected. | Good Hope missing: the loaded blueprint differs from the 2.1.7b dump or another rule excludes it (send the planner diagnostics). Haste missing: regression. |
@@ -18,6 +31,7 @@ any failure.
 | 7 | With a use available (e.g. after rest) and Fire active, run a routine containing Cold. Then plan Fire and Cold together in one routine; and, with Fire active, Cold followed by Fire. | Switching casts once, spends one use and removes the previous resistance; the planner never treats the choices as stackable ("these choices replace each other"), and never counts Fire as already active after a planned switch to Cold. | Both resistances active, two uses spent, both castings Ready, or Fire shown as skipped after Cold: mutually exclusive selections are being stacked. |
 | 8 | Plan Feather Step, Mass (or Blessing of Luck and Resolve Mass, Firebrand, Heroic Invocation) centred on a party member, with another ally outside the radius (15 ft for Feather Step; 30 ft for the others). Run it. | Native `CanTarget` admits a unit centre for these point-capable spells (**unverified offline**), and the centre, radius, recipients and one-slot cost match the game. | The planner refuses every centre ("the group spell cannot be centred there") or the run fails with `target-invalid`: the game refuses a unit centre, so the planner correctly fails closed and the spell stays unplannable (report it; no ground point is ever chosen). Buff on the distant ally, a different centre, or more than one slot: geometry/resource bug. |
 | 9 | Close and reopen the planner, rest, then save and reload: entries 1–8 stay listed and saved plans keep their castings. | Discovery and persistence survive a refresh. | Entries disappear: refresh-dependent discovery. |
+| 10 | Two casters who know Firebrand (any two arcane casters). With caster A's Firebrand active on the party, plan caster B's Firebrand over the same allies and then A's Firebrand (skip if active). Run it, then check the planner's verdict for A's next Firebrand. | Overlapping Firebrand instances from different casters are planned conservatively. A's existing Firebrand is not trusted after B's cast or a weaker recast. Each caster's immunity is to its own fire. | A's Firebrand shown as already active right after B's overlapping cast: stale evidence. Both instances visibly coexist and stay effective in game: the planner is conservative (it casts again), not wrong; report it, as coexistence is unverified offline. |
 
 Optional, same rules: Physical Enhancement selections (transmuter) behave like
 checks 5–7; Enlarge/Reduce Person, Mass behave like check 8 on an unmodded

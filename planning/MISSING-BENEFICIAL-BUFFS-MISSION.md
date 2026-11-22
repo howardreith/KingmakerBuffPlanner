@@ -453,3 +453,41 @@ Decision (owner option B):
 6. Update the existing blocker/resume records so the native-check blocker for
    this mission reads as superseded by this owner decision (the `zhcn19` lab
    lock itself remains a separate, still-open lab item).
+
+## 10. Owner workflow addendum of 2026-11-22: direct implementation and manual review
+
+This addendum records an explicit owner decision. Where it conflicts with §2
+(and with the controller-workflow wording in §1, §5 and §8), this section
+governs. The technical requirements of §3–§8 and owner addendum §9 are
+unchanged.
+
+1. **Workflow.** After review round 12 (of 15) the automated controller
+   stopped `BLOCKED`. The owner switched PR #25 to direct Claude
+   implementation. The owner and ChatGPT then perform an independent manual
+   review. No controller is enrolled, resumed or restarted for this ticket. The
+   remaining three automated rounds are historical controller budget, not a
+   limit on this work. `AWAITING_OWNER_REVIEW` and Astra approval are not
+   claimed. The endpoint is **"Ready for manual code review; in-game
+   acceptance pending."**
+2. **Ownership handoff (2026-11-22).** The enrollment
+   `kbp-codex-kingmaker-buff-planner-missing-beneficial-buffs-20261121094703-350e`
+   was idle: `BLOCKED`, no lock holder, no developer running, and no process
+   referencing it. It was pinned to the installed package `34fb8529…`
+   (fingerprint `17b66fac…`). It was cancelled through that package's
+   supported `cancel` command, with the reason "owner has switched PR #25 to
+   direct Claude implementation with manual Howie/ChatGPT review". Status is
+   now `CANCELLED`; its registry claim was released. Its records, transitions,
+   findings, review comments and budget history are preserved unchanged. The
+   existing branch, worktree `KingmakerBuffPlanner-MBB` and draft PR #25
+   continue; no continuation branch was needed.
+3. **Findings.** The twelve open findings (R8-F1, R9-F4, R9-F5, R10-F1, R11-F1,
+   R11-F2, R12-F1 to R12-F6) keep their IDs. Their reproductions, repairs and
+   evidence are in
+   [MISSING-BENEFICIAL-BUFFS-RECOVERY-LEDGER.md](MISSING-BENEFICIAL-BUFFS-RECOVERY-LEDGER.md).
+   A developer disposition is not reviewer acceptance.
+4. **Publication.** Commits are pushed through the guarded standalone helper
+   `codex-policy/Push-KingmakerBuffPlanner.ps1` (no force push), and the draft
+   PR is updated. No merge, tag, release, package, deployment or reviewer
+   request is made. A controller gate receipt is not required for this
+   workflow; ordinary `scripts/Test-Development.ps1` evidence bound to the
+   candidate replaces it.
