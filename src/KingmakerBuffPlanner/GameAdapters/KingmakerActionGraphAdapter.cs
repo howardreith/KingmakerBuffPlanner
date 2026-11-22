@@ -23,6 +23,15 @@ namespace KingmakerBuffPlanner.GameAdapters
         private readonly HashSet<string> _activeAbilities = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<BlueprintAbility> _activeAbilityObjects =
             new HashSet<BlueprintAbility>(ReferenceEqualityComparer<BlueprintAbility>.Instance);
+        private readonly List<BlueprintAbility> _referenced = new List<BlueprintAbility>();
+
+        // Missing-beneficial-buffs recovery (R11-F1): every ability this
+        // adapter followed through a reference (ContextActionCastSpell, a
+        // sticky-touch delivery), in order. The graph of a referenced ability
+        // is read from its run action or delivery only; whatever its other
+        // components execute is not, so a caller judging a whole cast can
+        // demand positive evidence for them.
+        internal IReadOnlyList<BlueprintAbility> ReferencedAbilities { get { return _referenced; } }
 
         internal DiscoveryNode Adapt(BlueprintAbility ability)
         {
@@ -77,6 +86,7 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         private DiscoveryNode Reference(BlueprintAbility ability, string contract)
         {
+            if (!_referenced.Contains(ability)) _referenced.Add(ability);
             return new DiscoveryNode(DiscoveryNodeKind.AbilityReference, ability.AssetGuid,
                 new[] { AdaptAbility(ability) }, referencedAbilityId: ability.AssetGuid,
                 sourceContract: contract);

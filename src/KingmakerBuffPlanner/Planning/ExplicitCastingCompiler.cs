@@ -379,10 +379,20 @@ namespace KingmakerBuffPlanner.Planning
             // funded castings so far. A funded caster-relative application by
             // one caster may replace another caster's instance of that effect
             // on the units it reaches (coexistence unverified), so those
-            // instances no longer prove anything; "<unit>\u001f<effect>" ->
-            // the applying caster. Same scope as the structural grants.
+            // instances no longer prove anything. Same scope as the
+            // structural grants.
+            // Recovery (R8-F1): invalidation is monotonic. Every funded
+            // caster-relative application voids every earlier instance of that
+            // effect on the units it may reach - the same caster's too (a
+            // recast replaces it with the new cast's strength) - and the
+            // "<unit>\u001f<effect>" key stays touched: returning to the
+            // original caster never restores the opening instance. The only
+            // new evidence is the funded application itself, recorded with
+            // its caster, caster level, metamagic and expected duration where
+            // it certainly lands, so a later row is judged against what that
+            // replacement actually provides.
             ActiveEffectSnapshot standingLive = liveEffects;
-            var casterRelativeApplied = new Dictionary<string, string>(StringComparer.Ordinal);
+            var casterRelativeTouched = new HashSet<string>(StringComparer.Ordinal);
             foreach (ResolvedCasting compiled in castings)
             {
                 ResolvedCasting casting = compiled;
@@ -392,7 +402,7 @@ namespace KingmakerBuffPlanner.Planning
                     grantedByUnit.Clear();
                     grantEffects.Clear();
                     standingLive = liveEffects;
-                    casterRelativeApplied.Clear();
+                    casterRelativeTouched.Clear();
                 }
                 grantRoutine = casting.RoutineId;
                 List<CastEnhancementSnapshot> matched;
@@ -428,10 +438,13 @@ namespace KingmakerBuffPlanner.Planning
                 // have replaced is re-assessed against the standing evidence.
                 // Review R11 (R8-F1): a Ready row too (its per-recipient
                 // pre-covered credit and notes rest on the same evidence).
+                // Recovery (R8-F1): whenever an opening instance it may rest on
+                // was touched by any funded application since (whoever cast it
+                // last).
                 if ((casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied ||
                         casting.Readiness == ResolvedCastingReadiness.Ready) && liveEffects != null &&
-                    casterRelativeApplied.Count != 0 && plannedById.TryGetValue(casting.CastingId, out planned) &&
-                    ReplacedByOtherCaster(casting, effectsBySource, casterRelativeApplied))
+                    casterRelativeTouched.Count != 0 && plannedById.TryGetValue(casting.CastingId, out planned) &&
+                    OpeningEvidenceTouched(casting, effectsBySource, casterRelativeTouched, liveEffects))
                 {
                     casting = CompileOne(planned, snapshot, options, effectsBySource, enhancementList,
                         modifierList, new List<string>(), standingLive, strictInstant, out matched,
@@ -512,12 +525,27 @@ namespace KingmakerBuffPlanner.Planning
                             new CastingCostLine[0], shape, BlockedNotes(casting, null)));
                         continue;
                     }
-                    if (deferredEmpty)
-                        casting = casting.WithBudgetResult(ResolvedCastingReadiness.Ready, new string[0],
-                            new CastingCostLine[0], shape);
-                    if (!now.OrderBy(v => v, StringComparer.Ordinal).SequenceEqual(
-                            casting.PredictedBeneficiaryUnitIds.OrderBy(v => v, StringComparer.Ordinal)))
-                        casting = casting.WithPredictedBeneficiaries(now);
+                    // Recovery (R12-F2): a row whose beneficiaries changed (or a
+                    // deferred row that now has some) is re-assessed for them
+                    // as a whole - existing-effect verdict, pre-covered units,
+                    // notes and readiness - against the standing evidence,
+                    // before any removal-conflict check or reservation: a Mass
+                    // Reduce left only with an ally whose Reduce is already
+                    // sufficient skips instead of running into the earlier
+                    // Enlarge it would no longer cast on.
+                    if ((deferredEmpty || !now.OrderBy(v => v, StringComparer.Ordinal).SequenceEqual(
+                            casting.PredictedBeneficiaryUnitIds.OrderBy(v => v, StringComparer.Ordinal))) &&
+                        plannedById.TryGetValue(casting.CastingId, out planned))
+                    {
+                        casting = CompileOne(planned, snapshot, options, effectsBySource, enhancementList,
+                            modifierList, new List<string>(), standingLive, strictInstant, out matched,
+                            out intended, out provider, out modifierDemands, out resolved, true, now);
+                        shape = provider == null
+                            ? new string[0]
+                            : CostShapeOf(ledger.DemandsFor(provider,
+                                casting.Readiness == ResolvedCastingReadiness.AlreadySatisfied
+                                    ? intended : matched, modifierDemands));
+                    }
                 }
                 // Review R5-F4: a skip changes nothing; it protects only the
                 // effects on the recipients its satisfaction rests on (its
@@ -587,7 +615,7 @@ namespace KingmakerBuffPlanner.Planning
                         removalState.Admit(casting.RoutineId, casting.CastingId, changes);
                         RecordSequential(projection, casting, resolved, effectsBySource);
                         standingLive = RecordCasterRelative(casting, resolved, effectsBySource, standingLive,
-                            casterRelativeApplied);
+                            casterRelativeTouched, matched);
                     }
                 }
                 if (casting.Readiness != ResolvedCastingReadiness.Ready || outOfScope)
@@ -616,7 +644,7 @@ namespace KingmakerBuffPlanner.Planning
                     removalState.Admit(casting.RoutineId, casting.CastingId, changes);
                     RecordSequential(projection, casting, resolved, effectsBySource);
                     standingLive = RecordCasterRelative(casting, resolved, effectsBySource, standingLive,
-                        casterRelativeApplied);
+                        casterRelativeTouched, matched);
                     {
                         // R1-F4: the one-pass sequence forgets a structural
                         // grant whose effect this casting removes (review
@@ -716,7 +744,13 @@ namespace KingmakerBuffPlanner.Planning
                 // casting for the beneficiaries earlier funded castings of
                 // the sequence leave it.
                 else if (predictedOverride != null && casting.TargetMode != CastingTargetMode.DirectTarget)
+                {
                     predicted = predictedOverride.ToList();
+                    // Recovery (R12-F2): a deferred empty burst that earlier
+                    // castings gave beneficiaries is no longer empty.
+                    if (predicted.Count != 0)
+                        reasons.RemoveAll(code => code.StartsWith(PredictedCoverageEmpty, StringComparison.Ordinal));
+                }
             }
             var applied = new List<string>();
             var omitted = new List<string>();
@@ -1070,13 +1104,9 @@ namespace KingmakerBuffPlanner.Planning
                 effectsBySource, casting.Ability, casting.SourceId);
             IEnumerable<string> reached = casting.TargetMode == CastingTargetMode.DirectTarget
                 ? new[] { casting.DirectTargetUnitId } : casting.PredictedBeneficiaryUnitIds;
-            if (casting.TargetMode != CastingTargetMode.DirectTarget)
-            {
-                string anchor = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
-                    ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
-                if (anchor != null) reached = reached.Concat(option.AffectedTargetIdsForAnchor(anchor));
-            }
-            state.Record(option, expression, reached, casting.CasterUnitId);
+            string anchor = GroupAnchor(casting);
+            if (anchor != null) reached = reached.Concat(option.AffectedTargetIdsForAnchor(anchor));
+            state.Record(option, expression, reached, casting.CasterUnitId, anchor);
         }
 
         private static EffectChanges ChangesFor(ResolvedCasting casting, ProviderPlanningOption option,
@@ -1100,9 +1130,27 @@ namespace KingmakerBuffPlanner.Planning
                     reached = reached.Concat(option.AffectedTargetIdsForAnchor(anchor))
                         .Distinct(StringComparer.Ordinal).ToList();
             }
+            // Recovery (R10-F1, R9-F5): a unit the burst only possibly
+            // reaches (an Ally-only selector with its relation unread, or an
+            // unmeasured distance) contributes possible changes only: what the
+            // cast may apply there never restores an earlier removal.
+            string groupAnchor = GroupAnchor(casting);
             return EffectChanges.Merge(reached.Select(recipient =>
-                EffectChangeAnalysis.Analyze(option.BindForRecipient(expression, recipient),
-                    casting.CasterUnitId, recipient)));
+            {
+                EffectChanges analyzed = EffectChangeAnalysis.Analyze(option.BindForRecipient(expression, recipient),
+                    casting.CasterUnitId, recipient);
+                return groupAnchor == null || option.ReachesDefinitely(groupAnchor, recipient)
+                    ? analyzed : analyzed.Possible();
+            }));
+        }
+
+        // The centre of a group casting (its caster or its anchor); null for
+        // a direct casting.
+        private static string GroupAnchor(ResolvedCasting casting)
+        {
+            if (casting.TargetMode == CastingTargetMode.DirectTarget) return null;
+            return casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
+                ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
         }
 
         private static ResolvedCasting BlockForRemoval(ResolvedCasting casting, string reason,
@@ -1182,11 +1230,16 @@ namespace KingmakerBuffPlanner.Planning
         }
 
         // Review R10 (R8-F1): a funded casting's caster-relative applications
-        // on every unit it reaches; other casters' live instances of those
-        // effects there stop counting as evidence.
+        // on every unit it reaches; earlier instances of those effects there
+        // stop counting as evidence.
+        // Recovery (R8-F1): every earlier instance (the same caster's too),
+        // monotonically; the funded application is the new evidence only
+        // where it certainly lands (definitely reached, guaranteed on every
+        // path), with the strength the cast provides.
         private static ActiveEffectSnapshot RecordCasterRelative(ResolvedCasting casting,
             ProviderPlanningOption option, IReadOnlyDictionary<string, EffectExpression> effectsBySource,
-            ActiveEffectSnapshot standing, Dictionary<string, string> applied)
+            ActiveEffectSnapshot standing, HashSet<string> touched,
+            IReadOnlyList<CastEnhancementSnapshot> matched)
         {
             EffectExpression payload = DiscoveredEffectLookup.ForAbility(
                 effectsBySource, casting.Ability, casting.SourceId);
@@ -1198,12 +1251,8 @@ namespace KingmakerBuffPlanner.Planning
             // unit the group cast's selected disk may reach.
             IEnumerable<string> recipients = casting.TargetMode == CastingTargetMode.DirectTarget
                 ? new[] { casting.DirectTargetUnitId } : casting.PredictedBeneficiaryUnitIds;
-            if (casting.TargetMode != CastingTargetMode.DirectTarget && option != null)
-            {
-                string anchor = casting.TargetMode == CastingTargetMode.CasterCenteredOrigin
-                    ? casting.CasterUnitId : casting.Origin == null ? null : casting.Origin.AnchorUnitId;
-                if (anchor != null) recipients = recipients.Concat(option.AffectedTargetIdsForAnchor(anchor));
-            }
+            string anchor = GroupAnchor(casting);
+            if (anchor != null && option != null) recipients = recipients.Concat(option.AffectedTargetIdsForAnchor(anchor));
             List<string> reached = recipients.Where(value => !string.IsNullOrEmpty(value))
                 .Distinct(StringComparer.Ordinal).ToList();
             var keys = new HashSet<string>(StringComparer.Ordinal);
@@ -1211,35 +1260,75 @@ namespace KingmakerBuffPlanner.Planning
                 foreach (string unit in role.Value ? new[] { casting.CasterUnitId } : (IEnumerable<string>)reached)
                 {
                     if (string.IsNullOrEmpty(unit)) continue;
-                    applied[unit + "\u001f" + role.Key] = casting.CasterUnitId;
+                    touched.Add(unit + "\u001f" + role.Key);
                     keys.Add(unit + "\u001f" + role.Key);
                 }
             if (standing == null || !standing.HasInstanceDetail) return standing;
+            // Where the application certainly lands: the analysis of each
+            // definitely reached recipient's bound payload.
+            var certain = new HashSet<string>(StringComparer.Ordinal);
+            if (option != null)
+                foreach (string recipient in reached.Where(unit => anchor == null || option.ReachesDefinitely(anchor, unit)))
+                    foreach (KeyValuePair<string, string> applied in EffectChangeAnalysis.Analyze(
+                        option.BindForRecipient(payload, recipient), casting.CasterUnitId, recipient).Guaranteed)
+                        if (applied.Key != null) certain.Add(applied.Key + "\u001f" + applied.Value);
+            ExistingEffectRequirement provided = option == null ? null : RequirementFor(option.Provider, matched);
+            Dictionary<string, EffectKind> kinds = EffectApplicationLifetime.Leaves(payload)
+                .GroupBy(leaf => leaf.EffectId, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First().Kind, StringComparer.Ordinal);
             var filtered = new Dictionary<string, IEnumerable<ActiveEffectInstance>>(StringComparer.Ordinal);
-            foreach (string unit in standing.ToUnitMarkers().Keys)
-                filtered[unit] = standing.GetInstances(unit).Where(instance =>
-                    !keys.Contains(unit + "\u001f" + instance.EffectId) ||
-                    string.Equals(instance.CasterUnitId, casting.CasterUnitId, StringComparison.Ordinal)).ToList();
+            var units = new HashSet<string>(standing.ToUnitMarkers().Keys, StringComparer.Ordinal);
+            units.UnionWith(keys.Select(key => key.Substring(0, key.IndexOf('\u001f'))));
+            foreach (string unit in units)
+            {
+                var kept = standing.GetInstances(unit).Where(instance =>
+                    !keys.Contains(unit + "\u001f" + instance.EffectId)).ToList();
+                foreach (KeyValuePair<string, bool> role in roles)
+                {
+                    string key = unit + "\u001f" + role.Key;
+                    EffectKind kind;
+                    if (provided == null || !keys.Contains(key) || !certain.Contains(key) ||
+                        !kinds.TryGetValue(role.Key, out kind) || kept.Any(instance => instance.EffectId == role.Key))
+                        continue;
+                    kept.Add(ProjectedInstance(kind, role.Key, provided, casting.CasterUnitId));
+                }
+                filtered[unit] = kept;
+            }
             return ActiveEffectSnapshot.FromInstances(filtered);
         }
 
-        // Whether a skip's caster-relative effect was applied, on one of the
-        // units it rests on, by another caster's funded casting.
-        private static bool ReplacedByOtherCaster(ResolvedCasting casting,
-            IReadOnlyDictionary<string, EffectExpression> effectsBySource, Dictionary<string, string> applied)
+        // The instance a funded application leaves: its caster, its caster
+        // level (unknown when not positive or when the cast's strength cannot
+        // be modelled), its metamagic and its expected duration (an unknown
+        // duration leaves an instance that never counts as lasting).
+        private static ActiveEffectInstance ProjectedInstance(EffectKind kind, string effectId,
+            ExistingEffectRequirement provided, string casterUnitId)
+        {
+            int? casterLevel = provided.PlannedCasterLevel > 0 && provided.StrengthUnprovableReason == null
+                ? provided.PlannedCasterLevel : (int?)null;
+            double remaining = provided.PlannedExpectedRounds > 0 ? provided.FinalExpectedRounds : 0.0;
+            return new ActiveEffectInstance(kind, effectId, remaining, casterLevel, provided.PlannedMetamagicMask,
+                false, true, casterUnitId);
+        }
+
+        // Recovery (R8-F1): whether an opening instance a row may rest on (a
+        // live instance of one of its caster-relative effects on one of its
+        // recipients, or on its caster for a caster-role leaf) has been
+        // touched by a funded application since.
+        private static bool OpeningEvidenceTouched(ResolvedCasting casting,
+            IReadOnlyDictionary<string, EffectExpression> effectsBySource, HashSet<string> touched,
+            ActiveEffectSnapshot opening)
         {
             EffectExpression payload = DiscoveredEffectLookup.ForAbility(
                 effectsBySource, casting.Ability, casting.SourceId);
-            if (payload == null) return false;
+            if (payload == null || opening == null) return false;
             IEnumerable<string> recipients = casting.TargetMode == CastingTargetMode.DirectTarget
                 ? new[] { casting.DirectTargetUnitId } : casting.PredictedBeneficiaryUnitIds;
             foreach (KeyValuePair<string, bool> role in EffectApplicationLifetime.CasterRelativeRoles(payload))
                 foreach (string unit in role.Value ? new[] { casting.CasterUnitId } : recipients)
                 {
-                    string applier;
-                    if (!string.IsNullOrEmpty(unit) && applied.TryGetValue(unit + "\u001f" + role.Key, out applier) &&
-                        !string.Equals(applier, casting.CasterUnitId, StringComparison.Ordinal))
-                        return true;
+                    if (string.IsNullOrEmpty(unit) || !touched.Contains(unit + "\u001f" + role.Key)) continue;
+                    if (InstancesFor(opening, unit).Any(instance => instance.EffectId == role.Key)) return true;
                 }
             return false;
         }

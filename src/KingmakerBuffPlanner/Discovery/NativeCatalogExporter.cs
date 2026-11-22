@@ -51,119 +51,9 @@ namespace KingmakerBuffPlanner.Discovery
             {
                 try
                 {
-                    DiscoveryScanResult scan = scanner.Scan(adapter.Adapt(ability));
-                    EffectOverrideApplication overrideApplication =
-                        _overrides.Apply(ability.AssetGuid, scan.Expression);
-                    EffectExpression effectiveExpression = overrideApplication.Expression;
-                    bool detected = EffectExpressionAnalysis.ContainsLeaf(effectiveExpression);
-                    string[] accessibilitySources = accessibility.GetSources(ability.AssetGuid);
-                    NativeSpellListRecord[] spellLists = accessibility.GetSpellLists(ability.AssetGuid);
-                    bool candidate = accessibilitySources.Length != 0;
-                    NativeEffectRecord[] effects = GetEffects(effectiveExpression);
-                    var entry = new NativeCatalogEntry
-                    {
-                        AbilityGuid = ability.AssetGuid,
-                        ParentGuid = ability.Parent == null ? string.Empty : ability.Parent.AssetGuid,
-                        VariantGuids = (ability.Variants ?? new BlueprintAbility[0])
-                            .Where(v => v != null).Select(v => v.AssetGuid).ToArray(),
-                        InternalName = ability.name ?? string.Empty,
-                        DisplayName = ability.Name ?? string.Empty,
-                        SourceAssembly = ability.GetType().Assembly.FullName,
-                        Ownership = _ownership.GetOwnership(ability.AssetGuid),
-                        IsSpell = ability.IsSpell,
-                        IsCandidate = candidate,
-                        HasDetectedEffect = detected,
-                        AbilityType = ability.Type.ToString(),
-                        AbilityComponentTypes = (ability.ComponentsArray ?? new BlueprintComponent[0])
-                            .Where(c => c != null).Select(c => c.GetType().FullName)
-                            .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToArray(),
-                        ActionType = ability.ActionType.ToString(),
-                        Range = ability.Range.ToString(),
-                        EffectOnAlly = ability.EffectOnAlly.ToString(),
-                        EffectOnEnemy = ability.EffectOnEnemy.ToString(),
-                        CanTargetSelf = ability.CanTargetSelf,
-                        CanTargetFriends = ability.CanTargetFriends,
-                        CanTargetEnemies = ability.CanTargetEnemies,
-                        CanTargetPoint = ability.CanTargetPoint,
-                        IsStickyTouch = ability.StickyTouch != null,
-                        IsMass = effects.Any(e => e.Target == EffectTarget.Party.ToString() ||
-                            e.Target == EffectTarget.AlliedAreaRecipients.ToString()),
-                        IsArea = effects.Any(e => e.Kind == EffectKind.AreaBuff.ToString() ||
-                            e.Target == EffectTarget.AlliedAreaRecipients.ToString() ||
-                            e.Target == EffectTarget.EnemyAreaRecipients.ToString() ||
-                            e.Target == EffectTarget.AmbiguousAreaRecipients.ToString()),
-                        AccessibilitySources = accessibilitySources,
-                        SpellLists = spellLists,
-                        ResourceIds = (ability.GetResourceIds() ?? new string[0])
-                            .OrderBy(v => v, StringComparer.Ordinal).ToArray(),
-                        MaterialItemGuid = ability.MaterialComponent.Item == null
-                            ? string.Empty : ability.MaterialComponent.Item.AssetGuid,
-                        MaterialCount = ability.MaterialComponent.Item == null
-                            ? 0 : ability.MaterialComponent.Count,
-                        RecognizedActionContracts = effects.Select(e => e.SourceContract)
-                            .Where(v => !string.IsNullOrEmpty(v)).Distinct(StringComparer.Ordinal)
-                            .OrderBy(v => v, StringComparer.Ordinal).ToArray(),
-                        Effects = effects,
-                        SelfGatedFactIds = SelfGatedFactIds(ability),
-                        RestorativeActions = scan.Diagnostics
-                            .Where(d => d.Code == "restorative-action")
-                            .Select(d => new NativeActionRecord
-                            {
-                                Contract = d.NodeIdentity,
-                                Detail = d.Detail,
-                                ActionPath = d.ActionPath
-                            }).ToArray(),
-                        Expression = effectiveExpression,
-                        Diagnostics = scan.Diagnostics.ToArray(),
-                        ManualOverride = overrideApplication.Entry == null
-                            ? string.Empty : overrideApplication.Entry.Disposition + ": " +
-                                overrideApplication.Entry.Reason,
-                        RuntimeEvidence = new string[0]
-                    };
-                    IReadOnlyList<string> allyExceptions = _overrides.AllyDispositionExceptions(ability.AssetGuid);
-                    NativeCandidateAuditFacts facts = AuditFacts(ability, candidate, effects, scan.Diagnostics,
-                        allyExceptions);
-                    NativeCandidateAuditDecision decision = classifier.Classify(facts);
-                    entry.Disposition = decision.Disposition;
-                    entry.SupportClass = decision.SupportClass;
-                    entry.DispositionReason = decision.Reason;
-                    entry.QualificationStatus = decision.QualificationStatus;
-                    entry.DispositionBefore040 = before040.Classify(facts).Disposition;
-                    // Live discovery classifies every ability a party member
-                    // actually has as reachable (KingmakerBuffSourceDiscovery):
-                    // the live scope is that classification, so sources the
-                    // static index cannot reach (the Heal skill's Treat
-                    // Affliction) are audited too.
-                    NativeCandidateAuditFacts live = AuditFacts(ability, true, effects, scan.Diagnostics,
-                        allyExceptions);
-                    NativeCandidateAuditDecision liveDecision = classifier.Classify(live);
-                    entry.LiveDisposition = liveDecision.Disposition;
-                    entry.LiveDispositionReason = liveDecision.Reason;
-                    entry.LiveDispositionBefore040 = before040.Classify(live).Disposition;
-                    entry.Payloads = liveDecision.Payloads.Select(e => e.EffectId).ToArray();
-                    if (overrideApplication.Entry != null)
-                    {
-                        EffectOverrideEntry applied = overrideApplication.Entry;
-                        entry.Disposition = applied.Disposition == "exclude" ? "exclude" :
-                            applied.Disposition == "unsupported-with-reason"
-                                ? "unsupported-with-reason" : "include";
-                        entry.SupportClass = entry.Disposition == "include"
-                            ? "override" : entry.Disposition == "exclude"
-                                ? "excluded-by-override" : "none";
-                        entry.DispositionReason = applied.Reason;
-                        entry.QualificationStatus = entry.Disposition == "include"
-                            ? "DEFER-runtime-qualification" : entry.Disposition == "exclude"
-                                ? "PASS-excluded-by-definition" : "FAIL-unsupported";
-                        // An override decides both scopes under both rule sets.
-                        entry.DispositionBefore040 = entry.Disposition;
-                        entry.LiveDisposition = entry.Disposition;
-                        entry.LiveDispositionReason = entry.DispositionReason;
-                        entry.LiveDispositionBefore040 = entry.Disposition;
-                        entry.Payloads = entry.Disposition == "include"
-                            ? effects.Select(e => e.EffectGuid).Distinct(StringComparer.Ordinal).ToArray()
-                            : new string[0];
-                    }
-                    entries.Add(entry);
+                    entries.Add(BuildEntry(ability, accessibility.GetSources(ability.AssetGuid),
+                        accessibility.GetSpellLists(ability.AssetGuid), classifier, before040, adapter, scanner,
+                        NativeBlueprintLookup.Loaded));
                 }
                 catch (Exception exception)
                 {
@@ -229,6 +119,135 @@ namespace KingmakerBuffPlanner.Discovery
             };
         }
 
+        // One catalogue entry: the ability's facts as the loaded blueprint
+        // (or, in the detached-blueprint regressions, the committed native
+        // blueprint) records them, classified exactly as live discovery
+        // classifies them. Recovery (R12-F1): the serialized diagnostics are
+        // the very diagnostics the classifier consumed (the scan's plus the
+        // on-cast facts), so an audit replaying the export reproduces both
+        // the static and the live verdict.
+        internal NativeCatalogEntry BuildEntry(BlueprintAbility ability, string[] accessibilitySources,
+            NativeSpellListRecord[] spellLists, NativeCandidateClassifier classifier,
+            NativeCandidateClassifier before040, KingmakerActionGraphAdapter adapter, ActionGraphScanner scanner,
+            NativeBlueprintLookup lookup)
+        {
+            DiscoveryScanResult scan = scanner.Scan(adapter.Adapt(ability));
+            EffectOverrideApplication overrideApplication =
+                _overrides.Apply(ability.AssetGuid, scan.Expression);
+            EffectExpression effectiveExpression = overrideApplication.Expression;
+            bool detected = EffectExpressionAnalysis.ContainsLeaf(effectiveExpression);
+            accessibilitySources = accessibilitySources ?? new string[0];
+            spellLists = spellLists ?? new NativeSpellListRecord[0];
+            bool candidate = accessibilitySources.Length != 0;
+            NativeEffectRecord[] effects = GetEffects(effectiveExpression, lookup);
+            DiscoveryDiagnostic[] classified = ClassificationDiagnostics(ability, scan.Diagnostics);
+            var entry = new NativeCatalogEntry
+            {
+                AbilityGuid = ability.AssetGuid,
+                ParentGuid = ability.Parent == null ? string.Empty : ability.Parent.AssetGuid,
+                VariantGuids = (ability.Variants ?? new BlueprintAbility[0])
+                    .Where(v => v != null).Select(v => v.AssetGuid).ToArray(),
+                InternalName = NameOf(ability),
+                DisplayName = DisplayNameOf(ability),
+                SourceAssembly = ability.GetType().Assembly.FullName,
+                Ownership = _ownership.GetOwnership(ability.AssetGuid),
+                IsSpell = ability.IsSpell,
+                IsCandidate = candidate,
+                HasDetectedEffect = detected,
+                AbilityType = ability.Type.ToString(),
+                AbilityComponentTypes = (ability.ComponentsArray ?? new BlueprintComponent[0])
+                    .Where(c => c != null).Select(c => c.GetType().FullName)
+                    .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToArray(),
+                ActionType = ability.ActionType.ToString(),
+                Range = ability.Range.ToString(),
+                EffectOnAlly = ability.EffectOnAlly.ToString(),
+                EffectOnEnemy = ability.EffectOnEnemy.ToString(),
+                CanTargetSelf = ability.CanTargetSelf,
+                CanTargetFriends = ability.CanTargetFriends,
+                CanTargetEnemies = ability.CanTargetEnemies,
+                CanTargetPoint = ability.CanTargetPoint,
+                IsStickyTouch = ability.StickyTouch != null,
+                IsMass = effects.Any(e => e.Target == EffectTarget.Party.ToString() ||
+                    e.Target == EffectTarget.AlliedAreaRecipients.ToString()),
+                IsArea = effects.Any(e => e.Kind == EffectKind.AreaBuff.ToString() ||
+                    e.Target == EffectTarget.AlliedAreaRecipients.ToString() ||
+                    e.Target == EffectTarget.EnemyAreaRecipients.ToString() ||
+                    e.Target == EffectTarget.AmbiguousAreaRecipients.ToString()),
+                AccessibilitySources = accessibilitySources,
+                SpellLists = spellLists,
+                ResourceIds = (ability.GetResourceIds() ?? new string[0])
+                    .OrderBy(v => v, StringComparer.Ordinal).ToArray(),
+                MaterialItemGuid = ability.MaterialComponent.Item == null
+                    ? string.Empty : ability.MaterialComponent.Item.AssetGuid,
+                MaterialCount = ability.MaterialComponent.Item == null
+                    ? 0 : ability.MaterialComponent.Count,
+                RecognizedActionContracts = effects.Select(e => e.SourceContract)
+                    .Where(v => !string.IsNullOrEmpty(v)).Distinct(StringComparer.Ordinal)
+                    .OrderBy(v => v, StringComparer.Ordinal).ToArray(),
+                Effects = effects,
+                SelfGatedFactIds = SelfGatedFactIds(ability),
+                RestorativeActions = scan.Diagnostics
+                    .Where(d => d.Code == "restorative-action")
+                    .Select(d => new NativeActionRecord
+                    {
+                        Contract = d.NodeIdentity,
+                        Detail = d.Detail,
+                        ActionPath = d.ActionPath
+                    }).ToArray(),
+                Expression = effectiveExpression,
+                Diagnostics = classified,
+                OnCastFactsRecorded = true,
+                ManualOverride = overrideApplication.Entry == null
+                    ? string.Empty : overrideApplication.Entry.Disposition + ": " +
+                        overrideApplication.Entry.Reason,
+                RuntimeEvidence = new string[0]
+            };
+            IReadOnlyList<string> allyExceptions = _overrides.AllyDispositionExceptions(ability.AssetGuid);
+            NativeCandidateAuditFacts facts = AuditFacts(ability, candidate, effects, classified,
+                allyExceptions);
+            NativeCandidateAuditDecision decision = classifier.Classify(facts);
+            entry.Disposition = decision.Disposition;
+            entry.SupportClass = decision.SupportClass;
+            entry.DispositionReason = decision.Reason;
+            entry.QualificationStatus = decision.QualificationStatus;
+            entry.DispositionBefore040 = before040.Classify(facts).Disposition;
+            // Live discovery classifies every ability a party member
+            // actually has as reachable (KingmakerBuffSourceDiscovery):
+            // the live scope is that classification, so sources the
+            // static index cannot reach (the Heal skill's Treat
+            // Affliction) are audited too.
+            NativeCandidateAuditFacts live = AuditFacts(ability, true, effects, classified,
+                allyExceptions);
+            NativeCandidateAuditDecision liveDecision = classifier.Classify(live);
+            entry.LiveDisposition = liveDecision.Disposition;
+            entry.LiveDispositionReason = liveDecision.Reason;
+            entry.LiveDispositionBefore040 = before040.Classify(live).Disposition;
+            entry.Payloads = liveDecision.Payloads.Select(e => e.EffectId).ToArray();
+            if (overrideApplication.Entry != null)
+            {
+                EffectOverrideEntry applied = overrideApplication.Entry;
+                entry.Disposition = applied.Disposition == "exclude" ? "exclude" :
+                    applied.Disposition == "unsupported-with-reason"
+                        ? "unsupported-with-reason" : "include";
+                entry.SupportClass = entry.Disposition == "include"
+                    ? "override" : entry.Disposition == "exclude"
+                        ? "excluded-by-override" : "none";
+                entry.DispositionReason = applied.Reason;
+                entry.QualificationStatus = entry.Disposition == "include"
+                    ? "DEFER-runtime-qualification" : entry.Disposition == "exclude"
+                        ? "PASS-excluded-by-definition" : "FAIL-unsupported";
+                // An override decides both scopes under both rule sets.
+                entry.DispositionBefore040 = entry.Disposition;
+                entry.LiveDisposition = entry.Disposition;
+                entry.LiveDispositionReason = entry.DispositionReason;
+                entry.LiveDispositionBefore040 = entry.Disposition;
+                entry.Payloads = entry.Disposition == "include"
+                    ? effects.Select(e => e.EffectGuid).Distinct(StringComparer.Ordinal).ToArray()
+                    : new string[0];
+            }
+            return entry;
+        }
+
         // One exported entry as the 0.4.0 catalogue audit reads it.
         internal static NativeCatalogAuditInput AuditInput(NativeCatalogEntry entry)
         {
@@ -274,7 +293,10 @@ namespace KingmakerBuffPlanner.Discovery
             IEnumerable<NativeEffectRecord> effects, IEnumerable<DiscoveryDiagnostic> diagnostics,
             IEnumerable<string> allyDispositionExceptions = null)
         {
-            DiscoveryDiagnostic[] scanned = (diagnostics ?? new DiscoveryDiagnostic[0]).ToArray();
+            // Recovery (R12-F1): the scan's diagnostics plus the on-cast facts,
+            // the same array a catalogue entry serializes. The contract strings
+            // the older rules match keep reading the scan's own diagnostics.
+            DiscoveryDiagnostic[] scanned = ClassificationDiagnostics(ability, diagnostics);
             return new NativeCandidateAuditFacts
             {
                 AllyDispositionExceptionEffectIds = (allyDispositionExceptions ?? new string[0]).ToArray(),
@@ -293,15 +315,39 @@ namespace KingmakerBuffPlanner.Discovery
                     .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal).ToArray(),
                 Effects = (effects ?? new NativeEffectRecord[0]).Select(EffectFacts).ToArray(),
                 SelfGatedFactIds = SelfGatedFactIds(ability),
-                DiagnosticContracts = scanned.Select(d => d.NodeIdentity + "|" + d.Detail).ToArray(),
+                DiagnosticContracts = ContractStrings(scanned),
                 Diagnostics = scanned.Select(d => new NativeCandidateDiagnosticFacts
                 {
                     Code = d.Code,
                     Contract = d.NodeIdentity,
                     Detail = d.Detail,
                     ActionPath = d.ActionPath
-                }).Concat(OnCastDiagnostics(ability)).ToArray()
+                }).ToArray()
             };
+        }
+
+        // The "contract|detail" strings of the scan's own diagnostics (an
+        // on-cast fact is judged by its code, never by these older contract
+        // rules) - shared with the audit reader of an exported entry.
+        internal static string[] ContractStrings(IEnumerable<DiscoveryDiagnostic> diagnostics)
+        {
+            return (diagnostics ?? new DiscoveryDiagnostic[0])
+                .Where(d => d != null && !string.Equals(d.Code, OnCastActionCode, StringComparison.Ordinal))
+                .Select(d => d.NodeIdentity + "|" + d.Detail).ToArray();
+        }
+
+        // Recovery (R12-F1): the diagnostics classification consumes - the
+        // scan's own and the on-cast facts (OnCastDiagnostics) - as one
+        // serializable array. Idempotent: an array that already carries the
+        // on-cast facts is returned as it is.
+        internal static DiscoveryDiagnostic[] ClassificationDiagnostics(BlueprintAbility ability,
+            IEnumerable<DiscoveryDiagnostic> scanned)
+        {
+            DiscoveryDiagnostic[] diagnostics = (scanned ?? new DiscoveryDiagnostic[0]).Where(d => d != null).ToArray();
+            if (diagnostics.Any(d => string.Equals(d.Code, OnCastActionCode, StringComparison.Ordinal)))
+                return diagnostics;
+            return diagnostics.Concat(OnCastDiagnostics(ability).Select(d =>
+                new DiscoveryDiagnostic(d.Code, d.Contract, d.Detail, d.ActionPath))).ToArray();
         }
 
         internal const string OnCastActionCode = "on-cast-action";
@@ -312,7 +358,42 @@ namespace KingmakerBuffPlanner.Discovery
         // A non-empty list that does anything beyond presentation (or cannot be
         // read) is reported, so the whole-cast exceptions refuse the ability;
         // the discovered graph itself is unchanged.
+        // Recovery (R11-F1): an empty scan is no proof of harmlessness when an
+        // ability is referenced - the adapter reads a referenced ability's run
+        // action or delivery only, never its own on-cast actions. So an on-cast
+        // list that references another ability is itself unproved, and every
+        // ability the cast's run graph references is held to the same on-cast
+        // rule as the cast (its own on-cast lists must be empty or
+        // presentation only). Nothing is simulated recursively: a reference
+        // inside an on-cast list is refused outright.
         private static IEnumerable<NativeCandidateDiagnosticFacts> OnCastDiagnostics(BlueprintAbility ability)
+        {
+            var result = new List<NativeCandidateDiagnosticFacts>();
+            result.AddRange(OnCastListDiagnostics(ability, "on-cast", string.Empty));
+            IReadOnlyList<BlueprintAbility> referenced;
+            try
+            {
+                var adapter = new KingmakerActionGraphAdapter();
+                adapter.Adapt(ability);
+                referenced = adapter.ReferencedAbilities;
+            }
+            catch (Exception exception)
+            {
+                result.Add(OnCastFact("references-unreadable:" + exception.GetType().Name, "on-cast"));
+                return result;
+            }
+            foreach (BlueprintAbility child in referenced)
+                if (child != null && !ReferenceEquals(child, ability))
+                    result.AddRange(OnCastListDiagnostics(child, "reference:" + child.AssetGuid + "/on-cast",
+                        "referenced-ability:" + child.AssetGuid + ";"));
+            return result;
+        }
+
+        // One ability's own AbilityExecuteActionOnCast lists: an unproved list
+        // (anything beyond presentation, an applied effect, a referenced
+        // ability, or an unreadable list) yields one on-cast fact.
+        private static IEnumerable<NativeCandidateDiagnosticFacts> OnCastListDiagnostics(BlueprintAbility ability,
+            string path, string prefix)
         {
             var result = new List<NativeCandidateDiagnosticFacts>();
             foreach (BlueprintComponent component in ability.ComponentsArray ?? new BlueprintComponent[0])
@@ -324,28 +405,36 @@ namespace KingmakerBuffPlanner.Discovery
                 {
                     if (onCast.Actions == null || onCast.Actions.Actions == null || onCast.Actions.Actions.Length == 0)
                         continue;
-                    DiscoveryScanResult scan = new ActionGraphScanner().Scan(
-                        new KingmakerActionGraphAdapter().AdaptActions(onCast.Actions));
+                    var adapter = new KingmakerActionGraphAdapter();
+                    DiscoveryScanResult scan = new ActionGraphScanner().Scan(adapter.AdaptActions(onCast.Actions));
                     string[] unsafeDiagnostics = scan.Diagnostics
                         .Where(d => !IsPresentationOnly(d.NodeIdentity))
                         .Select(d => d.Code + ":" + d.NodeIdentity).Distinct(StringComparer.Ordinal).ToArray();
                     bool applies = EffectExpressionAnalysis.ContainsLeaf(scan.Expression);
-                    if (unsafeDiagnostics.Length == 0 && !applies) continue;
-                    detail = string.Join(",", unsafeDiagnostics) + (applies ? ";applies-effects" : string.Empty);
+                    string[] references = adapter.ReferencedAbilities.Where(value => value != null)
+                        .Select(value => "references-ability:" + value.AssetGuid).Distinct(StringComparer.Ordinal).ToArray();
+                    if (unsafeDiagnostics.Length == 0 && !applies && references.Length == 0) continue;
+                    detail = string.Join(",", unsafeDiagnostics.Concat(references).ToArray()) +
+                        (applies ? ";applies-effects" : string.Empty);
                 }
                 catch (Exception exception)
                 {
                     detail = "unreadable:" + exception.GetType().Name;
                 }
-                result.Add(new NativeCandidateDiagnosticFacts
-                {
-                    Code = OnCastActionCode,
-                    Contract = typeof(AbilityExecuteActionOnCast).FullName,
-                    Detail = detail,
-                    ActionPath = "on-cast"
-                });
+                result.Add(OnCastFact(prefix + detail, path));
             }
             return result;
+        }
+
+        private static NativeCandidateDiagnosticFacts OnCastFact(string detail, string path)
+        {
+            return new NativeCandidateDiagnosticFacts
+            {
+                Code = OnCastActionCode,
+                Contract = typeof(AbilityExecuteActionOnCast).FullName,
+                Detail = detail,
+                ActionPath = path
+            };
         }
 
         private static NativeCandidateEffectFacts EffectFacts(NativeEffectRecord e)
@@ -535,6 +624,20 @@ namespace KingmakerBuffPlanner.Discovery
         private static string NativeName(UnityEngine.Object value)
         {
             return value.name ?? string.Empty;
+        }
+
+        // The localized display name (report identity only; unreadable
+        // outside the running game, as above).
+        private static string DisplayNameOf(BlueprintAbility ability)
+        {
+            try { return NativeDisplayName(ability); }
+            catch (Exception) { return string.Empty; }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static string NativeDisplayName(BlueprintAbility ability)
+        {
+            return ability.Name ?? string.Empty;
         }
 
         private static NativeEffectRecord[] GetEffects(EffectExpression expression, bool withFactActions,
@@ -744,6 +847,11 @@ namespace KingmakerBuffPlanner.Discovery
         // rc4 (review finding 1): the facts the ability forbids its own
         // target or caster to have (cooldowns and lockouts).
         [JsonProperty("selfGatedFactIds", Order = 44)] public string[] SelfGatedFactIds { get; set; }
+        // Missing-beneficial-buffs recovery (R12-F1): this entry's diagnostics
+        // include the on-cast facts the classifier consumed. Exports written
+        // before this field existed lack them: an audit of such an export
+        // cannot reconstruct an on-cast-dependent verdict and says so.
+        [JsonProperty("onCastFactsRecorded", Order = 45)] public bool OnCastFactsRecorded { get; set; }
     }
 
     internal sealed class NativeEffectRecord

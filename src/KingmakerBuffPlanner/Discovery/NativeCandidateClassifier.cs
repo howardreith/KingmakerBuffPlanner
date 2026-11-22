@@ -234,7 +234,7 @@ namespace KingmakerBuffPlanner.Discovery
             if (AuditRules && IsPersonalRange(facts) && facts.CanTargetEnemies &&
                 (string.Equals(facts.EffectOnEnemy, "Harmful", StringComparison.Ordinal) || !facts.CanTargetFriends) &&
                 effects.Any(e => e.Target == "CurrentTarget" || e.Target == "Caster") &&
-                (effects.Any(ImposesHarm) || HasUnsafeAction(facts)))
+                (effects.Any(UnsafeForWholeCast) || HasUnsafeAction(facts)))
                 return Exclude("harmful-only",
                     "A Personal-range ability flagged against enemies also harms its own caster (a harmful or penalty-only application, or an unsafe or unread action).");
 
@@ -513,7 +513,7 @@ namespace KingmakerBuffPlanner.Discovery
             // applied buff whose blueprint was not read is unproved. A buff
             // granted as a separate ability (Firebelly's breath, AddFacts)
             // is not an automatic application.
-            if (effects.Any(e => ImposesHarm(e) || AppliesUnreadEffect(e))) return true;
+            if (effects.Any(e => UnsafeForWholeCast(e) || AppliesUnreadEffect(e))) return true;
             // Review R6 (R5-F2): the waiver's own safety decision applies to
             // every automatic application too - receiving the approved buff
             // must not apply anything that is not itself an approved payload
@@ -539,6 +539,34 @@ namespace KingmakerBuffPlanner.Discovery
                 .SelectMany(list => list.AppliedEffects ?? new NativeCandidateEffectFacts[0])
                 .Any(applied => applied != null &&
                     (applied.Harmful == true || IsHarmfulCondition(applied) || IsPenaltyOnly(applied)));
+        }
+
+        // Missing-beneficial-buffs recovery (R12-F5, R12-F6): what the three
+        // whole-cast admissions (the unit-anchored allied burst, the
+        // ally-disposition waiver, the Personal rescue) refuse in an applied
+        // effect - beside harm (ImposesHarm):
+        // - a directly imposed harmful condition (a Daze beside a benefit on
+        //   the same buff: the all-components condition heuristic would let
+        //   the benefit hide it; a modifier penalty or a size change is not a
+        //   condition and is judged as before);
+        // - an automatic restorative action (a removal, heal or dispel) in
+        //   the buff's own Activated / NewRound / Deactivated lists: the
+        //   export records it by action type only, so the planner's effect
+        //   model cannot account for what it removes.
+        // The same holds for a buff those automatic lists apply.
+        private static bool UnsafeForWholeCast(NativeCandidateEffectFacts effect)
+        {
+            if (effect == null) return false;
+            if (ImposesHarm(effect) || ImposesHarmfulCondition(effect)) return true;
+            IReadOnlyList<NativeCandidateFactActions> lists = effect.FactActions ?? new NativeCandidateFactActions[0];
+            return lists.Any(list => (list.Restorative ?? new string[0]).Count != 0) ||
+                lists.SelectMany(list => list.AppliedEffects ?? new NativeCandidateEffectFacts[0])
+                    .Any(applied => applied != null && ImposesHarmfulCondition(applied));
+        }
+
+        private static bool ImposesHarmfulCondition(NativeCandidateEffectFacts effect)
+        {
+            return (effect.GrantedConditions ?? new string[0]).Any(HarmfulConditions.Contains);
         }
 
         // Review R6 (R5-F1): a buff whose every mechanic is a native modifier
@@ -653,7 +681,7 @@ namespace KingmakerBuffPlanner.Discovery
             // beneficial buff), although later rules would drop that leaf
             // from the payload list - the cast still executes it.
             return (facts.CanTargetSelf || facts.CanTargetFriends) && !facts.CanTargetEnemies &&
-                !facts.IsStickyTouch && !HasUnsafeAction(facts) && !effects.Any(ImposesHarm) &&
+                !facts.IsStickyTouch && !HasUnsafeAction(facts) && !effects.Any(UnsafeForWholeCast) &&
                 components.Any(value => ShortName(value) == "AbilityTargetsAround") &&
                 effects.Count != 0 &&
                 effects.All(effect => effect != null && effect.Kind == "Buff" &&

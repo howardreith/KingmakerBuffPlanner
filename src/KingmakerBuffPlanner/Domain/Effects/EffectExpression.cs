@@ -171,6 +171,15 @@ namespace KingmakerBuffPlanner.Domain.Effects
         // earlier removal or justify a structural "already granted").
         public IReadOnlyList<KeyValuePair<string, string>> Guaranteed { get; private set; }
 
+        // Missing-beneficial-buffs recovery (R10-F1): the same changes on a
+        // unit the casting only possibly reaches - whatever it may apply or
+        // remove there stays possible, nothing is certain (an application
+        // never restores an earlier removal; a removal is never certain).
+        public EffectChanges Possible()
+        {
+            return new EffectChanges(Applied, Removed);
+        }
+
         public static EffectChanges Merge(IEnumerable<EffectChanges> parts)
         {
             List<EffectChanges> list = (parts ?? new EffectChanges[0]).Where(p => p != null).ToList();

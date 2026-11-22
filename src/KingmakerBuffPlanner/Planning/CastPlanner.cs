@@ -92,10 +92,13 @@ namespace KingmakerBuffPlanner.Planning
             // Despair an earlier step cleared).
             var recipients = new SequentialRecipientState(false);
             recipients.EnterRoutine(string.Empty);
-            // Review R10 (R8-F1): "<unit>\u001f<effect>" -> the caster whose
-            // funded step in this routine applied that caster-relative effect
+            // Review R10 (R8-F1): "<unit>\u001f<effect>" -> the casters whose
+            // funded steps in this routine applied that caster-relative effect
             // there (a later skip on another caster's instance is withheld).
-            var overwritten = new Dictionary<string, string>(StringComparer.Ordinal);
+            // Recovery (R8-F1): every applier is kept, so once another caster
+            // may have replaced an instance, a later step by its own caster
+            // does not restore it as evidence.
+            var overwritten = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
             // Allocation order is the routine-wide explicit assignment order
             // with stable final tie-breakers; catalog sorting and dictionary
             // iteration order cannot influence it.
@@ -112,6 +115,13 @@ namespace KingmakerBuffPlanner.Planning
                 List<ProviderPlanningOption> sourceOptions = _targeting.Resolve(
                     snapshot, request, options, enhancementList)
                     .Select(option => recipients.Reevaluate(option, request.Source.Effects)).ToList();
+                // Recovery (R12-F3): provider permission is decided before the
+                // existing-effect decision, as allocation decides it: a banned
+                // provider neither vetoes a skip nor defines what a skip
+                // protects. (Resources are not permission: an enabled caster
+                // with no slot left still satisfies with its active effect.)
+                List<ProviderPlanningOption> permittedOptions = sourceOptions.Where(option =>
+                    !selectionPolicy.BannedProviderKeys.Contains(option.Provider.Key.Canonical)).ToList();
                 foreach (string targetId in request.TargetUnitIds)
                 {
                     UnitSnapshot unit;
@@ -128,7 +138,7 @@ namespace KingmakerBuffPlanner.Planning
                     }
                     if (request.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive)
                     {
-                        EffectPresenceResult presence = ClassicPresence(request, sourceOptions,
+                        EffectPresenceResult presence = ClassicPresence(request, permittedOptions,
                             activeEffects, targetId, ignored, recipients, overwritten);
                         if (presence.Kind == EffectPresenceKind.Complete)
                         {
@@ -136,7 +146,7 @@ namespace KingmakerBuffPlanner.Planning
                             // this routine removes is not satisfied.
                             // Review R9 (R8-F4): it relies on (and protects)
                             // exactly the branch that established it.
-                            EffectChanges kept = ClassicKept(request, sourceOptions, targetId);
+                            EffectChanges kept = ClassicKept(request, permittedOptions, targetId);
                             string removedBy = removals.RemovedByEarlier(string.Empty, kept);
                             if (removedBy != null)
                             {
@@ -181,7 +191,7 @@ namespace KingmakerBuffPlanner.Planning
         private EffectPresenceResult ClassicPresence(BuffCastRequest request,
             IReadOnlyList<ProviderPlanningOption> sourceOptions, ActiveEffectSnapshot activeEffects,
             string targetId, ISet<string> ignored, SequentialRecipientState recipients,
-            IDictionary<string, string> overwritten)
+            IDictionary<string, HashSet<string>> overwritten)
         {
             ISet<ActiveEffectMarker> markers = activeEffects.GetEffects(targetId);
             List<EffectLeafExpression> leaves = EffectApplicationLifetime.Leaves(request.Source.Effects).ToList();
@@ -191,8 +201,12 @@ namespace KingmakerBuffPlanner.Planning
             EffectPresenceResult first = null;
             foreach (ProviderPlanningOption option in candidates)
             {
+                // Recovery (R9-F4): bound to the target's known state at this
+                // point of the routine (fixed facts and every read or
+                // projected mutable buff predicate); a genuinely unread
+                // predicate stays unresolved.
                 EffectExpression bound = option == null ? request.Source.Effects
-                    : option.BindForRecipient(request.Source.Effects, targetId);
+                    : BindKnownState(option, request.Source.Effects, targetId);
                 // Review R9 (R8-F4): a skip that depends on the target's
                 // relation to the caster needs that relation read and friendly;
                 // an unread relation (a target outside every measured disk) or a
@@ -205,7 +219,7 @@ namespace KingmakerBuffPlanner.Planning
                     (option != null && EffectRecipientFactBinding.HostileOnPath(
                         option.BindEffects(request.Source.Effects, targetId),
                         key => RecipientFactGate.IsRelation(key) ? option.RecipientFactRead(targetId, key)
-                            : FixedFact(option, targetId, key))))
+                            : FixedFact(option, targetId, key) ?? option.RecipientFactRead(targetId, key))))
                     return new EffectPresenceResult(EffectPresenceKind.Absent, new string[0]);
                 string caster = option == null ? request.CasterUnitId : option.Provider.Key.CasterUnitId;
                 EffectPresenceResult result = _presence.EvaluateScoped(bound, (leaf, role) =>
@@ -230,9 +244,9 @@ namespace KingmakerBuffPlanner.Planning
                     // Review R10 (R8-F1): another caster's funded application
                     // earlier in this routine may have replaced the instance
                     // (coexistence unverified): no skip.
-                    string applier;
-                    if (overwritten.TryGetValue(targetId + "\u001f" + leaf.EffectId, out applier) &&
-                        !string.Equals(applier, caster, StringComparison.Ordinal))
+                    HashSet<string> appliers;
+                    if (overwritten.TryGetValue(targetId + "\u001f" + leaf.EffectId, out appliers) &&
+                        appliers.Any(applier => !string.Equals(applier, caster, StringComparison.Ordinal)))
                         return false;
                     // Review R9-F5: and only a readable, effective (not
                     // suppressed) instance of that caster.
@@ -245,6 +259,21 @@ namespace KingmakerBuffPlanner.Planning
                 if (first == null) first = result;
             }
             return first;
+        }
+
+        // Recovery (R9-F4): the expression as it acts on the target at this
+        // point of the routine - the provider binding, its fixed facts, then
+        // every non-relation recipient fact the option read or the routine's
+        // earlier funded steps left known (a re-evaluated option carries that
+        // state as its reads). Relations stay for the relation checks; an
+        // unknown predicate stays unresolved.
+        private static EffectExpression BindKnownState(ProviderPlanningOption option, EffectExpression expression,
+            string targetId)
+        {
+            bool unresolved;
+            return EffectRecipientFactBinding.Bind(option.BindForRecipient(expression, targetId),
+                key => RecipientFactGate.IsRelation(key) ? null : option.RecipientFactRead(targetId, key),
+                out unresolved);
         }
 
         // A fixed recipient fact the option read for the unit (creature type,
@@ -267,7 +296,7 @@ namespace KingmakerBuffPlanner.Planning
             if (sourceOptions.Count == 0)
                 return EffectChangeAnalysis.Analyze(request.Source.Effects, request.CasterUnitId, targetId);
             return EffectChanges.Merge(sourceOptions.Select(option => EffectChangeAnalysis.Analyze(
-                option.BindForRecipient(request.Source.Effects, targetId), option.Provider.Key.CasterUnitId,
+                BindKnownState(option, request.Source.Effects, targetId), option.Provider.Key.CasterUnitId,
                 targetId)));
         }
 
@@ -289,7 +318,8 @@ namespace KingmakerBuffPlanner.Planning
             internal ExplicitCastingCompiler.RemovalConflictState Removals =
                 new ExplicitCastingCompiler.RemovalConflictState();
             internal SequentialRecipientState Recipients = new SequentialRecipientState(false);
-            internal Dictionary<string, string> Overwritten = new Dictionary<string, string>(StringComparer.Ordinal);
+            internal Dictionary<string, HashSet<string>> Overwritten =
+                new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
             // The removal conflict that refused a candidate on every centre.
             internal string RemovalConflict;
             // Whether some candidate had a conflict-free centre (then a
@@ -333,7 +363,13 @@ namespace KingmakerBuffPlanner.Planning
             if (effects.Count == 0) return;
             foreach (string unit in reached.Distinct(StringComparer.Ordinal))
                 foreach (string effect in effects)
-                    context.Overwritten[unit + "\u001f" + effect] = option.Provider.Key.CasterUnitId;
+                {
+                    HashSet<string> appliers;
+                    if (!context.Overwritten.TryGetValue(unit + "\u001f" + effect, out appliers))
+                        context.Overwritten[unit + "\u001f" + effect] = appliers =
+                            new HashSet<string>(StringComparer.Ordinal);
+                    appliers.Add(option.Provider.Key.CasterUnitId);
+                }
         }
 
         private static void PlanPerTarget(PlanContext context, IEnumerable<string> pending)
@@ -372,7 +408,8 @@ namespace KingmakerBuffPlanner.Planning
                 context.Removals.Admit(string.Empty, request.AssignmentId,
                     StepChanges(request, selection.Option, new[] { targetId }));
                 context.Recipients.Record(selection.Option, request.Source.Effects,
-                    recipients.Concat(new[] { targetId }), selection.Option.Provider.Key.CasterUnitId);
+                    recipients.Concat(new[] { targetId }), selection.Option.Provider.Key.CasterUnitId,
+                    selection.Anchor);
                 RecordCasterRelative(context, selection.Option, recipients.Concat(new[] { targetId }));
                 context.Outcomes.Add(new TargetPlanOutcome(request.Source.SourceId,
                     request.AssignmentId, targetId, TargetOutcomeKind.Fulfilled,
@@ -427,12 +464,12 @@ namespace KingmakerBuffPlanner.Planning
                     EnhancementUsage(selection.AppliedEnhancementIds, context.Enhancements),
                     selection.OmittedEnhancementIds));
                 context.Removals.Admit(string.Empty, request.AssignmentId, StepChanges(request,
-                    selection.Option, selection.Option.AffectedTargetIdsForAnchor(selection.Anchor)));
+                    selection.Option, selection.Option.AffectedTargetIdsForAnchor(selection.Anchor), selection.Anchor));
                 // Review R9 (R8-F3): every unit the step reaches enters the
                 // routine's recipient state.
                 context.Recipients.Record(selection.Option, request.Source.Effects,
                     recipients.Concat(selection.Option.AffectedTargetIdsForAnchor(selection.Anchor)),
-                    selection.Option.Provider.Key.CasterUnitId);
+                    selection.Option.Provider.Key.CasterUnitId, selection.Anchor);
                 RecordCasterRelative(context, selection.Option,
                     recipients.Concat(selection.Option.AffectedTargetIdsForAnchor(selection.Anchor)));
                 foreach (string targetId in covered)
@@ -504,26 +541,24 @@ namespace KingmakerBuffPlanner.Planning
                 option.LegalAnchorIds.Count != 0 &&
                 required.Any(id => option.ReachableTargetIds.Contains(id)) &&
                 IsUnderCap(option.Provider.Key.Canonical, context.Policy, context.CastsByProvider));
-            foreach (ProviderPlanningOption option in candidates
-                .OrderBy(o => Priority(o, context.Policy))
-                .ThenByDescending(o => allRemaining.All(id => o.ReachableTargetIds.Contains(id)))
-                .ThenByDescending(o => allRemaining.Count(id => o.ReachableTargetIds.Contains(id)))
-                .ThenByDescending(o => o.EffectiveCasterLevel)
-                .ThenByDescending(o => o.ExpectedDurationRounds)
-                .ThenBy(o => ResourceRank(context.PoolKinds[o.Provider.ResourcePoolKey]))
-                .ThenBy(o => o.Provider.Key.Canonical, StringComparer.Ordinal))
+            // Recovery (R11-F2): each permitted candidate's best feasible
+            // single cast - its enhancement set and its best legal centre
+            // whose cast removes nothing an earlier step provides - is decided
+            // BEFORE any reservation, and equally prioritized candidates are
+            // compared by what that one cast covers (a bard whose single disk
+            // covers both requested allies beats one that needs a disk each).
+            // Explicit priorities and pins still decide first; the union of a
+            // provider's reachable units only breaks ties after that.
+            var assessed = candidates.Select(option =>
             {
-                EnhancementSetResolution enhancements = ResolveEnhancementSet(context, option);
-                if (!enhancements.Available)
-                    continue;
+                var candidate = new CandidateCast { Option = option, Enhancements = ResolveEnhancementSet(context, option) };
+                if (!candidate.Enhancements.Available) return candidate;
                 // R1-F5 / review R2-F4: the best legal centre whose cast
                 // does NOT remove an effect an earlier step of this routine
                 // provides; a conflicting centre is skipped before anything
                 // is reserved, and only when every centre conflicts is the
                 // candidate refused (with the conflict named).
-                string anchor = null;
-                string firstConflict = null;
-                foreach (string candidate in option.LegalAnchorIds
+                foreach (string centre in option.LegalAnchorIds
                     .Where(value => option.CoveredTargetIdsForAnchor(value)
                         .Any(id => required.Contains(id)))
                     // Review R11-F2: the centre covering the most outstanding
@@ -537,14 +572,37 @@ namespace KingmakerBuffPlanner.Planning
                 {
                     string conflict = context.Removals.RemovesProvided(string.Empty, StepChanges(request, option,
                         request.Source.Grouping == CastGroupingKind.MassConfiguredTargets
-                            ? option.AffectedTargetIdsForAnchor(candidate) : (IEnumerable<string>)required));
-                    if (conflict == null) { anchor = candidate; break; }
-                    firstConflict = firstConflict ?? conflict;
+                            ? option.AffectedTargetIdsForAnchor(centre) : (IEnumerable<string>)required,
+                        request.Source.Grouping == CastGroupingKind.MassConfiguredTargets ? centre : null));
+                    if (conflict == null)
+                    {
+                        candidate.Anchor = centre;
+                        candidate.Coverage = option.CoveredTargetIdsForAnchor(centre).Count(id => allRemaining.Contains(id));
+                        break;
+                    }
+                    candidate.FirstConflict = candidate.FirstConflict ?? conflict;
                 }
+                return candidate;
+            }).ToList();
+            foreach (CandidateCast candidate in assessed
+                .OrderBy(c => Priority(c.Option, context.Policy))
+                .ThenByDescending(c => c.Coverage)
+                .ThenByDescending(c => allRemaining.All(id => c.Option.ReachableTargetIds.Contains(id)))
+                .ThenByDescending(c => allRemaining.Count(id => c.Option.ReachableTargetIds.Contains(id)))
+                .ThenByDescending(c => c.Option.EffectiveCasterLevel)
+                .ThenByDescending(c => c.Option.ExpectedDurationRounds)
+                .ThenBy(c => ResourceRank(context.PoolKinds[c.Option.Provider.ResourcePoolKey]))
+                .ThenBy(c => c.Option.Provider.Key.Canonical, StringComparer.Ordinal))
+            {
+                ProviderPlanningOption option = candidate.Option;
+                EnhancementSetResolution enhancements = candidate.Enhancements;
+                if (!enhancements.Available)
+                    continue;
+                string anchor = candidate.Anchor;
                 if (string.IsNullOrWhiteSpace(anchor))
                 {
                     // Every centre of this candidate conflicts.
-                    context.RemovalConflict = context.RemovalConflict ?? firstConflict;
+                    context.RemovalConflict = context.RemovalConflict ?? candidate.FirstConflict;
                     continue;
                 }
                 // Review R3-F5: a safe centre exists, so a later refusal is a
@@ -569,6 +627,16 @@ namespace KingmakerBuffPlanner.Planning
                     enhancements.AppliedIds, enhancements.OmittedIds);
             }
             return null;
+        }
+
+        // One candidate provider's best feasible single cast (recovery R11-F2).
+        private sealed class CandidateCast
+        {
+            internal ProviderPlanningOption Option;
+            internal EnhancementSetResolution Enhancements;
+            internal string Anchor;
+            internal string FirstConflict;
+            internal int Coverage;
         }
 
         // Required-by-default enhancement policy with a documented
@@ -622,12 +690,20 @@ namespace KingmakerBuffPlanner.Planning
 
         // What one Classic step may apply and realizably remove on its
         // recipients, from the option's own binding (as execution uses).
+        // Recovery (R10-F1, R9-F5): a unit a mass step's centre only possibly
+        // reaches contributes possible changes only (its reapplication never
+        // restores an earlier removal).
         private static EffectChanges StepChanges(BuffCastRequest request, ProviderPlanningOption option,
-            IEnumerable<string> recipients)
+            IEnumerable<string> recipients, string massAnchor = null)
         {
             return EffectChanges.Merge((recipients ?? new string[0]).Select(recipient =>
-                EffectChangeAnalysis.Analyze(option.BindForRecipient(request.Source.Effects, recipient),
-                    option.Provider.Key.CasterUnitId, recipient)));
+            {
+                EffectChanges analyzed = EffectChangeAnalysis.Analyze(
+                    option.BindForRecipient(request.Source.Effects, recipient),
+                    option.Provider.Key.CasterUnitId, recipient);
+                return massAnchor == null || option.ReachesDefinitely(massAnchor, recipient)
+                    ? analyzed : analyzed.Possible();
+            }));
         }
 
         private static void RecordFailedDemand(PlanContext context)

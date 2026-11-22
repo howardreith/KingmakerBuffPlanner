@@ -204,6 +204,8 @@ namespace KingmakerBuffPlanner.Tests
         {
             foreach (KeyValuePair<string, Action> regression in MbbRegressions)
                 Run(regression.Key, regression.Value);
+            RunMissingBeneficialBuffsRecoveryTests();
+            RunMissingBeneficialBuffsRecoveryExportTests();
             RunExplicit("evidence-native-fixtures-missing-beneficial-buffs-capture", CaptureMbbFixtures);
             RunExplicit("evidence-native-fixtures-missing-beneficial-buffs-verify", VerifyMbbFixtures);
         }
@@ -5203,8 +5205,8 @@ namespace KingmakerBuffPlanner.Tests
             string conditionedReason = resolver.LastFailureReason;
             SetNative(selector, "m_Condition", null);
             AlliedAreaCoverage unreadSelector = resolver.Resolve(blueprint, blueprint);
-            MbbExpect(conditioned == null && conditionedReason == KingmakerAreaCoverageResolver.ConditionedPointSelector &&
-                unreadSelector == null && resolver.LastFailureReason == KingmakerAreaCoverageResolver.UnreadPointSelector,
+            MbbExpect(conditioned == null && conditionedReason == KingmakerAreaCoverageResolver.ConditionedAreaSelector &&
+                unreadSelector == null && resolver.LastFailureReason == KingmakerAreaCoverageResolver.UnreadAreaSelector,
                 "A point-capable selector with its own or an unread condition still produced coverage.");
             ProviderTargetingDecision withheld = ProviderTargetingPlanner.Decide(provider, expression,
                 group.Snapshot.Units, true, false, conditioned, id => true, MbbDistance(positions));

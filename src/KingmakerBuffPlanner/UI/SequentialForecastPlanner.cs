@@ -254,7 +254,7 @@ namespace KingmakerBuffPlanner.UI
                             }
                     EffectChanges stepChanges = StepChanges(step, stepOption, analyzed);
                     sequenceChanges.Record(stepOption, analyzed, StepReached(step, stepOption),
-                        step.Provider.CasterUnitId);
+                        step.Provider.CasterUnitId, step.MassCast ? step.AnchorUnitId : null);
                     foreach (KeyValuePair<string, string> removal in stepChanges.Removed)
                     {
                         HashSet<ActiveEffectMarker> markers;
@@ -388,13 +388,20 @@ namespace KingmakerBuffPlanner.UI
         // The step's provider-bound net changes: owner unit -> effect pairs it
         // may apply, certainly leaves applied, and may remove (any realizable
         // branch; a certain later re-application on the same path cancels).
+        // Missing-beneficial-buffs recovery (R10-F1, R9-F5): a unit the mass
+        // step's centre only possibly reaches contributes possible changes.
         private static EffectChanges StepChanges(CastStep step, ProviderPlanningOption option,
             EffectExpression analyzed)
         {
+            string anchor = step.MassCast ? step.AnchorUnitId : null;
             return EffectChanges.Merge(StepReached(step, option).Select(recipient =>
-                EffectChangeAnalysis.Analyze(option == null ? analyzed
+            {
+                EffectChanges changes = EffectChangeAnalysis.Analyze(option == null ? analyzed
                     : option.BindForRecipient(analyzed, recipient),
-                    step.Provider.CasterUnitId, recipient)));
+                    step.Provider.CasterUnitId, recipient);
+                return option == null || anchor == null || option.ReachesDefinitely(anchor, recipient)
+                    ? changes : changes.Possible();
+            }));
         }
 
         // Every unit a step reaches: its recipients and, for a group step,

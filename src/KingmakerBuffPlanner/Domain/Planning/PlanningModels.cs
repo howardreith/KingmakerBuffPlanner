@@ -282,10 +282,21 @@ namespace KingmakerBuffPlanner.Domain.Planning
             IDictionary<string, IEnumerable<string>> affectedIdsByAnchor = null,
             IDictionary<string, IReadOnlyDictionary<string, bool>> fixedRecipientFacts = null,
             IDictionary<string, IReadOnlyDictionary<string, bool>> recipientFactReads = null,
-            bool requiresAllyRelation = false)
+            bool requiresAllyRelation = false,
+            IDictionary<string, IEnumerable<string>> uncertainIdsByAnchor = null)
         {
             Provider = provider ?? throw new ArgumentNullException("provider");
             RequiresAllyRelation = requiresAllyRelation;
+            // Missing-beneficial-buffs recovery (R9-F5): the units an anchor's
+            // burst may reach although that was not established (the live
+            // distance from the centre could not be read). They are among the
+            // affected units, so anything they might lose or have replaced is
+            // accounted for, but nothing becomes certain on them.
+            var uncertain = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, IEnumerable<string>> pair in uncertainIdsByAnchor ??
+                new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal))
+                if (!string.IsNullOrWhiteSpace(pair.Key)) uncertain[pair.Key] = Sorted(pair.Value);
+            UncertainIdsByAnchor = new ReadOnlyDictionary<string, IReadOnlyList<string>>(uncertain);
             FixedRecipientFacts = CopyFacts(fixedRecipientFacts);
             RecipientFactReads = CopyFacts(recipientFactReads);
             // Missing-beneficial-buffs review R3-F1: every unit an anchor's
@@ -360,6 +371,33 @@ namespace KingmakerBuffPlanner.Domain.Planning
 
         public IReadOnlyDictionary<string, IReadOnlyList<string>> AffectedIdsByAnchor { get; private set; }
 
+        // Missing-beneficial-buffs recovery (R9-F5): the affected units whose
+        // reach from an anchor is possible but not established.
+        public IReadOnlyDictionary<string, IReadOnlyList<string>> UncertainIdsByAnchor { get; private set; }
+
+        // Missing-beneficial-buffs recovery (R9-F5, R10-F1): whether the
+        // native actions cast from the anchor certainly reach the unit - its
+        // distance was measured inside the burst and, under an Ally-only
+        // selector, its relation to the caster was read as allied. A unit only
+        // possibly reached may lose or have replaced what it has (invalidation
+        // and removals count it); what the cast applies there is never certain
+        // (no restored removal, no granted coverage, no replacement evidence).
+        public bool ReachesDefinitely(string anchorUnitId, string unitId)
+        {
+            if (string.IsNullOrEmpty(unitId)) return false;
+            if (RequiresAllyRelation && RecipientFactRead(unitId, RecipientFactGate.AllyOfCaster) != true) return false;
+            IReadOnlyList<string> uncertain;
+            return string.IsNullOrWhiteSpace(anchorUnitId) ||
+                !UncertainIdsByAnchor.TryGetValue(anchorUnitId, out uncertain) || !uncertain.Contains(unitId);
+        }
+
+        // The uncertain-reach map in the constructor's shape (for copies).
+        public IDictionary<string, IEnumerable<string>> UncertainCopy()
+        {
+            return UncertainIdsByAnchor.ToDictionary(pair => pair.Key, pair => (IEnumerable<string>)pair.Value,
+                StringComparer.Ordinal);
+        }
+
         // Review R4-F3: fixed facts (creature types, never a buff a casting
         // can add or remove) read for units inside the option's bursts.
         public IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>> FixedRecipientFacts { get; private set; }
@@ -432,7 +470,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 FixedRecipientFacts.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
                 recipientFactReads ??
                     RecipientFactReads.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
-                RequiresAllyRelation);
+                RequiresAllyRelation, UncertainCopy());
         }
 
         // The units an anchor's native actions reach (beneficiaries and units
@@ -522,15 +560,20 @@ namespace KingmakerBuffPlanner.Domain.Planning
         {
             if (option == null || expression == null) return new List<string>();
             return option.AffectedTargetIdsForAnchor(anchor)
-                .Where(unit => Receives(option, expression, unit)).ToList();
+                .Where(unit => Receives(option, expression, unit, anchor)).ToList();
         }
 
         public bool Receives(ProviderPlanningOption option, EffectExpression expression, string unit)
         {
+            return Receives(option, expression, unit, null);
+        }
+
+        public bool Receives(ProviderPlanningOption option, EffectExpression expression, string unit, string anchor)
+        {
             // Review R10-F1: an Ally-only native selector needs a read,
-            // allied relation.
-            if (option.RequiresAllyRelation &&
-                option.RecipientFactRead(unit, RecipientFactGate.AllyOfCaster) != true) return false;
+            // allied relation. Recovery (R9-F5): and a unit whose distance
+            // from the centre was not measured is not certainly reached.
+            if (!option.ReachesDefinitely(anchor, unit)) return false;
             bool unresolved;
             EffectExpression bound = Bind(option, expression, unit, true, out unresolved);
             // Review R9-F3: a unit read as hostile to the caster is affected
@@ -544,7 +587,7 @@ namespace KingmakerBuffPlanner.Domain.Planning
         // One funded casting's changes on the units it reaches (its own
         // routine's earlier changes included).
         public void Record(ProviderPlanningOption option, EffectExpression expression,
-            IEnumerable<string> reached, string casterUnitId)
+            IEnumerable<string> reached, string casterUnitId, string anchor = null)
         {
             if (option == null || expression == null) return;
             foreach (string unit in (reached ?? new string[0]).Distinct(StringComparer.Ordinal))
@@ -556,8 +599,9 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 // (relation to the caster not read as allied) is only
                 // possibly reached: nothing becomes definite on it (a
                 // possible change makes the state unknown unless it agrees).
-                bool possiblyReached = option.RequiresAllyRelation &&
-                    option.RecipientFactRead(unit, RecipientFactGate.AllyOfCaster) != true;
+                // Recovery (R9-F5): likewise a unit whose distance from the
+                // centre was not measured.
+                bool possiblyReached = !option.ReachesDefinitely(anchor, unit);
                 var guaranteed = new HashSet<KeyValuePair<string, string>>(possiblyReached
                     ? new KeyValuePair<string, string>[0] : changes.Guaranteed);
                 var certainlyRemoved = new HashSet<KeyValuePair<string, string>>(possiblyReached

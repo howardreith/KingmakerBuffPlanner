@@ -85,9 +85,11 @@ namespace KingmakerBuffPlanner.Tests
             var counts = new SortedDictionary<string, int>(StringComparer.Ordinal);
             string generator = string.Empty;
             int abilities = 0;
+            int withoutOnCastFacts = 0;
             foreach (JObject entry in ReadExportAbilities(exportPath, value => generator = value))
             {
                 abilities++;
+                if (!ExportRecordsOnCastFacts(entry)) withoutOnCastFacts++;
                 bool candidate = (bool?)entry["isCandidate"] ?? false;
                 NativeCandidateAuditFacts live = AuditFactsFromExport(entry, true);
                 NativeCandidateAuditFacts reachable = AuditFactsFromExport(entry, candidate);
@@ -148,14 +150,20 @@ namespace KingmakerBuffPlanner.Tests
             lines.Sort(StringComparer.Ordinal);
             changes.Sort(StringComparer.Ordinal);
             string header = "# candidate audit; profile=" + profile + "; export=" + exportPath + "; exportGenerator=" +
-                generator + "; abilities=" + abilities.ToString(CultureInfo.InvariantCulture) + "; baseline=dd3e997 classifier;" +
+                generator + "; abilities=" + abilities.ToString(CultureInfo.InvariantCulture) +
+                "; onCastFacts=" + (withoutOnCastFacts == 0 ? "recorded"
+                    : "absent-in-" + withoutOnCastFacts.ToString(CultureInfo.InvariantCulture) +
+                        " (an export written before the on-cast facts were serialized: a verdict that depends on an" +
+                        " ability's on-cast actions is NOT reconstructed for those rows, and nothing here verifies the" +
+                        " current installed stack)") +
+                "; baseline=dd3e997 classifier;" +
                 " repaired=" + label + "; columns: guid, internal name, display name, ownership, static scope," +
                 " range, S/F/E/P/T(sticky)/V(variants), ally, enemy, override, baseline>repaired for live/static x Current/Pre040," +
                 " effects, repaired payloads, reasons";
             File.WriteAllLines(output, new[] { header }.Concat(lines).ToArray(), new UTF8Encoding(false));
             File.WriteAllLines(changesOutput, new[] { header }.Concat(changes).ToArray(), new UTF8Encoding(false));
             Console.WriteLine("CANDIDATE-AUDIT " + profile + " abilities=" + abilities + " changed=" + changes.Count +
-                " report=" + output + " changes=" + changesOutput);
+                " withoutOnCastFacts=" + withoutOnCastFacts + " report=" + output + " changes=" + changesOutput);
             // Only the live-scope Current transitions that changed (the
             // complete per-row record, all four scopes, is in the reports).
             foreach (KeyValuePair<string, int> pair in counts)
@@ -269,6 +277,15 @@ namespace KingmakerBuffPlanner.Tests
             }
         }
 
+        // Missing-beneficial-buffs recovery (R12-F1): whether an exported
+        // entry's diagnostics include the on-cast facts the classifier
+        // consumed. Entries of exports written before they were serialized
+        // lack the marker; their on-cast facts are unknown, never inferred.
+        private static bool ExportRecordsOnCastFacts(JObject entry)
+        {
+            return (bool?)entry["onCastFactsRecorded"] ?? false;
+        }
+
         // NativeCatalogExporter.AuditFacts, rebuilt from one exported entry:
         // the exact facts the in-game export recorded for the ability.
         private static NativeCandidateAuditFacts AuditFactsFromExport(JObject entry, bool accessible)
@@ -293,7 +310,10 @@ namespace KingmakerBuffPlanner.Tests
                 AbilityComponentTypes = Strings(entry["abilityComponentTypes"]),
                 Effects = (((JArray)entry["effects"]) ?? new JArray()).OfType<JObject>().Select(ExportEffectFacts).ToArray(),
                 SelfGatedFactIds = Strings(entry["selfGatedFactIds"]),
+                // As NativeCatalogExporter.ContractStrings: the scan's own
+                // diagnostics (an on-cast fact is judged by its code).
                 DiagnosticContracts = diagnostics.OfType<JObject>()
+                    .Where(d => (string)d["code"] != NativeCatalogExporter.OnCastActionCode)
                     .Select(d => ((string)d["nodeIdentity"] ?? string.Empty) + "|" + ((string)d["detail"] ?? string.Empty))
                     .ToArray(),
                 Diagnostics = diagnostics.OfType<JObject>().Select(d => new NativeCandidateDiagnosticFacts

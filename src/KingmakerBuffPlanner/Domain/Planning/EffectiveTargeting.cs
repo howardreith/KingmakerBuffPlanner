@@ -211,8 +211,9 @@ namespace KingmakerBuffPlanner.Domain.Planning
                 option.RecipientFactReads.ToDictionary(pair => pair.Key, pair => pair.Value,
                     StringComparer.Ordinal),
                 // Missing-beneficial-buffs review R11 (R10-F1): the native
-                // Ally-selector restriction survives a strategy change.
-                option.RequiresAllyRelation);
+                // Ally-selector restriction survives a strategy change (and,
+                // recovery R9-F5, so does every unmeasured reach).
+                option.RequiresAllyRelation, option.UncertainCopy());
         }
     }
 }

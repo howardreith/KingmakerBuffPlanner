@@ -24,14 +24,20 @@ namespace KingmakerBuffPlanner.GameAdapters
         private bool _ambiguous;
         private string _selectorFilter;
 
-        internal const string ConditionedPointSelector = "point-area-selector-has-own-condition";
-        internal const string UnreadPointSelector = "point-area-selector-condition-unread";
+        internal const string ConditionedAreaSelector = "area-selector-has-own-condition";
+        internal const string UnreadAreaSelector = "area-selector-condition-unread";
 
         // Missing-beneficial-buffs review R2-F5: a point-capable ability is
         // planned on a unit anchor with one disk of allied recipients; its
         // own AbilityTargetsAround condition (m_Condition) would filter that
         // disk in ways the planner does not model, so a non-empty or unread
         // condition yields no coverage (the casting cannot be planned).
+        // Recovery (R12-F4): the same holds for every allied area, whatever
+        // CanTargetPoint says (Good Hope's selector included): a valid anchor
+        // proves nothing about which recipients the selector's own filter
+        // admits. (In the 2.1.7b dump no allied-area buff the planner covers
+        // has a selector condition; the 32 conditioned selectors belong to
+        // offensive, enemy or non-area abilities.)
         private static readonly FieldInfo SelectorCondition = typeof(AbilityTargetsAround).GetField(
             "m_Condition", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
 
@@ -40,10 +46,10 @@ namespace KingmakerBuffPlanner.GameAdapters
             try
             {
                 var checker = SelectorCondition == null ? null : SelectorCondition.GetValue(around) as ConditionsChecker;
-                if (checker == null) return UnreadPointSelector;
-                return checker.Conditions == null || checker.Conditions.Length == 0 ? null : ConditionedPointSelector;
+                if (checker == null) return UnreadAreaSelector;
+                return checker.Conditions == null || checker.Conditions.Length == 0 ? null : ConditionedAreaSelector;
             }
-            catch (Exception) { return UnreadPointSelector; }
+            catch (Exception) { return UnreadAreaSelector; }
         }
 
         internal string LastFailureReason { get; private set; }
@@ -120,7 +126,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 AbilityTargetsAround around = ability.GetComponent<AbilityTargetsAround>();
                 if (around != null)
                 {
-                    if (ability.CanTargetPoint && _selectorFilter == null)
+                    if (_selectorFilter == null)
                         _selectorFilter = PointSelectorFilter(around);
                     if (AreaRecipientSemantics.IsAllied(
                         AreaSelection(around.TargetType),

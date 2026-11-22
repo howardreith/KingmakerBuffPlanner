@@ -18,6 +18,10 @@ namespace KingmakerBuffPlanner.GameAdapters
         // Every unit an anchor's native actions reach (review R3-F1).
         internal Dictionary<string, IEnumerable<string>> AffectedIdsByAnchor =
             new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal);
+        // The affected units whose distance from the centre was not read
+        // (recovery R9-F5): possibly reached, never covered.
+        internal Dictionary<string, IEnumerable<string>> UncertainIdsByAnchor =
+            new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal);
         // unit -> fixed recipient fact -> read value (review R4-F3).
         internal Dictionary<string, Dictionary<string, bool>> FixedRecipientFacts =
             new Dictionary<string, Dictionary<string, bool>>(StringComparer.Ordinal);
@@ -184,6 +188,10 @@ namespace KingmakerBuffPlanner.GameAdapters
                     if (!measure(anchorId, anchorId).HasValue) continue;
                     completed.Add(anchorId);
                     string id = anchorId;
+                    // Recovery (R9-F5): a unit whose distance from this centre
+                    // cannot be read is not proven outside the disk either; it
+                    // is possibly reached (affected, never a beneficiary).
+                    var unmeasured = new List<string>();
                     UnitSnapshot[] inside = units.Where(unit =>
                     {
                         if (requiresAlly && allyRead(unit.UnitId) == false) return false;
@@ -191,6 +199,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                         // Review R11-F5: the recorded radius exactly (no
                         // margin without native evidence for one).
                         float? metres = measure(id, unit.UnitId);
+                        if (!metres.HasValue) unmeasured.Add(unit.UnitId);
                         return metres.HasValue && metres.Value <= radius;
                     }).ToArray();
                     if (requiresAlly)
@@ -212,7 +221,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                     // Review R3-F1: every unit inside the burst is affected
                     // by the native actions (an ally that only loses an effect
                     // included); only the eligible ones are beneficiaries.
-                    decision.AffectedIdsByAnchor.Add(anchorId, inside.Select(unit => unit.UnitId).ToArray());
+                    decision.AffectedIdsByAnchor.Add(anchorId,
+                        inside.Select(unit => unit.UnitId).Concat(unmeasured).ToArray());
+                    if (unmeasured.Count != 0) decision.UncertainIdsByAnchor.Add(anchorId, unmeasured.ToArray());
                     decision.RecipientIdsByAnchor.Add(anchorId, inside.Where(eligible)
                         .Select(unit => unit.UnitId).ToArray());
                     // Review R4-F3: the FIXED recipient facts read for these
@@ -278,7 +289,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     pair => (IReadOnlyDictionary<string, bool>)pair.Value, StringComparer.Ordinal),
                 decision.RecipientFactReads.ToDictionary(pair => pair.Key,
                     pair => (IReadOnlyDictionary<string, bool>)pair.Value, StringComparer.Ordinal),
-                decision.RequiresAlly);
+                decision.RequiresAlly, decision.UncertainIdsByAnchor);
         }
 
         private static string[] LegalAnchorIds(IEnumerable<UnitSnapshot> units, Func<string, bool> canTarget)
