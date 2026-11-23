@@ -49,7 +49,7 @@ button or **Ctrl+Shift+B**.
 ## Requirements
 
 - Pathfinder: Kingmaker Enhanced Plus Edition **2.1.7b**.
-- Unity Mod Manager **0.28.2** or later, installed for Kingmaker. The mod uses
+- Unity Mod Manager **0.31.1** or later, installed for Kingmaker. The mod uses
   the Harmony 1.2 library (`0Harmony12.dll`) that Unity Mod Manager provides;
   nothing else needs installing.
 
