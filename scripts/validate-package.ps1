@@ -53,6 +53,27 @@ try {
     }
     # Verify the bytes distributed inside the assembly. Loading from bytes leaves the extracted DLL unlocked.
     $assembly = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes((Join-Path $mod 'KingmakerBuffPlanner.dll')))
+    # UMM 0.31.1 baseline: the packaged manifest declares 0.31.1 and the packaged DLL's actual AssemblyRefs name exactly the
+    # pinned UnityModManager and 0Harmony12; lowering Info.json on a DLL compiled against a newer loader is refused.
+    if (-not ($info.ManagerVersion -is [string]) -or $info.ManagerVersion -cne '0.31.1') {
+        throw "Packaged ManagerVersion must be the JSON string 0.31.1."
+    }
+    $referenced = @($assembly.GetReferencedAssemblies())
+    foreach ($pin in @((Get-Content -LiteralPath (Join-Path $root 'scripts\loader-reference-pins.json') -Raw | ConvertFrom-Json).references)) {
+        $matches = @($referenced | Where-Object { $_.Name -ceq [string]$pin.Name })
+        if ($matches.Count -ne 1 -or $matches[0].Version.ToString() -cne [string]$pin.Version) {
+            throw "Packaged DLL must reference pinned $($pin.Name) $($pin.Version); lowering Info.json alone is not sufficient."
+        }
+    }
+    # Documentation and data entries must be text: no assembly can travel under an allowed name.
+    foreach ($textEntry in @('THIRD-PARTY-NOTICES.md', 'NativeEffectOverrides.json', 'LICENSE', 'Info.json')) {
+        $textBytes = [IO.File]::ReadAllBytes((Join-Path $mod $textEntry))
+        if (($textBytes.Length -ge 2 -and $textBytes[0] -eq 0x4D -and $textBytes[1] -eq 0x5A) -or [Array]::IndexOf($textBytes, [byte]0) -ge 0) {
+            throw "Package text entry contains binary content: $textEntry"
+        }
+        try { [void][Text.UTF8Encoding]::new($false, $true).GetString($textBytes) }
+        catch { throw "Package text entry is not valid UTF-8 text: $textEntry" }
+    }
     foreach ($locale in @('enGB', 'zhCN')) {
         $catalog = $assembly.GetManifestResourceStream("KBP.Text.$locale.json")
         if ($null -eq $catalog) { throw "Missing packaged catalog for $locale." }
@@ -70,4 +91,4 @@ try {
 finally {
     if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Recurse -Force }
 }
-Write-Host "Package validation: PASS=8 FAIL=0 sha256=$(Get-KbpSha256 $package)"
+Write-Host "Package validation: PASS=11 FAIL=0 sha256=$(Get-KbpSha256 $package)"
