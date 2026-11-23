@@ -1,0 +1,43 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PinnedLoaderReferenceDir>$(MSBuildThisFileDirectory)artifacts\references</PinnedLoaderReferenceDir>
+    <PinnedLoaderReferenceCheck>$(MSBuildThisFileDirectory)scripts\Get-PinnedLoaderReferences.ps1</PinnedLoaderReferenceCheck>
+    <LoaderReferencePowerShell Condition="'$(LoaderReferencePowerShell)' == ''">powershell.exe</LoaderReferencePowerShell>
+    <!-- IDE builds must always reach MSBuild so the guards below run, even when only a pin or the manifest changed. -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- A pin, verifier, guard or manifest change also forces recompilation (incremental MSBuild and IDE). -->
+    <_PinnedLoaderBuildInput Include="$(MSBuildThisFileDirectory)scripts\loader-reference-pins.json;$(PinnedLoaderReferenceCheck);$(MSBuildThisFileFullPath);$(MSBuildThisFileDirectory)src\KingmakerBuffPlanner\Info.json" />
+    <CustomAdditionalCompileInputs Include="@(_PinnedLoaderBuildInput)" />
+    <UpToDateCheckInput Include="@(_PinnedLoaderBuildInput)" />
+  </ItemGroup>
+  <!-- Before resolution: the canonical pinned files must exist with their exact SHA-256 and assembly identity, and
+       Info.json must declare the pinned minimum. Runs on every build, incremental or not. -->
+  <Target Name="ValidatePinnedLoaderReferences" BeforeTargets="ResolveAssemblyReferences">
+    <Exec Command="&quot;$(LoaderReferencePowerShell)&quot; -NoLogo -NoProfile -ExecutionPolicy Bypass -File &quot;$(PinnedLoaderReferenceCheck)&quot; -VerifyOnly -ReferenceDirectory &quot;$(PinnedLoaderReferenceDir)&quot;" />
+  </Target>
+  <!-- After reference-assembly selection, immediately before compilation: Csc receives @(ReferencePathWithRefAssemblies)
+       (Microsoft.CSharp.Core.targets). Each loader assembly in that exact list, found by file name or by assembly identity,
+       must be the canonical verified file (full path) in the pinned directory. A stray HintPath, a substituted reference
+       assembly, a same-stem or renamed file, or the installed loader can never be compiled against. -->
+  <Target Name="AssertPinnedLoaderReferencesResolved" AfterTargets="FindReferenceAssembliesForReferences" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <_PinnedLoaderDirectory>$([MSBuild]::NormalizeDirectory('$(PinnedLoaderReferenceDir)'))</_PinnedLoaderDirectory>
+    </PropertyGroup>
+    <ItemGroup>
+      <_PinnedLoaderUmm Include="@(ReferencePathWithRefAssemblies)" Condition="'%(Filename)' == 'UnityModManager' or $([System.String]::Copy('%(ReferencePathWithRefAssemblies.FusionName)').StartsWith('UnityModManager,'))" />
+      <_PinnedLoaderHarmony12 Include="@(ReferencePathWithRefAssemblies)" Condition="'%(Filename)' == '0Harmony12' or $([System.String]::Copy('%(ReferencePathWithRefAssemblies.FusionName)').StartsWith('0Harmony12,'))" />
+      <_PinnedLoaderOutside Include="@(_PinnedLoaderUmm)" Condition="'%(FullPath)' != '$(_PinnedLoaderDirectory)UnityModManager.dll'" />
+      <_PinnedLoaderOutside Include="@(_PinnedLoaderHarmony12)" Condition="'%(FullPath)' != '$(_PinnedLoaderDirectory)0Harmony12.dll'" />
+    </ItemGroup>
+    <Error Condition="'@(_PinnedLoaderUmm->Count())' != '1'" Text="Exactly one UnityModManager compiler input is required; resolved: @(_PinnedLoaderUmm)" />
+    <Error Condition="'@(_PinnedLoaderHarmony12->Count())' != '1'" Text="Exactly one 0Harmony12 compiler input is required; resolved: @(_PinnedLoaderHarmony12)" />
+    <Error Condition="'@(_PinnedLoaderOutside)' != ''" Text="Loader compiler references must be the verified files in the pinned directory $(_PinnedLoaderDirectory); resolved: @(_PinnedLoaderOutside)" />
+  </Target>
+  <!-- Opt-in (used by the build fingerprint): write the exact list Csc receives, so receipt reuse checks follow MSBuild's
+       own evaluation of the project and GamePath.props rather than a second interpretation. -->
+  <Target Name="WriteCompilerReferenceList" AfterTargets="FindReferenceAssembliesForReferences" Condition="'$(CompilerReferenceListPath)' != ''">
+    <WriteLinesToFile File="$(CompilerReferenceListPath)" Lines="@(ReferencePathWithRefAssemblies->'%(FullPath)')" Overwrite="true" />
+  </Target>
+</Project>

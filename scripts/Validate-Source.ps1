@@ -73,7 +73,7 @@ if ($info.Id -cne 'KingmakerBuffPlanner' -or
     $info.AssemblyName -cne 'KingmakerBuffPlanner.dll' -or
     $info.EntryMethod -cne 'KingmakerBuffPlanner.Main.Load' -or
     $info.Version -cne $version -or
-    $info.ManagerVersion -cne '0.28.2') {
+    -not ($info.ManagerVersion -is [string]) -or $info.ManagerVersion -cne '0.31.1') {
     throw 'Info.json standalone identity or version is invalid.'
 }
 $assertions++

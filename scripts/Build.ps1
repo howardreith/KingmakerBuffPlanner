@@ -7,6 +7,9 @@ $ErrorActionPreference = 'Stop'
 
 $root = Get-KbpRepositoryRoot
 & (Join-Path $PSScriptRoot 'Validate-Source.ps1')
+# Compile against the pinned UMM 0.31.1 / Harmony12 references, never the installed loader (fetched and verified here;
+# LoaderReferences.targets re-verifies them and the exact compiler inputs on every MSBuild build).
+[void](& (Join-Path $PSScriptRoot 'Get-PinnedLoaderReferences.ps1') -ReferenceDirectory (Join-Path $root 'artifacts\references'))
 $revision = (& git -C $root rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[0-9a-f]{40}$') { throw 'Exact Git revision is unavailable.' }
 $msbuild = Get-KbpMsBuild

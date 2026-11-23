@@ -3,6 +3,7 @@
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <Import Project="..\..\Version.props" />
   <Import Project="..\..\GamePath.props" Condition="Exists('..\..\GamePath.props')" />
+  <Import Project="..\..\LoaderReferences.targets" />
   <PropertyGroup>
     <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
@@ -49,7 +50,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityModManager">
-      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityModManager\UnityModManager.dll</HintPath>
+      <HintPath>$(PinnedLoaderReferenceDir)\UnityModManager.dll</HintPath>
       <Private>False</Private>
       <ExternallyResolved>True</ExternallyResolved>
     </Reference>
@@ -68,7 +69,7 @@
       <ExternallyResolved>True</ExternallyResolved>
     </Reference>
     <Reference Include="0Harmony12">
-      <HintPath>$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityModManager\0Harmony12.dll</HintPath>
+      <HintPath>$(PinnedLoaderReferenceDir)\0Harmony12.dll</HintPath>
       <Private>False</Private>
     </Reference>
         <Reference Include="UnityEngine.ScreenCaptureModule">
@@ -365,7 +366,7 @@
   </ItemGroup>
   <Target Name="ValidateLocalReferences" BeforeTargets="BeforeBuild">
     <Error Condition="'$(KingmakerInstallDir)' == ''" Text="KingmakerInstallDir is missing. Create ignored GamePath.props." />
-    <Error Condition="!Exists('$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityModManager\UnityModManager.dll')" Text="Exact local UnityModManager reference is missing." />
+    <Error Condition="!Exists('$(PinnedLoaderReferenceDir)\UnityModManager.dll')" Text="Pinned UnityModManager 0.31.1 reference is missing; build with scripts\Build.ps1." />
     <Error Condition="!Exists('$(KingmakerInstallDir)\Kingmaker_Data\Managed\Newtonsoft.Json.dll')" Text="Exact local Newtonsoft.Json reference is missing." />
     <Error Condition="!Exists('$(KingmakerInstallDir)\Kingmaker_Data\Managed\UnityEngine.CoreModule.dll')" Text="Exact local UnityEngine.CoreModule reference is missing." />
   </Target>
