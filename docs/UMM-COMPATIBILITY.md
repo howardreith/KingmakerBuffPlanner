@@ -45,6 +45,16 @@ compiled against the installed loader (the published 0.6.20 DLL references Unity
   UnityModManager 0.33.0.0) with only its manifest lowered to 0.31.1 is refused by
   `validate-package.ps1`: "Packaged DLL must reference pinned UnityModManager 0.31.1.0".
 - `Test-Development.ps1 -Only localization`: source validation 47/47, pinned build, 14/14 tests.
+- `scripts/Test-LoaderBaseline.ps1` (committed HEAD in a temporary clone whose path contains a space;
+  each check in its own process; this checkout's artifacts untouched): 37/37 - cache bytes (genuine,
+  corrupt, missing, the author's UnityModManager 0.32.4 as a known distinct fixture), dropped or misnamed
+  pins and raised/array manifests, direct and incremental MSBuild (the two pinned paths on the Csc command
+  line; manifest-only and pin-only changes refused), Csc-input probes (identical copy elsewhere, same-stem
+  or renamed files, the 0.32.4 fixture, a substituted reference assembly), the package validator against
+  smuggled, renamed and non-string-manifest packages, the 0.6.20 regression above, and both packages
+  validated in one Windows PowerShell session.
+- Machine-generated records (structured, no logs; local path prefixes replaced) are committed in
+  [`docs/evidence/umm-0311/`](evidence/umm-0311/INDEX.md).
 - Static loader API audit of the candidate DLL (8 types, 24 members into UnityModManager, 0Harmony12
   and 0Harmony, by name and decoded signature): all resolved on 0.31.1, 0.32.4, the owner's 0.33.0 and
   0.33.4 (newest stable on the author's NuGet feed, 2026-11-19). Profiles are component-assembled from

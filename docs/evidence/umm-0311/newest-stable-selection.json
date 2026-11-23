@@ -1,0 +1,76 @@
+{
+ "schema": "kingmaker.umm-newest-stable.v1",
+ "measured_utc": "2026-11-23T22:50:01Z",
+ "nuget_flatcontainer_versions": [
+  "0.26.0",
+  "0.27.0",
+  "0.27.2",
+  "0.27.5",
+  "0.27.12",
+  "0.27.14",
+  "0.28.2",
+  "0.29.0",
+  "0.30.1",
+  "0.31.0",
+  "0.31.1",
+  "0.32.3",
+  "0.32.4",
+  "0.33.2",
+  "0.33.4"
+ ],
+ "nuget_registration_0_3x": [
+  {
+   "version": "0.30.1",
+   "authors": "newman55",
+   "projectUrl": "https://www.nexusmods.com/site/mods/21",
+   "published": "2024-09-22"
+  },
+  {
+   "version": "0.31.0",
+   "authors": "newman55",
+   "projectUrl": "https://www.nexusmods.com/site/mods/21",
+   "published": "2024-09-25"
+  },
+  {
+   "version": "0.31.1",
+   "authors": "newman55",
+   "projectUrl": "https://www.nexusmods.com/site/mods/21",
+   "published": "2024-11-27"
+  },
+  {
+   "version": "0.32.3",
+   "authors": "newman55",
+   "projectUrl": "https://www.nexusmods.com/site/mods/21",
+   "published": "2025-04-21"
+  },
+  {
+   "version": "0.32.4",
+   "authors": "newman55",
+   "projectUrl": "https://www.nexusmods.com/site/mods/21",
+   "published": "2025-04-21"
+  },
+  {
+   "version": "0.33.2",
+   "authors": "newman55",
+   "projectUrl": "https://www.nexusmods.com/site/mods/21",
+   "published": "2026-10-11"
+  },
+  {
+   "version": "0.33.4",
+   "authors": "newman55",
+   "projectUrl": "https://www.nexusmods.com/site/mods/21",
+   "published": "2026-11-19"
+  }
+ ],
+ "github_head": {
+  "repository": "newman55/unity-mod-manager",
+  "sha": "3d14bf0d776ac30f86e9611696ba2696a9d1083c",
+  "date": "2026-11-19T12:45:23Z",
+  "UnityModManager.csproj": [
+   "<Version>0.33.4</Version>",
+   "<AssemblyVersion>0.33.4</AssemblyVersion>"
+  ]
+ },
+ "selected_newest_stable": "0.33.4",
+ "rule": "highest non-prerelease version published by the UMM author (newman55) on NuGet, cross-checked against the author's GitHub HEAD project version"
+}

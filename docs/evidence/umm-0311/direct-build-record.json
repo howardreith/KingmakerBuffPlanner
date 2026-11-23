@@ -1,0 +1,36 @@
+{
+ "schema": "kingmaker.build-record.v1",
+ "source_commit": "ca04d74d9de3312fb1d34764e8bba7db5b7513d3",
+ "product": "KingmakerBuffPlanner.dll",
+ "product_compilations": [
+  {
+   "out": "<temp>\\claude\\c237366b8a8ea80b\\e178a93b-ca53-4b6b-a4d2-a357d48eaa77\\scratchpad\\kbp-direct-obj\\KingmakerBuffPlanner.dll",
+   "references": [
+    "<repo>\\artifacts\\references\\0Harmony12.dll",
+    "<game>\\Kingmaker_Data\\Managed\\Assembly-CSharp-firstpass.dll",
+    "<game>\\Kingmaker_Data\\Managed\\Assembly-CSharp.dll",
+    "<reference-assemblies>\\Microsoft\\Framework\\.NETFramework\\v4.7\\mscorlib.dll",
+    "<game>\\Kingmaker_Data\\Managed\\Newtonsoft.Json.dll",
+    "<game>\\Kingmaker_Data\\Managed\\Rewired_Core.dll",
+    "<reference-assemblies>\\Microsoft\\Framework\\.NETFramework\\v4.7\\System.Core.dll",
+    "<reference-assemblies>\\Microsoft\\Framework\\.NETFramework\\v4.7\\System.dll",
+    "<game>\\Kingmaker_Data\\Managed\\UniRx.dll",
+    "<game>\\Kingmaker_Data\\Managed\\UnityEngine.CoreModule.dll",
+    "<game>\\Kingmaker_Data\\Managed\\UnityEngine.dll",
+    "<game>\\Kingmaker_Data\\Managed\\UnityEngine.ImageConversionModule.dll",
+    "<game>\\Kingmaker_Data\\Managed\\UnityEngine.IMGUIModule.dll",
+    "<game>\\Kingmaker_Data\\Managed\\UnityEngine.ScreenCaptureModule.dll",
+    "<game>\\Kingmaker_Data\\Managed\\UnityEngine.TextRenderingModule.dll",
+    "<game>\\Kingmaker_Data\\Managed\\UnityEngine.UI.dll",
+    "<game>\\Kingmaker_Data\\Managed\\UnityEngine.UIModule.dll",
+    "<repo>\\artifacts\\references\\UnityModManager.dll"
+   ]
+  }
+ ],
+ "other_compilations": [],
+ "summary_lines": [
+  "Build succeeded.",
+  "0 Warning(s)",
+  "0 Error(s)"
+ ]
+}
