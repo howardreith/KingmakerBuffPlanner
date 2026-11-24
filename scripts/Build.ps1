@@ -6,6 +6,9 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Common.ps1')
 
 $root = Get-KbpRepositoryRoot
+# The bounded local build configuration applies to every build route that records or reuses a receipt (Build.ps1,
+# Build-Local.ps1, Build-Release.ps1, receipt admission); direct MSBuild produces no receipt.
+Assert-KbpLocalBuildConfiguration
 & (Join-Path $PSScriptRoot 'Validate-Source.ps1')
 # Compile against the pinned UMM 0.31.1 / Harmony12 references, never the installed loader (fetched and verified here;
 # LoaderReferences.targets re-verifies them and the exact compiler inputs on every MSBuild build).

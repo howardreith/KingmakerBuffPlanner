@@ -87,12 +87,29 @@ function Assert-KbpLocalBuildConfiguration {
     if (-not $ok) { throw 'GamePath.props may only define KingmakerInstallDir (no conditions, imports, items, targets or other properties).' }
     $dir = Split-Path -Parent ([IO.Path]::GetFullPath($root).TrimEnd('\'))
     while ($dir) {
-        foreach ($name in @('Directory.Build.props', 'Directory.Build.targets')) {
+        foreach ($name in @('Directory.Build.props', 'Directory.Build.targets', 'Directory.Build.rsp')) {
             if (Test-Path -LiteralPath (Join-Path $dir $name) -PathType Leaf) { throw "An outside $name applies to the build: $(Join-Path $dir $name)" }
         }
         $parent = Split-Path -Parent $dir
         if ($parent -eq $dir) { break }
         $dir = $parent
+    }
+    # Inside the repository only tracked MSBuild configuration applies (an ignored or new Directory.Build file or project
+    # .user file is refused); no environment variable may select further imports; no per-user import hooks.
+    $untracked = @(& git -C $root ls-files --others -- ':(glob)**/Directory.Build.props' ':(glob)**/Directory.Build.targets' ':(glob)**/Directory.Build.rsp' ':(glob)**/*.csproj.user')
+    if ($LASTEXITCODE -ne 0) { throw 'git ls-files failed while checking the local build configuration.' }
+    if ($untracked.Count -gt 0) { throw "Untracked MSBuild configuration files apply to the build: $($untracked -join ', ')" }
+    foreach ($name in @('DirectoryBuildPropsPath', 'DirectoryBuildTargetsPath', 'ImportDirectoryBuildProps', 'ImportDirectoryBuildTargets',
+            'CustomBeforeMicrosoftCommonProps', 'CustomAfterMicrosoftCommonProps', 'CustomBeforeMicrosoftCommonTargets', 'CustomAfterMicrosoftCommonTargets',
+            'CustomBeforeMicrosoftCSharpProps', 'CustomAfterMicrosoftCSharpProps', 'CustomBeforeMicrosoftCSharpTargets', 'CustomAfterMicrosoftCSharpTargets',
+            'MSBuildUserExtensionsPath', 'ImportUserLocationsByWildcardBeforeMicrosoftCommonProps', 'ImportUserLocationsByWildcardAfterMicrosoftCommonProps',
+            'ImportUserLocationsByWildcardBeforeMicrosoftCommonTargets', 'ImportUserLocationsByWildcardAfterMicrosoftCommonTargets')) {
+        if (-not [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable($name))) { throw "The environment variable $name selects MSBuild imports; unset it before building." }
+    }
+    $userExtensions = Join-Path $env:LOCALAPPDATA 'Microsoft\MSBuild'
+    if (Test-Path -LiteralPath $userExtensions -PathType Container) {
+        $hooks = @(Get-ChildItem -LiteralPath $userExtensions -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\Import(Before|After)\\' })
+        if ($hooks.Count -gt 0) { throw "Per-user MSBuild extension files apply to the build: $(@($hooks | ForEach-Object { $_.FullName }) -join ', ')" }
     }
 }
 
@@ -107,7 +124,7 @@ function Assert-KbpReleaseReconciliation {
         [Parameter(Mandatory = $true)][string]$ReleasePackageSha256)
     foreach ($build in $Builds) {
         $m = $build.Manifest
-        if ($m.sourceDirty -ne $false -or [string]$m.commit -cne $ReleaseHead -or [string]$m.embeddedCommit -cne $ReleaseHead -or [string]$m.packageSha256 -cne [string]$build.PackageSha256) {
+        if (-not ($m.PSObject.Properties['sourceDirty']) -or -not ($m.sourceDirty -is [bool]) -or $m.sourceDirty -or [string]$m.commit -cne $ReleaseHead -or [string]$m.embeddedCommit -cne $ReleaseHead -or [string]$m.packageSha256 -cne [string]$build.PackageSha256) {
             throw 'A deterministic build receipt does not name the clean release commit or its own package.'
         }
     }

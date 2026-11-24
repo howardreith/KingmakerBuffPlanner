@@ -607,18 +607,24 @@ function Get-KbpCompatibilitySourcePath($Expected, [string]$LiveModsPath) {
 # Writes the runtime request and returns the decoded snapshot of the bytes just written: the launcher keeps it in memory
 # and checks the result against it, never against a later read of the evidence file.
 function Save-KbpRuntimeRequest([string]$Path, $Request) {
-    Write-KbpJsonAtomic $Path $Request
-    return (Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json)
+    # The retained request is decoded from the exact serialization passed to the atomic writer (never a reread of the
+    # destination, which another process could replace, and independent of the reader's default encoding).
+    $json = ($Request | ConvertTo-Json -Depth 20) + [Environment]::NewLine
+    Write-KbpTextAtomic $Path $json
+    return ($json | ConvertFrom-Json)
 }
 
 function Write-KbpJsonAtomic([string]$Path, $Value) {
+    Write-KbpTextAtomic $Path (($Value | ConvertTo-Json -Depth 20) + [Environment]::NewLine)
+}
+
+function Write-KbpTextAtomic([string]$Path, [string]$json) {
     $directory = Split-Path -Parent $Path
     if (-not (Test-Path -LiteralPath $directory -PathType Container)) {
         throw "Atomic JSON destination directory is missing: $directory"
     }
     $temporary = Join-Path $directory ('.' + [IO.Path]::GetFileName($Path) + '.' + [Guid]::NewGuid().ToString('N') + '.tmp')
     try {
-        $json = ($Value | ConvertTo-Json -Depth 20) + [Environment]::NewLine
         $bytes = [Text.UTF8Encoding]::new($false).GetBytes($json)
         $stream = [IO.File]::Open($temporary, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
         try { $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) }
@@ -935,19 +941,30 @@ function Enter-KbpRuntimeTransaction {
         $preStateFailure = $_
         if (-not (Test-Path -LiteralPath $statePath)) {
             # The transaction's own package copy (complete or partial) lives only in this run's backup folder.
+            # Each cleanup step is attempted on its own; a failed step names the owned path that still needs cleanup,
+            # and the token-checked lock release is attempted regardless.
+            $cleanupFailures = @()
             $ownedCopy = Join-Path $backupRunRoot 'package.zip'
-            if ([IO.Path]::GetFullPath($ownedCopy).StartsWith([IO.Path]::GetFullPath($backupRunRoot).TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) -and
-                (Test-Path -LiteralPath $ownedCopy -PathType Leaf)) { Remove-Item -LiteralPath $ownedCopy -Force }
-            foreach ($owned in @($backupRunRoot, $transactionRoot)) {
-                if ((Test-Path -LiteralPath $owned -PathType Container) -and
-                    @(Get-ChildItem -LiteralPath $owned -Force).Count -eq 0) {
-                    Remove-Item -LiteralPath $owned -Force
-                }
+            try {
+                if ([IO.Path]::GetFullPath($ownedCopy).StartsWith([IO.Path]::GetFullPath($backupRunRoot).TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) -and
+                    (Test-Path -LiteralPath $ownedCopy -PathType Leaf)) { Remove-Item -LiteralPath $ownedCopy -Force -ErrorAction Stop }
             }
-            try { Remove-KbpOwnedLock $lockPath $RunId $token }
-            catch {
-                throw ("Runtime entry failed before its state existed (" + $preStateFailure.Exception.Message +
-                    ") and its lock could not be released: " + $_.Exception.Message)
+            catch { $cleanupFailures += "owned package copy $ownedCopy ($($_.Exception.Message))" }
+            foreach ($owned in @($backupRunRoot, $transactionRoot)) {
+                try {
+                    if ((Test-Path -LiteralPath $owned -PathType Container) -and
+                        @(Get-ChildItem -LiteralPath $owned -Force).Count -eq 0) {
+                        Remove-Item -LiteralPath $owned -Force -ErrorAction Stop
+                    }
+                }
+                catch { $cleanupFailures += "owned folder $owned ($($_.Exception.Message))" }
+            }
+            $lockFailure = $null
+            try { Remove-KbpOwnedLock $lockPath $RunId $token } catch { $lockFailure = $_.Exception.Message }
+            if ($cleanupFailures.Count -gt 0 -or $lockFailure) {
+                throw ("Runtime entry failed before its state existed (" + $preStateFailure.Exception.Message + ")" +
+                    $(if ($lockFailure) { "; its lock could not be released: $lockFailure" } else { '; its lock was released' }) +
+                    $(if ($cleanupFailures.Count -gt 0) { '; still to clean up: ' + ($cleanupFailures -join '; ') } else { '' }))
             }
         }
         throw $preStateFailure

@@ -75,6 +75,8 @@ function Assert-KbpLoaderIdentityContract($Loader, [string]$ProfileId) {
 # (compatibility/loaders/<id>.json: UnityModManager, 0Harmony12 and the Harmony2 module 0Harmony12 forwards to).
 function Get-KbpLoaderIdentity {
     param([Parameter(Mandatory = $true)][ValidateSet('0.31.1', '0.32.4', 'owner-0.33.0', '0.33.4')][string]$LoaderId)
+    # ValidateSet accepts any letter case; the canonical row ID is used from here on.
+    $LoaderId = @('0.31.1', '0.32.4', 'owner-0.33.0', '0.33.4' | Where-Object { [string]::Equals($_, $LoaderId, [StringComparison]::OrdinalIgnoreCase) })[0]
     $path = Join-Path (Get-KbpRepositoryRoot) ("compatibility\loaders\$LoaderId.json")
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Loader identity row is missing: $LoaderId" }
     $row = Read-KbpJson $path

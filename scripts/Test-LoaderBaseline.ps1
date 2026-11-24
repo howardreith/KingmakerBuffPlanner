@@ -388,6 +388,20 @@ try {
     Expect-Rejected 'receipt-with-compiler-selection-override-rejected' (Test-FrozenReceipt) 'GamePath\.props may only define KingmakerInstallDir'
     [IO.File]::WriteAllText($gamePath, $gamePathOriginal)
     Expect-Accepted 'receipt-after-override-removed-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
+    # Local imports outside GamePath.props: a target selected through the DirectoryBuildTargetsPath environment variable
+    # that changes the generated version only for a real compile, and the same target as an untracked
+    # src\Directory.Build.targets, are refused for reuse (and by Build.ps1); with them removed the receipt is accepted.
+    $localTargets = Join-Path $temp 'local selected.targets'
+    [IO.File]::WriteAllText($localTargets, "<Project><PropertyGroup Condition=`"'`$(SkipCompilerExecution)' != 'true'`"><KbpVersion>9.9.9</KbpVersion></PropertyGroup></Project>")
+    $env:DirectoryBuildTargetsPath = $localTargets
+    try { Expect-Rejected 'receipt-with-import-selected-by-environment-rejected' (Test-FrozenReceipt) 'environment variable DirectoryBuildTargetsPath selects MSBuild imports' }
+    finally { Remove-Item Env:\DirectoryBuildTargetsPath }
+    $untrackedTargets = Join-Path $base 'src\Directory.Build.targets'
+    Copy-Item -LiteralPath $localTargets -Destination $untrackedTargets
+    Expect-Rejected 'receipt-with-untracked-directory-build-targets-rejected' (Test-FrozenReceipt) 'Untracked MSBuild configuration files apply to the build: src/Directory\.Build\.targets'
+    Expect-Rejected 'build-with-untracked-directory-build-targets-rejected' (Invoke-Isolated @('-File', (Join-Path $base 'scripts\Build.ps1'))) 'Untracked MSBuild configuration files apply to the build'
+    Remove-Item -LiteralPath $untrackedTargets
+    Expect-Accepted 'receipt-after-local-imports-removed-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
 
     # 9. The runtime transaction stages only its own copy of the admitted package; a package replaced after admission is
     #    refused before anything is staged or activated (fixture game folder; FixtureMode roots in the temporary folder).
@@ -425,6 +439,14 @@ try {
     $retryState = & $tx $zipA 'statefail'
     Add-Case 'transaction-same-run-id-retry-after-state-write-failure' ($retryState.ExitCode -eq 0 -and $retryState.Output -match 'ENTERED' -and (Get-KbpSha256 (Join-Path $fixtureGame 'Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll')) -eq $ma.dllSha256) "exit $($retryState.ExitCode)"
     Invoke-Script (". $(Quote $harness); Restore-KbpRuntimeTransaction -RunId statefail -StateRoot $(Quote $txRoots[0]) -FixtureMode -KnownKingmakerProcessIds @() | Out-Null") | Out-Null
+    # The same state-write failure while the owned ZIP denies deletion (held open by the failing process): Mods unchanged,
+    # the token-checked lock is still released, and the error names the owned copy that still needs cleanup.
+    $modsBefore = @(Get-ChildItem -LiteralPath (Join-Path $fixtureGame 'Mods') -Recurse -Force | ForEach-Object { $_.FullName }) -join ';'
+    $heldState = Invoke-Script (". $(Quote $harness); `$original = `${function:Write-KbpJsonAtomic}; function Write-KbpJsonAtomic([string]`$Path, `$Value) { if (`$Value -is [Collections.IDictionary] -and `$Value.Contains('ownedPackagePath')) { `$global:heldCopy = [IO.File]::Open([string]`$Value['ownedPackagePath'], 'Open', 'Read', 'None'); throw 'injected state-write failure' }; & `$original `$Path `$Value }; Enter-KbpRuntimeTransaction -PackagePath $(Quote $zipA) -KingmakerInstallDir $(Quote $fixtureGame) -StateRoot $(Quote $txRoots[0]) -StagingRoot $(Quote $txRoots[1]) -BackupRoot $(Quote $txRoots[2]) -RunId heldcopy -FixtureMode -KnownKingmakerProcessIds @() -ExpectedPackageSha256 $admitted | Out-Null")
+    $modsAfter = @(Get-ChildItem -LiteralPath (Join-Path $fixtureGame 'Mods') -Recurse -Force | ForEach-Object { $_.FullName }) -join ';'
+    $lockLeft = Test-Path -LiteralPath (Join-Path $txRoots[0] 'deployment.lock')
+    Add-Case 'transaction-cleanup-failure-still-releases-the-lock' ($heldState.ExitCode -ne 0 -and $heldState.Output -match 'injected state-write failure' -and $heldState.Output -match 'its lock was released' -and $heldState.Output -match 'still to clean up: owned package copy' -and $modsBefore -ceq $modsAfter -and -not $lockLeft) ("exit $($heldState.ExitCode); Mods unchanged: $($modsBefore -ceq $modsAfter); lock left: $lockLeft; " + (Get-Reason $heldState.Output))
+    Get-ChildItem -LiteralPath $txRoots[2] -Directory -Filter '*heldcopy*' -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
 
     # Release reconciliation (Build-Release): the clone's receipt for the clean pair as both deterministic builds; the
     # validated release copy must be byte-identical. A substituted release copy (same DLL, different data) and a dirty
@@ -444,6 +466,11 @@ try {
     Expect-Rejected 'release-reconciliation-substituted-release-copy-rejected' (& $reconcile $substituted $null) 'does not match the deterministic build'
     Remove-Item -LiteralPath $substituted
     Expect-Rejected 'release-reconciliation-dirty-producing-receipt-rejected' (& $reconcile $zipA { param($j) $j.sourceDirty = $true }) 'does not name the clean release commit'
+    # A malformed clean flag (an empty array, the string "false", the number 0) on one producing receipt is refused.
+    foreach ($bad in @(@('empty-array', @()), @('string-false', 'false'), @('number-zero', 0))) {
+        $badValue = $bad[1]
+        Expect-Rejected "release-reconciliation-$($bad[0])-dirty-flag-rejected" (& $reconcile $zipA { param($j) $j.sourceDirty = $badValue }) 'does not name the clean release commit'
+    }
 
     # 10. The release installer reconciles every identity of the release manifest with a validated private copy of the
     #     release ZIP before any state or staging (Install-Local -WhatIf against a fixture game folder).
@@ -451,6 +478,20 @@ try {
     $releaseManifest = Join-Path $base ("artifacts\release\" + $ma.version + '\release-manifest.json')
     $rm = if (Test-Path -LiteralPath $releaseManifest) { Get-Content -LiteralPath $releaseManifest -Raw | ConvertFrom-Json } else { $null }
     Add-Case 'release-manifest-from-validated-release-zip' ($rel.ExitCode -eq 0 -and $rm -and $rm.embeddedCommit -eq $commit -and $rm.commit -eq $commit -and $rm.dllSha256 -eq $ma.dllSha256) ("exit $($rel.ExitCode); commit $($rm.commit) embedded $($rm.embeddedCommit) DLL $($rm.dllSha256) MVID $($rm.assemblyMvid)")
+    # The versioned release above is the previous release: a Build-Release whose producing builds disagree (a disposable
+    # instrumented copy changes the second package digest) is refused, and the previous ZIP and manifest keep their hashes.
+    $releaseDir = Split-Path -Parent $releaseManifest
+    $releaseFiles = { @(Get-ChildItem -LiteralPath $releaseDir -File | Sort-Object Name | ForEach-Object { $_.Name + '=' + (Get-KbpSha256 $_.FullName) }) -join ';' }
+    $releaseBefore = & $releaseFiles
+    $releaseText = [IO.File]::ReadAllText((Join-Path $base 'scripts\Build-Release.ps1'))
+    $releaseAnchor = '$secondHash = Get-KbpSha256 $secondPackage'
+    if ($releaseText.IndexOf($releaseAnchor) -lt 0) { throw 'Build-Release.ps1 anchor not found.' }
+    $disagreeing = Join-Path $base 'scripts\Build-Release-instrumented.ps1'
+    [IO.File]::WriteAllText($disagreeing, $releaseText.Replace($releaseAnchor, $releaseAnchor + "`r`n`$secondHash = ('0' * 64)"))
+    $relBad = Invoke-Isolated @('-File', $disagreeing)
+    Remove-Item -LiteralPath $disagreeing -Force
+    $prepareLeft = @(Get-ChildItem -LiteralPath (Join-Path $base 'artifacts\release') -Directory -Force -Filter '.prepare-*').Count
+    Add-Case 'release-with-disagreeing-builds-keeps-previous-release' ($relBad.ExitCode -ne 0 -and $releaseBefore -notmatch '^$' -and (& $releaseFiles) -ceq $releaseBefore -and $prepareLeft -eq 0) ("exit $($relBad.ExitCode); previous ZIP and manifest unchanged: $((& $releaseFiles) -ceq $releaseBefore); private folders left $prepareLeft; " + (Get-Reason $relBad.Output))
     $installGame = Join-Path $temp 'install fixture game'
     New-Item -ItemType Directory -Path (Join-Path $installGame 'Mods') -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $installGame 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii

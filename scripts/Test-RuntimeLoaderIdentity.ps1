@@ -148,6 +148,22 @@ try {
     Write-KbpJsonAtomic $requestFile (New-KbpRuntimeRequest -RunId 'loader-identity' -EvidenceDirectory 'evidence' -BuildManifest $manifest -TimeoutSeconds 60 -ExitAfterCompletion $true -ExpectedLoader $rows['0.33.4'] -Scenario 'ui-root-smoke')
     Invoke-Expecting 'retained-request-refuses-other-row-result-after-file-changed' { Assert-KbpRuntimeResult -Result (New-Result $rows['0.33.4']) -Request $retained -BuildManifest $manifest } 'ummVersion expected=0\.31\.1\.0 observed=0\.33\.4\.0' | Out-Null
     Invoke-Expecting 'retained-request-admits-its-own-row-result' { Assert-KbpRuntimeResult -Result (New-Result $rows['0.31.1']) -Request $retained -BuildManifest $manifest } '' | Out-Null
+    # A writer that replaces the destination at the write boundary (the atomic writer wrapped in this process) cannot
+    # change the retained request: it keeps its loader row and non-ASCII text and refuses a result for the replacement row.
+    $originalWriter = ${function:Write-KbpTextAtomic}
+    $replacement = (New-KbpRuntimeRequest -RunId 'loader-identity' -EvidenceDirectory 'evidence' -BuildManifest $manifest -TimeoutSeconds 60 -ExitAfterCompletion $true -ExpectedLoader $rows['0.33.4'] -Scenario 'ui-root-smoke') | ConvertTo-Json -Depth 20
+    Set-Item -Path function:Write-KbpTextAtomic -Value { param([string]$Path, [string]$json) & $originalWriter $Path $json; [IO.File]::WriteAllText($Path, $replacement) }
+    $nonAscii = 'Pr' + [char]0x00FC + 'fung ' + [char]0x2013 + ' ' + [char]0x00DC + 'n' + [char]0x00EF + 'c' + [char]0x00F8 + 'd' + [char]0x00E9 + ' ' + [char]0x2713
+    $boundaryRequest = New-KbpRuntimeRequest -RunId 'loader-identity' -EvidenceDirectory 'evidence' -BuildManifest $manifest -TimeoutSeconds 60 -ExitAfterCompletion $true -ExpectedLoader $rows['0.31.1'] -Scenario 'ui-root-smoke'
+    $boundaryRequest['operatorNote'] = $nonAscii
+    try { $boundaryRetained = Save-KbpRuntimeRequest (Join-Path $temp 'boundary-request.json') $boundaryRequest }
+    finally { Set-Item -Path function:Write-KbpTextAtomic -Value $originalWriter }
+    $onDisk = Get-Content -LiteralPath (Join-Path $temp 'boundary-request.json') -Raw | ConvertFrom-Json
+    Add-Case 'retained-request-survives-replacement-at-the-write-boundary' ([string]$boundaryRetained.expectedLoader.unityModManager.version -eq '0.31.1.0' -and [string]$boundaryRetained.operatorNote -ceq $nonAscii -and [string]$onDisk.expectedLoader.unityModManager.version -eq '0.33.4.0') "retained row $($boundaryRetained.expectedLoader.unityModManager.version) (file now $($onDisk.expectedLoader.unityModManager.version)); note preserved: $([string]$boundaryRetained.operatorNote -ceq $nonAscii)"
+    Invoke-Expecting 'boundary-retained-request-refuses-the-replacement-row-result' { Assert-KbpRuntimeResult -Result (New-Result $rows['0.33.4']) -Request $boundaryRetained -BuildManifest $manifest } 'ummVersion expected=0\.31\.1\.0 observed=0\.33\.4\.0' | Out-Null
+    # A mixed-case owner ID resolves to the canonical owner-0.33.0 identity.
+    $mixed = Get-KbpLoaderIdentity -LoaderId 'Owner-0.33.0'
+    Add-Case 'mixed-case-owner-loader-id-resolves-to-the-canonical-row' ($mixed.loaderId -ceq 'owner-0.33.0' -and ($mixed | ConvertTo-Json -Depth 6) -ceq ((Get-KbpLoaderIdentity -LoaderId 'owner-0.33.0') | ConvertTo-Json -Depth 6)) "loaderId $($mixed.loaderId)"
     $request = New-Request $rows['0.32.4']
     Add-Case 'request-carries-selected-row' ($request.expectedLoader.loaderId -ceq '0.32.4' -and $request.expectedLoader.harmony2.sha256 -ceq $rows['0.32.4'].harmony2.sha256) "expectedLoader $($request.expectedLoader.loaderId)"
 
@@ -173,7 +189,7 @@ try {
     #    transaction or a running Kingmaker owned by another session, is reported separately); a crossed row is refused
     #    before staging; the private game folder is unchanged.
     if ($CandidatePackage) {
-        $CandidatePackage = [IO.Path]::GetFullPath($CandidatePackage)
+        $CandidatePackage = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($CandidatePackage)
         $wrapper = Join-Path $PSScriptRoot 'compatibility\Enter-KingmakerCompatibilityProfile.ps1'
         $deployScript = Join-Path $PSScriptRoot 'Deploy-Local.ps1'
         function Invoke-Deploy([string]$Entry, [string]$Game, [string]$Row) {

@@ -22,13 +22,15 @@ $secondHash = Get-KbpSha256 $secondPackage
 $secondManifest = Get-Content -LiteralPath ($secondPackage + '.build-local.json') -Raw | ConvertFrom-Json
 $builds = @([pscustomobject]@{ Manifest = $firstManifest; PackageSha256 = $firstHash }, [pscustomobject]@{ Manifest = $secondManifest; PackageSha256 = $secondHash })
 
-$releaseRoot = Join-Path $root "artifacts\release\$version"
-if (Test-Path -LiteralPath $releaseRoot) {
-    $resolvedRelease = [IO.Path]::GetFullPath($releaseRoot)
-    [void](Assert-KbpPathWithin -Path $resolvedRelease -Root (Join-Path $root 'artifacts\release'))
-    Remove-Item -LiteralPath $resolvedRelease -Recurse -Force
-}
-New-Item -ItemType Directory -Path $releaseRoot | Out-Null
+# The replacement release is prepared and reconciled in a private folder under artifacts\release; the versioned release
+# directory is replaced only after the ZIP and manifest are ready, so a refusal leaves the previous release untouched.
+$releaseParent = Join-Path $root 'artifacts\release'
+$finalReleaseRoot = Join-Path $releaseParent $version
+[void](Assert-KbpPathWithin -Path ([IO.Path]::GetFullPath($finalReleaseRoot)) -Root $releaseParent)
+$privateRelease = Join-Path $releaseParent ('.prepare-' + [Guid]::NewGuid().ToString('N'))
+$releaseRoot = Join-Path $privateRelease $version
+New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
+try {
 $releasePackage = Join-Path $releaseRoot "KingmakerBuffPlanner-$version.zip"
 Copy-Item -LiteralPath $secondPackage -Destination $releasePackage
 $releaseValidation = Join-Path ([IO.Path]::GetTempPath()) ('kbp-release-validation-' + [Guid]::NewGuid().ToString('N') + '.json')
@@ -48,7 +50,7 @@ $releaseManifest = [ordered]@{
     generator = 'scripts/Build-Release.ps1'
     version = $version
     commit = $releaseCommit
-    packagePath = $releasePackage
+    packagePath = (Join-Path $finalReleaseRoot "KingmakerBuffPlanner-$version.zip")
     packageSha256 = [string]$validatedRelease.package_sha256
     dllSha256 = [string]$validatedRelease.dll_sha256
     assemblyMvid = [string]$validatedRelease.dll_mvid
@@ -59,5 +61,19 @@ $releaseManifest = [ordered]@{
 }
 $releaseManifest | ConvertTo-Json -Depth 5 | Set-Content `
     -LiteralPath (Join-Path $releaseRoot 'release-manifest.json') -Encoding UTF8
+# Replace the versioned release: the previous directory is moved aside, the prepared one moved in, and the previous one
+# removed only after that succeeded (restored otherwise).
+$previousRelease = Join-Path $privateRelease 'previous'
+if (Test-Path -LiteralPath $finalReleaseRoot) { Move-Item -LiteralPath $finalReleaseRoot -Destination $previousRelease }
+try { Move-Item -LiteralPath $releaseRoot -Destination $finalReleaseRoot }
+catch {
+    if ((Test-Path -LiteralPath $previousRelease) -and -not (Test-Path -LiteralPath $finalReleaseRoot)) { Move-Item -LiteralPath $previousRelease -Destination $finalReleaseRoot }
+    throw
+}
+}
+finally {
+    if (Test-Path -LiteralPath $privateRelease) { Remove-Item -LiteralPath $privateRelease -Recurse -Force -ErrorAction SilentlyContinue }
+}
+$releasePackage = Join-Path $finalReleaseRoot "KingmakerBuffPlanner-$version.zip"
 Write-Host "Release build: PASS=3 FAIL=0 deterministic=2 sha256=$($releaseManifest.packageSha256)"
 Write-Output $releasePackage

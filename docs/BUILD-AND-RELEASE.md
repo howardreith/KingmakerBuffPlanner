@@ -42,8 +42,18 @@ verifies them; nothing falls back to the installed loader.
 # (suite), and the official UnityModManager 0.31.1/0.32.4/0.33.4 and Lib.Harmony 2.3.1.1/2.3.6/2.4.3 packages
 # (identity checks). For an offline run, pass local copies:
 .\scripts\Test-LoaderBaseline.ps1 -LegacyReleaseZip <KingmakerBuffPlanner-0.6.20.zip> -WrongLoaderPackage <unitymodmanager.0.32.4.nupkg>
-.\scripts\Test-RuntimeLoaderIdentity.ps1 -PackageDirectory <folder with the six .nupkg files>
+.\scripts\Test-RuntimeLoaderIdentity.ps1 -PackageDirectory <folder with the six .nupkg files> -CandidatePackage artifacts\local-runtime\<version>\KingmakerBuffPlanner-<version>-local-runtime.zip
 ```
+
+`-CandidatePackage` (a relative path is resolved from the current PowerShell location) is needed for the
+deployment checks: `Deploy-Local.ps1 -WhatIf` and the compatibility wrapper on private game directories for each
+loader row, the crossed-row refusals and the unchanged-fixture check. Without it the identity suite runs only its
+row, preflight and result-admission checks.
+
+The bounded local build configuration (only `KingmakerInstallDir` in `GamePath.props`; no outside or untracked
+`Directory.Build.*` file or project `.user` file; no environment variable that selects MSBuild imports; no per-user
+MSBuild import hooks) is enforced by `Build.ps1`, `Build-Local.ps1`, `Build-Release.ps1` (through them) and every
+receipt admission. Direct MSBuild produces no receipt and is not a reuse route.
 
 Runtime runs select the loader they expect with `-LoaderId` (`0.31.1`, `0.32.4`, `owner-0.33.0` - the
 default, the owner's measured installation - or `0.33.4`; rows in `compatibility/loaders/`), independently of
