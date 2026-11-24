@@ -56,7 +56,7 @@ $package = (Resolve-Path -LiteralPath ([string]$release.packagePath)).Path
 # Preflight, before any state, staging or transaction: validate a private copy of the release ZIP and reconcile every
 # identity the release manifest claims (ZIP and DLL digests, MVID, embedded source revision) with that copy; the install
 # then stages exactly this copy.
-$privatePackageRoot = Join-Path $root ('artifacts.install-package-' + [Guid]::NewGuid().ToString('N'))
+$privatePackageRoot = Join-Path $root ('artifacts\.install-package-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $privatePackageRoot | Out-Null
 try {
 $privatePackage = Join-Path $privatePackageRoot 'release.zip'
