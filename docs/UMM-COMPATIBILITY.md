@@ -52,10 +52,13 @@ compiled against the installed loader (the published 0.6.20 DLL references Unity
   its own command line, which must equal the evaluated one entry by entry. Because the commit is stamped into
   the DLL, a receipt is reusable only at its own commit.
 - Bounded local configuration: the ignored `GamePath.props` may only set `KingmakerInstallDir` (no conditions,
-  imports, items, targets or other properties), and no `Directory.Build.props`/`.targets` outside the
-  repository may apply. A setting that only a production compile would see could otherwise change the DLL
-  without changing the evaluated inventory, so building and receipt reuse both refuse it. Relocating
-  byte-identical game references remains supported.
+  imports, items, targets or other properties); no `Directory.Build.props`/`.targets`/`.rsp` outside the
+  repository, and none inside it that Git does not track, nor an untracked project `.user` file; no environment
+  variable that selects MSBuild imports (`DirectoryBuildTargetsPath`, `CustomAfterMicrosoftCommonTargets` and the
+  related names); no per-user MSBuild `ImportBefore`/`ImportAfter` hook. A setting that only a production compile
+  would see could otherwise change the DLL without changing the evaluated inventory, so it is refused by
+  `Build.ps1` (and so `Build-Local.ps1` and `Build-Release.ps1`) and by every receipt admission. Direct MSBuild
+  produces no receipt and is not a reuse route. Relocating byte-identical game references remains supported.
 - Runtime qualification (`Invoke-KingmakerRuntimeTest.ps1`, via `Read-KbpBuildManifest`) reuses a receipt
   only before staging and only when it is typed correctly, names a clean producing commit equal to HEAD,
   matches the current build-input fingerprint (the recorded compiler inventory is compared with the one MSBuild
@@ -68,7 +71,8 @@ compiled against the installed loader (the published 0.6.20 DLL references Unity
   preflight (launcher, `Deploy-Local.ps1`, the compatibility wrapper, the standalone profile test) refuses to
   stage unless the installed UnityModManager, 0Harmony12 and 0Harmony files match the row; the request carries
   the row (`expectedLoader`); the launcher keeps the decoded request it wrote before launch and checks the result
-  against that snapshot, never against a later read of the request file; the in-game result reports the loaded
+  against that snapshot, decoded from the exact serialization it passed to the atomic writer (never a reread of
+  the file); the in-game result reports the loaded
   UnityModManager, 0Harmony12 and Harmony2 modules and the installed files beside them; results are admitted
   only when loaded and installed identities both equal the row; and the compatibility identity used by
   allowances and earlier-pass admission includes the row (earlier allowances must be re-issued).
@@ -76,14 +80,33 @@ compiled against the installed loader (the published 0.6.20 DLL references Unity
   package once into its own folder and refuses a copy whose digest differs from the admitted one before
   anything is staged or activated. If entry fails after that copy but before the transaction state exists,
   the transaction removes its own copy (including a partial one) and releases the lock, so the same run ID can
-  retry. `Install-Local.ps1` validates a private copy of the release ZIP, reconciles the release manifest's ZIP
+  retry; each cleanup step is attempted on its own, the token-checked lock release is attempted regardless, and
+  the error names any owned path that still needs cleanup. `Install-Local.ps1` validates a private copy of the release ZIP, reconciles the release manifest's ZIP
   and DLL digests, MVID, embedded revision and its `embeddedCommit` field with it before any state or staging,
   and stages that copy. `Build-Release.ps1` reads both deterministic build receipts while their outputs are
-  current; both must name the clean release commit (also as the embedded revision) and their own packages and
-  agree with each other, and the validated release ZIP must be byte-identical to them with the same DLL, MVID
-  and embedded revision before the release manifest is written.
+  current; both must be clean (`sourceDirty` a JSON boolean `false`), name the release commit (also as the
+  embedded revision) and their own packages and agree with each other, and the validated release ZIP must be
+  byte-identical to them with the same DLL, MVID and embedded revision before the release manifest is written.
+  The release is prepared and reconciled in a private folder; the versioned release directory is replaced only
+  after its ZIP and manifest are ready, so a refusal leaves the previous release untouched.
 
-## Current frozen product (2026-11-24, round 4)
+## Current frozen product (2026-11-24, round 5)
+
+Product code and build tooling are frozen at `c2a594c` (the product source is unchanged since round 2; round 5
+changed build and runtime tooling). `Build-Local.ps1` in a dedicated worktree at `c2a594c` built the retained pair:
+ZIP SHA-256 `e8c19adf7aea9a0d92f0a631300b61439d449fe00caa5b6ca9b79951d700b480`, DLL SHA-256
+`a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda`, MVID `eb7e8a92-d678-45b3-a9a2-065ae10511c0`,
+embedded revision `c2a594c`, clean (validator 13/13). `retained-frozen-product.json` rebuilds `c2a594c` and the
+documentation commit in one clone, stamped with each revision. `scripts/Test-LoaderBaseline.ps1` 99/99 on a clone of
+`c2a594c` and `scripts/Test-RuntimeLoaderIdentity.ps1` 40/40 (run from the checkout with a relative
+`-CandidatePackage`); records in [`docs/evidence/umm-0311/`](evidence/umm-0311/INDEX.md). Cases added in round 5: an
+import selected by `DirectoryBuildTargetsPath` and an untracked `src\Directory.Build.targets` refused (reuse and
+`Build.ps1`); a pre-state cleanup failure (owned ZIP held) still releases the lock and names the copy; malformed clean
+flags refused; a release whose producing builds disagree keeps the previous release; a request replaced at the write
+boundary leaves the retained request (loader row, non-ASCII text) unchanged; a mixed-case owner loader ID resolves to
+the canonical row. The controller gate builds the candidate commit, so its DLL has its own digest.
+
+## Frozen product of round 4 (history)
 
 Product code and build tooling are frozen at `8ac5738`; later commits change only documentation and committed
 evidence. `Build-Local.ps1` in a dedicated worktree at `8ac5738` built the retained pair:
