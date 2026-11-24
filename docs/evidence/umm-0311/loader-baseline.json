@@ -1,21 +1,21 @@
 {
-    "schema":  "kbp.loader-baseline-tests.v1",
-    "source_commit":  "ca04d74d9de3312fb1d34764e8bba7db5b7513d3",
-    "candidate_package_sha256":  "06a50dd36e34a77e633ba4fbb230745329786b0f0d3de5e94bcdbbc25dab53bf",
-    "candidate_dll_sha256":  "ed79f02b4f520107798219014d9dcec8f560409f48bb70ca52f350a61571692a",
+    "schema":  "kbp.loader-baseline-tests.v2",
+    "source_commit":  "75aeeff68670913994a3caa0fb6a0d5e1edd49ba",
+    "candidate_package_sha256":  "3eb972730ef323f49552cca20aa0837fff1ba3c2ac10c194ba5b43b92a416b49",
+    "candidate_dll_sha256":  "c7f7c10e70a891b988a014b59060aeb799b84e7c054c576f60309c23f6a31c9f",
     "legacy_release_zip_sha256":  "54153abb96c9aa5a3e0cb87dc18401dc23aeb47e603b9a69148b5a944668f780",
     "wrong_loader_fixture":  "UnityModManager 0.32.4.0 1387468bc3af41c50fe51859a3bb7af4922891aa8f13a6187e7a348ceaabfd88",
     "owner_install_measured":  {
                                    "version":  "0.33.0.0",
                                    "sha256":  "63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691"
                                },
-    "passed":  37,
-    "total":  37,
+    "passed":  62,
+    "total":  62,
     "cases":  [
                   {
                       "name":  "clone-build-local-from-detached-commit",
                       "passed":  true,
-                      "detail":  "detached clone of ca04d74d9de3312fb1d34764e8bba7db5b7513d3; package 06a50dd36e34a77e633ba4fbb230745329786b0f0d3de5e94bcdbbc25dab53bf; DLL ed79f02b4f520107798219014d9dcec8f560409f48bb70ca52f350a61571692a"
+                      "detail":  "detached clone of 75aeeff68670913994a3caa0fb6a0d5e1edd49ba; package 3eb972730ef323f49552cca20aa0837fff1ba3c2ac10c194ba5b43b92a416b49; DLL c7f7c10e70a891b988a014b59060aeb799b84e7c054c576f60309c23f6a31c9f"
                   },
                   {
                       "name":  "cache-genuine-verified",
@@ -75,7 +75,7 @@
                   {
                       "name":  "msbuild-direct-compiles-against-pinned-inputs",
                       "passed":  true,
-                      "detail":  "exit 0; UnityModManager.dll -\u003e <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\artifacts\\references\\UnityModManager.dll; 0Harmony12.dll -\u003e <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\artifacts\\references\\0Harmony12.dll"
+                      "detail":  "exit 0; UnityModManager.dll -\u003e <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\artifacts\\references\\UnityModManager.dll; 0Harmony12.dll -\u003e <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\artifacts\\references\\0Harmony12.dll"
                   },
                   {
                       "name":  "incremental-build-genuine-accepted",
@@ -110,32 +110,32 @@
                   {
                       "name":  "csc-input-identical-copy-elsewhere-rejected",
                       "passed":  true,
-                      "detail":  "rejected: <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\stray copy\\UnityModManager.dll [<temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\probe stray.csproj]"
+                      "detail":  "rejected: <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\stray copy\\UnityModManager.dll [<temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\probe stray.csproj]"
                   },
                   {
                       "name":  "csc-input-same-stem-file-in-pinned-dir-rejected",
                       "passed":  true,
-                      "detail":  "rejected: <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\artifacts\\references\\UnityModManager.exe [<temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\probe samestem.csproj]"
+                      "detail":  "rejected: <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\artifacts\\references\\UnityModManager.exe [<temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\probe samestem.csproj]"
                   },
                   {
                       "name":  "csc-input-renamed-loader-in-pinned-dir-rejected",
                       "passed":  true,
-                      "detail":  "rejected: <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\artifacts\\references\\umm-alias.dll [<temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\probe alias.csproj]"
+                      "detail":  "rejected: <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\artifacts\\references\\umm-alias.dll [<temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\probe alias.csproj]"
                   },
                   {
                       "name":  "csc-input-umm-0.32.4-fixture-rejected",
                       "passed":  true,
-                      "detail":  "rejected: <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\inputs\\UnityModManager-0.32.4.dll [<temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\probe wrong.csproj]"
+                      "detail":  "rejected: <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\inputs\\UnityModManager-0.32.4.dll [<temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\probe wrong.csproj]"
                   },
                   {
                       "name":  "csc-input-substituted-reference-assembly-rejected",
                       "passed":  true,
-                      "detail":  "rejected: <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\stray copy\\UnityModManager.dll [<temp>\\kbp-loader-baseline-fd0ae8bd554d4d2d8ffa216370bdb6c8\\probe substituted.csproj]"
+                      "detail":  "rejected: <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\stray copy\\UnityModManager.dll [<temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\probe substituted.csproj]"
                   },
                   {
                       "name":  "package-candidate-accepted",
                       "passed":  true,
-                      "detail":  "accepted: Package validation: PASS=11 FAIL=0"
+                      "detail":  "accepted: Package validation: PASS=13 FAIL=0"
                   },
                   {
                       "name":  "package-extra-harmony-rejected",
@@ -180,12 +180,137 @@
                   {
                       "name":  "same-host-validation-KingmakerBuffPlanner-0.6.20-local-runtime-first",
                       "passed":  true,
-                      "detail":  "Package validation: PASS=11 FAIL=0 sha256=06a50dd36e34a77e633ba4fbb230745329786b0f0d3de5e94bcdbbc25dab53bf | ACCEPTED KingmakerBuffPlanner-0.6.20-local-runtime.zip | REJECTED KingmakerBuffPlanner-0.6.20-lowered.zip: Packaged DLL must reference pinned UnityModManager 0.31.1.0; lowering Info.json alone is not sufficient."
+                      "detail":  "Package validation: PASS=13 FAIL=0 sha256=3eb972730ef323f49552cca20aa0837fff1ba3c2ac10c194ba5b43b92a416b49 dll=c7f7c10e70a891b988a014b59060aeb799b84e7c054c576f60309c23f6a31c9f mvid=ed4ae28d-ff7c-48d9-b3b9-b09e063181d4 commit=75aeeff68670913994a3caa0fb6a0d5e1edd49ba | ACCEPTED KingmakerBuffPlanner-0.6.20-local-runtime.zip | REJECTED KingmakerBuffPlanner-0.6.20-lowered.zip: Packaged DLL must reference pinned UnityModManager 0.31.1.0; lowering Info.json alone is not sufficient."
                   },
                   {
                       "name":  "same-host-validation-KingmakerBuffPlanner-0.6.20-lowered-first",
                       "passed":  true,
-                      "detail":  "REJECTED KingmakerBuffPlanner-0.6.20-lowered.zip: Packaged DLL must reference pinned UnityModManager 0.31.1.0; lowering Info.json alone is not sufficient. | Package validation: PASS=11 FAIL=0 sha256=06a50dd36e34a77e633ba4fbb230745329786b0f0d3de5e94bcdbbc25dab53bf | ACCEPTED KingmakerBuffPlanner-0.6.20-local-runtime.zip"
+                      "detail":  "REJECTED KingmakerBuffPlanner-0.6.20-lowered.zip: Packaged DLL must reference pinned UnityModManager 0.31.1.0; lowering Info.json alone is not sufficient. | Package validation: PASS=13 FAIL=0 sha256=3eb972730ef323f49552cca20aa0837fff1ba3c2ac10c194ba5b43b92a416b49 dll=c7f7c10e70a891b988a014b59060aeb799b84e7c054c576f60309c23f6a31c9f mvid=ed4ae28d-ff7c-48d9-b3b9-b09e063181d4 commit=75aeeff68670913994a3caa0fb6a0d5e1edd49ba | ACCEPTED KingmakerBuffPlanner-0.6.20-local-runtime.zip"
+                  },
+                  {
+                      "name":  "validator-offline-without-reference-cache-accepted",
+                      "passed":  true,
+                      "detail":  "accepted: Package validation: PASS=13 FAIL=0"
+                  },
+                  {
+                      "name":  "validator-pin-definition-missing-harmony12-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: The pin file must define exactly: UnityModManager, 0Harmony12."
+                  },
+                  {
+                      "name":  "validator-umm-pin-inconsistent-with-minimum-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: The UnityModManager compile reference must equal the declared minimum."
+                  },
+                  {
+                      "name":  "validator-genuine-control-after-restore-accepted",
+                      "passed":  true,
+                      "detail":  "accepted: Package validation: PASS=13 FAIL=0"
+                  },
+                  {
+                      "name":  "relative-cache-uses-powershell-location-corrupt-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Pinned loader reference hash mismatch: <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\powershell dir\\cache\\UnityModManager.dll. Preserve or remove the mismatched file explicitly before retrying."
+                  },
+                  {
+                      "name":  "relative-cache-uses-powershell-location-genuine-accepted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "relative-cache-not-yet-created-resolves-under-powershell-location",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Pinned loader reference missing: <temp>\\kbp-loader-baseline-d64a3fedb3f44a2abd336464a11092b3\\empty location\\cache\\UnityModManager.dll. Run scripts/Get-PinnedLoaderReferences.ps1 first."
+                  },
+                  {
+                      "name":  "receipt-records-clean-producing-build",
+                      "passed":  true,
+                      "detail":  "commit 75aeeff68670913994a3caa0fb6a0d5e1edd49ba dirty False embedded 75aeeff68670913994a3caa0fb6a0d5e1edd49ba DLL c7f7c10e70a891b988a014b59060aeb799b84e7c054c576f60309c23f6a31c9f MVID ed4ae28d-ff7c-48d9-b3b9-b09e063181d4 inputs f067a5ba7eea986e1ddf0652ff9dfdb4a4b81c615683be8df010b39c4ba3d76a (304 compiler inputs)"
+                  },
+                  {
+                      "name":  "receipt-matching-archive-and-receipt-accepted",
+                      "passed":  true,
+                      "detail":  "accepted: RECEIPT ACCEPTED"
+                  },
+                  {
+                      "name":  "receipt-wrong-embedded-revision-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Build receipt does not match the validated package: embedded source revision."
+                  },
+                  {
+                      "name":  "receipt-wrong-dll-digest-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Build receipt does not match the validated package: DLL SHA-256."
+                  },
+                  {
+                      "name":  "receipt-wrong-mvid-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Build receipt does not match the validated package: MVID."
+                  },
+                  {
+                      "name":  "receipt-dirty-flag-as-string-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Build receipt has no boolean sourceDirty; rebuild with Build-Local.ps1."
+                  },
+                  {
+                      "name":  "receipt-inputs-digest-array-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Build receipt has no string buildInputsSha256; rebuild with Build-Local.ps1."
+                  },
+                  {
+                      "name":  "second-same-version-build-is-distinct",
+                      "passed":  true,
+                      "detail":  "version 0.6.20; DLL 7924708cd6be8680723ba4be14e7741f3d0ae0ee2578ebf1a7f1aa0cfb5533a0 vs c7f7c10e70a891b988a014b59060aeb799b84e7c054c576f60309c23f6a31c9f; dirty True"
+                  },
+                  {
+                      "name":  "receipt-dirty-development-build-not-reused",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Build receipt is from a dirty development build; only a clean build is eligible for frozen reuse."
+                  },
+                  {
+                      "name":  "receipt-swapped-receipt-for-other-build-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Build-local manifest does not match the exact package and clean HEAD."
+                  },
+                  {
+                      "name":  "receipt-swapped-archive-from-other-build-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Build-local manifest does not match the exact package and clean HEAD."
+                  },
+                  {
+                      "name":  "receipt-pair-a-restored-accepted",
+                      "passed":  true,
+                      "detail":  "accepted: RECEIPT ACCEPTED"
+                  },
+                  {
+                      "name":  "receipt-after-reference-helper-change-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Build inputs changed since this package was built (source, project, pins, wrappers or resolved local references); rebuild with Build-Local.ps1."
+                  },
+                  {
+                      "name":  "receipt-after-project-file-change-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Build inputs changed since this package was built (source, project, pins, wrappers or resolved local references); rebuild with Build-Local.ps1."
+                  },
+                  {
+                      "name":  "receipt-after-build-wrapper-change-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Build inputs changed since this package was built (source, project, pins, wrappers or resolved local references); rebuild with Build-Local.ps1."
+                  },
+                  {
+                      "name":  "receipt-identical-local-references-relocated-accepted",
+                      "passed":  true,
+                      "detail":  "accepted: RECEIPT ACCEPTED"
+                  },
+                  {
+                      "name":  "receipt-after-resolved-local-reference-change-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Build inputs changed since this package was built (source, project, pins, wrappers or resolved local references); rebuild with Build-Local.ps1."
+                  },
+                  {
+                      "name":  "receipt-after-inputs-restored-accepted",
+                      "passed":  true,
+                      "detail":  "accepted: RECEIPT ACCEPTED"
                   },
                   {
                       "name":  "repository-artifacts-untouched",

@@ -1,0 +1,126 @@
+{
+    "schema":  "kbp.runtime-loader-identity-tests.v1",
+    "installed_loader_observed":  {
+                                      "unityModManager":  {
+                                                              "version":  "0.33.0.0",
+                                                              "sha256":  "63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691"
+                                                          },
+                                      "harmony12":  {
+                                                        "version":  "1.2.0.1",
+                                                        "sha256":  "aa1cd48317254985d8b700cc74953477d1b40c3022ce9aa4c95ed2b8327e1292"
+                                                    },
+                                      "harmony2":  {
+                                                       "version":  "2.3.6.0",
+                                                       "sha256":  "df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80"
+                                                   }
+                                  },
+    "passed":  21,
+    "total":  21,
+    "cases":  [
+                  {
+                      "name":  "profile-advanced-gunslinger-0136-loader-identity",
+                      "passed":  true,
+                      "detail":  "UMM 0.33.0.0 / Harmony12 1.2.0.1 / Harmony2 2.3.6.0"
+                  },
+                  {
+                      "name":  "profile-call-of-the-wild-loader-identity",
+                      "passed":  true,
+                      "detail":  "UMM 0.33.0.0 / Harmony12 1.2.0.1 / Harmony2 2.3.6.0"
+                  },
+                  {
+                      "name":  "profile-call-of-the-wild-plus-tabletop-added-rules-loader-identity",
+                      "passed":  true,
+                      "detail":  "status unavailable-local-reference"
+                  },
+                  {
+                      "name":  "profile-full-user-loader-identity",
+                      "passed":  true,
+                      "detail":  "UMM 0.33.0.0 / Harmony12 1.2.0.1 / Harmony2 2.3.6.0"
+                  },
+                  {
+                      "name":  "profile-human-reproduction-loader-identity",
+                      "passed":  true,
+                      "detail":  "UMM 0.33.0.0 / Harmony12 1.2.0.1 / Harmony2 2.3.6.0"
+                  },
+                  {
+                      "name":  "profile-native-only-loader-identity",
+                      "passed":  true,
+                      "detail":  "UMM 0.33.0.0 / Harmony12 1.2.0.1 / Harmony2 2.3.6.0"
+                  },
+                  {
+                      "name":  "profile-tabletop-added-rules-loader-identity",
+                      "passed":  true,
+                      "detail":  "status unavailable-local-reference"
+                  },
+                  {
+                      "name":  "loader-contract-malformed-harmony2-row-refused",
+                      "passed":  true,
+                      "detail":  "refused: Compatibility loader identity row is invalid: test harmony2"
+                  },
+                  {
+                      "name":  "loader-contract-missing-harmony2-refused",
+                      "passed":  true,
+                      "detail":  "refused: Compatibility loader identity must name exactly unityModManager, harmony12, harmony2: test"
+                  },
+                  {
+                      "name":  "preflight-matching-installation-accepted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "preflight-different-umm-row-refused",
+                      "passed":  true,
+                      "detail":  "refused: Installed loader does not match compatibility profile native-only: unityModManager expected=0.31.1.0/2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4 observed=UnityModManager 0.33.0.0/63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691"
+                  },
+                  {
+                      "name":  "preflight-harmony2-only-mismatch-refused",
+                      "passed":  true,
+                      "detail":  "refused: Installed loader does not match compatibility profile native-only: harmony2 expected=2.3.6.0/0000000000000000000000000000000000000000000000000000000000000000 observed=0Harmony 2.3.6.0/df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80"
+                  },
+                  {
+                      "name":  "preflight-installed-file-swapped-refused",
+                      "passed":  true,
+                      "detail":  "refused: Installed loader does not match compatibility profile native-only: unityModManager expected=0.33.0.0/63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691 observed=UnityModManager 0.31.1.0/2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4"
+                  },
+                  {
+                      "name":  "preflight-missing-harmony2-refused",
+                      "passed":  true,
+                      "detail":  "refused: Installed loader does not match compatibility profile native-only: harmony2 missing (0Harmony.dll)"
+                  },
+                  {
+                      "name":  "result-matching-loader-admitted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "result-different-umm-row-refused",
+                      "passed":  true,
+                      "detail":  "refused: Runtime result identity/hash mismatch: ummVersion expected=0.33.0.0 observed=0.31.1.0; ummSha256 expected=63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691 observed=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4"
+                  },
+                  {
+                      "name":  "result-harmony2-only-mismatch-refused",
+                      "passed":  true,
+                      "detail":  "refused: Runtime result identity/hash mismatch: harmony2Sha256 expected=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80 observed=0000000000000000000000000000000000000000000000000000000000000000"
+                  },
+                  {
+                      "name":  "result-harmony2-not-loaded-refused",
+                      "passed":  true,
+                      "detail":  "refused: Runtime result identity/hash mismatch: harmony2Version expected=2.3.6.0 observed=not-loaded; harmony2Sha256 expected=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80 observed=not-loaded"
+                  },
+                  {
+                      "name":  "result-earlier-shape-without-harmony2-refused",
+                      "passed":  true,
+                      "detail":  "refused: Runtime result identity/hash mismatch: harmony2Version expected=2.3.6.0 observed=(absent); harmony2Sha256 expected=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80 observed=(absent)"
+                  },
+                  {
+                      "name":  "result-under-other-expected-harmony2-refused",
+                      "passed":  true,
+                      "detail":  "refused: Runtime result identity/hash mismatch: harmony2Version expected=2.4.3.0 observed=2.3.6.0"
+                  },
+                  {
+                      "name":  "compatibility-identity-binds-loader",
+                      "passed":  true,
+                      "detail":  "native-only 41020f1bca1c1adf63a92eafc58b9cce4002223ee3faca83b74c41589780381b; Harmony2-only change 8fb90e91de6d10024d8d07848e37503d12d23dab2897a120d3781e6d074a9cc9"
+                  }
+              ]
+}
