@@ -136,7 +136,7 @@ try {
     if ($build.ExitCode -ne 0 -or -not $packageMatch.Success) { throw "Clone Build-Local failed: $($build.Output)" }
     $candidateZip = $packageMatch.Groups[1].Value.Trim()
     $manifest = Get-Content -LiteralPath ($candidateZip + '.build-local.json') -Raw | ConvertFrom-Json
-    Add-Case 'clone-build-local-from-detached-commit' ($build.Output -match 'Package validation: PASS=11 FAIL=0') ("detached clone of $commit; package $(Get-KbpSha256 $candidateZip); DLL $($manifest.dllSha256)")
+    Add-Case 'clone-build-local-from-detached-commit' ($build.Output -match 'Package validation: PASS=13 FAIL=0') ("detached clone of $commit; package $(Get-KbpSha256 $candidateZip); DLL $($manifest.dllSha256)")
     $verifier = Join-Path $base 'scripts\Get-PinnedLoaderReferences.ps1'
     $validator = Join-Path $base 'scripts\validate-package.ps1'
     $project = Join-Path $base 'src\KingmakerBuffPlanner\KingmakerBuffPlanner.csproj'
@@ -241,7 +241,7 @@ try {
 
     # 5. Package validator on real archives (inside the clone's artifacts, as the validator requires).
     $v = { param($zip) Invoke-Isolated @('-File', $validator, '-PackagePath', $zip) }
-    Expect-Accepted 'package-candidate-accepted' (& $v $candidateZip) 'Package validation: PASS=11 FAIL=0'
+    Expect-Accepted 'package-candidate-accepted' (& $v $candidateZip) 'Package validation: PASS=13 FAIL=0'
     $dllBytes = $null
     $p = Join-Path $testZips 'extra-harmony.zip'
     Copy-ZipWith $candidateZip $p { param($name, $bytes) [pscustomobject]@{ Name = $name; Bytes = $bytes }; if ($name -ceq "$modFolder/Info.json") { [pscustomobject]@{ Name = "$modFolder/0Harmony12.dll"; Bytes = [IO.File]::ReadAllBytes($pinned['0Harmony12.dll']) } } }
