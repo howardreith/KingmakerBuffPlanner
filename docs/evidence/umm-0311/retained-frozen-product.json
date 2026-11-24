@@ -1,17 +1,17 @@
 {
     "schema":  "kbp.retained-frozen-product.v2",
-    "frozen_commit":  "5cd32d080416718706d94e539c92f000a66fb7b6",
-    "retained_location":  "<dev>\\KingmakerBuffPlannerLab\\worktrees\\umm-0311-frozen-5cd32d0\\artifacts\\local-runtime\\0.6.20\\KingmakerBuffPlanner-0.6.20-local-runtime.zip",
-    "frozen_worktree":  "<dev>\\KingmakerBuffPlannerLab\\worktrees\\umm-0311-frozen-5cd32d0",
+    "frozen_commit":  "8ac57387509f13840659365c9f7d01762e80bcf5",
+    "retained_location":  "<dev>\\KingmakerBuffPlannerLab\\worktrees\\umm-0311-frozen-8ac5738\\artifacts\\local-runtime\\0.6.20\\KingmakerBuffPlanner-0.6.20-local-runtime.zip",
+    "frozen_worktree":  "<dev>\\KingmakerBuffPlannerLab\\worktrees\\umm-0311-frozen-8ac5738",
     "retained_pair":  {
-                          "zip_sha256":  "4a4b117d5f011b985f83aeb32d686714a9ba8db7292ec8462759fd3c3538131b",
-                          "sidecar_sha256":  "a59cc6e44066aca9204c5b6a2e4680a547e6ab24274e9eee68b4dff1e3582945"
+                          "zip_sha256":  "94e9a036d51a996540c9fb20d1ca23319fbc5425e53a0707a7da47c01d559133",
+                          "sidecar_sha256":  "4e317a36eb66e5204d5949aa2caeba89a1f4d3da7a8660035c6338f0a8586f43"
                       },
     "read_back":  {
-                      "package_sha256":  "4a4b117d5f011b985f83aeb32d686714a9ba8db7292ec8462759fd3c3538131b",
-                      "dll_sha256":  "7c7fe1506da3b586b06e9a1310669add89409de0ee2248bf7c0f34324fbbf897",
-                      "mvid":  "653c355d-9dbb-4675-9bf1-98aef4477d96",
-                      "embedded_commit":  "5cd32d080416718706d94e539c92f000a66fb7b6",
+                      "package_sha256":  "94e9a036d51a996540c9fb20d1ca23319fbc5425e53a0707a7da47c01d559133",
+                      "dll_sha256":  "80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf",
+                      "mvid":  "b12670d5-f94f-49ca-b23d-1514086a1f4b",
+                      "embedded_commit":  "8ac57387509f13840659365c9f7d01762e80bcf5",
                       "loader_references":  [
                                                 {
                                                     "name":  "0Harmony12",
@@ -24,35 +24,35 @@
                                             ]
                   },
     "receipt":  {
-                    "commit":  "5cd32d080416718706d94e539c92f000a66fb7b6",
+                    "commit":  "8ac57387509f13840659365c9f7d01762e80bcf5",
                     "sourceDirty":  false,
-                    "packageSha256":  "4a4b117d5f011b985f83aeb32d686714a9ba8db7292ec8462759fd3c3538131b",
-                    "dllSha256":  "7c7fe1506da3b586b06e9a1310669add89409de0ee2248bf7c0f34324fbbf897",
-                    "assemblyMvid":  "653c355d-9dbb-4675-9bf1-98aef4477d96",
-                    "embeddedCommit":  "5cd32d080416718706d94e539c92f000a66fb7b6",
-                    "buildInputsSha256":  "606860b6ee71c16212d16201a943c01090129a1a03462d57e5bab1f332fc0ef0"
+                    "packageSha256":  "94e9a036d51a996540c9fb20d1ca23319fbc5425e53a0707a7da47c01d559133",
+                    "dllSha256":  "80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf",
+                    "assemblyMvid":  "b12670d5-f94f-49ca-b23d-1514086a1f4b",
+                    "embeddedCommit":  "8ac57387509f13840659365c9f7d01762e80bcf5",
+                    "buildInputsSha256":  "daa86370ca401b367c3cae52e92e6faa993a52bf1ab9f23fca7cb09fad39899e"
                 },
     "frozen_receipt_check_at_frozen_worktree":  "accepted by Read-KbpBuildManifest (clean producing commit = HEAD, current build inputs, revalidated package identities)",
-    "candidate_commit":  "f33b945b8fce2a4581ddf8ddbc510524671cdad3",
+    "candidate_commit":  "0e26eeda0881f9a9a73376d18d12bd30c99a8187",
     "files_changed_since_frozen":  [
                                        "docs/BUILD-AND-RELEASE.md",
                                        "docs/UMM-COMPATIBILITY.md"
                                    ],
     "revision_stamp_builds_one_clone":  [
                                             {
-                                                "source_commit":  "5cd32d080416718706d94e539c92f000a66fb7b6",
-                                                "stamped_revision":  "5cd32d080416718706d94e539c92f000a66fb7b6",
-                                                "dll_sha256":  "7c7fe1506da3b586b06e9a1310669add89409de0ee2248bf7c0f34324fbbf897"
+                                                "source_commit":  "8ac57387509f13840659365c9f7d01762e80bcf5",
+                                                "stamped_revision":  "8ac57387509f13840659365c9f7d01762e80bcf5",
+                                                "dll_sha256":  "80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf"
                                             },
                                             {
-                                                "source_commit":  "f33b945b8fce2a4581ddf8ddbc510524671cdad3",
-                                                "stamped_revision":  "5cd32d080416718706d94e539c92f000a66fb7b6",
-                                                "dll_sha256":  "7c7fe1506da3b586b06e9a1310669add89409de0ee2248bf7c0f34324fbbf897"
+                                                "source_commit":  "0e26eeda0881f9a9a73376d18d12bd30c99a8187",
+                                                "stamped_revision":  "8ac57387509f13840659365c9f7d01762e80bcf5",
+                                                "dll_sha256":  "80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf"
                                             },
                                             {
-                                                "source_commit":  "f33b945b8fce2a4581ddf8ddbc510524671cdad3",
-                                                "stamped_revision":  "f33b945b8fce2a4581ddf8ddbc510524671cdad3",
-                                                "dll_sha256":  "e634b5d1ac8109cd3f542c5929050c2ee287fc276f70e1d9a11ddd3a7199b3ea"
+                                                "source_commit":  "0e26eeda0881f9a9a73376d18d12bd30c99a8187",
+                                                "stamped_revision":  "0e26eeda0881f9a9a73376d18d12bd30c99a8187",
+                                                "dll_sha256":  "c5b2a632c3443a3bc9d1e935fabfd33d69cecce42be25ea3e0f435929561c1e0"
                                             }
                                         ],
     "candidate_stamped_frozen_equals_frozen_build":  true,

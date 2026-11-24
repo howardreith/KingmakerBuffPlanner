@@ -1,12 +1,12 @@
 {
   "schema": "kingmaker.loader-profile-inventory.v1",
-  "measured_utc": "2026-11-24T02:12:30Z",
+  "measured_utc": "2026-11-24T15:16:29Z",
   "candidate": {
     "file": "retained.dll",
     "assembly": "KingmakerBuffPlanner",
     "version": "0.6.20.0",
-    "sha256": "7c7fe1506da3b586b06e9a1310669add89409de0ee2248bf7c0f34324fbbf897",
-    "mvid": "653c355d-9dbb-4675-9bf1-98aef4477d96",
+    "sha256": "80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf",
+    "mvid": "b12670d5-f94f-49ca-b23d-1514086a1f4b",
     "references": [
       "UnityModManager 0.31.1.0",
       "0Harmony12 1.2.0.1"
