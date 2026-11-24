@@ -424,8 +424,8 @@ try {
     # unrelated pre-existing runtime transaction in the lab (owner state, never touched); that refusal is reported as such.
     $g = & $install $releaseManifest 'genuine'
     $gText = $g.Output -replace '\s+', ' '
-    $ok = $gText -notmatch 'does not match the validated release package' -and $gText -match 'Package validation: PASS=13 FAIL=0' -and (($g.ExitCode -eq 0 -and $gText -match 'Local install preflight PASS') -or ($g.ExitCode -ne 0 -and $gText -match 'Unresolved runtime transaction exists'))
-    Add-Case 'install-preflight-matching-release-passes-reconciliation' $ok $(if ($g.ExitCode -eq 0) { 'reconciled; Local install preflight PASS' } else { 'reconciled (validated copy matches the release manifest); then refused by an unrelated pre-existing lab runtime transaction: ' + (Get-Reason $g.Output) })
+    $ok = $gText -notmatch 'does not match the validated release package' -and $gText -match 'Package validation: PASS=13 FAIL=0' -and (($g.ExitCode -eq 0 -and $gText -match 'Local install preflight PASS') -or ($g.ExitCode -ne 0 -and $gText -match 'Unresolved runtime transaction exists|Pathfinder: Kingmaker is running'))
+    Add-Case 'install-preflight-matching-release-passes-reconciliation' $ok $(if ($g.ExitCode -eq 0) { 'reconciled; Local install preflight PASS' } else { 'reconciled (validated copy matches the release manifest); then stopped by an unrelated host gate (a pre-existing lab runtime transaction or a running Kingmaker owned by another session): ' + (Get-Reason $g.Output) })
     $savedRelease = Join-Path $inputs 'release-manifest.json'
     Copy-Item -LiteralPath $releaseManifest -Destination $savedRelease
     foreach ($bad in @(
@@ -457,8 +457,8 @@ try {
     foreach ($entry in @(@('deploy-local', $deployScript, @('-CompatibilityProfileId', 'native-only')), @('compatibility-wrapper', $wrapper, @('-ProfileId', 'native-only')))) {
         $m = & $deploy $entry[1] $entry[2]
         $mText = $m.Output -replace '\s+', ' '
-        $ok = $mText -notmatch 'Installed loader does not match' -and (($m.ExitCode -eq 0 -and $mText -match 'Deployment preflight PASS') -or ($m.ExitCode -ne 0 -and $mText -match 'Unresolved runtime transaction exists'))
-        Add-Case "$($entry[0])-whatif-matching-loader-row-passes-preflight" $ok $(if ($m.ExitCode -eq 0) { 'Deployment preflight PASS' } else { 'loader row matched; then stopped at an unrelated pre-existing lab runtime transaction: ' + (Get-Reason $m.Output) })
+        $ok = $mText -notmatch 'Installed loader does not match' -and (($m.ExitCode -eq 0 -and $mText -match 'Deployment preflight PASS') -or ($m.ExitCode -ne 0 -and $mText -match 'Unresolved runtime transaction exists|Pathfinder: Kingmaker is running'))
+        Add-Case "$($entry[0])-whatif-matching-loader-row-passes-preflight" $ok $(if ($m.ExitCode -eq 0) { 'Deployment preflight PASS' } else { 'loader row matched; then stopped by an unrelated host gate (a pre-existing lab runtime transaction or a running Kingmaker owned by another session): ' + (Get-Reason $m.Output) })
     }
     Copy-Item -LiteralPath (Join-Path $deployLoader '0Harmony12.dll') -Destination (Join-Path $deployLoader '0Harmony.dll') -Force
     foreach ($entry in @(@('deploy-local', $deployScript, @('-CompatibilityProfileId', 'native-only')), @('compatibility-wrapper', $wrapper, @('-ProfileId', 'native-only')))) {
