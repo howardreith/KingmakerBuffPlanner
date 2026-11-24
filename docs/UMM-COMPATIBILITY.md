@@ -44,66 +44,92 @@ compiled against the installed loader (the published 0.6.20 DLL references Unity
   must not change while building, and the package/DLL/MVID/revision identities from the validator's
   snapshot. The compiler inventory is the exact Csc command line of the production compile, evaluated the
   way `Build.ps1` builds (the solution, the configuration and the commit stamped as `KbpSourceRevision`) with
-  a `SkipCompilerExecution` pass through `PrepareResources` and `CoreCompile`: every option verbatim,
-  references (including the ignored game assemblies `GamePath.props` selects), sources including the
-  generated `BuildInfo` (whose content carries the version and revision), embedded resources and other
-  file-valued inputs by content. The production compile writes its own command line, which must equal the
-  evaluated one. Because the commit is stamped into the DLL, a receipt is reusable only at its own commit.
+  a `SkipCompilerExecution` pass through `PrepareResources` and `CoreCompile`. It is kept in argument order:
+  first the effective compiler binary (from `CscToolPath`/`CscToolExe`, by content) and, without `/noconfig`,
+  the implicit `csc.rsp`; then every option verbatim, references (including the ignored game assemblies
+  `GamePath.props` selects), sources including the generated `BuildInfo` (whose content carries the version
+  and revision), embedded resources and other file-valued inputs by content. The production compile writes
+  its own command line, which must equal the evaluated one entry by entry. Because the commit is stamped into
+  the DLL, a receipt is reusable only at its own commit.
+- Bounded local configuration: the ignored `GamePath.props` may only set `KingmakerInstallDir` (no conditions,
+  imports, items, targets or other properties), and no `Directory.Build.props`/`.targets` outside the
+  repository may apply. A setting that only a production compile would see could otherwise change the DLL
+  without changing the evaluated inventory, so building and receipt reuse both refuse it. Relocating
+  byte-identical game references remains supported.
 - Runtime qualification (`Invoke-KingmakerRuntimeTest.ps1`, via `Read-KbpBuildManifest`) reuses a receipt
   only before staging and only when it is typed correctly, names a clean producing commit equal to HEAD,
-  matches the current build-input fingerprint, and agrees with the revalidated package (ZIP digest, DLL
-  digest, MVID, embedded revision). A dirty development build is never reused as a frozen receipt.
+  matches the current build-input fingerprint (the recorded compiler inventory is compared with the one MSBuild
+  resolves now, entry by entry in order), and agrees with the revalidated package (ZIP digest, DLL digest, MVID,
+  embedded revision). A dirty development build is never reused as a frozen receipt.
 - Runtime loader identity: a run selects one measured loader row (`-LoaderId`: `0.31.1`, `0.32.4`,
-  `owner-0.33.0`, `0.33.4`; `compatibility/loaders/`), independently of the optional-mod profile. The shared
-  installation preflight (launcher, `Deploy-Local.ps1`, the standalone profile test) refuses to stage unless
-  the installed UnityModManager, 0Harmony12 and 0Harmony files match the row; the request carries the row
-  (`expectedLoader`); the in-game result reports the loaded UnityModManager, 0Harmony12 and Harmony2 modules
-  and the installed files beside them; results are admitted only when loaded and installed identities both
-  equal the row; and the compatibility identity used by allowances and earlier-pass admission includes the
-  row (earlier allowances must be re-issued).
+  `owner-0.33.0`, `0.33.4`; `compatibility/loaders/`), independently of the optional-mod profile. The launcher
+  forwards the row to both of its `Deploy-Local.ps1` calls, and `Enter-KingmakerCompatibilityProfile.ps1` accepts
+  and forwards `-LoaderId` (callers that omit it keep the `owner-0.33.0` default). The shared installation
+  preflight (launcher, `Deploy-Local.ps1`, the compatibility wrapper, the standalone profile test) refuses to
+  stage unless the installed UnityModManager, 0Harmony12 and 0Harmony files match the row; the request carries
+  the row (`expectedLoader`); the launcher keeps the decoded request it wrote before launch and checks the result
+  against that snapshot, never against a later read of the request file; the in-game result reports the loaded
+  UnityModManager, 0Harmony12 and Harmony2 modules and the installed files beside them; results are admitted
+  only when loaded and installed identities both equal the row; and the compatibility identity used by
+  allowances and earlier-pass admission includes the row (earlier allowances must be re-issued).
 - Deployment and release installation stage only a copy they own: the transaction copies the admitted
   package once into its own folder and refuses a copy whose digest differs from the admitted one before
-  anything is staged or activated; `Install-Local.ps1` validates a private copy of the release ZIP, reconciles
-  the release manifest's ZIP and DLL digests, MVID and embedded revision with it before any state or staging,
-  and stages that copy. `Build-Release.ps1` takes the release manifest's identities from the validated
-  release ZIP.
+  anything is staged or activated. If entry fails after that copy but before the transaction state exists,
+  the transaction removes its own copy (including a partial one) and releases the lock, so the same run ID can
+  retry. `Install-Local.ps1` validates a private copy of the release ZIP, reconciles the release manifest's ZIP
+  and DLL digests, MVID, embedded revision and its `embeddedCommit` field with it before any state or staging,
+  and stages that copy. `Build-Release.ps1` reads both deterministic build receipts while their outputs are
+  current; both must name the clean release commit (also as the embedded revision) and their own packages and
+  agree with each other, and the validated release ZIP must be byte-identical to them with the same DLL, MVID
+  and embedded revision before the release manifest is written.
 
-## Evidence for this change (2026-11-24, round 2)
+## Current frozen product (2026-11-24, round 4)
 
-The product code is frozen at `75aeeff`; later commits change only documentation and committed evidence.
-Because `Build.ps1` stamps the current commit into `BuildInfo.Commit`, a build of a later commit (for
-example the controller's focused gate) produces different DLL bytes; the committed evidence shows that a
-build of the later commit stamped with `75aeeff` reproduces the frozen DLL exactly.
+Product code and build tooling are frozen at `8ac5738`; later commits change only documentation and committed
+evidence. `Build-Local.ps1` in a dedicated worktree at `8ac5738` built the retained pair:
+`KingmakerBuffPlanner-0.6.20-local-runtime.zip`, ZIP SHA-256
+`94e9a036d51a996540c9fb20d1ca23319fbc5425e53a0707a7da47c01d559133`, DLL SHA-256
+`80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf`, MVID `b12670d5-f94f-49ca-b23d-1514086a1f4b`,
+embedded revision `8ac5738`, clean, references UnityModManager 0.31.1.0 and 0Harmony12 1.2.0.1 (validator 13/13).
+The boundary suite's own clean-clone build of `8ac5738` produced the same ZIP and DLL bytes.
 
-- `scripts/Test-LoaderBaseline.ps1` on `75aeeff` (temporary clone whose path contains a space; each check
-  in its own process; this checkout's artifacts untouched): 62/62. In addition to the round-1 cases (cache
-  bytes, pin definition and manifests, direct and incremental MSBuild, Csc-input probes, package
-  validator, the 0.6.20 regression, same-host validation) it covers offline validation without a cache,
-  a missing Harmony12 pin and a UMM pin inconsistent with the minimum, relative cache paths resolved
-  from the PowerShell location (corrupt and genuine caches in distinct process and PowerShell
-  directories, and a not-yet-created cache), and frozen-receipt reuse: a clean receipt accepted; wrong
-  embedded revision, DLL digest, MVID, dirty-flag type or inputs-digest type refused; a second real
-  same-version build (dirty) not reused; swapped receipt and swapped archive refused; reference-helper,
-  project-file and build-wrapper changes at the same HEAD refused; identical local references relocated
-  accepted and one changed byte refused.
-- `scripts/Test-RuntimeLoaderIdentity.ps1` (offline): 21/21 - every available profile carries the loader
-  identity; malformed rows refused; preflight on a private copy of the installed loader accepts the
-  matching identity and refuses a different UMM row, a Harmony2-only mismatch, a swapped file and a
-  missing Harmony2; result admission accepts matching rows and refuses a different UMM row, a
-  Harmony2-only mismatch, an unloaded Harmony2, a result without Harmony2 fields and a different expected
-  Harmony2; the compatibility identity changes when only the loader changes.
-- The genuine published 0.6.20 release (ZIP SHA-256
-  `54153abb96c9aa5a3e0cb87dc18401dc23aeb47e603b9a69148b5a944668f780`, DLL compiled against
-  UnityModManager 0.33.0.0) with only its manifest lowered to 0.31.1 is refused by
-  `validate-package.ps1`: "Packaged DLL must reference pinned UnityModManager 0.31.1.0".
-- Machine-generated records (structured, no logs; local path prefixes replaced; frozen product
-  identities, receipt, validator report, static audit and profile inventory of the frozen DLL, the
-  revision-stamp equivalence, suite results and link checks) are committed in
+- `scripts/Test-LoaderBaseline.ps1` on a temporary clone of `8ac5738`: 90/90 (`loader-baseline.json`). Beyond the
+  earlier cases it covers a production-only local setting and a compiler-selection override (both refused, at build
+  and at reuse), reordered and missing compiler entries refused with unchanged and restored controls, the
+  transaction's state-write failure (no copy or lock left, same-run-ID retry succeeds), release reconciliation (a
+  substituted release copy with the same DLL and different data refused, a dirty producing receipt refused, the
+  matching clean pair accepted), the installer's `embeddedCommit` reconciliation, and `Deploy-Local.ps1` and the
+  compatibility wrapper on a private game directory with `-WhatIf`.
+- `scripts/Test-RuntimeLoaderIdentity.ps1` (offline) on `74a9efc`: 37/37 (`runtime-loader-identity.json`). The
+  only later change before `8ac5738` is to `Test-LoaderBaseline.ps1`. For each of the four rows, `Deploy-Local.ps1 -WhatIf`
+  and the compatibility wrapper on a private game directory holding that row's loader files clear the loader
+  check; a crossed row is refused before staging; the private Mods folders stay empty. The host guard reached
+  after a cleared loader check (an unrelated pending lab transaction, or another session's running game) is
+  reported separately. The launcher passes
+  `-LoaderId` to both deployment calls, and a result for another row is refused against the retained request after
+  the request file is changed.
+- Revision stamp: `Build.ps1` stamps the building commit into `BuildInfo.Commit`. `retained-frozen-product.json`
+  rebuilds `8ac5738` and the documentation commit in one clone, stamped with each revision, and records
+  whether the documentation commit stamped with `8ac5738` reproduces the frozen DLL.
+- The controller's focused gate builds the candidate commit, so its DLL is stamped with that commit and has its own
+  digest (controller receipt); it is not the retained DLL.
+- Static loader API audit of the retained DLL `80e0a1fb` (into UnityModManager, 0Harmony12 and 0Harmony, by name and
+  decoded signature): resolved on 0.31.1, 0.32.4, the owner's 0.33.0 and 0.33.4 (newest stable on the author's
+  NuGet feed, 2026-11-19), 8 types and 24 members each (`api-audit.json`). Profiles are component-assembled from
+  official packages, not UMM distribution ZIPs. Static evidence only; not a compatibility claim.
+- Machine-generated records, with the producer of each file, are in
   [`docs/evidence/umm-0311/`](evidence/umm-0311/INDEX.md).
-- Static loader API audit of the frozen DLL (into UnityModManager, 0Harmony12 and 0Harmony, by name and
-  decoded signature) on 0.31.1, 0.32.4, the owner's 0.33.0 and 0.33.4 (newest stable on the author's
-  NuGet feed, 2026-11-19); see `api-audit.json`. Profiles are component-assembled from official packages,
-  not UMM distribution ZIPs. Static evidence only; not a compatibility claim.
+
+## History (earlier rounds, superseded)
+
+- Round 2 (2026-11-24): product frozen at `75aeeff`; boundary suite 62/62 and runtime loader identity 21/21 on
+  `75aeeff`; records committed at `62b65e2`. The genuine published 0.6.20 release (ZIP SHA-256
+  `54153abb96c9aa5a3e0cb87dc18401dc23aeb47e603b9a69148b5a944668f780`, DLL compiled against UnityModManager 0.33.0.0)
+  with only its manifest lowered to 0.31.1 was refused by `validate-package.ps1` ("Packaged DLL must reference
+  pinned UnityModManager 0.31.1.0"); the current suite repeats that case.
+- Round 3 (2026-11-24): product frozen at `5cd32d0` (retained pair in its own worktree); boundary suite 71/71 and
+  runtime loader identity 23/23; the revision-stamp comparison was measured with `f33b945` as the later commit;
+  records committed at `7ad3069`. The round-3 controller gate built its own DLL stamped with its candidate commit.
 
 | Observation | Result |
 | --- | --- |

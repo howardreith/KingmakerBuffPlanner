@@ -7,7 +7,10 @@ machine. It requires:
 
 - the exact local Pathfinder: Kingmaker and Unity references configured through
   ignored `GamePath.props` (Unity Mod Manager and Harmony 1.2 are not taken from
-  the installation; see [Loader compile baseline](#loader-compile-baseline-umm-0311));
+  the installation; see [Loader compile baseline](#loader-compile-baseline-umm-0311)).
+  `GamePath.props` may only set `KingmakerInstallDir`, and no `Directory.Build.props`
+  or `Directory.Build.targets` outside the repository may apply: builds and receipt
+  reuse refuse anything else;
 - Visual Studio/MSBuild and the .NET Framework 4.7 targeting pack;
 - Windows PowerShell 5.1 or newer;
 - Git and GitHub CLI (`gh`);
