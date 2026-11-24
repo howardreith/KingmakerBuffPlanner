@@ -165,8 +165,8 @@ try {
         $index = -1; for ($i = 0; $i -lt $elements.Count; $i++) { if ($elements[$i] -is [Management.Automation.Language.CommandParameterAst] -and $elements[$i].ParameterName -eq 'LoaderId') { $index = $i } }
         $index -ge 0 -and $index + 1 -lt $elements.Count -and $elements[$index + 1].Extent.Text -ceq '$LoaderId' })
     $loaderParam = @($launcherAst.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'LoaderId' })
-    $validateSet = if ($loaderParam.Count) { @($loaderParam[0].Attributes | Where-Object { $_.TypeName.Name -eq 'ValidateSet' } | ForEach-Object { $_.PositionalArguments.Value }) } else { @() }
-    Add-Case 'launcher-forwards-loader-row-to-both-deployment-calls' ($deployCalls.Count -eq 2 -and $forwarded.Count -eq 2 -and (@('0.31.1', '0.32.4', 'owner-0.33.0', '0.33.4') | Where-Object { $validateSet -notcontains $_ }).Count -eq 0) ("Deploy-Local calls $($deployCalls.Count), with -LoaderId `$LoaderId $($forwarded.Count); launcher rows: $($validateSet -join ', ')")
+    $validateSet = @(if ($loaderParam.Count) { @($loaderParam[0].Attributes | Where-Object { $_.TypeName.Name -eq 'ValidateSet' } | ForEach-Object { $_.PositionalArguments.Value }) })
+    Add-Case 'launcher-forwards-loader-row-to-both-deployment-calls' ($deployCalls.Count -eq 2 -and $forwarded.Count -eq 2 -and @(@('0.31.1', '0.32.4', 'owner-0.33.0', '0.33.4') | Where-Object { $validateSet -notcontains $_ }).Count -eq 0) ("Deploy-Local calls $($deployCalls.Count), with -LoaderId `$LoaderId $($forwarded.Count); launcher rows: $($validateSet -join ', ')")
 
     # 6. Deploy-Local -WhatIf and the compatibility wrapper with each row against a private game folder holding that row's
     #    loader files: the matching row clears the loader check (a later independent host guard, such as an unrelated lab

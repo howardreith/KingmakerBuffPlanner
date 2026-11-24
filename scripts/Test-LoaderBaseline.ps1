@@ -419,7 +419,7 @@ try {
     $modsBefore = @(Get-ChildItem -LiteralPath (Join-Path $fixtureGame 'Mods') -Recurse -Force | ForEach-Object { $_.FullName }) -join ';'
     $failState = Invoke-Script (". $(Quote $harness); `$original = `${function:Write-KbpJsonAtomic}; function Write-KbpJsonAtomic([string]`$Path, `$Value) { if (`$Value -is [Collections.IDictionary] -and `$Value.Contains('ownedPackagePath')) { throw 'injected state-write failure' }; & `$original `$Path `$Value }; Enter-KbpRuntimeTransaction -PackagePath $(Quote $zipA) -KingmakerInstallDir $(Quote $fixtureGame) -StateRoot $(Quote $txRoots[0]) -StagingRoot $(Quote $txRoots[1]) -BackupRoot $(Quote $txRoots[2]) -RunId statefail -FixtureMode -KnownKingmakerProcessIds @() -ExpectedPackageSha256 $admitted | Out-Null")
     $modsAfter = @(Get-ChildItem -LiteralPath (Join-Path $fixtureGame 'Mods') -Recurse -Force | ForEach-Object { $_.FullName }) -join ';'
-    $copiesLeft = @(Get-ChildItem -LiteralPath $txRoots[2] -Recurse -Filter 'package.zip' -ErrorAction SilentlyContinue).Count
+    $copiesLeft = @(Get-ChildItem -LiteralPath $txRoots[2] -Recurse -Filter 'package.zip' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -like '*statefail*' }).Count
     $lockLeft = Test-Path -LiteralPath (Join-Path $txRoots[0] 'deployment.lock')
     Add-Case 'transaction-state-write-failure-leaves-no-copy-or-lock' ($failState.ExitCode -ne 0 -and $failState.Output -match 'injected state-write failure' -and $modsBefore -ceq $modsAfter -and $copiesLeft -eq 0 -and -not $lockLeft) "exit $($failState.ExitCode); Mods unchanged: $($modsBefore -ceq $modsAfter); owned copies left: $copiesLeft; lock left: $lockLeft"
     $retryState = & $tx $zipA 'statefail'
@@ -438,7 +438,11 @@ try {
         Invoke-Script (". $(Quote $common); `$v = Join-Path $(Quote $inputs) ('release-validation-' + [Guid]::NewGuid().ToString('N') + '.json'); & $(Quote $validatorScript) -PackagePath $(Quote $releaseZip) -ReportPath `$v | Out-Null; `$m = Get-Content -LiteralPath $(Quote $r) -Raw | ConvertFrom-Json; `$b = [pscustomobject]@{ Manifest = `$m; PackageSha256 = [string]`$m.packageSha256 }; Assert-KbpReleaseReconciliation -ReleaseHead $(Quote ([string]$ma.commit)) -Builds @(`$b, `$b) -ValidatedRelease (Get-Content -LiteralPath `$v -Raw | ConvertFrom-Json) -ReleasePackageSha256 (Get-KbpSha256 $(Quote $releaseZip)); 'RECONCILED'")
     }
     Expect-Accepted 'release-reconciliation-matching-clean-pair-accepted' (& $reconcile $zipA $null) 'RECONCILED'
-    Expect-Rejected 'release-reconciliation-substituted-release-copy-rejected' (& $reconcile $swapped $null) 'does not match the deterministic build'
+    # The validator admits packages under artifacts only, so the substituted copy is placed there.
+    $substituted = Join-Path $base 'artifactselease-substituted.zip'
+    Copy-Item -LiteralPath $swapped -Destination $substituted
+    Expect-Rejected 'release-reconciliation-substituted-release-copy-rejected' (& $reconcile $substituted $null) 'does not match the deterministic build'
+    Remove-Item -LiteralPath $substituted
     Expect-Rejected 'release-reconciliation-dirty-producing-receipt-rejected' (& $reconcile $zipA { param($j) $j.sourceDirty = $true }) 'does not name the clean release commit'
 
     # 10. The release installer reconciles every identity of the release manifest with a validated private copy of the
