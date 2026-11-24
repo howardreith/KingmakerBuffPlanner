@@ -179,7 +179,7 @@ function New-KbpRuntimeRequest {
         [int]$TimeoutSeconds, [bool]$ExitAfterCompletion,
         [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
-        [hashtable]$Parameters = @{},
+        [hashtable]$Parameters = @{}, $ExpectedLoader,
         [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal', 'live-workspace-native-ui', 'live-heroism-fixture-prepare')][string]$Scenario = 'mod-load-smoke')
     # This ValidateSet must equal the launcher's -Scenario set exactly
     # (Test-RuntimeHarness builds a request for every launcher scenario).
@@ -199,6 +199,11 @@ function New-KbpRuntimeRequest {
         expectedOptionalMods = @($ExpectedOptionalMods)
         expectedBlueprintGuids = @($ExpectedBlueprintGuids)
         parameters = $Parameters
+        expectedLoader = if ($null -eq $ExpectedLoader) { $null } else { [ordered]@{
+            loaderId = [string]$ExpectedLoader.loaderId
+            unityModManager = [ordered]@{ version = [string]$ExpectedLoader.unityModManager.version; sha256 = [string]$ExpectedLoader.unityModManager.sha256 }
+            harmony12 = [ordered]@{ version = [string]$ExpectedLoader.harmony12.version; sha256 = [string]$ExpectedLoader.harmony12.sha256 }
+            harmony2 = [ordered]@{ version = [string]$ExpectedLoader.harmony2.version; sha256 = [string]$ExpectedLoader.harmony2.sha256 } } }
     }
 }
 
@@ -487,8 +492,11 @@ function Wait-KbpNewKingmakerProcess {
 }
 
 function Assert-KbpRuntimeResult {
-    # -ExpectedLoader: the compatibility profile's verified loader identity (unityModManager, harmony12, harmony2 rows).
-    param($Result, $Request, $BuildManifest, [Parameter(Mandatory = $true)]$ExpectedLoader)
+    # The loader row the request carried (expectedLoader) is the expected identity of every loader assembly the game
+    # actually loaded and of the installed files beside them.
+    param($Result, $Request, $BuildManifest)
+    $ExpectedLoader = if ($Request.PSObject.Properties.Name -contains 'expectedLoader') { $Request.expectedLoader } else { $null }
+    if ($null -eq $ExpectedLoader) { throw 'Runtime request carries no expected loader row.' }
     foreach ($component in @('unityModManager', 'harmony12', 'harmony2')) {
         $row = $ExpectedLoader.$component
         if ($null -eq $row -or [string]$row.version -cnotmatch '^[0-9]+([.][0-9]+){3}$' -or [string]$row.sha256 -cnotmatch '^[0-9a-f]{64}$') {
@@ -515,6 +523,10 @@ function Assert-KbpRuntimeResult {
         harmonySha256 = [pscustomobject]@{ expected = [string]$ExpectedLoader.harmony12.sha256; observed = $Result.harmonySha256 }
         harmony2Version = [pscustomobject]@{ expected = [string]$ExpectedLoader.harmony2.version; observed = $(if ($Result.PSObject.Properties.Name -contains 'harmony2Version') { $Result.harmony2Version } else { '(absent)' }) }
         harmony2Sha256 = [pscustomobject]@{ expected = [string]$ExpectedLoader.harmony2.sha256; observed = $(if ($Result.PSObject.Properties.Name -contains 'harmony2Sha256') { $Result.harmony2Sha256 } else { '(absent)' }) }
+        # The installed files beside the loaded assemblies must be the same identity (loaded-versus-installed).
+        ummInstalledSha256 = [pscustomobject]@{ expected = [string]$ExpectedLoader.unityModManager.sha256; observed = $(if ($Result.PSObject.Properties.Name -contains 'ummInstalledSha256') { $Result.ummInstalledSha256 } else { '(absent)' }) }
+        harmonyInstalledSha256 = [pscustomobject]@{ expected = [string]$ExpectedLoader.harmony12.sha256; observed = $(if ($Result.PSObject.Properties.Name -contains 'harmonyInstalledSha256') { $Result.harmonyInstalledSha256 } else { '(absent)' }) }
+        harmony2InstalledSha256 = [pscustomobject]@{ expected = [string]$ExpectedLoader.harmony2.sha256; observed = $(if ($Result.PSObject.Properties.Name -contains 'harmony2InstalledSha256') { $Result.harmony2InstalledSha256 } else { '(absent)' }) }
     }
     $mismatches = @()
     foreach ($name in $checks.Keys) {
@@ -2310,16 +2322,17 @@ function Assert-KbpAdvancedFixtureBinding {
 # profile id, as one SHA-256. Evidence from a run with another identity
 # never qualifies a later run.
 function Get-KbpCompatibilityIdentityDigest {
-    param([Parameter(Mandatory = $true)]$Profile)
+    param([Parameter(Mandatory = $true)]$Profile, $Loader)
     $lines = @('profile|' + [string]$Profile.profileId) + @(@($Profile.mods) | ForEach-Object {
         [string]$_.directoryName + '|' + [string]$_.version + '|' + [string]$_.directoryManifestSha256 + '|' +
             [string]$_.fileCount + '|' + [string]$_.totalBytes
     } | Sort-Object)
     # The verified loader identity is part of the compatibility identity, so allowances and earlier passes recorded
     # under one loader are not admitted under another.
-    if ($Profile.PSObject.Properties.Name -contains 'loader') {
+    if ($null -ne $Loader) {
+        $lines += 'loader|' + [string]$Loader.loaderId
         foreach ($component in @('unityModManager', 'harmony12', 'harmony2')) {
-            $lines += 'loader|' + $component + '|' + [string]$Profile.loader.$component.version + '|' + [string]$Profile.loader.$component.sha256
+            $lines += 'loader|' + $component + '|' + [string]$Loader.$component.version + '|' + [string]$Loader.$component.sha256
         }
     }
     $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($lines -join "`n") + "`n")

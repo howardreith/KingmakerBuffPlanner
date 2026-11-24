@@ -11,7 +11,7 @@ function Get-KbpCompatibilityProfile {
     }
     $profile = Read-KbpJson $path
     $required = @('schemaVersion', 'profileId', 'status', 'mods', 'expectedBlueprints')
-    $allowed = $required + @('reason', 'loader')
+    $allowed = $required + @('reason')
     $names = @($profile.PSObject.Properties.Name)
     if (@($required | Where-Object { $_ -notin $names }).Count -ne 0 -or
         @($names | Where-Object { $_ -notin $allowed }).Count -ne 0 -or
@@ -20,10 +20,6 @@ function Get-KbpCompatibilityProfile {
         throw "Compatibility profile contract is invalid: $ProfileId"
     }
     if ($profile.status -ceq 'available') {
-        # The verified loader identity of the installation this profile describes; runtime preflight and result
-        # admission compare against it (UnityModManager, 0Harmony12 and the Harmony2 module 0Harmony12 forwards to).
-        if ($names -notcontains 'loader') { throw "Compatibility profile has no verified loader identity: $ProfileId" }
-        [void](Assert-KbpLoaderIdentityContract $profile.loader $ProfileId)
         foreach ($mod in @($profile.mods)) {
             $modRequired = @('ummId', 'directoryName', 'version', 'assemblyName', 'infoSha256',
                 'assemblySha256', 'directoryManifestSha256', 'fileCount', 'totalBytes')
@@ -75,12 +71,30 @@ function Assert-KbpLoaderIdentityContract($Loader, [string]$ProfileId) {
     return $Loader
 }
 
-# Offline preflight: the installed loader files must be exactly the profile's verified identity (assembly name,
-# version and SHA-256 of UnityModManager.dll, 0Harmony12.dll and 0Harmony.dll in the UnityModManager directory).
+# The measured loader rows a runtime run can select, independently of the optional-mod profile
+# (compatibility/loaders/<id>.json: UnityModManager, 0Harmony12 and the Harmony2 module 0Harmony12 forwards to).
+function Get-KbpLoaderIdentity {
+    param([Parameter(Mandatory = $true)][ValidateSet('0.31.1', '0.32.4', 'owner-0.33.0', '0.33.4')][string]$LoaderId)
+    $path = Join-Path (Get-KbpRepositoryRoot) ("compatibility\loaders\$LoaderId.json")
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Loader identity row is missing: $LoaderId" }
+    $row = Read-KbpJson $path
+    $names = @($row.PSObject.Properties.Name)
+    foreach ($field in @('schemaVersion', 'loaderId', 'source')) { if ($names -notcontains $field) { throw "Loader identity row has no ${field}: $LoaderId" } }
+    if ([int]$row.schemaVersion -ne 1 -or [string]$row.loaderId -cne $LoaderId) { throw "Loader identity row contract is invalid: $LoaderId" }
+    $loader = [pscustomobject]@{ loaderId = $LoaderId; unityModManager = $row.unityModManager; harmony12 = $row.harmony12; harmony2 = $row.harmony2 }
+    [void](Assert-KbpLoaderIdentityContract ([pscustomobject]@{ unityModManager = $row.unityModManager; harmony12 = $row.harmony12; harmony2 = $row.harmony2 }) $LoaderId)
+    return $loader
+}
+
+# Offline preflight: the installed loader files must be exactly the selected loader row (assembly name, version and
+# SHA-256 of UnityModManager.dll, 0Harmony12.dll and 0Harmony.dll in the UnityModManager directory).
 function Assert-KbpInstalledLoaderIdentity {
-    param([Parameter(Mandatory = $true)]$Profile, [string]$UnityModManagerDir)
-    if (-not $UnityModManagerDir) { $UnityModManagerDir = Join-Path (Get-KbpGamePath) 'Kingmaker_Data\Managed\UnityModManager' }
-    $loader = Assert-KbpLoaderIdentityContract $Profile.loader $Profile.profileId
+    param([Parameter(Mandatory = $true)]$Loader, [string]$UnityModManagerDir, [string]$KingmakerInstallDir)
+    if (-not $UnityModManagerDir) {
+        if (-not $KingmakerInstallDir) { $KingmakerInstallDir = Get-KbpGamePath }
+        $UnityModManagerDir = Join-Path $KingmakerInstallDir 'Kingmaker_Data\Managed\UnityModManager'
+    }
+    $loader = $Loader
     $files = [ordered]@{ unityModManager = @('UnityModManager.dll', 'UnityModManager'); harmony12 = @('0Harmony12.dll', '0Harmony12'); harmony2 = @('0Harmony.dll', '0Harmony') }
     $observed = [ordered]@{}
     $mismatches = @()
@@ -94,8 +108,17 @@ function Assert-KbpInstalledLoaderIdentity {
             $mismatches += "$component expected=$($loader.$component.version)/$($loader.$component.sha256) observed=$($name.Name) $($row.version)/$($row.sha256)"
         }
     }
-    if ($mismatches.Count -ne 0) { throw "Installed loader does not match compatibility profile $($Profile.profileId): $($mismatches -join '; ')" }
+    if ($mismatches.Count -ne 0) { throw "Installed loader does not match loader row $($Loader.loaderId): $($mismatches -join '; ')" }
     return [pscustomobject]$observed
+}
+
+# The shared installation preflight of the runtime launcher, the deployment script and the standalone profile test: the
+# optional-mod fixtures of the profile and the selected loader row, both against the caller's installation.
+function Assert-KbpInstallationPreflight {
+    param([Parameter(Mandatory = $true)]$Profile, [Parameter(Mandatory = $true)]$Loader, [string]$KingmakerInstallDir)
+    if (-not $KingmakerInstallDir) { $KingmakerInstallDir = Get-KbpGamePath }
+    Assert-KbpCompatibilityProfileFixtures -Profile $Profile -KingmakerInstallDir $KingmakerInstallDir
+    return Assert-KbpInstalledLoaderIdentity -Loader $Loader -KingmakerInstallDir $KingmakerInstallDir
 }
 
 function Assert-KbpCompatibilityProfileFixtures {

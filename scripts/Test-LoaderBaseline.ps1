@@ -368,6 +368,56 @@ try {
     [IO.File]::WriteAllText($gamePath, $gamePathOriginal)
     Expect-Accepted 'receipt-after-inputs-restored-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
 
+    # 9. The runtime transaction stages only its own copy of the admitted package; a package replaced after admission is
+    #    refused before anything is staged or activated (fixture game folder; FixtureMode roots in the temporary folder).
+    $harness = Join-Path $base 'scripts\RuntimeHarness.Common.ps1'
+    $fixtureRoot = Join-Path $temp 'transaction fixture'
+    $txRoots = @('state', 'staging', 'backups') | ForEach-Object { $d = Join-Path $fixtureRoot $_; New-Item -ItemType Directory -Path $d -Force | Out-Null; $d }
+    $fixtureGame = Join-Path $fixtureRoot 'game'
+    New-Item -ItemType Directory -Path (Join-Path $fixtureGame 'Mods\Existing') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $fixtureGame 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii
+    Set-Content -LiteralPath (Join-Path $fixtureGame 'Mods\Existing\Info.json') -Value '{"Id":"Existing"}' -Encoding Ascii
+    $admitted = Get-KbpSha256 $zipA
+    $swapped = Join-Path $inputs 'swapped-after-admission.zip'
+    Copy-ZipWith $zipA $swapped { param($name, $bytes) if ($name -ceq "$modFolder/NativeEffectOverrides.json") { [pscustomobject]@{ Name = $name; Bytes = [Text.Encoding]::UTF8.GetBytes(([Text.Encoding]::UTF8.GetString($bytes)).TrimEnd() + "`n") } } else { [pscustomobject]@{ Name = $name; Bytes = $bytes } } }
+    $tx = { param($zip, $runId) Invoke-Script (". $(Quote $harness); Enter-KbpRuntimeTransaction -PackagePath $(Quote $zip) -KingmakerInstallDir $(Quote $fixtureGame) -StateRoot $(Quote $txRoots[0]) -StagingRoot $(Quote $txRoots[1]) -BackupRoot $(Quote $txRoots[2]) -RunId $runId -FixtureMode -KnownKingmakerProcessIds @() -ExpectedPackageSha256 $admitted | Out-Null; 'ENTERED'") }
+    $modsBefore = @(Get-ChildItem -LiteralPath (Join-Path $fixtureGame 'Mods') -Recurse -Force | ForEach-Object { $_.FullName }) -join ';'
+    Expect-Rejected 'transaction-refuses-package-replaced-after-admission' (& $tx $swapped 'swapped') 'changed after admission'
+    $modsAfter = @(Get-ChildItem -LiteralPath (Join-Path $fixtureGame 'Mods') -Recurse -Force | ForEach-Object { $_.FullName }) -join ';'
+    Add-Case 'transaction-refusal-left-mods-untouched' ($modsBefore -ceq $modsAfter -and -not (Test-Path -LiteralPath (Join-Path $fixtureGame 'Mods\KingmakerBuffPlanner'))) 'fixture Mods unchanged; nothing staged or activated'
+    $entered = & $tx $zipA 'admitted'
+    $txState = @(Get-ChildItem -LiteralPath $txRoots[0] -Recurse -Filter '*.json' | Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match '"ownedPackagePath"' } | Select-Object -First 1)
+    $st = if ($txState.Count) { Get-Content -LiteralPath $txState[0].FullName -Raw | ConvertFrom-Json } else { $null }
+    $ok = $entered.ExitCode -eq 0 -and $entered.Output -match 'ENTERED' -and $st -and $st.packageSha256 -eq $admitted -and (Get-Sha256 $st.ownedPackagePath) -eq $admitted -and
+        (Get-Sha256 (Join-Path $fixtureGame 'Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll')) -eq $ma.dllSha256
+    Add-Case 'transaction-stages-its-own-admitted-copy' $ok ("state packageSha256 $($st.packageSha256); owned copy $(if ($st) { Split-Path -Leaf $st.ownedPackagePath }); staged DLL $(Get-Sha256 (Join-Path $fixtureGame 'Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll'))")
+    Invoke-Script (". $(Quote $harness); Restore-KbpRuntimeTransaction -RunId admitted -StateRoot $(Quote $txRoots[0]) -FixtureMode -KnownKingmakerProcessIds @() | Out-Null") | Out-Null
+
+    # 10. The release installer reconciles every identity of the release manifest with a validated private copy of the
+    #     release ZIP before any state or staging (Install-Local -WhatIf against a fixture game folder).
+    $rel = Invoke-Isolated @('-File', (Join-Path $base 'scripts\Build-Release.ps1'))
+    $releaseManifest = Join-Path $base ("artifacts\release\" + $ma.version + '\release-manifest.json')
+    $rm = if (Test-Path -LiteralPath $releaseManifest) { Get-Content -LiteralPath $releaseManifest -Raw | ConvertFrom-Json } else { $null }
+    Add-Case 'release-manifest-from-validated-release-zip' ($rel.ExitCode -eq 0 -and $rm -and $rm.embeddedCommit -eq $commit -and $rm.commit -eq $commit -and $rm.dllSha256 -eq $ma.dllSha256) ("exit $($rel.ExitCode); commit $($rm.commit) embedded $($rm.embeddedCommit) DLL $($rm.dllSha256) MVID $($rm.assemblyMvid)")
+    $installGame = Join-Path $temp 'install fixture game'
+    New-Item -ItemType Directory -Path (Join-Path $installGame 'Mods') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $installGame 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii
+    $install = { param($manifestPath, $id) Invoke-Isolated @('-File', (Join-Path $base 'scripts\Install-Local.ps1'), '-ReleaseManifestPath', $manifestPath, '-InstallId', $id, '-KingmakerInstallDir', $installGame, '-WhatIf') }
+    Expect-Accepted 'install-preflight-matching-release-accepted' (& $install $releaseManifest 'genuine') 'Local install preflight PASS'
+    $savedRelease = Join-Path $inputs 'release-manifest.json'
+    Copy-Item -LiteralPath $releaseManifest -Destination $savedRelease
+    foreach ($bad in @(
+        @{ Name = 'commit'; Edit = { param($j) $j.commit = ('e' * 40) }; Pattern = 'embedded source revision' },
+        @{ Name = 'mvid'; Edit = { param($j) $j.assemblyMvid = '00000000-0000-0000-0000-000000000000' }; Pattern = 'MVID' },
+        @{ Name = 'dll-digest'; Edit = { param($j) $j.dllSha256 = ('d' * 64) }; Pattern = 'DLL SHA-256' })) {
+        Copy-Item -LiteralPath $savedRelease -Destination $releaseManifest -Force
+        Edit-Json $releaseManifest $bad.Edit
+        Expect-Rejected "install-preflight-wrong-release-$($bad.Name)-rejected" (& $install $releaseManifest ('bad-' + $bad.Name)) $bad.Pattern
+    }
+    Copy-Item -LiteralPath $savedRelease -Destination $releaseManifest -Force
+    $installState = @(Get-ChildItem -LiteralPath (Join-Path $installGame 'Mods') -Force).Count
+    Add-Case 'install-preflight-refusals-left-no-staging' ($installState -eq 0) "fixture Mods entries after the refusals: $installState"
+
     $artifactsAfter = @(Get-ChildItem -LiteralPath (Join-Path $source 'artifacts') -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName + '=' + $_.Length + '@' + $_.LastWriteTimeUtc.Ticks }) -join ';'
     Add-Case 'repository-artifacts-untouched' ($artifactsBefore -ceq $artifactsAfter) 'this checkout''s artifacts are unchanged'
     Add-Case 'legacy-input-preserved' ((Get-KbpSha256 $legacyZip) -ceq $legacySha256) "private copy still $legacySha256"

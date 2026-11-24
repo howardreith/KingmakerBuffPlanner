@@ -30,7 +30,17 @@ if (Test-Path -LiteralPath $releaseRoot) {
 New-Item -ItemType Directory -Path $releaseRoot | Out-Null
 $releasePackage = Join-Path $releaseRoot "KingmakerBuffPlanner-$version.zip"
 Copy-Item -LiteralPath $secondPackage -Destination $releasePackage
-& (Join-Path $PSScriptRoot 'validate-package.ps1') -PackagePath $releasePackage
+$releaseValidation = Join-Path ([IO.Path]::GetTempPath()) ('kbp-release-validation-' + [Guid]::NewGuid().ToString('N') + '.json')
+try {
+    & (Join-Path $PSScriptRoot 'validate-package.ps1') -PackagePath $releasePackage -ReportPath $releaseValidation
+    $validatedRelease = Get-Content -LiteralPath $releaseValidation -Raw | ConvertFrom-Json
+}
+finally { Remove-Item -LiteralPath $releaseValidation -Force -ErrorAction SilentlyContinue }
+$releaseCommit = (& git -C $root rev-parse HEAD).Trim()
+if ([string]$validatedRelease.dll_sha256 -cne [string]$secondManifest.dllSha256 -or [string]$validatedRelease.dll_mvid -cne [string]$secondManifest.assemblyMvid -or
+    [string]$validatedRelease.embedded_commit -cne $releaseCommit -or [string]$validatedRelease.package_sha256 -cne (Get-KbpSha256 $releasePackage)) {
+    throw 'The validated release package does not match the deterministic build (DLL, MVID, embedded revision or package digest).'
+}
 Copy-Item -LiteralPath (Join-Path $root 'docs\RELEASE-NOTES-DRAFT.md') `
     -Destination (Join-Path $releaseRoot 'RELEASE-NOTES-DRAFT.md')
 
@@ -38,11 +48,12 @@ $releaseManifest = [ordered]@{
     schemaVersion = 1
     generator = 'scripts/Build-Release.ps1'
     version = $version
-    commit = (& git -C $root rev-parse HEAD).Trim()
+    commit = $releaseCommit
     packagePath = $releasePackage
-    packageSha256 = Get-KbpSha256 $releasePackage
-    dllSha256 = [string]$secondManifest.dllSha256
-    assemblyMvid = [string]$secondManifest.assemblyMvid
+    packageSha256 = [string]$validatedRelease.package_sha256
+    dllSha256 = [string]$validatedRelease.dll_sha256
+    assemblyMvid = [string]$validatedRelease.dll_mvid
+    embeddedCommit = [string]$validatedRelease.embedded_commit
     deterministicBuilds = 2
     validated = $true
     publicationStatus = 'local-only'

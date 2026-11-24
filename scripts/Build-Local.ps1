@@ -13,9 +13,17 @@ $commit = (& git -C $root rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $commit -cnotmatch '^[0-9a-f]{40}$') { throw 'Unable to read Git HEAD.' }
 $sourceDirty = [bool](& git -C $root status --porcelain)
 [void](& (Join-Path $PSScriptRoot 'Get-PinnedLoaderReferences.ps1') -ReferenceDirectory (Join-Path $root 'artifacts\references'))
-$buildInputs = Get-KbpBuildInputFingerprint 'Release'
-$compilerInputs = @(Get-KbpCompilerInputs 'Release')
-$dllOutput = & (Join-Path $PSScriptRoot 'Build.ps1') -Configuration Release | Select-Object -Last 1
+$compilerInputs = @(Get-KbpCompilerInputs 'Release' $commit)
+$buildInputs = Get-KbpBuildInputFingerprint 'Release' $compilerInputs
+$productionInventory = Join-Path ([IO.Path]::GetTempPath()) ('kbp-production-inputs-' + [Guid]::NewGuid().ToString('N') + '.txt')
+try {
+    $dllOutput = & (Join-Path $PSScriptRoot 'Build.ps1') -Configuration Release -CompilerInventoryPath $productionInventory | Select-Object -Last 1
+    $produced = @(ConvertFrom-CompilerInputList $productionInventory)
+}
+finally { Remove-Item -LiteralPath $productionInventory -Force -ErrorAction SilentlyContinue }
+if ((ConvertTo-KbpCompilerInventoryText $produced) -cne (ConvertTo-KbpCompilerInventoryText $compilerInputs)) {
+    throw 'The production compile used different compiler inputs (command line, generated or file-valued inputs) from the evaluated inventory; the build is not recorded.'
+}
 if ((& git -C $root rev-parse HEAD).Trim() -cne $commit -or (Get-KbpBuildInputFingerprint 'Release') -cne $buildInputs) {
     throw 'HEAD or a build input changed while building; the build is not recorded.'
 }

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "loaderId": "0.31.1",
+  "source": "UnityModManager 0.31.1 (author NuGet unitymodmanager.0.31.1, lib/net35) with Lib.Harmony 2.3.1.1 net48 and 0Harmony12 1.2.0.1 (newman55/unity-mod-manager 10cfb1cc)",
+  "unityModManager": {
+    "version": "0.31.1.0",
+    "sha256": "2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4"
+  },
+  "harmony12": {
+    "version": "1.2.0.1",
+    "sha256": "aa1cd48317254985d8b700cc74953477d1b40c3022ce9aa4c95ed2b8327e1292"
+  },
+  "harmony2": {
+    "version": "2.3.1.1",
+    "sha256": "5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f"
+  }
+}

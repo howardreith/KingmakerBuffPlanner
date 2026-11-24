@@ -2,20 +2,6 @@
     "schemaVersion":  1,
     "profileId":  "call-of-the-wild",
     "status":  "available",
-    "loader": {
-      "unityModManager": {
-        "version": "0.33.0.0",
-        "sha256": "63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691"
-      },
-      "harmony12": {
-        "version": "1.2.0.1",
-        "sha256": "aa1cd48317254985d8b700cc74953477d1b40c3022ce9aa4c95ed2b8327e1292"
-      },
-      "harmony2": {
-        "version": "2.3.6.0",
-        "sha256": "df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80"
-      }
-    },
     "mods":  [
                  {
                      "ummId":  "CallOfTheWild",

@@ -23,6 +23,11 @@ namespace KingmakerBuffPlanner.RuntimeTesting
             return assembly == null || string.IsNullOrEmpty(assembly.Location) ? NotLoaded : Hashing.Sha256(assembly.Location);
         }
 
+        internal static string FileSha256(string path)
+        {
+            return System.IO.File.Exists(path) ? Hashing.Sha256(path) : NotLoaded;
+        }
+
         private static Assembly Find(string simpleName)
         {
             Assembly[] matches = AppDomain.CurrentDomain.GetAssemblies()

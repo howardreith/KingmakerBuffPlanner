@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([ValidateSet('Debug', 'Release')][string]$Configuration = 'Release')
+param([ValidateSet('Debug', 'Release')][string]$Configuration = 'Release', [string]$CompilerInventoryPath)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -13,7 +13,8 @@ $root = Get-KbpRepositoryRoot
 $revision = (& git -C $root rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[0-9a-f]{40}$') { throw 'Exact Git revision is unavailable.' }
 $msbuild = Get-KbpMsBuild
-& $msbuild (Join-Path $root 'KingmakerBuffPlanner.sln') /t:Rebuild "/p:Configuration=$Configuration" "/p:KbpSourceRevision=$revision" /m /nologo /v:minimal
+$inventoryArgument = @(if ($CompilerInventoryPath) { "/p:CompilerReferenceListPath=$CompilerInventoryPath" })
+& $msbuild (Join-Path $root 'KingmakerBuffPlanner.sln') /t:Rebuild "/p:Configuration=$Configuration" "/p:KbpSourceRevision=$revision" @inventoryArgument /m /nologo /v:minimal
 if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE." }
 $output = Join-Path $root "artifacts\build\$Configuration\KingmakerBuffPlanner.dll"
 if (-not (Test-Path -LiteralPath $output -PathType Leaf)) { throw 'Expected product DLL was not produced.' }

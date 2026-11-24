@@ -10,32 +10,73 @@ function Get-KbpVersion {
     return [string]$props.Project.PropertyGroup.KbpVersion
 }
 
-# The compiler inputs of the production project for a configuration as MSBuild itself evaluates them (GamePath.props,
-# Version.props and every other import included): the exact references Csc receives after reference-assembly selection,
-# source/resource/analyzer items and compile-affecting properties, as path-free identities.
-function Get-KbpCompilerInputs([string]$Configuration = 'Release') {
+# Reads a compiler-input list written by the WriteCompilerReferenceList target (the intermediate directory, then every Csc
+# argument) into path-free identities in a canonical order: kind reference/compile/file-option with the file's name
+# (repository-relative, obj:<name> for generated files in the intermediate directory, otherwise the file name) and
+# SHA-256; kind option for every other argument verbatim; kind output for output locations (file name only).
+function ConvertFrom-CompilerInputList([string] $ListPath) {
+    $rootPrefix = [IO.Path]::GetFullPath((Get-KbpRepositoryRoot)).TrimEnd('\') + '\'
+    $lines = @(Get-Content -LiteralPath $ListPath -Encoding UTF8 | Where-Object { $_ })
+    if ($lines.Count -lt 3 -or -not $lines[0].StartsWith('intermediate|') -or -not $lines[1].StartsWith('project|')) { throw "Compiler input list is malformed: $ListPath" }
+    $objPrefix = [IO.Path]::GetFullPath($lines[0].Substring('intermediate|'.Length)).TrimEnd('\') + '\'
+    $projectDirectory = $lines[1].Substring('project|'.Length)
+    # Csc arguments name files relative to the project directory.
+    function Resolve-InputPath([string] $Path) { return [IO.Path]::GetFullPath([IO.Path]::Combine($projectDirectory, $Path.Trim('"'))) }
+    function Get-InputName([string] $Path) {
+        $full = Resolve-InputPath $Path
+        # MSBuild's generated target-framework attribute file lives in the intermediate or the temporary directory.
+        if ([IO.Path]::GetFileName($full) -like '*.AssemblyAttributes.cs') { return 'generated:' + [IO.Path]::GetFileName($full) }
+        if ($full.StartsWith($objPrefix, [StringComparison]::OrdinalIgnoreCase)) { return 'obj:' + $full.Substring($objPrefix.Length).Replace('\', '/') }
+        if ($full.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) { return $full.Substring($rootPrefix.Length).Replace('\', '/') }
+        return [IO.Path]::GetFileName($full)
+    }
+    function Get-InputDigest([string] $Path) { $full = Resolve-InputPath $Path; if (Test-Path -LiteralPath $full -PathType Leaf) { return Get-KbpSha256 $full } else { return 'absent' } }
+    $outputSwitches = @('out', 'pdb', 'refout', 'doc', 'errorlog', 'generatedfilesout')
+    $fileSwitches = @('win32res', 'win32icon', 'win32manifest', 'keyfile', 'ruleset', 'appconfig', 'analyzer', 'a', 'additionalfile', 'analyzerconfig', 'embed', 'sourcelink', 'addmodule')
+    $resourceSwitches = @('resource', 'res', 'linkresource', 'linkres')
+    $entries = foreach ($line in $lines[2..($lines.Count - 1)]) {
+        if (-not $line.StartsWith('arg|')) { throw "Compiler input list is malformed: $line" }
+        $arg = $line.Substring(4)
+        $m = [regex]::Match($arg, '^[/-]([A-Za-z0-9_+-]+?)(?::(.*))?$')
+        if (-not $m.Success) { [ordered]@{ kind = 'compile'; name = Get-InputName $arg; sha256 = Get-InputDigest $arg }; continue }
+        $switch = $m.Groups[1].Value.ToLowerInvariant(); $value = $m.Groups[2].Value
+        if ($outputSwitches -ccontains $switch) { [ordered]@{ kind = 'output'; name = "/$switch" + ':' + [IO.Path]::GetFileName($value.Trim('"')); sha256 = '' } }
+        elseif ($switch -ceq 'reference' -or $switch -ceq 'r') {
+            $alias, $path = if ($value -match '^[A-Za-z_][A-Za-z0-9_]*=') { $value -split '=', 2 } else { $null, $value }
+            [ordered]@{ kind = 'reference'; name = $(if ($alias) { "$alias=" } else { '' }) + (Get-InputName $path); sha256 = Get-InputDigest $path }
+        }
+        elseif ($resourceSwitches -ccontains $switch) {
+            $path, $rest = $value -split ',', 2
+            [ordered]@{ kind = 'file-option'; name = "/$switch" + ':' + (Get-InputName $path) + $(if ($rest) { ',' + $rest } else { '' }); sha256 = Get-InputDigest $path }
+        }
+        elseif ($fileSwitches -ccontains $switch -and $value) { [ordered]@{ kind = 'file-option'; name = "/$switch" + ':' + (Get-InputName $value); sha256 = Get-InputDigest $value } }
+        else { [ordered]@{ kind = 'option'; name = $arg.Replace($objPrefix.TrimEnd('\'), 'obj:'); sha256 = '' } }
+    }
+    return @($entries | Sort-Object { $_.kind + '|' + $_.name + '|' + $_.sha256 })
+}
+
+
+function ConvertTo-KbpCompilerInventoryText($Inventory) {
+    return (@($Inventory | ForEach-Object { [string]$_.kind + '|' + [string]$_.name + '|' + [string]$_.sha256 }) -join "`n")
+}
+
+# The production compile's exact Csc command line, evaluated the way Build.ps1 builds: the solution, the configuration and
+# the source revision stamped into the generated BuildInfo (generated inputs are hashed by content), with a
+# SkipCompilerExecution pass through CoreCompile in a fresh intermediate directory.
+function Get-KbpCompilerInputs([string]$Configuration = 'Release', [string]$SourceRevision) {
     $root = Get-KbpRepositoryRoot
+    if (-not $SourceRevision) { $SourceRevision = (& git -C $root rev-parse HEAD).Trim() }
     $id = [Guid]::NewGuid().ToString('N')
     $list = Join-Path ([IO.Path]::GetTempPath()) ("kbp-compiler-inputs-$id.txt")
     $obj = Join-Path ([IO.Path]::GetTempPath()) ("kbp-compiler-inputs-$id\")
-    $project = Join-Path $root 'src\KingmakerBuffPlanner\KingmakerBuffPlanner.csproj'
     $msbuild = Get-KbpMsBuild
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        $output = $null | & $msbuild $project /nologo /v:q /nr:false '/t:ResolveReferences;FindReferenceAssembliesForReferences' `
-            "/p:Configuration=$Configuration" "/p:CompilerReferenceListPath=$list" "/p:IntermediateOutputPath=$obj" 2>&1 | ForEach-Object { "$_" }
+        $output = $null | & $msbuild (Join-Path $root 'KingmakerBuffPlanner.sln') /nologo /v:q /nr:false '/t:KingmakerBuffPlanner:PrepareResources;KingmakerBuffPlanner:Compile' /p:SkipCompilerExecution=true `
+            "/p:Configuration=$Configuration" "/p:KbpSourceRevision=$SourceRevision" "/p:CompilerReferenceListPath=$list" "/p:IntermediateOutputPath=$obj" "/p:OutputPath=$($obj)bin" 2>&1 | ForEach-Object { "$_" }
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $list)) { throw "Could not resolve the compiler inputs: $($output -join ' ')" }
-        $rootPrefix = [IO.Path]::GetFullPath($root).TrimEnd('\') + '\'
-        return @(Get-Content -LiteralPath $list -Encoding UTF8 | Where-Object { $_ } | ForEach-Object {
-            $kind, $value = $_ -split '\|', 2
-            if ($kind -ceq 'setting') { [ordered]@{ kind = $kind; name = $value; sha256 = '' } }
-            else {
-                $name = if ($value.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) { $value.Substring($rootPrefix.Length).Replace('\', '/') } else { [IO.Path]::GetFileName($value) }
-                $digest = if (Test-Path -LiteralPath $value -PathType Leaf) { Get-KbpSha256 $value } else { 'absent' }
-                [ordered]@{ kind = $kind; name = $name; sha256 = $digest }
-            }
-        } | Sort-Object { $_.kind + '|' + $_.name + '|' + $_.sha256 })
+        return @(ConvertFrom-CompilerInputList $list)
     }
     finally {
         $ErrorActionPreference = $previous
@@ -47,7 +88,7 @@ function Get-KbpCompilerInputs([string]$Configuration = 'Release') {
 # Material inputs of the production DLL: tracked or new files under src (ignored build output excluded), the solution,
 # version and loader-pin definitions, the build wrappers, and the MSBuild-evaluated compiler inputs (which include
 # ignored local references such as the game assemblies selected through GamePath.props).
-function Get-KbpBuildInputFingerprint([string]$Configuration = 'Release') {
+function Get-KbpBuildInputFingerprint([string]$Configuration = 'Release', $CompilerInputs = $null) {
     $root = Get-KbpRepositoryRoot
     $paths = @('src', 'KingmakerBuffPlanner.sln', 'Version.props', 'LoaderReferences.targets', 'scripts/loader-reference-pins.json',
         'scripts/Get-PinnedLoaderReferences.ps1', 'scripts/Build.ps1', 'scripts/Build-Local.ps1', 'scripts/Common.ps1')
@@ -57,7 +98,8 @@ function Get-KbpBuildInputFingerprint([string]$Configuration = 'Release') {
         $full = Join-Path $root $file
         if (Test-Path -LiteralPath $full -PathType Leaf) { $file + "`t" + (Get-KbpSha256 $full) }
     })
-    foreach ($input in (Get-KbpCompilerInputs $Configuration)) { $lines += 'compiler-' + $input.kind + ':' + $input.name + "`t" + $input.sha256 }
+    if ($null -eq $CompilerInputs) { $CompilerInputs = @(Get-KbpCompilerInputs $Configuration) }
+    foreach ($entry in @($CompilerInputs)) { $lines += 'compiler-' + [string]$entry.kind + ':' + [string]$entry.name + "`t" + [string]$entry.sha256 }
     $hasher = [Security.Cryptography.SHA256]::Create()
     try { $digest = $hasher.ComputeHash([Text.Encoding]::UTF8.GetBytes(($lines -join "`n"))) }
     finally { $hasher.Dispose() }

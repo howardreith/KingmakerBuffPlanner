@@ -2,6 +2,8 @@
 param(
     [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal', 'live-workspace-native-ui', 'live-heroism-fixture-prepare')][string]$Scenario = 'mod-load-smoke',
     [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136')][string]$CompatibilityProfileId = 'native-only',
+    # The measured loader row the run expects (compatibility/loaders), independent of the optional-mod profile.
+    [ValidateSet('0.31.1', '0.32.4', 'owner-0.33.0', '0.33.4')][string]$LoaderId = 'owner-0.33.0',
     [ValidateRange(5, 1800)][int]$TimeoutSeconds = 180,
     [ValidateRange(5, 300)][int]$LaunchTimeoutSeconds = 60,
     [ValidateSet('animated', 'instant')][string]$ExecutionMode = 'instant',
@@ -326,9 +328,9 @@ if (($FixtureFamily -ceq 'Advanced') -ne ($CompatibilityProfileId -ceq 'advanced
         "profile only with -FixtureFamily Advanced; refused: $FixtureFamily with $CompatibilityProfileId.")
 }
 $compatibilityProfile = Get-KbpCompatibilityProfile $CompatibilityProfileId
-Assert-KbpCompatibilityProfileFixtures -Profile $compatibilityProfile
-# Preflight, before anything is deployed: the installed loader must be the profile's verified identity.
-$installedLoader = Assert-KbpInstalledLoaderIdentity -Profile $compatibilityProfile
+# Preflight, before anything is deployed: the profile's optional-mod fixtures and the selected loader row.
+$loaderIdentity = Get-KbpLoaderIdentity $LoaderId
+$installedLoader = Assert-KbpInstallationPreflight -Profile $compatibilityProfile -Loader $loaderIdentity
 $expectedOptionalMods = @($compatibilityProfile.mods | ForEach-Object {
     [ordered]@{
         ummId = $_.ummId
@@ -353,7 +355,7 @@ $advancedBinding = if ($FixtureFamily -ceq 'Advanced') { Assert-KbpAdvancedFixtu
 $advancedInspectionRunId = if ($FixtureFamily -ceq 'Advanced' -and $Scenario -ceq 'live-cast-qual') {
     Assert-KbpAdvancedInspectionPassed -Binding $advancedBinding -Pair $savePair `
         -ProfileId $CompatibilityProfileId `
-        -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile)
+        -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile -Loader $loaderIdentity)
 } else { $null }
 # Review C5: a casting allowance must name this profile, its exact identity
 # and this WORKING save; anything else is refused before any deployment.
@@ -361,30 +363,30 @@ $allowanceWorkingSha256 = if ($null -eq $savePair) { $null } else { [string]$sav
 $allowanceGameId = if ($null -eq $savePair) { $null } else { [string]$savePair.working.gameId }
 if ($null -ne $qualificationAllowanceJson) {
     $bindingRefusal = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $qualificationAllowanceJson `
-        -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile) `
+        -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile -Loader $loaderIdentity) `
         -WorkingSaveSha256 $allowanceWorkingSha256 -FixtureGameId $allowanceGameId
     if ($null -ne $bindingRefusal) { throw "The qualification allowance was refused: $bindingRefusal" }
 }
 if ($null -ne $probeAllowanceJson) {
     $bindingRefusal = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $probeAllowanceJson `
-        -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile) `
+        -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile -Loader $loaderIdentity) `
         -WorkingSaveSha256 $allowanceWorkingSha256
     if ($null -ne $bindingRefusal) { throw "The probe allowance was refused: $bindingRefusal" }
 }
 if ($null -ne $classicAllowanceJson) {
     $bindingRefusal = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $classicAllowanceJson `
-        -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile) `
+        -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile -Loader $loaderIdentity) `
         -WorkingSaveSha256 $allowanceWorkingSha256 -FixtureGameId $allowanceGameId
     if ($null -ne $bindingRefusal) { throw "The classic allowance was refused: $bindingRefusal" }
 }
 if ($null -ne $cfAllowanceJson) {
     $bindingRefusal = Get-KbpAllowanceFixtureBindingRefusal -AllowanceJson $cfAllowanceJson `
-        -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile) `
+        -ProfileId $CompatibilityProfileId -CompatibilityIdentity (Get-KbpCompatibilityIdentityDigest $compatibilityProfile -Loader $loaderIdentity) `
         -WorkingSaveSha256 $allowanceWorkingSha256 -FixtureGameId $allowanceGameId
     if ($null -ne $bindingRefusal) { throw "The casting-first allowance was refused: $bindingRefusal" }
 }
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
-& (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
+& (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package -ExpectedPackageSha256 $buildManifest.packageSha256 `
     -RunId 'runtime-whatif-preflight' -CompatibilityProfileId $CompatibilityProfileId `
     -WhatIf -Confirm:$false
 $WhatIfPreference = $requestedWhatIf
@@ -466,7 +468,7 @@ $runFailure = $null
 $runSucceeded = $false
 $result = $null
 try {
-    $statePath = & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package `
+    $statePath = & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package -ExpectedPackageSha256 $buildManifest.packageSha256 `
         -RunId $runId -CompatibilityProfileId $CompatibilityProfileId `
         -Confirm:$false | Select-Object -Last 1
     $transactionEntered = $true
@@ -581,7 +583,7 @@ try {
     if (-not [string]::IsNullOrWhiteSpace($QualificationRecipe)) {
         $scenarioParameters.qualificationRecipe = $QualificationRecipe
     }
-    $request = New-KbpRuntimeRequest -RunId $runId -EvidenceDirectory $evidence `
+    $request = New-KbpRuntimeRequest -RunId $runId -EvidenceDirectory $evidence -ExpectedLoader $loaderIdentity `
         -BuildManifest $buildManifest -TimeoutSeconds $TimeoutSeconds `
         -ExitAfterCompletion $ExitAfterCompletion -Scenario $Scenario `
         -ProfileId $CompatibilityProfileId -ExpectedOptionalMods $expectedOptionalMods `
@@ -597,7 +599,7 @@ try {
         status = 'IN PROGRESS'; stage = 'request-written'; steamSafety = $steamSafety
         manualRehearsal = [bool]$ManualRehearseDone
         packagePath = $package; packageSha256 = $buildManifest.packageSha256
-        loaderIdentity = $compatibilityProfile.loader; installedLoaderObserved = $installedLoader
+        loaderIdentity = $loaderIdentity; installedLoaderObserved = $installedLoader
         transactionStatePath = $statePath; startedAtUtc = [DateTime]::UtcNow.ToString('o')
     }
     Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
@@ -1099,7 +1101,7 @@ public static class KbpPhysicalInput {
         throw
     }
     $result = Read-KbpJson $resultPath
-    Assert-KbpRuntimeResult -Result $result -Request $request -BuildManifest $buildManifest -ExpectedLoader $compatibilityProfile.loader
+    Assert-KbpRuntimeResult -Result $result -Request (Read-KbpJson $requestPath) -BuildManifest $buildManifest
     # Re-review (harness): a result published after the deadline's abort
     # marker is never a pass.
     if ($null -ne $abortWrittenUtc -and [string]$result.status -ceq 'PASS') {
@@ -1296,7 +1298,7 @@ finally {
             $completionTransaction = if ($transactionEntered) {
                 Join-Path $script:KbpRuntimeStateRoot "transactions\$runId\transaction.json" } else { $null }
             $completionIdentity = if ($null -ne $compatibilityProfile) {
-                Get-KbpCompatibilityIdentityDigest $compatibilityProfile } else { $null }
+                Get-KbpCompatibilityIdentityDigest $compatibilityProfile -Loader $loaderIdentity } else { $null }
             $completionBinding = if ($null -eq $advancedBinding) { $null } else { [string]$advancedBinding.manifestPath }
             $completionGame = if ($null -ne $result) { [string]$result.status } else { $null }
             $completionExited = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0

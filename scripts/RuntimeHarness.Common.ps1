@@ -819,6 +819,9 @@ function Enter-KbpRuntimeTransaction {
         [switch]$FixtureMode,
         [int[]]$KnownKingmakerProcessIds,
         $CompatibilityProfile,
+        # The digest admitted by the receipt/validation preflight: the transaction copies the package once into its own
+        # folder, refuses a copy with another digest before anything is activated, and extracts only that copy.
+        [string]$ExpectedPackageSha256,
         # The bounded retry of the two directory moves (a transient sharing
         # lock on the live Mods folder refused the first move of live run
         # casting-qual-select-20260924-45bff28-01); tests shorten it.
@@ -894,10 +897,17 @@ function Enter-KbpRuntimeTransaction {
     })
     $originalBackup = Join-Path $backupRunRoot 'Mods.original'
     $stagedQuarantine = Join-Path $backupRunRoot 'Mods.staged'
+    $ownedPackage = Join-Path $backupRunRoot 'package.zip'
+    [IO.File]::Copy($package, $ownedPackage)
+    $ownedPackageSha256 = Get-KbpSha256 $ownedPackage
+    if ($ExpectedPackageSha256 -and $ownedPackageSha256 -cne $ExpectedPackageSha256) {
+        Remove-Item -LiteralPath $ownedPackage -Force
+        throw "The package changed after admission (admitted $ExpectedPackageSha256, now $ownedPackageSha256); nothing was staged or activated."
+    }
     $state = [ordered]@{
         schemaVersion = 1; runId = $RunId; token = $token; status = 'Preparing'
-        createdAtUtc = [DateTime]::UtcNow.ToString('o'); packagePath = $package
-        packageSha256 = Get-KbpSha256 $package; gameRoot = $game; modsPath = $mods
+        createdAtUtc = [DateTime]::UtcNow.ToString('o'); packagePath = $package; ownedPackagePath = $ownedPackage
+        packageSha256 = $ownedPackageSha256; gameRoot = $game; modsPath = $mods
         originalExisted = $originalExisted; originalManifest = $originalManifest
         originalBackup = $originalBackup; stagedQuarantine = $stagedQuarantine
         stagingRunRoot = $stagingRunRoot; lockPath = $lockPath
@@ -932,7 +942,7 @@ function Enter-KbpRuntimeTransaction {
         throw $preStateFailure
     }
     try {
-        $mod = Expand-KbpPackageToStaging -PackagePath $package -StagingRunRoot $stagingRunRoot
+        $mod = Expand-KbpPackageToStaging -PackagePath $ownedPackage -StagingRunRoot $stagingRunRoot
         $stagedMods = Join-Path $stagingRunRoot 'Mods'
         New-Item -ItemType Directory -Path $stagedMods | Out-Null
         Move-Item -LiteralPath $mod -Destination (Join-Path $stagedMods 'KingmakerBuffPlanner')
