@@ -590,9 +590,8 @@ try {
         -ExpectedBlueprintGuids @($compatibilityProfile.expectedBlueprints) `
         -Parameters $scenarioParameters
     $requestPath = Join-Path $evidence 'runtime-request.json'
-    Write-KbpJsonAtomic $requestPath $request
     # The decoded request retained before launch is the expectation the result is checked against (never re-read).
-    $requestSnapshot = $request | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $requestSnapshot = Save-KbpRuntimeRequest $requestPath $request
     $orchestration = [ordered]@{
         schemaVersion = 1; runId = $runId; scenario = $Scenario; profileId = $CompatibilityProfileId
         fixtureFamily = $FixtureFamily

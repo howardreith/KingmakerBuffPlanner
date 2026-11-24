@@ -20,15 +20,7 @@ $firstManifest = Get-Content -LiteralPath ($firstPackage + '.build-local.json') 
 $secondPackage = & (Join-Path $PSScriptRoot 'Build-Local.ps1') | Select-Object -Last 1
 $secondHash = Get-KbpSha256 $secondPackage
 $secondManifest = Get-Content -LiteralPath ($secondPackage + '.build-local.json') -Raw | ConvertFrom-Json
-foreach ($pair in @(@($firstManifest, $firstHash), @($secondManifest, $secondHash))) {
-    $m = $pair[0]
-    if ($m.sourceDirty -ne $false -or [string]$m.commit -cne $releaseHead -or [string]$m.embeddedCommit -cne $releaseHead -or [string]$m.packageSha256 -cne $pair[1]) {
-        throw 'A deterministic build receipt does not name the clean release commit or its own package.'
-    }
-}
-if ($firstHash -cne $secondHash -or [string]$firstManifest.dllSha256 -cne [string]$secondManifest.dllSha256 -or [string]$firstManifest.assemblyMvid -cne [string]$secondManifest.assemblyMvid) {
-    throw "Clean-head deterministic build failed: package $firstHash/$secondHash DLL $($firstManifest.dllSha256)/$($secondManifest.dllSha256)"
-}
+$builds = @([pscustomobject]@{ Manifest = $firstManifest; PackageSha256 = $firstHash }, [pscustomobject]@{ Manifest = $secondManifest; PackageSha256 = $secondHash })
 
 $releaseRoot = Join-Path $root "artifacts\release\$version"
 if (Test-Path -LiteralPath $releaseRoot) {
@@ -46,11 +38,8 @@ try {
 }
 finally { Remove-Item -LiteralPath $releaseValidation -Force -ErrorAction SilentlyContinue }
 $releaseCommit = (& git -C $root rev-parse HEAD).Trim()
-if ([string]$validatedRelease.dll_sha256 -cne [string]$secondManifest.dllSha256 -or [string]$validatedRelease.dll_mvid -cne [string]$secondManifest.assemblyMvid -or
-    [string]$validatedRelease.embedded_commit -cne $releaseCommit -or [string]$validatedRelease.package_sha256 -cne (Get-KbpSha256 $releasePackage) -or
-    [string]$validatedRelease.package_sha256 -cne $firstHash -or $releaseCommit -cne $releaseHead) {
-    throw 'The validated release package does not match the deterministic build (DLL, MVID, embedded revision or package digest).'
-}
+if ($releaseCommit -cne $releaseHead) { throw 'HEAD changed while building the release.' }
+Assert-KbpReleaseReconciliation -ReleaseHead $releaseHead -Builds $builds -ValidatedRelease $validatedRelease -ReleasePackageSha256 (Get-KbpSha256 $releasePackage)
 Copy-Item -LiteralPath (Join-Path $root 'docs\RELEASE-NOTES-DRAFT.md') `
     -Destination (Join-Path $releaseRoot 'RELEASE-NOTES-DRAFT.md')
 

@@ -3,7 +3,9 @@ param(
     # Optional folder holding the official NuGet packages (unitymodmanager.<v>.nupkg, lib.harmony.<v>.nupkg); otherwise
     # they are downloaded. Every package and extracted DLL is hash-checked.
     [string]$PackageDirectory,
-    [string]$ReportPath
+    [string]$ReportPath,
+    # Optional Build-Local package of this checkout: enables the Deploy-Local / compatibility-wrapper -WhatIf cases.
+    [string]$CandidatePackage
 )
 # Offline tests of the selectable runtime loader rows (compatibility/loaders) with private copies of real loader files:
 # the installed-loader preflight for each measured row, cross-row and Harmony2-only mismatches, the shared installation
@@ -139,6 +141,13 @@ try {
     Invoke-Expecting 'result-earlier-shape-without-harmony2-refused' { Assert-KbpRuntimeResult -Result $r -Request (New-Request $rows['0.31.1']) -BuildManifest $manifest } 'harmony2Version expected=2\.3\.1\.1 observed=\(absent\)' | Out-Null
     $noLoader = New-KbpRuntimeRequest -RunId 'loader-identity' -EvidenceDirectory 'evidence' -BuildManifest $manifest -TimeoutSeconds 60 -ExitAfterCompletion $true -Scenario 'ui-root-smoke' | ConvertTo-Json -Depth 8 | ConvertFrom-Json
     Invoke-Expecting 'result-for-request-without-loader-row-refused' { Assert-KbpRuntimeResult -Result (New-Result $rows['0.31.1']) -Request $noLoader -BuildManifest $manifest } 'carries no expected loader row' | Out-Null
+    # The launcher's retained request: written once, decoded from the bytes written; a later change of the evidence file
+    # (here to another row) does not change the expectation.
+    $requestFile = Join-Path $temp 'runtime-request.json'
+    $retained = Save-KbpRuntimeRequest $requestFile (New-KbpRuntimeRequest -RunId 'loader-identity' -EvidenceDirectory 'evidence' -BuildManifest $manifest -TimeoutSeconds 60 -ExitAfterCompletion $true -ExpectedLoader $rows['0.31.1'] -Scenario 'ui-root-smoke')
+    Write-KbpJsonAtomic $requestFile (New-KbpRuntimeRequest -RunId 'loader-identity' -EvidenceDirectory 'evidence' -BuildManifest $manifest -TimeoutSeconds 60 -ExitAfterCompletion $true -ExpectedLoader $rows['0.33.4'] -Scenario 'ui-root-smoke')
+    Invoke-Expecting 'retained-request-refuses-other-row-result-after-file-changed' { Assert-KbpRuntimeResult -Result (New-Result $rows['0.33.4']) -Request $retained -BuildManifest $manifest } 'ummVersion expected=0\.31\.1\.0 observed=0\.33\.4\.0' | Out-Null
+    Invoke-Expecting 'retained-request-admits-its-own-row-result' { Assert-KbpRuntimeResult -Result (New-Result $rows['0.31.1']) -Request $retained -BuildManifest $manifest } '' | Out-Null
     $request = New-Request $rows['0.32.4']
     Add-Case 'request-carries-selected-row' ($request.expectedLoader.loaderId -ceq '0.32.4' -and $request.expectedLoader.harmony2.sha256 -ceq $rows['0.32.4'].harmony2.sha256) "expectedLoader $($request.expectedLoader.loaderId)"
 
@@ -146,6 +155,61 @@ try {
     $d1 = Get-KbpCompatibilityIdentityDigest $profile -Loader $rows['0.31.1']
     $d2 = Get-KbpCompatibilityIdentityDigest $profile -Loader $rows['owner-0.33.0']
     Add-Case 'compatibility-identity-binds-loader-row' ($d1 -cne $d2 -and $d1 -cmatch '^[0-9a-f]{64}$') "native-only + 0.31.1 $d1; + owner-0.33.0 $d2"
+
+    # 5. The launcher forwards its -LoaderId to both Deploy-Local calls (parsed, not run: the launcher operates the game).
+    $tokens = $null; $parseErrors = $null
+    $launcherAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'Invoke-KingmakerRuntimeTest.ps1'), [ref]$tokens, [ref]$parseErrors)
+    $deployCalls = @($launcherAst.FindAll({ param($n) $n -is [Management.Automation.Language.CommandAst] -and $n.Extent.Text -match "Deploy-Local\.ps1'\)" }, $true))
+    $forwarded = @($deployCalls | Where-Object {
+        $elements = @($_.CommandElements)
+        $index = -1; for ($i = 0; $i -lt $elements.Count; $i++) { if ($elements[$i] -is [Management.Automation.Language.CommandParameterAst] -and $elements[$i].ParameterName -eq 'LoaderId') { $index = $i } }
+        $index -ge 0 -and $index + 1 -lt $elements.Count -and $elements[$index + 1].Extent.Text -ceq '$LoaderId' })
+    $loaderParam = @($launcherAst.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'LoaderId' })
+    $validateSet = if ($loaderParam.Count) { @($loaderParam[0].Attributes | Where-Object { $_.TypeName.Name -eq 'ValidateSet' } | ForEach-Object { $_.PositionalArguments.Value }) } else { @() }
+    Add-Case 'launcher-forwards-loader-row-to-both-deployment-calls' ($deployCalls.Count -eq 2 -and $forwarded.Count -eq 2 -and (@('0.31.1', '0.32.4', 'owner-0.33.0', '0.33.4') | Where-Object { $validateSet -notcontains $_ }).Count -eq 0) ("Deploy-Local calls $($deployCalls.Count), with -LoaderId `$LoaderId $($forwarded.Count); launcher rows: $($validateSet -join ', ')")
+
+    # 6. Deploy-Local -WhatIf and the compatibility wrapper with each row against a private game folder holding that row's
+    #    loader files: the matching row clears the loader check (a later independent host guard, such as an unrelated lab
+    #    transaction or a running Kingmaker owned by another session, is reported separately); a crossed row is refused
+    #    before staging; the private game folder is unchanged.
+    if ($CandidatePackage) {
+        $CandidatePackage = [IO.Path]::GetFullPath($CandidatePackage)
+        $wrapper = Join-Path $PSScriptRoot 'compatibility\Enter-KingmakerCompatibilityProfile.ps1'
+        $deployScript = Join-Path $PSScriptRoot 'Deploy-Local.ps1'
+        function Invoke-Deploy([string]$Entry, [string]$Game, [string]$Row) {
+            $common = @('-PackagePath', $CandidatePackage, '-RunId', 'loader-row-whatif', '-KingmakerInstallDir', $Game, '-LoaderId', $Row, '-WhatIf')
+            $argv = if ($Entry -eq 'deploy-local') { @('-File', $deployScript, '-CompatibilityProfileId', 'native-only') + $common } else { @('-File', $wrapper, '-ProfileId', 'native-only') + $common }
+            $ErrorActionPreference = 'Continue'
+            $o = (& powershell.exe -NoProfile -ExecutionPolicy Bypass @argv 2>&1 | ForEach-Object { "$_" }) -join ' '
+            return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = ($o -replace '\s+', ' ') }
+        }
+        function New-RowGame([string]$Name, [string]$LoaderFolder) {
+            $g = Join-Path $temp ('deploy game ' + $Name)
+            New-Item -ItemType Directory -Path (Join-Path $g 'Kingmaker_Data\Managed\UnityModManager'), (Join-Path $g 'Mods') -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $g 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii
+            foreach ($file in @('UnityModManager.dll', '0Harmony12.dll', '0Harmony.dll')) { Copy-Item -LiteralPath (Join-Path $LoaderFolder $file) -Destination (Join-Path $g 'Kingmaker_Data\Managed\UnityModManager') }
+            return $g
+        }
+        $games = @()
+        foreach ($id in $rows.Keys) {
+            $g = New-RowGame $id $folders[$id]; $games += $g
+            foreach ($entry in @('deploy-local', 'compatibility-wrapper')) {
+                $m = Invoke-Deploy $entry $g $id
+                $cleared = $m.Output -notmatch 'Installed loader does not match'
+                $preflight = $m.ExitCode -eq 0 -and $m.Output -match 'Deployment preflight PASS'
+                $hostGuard = $m.ExitCode -ne 0 -and $m.Output -match 'Unresolved runtime transaction exists|Pathfinder: Kingmaker is running'
+                $guardText = if ($hostGuard) { [regex]::Match($m.Output, '(Unresolved runtime transaction exists[^.]*|Pathfinder: Kingmaker is running \(PID\(s\): [0-9, ]+\))').Value } else { '' }
+                Add-Case "$entry-whatif-row-$id-clears-loader-check" ($cleared -and ($preflight -or $hostGuard)) $(if ($preflight) { 'Deployment preflight PASS' } else { "loader check cleared; independent host guard afterwards: $guardText (exit $($m.ExitCode))" })
+            }
+        }
+        $crossed = New-RowGame 'crossed 0.31.1 files' $folders['0.31.1']; $games += $crossed
+        foreach ($entry in @('deploy-local', 'compatibility-wrapper')) {
+            $m = Invoke-Deploy $entry $crossed '0.32.4'
+            Add-Case "$entry-whatif-crossed-row-refused" ($m.ExitCode -ne 0 -and $m.Output -match 'Installed loader does not match loader row 0\.32\.4: unityModManager expected=0\.32\.4\.0') ("exit $($m.ExitCode); " + [regex]::Match($m.Output, 'Installed loader does not match[^;]*').Value)
+        }
+        $untouched = @($games | Where-Object { @(Get-ChildItem -LiteralPath (Join-Path $_ 'Mods') -Force).Count -ne 0 }).Count -eq 0
+        Add-Case 'deploy-row-fixtures-unchanged' $untouched 'every private game Mods folder is still empty (WhatIf staged nothing)'
+    }
 
     $failed = @($cases | Where-Object { -not $_.passed })
     $summary = [ordered]@{ schema = 'kbp.runtime-loader-identity-tests.v2'; rows = @($rows.Keys); passed = $cases.Count - $failed.Count; total = $cases.Count; cases = @($cases) }

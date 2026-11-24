@@ -383,6 +383,11 @@ try {
     Edit-Json $receiptA { param($j) $j.compilerInputs = @(@($j.compilerInputs) | Select-Object -SkipLast 1) }
     Expect-Rejected 'receipt-with-missing-compiler-entry-rejected' (Test-FrozenReceipt) 'entry count'
     Restore-PairA
+    # A compiler selection through the ignored props (CscToolPath) is an unsupported override: refused for reuse.
+    [IO.File]::WriteAllText($gamePath, $gamePathOriginal.Replace('</PropertyGroup>', "<CscToolPath>$([Security.SecurityElement]::Escape($temp))</CscToolPath></PropertyGroup>"))
+    Expect-Rejected 'receipt-with-compiler-selection-override-rejected' (Test-FrozenReceipt) 'GamePath\.props may only define KingmakerInstallDir'
+    [IO.File]::WriteAllText($gamePath, $gamePathOriginal)
+    Expect-Accepted 'receipt-after-override-removed-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
 
     # 9. The runtime transaction stages only its own copy of the admitted package; a package replaced after admission is
     #    refused before anything is staged or activated (fixture game folder; FixtureMode roots in the temporary folder).
@@ -409,6 +414,32 @@ try {
         (Get-KbpSha256 (Join-Path $fixtureGame 'Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll')) -eq $ma.dllSha256
     Add-Case 'transaction-stages-its-own-admitted-copy' $ok ("state packageSha256 $($st.packageSha256); owned copy $(if ($st) { Split-Path -Leaf $st.ownedPackagePath }); staged DLL $(Get-KbpSha256 (Join-Path $fixtureGame 'Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll'))")
     Invoke-Script (". $(Quote $harness); Restore-KbpRuntimeTransaction -RunId admitted -StateRoot $(Quote $txRoots[0]) -FixtureMode -KnownKingmakerProcessIds @() | Out-Null") | Out-Null
+    # A state-write failure after the package copy (injected by wrapping Write-KbpJsonAtomic for the state record only):
+    # Mods unchanged, no owned ZIP and no lock left, and the same run ID then enters normally.
+    $modsBefore = @(Get-ChildItem -LiteralPath (Join-Path $fixtureGame 'Mods') -Recurse -Force | ForEach-Object { $_.FullName }) -join ';'
+    $failState = Invoke-Script (". $(Quote $harness); `$original = `${function:Write-KbpJsonAtomic}; function Write-KbpJsonAtomic([string]`$Path, `$Value) { if (`$Value -is [Collections.IDictionary] -and `$Value.Contains('ownedPackagePath')) { throw 'injected state-write failure' }; & `$original `$Path `$Value }; Enter-KbpRuntimeTransaction -PackagePath $(Quote $zipA) -KingmakerInstallDir $(Quote $fixtureGame) -StateRoot $(Quote $txRoots[0]) -StagingRoot $(Quote $txRoots[1]) -BackupRoot $(Quote $txRoots[2]) -RunId statefail -FixtureMode -KnownKingmakerProcessIds @() -ExpectedPackageSha256 $admitted | Out-Null")
+    $modsAfter = @(Get-ChildItem -LiteralPath (Join-Path $fixtureGame 'Mods') -Recurse -Force | ForEach-Object { $_.FullName }) -join ';'
+    $copiesLeft = @(Get-ChildItem -LiteralPath $txRoots[2] -Recurse -Filter 'package.zip' -ErrorAction SilentlyContinue).Count
+    $lockLeft = Test-Path -LiteralPath (Join-Path $txRoots[0] 'deployment.lock')
+    Add-Case 'transaction-state-write-failure-leaves-no-copy-or-lock' ($failState.ExitCode -ne 0 -and $failState.Output -match 'injected state-write failure' -and $modsBefore -ceq $modsAfter -and $copiesLeft -eq 0 -and -not $lockLeft) "exit $($failState.ExitCode); Mods unchanged: $($modsBefore -ceq $modsAfter); owned copies left: $copiesLeft; lock left: $lockLeft"
+    $retryState = & $tx $zipA 'statefail'
+    Add-Case 'transaction-same-run-id-retry-after-state-write-failure' ($retryState.ExitCode -eq 0 -and $retryState.Output -match 'ENTERED' -and (Get-KbpSha256 (Join-Path $fixtureGame 'Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll')) -eq $ma.dllSha256) "exit $($retryState.ExitCode)"
+    Invoke-Script (". $(Quote $harness); Restore-KbpRuntimeTransaction -RunId statefail -StateRoot $(Quote $txRoots[0]) -FixtureMode -KnownKingmakerProcessIds @() | Out-Null") | Out-Null
+
+    # Release reconciliation (Build-Release): the clone's receipt for the clean pair as both deterministic builds; the
+    # validated release copy must be byte-identical. A substituted release copy (same DLL, different data) and a dirty
+    # producing receipt are refused; the matching clean pair is accepted.
+    $common = Join-Path $base 'scripts\Common.ps1'
+    $validatorScript = Join-Path $base 'scripts\validate-package.ps1'
+    $reconcile = { param($releaseZip, $receiptEdit)
+        $r = Join-Path $inputs ('release-receipt-' + [Guid]::NewGuid().ToString('N') + '.json')
+        Copy-Item -LiteralPath $receiptA -Destination $r
+        if ($receiptEdit) { Edit-Json $r $receiptEdit }
+        Invoke-Script (". $(Quote $common); `$v = Join-Path $(Quote $inputs) ('release-validation-' + [Guid]::NewGuid().ToString('N') + '.json'); & $(Quote $validatorScript) -PackagePath $(Quote $releaseZip) -ReportPath `$v | Out-Null; `$m = Get-Content -LiteralPath $(Quote $r) -Raw | ConvertFrom-Json; `$b = [pscustomobject]@{ Manifest = `$m; PackageSha256 = [string]`$m.packageSha256 }; Assert-KbpReleaseReconciliation -ReleaseHead $(Quote ([string]$ma.commit)) -Builds @(`$b, `$b) -ValidatedRelease (Get-Content -LiteralPath `$v -Raw | ConvertFrom-Json) -ReleasePackageSha256 (Get-KbpSha256 $(Quote $releaseZip)); 'RECONCILED'")
+    }
+    Expect-Accepted 'release-reconciliation-matching-clean-pair-accepted' (& $reconcile $zipA $null) 'RECONCILED'
+    Expect-Rejected 'release-reconciliation-substituted-release-copy-rejected' (& $reconcile $swapped $null) 'does not match the deterministic build'
+    Expect-Rejected 'release-reconciliation-dirty-producing-receipt-rejected' (& $reconcile $zipA { param($j) $j.sourceDirty = $true }) 'does not name the clean release commit'
 
     # 10. The release installer reconciles every identity of the release manifest with a validated private copy of the
     #     release ZIP before any state or staging (Install-Local -WhatIf against a fixture game folder).

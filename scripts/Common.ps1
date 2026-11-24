@@ -96,6 +96,34 @@ function Assert-KbpLocalBuildConfiguration {
     }
 }
 
+# Release reconciliation: each deterministic build receipt (read while its output is current) must name the clean
+# release commit (also as the embedded revision) and its own package; the builds must agree; and the validated release
+# ZIP must be byte-identical to them with the same DLL, MVID and embedded revision.
+function Assert-KbpReleaseReconciliation {
+    param(
+        [Parameter(Mandatory = $true)][string]$ReleaseHead,
+        [Parameter(Mandatory = $true)][object[]]$Builds,
+        [Parameter(Mandatory = $true)]$ValidatedRelease,
+        [Parameter(Mandatory = $true)][string]$ReleasePackageSha256)
+    foreach ($build in $Builds) {
+        $m = $build.Manifest
+        if ($m.sourceDirty -ne $false -or [string]$m.commit -cne $ReleaseHead -or [string]$m.embeddedCommit -cne $ReleaseHead -or [string]$m.packageSha256 -cne [string]$build.PackageSha256) {
+            throw 'A deterministic build receipt does not name the clean release commit or its own package.'
+        }
+    }
+    $first = $Builds[0]
+    foreach ($build in $Builds) {
+        if ([string]$build.PackageSha256 -cne [string]$first.PackageSha256 -or [string]$build.Manifest.dllSha256 -cne [string]$first.Manifest.dllSha256 -or [string]$build.Manifest.assemblyMvid -cne [string]$first.Manifest.assemblyMvid) {
+            throw "Clean-head deterministic build failed: package $($first.PackageSha256)/$($build.PackageSha256) DLL $($first.Manifest.dllSha256)/$($build.Manifest.dllSha256)"
+        }
+    }
+    if ([string]$ValidatedRelease.package_sha256 -cne $ReleasePackageSha256 -or [string]$ValidatedRelease.package_sha256 -cne [string]$first.PackageSha256 -or
+        [string]$ValidatedRelease.dll_sha256 -cne [string]$first.Manifest.dllSha256 -or [string]$ValidatedRelease.dll_mvid -cne [string]$first.Manifest.assemblyMvid -or
+        [string]$ValidatedRelease.embedded_commit -cne $ReleaseHead) {
+        throw 'The validated release package does not match the deterministic build (DLL, MVID, embedded revision or package digest).'
+    }
+}
+
 function ConvertTo-KbpCompilerInventoryText($Inventory) {
     return (@($Inventory | ForEach-Object { [string]$_.kind + '|' + [string]$_.name + '|' + [string]$_.sha256 }) -join "`n")
 }

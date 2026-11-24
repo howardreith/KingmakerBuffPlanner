@@ -604,6 +604,13 @@ function Get-KbpCompatibilitySourcePath($Expected, [string]$LiveModsPath) {
     return Join-Path $LiveModsPath ([string]$Expected.directoryName)
 }
 
+# Writes the runtime request and returns the decoded snapshot of the bytes just written: the launcher keeps it in memory
+# and checks the result against it, never against a later read of the evidence file.
+function Save-KbpRuntimeRequest([string]$Path, $Request) {
+    Write-KbpJsonAtomic $Path $Request
+    return (Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json)
+}
+
 function Write-KbpJsonAtomic([string]$Path, $Value) {
     $directory = Split-Path -Parent $Path
     if (-not (Test-Path -LiteralPath $directory -PathType Container)) {
