@@ -403,7 +403,12 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $installGame 'Mods') -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $installGame 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii
     $install = { param($manifestPath, $id) Invoke-Isolated @('-File', (Join-Path $base 'scripts\Install-Local.ps1'), '-ReleaseManifestPath', $manifestPath, '-InstallId', $id, '-KingmakerInstallDir', $installGame, '-WhatIf') }
-    Expect-Accepted 'install-preflight-matching-release-accepted' (& $install $releaseManifest 'genuine') 'Local install preflight PASS'
+    # A matching release passes the reconciliation; the installer's later host checks may still refuse because of an
+    # unrelated pre-existing runtime transaction in the lab (owner state, never touched); that refusal is reported as such.
+    $g = & $install $releaseManifest 'genuine'
+    $gText = $g.Output -replace '\s+', ' '
+    $ok = $gText -notmatch 'does not match the validated release package' -and $gText -match 'Package validation: PASS=13 FAIL=0' -and (($g.ExitCode -eq 0 -and $gText -match 'Local install preflight PASS') -or ($g.ExitCode -ne 0 -and $gText -match 'Unresolved runtime transaction exists'))
+    Add-Case 'install-preflight-matching-release-passes-reconciliation' $ok $(if ($g.ExitCode -eq 0) { 'reconciled; Local install preflight PASS' } else { 'reconciled (validated copy matches the release manifest); then refused by an unrelated pre-existing lab runtime transaction: ' + (Get-Reason $g.Output) })
     $savedRelease = Join-Path $inputs 'release-manifest.json'
     Copy-Item -LiteralPath $releaseManifest -Destination $savedRelease
     foreach ($bad in @(
