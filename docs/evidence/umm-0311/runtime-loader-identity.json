@@ -1,126 +1,128 @@
 {
-    "schema":  "kbp.runtime-loader-identity-tests.v1",
-    "installed_loader_observed":  {
-                                      "unityModManager":  {
-                                                              "version":  "0.33.0.0",
-                                                              "sha256":  "63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691"
-                                                          },
-                                      "harmony12":  {
-                                                        "version":  "1.2.0.1",
-                                                        "sha256":  "aa1cd48317254985d8b700cc74953477d1b40c3022ce9aa4c95ed2b8327e1292"
-                                                    },
-                                      "harmony2":  {
-                                                       "version":  "2.3.6.0",
-                                                       "sha256":  "df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80"
-                                                   }
-                                  },
-    "passed":  21,
-    "total":  21,
+    "schema":  "kbp.runtime-loader-identity-tests.v2",
+    "rows":  [
+                 "0.31.1",
+                 "0.32.4",
+                 "0.33.4",
+                 "owner-0.33.0"
+             ],
+    "passed":  23,
+    "total":  23,
     "cases":  [
                   {
-                      "name":  "profile-advanced-gunslinger-0136-loader-identity",
-                      "passed":  true,
-                      "detail":  "UMM 0.33.0.0 / Harmony12 1.2.0.1 / Harmony2 2.3.6.0"
-                  },
-                  {
-                      "name":  "profile-call-of-the-wild-loader-identity",
-                      "passed":  true,
-                      "detail":  "UMM 0.33.0.0 / Harmony12 1.2.0.1 / Harmony2 2.3.6.0"
-                  },
-                  {
-                      "name":  "profile-call-of-the-wild-plus-tabletop-added-rules-loader-identity",
-                      "passed":  true,
-                      "detail":  "status unavailable-local-reference"
-                  },
-                  {
-                      "name":  "profile-full-user-loader-identity",
-                      "passed":  true,
-                      "detail":  "UMM 0.33.0.0 / Harmony12 1.2.0.1 / Harmony2 2.3.6.0"
-                  },
-                  {
-                      "name":  "profile-human-reproduction-loader-identity",
-                      "passed":  true,
-                      "detail":  "UMM 0.33.0.0 / Harmony12 1.2.0.1 / Harmony2 2.3.6.0"
-                  },
-                  {
-                      "name":  "profile-native-only-loader-identity",
-                      "passed":  true,
-                      "detail":  "UMM 0.33.0.0 / Harmony12 1.2.0.1 / Harmony2 2.3.6.0"
-                  },
-                  {
-                      "name":  "profile-tabletop-added-rules-loader-identity",
-                      "passed":  true,
-                      "detail":  "status unavailable-local-reference"
-                  },
-                  {
-                      "name":  "loader-contract-malformed-harmony2-row-refused",
-                      "passed":  true,
-                      "detail":  "refused: Compatibility loader identity row is invalid: test harmony2"
-                  },
-                  {
-                      "name":  "loader-contract-missing-harmony2-refused",
-                      "passed":  true,
-                      "detail":  "refused: Compatibility loader identity must name exactly unityModManager, harmony12, harmony2: test"
-                  },
-                  {
-                      "name":  "preflight-matching-installation-accepted",
+                      "name":  "preflight-row-0.31.1-matching-loader-accepted",
                       "passed":  true,
                       "detail":  "accepted"
                   },
                   {
-                      "name":  "preflight-different-umm-row-refused",
+                      "name":  "preflight-row-0.32.4-matching-loader-accepted",
                       "passed":  true,
-                      "detail":  "refused: Installed loader does not match compatibility profile native-only: unityModManager expected=0.31.1.0/2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4 observed=UnityModManager 0.33.0.0/63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691"
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "preflight-row-0.33.4-matching-loader-accepted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "preflight-row-owner-0.33.0-matching-loader-accepted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "preflight-cross-row-0.31.1-files-under-0.32.4-row-refused",
+                      "passed":  true,
+                      "detail":  "refused: Installed loader does not match loader row 0.32.4: unityModManager expected=0.32.4.0/1387468bc3af41c50fe51859a3bb7af4922891aa8f13a6187e7a348ceaabfd88 observed=UnityModManager 0.31.1.0/2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4; harmony2 expected=2.3.6.0/df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80 observed=0Harmony 2.3.1.1/5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f"
                   },
                   {
                       "name":  "preflight-harmony2-only-mismatch-refused",
                       "passed":  true,
-                      "detail":  "refused: Installed loader does not match compatibility profile native-only: harmony2 expected=2.3.6.0/0000000000000000000000000000000000000000000000000000000000000000 observed=0Harmony 2.3.6.0/df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80"
+                      "detail":  "refused: Installed loader does not match loader row 0.33.4: harmony2 expected=2.4.3.0/ddc070b57f695ece6f92c43cf82cf4d863c69685de96a99ebd9d2fa1d8fa7a19 observed=0Harmony 2.3.6.0/df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80"
                   },
                   {
-                      "name":  "preflight-installed-file-swapped-refused",
+                      "name":  "loader-row-unknown-id-refused",
                       "passed":  true,
-                      "detail":  "refused: Installed loader does not match compatibility profile native-only: unityModManager expected=0.33.0.0/63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691 observed=UnityModManager 0.31.1.0/2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4"
+                      "detail":  "refused: Cannot validate argument on parameter \u0027LoaderId\u0027. The argument \"unknown-row\" does not belong to the set \"0.31.1,0.32.4,owner-0.33.0,0.33.4\" specified by the ValidateSet attribute. Supply an argument that is in the set and then try the command again."
                   },
                   {
-                      "name":  "preflight-missing-harmony2-refused",
-                      "passed":  true,
-                      "detail":  "refused: Installed loader does not match compatibility profile native-only: harmony2 missing (0Harmony.dll)"
-                  },
-                  {
-                      "name":  "result-matching-loader-admitted",
+                      "name":  "installation-preflight-matching-row-accepted",
                       "passed":  true,
                       "detail":  "accepted"
                   },
                   {
-                      "name":  "result-different-umm-row-refused",
+                      "name":  "installation-preflight-harmony2-only-mismatch-refused",
                       "passed":  true,
-                      "detail":  "refused: Runtime result identity/hash mismatch: ummVersion expected=0.33.0.0 observed=0.31.1.0; ummSha256 expected=63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691 observed=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4"
+                      "detail":  "refused: Installed loader does not match loader row 0.31.1: harmony2 expected=2.3.1.1/5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f observed=0Harmony 2.3.6.0/df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80"
+                  },
+                  {
+                      "name":  "profile-test-entry-point-refuses-harmony2-only-mismatch",
+                      "passed":  true,
+                      "detail":  "exit 1"
+                  },
+                  {
+                      "name":  "profile-test-entry-point-accepts-matching-row",
+                      "passed":  true,
+                      "detail":  "exit 0: Compatibility profile: PASS=1 FAIL=0 id=native-only mods=0 loader=0.31.1"
+                  },
+                  {
+                      "name":  "deploy-and-launcher-run-the-shared-preflight-before-staging",
+                      "passed":  true,
+                      "detail":  "Deploy-Local and the launcher call Assert-KbpInstallationPreflight (with the selected row and the caller\u0027s KingmakerInstallDir) before any staging or request"
+                  },
+                  {
+                      "name":  "result-row-0.31.1-admitted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "result-row-0.32.4-admitted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "result-row-0.33.4-admitted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "result-row-owner-0.33.0-admitted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "result-cross-row-refused",
+                      "passed":  true,
+                      "detail":  "refused: Runtime result identity/hash mismatch: ummVersion expected=0.33.0.0 observed=0.31.1.0; ummSha256 expected=63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691 observed=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4; harmony2Version expected=2.3.6.0 observed=2.3.1.1; harmony2Sha256 expected=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80 observed=5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f; ummInstalledSha256 expected=63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691 observed=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4; harmony2InstalledSha256 expected=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80 observed=5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f"
                   },
                   {
                       "name":  "result-harmony2-only-mismatch-refused",
                       "passed":  true,
-                      "detail":  "refused: Runtime result identity/hash mismatch: harmony2Sha256 expected=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80 observed=0000000000000000000000000000000000000000000000000000000000000000"
+                      "detail":  "refused: Runtime result identity/hash mismatch: harmony2Version expected=2.4.3.0 observed=2.3.6.0; harmony2Sha256 expected=ddc070b57f695ece6f92c43cf82cf4d863c69685de96a99ebd9d2fa1d8fa7a19 observed=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80; harmony2InstalledSha256 expected=ddc070b57f695ece6f92c43cf82cf4d863c69685de96a99ebd9d2fa1d8fa7a19 observed=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80"
                   },
                   {
-                      "name":  "result-harmony2-not-loaded-refused",
+                      "name":  "result-loaded-versus-installed-mismatch-refused",
                       "passed":  true,
-                      "detail":  "refused: Runtime result identity/hash mismatch: harmony2Version expected=2.3.6.0 observed=not-loaded; harmony2Sha256 expected=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80 observed=not-loaded"
+                      "detail":  "refused: Runtime result identity/hash mismatch: ummInstalledSha256 expected=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4 observed=1387468bc3af41c50fe51859a3bb7af4922891aa8f13a6187e7a348ceaabfd88"
                   },
                   {
                       "name":  "result-earlier-shape-without-harmony2-refused",
                       "passed":  true,
-                      "detail":  "refused: Runtime result identity/hash mismatch: harmony2Version expected=2.3.6.0 observed=(absent); harmony2Sha256 expected=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80 observed=(absent)"
+                      "detail":  "refused: Runtime result identity/hash mismatch: harmony2Version expected=2.3.1.1 observed=(absent); harmony2Sha256 expected=5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f observed=(absent)"
                   },
                   {
-                      "name":  "result-under-other-expected-harmony2-refused",
+                      "name":  "result-for-request-without-loader-row-refused",
                       "passed":  true,
-                      "detail":  "refused: Runtime result identity/hash mismatch: harmony2Version expected=2.4.3.0 observed=2.3.6.0"
+                      "detail":  "refused: Runtime request carries no expected loader row."
                   },
                   {
-                      "name":  "compatibility-identity-binds-loader",
+                      "name":  "request-carries-selected-row",
                       "passed":  true,
-                      "detail":  "native-only 41020f1bca1c1adf63a92eafc58b9cce4002223ee3faca83b74c41589780381b; Harmony2-only change 8fb90e91de6d10024d8d07848e37503d12d23dab2897a120d3781e6d074a9cc9"
+                      "detail":  "expectedLoader 0.32.4"
+                  },
+                  {
+                      "name":  "compatibility-identity-binds-loader-row",
+                      "passed":  true,
+                      "detail":  "native-only + 0.31.1 3da95c694bc0b87a244360d69856ef426f8dd2370e81f9098307c9f5a8230eba; + owner-0.33.0 9e6cdbc5ecf4a7997cd5e35ead4e0b50d18d1ee373c95e393db0e3c20889ff68"
                   }
               ]
 }

@@ -2,14 +2,19 @@
     "schemaVersion":  1,
     "generator":  "scripts/Build-Local.ps1",
     "version":  "0.6.20",
-    "commit":  "75aeeff68670913994a3caa0fb6a0d5e1edd49ba",
+    "commit":  "5cd32d080416718706d94e539c92f000a66fb7b6",
     "sourceDirty":  false,
-    "buildInputsSha256":  "0f6aca369a87166d6dc46763d52c798f4151dec1631c429e7797e17c8fb0ceb9",
+    "buildInputsSha256":  "606860b6ee71c16212d16201a943c01090129a1a03462d57e5bab1f332fc0ef0",
     "compilerInputs":  [
                            {
                                "kind":  "compile",
-                               "name":  "BuildInfo.Generated.cs",
-                               "sha256":  "absent"
+                               "name":  "generated:.NETFramework,Version=v4.7.AssemblyAttributes.cs",
+                               "sha256":  "1555ebe6741e05c08c49de3019df3761b92ef583871c838b4262de2ff67fac4e"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "obj:BuildInfo.Generated.cs",
+                               "sha256":  "d45c80daacbdfc354e2e9acd36c36a968047a23ada281388302ac0a28e5b00e4"
                            },
                            {
                                "kind":  "compile",
@@ -704,7 +709,7 @@
                            {
                                "kind":  "compile",
                                "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimeLoaderIdentity.cs",
-                               "sha256":  "146f8769e070b2329dd6aa2b3e226d5e795184f924ef752f14f674cc62f95fc5"
+                               "sha256":  "b35ae501c1cdf41daffb82588ba9d22357042f05988e1e4108e0f4b8abef759e"
                            },
                            {
                                "kind":  "compile",
@@ -754,17 +759,17 @@
                            {
                                "kind":  "compile",
                                "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimeTestHost.cs",
-                               "sha256":  "4a6fc8e4f2ee9e3442a2a2a437da27e903a1aa1e758a34acfb0c5dfc75f59452"
+                               "sha256":  "58ef64a9ca120a64d9a2590f335c351f9742233ef341622c4903e0f2493d9a33"
                            },
                            {
                                "kind":  "compile",
                                "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimeTestProtocol.cs",
-                               "sha256":  "a9dc129a8c840892ab44d9994d2f3eaeb518fe67c54d1eca24c2d1c341da652b"
+                               "sha256":  "3852588702382de35e1d63e26396b7cd55d6af3f4365cc6a7bd5a03d159ff2d1"
                            },
                            {
                                "kind":  "compile",
                                "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimeTestResultModels.cs",
-                               "sha256":  "d66dcfc5f54a95fdd1e21688bb64a6d09d57ad6f5ca525a24b4e9846304e6a88"
+                               "sha256":  "fd09479f21e60b0b30c931832bd29333fb36e11d8d673e499a9195cbe73a6295"
                            },
                            {
                                "kind":  "compile",
@@ -1237,6 +1242,106 @@
                                "sha256":  "8e59f5fb2167e9ea4c370a20efdf2eafbd56706c267ac0ec424de49966545b94"
                            },
                            {
+                               "kind":  "file-option",
+                               "name":  "/resource:src/KingmakerBuffPlanner/Localization/enGB.json,KBP.Text.enGB.json",
+                               "sha256":  "d19beafeeca21d82552efaf1a96b98635c13847b70b53c13cb0b68159b92c5db"
+                           },
+                           {
+                               "kind":  "file-option",
+                               "name":  "/resource:src/KingmakerBuffPlanner/Localization/zhCN.json,KBP.Text.zhCN.json",
+                               "sha256":  "07162bb993d87ce26bb2f5054faa7a1a099f9c66197fa2cac659daf0dd7e99a8"
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/debug:pdbonly",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/define:TRACE",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/deterministic+",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/filealign:512",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/fullpaths",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/highentropyva+",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/langversion:7.3",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/noconfig",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/nostdlib+",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/nowarn:1701,1702",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/optimize+",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/pathmap:<dev>\\KingmakerBuffPlannerLab\\worktrees\\umm-0311-frozen-5cd32d0\\src\\KingmakerBuffPlanner=/_/src/KingmakerBuffPlanner",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/subsystemversion:6.00",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/target:library",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/utf8output",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/warn:4",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/warnaserror+",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "output",
+                               "name":  "/out:KingmakerBuffPlanner.dll",
+                               "sha256":  ""
+                           },
+                           {
                                "kind":  "reference",
                                "name":  "artifacts/references/0Harmony12.dll",
                                "sha256":  "aa1cd48317254985d8b700cc74953477d1b40c3022ce9aa4c95ed2b8327e1292"
@@ -1325,213 +1430,13 @@
                                "kind":  "reference",
                                "name":  "UnityEngine.UIModule.dll",
                                "sha256":  "51b32055e2a03c78d3e7b2d7d8a6425ee80d415c1e07ea0ec7b1dd84eddc9f12"
-                           },
-                           {
-                               "kind":  "resource",
-                               "name":  "src/KingmakerBuffPlanner/Localization/enGB.json",
-                               "sha256":  "d19beafeeca21d82552efaf1a96b98635c13847b70b53c13cb0b68159b92c5db"
-                           },
-                           {
-                               "kind":  "resource",
-                               "name":  "src/KingmakerBuffPlanner/Localization/zhCN.json",
-                               "sha256":  "07162bb993d87ce26bb2f5054faa7a1a099f9c66197fa2cac659daf0dd7e99a8"
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "AdditionalLibPaths=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "AllowUnsafeBlocks=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "ApplicationIcon=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "AssemblyName=KingmakerBuffPlanner",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "AssemblyOriginatorKeyFile=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "CheckForOverflowUnderflow=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "CscToolExe=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "CscToolPath=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "DebugSymbols=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "DebugType=pdbonly",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "DefineConstants=TRACE",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "DelaySign=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "Deterministic=true",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "Features=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "FileAlignment=512",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "HighEntropyVA=true",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "LangVersion=7.3",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "ModuleAssemblyName=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "NoConfig=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "NoStdLib=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "NoWarn=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "Nullable=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "Optimize=true",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "PathMap=<temp>\\kbp-frozen-4119cb9745774d859606c5a4d17a30db\\frozen clone\\src\\KingmakerBuffPlanner=/_/src/KingmakerBuffPlanner",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "PlatformTarget=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "Prefer32Bit=false",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "PublicSign=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "RootNamespace=KingmakerBuffPlanner",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "SignAssembly=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "SubsystemVersion=6.00",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "TargetFrameworkMoniker=.NETFramework,Version=v4.7",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "TargetFrameworkVersion=v4.7",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "TreatWarningsAsErrors=true",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "WarningLevel=4",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "WarningsAsErrors=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "WarningsNotAsErrors=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "Win32Manifest=",
-                               "sha256":  ""
-                           },
-                           {
-                               "kind":  "setting",
-                               "name":  "Win32Resource=",
-                               "sha256":  ""
                            }
                        ],
-    "packagePath":  "<temp>\\kbp-frozen-4119cb9745774d859606c5a4d17a30db\\frozen clone\\artifacts\\local-runtime\\0.6.20\\KingmakerBuffPlanner-0.6.20-local-runtime.zip",
-    "packageSha256":  "3eb972730ef323f49552cca20aa0837fff1ba3c2ac10c194ba5b43b92a416b49",
-    "dllSha256":  "c7f7c10e70a891b988a014b59060aeb799b84e7c054c576f60309c23f6a31c9f",
-    "assemblyMvid":  "ed4ae28d-ff7c-48d9-b3b9-b09e063181d4",
-    "embeddedCommit":  "75aeeff68670913994a3caa0fb6a0d5e1edd49ba",
+    "packagePath":  "<dev>\\KingmakerBuffPlannerLab\\worktrees\\umm-0311-frozen-5cd32d0\\artifacts\\local-runtime\\0.6.20\\KingmakerBuffPlanner-0.6.20-local-runtime.zip",
+    "packageSha256":  "4a4b117d5f011b985f83aeb32d686714a9ba8db7292ec8462759fd3c3538131b",
+    "dllSha256":  "7c7fe1506da3b586b06e9a1310669add89409de0ee2248bf7c0f34324fbbf897",
+    "assemblyMvid":  "653c355d-9dbb-4675-9bf1-98aef4477d96",
+    "embeddedCommit":  "5cd32d080416718706d94e539c92f000a66fb7b6",
     "loaderReferences":  [
                              {
                                  "name":  "0Harmony12",

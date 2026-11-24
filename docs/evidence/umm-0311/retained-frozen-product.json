@@ -1,0 +1,60 @@
+{
+    "schema":  "kbp.retained-frozen-product.v2",
+    "frozen_commit":  "5cd32d080416718706d94e539c92f000a66fb7b6",
+    "retained_location":  "<dev>\\KingmakerBuffPlannerLab\\worktrees\\umm-0311-frozen-5cd32d0\\artifacts\\local-runtime\\0.6.20\\KingmakerBuffPlanner-0.6.20-local-runtime.zip",
+    "frozen_worktree":  "<dev>\\KingmakerBuffPlannerLab\\worktrees\\umm-0311-frozen-5cd32d0",
+    "retained_pair":  {
+                          "zip_sha256":  "4a4b117d5f011b985f83aeb32d686714a9ba8db7292ec8462759fd3c3538131b",
+                          "sidecar_sha256":  "a59cc6e44066aca9204c5b6a2e4680a547e6ab24274e9eee68b4dff1e3582945"
+                      },
+    "read_back":  {
+                      "package_sha256":  "4a4b117d5f011b985f83aeb32d686714a9ba8db7292ec8462759fd3c3538131b",
+                      "dll_sha256":  "7c7fe1506da3b586b06e9a1310669add89409de0ee2248bf7c0f34324fbbf897",
+                      "mvid":  "653c355d-9dbb-4675-9bf1-98aef4477d96",
+                      "embedded_commit":  "5cd32d080416718706d94e539c92f000a66fb7b6",
+                      "loader_references":  [
+                                                {
+                                                    "name":  "0Harmony12",
+                                                    "version":  "1.2.0.1"
+                                                },
+                                                {
+                                                    "name":  "UnityModManager",
+                                                    "version":  "0.31.1.0"
+                                                }
+                                            ]
+                  },
+    "receipt":  {
+                    "commit":  "5cd32d080416718706d94e539c92f000a66fb7b6",
+                    "sourceDirty":  false,
+                    "packageSha256":  "4a4b117d5f011b985f83aeb32d686714a9ba8db7292ec8462759fd3c3538131b",
+                    "dllSha256":  "7c7fe1506da3b586b06e9a1310669add89409de0ee2248bf7c0f34324fbbf897",
+                    "assemblyMvid":  "653c355d-9dbb-4675-9bf1-98aef4477d96",
+                    "embeddedCommit":  "5cd32d080416718706d94e539c92f000a66fb7b6",
+                    "buildInputsSha256":  "606860b6ee71c16212d16201a943c01090129a1a03462d57e5bab1f332fc0ef0"
+                },
+    "frozen_receipt_check_at_frozen_worktree":  "accepted by Read-KbpBuildManifest (clean producing commit = HEAD, current build inputs, revalidated package identities)",
+    "candidate_commit":  "f33b945b8fce2a4581ddf8ddbc510524671cdad3",
+    "files_changed_since_frozen":  [
+                                       "docs/BUILD-AND-RELEASE.md",
+                                       "docs/UMM-COMPATIBILITY.md"
+                                   ],
+    "revision_stamp_builds_one_clone":  [
+                                            {
+                                                "source_commit":  "5cd32d080416718706d94e539c92f000a66fb7b6",
+                                                "stamped_revision":  "5cd32d080416718706d94e539c92f000a66fb7b6",
+                                                "dll_sha256":  "7c7fe1506da3b586b06e9a1310669add89409de0ee2248bf7c0f34324fbbf897"
+                                            },
+                                            {
+                                                "source_commit":  "f33b945b8fce2a4581ddf8ddbc510524671cdad3",
+                                                "stamped_revision":  "5cd32d080416718706d94e539c92f000a66fb7b6",
+                                                "dll_sha256":  "7c7fe1506da3b586b06e9a1310669add89409de0ee2248bf7c0f34324fbbf897"
+                                            },
+                                            {
+                                                "source_commit":  "f33b945b8fce2a4581ddf8ddbc510524671cdad3",
+                                                "stamped_revision":  "f33b945b8fce2a4581ddf8ddbc510524671cdad3",
+                                                "dll_sha256":  "e634b5d1ac8109cd3f542c5929050c2ee287fc276f70e1d9a11ddd3a7199b3ea"
+                                            }
+                                        ],
+    "candidate_stamped_frozen_equals_frozen_build":  true,
+    "note":  "Build.ps1 stamps the building commit into BuildInfo.Commit. The retained DLL was built in the frozen worktree (its path is in the PDB record); the stamp comparison builds both commits in one clone directory. The controller gate on the candidate commit builds a DLL stamped with that commit."
+}

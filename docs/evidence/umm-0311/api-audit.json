@@ -1,8 +1,8 @@
 {
   "schema": "kingmaker.loader-api-audit.v1",
-  "mod": "frozen.dll",
-  "mod_sha256": "c7f7c10e70a891b988a014b59060aeb799b84e7c054c576f60309c23f6a31c9f",
-  "mod_mvid": "ed4ae28d-ff7c-48d9-b3b9-b09e063181d4",
+  "mod": "retained.dll",
+  "mod_sha256": "7c7fe1506da3b586b06e9a1310669add89409de0ee2248bf7c0f34324fbbf897",
+  "mod_mvid": "653c355d-9dbb-4675-9bf1-98aef4477d96",
   "mod_assembly_references": [
     "mscorlib 4.0.0.0",
     "System 4.0.0.0",

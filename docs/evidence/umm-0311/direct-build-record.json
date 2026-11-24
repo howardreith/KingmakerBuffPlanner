@@ -1,12 +1,12 @@
 {
  "schema": "kingmaker.build-record.v1",
- "source_commit": "75aeeff68670913994a3caa0fb6a0d5e1edd49ba",
+ "source_commit": "5cd32d080416718706d94e539c92f000a66fb7b6",
  "product": "KingmakerBuffPlanner.dll",
  "product_compilations": [
   {
-   "out": "<temp>\\kbp-frozen-4119cb9745774d859606c5a4d17a30db\\direct-obj\\KingmakerBuffPlanner.dll",
+   "out": "<temp>\\claude\\c237366b8a8ea80b\\e178a93b-ca53-4b6b-a4d2-a357d48eaa77\\scratchpad\\kbp-ev3\\direct-obj\\KingmakerBuffPlanner.dll",
    "references": [
-    "<temp>\\kbp-frozen-4119cb9745774d859606c5a4d17a30db\\frozen clone\\artifacts\\references\\0Harmony12.dll",
+    "<dev>\\KingmakerBuffPlannerLab\\worktrees\\umm-0311-frozen-5cd32d0\\artifacts\\references\\0Harmony12.dll",
     "<game>\\Kingmaker_Data\\Managed\\Assembly-CSharp-firstpass.dll",
     "<game>\\Kingmaker_Data\\Managed\\Assembly-CSharp.dll",
     "<reference-assemblies>\\Microsoft\\Framework\\.NETFramework\\v4.7\\mscorlib.dll",
@@ -23,7 +23,7 @@
     "<game>\\Kingmaker_Data\\Managed\\UnityEngine.TextRenderingModule.dll",
     "<game>\\Kingmaker_Data\\Managed\\UnityEngine.UI.dll",
     "<game>\\Kingmaker_Data\\Managed\\UnityEngine.UIModule.dll",
-    "<temp>\\kbp-frozen-4119cb9745774d859606c5a4d17a30db\\frozen clone\\artifacts\\references\\UnityModManager.dll"
+    "<dev>\\KingmakerBuffPlannerLab\\worktrees\\umm-0311-frozen-5cd32d0\\artifacts\\references\\UnityModManager.dll"
    ]
   }
  ],

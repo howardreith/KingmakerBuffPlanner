@@ -1,9 +1,9 @@
 {
     "schema":  "kbp.package-validation.v1",
-    "package_sha256":  "3eb972730ef323f49552cca20aa0837fff1ba3c2ac10c194ba5b43b92a416b49",
-    "dll_sha256":  "c7f7c10e70a891b988a014b59060aeb799b84e7c054c576f60309c23f6a31c9f",
-    "dll_mvid":  "ed4ae28d-ff7c-48d9-b3b9-b09e063181d4",
-    "embedded_commit":  "75aeeff68670913994a3caa0fb6a0d5e1edd49ba",
+    "package_sha256":  "4a4b117d5f011b985f83aeb32d686714a9ba8db7292ec8462759fd3c3538131b",
+    "dll_sha256":  "7c7fe1506da3b586b06e9a1310669add89409de0ee2248bf7c0f34324fbbf897",
+    "dll_mvid":  "653c355d-9dbb-4675-9bf1-98aef4477d96",
+    "embedded_commit":  "5cd32d080416718706d94e539c92f000a66fb7b6",
     "manager_version":  "0.31.1",
     "dll_loader_references":  [
                                   {
