@@ -1,8 +1,8 @@
 {
   "schema": "kingmaker.loader-api-audit.v1",
-  "mod": "KingmakerBuffPlanner.dll",
-  "mod_sha256": "80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf",
-  "mod_mvid": "b12670d5-f94f-49ca-b23d-1514086a1f4b",
+  "mod": "retained.dll",
+  "mod_sha256": "a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda",
+  "mod_mvid": "eb7e8a92-d678-45b3-a9a2-065ae10511c0",
   "mod_assembly_references": [
     "mscorlib 4.0.0.0",
     "System 4.0.0.0",

@@ -6,8 +6,8 @@
                  "0.33.4",
                  "owner-0.33.0"
              ],
-    "passed":  37,
-    "total":  37,
+    "passed":  40,
+    "total":  40,
     "cases":  [
                   {
                       "name":  "preflight-row-0.31.1-matching-loader-accepted",
@@ -123,6 +123,21 @@
                       "name":  "retained-request-admits-its-own-row-result",
                       "passed":  true,
                       "detail":  "accepted"
+                  },
+                  {
+                      "name":  "retained-request-survives-replacement-at-the-write-boundary",
+                      "passed":  true,
+                      "detail":  "retained row 0.31.1.0 (file now 0.33.4.0); note preserved: True"
+                  },
+                  {
+                      "name":  "boundary-retained-request-refuses-the-replacement-row-result",
+                      "passed":  true,
+                      "detail":  "refused: Runtime result identity/hash mismatch: ummVersion expected=0.31.1.0 observed=0.33.4.0; ummSha256 expected=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4 observed=c5ed5617457f597d7befb272f9fe311d7128c647fd427a114c197bea13475239; harmony2Version expected=2.3.1.1 observed=2.4.3.0; harmony2Sha256 expected=5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f observed=ddc070b57f695ece6f92c43cf82cf4d863c69685de96a99ebd9d2fa1d8fa7a19; ummInstalledSha256 expected=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4 observed=c5ed5617457f597d7befb272f9fe311d7128c647fd427a114c197bea13475239; harmony2InstalledSha256 expected=5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f observed=ddc070b57f695ece6f92c43cf82cf4d863c69685de96a99ebd9d2fa1d8fa7a19"
+                  },
+                  {
+                      "name":  "mixed-case-owner-loader-id-resolves-to-the-canonical-row",
+                      "passed":  true,
+                      "detail":  "loaderId owner-0.33.0"
                   },
                   {
                       "name":  "request-carries-selected-row",

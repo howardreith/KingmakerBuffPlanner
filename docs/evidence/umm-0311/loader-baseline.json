@@ -1,21 +1,21 @@
 {
     "schema":  "kbp.loader-baseline-tests.v2",
-    "source_commit":  "8ac57387509f13840659365c9f7d01762e80bcf5",
-    "candidate_package_sha256":  "94e9a036d51a996540c9fb20d1ca23319fbc5425e53a0707a7da47c01d559133",
-    "candidate_dll_sha256":  "80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf",
+    "source_commit":  "c2a594ce7124cba35c63523b6ad4a039c84cdbc3",
+    "candidate_package_sha256":  "e8c19adf7aea9a0d92f0a631300b61439d449fe00caa5b6ca9b79951d700b480",
+    "candidate_dll_sha256":  "a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda",
     "legacy_release_zip_sha256":  "54153abb96c9aa5a3e0cb87dc18401dc23aeb47e603b9a69148b5a944668f780",
     "wrong_loader_fixture":  "UnityModManager 0.32.4.0 1387468bc3af41c50fe51859a3bb7af4922891aa8f13a6187e7a348ceaabfd88",
     "owner_install_measured":  {
                                    "version":  "0.33.0.0",
                                    "sha256":  "63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691"
                                },
-    "passed":  90,
-    "total":  90,
+    "passed":  99,
+    "total":  99,
     "cases":  [
                   {
                       "name":  "clone-build-local-from-detached-commit",
                       "passed":  true,
-                      "detail":  "detached clone of 8ac57387509f13840659365c9f7d01762e80bcf5; package 94e9a036d51a996540c9fb20d1ca23319fbc5425e53a0707a7da47c01d559133; DLL 80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf"
+                      "detail":  "detached clone of c2a594ce7124cba35c63523b6ad4a039c84cdbc3; package e8c19adf7aea9a0d92f0a631300b61439d449fe00caa5b6ca9b79951d700b480; DLL a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda"
                   },
                   {
                       "name":  "cache-genuine-verified",
@@ -75,7 +75,7 @@
                   {
                       "name":  "msbuild-direct-compiles-against-pinned-inputs",
                       "passed":  true,
-                      "detail":  "exit 0; UnityModManager.dll -\u003e <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\artifacts\\references\\UnityModManager.dll; 0Harmony12.dll -\u003e <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\artifacts\\references\\0Harmony12.dll"
+                      "detail":  "exit 0; UnityModManager.dll -\u003e <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\artifacts\\references\\UnityModManager.dll; 0Harmony12.dll -\u003e <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\artifacts\\references\\0Harmony12.dll"
                   },
                   {
                       "name":  "incremental-build-genuine-accepted",
@@ -110,27 +110,27 @@
                   {
                       "name":  "csc-input-identical-copy-elsewhere-rejected",
                       "passed":  true,
-                      "detail":  "rejected: <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\stray copy\\UnityModManager.dll [<temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\probe stray.csproj]"
+                      "detail":  "rejected: <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\stray copy\\UnityModManager.dll [<temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\probe stray.csproj]"
                   },
                   {
                       "name":  "csc-input-same-stem-file-in-pinned-dir-rejected",
                       "passed":  true,
-                      "detail":  "rejected: <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\artifacts\\references\\UnityModManager.exe [<temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\probe samestem.csproj]"
+                      "detail":  "rejected: <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\artifacts\\references\\UnityModManager.exe [<temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\probe samestem.csproj]"
                   },
                   {
                       "name":  "csc-input-renamed-loader-in-pinned-dir-rejected",
                       "passed":  true,
-                      "detail":  "rejected: <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\artifacts\\references\\umm-alias.dll [<temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\probe alias.csproj]"
+                      "detail":  "rejected: <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\artifacts\\references\\umm-alias.dll [<temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\probe alias.csproj]"
                   },
                   {
                       "name":  "csc-input-umm-0.32.4-fixture-rejected",
                       "passed":  true,
-                      "detail":  "rejected: <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\inputs\\UnityModManager-0.32.4.dll [<temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\probe wrong.csproj]"
+                      "detail":  "rejected: <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\inputs\\UnityModManager-0.32.4.dll [<temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\probe wrong.csproj]"
                   },
                   {
                       "name":  "csc-input-substituted-reference-assembly-rejected",
                       "passed":  true,
-                      "detail":  "rejected: <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\stray copy\\UnityModManager.dll [<temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\probe substituted.csproj]"
+                      "detail":  "rejected: <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\LoaderReferences.targets(36,5): error : Loader compiler references must be the verified files in the pinned directory <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\clone with space\\artifacts\\references\\; resolved: <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\stray copy\\UnityModManager.dll [<temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\probe substituted.csproj]"
                   },
                   {
                       "name":  "package-candidate-accepted",
@@ -180,12 +180,12 @@
                   {
                       "name":  "same-host-validation-KingmakerBuffPlanner-0.6.20-local-runtime-first",
                       "passed":  true,
-                      "detail":  "Package validation: PASS=13 FAIL=0 sha256=94e9a036d51a996540c9fb20d1ca23319fbc5425e53a0707a7da47c01d559133 dll=80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf mvid=b12670d5-f94f-49ca-b23d-1514086a1f4b commit=8ac57387509f13840659365c9f7d01762e80bcf5 | ACCEPTED KingmakerBuffPlanner-0.6.20-local-runtime.zip | REJECTED KingmakerBuffPlanner-0.6.20-lowered.zip: Packaged DLL must reference pinned UnityModManager 0.31.1.0; lowering Info.json alone is not sufficient."
+                      "detail":  "Package validation: PASS=13 FAIL=0 sha256=e8c19adf7aea9a0d92f0a631300b61439d449fe00caa5b6ca9b79951d700b480 dll=a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda mvid=eb7e8a92-d678-45b3-a9a2-065ae10511c0 commit=c2a594ce7124cba35c63523b6ad4a039c84cdbc3 | ACCEPTED KingmakerBuffPlanner-0.6.20-local-runtime.zip | REJECTED KingmakerBuffPlanner-0.6.20-lowered.zip: Packaged DLL must reference pinned UnityModManager 0.31.1.0; lowering Info.json alone is not sufficient."
                   },
                   {
                       "name":  "same-host-validation-KingmakerBuffPlanner-0.6.20-lowered-first",
                       "passed":  true,
-                      "detail":  "REJECTED KingmakerBuffPlanner-0.6.20-lowered.zip: Packaged DLL must reference pinned UnityModManager 0.31.1.0; lowering Info.json alone is not sufficient. | Package validation: PASS=13 FAIL=0 sha256=94e9a036d51a996540c9fb20d1ca23319fbc5425e53a0707a7da47c01d559133 dll=80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf mvid=b12670d5-f94f-49ca-b23d-1514086a1f4b commit=8ac57387509f13840659365c9f7d01762e80bcf5 | ACCEPTED KingmakerBuffPlanner-0.6.20-local-runtime.zip"
+                      "detail":  "REJECTED KingmakerBuffPlanner-0.6.20-lowered.zip: Packaged DLL must reference pinned UnityModManager 0.31.1.0; lowering Info.json alone is not sufficient. | Package validation: PASS=13 FAIL=0 sha256=e8c19adf7aea9a0d92f0a631300b61439d449fe00caa5b6ca9b79951d700b480 dll=a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda mvid=eb7e8a92-d678-45b3-a9a2-065ae10511c0 commit=c2a594ce7124cba35c63523b6ad4a039c84cdbc3 | ACCEPTED KingmakerBuffPlanner-0.6.20-local-runtime.zip"
                   },
                   {
                       "name":  "validator-offline-without-reference-cache-accepted",
@@ -210,7 +210,7 @@
                   {
                       "name":  "relative-cache-uses-powershell-location-corrupt-rejected",
                       "passed":  true,
-                      "detail":  "rejected: ERROR: Pinned loader reference hash mismatch: <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\powershell dir\\cache\\UnityModManager.dll. Preserve or remove the mismatched file explicitly before retrying."
+                      "detail":  "rejected: ERROR: Pinned loader reference hash mismatch: <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\powershell dir\\cache\\UnityModManager.dll. Preserve or remove the mismatched file explicitly before retrying."
                   },
                   {
                       "name":  "relative-cache-uses-powershell-location-genuine-accepted",
@@ -220,12 +220,12 @@
                   {
                       "name":  "relative-cache-not-yet-created-resolves-under-powershell-location",
                       "passed":  true,
-                      "detail":  "rejected: ERROR: Pinned loader reference missing: <temp>\\kbp-loader-baseline-6f12ae77869d4f8baaa9526c7d783458\\empty location\\cache\\UnityModManager.dll. Run scripts/Get-PinnedLoaderReferences.ps1 first."
+                      "detail":  "rejected: ERROR: Pinned loader reference missing: <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\empty location\\cache\\UnityModManager.dll. Run scripts/Get-PinnedLoaderReferences.ps1 first."
                   },
                   {
                       "name":  "receipt-records-clean-producing-build",
                       "passed":  true,
-                      "detail":  "commit 8ac57387509f13840659365c9f7d01762e80bcf5 dirty False embedded 8ac57387509f13840659365c9f7d01762e80bcf5 DLL 80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf MVID b12670d5-f94f-49ca-b23d-1514086a1f4b inputs 455a27e8af91f3e6a04cea62e29b1d4b740053586a7bc998e33c56172c3ee551 (286 compiler inputs)"
+                      "detail":  "commit c2a594ce7124cba35c63523b6ad4a039c84cdbc3 dirty False embedded c2a594ce7124cba35c63523b6ad4a039c84cdbc3 DLL a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda MVID eb7e8a92-d678-45b3-a9a2-065ae10511c0 inputs 02b9868bb8c5c3358111a80241432ab838abddd6516cd4b1d3d6c2ffc632c601 (286 compiler inputs)"
                   },
                   {
                       "name":  "receipt-matching-archive-and-receipt-accepted",
@@ -260,7 +260,7 @@
                   {
                       "name":  "second-same-version-build-is-distinct",
                       "passed":  true,
-                      "detail":  "version 0.6.20; DLL cb906e81ee85cf5a7cf3e779f20d8b3bba3f3e03a576a9923840d95433673640 vs 80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf; dirty True"
+                      "detail":  "version 0.6.20; DLL f69737e3f5a72dfb62b837c8f43d1e97b50e2cc1b296bb337727496a8c3b8364 vs a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda; dirty True"
                   },
                   {
                       "name":  "receipt-dirty-development-build-not-reused",
@@ -348,9 +348,29 @@
                       "detail":  "accepted: RECEIPT ACCEPTED"
                   },
                   {
+                      "name":  "receipt-with-import-selected-by-environment-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: The environment variable DirectoryBuildTargetsPath selects MSBuild imports; unset it before building."
+                  },
+                  {
+                      "name":  "receipt-with-untracked-directory-build-targets-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: Untracked MSBuild configuration files apply to the build: src/Directory.Build.targets"
+                  },
+                  {
+                      "name":  "build-with-untracked-directory-build-targets-rejected",
+                      "passed":  true,
+                      "detail":  "rejected:     + FullyQualifiedErrorId : Untracked MSBuild configuration files apply to the build: src/Directory.Build.targets"
+                  },
+                  {
+                      "name":  "receipt-after-local-imports-removed-accepted",
+                      "passed":  true,
+                      "detail":  "accepted: RECEIPT ACCEPTED"
+                  },
+                  {
                       "name":  "transaction-refuses-package-replaced-after-admission",
                       "passed":  true,
-                      "detail":  "rejected: ERROR: The package changed after admission (admitted 94e9a036d51a996540c9fb20d1ca23319fbc5425e53a0707a7da47c01d559133, now 26efed46201a935b82df184aff34f878bd4ed8b4c452c169ddad0d373cbf3194); nothing was staged or activated."
+                      "detail":  "rejected: ERROR: The package changed after admission (admitted e8c19adf7aea9a0d92f0a631300b61439d449fe00caa5b6ca9b79951d700b480, now 8ad1df719caee7ad8fc9df2d9c1532d618815087523c7c84f3cd5135f4c4277f); nothing was staged or activated."
                   },
                   {
                       "name":  "transaction-refusal-left-mods-untouched",
@@ -360,7 +380,7 @@
                   {
                       "name":  "transaction-stages-its-own-admitted-copy",
                       "passed":  true,
-                      "detail":  "state packageSha256 94e9a036d51a996540c9fb20d1ca23319fbc5425e53a0707a7da47c01d559133; owned copy package.zip; staged DLL 80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf"
+                      "detail":  "state packageSha256 e8c19adf7aea9a0d92f0a631300b61439d449fe00caa5b6ca9b79951d700b480; owned copy package.zip; staged DLL a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda"
                   },
                   {
                       "name":  "transaction-state-write-failure-leaves-no-copy-or-lock",
@@ -371,6 +391,11 @@
                       "name":  "transaction-same-run-id-retry-after-state-write-failure",
                       "passed":  true,
                       "detail":  "exit 0"
+                  },
+                  {
+                      "name":  "transaction-cleanup-failure-still-releases-the-lock",
+                      "passed":  true,
+                      "detail":  "exit 1; Mods unchanged: True; lock left: False; ERROR: Runtime entry failed before its state existed (injected state-write failure); its lock was released; still to clean up: owned package copy <temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\transaction fixture\\backups\\heldcopy\\package.zip (The process cannot access the file \u0027<temp>\\kbp-loader-baseline-a581457e3f444c00ab8070f243f2a23c\\transaction fixture\\backups\\heldcopy\\package.zip\u0027 because it is being used by another process.)"
                   },
                   {
                       "name":  "release-reconciliation-matching-clean-pair-accepted",
@@ -388,14 +413,34 @@
                       "detail":  "rejected: ERROR: A deterministic build receipt does not name the clean release commit or its own package."
                   },
                   {
+                      "name":  "release-reconciliation-empty-array-dirty-flag-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: A deterministic build receipt does not name the clean release commit or its own package."
+                  },
+                  {
+                      "name":  "release-reconciliation-string-false-dirty-flag-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: A deterministic build receipt does not name the clean release commit or its own package."
+                  },
+                  {
+                      "name":  "release-reconciliation-number-zero-dirty-flag-rejected",
+                      "passed":  true,
+                      "detail":  "rejected: ERROR: A deterministic build receipt does not name the clean release commit or its own package."
+                  },
+                  {
                       "name":  "release-manifest-from-validated-release-zip",
                       "passed":  true,
-                      "detail":  "exit 0; commit 8ac57387509f13840659365c9f7d01762e80bcf5 embedded 8ac57387509f13840659365c9f7d01762e80bcf5 DLL 80e0a1fbee65d2f4dc7cee36a6583875d84c1991e7f5e17095a90189ddcb87cf MVID b12670d5-f94f-49ca-b23d-1514086a1f4b"
+                      "detail":  "exit 0; commit c2a594ce7124cba35c63523b6ad4a039c84cdbc3 embedded c2a594ce7124cba35c63523b6ad4a039c84cdbc3 DLL a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda MVID eb7e8a92-d678-45b3-a9a2-065ae10511c0"
+                  },
+                  {
+                      "name":  "release-with-disagreeing-builds-keeps-previous-release",
+                      "passed":  true,
+                      "detail":  "exit 1; previous ZIP and manifest unchanged: True; private folders left 0;     + FullyQualifiedErrorId : Release packaging requires a clean Git worktree."
                   },
                   {
                       "name":  "install-preflight-matching-release-passes-reconciliation",
                       "passed":  true,
-                      "detail":  "reconciled (validated copy matches the release manifest); then stopped by an unrelated host gate (a pre-existing lab runtime transaction or a running Kingmaker owned by another session):     + FullyQualifiedErrorId : Pathfinder: Kingmaker is running (PID(s): 17228)."
+                      "detail":  "reconciled (validated copy matches the release manifest); then stopped by an unrelated host gate (a pre-existing lab runtime transaction or a running Kingmaker owned by another session):     + FullyQualifiedErrorId : Pathfinder: Kingmaker is running (PID(s): 40264)."
                   },
                   {
                       "name":  "install-preflight-wrong-release-commit-rejected",
@@ -425,12 +470,12 @@
                   {
                       "name":  "deploy-local-whatif-matching-loader-row-passes-preflight",
                       "passed":  true,
-                      "detail":  "loader row matched; then stopped by an unrelated host gate (a pre-existing lab runtime transaction or a running Kingmaker owned by another session):     + FullyQualifiedErrorId : Pathfinder: Kingmaker is running (PID(s): 17228)."
+                      "detail":  "loader row matched; then stopped by an unrelated host gate (a pre-existing lab runtime transaction or a running Kingmaker owned by another session):     + FullyQualifiedErrorId : Pathfinder: Kingmaker is running (PID(s): 40264)."
                   },
                   {
                       "name":  "compatibility-wrapper-whatif-matching-loader-row-passes-preflight",
                       "passed":  true,
-                      "detail":  "loader row matched; then stopped by an unrelated host gate (a pre-existing lab runtime transaction or a running Kingmaker owned by another session):     + FullyQualifiedErrorId : Pathfinder: Kingmaker is running (PID(s): 17228)."
+                      "detail":  "loader row matched; then stopped by an unrelated host gate (a pre-existing lab runtime transaction or a running Kingmaker owned by another session):     + FullyQualifiedErrorId : Pathfinder: Kingmaker is running (PID(s): 40264)."
                   },
                   {
                       "name":  "deploy-local-whatif-harmony2-only-mismatch-refused",
