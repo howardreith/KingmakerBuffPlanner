@@ -69,6 +69,7 @@ if ([string]$validatedRelease.package_sha256 -cne [string]$release.packageSha256
 if ([string]$validatedRelease.dll_sha256 -cne [string]$release.dllSha256) { $releaseMismatch += 'DLL SHA-256' }
 if ([string]$validatedRelease.dll_mvid -cne [string]$release.assemblyMvid) { $releaseMismatch += 'MVID' }
 if ([string]$validatedRelease.embedded_commit -cne [string]$release.commit) { $releaseMismatch += 'embedded source revision' }
+if ($release.PSObject.Properties.Name -contains 'embeddedCommit' -and ([string]$release.embeddedCommit -cne [string]$release.commit -or [string]$release.embeddedCommit -cne [string]$validatedRelease.embedded_commit)) { $releaseMismatch += 'embeddedCommit field' }
 if ($releaseMismatch.Count -ne 0) { throw "Release manifest does not match the validated release package: $($releaseMismatch -join ', '); nothing was staged." }
 if (-not $KingmakerInstallDir) { $KingmakerInstallDir = Get-KbpGamePath }
 $game = (Resolve-Path -LiteralPath $KingmakerInstallDir).Path

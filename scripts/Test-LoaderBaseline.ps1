@@ -367,6 +367,22 @@ try {
     Expect-Rejected 'receipt-after-resolved-local-reference-change-rejected' (Test-FrozenReceipt) 'Build inputs changed'
     [IO.File]::WriteAllText($gamePath, $gamePathOriginal)
     Expect-Accepted 'receipt-after-inputs-restored-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
+    # The bounded local configuration: any other setting in GamePath.props (here one that only a production build would
+    # see) refuses reuse and building.
+    [IO.File]::WriteAllText($gamePath, $gamePathOriginal.Replace('</PropertyGroup>', "<DefineConstants Condition=`"'`$(SkipCompilerExecution)' != 'true'`">`$(DefineConstants);PRODUCTION_ONLY</DefineConstants></PropertyGroup>"))
+    Expect-Rejected 'receipt-with-production-only-local-setting-rejected' (Test-FrozenReceipt) 'GamePath\.props may only define KingmakerInstallDir'
+    Expect-Rejected 'build-with-production-only-local-setting-rejected' (Invoke-Isolated @('-File', (Join-Path $base 'scripts\Build-Local.ps1'))) 'GamePath\.props may only define KingmakerInstallDir'
+    [IO.File]::WriteAllText($gamePath, $gamePathOriginal)
+    Restore-PairA
+    # Structural comparison: the receipt names the effective compiler first and its entries are compared in order.
+    $inv = @((Get-Content -LiteralPath $receiptA -Raw | ConvertFrom-Json).compilerInputs)
+    Add-Case 'receipt-records-effective-compiler-first' ($inv.Count -gt 2 -and $inv[0].kind -eq 'compiler' -and $inv[0].name -eq 'csc.exe' -and $inv[0].sha256 -match '^[0-9a-f]{64}$') ("first entries: $($inv[0].kind) $($inv[0].name); $($inv[1].kind) $($inv[1].name)")
+    Edit-Json $receiptA { param($j) $x = @($j.compilerInputs); $t = $x[1]; $x[1] = $x[2]; $x[2] = $t; $j.compilerInputs = $x }
+    Expect-Rejected 'receipt-with-reordered-compiler-arguments-rejected' (Test-FrozenReceipt) 'compiler inputs differ .*entry'
+    Restore-PairA
+    Edit-Json $receiptA { param($j) $j.compilerInputs = @(@($j.compilerInputs) | Select-Object -SkipLast 1) }
+    Expect-Rejected 'receipt-with-missing-compiler-entry-rejected' (Test-FrozenReceipt) 'entry count'
+    Restore-PairA
 
     # 9. The runtime transaction stages only its own copy of the admitted package; a package replaced after admission is
     #    refused before anything is staged or activated (fixture game folder; FixtureMode roots in the temporary folder).
@@ -384,7 +400,8 @@ try {
     $modsBefore = @(Get-ChildItem -LiteralPath (Join-Path $fixtureGame 'Mods') -Recurse -Force | ForEach-Object { $_.FullName }) -join ';'
     Expect-Rejected 'transaction-refuses-package-replaced-after-admission' (& $tx $swapped 'swapped') 'changed after admission'
     $modsAfter = @(Get-ChildItem -LiteralPath (Join-Path $fixtureGame 'Mods') -Recurse -Force | ForEach-Object { $_.FullName }) -join ';'
-    Add-Case 'transaction-refusal-left-mods-untouched' ($modsBefore -ceq $modsAfter -and -not (Test-Path -LiteralPath (Join-Path $fixtureGame 'Mods\KingmakerBuffPlanner'))) 'fixture Mods unchanged; nothing staged or activated'
+    $strandedCopies = @(Get-ChildItem -LiteralPath $txRoots[2] -Recurse -Filter 'package.zip' -ErrorAction SilentlyContinue).Count
+    Add-Case 'transaction-refusal-left-mods-untouched' ($modsBefore -ceq $modsAfter -and -not (Test-Path -LiteralPath (Join-Path $fixtureGame 'Mods\KingmakerBuffPlanner')) -and $strandedCopies -eq 0) "fixture Mods unchanged; nothing staged or activated; transaction package copies left: $strandedCopies"
     $entered = & $tx $zipA 'admitted'
     $txState = @(Get-ChildItem -LiteralPath $txRoots[0] -Recurse -Filter '*.json' | Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match '"ownedPackagePath"' } | Select-Object -First 1)
     $st = if ($txState.Count) { Get-Content -LiteralPath $txState[0].FullName -Raw | ConvertFrom-Json } else { $null }
@@ -420,8 +437,37 @@ try {
         Expect-Rejected "install-preflight-wrong-release-$($bad.Name)-rejected" (& $install $releaseManifest ('bad-' + $bad.Name)) $bad.Pattern
     }
     Copy-Item -LiteralPath $savedRelease -Destination $releaseManifest -Force
+    Edit-Json $releaseManifest { param($j) $j.embeddedCommit = ('e' * 40) }
+    Expect-Rejected 'install-preflight-wrong-embedded-commit-field-rejected' (& $install $releaseManifest 'bad-embedded') 'embeddedCommit field'
+    Copy-Item -LiteralPath $savedRelease -Destination $releaseManifest -Force
     $installState = @(Get-ChildItem -LiteralPath (Join-Path $installGame 'Mods') -Force).Count
     Add-Case 'install-preflight-refusals-left-no-staging' ($installState -eq 0) "fixture Mods entries after the refusals: $installState"
+
+    # 11. Deploy-Local -WhatIf (directly and through the compatibility wrapper) with the clone's package, a private game
+    #     folder and the selected loader row: the matching row passes the shared preflight; a Harmony2-only mismatch is
+    #     refused before staging. The matching case may then stop at an unrelated pre-existing lab runtime transaction.
+    $deployGame = Join-Path $temp 'deploy fixture game'
+    $deployLoader = Join-Path $deployGame 'Kingmaker_Data\Managed\UnityModManager'
+    New-Item -ItemType Directory -Path $deployLoader, (Join-Path $deployGame 'Mods') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $deployGame 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii
+    foreach ($file in @('UnityModManager.dll', '0Harmony12.dll', '0Harmony.dll')) { Copy-Item -LiteralPath (Join-Path $installDir "Kingmaker_Data\Managed\UnityModManager\$file") -Destination $deployLoader }
+    $deploy = { param($script, $extra) Invoke-Isolated (@('-File', $script, '-PackagePath', $zipA, '-RunId', 'deploy-preflight', '-KingmakerInstallDir', $deployGame, '-LoaderId', 'owner-0.33.0', '-WhatIf') + $extra) }
+    $deployScript = Join-Path $base 'scripts\Deploy-Local.ps1'
+    $wrapper = Join-Path $base 'scripts\compatibility\Enter-KingmakerCompatibilityProfile.ps1'
+    foreach ($entry in @(@('deploy-local', $deployScript, @('-CompatibilityProfileId', 'native-only')), @('compatibility-wrapper', $wrapper, @('-ProfileId', 'native-only')))) {
+        $m = & $deploy $entry[1] $entry[2]
+        $mText = $m.Output -replace '\s+', ' '
+        $ok = $mText -notmatch 'Installed loader does not match' -and (($m.ExitCode -eq 0 -and $mText -match 'Deployment preflight PASS') -or ($m.ExitCode -ne 0 -and $mText -match 'Unresolved runtime transaction exists'))
+        Add-Case "$($entry[0])-whatif-matching-loader-row-passes-preflight" $ok $(if ($m.ExitCode -eq 0) { 'Deployment preflight PASS' } else { 'loader row matched; then stopped at an unrelated pre-existing lab runtime transaction: ' + (Get-Reason $m.Output) })
+    }
+    Copy-Item -LiteralPath (Join-Path $deployLoader '0Harmony12.dll') -Destination (Join-Path $deployLoader '0Harmony.dll') -Force
+    foreach ($entry in @(@('deploy-local', $deployScript, @('-CompatibilityProfileId', 'native-only')), @('compatibility-wrapper', $wrapper, @('-ProfileId', 'native-only')))) {
+        Expect-Rejected "$($entry[0])-whatif-harmony2-only-mismatch-refused" (& $deploy $entry[1] $entry[2]) 'Installed loader does not match loader row owner-0\.33\.0: harmony2'
+    }
+    Add-Case 'deploy-fixture-mods-untouched' (@(Get-ChildItem -LiteralPath (Join-Path $deployGame 'Mods') -Force).Count -eq 0) 'private game Mods folder still empty'
+    $launcherText = [IO.File]::ReadAllText((Join-Path $base 'scripts\Invoke-KingmakerRuntimeTest.ps1'))
+    $ok = ([regex]::Matches($launcherText, '-CompatibilityProfileId \$CompatibilityProfileId -LoaderId \$LoaderId')).Count -eq 2 -and $launcherText.Contains('-Request $requestSnapshot') -and -not $launcherText.Contains('-Request (Read-KbpJson $requestPath)')
+    Add-Case 'launcher-forwards-loader-row-and-checks-retained-request' $ok 'both Deploy-Local calls pass -LoaderId; the result is checked against the request snapshot retained before launch'
 
     $artifactsAfter = @(Get-ChildItem -LiteralPath (Join-Path $source 'artifacts') -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName + '=' + $_.Length + '@' + $_.LastWriteTimeUtc.Ticks }) -join ';'
     Add-Case 'repository-artifacts-untouched' ($artifactsBefore -ceq $artifactsAfter) 'this checkout''s artifacts are unchanged'

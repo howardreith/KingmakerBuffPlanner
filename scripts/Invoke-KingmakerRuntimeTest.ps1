@@ -387,7 +387,7 @@ if ($null -ne $cfAllowanceJson) {
 }
 $steamSafety = Assert-KbpSteamSafety -SteamPath $SteamPath
 & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package -ExpectedPackageSha256 $buildManifest.packageSha256 `
-    -RunId 'runtime-whatif-preflight' -CompatibilityProfileId $CompatibilityProfileId `
+    -RunId 'runtime-whatif-preflight' -CompatibilityProfileId $CompatibilityProfileId -LoaderId $LoaderId `
     -WhatIf -Confirm:$false
 $WhatIfPreference = $requestedWhatIf
 $shouldProceed = $false
@@ -469,7 +469,7 @@ $runSucceeded = $false
 $result = $null
 try {
     $statePath = & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package -ExpectedPackageSha256 $buildManifest.packageSha256 `
-        -RunId $runId -CompatibilityProfileId $CompatibilityProfileId `
+        -RunId $runId -CompatibilityProfileId $CompatibilityProfileId -LoaderId $LoaderId `
         -Confirm:$false | Select-Object -Last 1
     $transactionEntered = $true
     # Final review C2 and its re-review: the saves are read only once this
@@ -591,6 +591,8 @@ try {
         -Parameters $scenarioParameters
     $requestPath = Join-Path $evidence 'runtime-request.json'
     Write-KbpJsonAtomic $requestPath $request
+    # The decoded request retained before launch is the expectation the result is checked against (never re-read).
+    $requestSnapshot = $request | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $orchestration = [ordered]@{
         schemaVersion = 1; runId = $runId; scenario = $Scenario; profileId = $CompatibilityProfileId
         fixtureFamily = $FixtureFamily
@@ -1101,7 +1103,7 @@ public static class KbpPhysicalInput {
         throw
     }
     $result = Read-KbpJson $resultPath
-    Assert-KbpRuntimeResult -Result $result -Request (Read-KbpJson $requestPath) -BuildManifest $buildManifest
+    Assert-KbpRuntimeResult -Result $result -Request $requestSnapshot -BuildManifest $buildManifest
     # Re-review (harness): a result published after the deadline's abort
     # marker is never a pass.
     if ($null -ne $abortWrittenUtc -and [string]$result.status -ceq 'PASS') {

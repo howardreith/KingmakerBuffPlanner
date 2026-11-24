@@ -40,7 +40,17 @@ function Assert-KbpFrozenBuildReceipt($Manifest, [string]$PackagePath) {
     }
     if ($names -notcontains 'sourceDirty' -or -not ($Manifest.sourceDirty -is [bool])) { throw 'Build receipt has no boolean sourceDirty; rebuild with Build-Local.ps1.' }
     if ($Manifest.sourceDirty) { throw 'Build receipt is from a dirty development build; only a clean build is eligible for frozen reuse.' }
-    if ([string]$Manifest.buildInputsSha256 -cne (Get-KbpBuildInputFingerprint 'Release')) {
+    $current = @(Get-KbpCompilerInputs 'Release' ([string]$Manifest.commit))
+    $recorded = @($Manifest.compilerInputs)
+    if ($recorded.Count -ne $current.Count) { throw 'Build receipt compiler inputs differ from the inputs MSBuild resolves now (entry count); rebuild with Build-Local.ps1.' }
+    for ($i = 0; $i -lt $current.Count; $i++) {
+        foreach ($field in @('kind', 'name', 'sha256')) {
+            if (-not ($recorded[$i].$field -is [string]) -or [string]$recorded[$i].$field -cne [string]$current[$i].$field) {
+                throw "Build receipt compiler inputs differ from the inputs MSBuild resolves now (entry $i $field); rebuild with Build-Local.ps1."
+            }
+        }
+    }
+    if ([string]$Manifest.buildInputsSha256 -cne (Get-KbpBuildInputFingerprint 'Release' $current)) {
         throw 'Build inputs changed since this package was built (source, project, pins, wrappers or resolved local references); rebuild with Build-Local.ps1.'
     }
     $report = Join-Path ([IO.Path]::GetTempPath()) ('kbp-receipt-validation-' + [Guid]::NewGuid().ToString('N') + '.json')

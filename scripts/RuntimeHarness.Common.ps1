@@ -927,6 +927,10 @@ function Enter-KbpRuntimeTransaction {
         # lock without a record to restore from.
         $preStateFailure = $_
         if (-not (Test-Path -LiteralPath $statePath)) {
+            # The transaction's own package copy (complete or partial) lives only in this run's backup folder.
+            $ownedCopy = Join-Path $backupRunRoot 'package.zip'
+            if ([IO.Path]::GetFullPath($ownedCopy).StartsWith([IO.Path]::GetFullPath($backupRunRoot).TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) -and
+                (Test-Path -LiteralPath $ownedCopy -PathType Leaf)) { Remove-Item -LiteralPath $ownedCopy -Force }
             foreach ($owned in @($backupRunRoot, $transactionRoot)) {
                 if ((Test-Path -LiteralPath $owned -PathType Container) -and
                     @(Get-ChildItem -LiteralPath $owned -Force).Count -eq 0) {

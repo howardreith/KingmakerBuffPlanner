@@ -46,6 +46,12 @@
     <Error Condition="'@(CscCommandLineArgs)' == ''" Text="The compiler command line was not captured (CoreCompile did not run); use a fresh intermediate directory." />
     <WriteLinesToFile File="$(CompilerReferenceListPath)" Lines="intermediate|$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)'))))" Overwrite="true" Encoding="UTF-8" />
     <WriteLinesToFile File="$(CompilerReferenceListPath)" Lines="project|$(MSBuildProjectDirectory)" Overwrite="false" Encoding="UTF-8" />
+    <PropertyGroup>
+      <_EffectiveCscTool Condition="'$(CscToolPath)' != ''">$([System.IO.Path]::Combine('$(CscToolPath)', '$(CscToolExe)'))</_EffectiveCscTool>
+      <_EffectiveCscTool Condition="'$(CscToolPath)' == '' and '$(CscToolExe)' != ''">$([System.IO.Path]::Combine('$(RoslynTargetsPath)', '$(CscToolExe)'))</_EffectiveCscTool>
+      <_EffectiveCscTool Condition="'$(_EffectiveCscTool)' == ''">$([System.IO.Path]::Combine('$(RoslynTargetsPath)', 'csc.exe'))</_EffectiveCscTool>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(CompilerReferenceListPath)" Lines="compiler|$(_EffectiveCscTool)" Overwrite="false" Encoding="UTF-8" />
     <WriteLinesToFile File="$(CompilerReferenceListPath)" Lines="@(CscCommandLineArgs->'arg|%(Identity)')" Overwrite="false" Encoding="UTF-8" />
   </Target>
 </Project>
