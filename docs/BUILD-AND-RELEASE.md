@@ -34,10 +34,20 @@ verifies them; nothing falls back to the installed loader.
 .\scripts\Build-Local.ps1
 .\scripts\validate-package.ps1 -PackagePath artifacts\local-runtime\<version>\KingmakerBuffPlanner-<version>-local-runtime.zip -ReportPath artifacts\package-validation.json
 
-# Offline boundary suite (temporary clone of HEAD) and runtime loader identity checks.
-.\scripts\Test-LoaderBaseline.ps1
-.\scripts\Test-RuntimeLoaderIdentity.ps1
+# Boundary suite (temporary clone of HEAD) and runtime loader identity checks. By default they download their
+# hash-checked fixtures: the published 0.6.20 release ZIP and the author's UnityModManager 0.32.4 NuGet package
+# (suite), and the official UnityModManager 0.31.1/0.32.4/0.33.4 and Lib.Harmony 2.3.1.1/2.3.6/2.4.3 packages
+# (identity checks). For an offline run, pass local copies:
+.\scripts\Test-LoaderBaseline.ps1 -LegacyReleaseZip <KingmakerBuffPlanner-0.6.20.zip> -WrongLoaderPackage <unitymodmanager.0.32.4.nupkg>
+.\scripts\Test-RuntimeLoaderIdentity.ps1 -PackageDirectory <folder with the six .nupkg files>
 ```
+
+Runtime runs select the loader they expect with `-LoaderId` (`0.31.1`, `0.32.4`, `owner-0.33.0` - the
+default, the owner's measured installation - or `0.33.4`; rows in `compatibility/loaders/`), independently of
+`-CompatibilityProfileId`. `Invoke-KingmakerRuntimeTest.ps1`, `Deploy-Local.ps1` and
+`compatibility/Test-KingmakerCompatibilityProfile.ps1` run the same installation preflight (the profile's
+optional-mod fixtures and the selected loader row against the caller's `KingmakerInstallDir`) before
+anything is staged.
 
 `validate-package.ps1` works offline on a supplied ZIP: it applies the same
 pin-definition contract as the build, inspects one private snapshot, requires

@@ -39,22 +39,34 @@ compiled against the installed loader (the published 0.6.20 DLL references Unity
   UnityModManager or Harmony assembly, requires the documentation/data entries to be UTF-8 text, and
   reports the snapshot's ZIP digest, DLL digest, MVID and embedded source revision (`BuildInfo.Commit`).
 - `scripts/Build-Local.ps1` records in `<zip>.build-local.json` the commit and dirty state read before
-  building, a build-input fingerprint (tracked or new files under `src/`, the solution, `Version.props`,
-  the pins, verifier, MSBuild guard and build wrappers, plus the inputs MSBuild evaluates for the
-  production compile: the exact Csc references including the ignored game assemblies selected through
-  `GamePath.props`, source/resource items and compile-affecting properties) that must not change while
-  building, and the package/DLL/MVID/revision identities from the validator's snapshot.
+  building, the compiler inventory and a build-input fingerprint (tracked or new files under `src/`, the
+  solution, `Version.props`, the pins, verifier, MSBuild guard and build wrappers, plus that inventory) that
+  must not change while building, and the package/DLL/MVID/revision identities from the validator's
+  snapshot. The compiler inventory is the exact Csc command line of the production compile, evaluated the
+  way `Build.ps1` builds (the solution, the configuration and the commit stamped as `KbpSourceRevision`) with
+  a `SkipCompilerExecution` pass through `PrepareResources` and `CoreCompile`: every option verbatim,
+  references (including the ignored game assemblies `GamePath.props` selects), sources including the
+  generated `BuildInfo` (whose content carries the version and revision), embedded resources and other
+  file-valued inputs by content. The production compile writes its own command line, which must equal the
+  evaluated one. Because the commit is stamped into the DLL, a receipt is reusable only at its own commit.
 - Runtime qualification (`Invoke-KingmakerRuntimeTest.ps1`, via `Read-KbpBuildManifest`) reuses a receipt
   only before staging and only when it is typed correctly, names a clean producing commit equal to HEAD,
   matches the current build-input fingerprint, and agrees with the revalidated package (ZIP digest, DLL
   digest, MVID, embedded revision). A dirty development build is never reused as a frozen receipt.
-- Runtime loader identity: each available compatibility profile records the verified loader identity of
-  the installation it describes (UnityModManager, 0Harmony12 and the Harmony2 module `0Harmony` that
-  0Harmony12 forwards to; currently the owner's UMM 0.33.0 installation). The runtime test refuses to
-  start unless the installed files match it, the in-game result now reports the Harmony2 module actually
-  bound in the game process, results are admitted only when all three rows match the profile, and the
-  compatibility identity used by allowances and earlier-pass admission includes the loader identity
-  (earlier allowances must be re-issued).
+- Runtime loader identity: a run selects one measured loader row (`-LoaderId`: `0.31.1`, `0.32.4`,
+  `owner-0.33.0`, `0.33.4`; `compatibility/loaders/`), independently of the optional-mod profile. The shared
+  installation preflight (launcher, `Deploy-Local.ps1`, the standalone profile test) refuses to stage unless
+  the installed UnityModManager, 0Harmony12 and 0Harmony files match the row; the request carries the row
+  (`expectedLoader`); the in-game result reports the loaded UnityModManager, 0Harmony12 and Harmony2 modules
+  and the installed files beside them; results are admitted only when loaded and installed identities both
+  equal the row; and the compatibility identity used by allowances and earlier-pass admission includes the
+  row (earlier allowances must be re-issued).
+- Deployment and release installation stage only a copy they own: the transaction copies the admitted
+  package once into its own folder and refuses a copy whose digest differs from the admitted one before
+  anything is staged or activated; `Install-Local.ps1` validates a private copy of the release ZIP, reconciles
+  the release manifest's ZIP and DLL digests, MVID and embedded revision with it before any state or staging,
+  and stages that copy. `Build-Release.ps1` takes the release manifest's identities from the validated
+  release ZIP.
 
 ## Evidence for this change (2026-11-24, round 2)
 
