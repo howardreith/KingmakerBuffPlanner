@@ -439,7 +439,7 @@ try {
     }
     Expect-Accepted 'release-reconciliation-matching-clean-pair-accepted' (& $reconcile $zipA $null) 'RECONCILED'
     # The validator admits packages under artifacts only, so the substituted copy is placed there.
-    $substituted = Join-Path $base 'artifactselease-substituted.zip'
+    $substituted = Join-Path $base 'artifacts\release-substituted.zip'
     Copy-Item -LiteralPath $swapped -Destination $substituted
     Expect-Rejected 'release-reconciliation-substituted-release-copy-rejected' (& $reconcile $substituted $null) 'does not match the deterministic build'
     Remove-Item -LiteralPath $substituted
