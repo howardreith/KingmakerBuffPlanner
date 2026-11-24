@@ -10,6 +10,60 @@ function Get-KbpVersion {
     return [string]$props.Project.PropertyGroup.KbpVersion
 }
 
+# The compiler inputs of the production project for a configuration as MSBuild itself evaluates them (GamePath.props,
+# Version.props and every other import included): the exact references Csc receives after reference-assembly selection,
+# source/resource/analyzer items and compile-affecting properties, as path-free identities.
+function Get-KbpCompilerInputs([string]$Configuration = 'Release') {
+    $root = Get-KbpRepositoryRoot
+    $id = [Guid]::NewGuid().ToString('N')
+    $list = Join-Path ([IO.Path]::GetTempPath()) ("kbp-compiler-inputs-$id.txt")
+    $obj = Join-Path ([IO.Path]::GetTempPath()) ("kbp-compiler-inputs-$id\")
+    $project = Join-Path $root 'src\KingmakerBuffPlanner\KingmakerBuffPlanner.csproj'
+    $msbuild = Get-KbpMsBuild
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = $null | & $msbuild $project /nologo /v:q /nr:false '/t:ResolveReferences;FindReferenceAssembliesForReferences' `
+            "/p:Configuration=$Configuration" "/p:CompilerReferenceListPath=$list" "/p:IntermediateOutputPath=$obj" 2>&1 | ForEach-Object { "$_" }
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $list)) { throw "Could not resolve the compiler inputs: $($output -join ' ')" }
+        $rootPrefix = [IO.Path]::GetFullPath($root).TrimEnd('\') + '\'
+        return @(Get-Content -LiteralPath $list -Encoding UTF8 | Where-Object { $_ } | ForEach-Object {
+            $kind, $value = $_ -split '\|', 2
+            if ($kind -ceq 'setting') { [ordered]@{ kind = $kind; name = $value; sha256 = '' } }
+            else {
+                $name = if ($value.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) { $value.Substring($rootPrefix.Length).Replace('\', '/') } else { [IO.Path]::GetFileName($value) }
+                $digest = if (Test-Path -LiteralPath $value -PathType Leaf) { Get-KbpSha256 $value } else { 'absent' }
+                [ordered]@{ kind = $kind; name = $name; sha256 = $digest }
+            }
+        } | Sort-Object { $_.kind + '|' + $_.name + '|' + $_.sha256 })
+    }
+    finally {
+        $ErrorActionPreference = $previous
+        Remove-Item -LiteralPath $list -Force -ErrorAction SilentlyContinue
+        if ([IO.Directory]::Exists($obj)) { [IO.Directory]::Delete($obj, $true) }
+    }
+}
+
+# Material inputs of the production DLL: tracked or new files under src (ignored build output excluded), the solution,
+# version and loader-pin definitions, the build wrappers, and the MSBuild-evaluated compiler inputs (which include
+# ignored local references such as the game assemblies selected through GamePath.props).
+function Get-KbpBuildInputFingerprint([string]$Configuration = 'Release') {
+    $root = Get-KbpRepositoryRoot
+    $paths = @('src', 'KingmakerBuffPlanner.sln', 'Version.props', 'LoaderReferences.targets', 'scripts/loader-reference-pins.json',
+        'scripts/Get-PinnedLoaderReferences.ps1', 'scripts/Build.ps1', 'scripts/Build-Local.ps1', 'scripts/Common.ps1')
+    $files = @(& git -C $root ls-files --cached --others --exclude-standard -- @paths)
+    if ($LASTEXITCODE -ne 0) { throw 'git ls-files failed while fingerprinting build inputs.' }
+    $lines = @(foreach ($file in ($files | Sort-Object -Unique)) {
+        $full = Join-Path $root $file
+        if (Test-Path -LiteralPath $full -PathType Leaf) { $file + "`t" + (Get-KbpSha256 $full) }
+    })
+    foreach ($input in (Get-KbpCompilerInputs $Configuration)) { $lines += 'compiler-' + $input.kind + ':' + $input.name + "`t" + $input.sha256 }
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try { $digest = $hasher.ComputeHash([Text.Encoding]::UTF8.GetBytes(($lines -join "`n"))) }
+    finally { $hasher.Dispose() }
+    return ([BitConverter]::ToString($digest)).Replace('-', '').ToLowerInvariant()
+}
+
 function Get-KbpGamePath {
     $root = Get-KbpRepositoryRoot
     $propsPath = Join-Path $root 'GamePath.props'

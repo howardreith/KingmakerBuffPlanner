@@ -155,6 +155,7 @@
     <Compile Include="UI\ClassicRoutineAdmission.cs" />
     <Compile Include="Execution\AppliedEffectJudgement.cs" />
     <Compile Include="RuntimeTesting\LegacyProfileFixture.cs" />
+    <Compile Include="RuntimeTesting\RuntimeLoaderIdentity.cs" />
     <Compile Include="RuntimeTesting\BlueprintReferenceIndex.cs" />
     <Compile Include="RuntimeTesting\NativePaperDonorInventory.cs" />
     <Compile Include="RuntimeTesting\NativePaperReferenceCapture.cs" />

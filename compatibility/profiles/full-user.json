@@ -2,6 +2,20 @@
   "schemaVersion": 1,
   "profileId": "full-user",
   "status": "available",
+  "loader": {
+    "unityModManager": {
+      "version": "0.33.0.0",
+      "sha256": "63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691"
+    },
+    "harmony12": {
+      "version": "1.2.0.1",
+      "sha256": "aa1cd48317254985d8b700cc74953477d1b40c3022ce9aa4c95ed2b8327e1292"
+    },
+    "harmony2": {
+      "version": "2.3.6.0",
+      "sha256": "df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80"
+    }
+  },
   "reason": "Entire installed mod set at 2026-09-19: the known-good configuration the disposable seed was created and human-verified with; staging swaps only KingmakerBuffPlanner to the candidate (single factor). BagOfTricks resealed 2026-09-24 (owner-approved) at its settings after the owner's advanced-fixture preparation: it rewrites its own Settings.xml at every game exit, so runs stage a frozen exact copy (version, info and assembly unchanged; its resource-altering cheats verified off; provenance beside the copy) and the installed directory is restored byte-exact.",
   "mods": [
     {

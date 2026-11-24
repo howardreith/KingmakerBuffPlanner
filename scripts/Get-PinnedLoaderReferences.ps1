@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [string]$ReferenceDirectory = '',
-    [switch]$VerifyOnly
+    [switch]$VerifyOnly,
+    # Offline: check only the pin definition and the manifests (used by the standalone package validator).
+    [switch]$DefinitionOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,8 +33,11 @@ foreach ($manifest in $pins.manifests) {
         throw "$manifest ManagerVersion must equal the pinned baseline $($pins.minimumManagerVersion)."
     }
 }
+if ($DefinitionOnly) { Write-Output 'Loader pin definition: PASS'; return }
 if ([string]::IsNullOrWhiteSpace($ReferenceDirectory)) { $ReferenceDirectory = Join-Path $repoRoot 'artifacts/references' }
-$ReferenceDirectory = [IO.Path]::GetFullPath($ReferenceDirectory)
+# PowerShell filesystem semantics: a relative path is relative to the current PowerShell location (not the process
+# directory), and a cache that does not exist yet still resolves.
+$ReferenceDirectory = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ReferenceDirectory)
 
 function Assert-PinnedReference([string]$Path, $Pin) {
     $hash = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()

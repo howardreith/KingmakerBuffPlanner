@@ -327,6 +327,8 @@ if (($FixtureFamily -ceq 'Advanced') -ne ($CompatibilityProfileId -ceq 'advanced
 }
 $compatibilityProfile = Get-KbpCompatibilityProfile $CompatibilityProfileId
 Assert-KbpCompatibilityProfileFixtures -Profile $compatibilityProfile
+# Preflight, before anything is deployed: the installed loader must be the profile's verified identity.
+$installedLoader = Assert-KbpInstalledLoaderIdentity -Profile $compatibilityProfile
 $expectedOptionalMods = @($compatibilityProfile.mods | ForEach-Object {
     [ordered]@{
         ummId = $_.ummId
@@ -595,6 +597,7 @@ try {
         status = 'IN PROGRESS'; stage = 'request-written'; steamSafety = $steamSafety
         manualRehearsal = [bool]$ManualRehearseDone
         packagePath = $package; packageSha256 = $buildManifest.packageSha256
+        loaderIdentity = $compatibilityProfile.loader; installedLoaderObserved = $installedLoader
         transactionStatePath = $statePath; startedAtUtc = [DateTime]::UtcNow.ToString('o')
     }
     Write-KbpJsonAtomic (Join-Path $evidence 'orchestration.json') $orchestration
@@ -1096,7 +1099,7 @@ public static class KbpPhysicalInput {
         throw
     }
     $result = Read-KbpJson $resultPath
-    Assert-KbpRuntimeResult -Result $result -Request $request -BuildManifest $buildManifest
+    Assert-KbpRuntimeResult -Result $result -Request $request -BuildManifest $buildManifest -ExpectedLoader $compatibilityProfile.loader
     # Re-review (harness): a result published after the deadline's abort
     # marker is never a pass.
     if ($null -ne $abortWrittenUtc -and [string]$result.status -ceq 'PASS') {

@@ -274,13 +274,107 @@ try {
         Add-Case "same-host-validation-$([IO.Path]::GetFileNameWithoutExtension($order[0]))-first" $ok ($r.Output.Trim() -replace "`n", ' | ')
     }
 
+    # 6. Standalone validator: the same pin-definition contract as the build, offline (no cache needed).
+    $cacheAway = Join-Path $temp 'cache moved away'
+    Move-Item -LiteralPath $references -Destination $cacheAway
+    Expect-Accepted 'validator-offline-without-reference-cache-accepted' (& $v $candidateZip) 'Package validation: PASS=13 FAIL=0'
+    Move-Item -LiteralPath $cacheAway -Destination $references
+    $pinsFile = Join-Path $base 'scripts\loader-reference-pins.json'
+    Edit-Json $pinsFile { param($j) $j.references = @($j.references | Where-Object Name -ne '0Harmony12') }
+    Expect-Rejected 'validator-pin-definition-missing-harmony12-rejected' (& $v $candidateZip) 'must define exactly'
+    & git -C $base checkout -q -- scripts/loader-reference-pins.json
+    Edit-Json $pinsFile { param($j) @($j.references | Where-Object Name -eq 'UnityModManager')[0].Version = '0.32.4.0' }
+    Expect-Rejected 'validator-umm-pin-inconsistent-with-minimum-rejected' (& $v $candidateZip) 'must equal the declared minimum'
+    & git -C $base checkout -q -- scripts/loader-reference-pins.json
+    Expect-Accepted 'validator-genuine-control-after-restore-accepted' (& $v $candidateZip) 'Package validation: PASS=13 FAIL=0'
+
+    # 7. A relative cache path follows PowerShell's current location, not the process directory, including a cache
+    #    that does not exist yet.
+    $processDir = Join-Path $temp 'process dir'; $psDir = Join-Path $temp 'powershell dir'
+    Copy-Pins $references (Join-Path $processDir 'cache')
+    Copy-Pins $corrupt (Join-Path $psDir 'cache')
+    $relative = { param($processLocation, $psLocation, $extra) Invoke-Script ("[Environment]::CurrentDirectory = $(Quote $processLocation); Set-Location -LiteralPath $(Quote $psLocation); & $(Quote $verifier) -VerifyOnly -ReferenceDirectory 'cache'" + $extra) }
+    Expect-Rejected 'relative-cache-uses-powershell-location-corrupt-rejected' (& $relative $processDir $psDir '') ('hash mismatch: ' + [regex]::Escape((Join-Path $psDir 'cache')))
+    Expect-Accepted 'relative-cache-uses-powershell-location-genuine-accepted' (& $relative $psDir $processDir '') ''
+    $emptyDir = Join-Path $temp 'empty location'; New-Item -ItemType Directory -Path $emptyDir | Out-Null
+    Expect-Rejected 'relative-cache-not-yet-created-resolves-under-powershell-location' (& $relative $processDir $emptyDir '') ('reference missing: ' + [regex]::Escape((Join-Path $emptyDir 'cache')))
+
+    # 8. Frozen receipt reuse (Read-KbpBuildManifest, the runtime harness's preflight before staging) on the clone's
+    #    clean Build-Local package: identities from one validated snapshot, clean producing source, current inputs.
+    $runtimeCommon = Join-Path $base 'scripts\RuntimeAutomation.Common.ps1'
+    $zipA = $candidateZip; $receiptA = $candidateZip + '.build-local.json'
+    $saved = Join-Path $inputs 'receipts'; New-Item -ItemType Directory -Path $saved -Force | Out-Null
+    Copy-Item -LiteralPath $zipA -Destination (Join-Path $saved 'a.zip'); Copy-Item -LiteralPath $receiptA -Destination (Join-Path $saved 'a.json')
+    function Restore-PairA {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $zipA) | Out-Null
+        Copy-Item -LiteralPath (Join-Path $saved 'a.zip') -Destination $zipA -Force
+        Copy-Item -LiteralPath (Join-Path $saved 'a.json') -Destination $receiptA -Force
+    }
+    function Test-FrozenReceipt { Invoke-Script (". $(Quote $runtimeCommon); [void](Read-KbpBuildManifest $(Quote $zipA)); 'RECEIPT ACCEPTED'") }
+    $ma = Get-Content -LiteralPath $receiptA -Raw | ConvertFrom-Json
+    Add-Case 'receipt-records-clean-producing-build' ($ma.sourceDirty -eq $false -and $ma.commit -eq $commit -and $ma.embeddedCommit -eq $commit -and [string]$ma.buildInputsSha256 -match '^[0-9a-f]{64}$' -and @($ma.compilerInputs).Count -gt 0) ("commit $($ma.commit) dirty $($ma.sourceDirty) embedded $($ma.embeddedCommit) DLL $($ma.dllSha256) MVID $($ma.assemblyMvid) inputs $($ma.buildInputsSha256) ($(@($ma.compilerInputs).Count) compiler inputs)")
+    Expect-Accepted 'receipt-matching-archive-and-receipt-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
+    foreach ($bad in @(
+        @{ Name = 'wrong-embedded-revision'; Edit = { param($j) $j.embeddedCommit = ('e' * 40) }; Pattern = 'embedded source revision' },
+        @{ Name = 'wrong-dll-digest'; Edit = { param($j) $j.dllSha256 = ('d' * 64) }; Pattern = 'DLL SHA-256' },
+        @{ Name = 'wrong-mvid'; Edit = { param($j) $j.assemblyMvid = '00000000-0000-0000-0000-000000000000' }; Pattern = 'MVID' },
+        @{ Name = 'dirty-flag-as-string'; Edit = { param($j) $j.sourceDirty = 'false' }; Pattern = 'boolean sourceDirty' },
+        @{ Name = 'inputs-digest-array'; Edit = { param($j) $j.buildInputsSha256 = @($j.buildInputsSha256) }; Pattern = 'no string buildInputsSha256' })) {
+        Restore-PairA
+        Edit-Json $receiptA $bad.Edit
+        Expect-Rejected "receipt-$($bad.Name)-rejected" (Test-FrozenReceipt) $bad.Pattern
+    }
+    # A second real build of the same version from changed source (a dirty development build).
+    $marker = Join-Path $base 'src\KingmakerBuffPlanner\Main.cs'
+    [IO.File]::AppendAllText($marker, "`r`nnamespace KingmakerBuffPlanner { internal static class LoaderBaselineReceiptMarker { } }`r`n")
+    $buildB = Invoke-Isolated @('-File', (Join-Path $base 'scripts\Build-Local.ps1'))
+    Copy-Item -LiteralPath $zipA -Destination (Join-Path $saved 'b.zip'); Copy-Item -LiteralPath $receiptA -Destination (Join-Path $saved 'b.json')
+    & git -C $base checkout -q -- src/KingmakerBuffPlanner/Main.cs
+    $mb = Get-Content -LiteralPath (Join-Path $saved 'b.json') -Raw | ConvertFrom-Json
+    Add-Case 'second-same-version-build-is-distinct' ($buildB.ExitCode -eq 0 -and $mb.version -eq $ma.version -and $mb.dllSha256 -ne $ma.dllSha256 -and $mb.packageSha256 -ne $ma.packageSha256 -and $mb.sourceDirty -eq $true) ("version $($mb.version); DLL $($mb.dllSha256) vs $($ma.dllSha256); dirty $($mb.sourceDirty)")
+    Expect-Rejected 'receipt-dirty-development-build-not-reused' (Test-FrozenReceipt) 'dirty development build'
+    Restore-PairA; Copy-Item -LiteralPath (Join-Path $saved 'b.json') -Destination $receiptA -Force
+    Expect-Rejected 'receipt-swapped-receipt-for-other-build-rejected' (Test-FrozenReceipt) 'does not match the exact package'
+    Restore-PairA; Copy-Item -LiteralPath (Join-Path $saved 'b.zip') -Destination $zipA -Force
+    Expect-Rejected 'receipt-swapped-archive-from-other-build-rejected' (Test-FrozenReceipt) 'does not match the exact package'
+    Restore-PairA
+    Expect-Accepted 'receipt-pair-a-restored-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
+    # Material input changes at the same HEAD invalidate the receipt.
+    foreach ($mutation in @(
+        @{ Name = 'reference-helper'; File = 'scripts\Get-PinnedLoaderReferences.ps1'; Text = "`r`n# loader-baseline test edit`r`n" },
+        @{ Name = 'project-file'; File = 'src\KingmakerBuffPlanner\KingmakerBuffPlanner.csproj'; Text = "`r`n<!-- loader-baseline test edit -->`r`n" },
+        @{ Name = 'build-wrapper'; File = 'scripts\Build.ps1'; Text = "`r`n# loader-baseline test edit`r`n" })) {
+        [IO.File]::AppendAllText((Join-Path $base $mutation.File), $mutation.Text)
+        Expect-Rejected "receipt-after-$($mutation.Name)-change-rejected" (Test-FrozenReceipt) 'Build inputs changed'
+        & git -C $base checkout -q -- ($mutation.File.Replace('\', '/'))
+    }
+    # Ignored local references selected by MSBuild: identical bytes relocated are accepted; one changed byte is not.
+    $gamePath = Join-Path $base 'GamePath.props'
+    $gamePathOriginal = [IO.File]::ReadAllText($gamePath)
+    $fakeInstall = Join-Path $temp 'relocated game'
+    $fakeManaged = Join-Path $fakeInstall 'Kingmaker_Data\Managed'
+    New-Item -ItemType Directory -Path $fakeManaged -Force | Out-Null
+    [xml]$projectXml = Get-Content -LiteralPath $project -Raw
+    foreach ($hint in @($projectXml.SelectNodes("//*[local-name()='Reference']/*[local-name()='HintPath']") | ForEach-Object { $_.InnerText } | Where-Object { $_.StartsWith('$(KingmakerInstallDir)') })) {
+        $relativeHint = $hint.Substring('$(KingmakerInstallDir)'.Length).TrimStart('\')
+        Copy-Item -LiteralPath (Join-Path $installDir $relativeHint) -Destination (Join-Path $fakeInstall $relativeHint)
+    }
+    [IO.File]::WriteAllText($gamePath, "<Project xmlns=`"http://schemas.microsoft.com/developer/msbuild/2003`"><PropertyGroup><KingmakerInstallDir>$([Security.SecurityElement]::Escape($fakeInstall))</KingmakerInstallDir></PropertyGroup></Project>")
+    Expect-Accepted 'receipt-identical-local-references-relocated-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
+    $coreModule = Join-Path $fakeManaged 'UnityEngine.CoreModule.dll'
+    $coreBytes = [IO.File]::ReadAllBytes($coreModule); $coreBytes[$coreBytes.Length - 1] = $coreBytes[$coreBytes.Length - 1] -bxor 0x01
+    [IO.File]::WriteAllBytes($coreModule, $coreBytes)
+    Expect-Rejected 'receipt-after-resolved-local-reference-change-rejected' (Test-FrozenReceipt) 'Build inputs changed'
+    [IO.File]::WriteAllText($gamePath, $gamePathOriginal)
+    Expect-Accepted 'receipt-after-inputs-restored-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
+
     $artifactsAfter = @(Get-ChildItem -LiteralPath (Join-Path $source 'artifacts') -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName + '=' + $_.Length + '@' + $_.LastWriteTimeUtc.Ticks }) -join ';'
     Add-Case 'repository-artifacts-untouched' ($artifactsBefore -ceq $artifactsAfter) 'this checkout''s artifacts are unchanged'
     Add-Case 'legacy-input-preserved' ((Get-KbpSha256 $legacyZip) -ceq $legacySha256) "private copy still $legacySha256"
 
     $failed = @($cases | Where-Object { -not $_.passed })
     $summary = [ordered]@{
-        schema = 'kbp.loader-baseline-tests.v1'
+        schema = 'kbp.loader-baseline-tests.v2'
         source_commit = $commit
         candidate_package_sha256 = Get-KbpSha256 $candidateZip
         candidate_dll_sha256 = $manifest.dllSha256

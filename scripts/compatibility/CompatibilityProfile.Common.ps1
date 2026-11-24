@@ -11,7 +11,7 @@ function Get-KbpCompatibilityProfile {
     }
     $profile = Read-KbpJson $path
     $required = @('schemaVersion', 'profileId', 'status', 'mods', 'expectedBlueprints')
-    $allowed = $required + @('reason')
+    $allowed = $required + @('reason', 'loader')
     $names = @($profile.PSObject.Properties.Name)
     if (@($required | Where-Object { $_ -notin $names }).Count -ne 0 -or
         @($names | Where-Object { $_ -notin $allowed }).Count -ne 0 -or
@@ -20,6 +20,10 @@ function Get-KbpCompatibilityProfile {
         throw "Compatibility profile contract is invalid: $ProfileId"
     }
     if ($profile.status -ceq 'available') {
+        # The verified loader identity of the installation this profile describes; runtime preflight and result
+        # admission compare against it (UnityModManager, 0Harmony12 and the Harmony2 module 0Harmony12 forwards to).
+        if ($names -notcontains 'loader') { throw "Compatibility profile has no verified loader identity: $ProfileId" }
+        [void](Assert-KbpLoaderIdentityContract $profile.loader $ProfileId)
         foreach ($mod in @($profile.mods)) {
             $modRequired = @('ummId', 'directoryName', 'version', 'assemblyName', 'infoSha256',
                 'assemblySha256', 'directoryManifestSha256', 'fileCount', 'totalBytes')
@@ -51,6 +55,47 @@ function Get-KbpCompatibilityProfile {
         throw "Compatibility blueprint expectation count is invalid: $ProfileId"
     }
     return $profile
+}
+
+function Assert-KbpLoaderIdentityContract($Loader, [string]$ProfileId) {
+    $components = @('unityModManager', 'harmony12', 'harmony2')
+    $names = @($Loader.PSObject.Properties.Name)
+    if (@($components | Where-Object { $_ -notin $names }).Count -ne 0 -or @($names | Where-Object { $_ -notin $components }).Count -ne 0) {
+        throw "Compatibility loader identity must name exactly $($components -join ', '): $ProfileId"
+    }
+    foreach ($component in $components) {
+        $row = $Loader.$component
+        $rowNames = @($row.PSObject.Properties.Name)
+        if ($rowNames.Count -ne 2 -or $rowNames -notcontains 'version' -or $rowNames -notcontains 'sha256' -or
+            -not ($row.version -is [string]) -or $row.version -cnotmatch '^[0-9]+([.][0-9]+){3}$' -or
+            -not ($row.sha256 -is [string]) -or $row.sha256 -cnotmatch '^[0-9a-f]{64}$') {
+            throw "Compatibility loader identity row is invalid: $ProfileId $component"
+        }
+    }
+    return $Loader
+}
+
+# Offline preflight: the installed loader files must be exactly the profile's verified identity (assembly name,
+# version and SHA-256 of UnityModManager.dll, 0Harmony12.dll and 0Harmony.dll in the UnityModManager directory).
+function Assert-KbpInstalledLoaderIdentity {
+    param([Parameter(Mandatory = $true)]$Profile, [string]$UnityModManagerDir)
+    if (-not $UnityModManagerDir) { $UnityModManagerDir = Join-Path (Get-KbpGamePath) 'Kingmaker_Data\Managed\UnityModManager' }
+    $loader = Assert-KbpLoaderIdentityContract $Profile.loader $Profile.profileId
+    $files = [ordered]@{ unityModManager = @('UnityModManager.dll', 'UnityModManager'); harmony12 = @('0Harmony12.dll', '0Harmony12'); harmony2 = @('0Harmony.dll', '0Harmony') }
+    $observed = [ordered]@{}
+    $mismatches = @()
+    foreach ($component in $files.Keys) {
+        $path = Join-Path $UnityModManagerDir $files[$component][0]
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { $mismatches += "$component missing ($($files[$component][0]))"; continue }
+        $name = [Reflection.AssemblyName]::GetAssemblyName($path)
+        $row = [ordered]@{ version = $name.Version.ToString(); sha256 = Get-KbpSha256 $path }
+        $observed[$component] = $row
+        if ($name.Name -cne $files[$component][1] -or $row.version -cne [string]$loader.$component.version -or $row.sha256 -cne [string]$loader.$component.sha256) {
+            $mismatches += "$component expected=$($loader.$component.version)/$($loader.$component.sha256) observed=$($name.Name) $($row.version)/$($row.sha256)"
+        }
+    }
+    if ($mismatches.Count -ne 0) { throw "Installed loader does not match compatibility profile $($Profile.profileId): $($mismatches -join '; ')" }
+    return [pscustomobject]$observed
 }
 
 function Assert-KbpCompatibilityProfileFixtures {

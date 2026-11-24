@@ -25,6 +25,9 @@ namespace KingmakerBuffPlanner.RuntimeTesting
         [JsonProperty("ummSha256", Order = 15)] public string UmmSha256 { get; set; }
         [JsonProperty("harmonyVersion", Order = 16)] public string HarmonyVersion { get; set; }
         [JsonProperty("harmonySha256", Order = 17)] public string HarmonySha256 { get; set; }
+        // The Harmony2 module actually bound in the game process (0Harmony12 forwards to it).
+        [JsonProperty("harmony2Version", Order = 211)] public string Harmony2Version { get; set; }
+        [JsonProperty("harmony2Sha256", Order = 212)] public string Harmony2Sha256 { get; set; }
         [JsonProperty("processId", Order = 18)] public int ProcessId { get; set; }
         [JsonProperty("startedAtUtc", Order = 19)] public string StartedAtUtc { get; set; }
         [JsonProperty("endedAtUtc", Order = 20)] public string EndedAtUtc { get; set; }
