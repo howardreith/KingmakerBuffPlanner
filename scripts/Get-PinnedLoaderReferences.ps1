@@ -33,6 +33,18 @@ foreach ($manifest in $pins.manifests) {
         throw "$manifest ManagerVersion must equal the pinned baseline $($pins.minimumManagerVersion)."
     }
 }
+# The complete pin definition (every field of every pin), checked before any cache access and also in -DefinitionOnly.
+$definitionSeen = @{}
+foreach ($pin in $pins.references) {
+    if ([string]$pin.File -cnotmatch '^[A-Za-z0-9._-]+[.]dll$' -or
+        [string]$pin.Sha256 -cnotmatch '^[0-9a-f]{64}$' -or
+        [string]$pin.Version -cnotmatch '^[0-9]+([.][0-9]+){3}$' -or
+        [string]::IsNullOrWhiteSpace([string]$pin.Name) -or
+        -not ([Uri]$pin.Url).IsAbsoluteUri -or ([Uri]$pin.Url).Scheme -cne 'https' -or
+        $definitionSeen.ContainsKey([string]$pin.File)) { throw 'Invalid or duplicate loader reference pin.' }
+    $definitionSeen[[string]$pin.File] = $true
+    if ($pin.ArchiveEntry -and [string]$pin.ArchiveSha256 -cnotmatch '^[0-9a-f]{64}$') { throw "Missing archive hash for $($pin.File)." }
+}
 if ($DefinitionOnly) { Write-Output 'Loader pin definition: PASS'; return }
 if ([string]::IsNullOrWhiteSpace($ReferenceDirectory)) { $ReferenceDirectory = Join-Path $repoRoot 'artifacts/references' }
 # PowerShell filesystem semantics: a relative path is relative to the current PowerShell location (not the process

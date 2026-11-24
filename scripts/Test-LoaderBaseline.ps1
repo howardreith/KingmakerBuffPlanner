@@ -388,9 +388,9 @@ try {
     $entered = & $tx $zipA 'admitted'
     $txState = @(Get-ChildItem -LiteralPath $txRoots[0] -Recurse -Filter '*.json' | Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match '"ownedPackagePath"' } | Select-Object -First 1)
     $st = if ($txState.Count) { Get-Content -LiteralPath $txState[0].FullName -Raw | ConvertFrom-Json } else { $null }
-    $ok = $entered.ExitCode -eq 0 -and $entered.Output -match 'ENTERED' -and $st -and $st.packageSha256 -eq $admitted -and (Get-Sha256 $st.ownedPackagePath) -eq $admitted -and
-        (Get-Sha256 (Join-Path $fixtureGame 'Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll')) -eq $ma.dllSha256
-    Add-Case 'transaction-stages-its-own-admitted-copy' $ok ("state packageSha256 $($st.packageSha256); owned copy $(if ($st) { Split-Path -Leaf $st.ownedPackagePath }); staged DLL $(Get-Sha256 (Join-Path $fixtureGame 'Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll'))")
+    $ok = $entered.ExitCode -eq 0 -and $entered.Output -match 'ENTERED' -and $st -and $st.packageSha256 -eq $admitted -and (Get-KbpSha256 $st.ownedPackagePath) -eq $admitted -and
+        (Get-KbpSha256 (Join-Path $fixtureGame 'Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll')) -eq $ma.dllSha256
+    Add-Case 'transaction-stages-its-own-admitted-copy' $ok ("state packageSha256 $($st.packageSha256); owned copy $(if ($st) { Split-Path -Leaf $st.ownedPackagePath }); staged DLL $(Get-KbpSha256 (Join-Path $fixtureGame 'Mods\KingmakerBuffPlanner\KingmakerBuffPlanner.dll'))")
     Invoke-Script (". $(Quote $harness); Restore-KbpRuntimeTransaction -RunId admitted -StateRoot $(Quote $txRoots[0]) -FixtureMode -KnownKingmakerProcessIds @() | Out-Null") | Out-Null
 
     # 10. The release installer reconciles every identity of the release manifest with a validated private copy of the
