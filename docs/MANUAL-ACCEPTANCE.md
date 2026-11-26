@@ -1,3 +1,19 @@
+## Greater Magic Fang — owner in-game acceptance (pending)
+
+Draft PR from branch `codex/kingmaker-buff-planner-greater-magic-fang`,
+unreleased. **None of these checks has run.** No approved automated fixture
+has a Druid and pets of two masters. Offline evidence:
+[record](GREATER-MAGIC-FANG-REPAIR.md). Use a normal-play save with the PR
+build. Note the Druid's caster level and the run report text for any failure.
+
+| # | Check | Proves | A failure means |
+|---|---|---|---|
+| 1 | A Druid of caster level 8+ who knows Greater Magic Fang; the Druid's animal companion and another character's pet (e.g. a ranger's or a hunter's) nearby. Plan Greater Magic Fang on the Druid's pet first, then on the other pet. Run it. | Both casts happen and both are reported as done; two 3rd-level slots (or prepared copies) are spent. | Only the first cast happens: the confirmation still fails in the game. |
+| 2 | Repeat check 1 with the other pet first. | The order does not matter. | The second cast is stopped. |
+| 3 | After either run, inspect both pets' natural attacks (character sheet / tooltip). | Each pet's natural weapons carry the enhancement for the Druid's level (+2 at 8–11, +3 at 12–15, +4 at 16–19, +5 at 20) and Greater Magic Fang is listed. | Wrong or missing bonus: the tier binding does not match the game. |
+| 4 | Plan Greater Magic Fang on a party member with empty hands (or under a polymorph with natural attacks). Run it. | The cast is reported as done. | "Unconfirmed": the empty-hand or limb weapon is still not observed. |
+| 5 | Ordinary Magic Fang on both pets in one run. | Unchanged: both casts happen and are reported as done. | A regression in ordinary Magic Fang. |
+
 ## Missing beneficial buffs — owner in-game acceptance (pending)
 
 Draft PR #25, unreleased. By owner decision of 2026-11-21 (mission §9) these

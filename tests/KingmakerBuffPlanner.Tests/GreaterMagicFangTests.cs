@@ -207,7 +207,7 @@ namespace KingmakerBuffPlanner.Tests
                 string book = "book-" + caster.Item1;
                 bool prepared = caster.Item1 == "druid";
                 ResourceTokenSnapshot[] tokens = prepared ? Enumerable.Range(0, caster.Item3).Select(index =>
-                    new ResourceTokenSnapshot(caster.Item1 + "|" + PreparedSlotIds.Format(spellLevel, 0, index),
+                    new ResourceTokenSnapshot(PreparedSlotIds.Format(spellLevel, 0, index),
                         MbbSpellKey(spell), spellLevel, PreparedSlotKind.Common, true, true, null)).ToArray()
                     : new ResourceTokenSnapshot[0];
                 ResourcePoolSnapshot pool = prepared
