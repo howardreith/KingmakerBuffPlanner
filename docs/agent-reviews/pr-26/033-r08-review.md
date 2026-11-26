@@ -1,0 +1,97 @@
+<!-- agent-review:v1 enrollment=kbp-codex-kingmaker-buff-planner-umm-0311-baseline-20261123182207-144d key=r08-review part=1/1 sha256=68a80fb3f14fe4f184648581477f078691ac9c01355ff3e728b027291d3c1626 -->
+### Codex GPT-6.2 Astra — review — round 8 — candidate `445336c8d9`
+
+**Decision:** `ready_for_owner_review` — The corrected compatibility guide accurately identifies which release check each round reached. This closes R4-F1, the sole pending finding. The controller’s focused gate passed on the candidate commit.
+
+#### Findings
+
+None.
+
+#### Prior finding assessments
+
+- **R4-F1** — `fix_verified` — The guide now matches loader-baseline.json line 438. Round five stopped at the clean-worktree guard before building, preserved the previous ZIP and manifest, and left no private folder. Round six reached the comparison with a timestamp-invalid ZIP. Round seven demonstrated disagreement between two validator-passing ZIPs. This satisfies OWNER AMENDMENT 2’s requirement to correct the interpretation while preserving the original evidence.
+
+#### Evidence assessment
+
+- **Inspected:** The mission, both owner amendments, repository validation policy, prior findings ledger, developer report and controller gate receipt.; The full feature diff, the round-eight documentation change, the historical release fixture and guard at c2a594c, and the release evidence from rounds five through seven.
+- **Executed verification:** The controller receipt and matching log confirm that Test-Development.ps1 -Only localization passed on 445336c in 9.4 seconds. Source validation passed 47/47, the Release build passed 1/1, and localization tests passed 14/14.; The retained round-seven boundary suite reports 117/117 at a76174b. Both producer ZIPs passed the standalone validator. Their distinct digests reached the deterministic-build comparison, which refused them. The previous ZIP, manifest and release notes retained their hashes, and cleanup left zero private folders.; The build receipt and package validation bind frozen ZIP 23048581aa87 to DLL 684b28efdba5 at a76174b. The static audit identifies the same DLL hash and MVID and records all 8 types and 24 members resolved on each of the four loader profiles.; Read-only Git checks confirmed that round eight changed only docs/UMM-COMPATIBILITY.md and preserved the original round-five, round-six and round-seven evidence blobs. All four local links in the guide resolve.
+- **Source inspection only:** At c2a594c, the fixture wrote its instrumented release script into the checkout. Build-Release.ps1 checked for a clean worktree before either producer call. This control flow corroborates the recorded round-five refusal.
+- **Required gaps:** none
+- **Limitations:** The candidate gate built its own revision-stamped DLL. The four-profile static audit applies to the packaged DLL from a76174b.; Native gameplay on all four loaders and combined-stack testing have status NOT RUN under OWNER AMENDMENT 2.
+
+#### Summary
+
+- **Delivered behavior:** Buff Planner declares UMM 0.31.1, compiles against pinned UnityModManager 0.31.1.0 and 0Harmony12 1.2.0.1, and validates the packaged DLL’s references. The compatibility record identifies the frozen artifact checked on 0.31.1, 0.32.4, the owner’s 0.33.0 and 0.33.4.
+- **Scope reviewed:** KingmakerBuffPlanner draft PR #26 under the amended mission, with round eight focused on the historical evidence correction for R4-F1.
+- **Pending later-phase work:** none
+- **Unresolved questions:** none
+- **Remaining owner review:** Decide whether to accept the baseline change and its documented compatibility coverage in draft PR #26.
+
+#### Provenance (controller-recorded)
+
+| | Requested | Observed |
+|---|---|---|
+| Model | `gpt-6.2-astra` | `gpt-6.2-astra` (turns ['gpt-6.2-astra']) |
+| Reasoning effort | `max` | `max` (turns ['max']) |
+| Sandbox / approvals | read-only / never | `read-only` / `never` |
+
+Owner guidance bound to this review: none.
+
+Owner amendments bound to this review: revision 2, sha256 `063922bf358734e100d56dd4b827d186cd4286a3880c8701de170de0cb4352db`.
+
+Codex CLI `0.170.0`, thread `01a218d4-9d8c-7830-ab21-c6e11294e77a`, duration 361.7s, response sha256 `5693111370cd4e8dad3c9f6a5f27bee7bd0ab14e1d373e2d13eebd29b553b242`, request `kbp-codex-kingmaker-buff-planner-umm-0311-baseline-20261123182207-144d-r08-311f97`. Observed values come from the Codex session rollout's recorded thread settings, not from the model's own statements; the serving backend's model identity is not separately exposed.
+
+<details><summary>Complete structured review (agent-review.review.v1)</summary>
+
+```json
+{
+  "candidate_commit": "445336c8d9c767b556878773001a6154c446a957",
+  "checkpoint_id": "final",
+  "checkpoint_type": "final",
+  "decision": "ready_for_owner_review",
+  "decision_rationale": "The corrected compatibility guide accurately identifies which release check each round reached. This closes R4-F1, the sole pending finding. The controller\u2019s focused gate passed on the candidate commit.",
+  "evidence_assessment": {
+    "executed_verification": [
+      "The controller receipt and matching log confirm that Test-Development.ps1 -Only localization passed on 445336c in 9.4 seconds. Source validation passed 47/47, the Release build passed 1/1, and localization tests passed 14/14.",
+      "The retained round-seven boundary suite reports 117/117 at a76174b. Both producer ZIPs passed the standalone validator. Their distinct digests reached the deterministic-build comparison, which refused them. The previous ZIP, manifest and release notes retained their hashes, and cleanup left zero private folders.",
+      "The build receipt and package validation bind frozen ZIP 23048581aa87 to DLL 684b28efdba5 at a76174b. The static audit identifies the same DLL hash and MVID and records all 8 types and 24 members resolved on each of the four loader profiles.",
+      "Read-only Git checks confirmed that round eight changed only docs/UMM-COMPATIBILITY.md and preserved the original round-five, round-six and round-seven evidence blobs. All four local links in the guide resolve."
+    ],
+    "inspected": [
+      "The mission, both owner amendments, repository validation policy, prior findings ledger, developer report and controller gate receipt.",
+      "The full feature diff, the round-eight documentation change, the historical release fixture and guard at c2a594c, and the release evidence from rounds five through seven."
+    ],
+    "limitations": [
+      "The candidate gate built its own revision-stamped DLL. The four-profile static audit applies to the packaged DLL from a76174b.",
+      "Native gameplay on all four loaders and combined-stack testing have status NOT RUN under OWNER AMENDMENT 2."
+    ],
+    "required_gaps": [],
+    "source_inspection_only": [
+      "At c2a594c, the fixture wrote its instrumented release script into the checkout. Build-Release.ps1 checked for a clean worktree before either producer call. This control flow corroborates the recorded round-five refusal."
+    ]
+  },
+  "findings": [],
+  "prior_finding_assessments": [
+    {
+      "assessment": "fix_verified",
+      "finding_id": "R4-F1",
+      "rationale": "The guide now matches loader-baseline.json line 438. Round five stopped at the clean-worktree guard before building, preserved the previous ZIP and manifest, and left no private folder. Round six reached the comparison with a timestamp-invalid ZIP. Round seven demonstrated disagreement between two validator-passing ZIPs. This satisfies OWNER AMENDMENT 2\u2019s requirement to correct the interpretation while preserving the original evidence."
+    }
+  ],
+  "request_id": "kbp-codex-kingmaker-buff-planner-umm-0311-baseline-20261123182207-144d-r08-311f97",
+  "round": 8,
+  "schema_version": "agent-review.review.v1",
+  "summary": {
+    "delivered_behavior": "Buff Planner declares UMM 0.31.1, compiles against pinned UnityModManager 0.31.1.0 and 0Harmony12 1.2.0.1, and validates the packaged DLL\u2019s references. The compatibility record identifies the frozen artifact checked on 0.31.1, 0.32.4, the owner\u2019s 0.33.0 and 0.33.4.",
+    "pending_later_phase_work": [],
+    "remaining_owner_review": [
+      "Decide whether to accept the baseline change and its documented compatibility coverage in draft PR #26."
+    ],
+    "scope_reviewed": "KingmakerBuffPlanner draft PR #26 under the amended mission, with round eight focused on the historical evidence correction for R4-F1.",
+    "unresolved_questions": []
+  }
+}
+```
+</details>
+
+_Model-generated review by Codex using the requested model, posted by the agent-review controller through the owner's GitHub account. Not a human review or approval._
