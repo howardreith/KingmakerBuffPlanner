@@ -1,6 +1,6 @@
 # UMM 0.31.1 baseline evidence
 
-Machine-generated outputs exported 2026-11-26 14:15 UTC for candidate commit `aebe2ededc6b8773c62dfa5cac9c51397adfc720`. Each row names what produced that output (its
+Machine-generated outputs exported 2026-11-26 16:50 UTC for candidate commit `a76174b9767bdc131840a90027fbe080e8334420`. Each row names what produced that output (its
 source commit, or the reused input it describes); outputs produced at another commit are identified there.
 Only local path prefixes were replaced: `<repo>` (this checkout or its temporary clone root), `<temp>`, `<game>`
 (the Kingmaker installation, read-only), `<buildtools>`, `<reference-assemblies>`, `<dotnet>`, `<controller>` (the agent-review controller), `<dev>` (the owner's development folder), `<steam>`, `<user-profile>`, `<fleet>` (the owner's fleet mission folder,
@@ -17,7 +17,11 @@ python -c "import hashlib,subprocess,sys; print(hashlib.sha256(subprocess.check_
 
 | File | Produced by | Raw SHA-256 | Exported SHA-256 (Git blob) |
 | --- | --- | --- | --- |
-| `loader-baseline-r6.json` | aebe2ed (round-6 code 51e8776; 111/111 on a temporary clone) | `1016cc8423425acabde292b5af649fcf89bf47d64ab049b06285e0adf99da2b0` | `9401d3e0ec11c281aa6375da7f7a45b0b5f88357d8e8f5e68336a9e228751703` |
+| `loader-baseline-r7.json` | a76174b (round-7 code; 117/117 on a temporary clone) | `aab54fb3a4e25416b21df62575ec8fea9004223d8e541b9012e88fec24e40dd2` | `b2b9273a9bae48c4850e35302f7a4886cfa2848ac3705c4f60babcc0bb3924b0` |
+| `build-receipt-r7.json` | a76174b (Build-Local in this clean checkout) | `bcf131fe7c15e5ddb146c7ddc997193513f75ee158f710a871c5e88354c63f80` | `779ebc1d1a25d5fa4cd64f4d539859ed79fa894c217683cacfb33ceef16c63ff` |
+| `package-validation-r7.json` | a76174b (validate-package on the Build-Local ZIP 23048581) | `a4a0de82fa293f050debb1536be254410134c1972f6389dae90e183768b4f126` | `2d739bcc2043dbcaa525b3fe987aa08b9563045911dbd97802ac0fd269c4f195` |
+| `api-audit-r7.json` | static audit of the a76174b packaged DLL 684b28ef (MVID 5a94f398) | `16b05f3aa8987a317976c4ba3a1456a4bd1ce3e62cd1e86720e1d5d92eebeffd` | `99d11f8bdd3a2199e62203ce1f627ba7f8d4a0e608697ea5819f25e82754a911` |
+| `loader-baseline-r6.json` | aebe2ed (round-6 code 51e8776; 111/111 on a temporary clone) | `1016cc8423425acabde292b5af649fcf89bf47d64ab049b06285e0adf99da2b0` (original output, from its first export) | `9401d3e0ec11c281aa6375da7f7a45b0b5f88357d8e8f5e68336a9e228751703` |
 | `retained-frozen-product.json` | retained pair built in the frozen worktree at c2a594c; stamp comparison with 1c3671ff | `be30c9b227c1cd2dc3e2ab7b16da7417e778ec81e8bb69135e5e64c900e00672` (original output, from its first export) | `081c3904b1b9ce94a928e89b8ddac13409491e96882716542eab7e9294840984` |
 | `retained-build-receipt.json` | `c2a594ce7124cba35c63523b6ad4a039c84cdbc3` | `fa40acdb2dfb0e6a30cb3bbde4a604e2cfd1cbb59858823b546cb030cbe1299b` (original output, from its first export) | `7110deff0b7ce8916174ec1eb50795436b2bfcffe730bf26f81d0ed5e5f11e8d` |
 | `retained-validation.json` | read-back of the retained pair at c2a594c | `f0e365ef2d549225628604f8e701281e90cbc13c9a62da799c69122679f875b3` (original output, from its first export) | `6df6d5361b5ca45e504131544c41579fbcfd8f1ddbb5af63db2a8c6726528c4c` |

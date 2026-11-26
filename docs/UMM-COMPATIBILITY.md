@@ -135,8 +135,13 @@ and refused by reuse and `Build.ps1`, and accepted again once removed (the test 
 and two producer ZIPs that each pass the standalone validator (the second build, and the first build's ZIP re-written
 with every entry stored without compression, same entries and fixed timestamps) fail the inter-build reconciliation with
 distinct package digests and the same DLL, the previous release unchanged and the alternate ZIP removed. The
-four-profile static audit is repeated on the DLL packaged from the round-7 code (records in
-[`docs/evidence/umm-0311/`](evidence/umm-0311/INDEX.md); the round-5 audit stays attached to its own DLL).
+four-profile static audit is repeated on the DLL packaged from the round-7 code: `Build-Local.ps1` in a clean checkout of
+`a76174b` built ZIP SHA-256 `23048581aa870e6639861ee88011ec6128bc774ca1592049da0b476309e00060`, DLL SHA-256
+`684b28efdba53369ebd5c9b199e02c04c6b3c76f697426684a7935f607f91184`, MVID `5a94f398-42b6-42df-a682-4e20167cb829`, embedded
+revision `a76174b` (standalone validator 13/13), and the same DLL resolves 8 types and 24 members on UMM 0.31.1, 0.32.4,
+the owner's 0.33.0 and 0.33.4 (`build-receipt-r7.json`, `package-validation-r7.json`, `api-audit-r7.json` in
+[`docs/evidence/umm-0311/`](evidence/umm-0311/INDEX.md); the round-5 audit `api-audit.json` stays attached to its own
+DLL `a384dc44`).
 
 ## Frozen product of round 5 (history)
 
