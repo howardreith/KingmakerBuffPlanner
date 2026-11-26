@@ -44,10 +44,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                             RemainingRounds(buff), CasterLevel(buff), Metamagic(buff),
                             suppressed, suppressionReadable, CasterId(buff)));
                     }
-                    foreach (ItemSlot slot in unit.Descriptor.Body.CurrentEquipmentSlots)
+                    foreach (ItemEntity item in KingmakerEnchantedItems.Read(unit.Descriptor.Body))
                     {
-                        ItemEntity item = slot == null ? null : slot.MaybeItem;
-                        if (item == null || item.Enchantments == null) continue;
+                        if (item.Enchantments == null) continue;
                         // Worn enchantments last while worn: no expiry, and
                         // no caster level or metamagic to compare.
                         foreach (var enchantment in item.Enchantments.Where(e => e != null && e.Blueprint != null))

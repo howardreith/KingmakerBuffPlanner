@@ -200,10 +200,9 @@ namespace KingmakerBuffPlanner.GameAdapters
                     // Review R9-F2: the applying caster (null when unread).
                     KingmakerActiveEffectSnapshotBuilder.CasterId(buff)));
             }
-            foreach (ItemSlot slot in unit.Descriptor.Body.CurrentEquipmentSlots)
+            foreach (ItemEntity item in KingmakerEnchantedItems.Read(unit.Descriptor.Body))
             {
-                ItemEntity item = slot == null ? null : slot.MaybeItem;
-                if (item == null || item.Enchantments == null) continue;
+                if (item.Enchantments == null) continue;
                 foreach (var enchantment in item.Enchantments)
                 {
                     if (enchantment == null || enchantment.Blueprint == null ||

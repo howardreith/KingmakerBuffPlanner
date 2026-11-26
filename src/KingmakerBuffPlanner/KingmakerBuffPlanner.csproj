@@ -193,6 +193,7 @@
     <Compile Include="GameAdapters\KingmakerActionGraphAdapter.cs" />
     <Compile Include="GameAdapters\KingmakerAreaCoverageResolver.cs" />
     <Compile Include="GameAdapters\KingmakerActiveEffectSnapshotBuilder.cs" />
+    <Compile Include="GameAdapters\KingmakerEnchantedItems.cs" />
     <Compile Include="GameAdapters\KingmakerAbilityVariants.cs" />
     <Compile Include="GameAdapters\KingmakerGameLog.cs" />
     <Compile Include="GameAdapters\KingmakerAnimatedCastAdapter.cs" />
