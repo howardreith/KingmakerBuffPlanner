@@ -216,6 +216,10 @@ namespace KingmakerBuffPlanner.Execution
             EffectBaseline baseline, Func<string, IEnumerable<ObservedEffectInstance>> readAfter, bool requireFresh = true)
         {
             if (expected == null || baseline == null || readAfter == null) return false;
+            // Greater Magic Fang repair: a tier selection left unbound (the
+            // caster level was unknown) cannot say which tier this cast
+            // applied, so no tier present proves the application.
+            if (CasterLevelPredicate.HasUnresolved(expected)) return false;
             // H1: kept coverage is lasting coverage; a short-lived application
             // is only ever a delivery obligation of the attempt that made it.
             if (!requireFresh && EffectApplicationLifetime.ContainsDurable(expected))
@@ -389,7 +393,7 @@ namespace KingmakerBuffPlanner.Execution
             IEnumerable<ObservedEffectInstance> after)
         {
             if (expected == null || before == null || after == null) return false;
-            if (HasCasterRelativeLeaf(expected)) return false;
+            if (HasCasterRelativeLeaf(expected) || CasterLevelPredicate.HasUnresolved(expected)) return false;
             List<ObservedEffectInstance> live = after
                 .Where(value => value != null && !value.Suppressed).ToList();
             var markers = new HashSet<ActiveEffectMarker>(live.Select(value =>

@@ -72,7 +72,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 // Review R1-F8: the decisions are game-free; this builder only
                 // supplies the native target verdict and live distances.
                 AbilityData verdictAbility = targetingAbility;
-                IReadOnlyDictionary<string, bool> facts = ReadCasterFacts(expression, caster);
+                IReadOnlyDictionary<string, bool> facts = ReadCasterFacts(expression, caster,
+                    provider.EffectiveCasterLevel);
                 ProviderTargetingDecision decision = ProviderTargetingPlanner.Decide(
                     provider, expression, snapshot.Units, caster != null, infusedPersonal,
                     areaCoverage,
@@ -182,20 +183,20 @@ namespace KingmakerBuffPlanner.GameAdapters
             return options.OrderBy(o => o.Provider.Key.Canonical, StringComparer.Ordinal).ToArray();
         }
 
-        private static IReadOnlyDictionary<string, bool> ReadCasterFacts(EffectExpression expression, UnitEntityData caster)
+        private static IReadOnlyDictionary<string, bool> ReadCasterFacts(EffectExpression expression,
+            UnitEntityData caster, int effectiveCasterLevel)
         {
-            var facts = new Dictionary<string, bool>(StringComparer.Ordinal);
-            foreach (string id in EffectConditionBinding.FactIds(expression))
+            return ProviderTargetingPlanner.CasterFacts(expression, effectiveCasterLevel, id =>
             {
                 try
                 {
                     var fact = ResourcesLibrary.TryGetBlueprint<BlueprintUnitFact>(id);
                     if (fact != null && caster != null && caster.Descriptor != null)
-                        facts[id] = caster.Descriptor.HasFact(fact);
+                        return caster.Descriptor.HasFact(fact);
                 }
                 catch (Exception) { /* Unreadable is unknown, never false. */ }
-            }
-            return facts;
+                return null;
+            });
         }
 
         private static IReadOnlyList<string> SelectNearbyRecipients(NearbyRecipientRule rule,

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json;
 
@@ -579,6 +580,63 @@ namespace KingmakerBuffPlanner.Domain.Effects
         [JsonProperty("any")] public bool Any { get; private set; }
         // Value is the native condition's Not flag.
         [JsonProperty("facts")] public IReadOnlyList<KeyValuePair<string, bool>> Facts { get; private set; }
+    }
+
+    // Greater Magic Fang repair: a caster predicate on the casting's own
+    // caster level, carried as a CasterFactGate key like the synthetic
+    // recipient predicates below. The native 2.1.7b MagicFang action applies
+    // ONE element of its enchantment array, chosen by a caster-level rank;
+    // the adapter expresses that choice as conditionals on these keys. The
+    // provider's effective caster level (native
+    // AbilityData.CalculateParams().CasterLevel, the value the cast's context
+    // ranks are computed from) answers them; an unknown level (0) leaves them
+    // unread, so the selection stays unresolved and confirms nothing.
+    public static class CasterLevelPredicate
+    {
+        public const string Prefix = "caster-level-at-least:";
+
+        public static string Key(int level)
+        {
+            if (level < 1) throw new ArgumentOutOfRangeException("level");
+            return Prefix + level.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static bool TryParse(string factKey, out int level)
+        {
+            level = 0;
+            return factKey != null && factKey.StartsWith(Prefix, StringComparison.Ordinal) &&
+                int.TryParse(factKey.Substring(Prefix.Length), NumberStyles.None, CultureInfo.InvariantCulture,
+                    out level) && level >= 1;
+        }
+
+        // The value of a caster-level key for a known caster level; null for
+        // any other key, or when the level is unknown (not positive).
+        public static bool? Read(string factKey, int casterLevel)
+        {
+            int level;
+            if (!TryParse(factKey, out level) || casterLevel < 1) return null;
+            return casterLevel >= level;
+        }
+
+        // A caster-level selection still unresolved anywhere in the
+        // expression (its caster level was not bound).
+        public static bool HasUnresolved(EffectExpression expression)
+        {
+            var conditional = expression as ConditionalEffectExpression;
+            if (conditional != null)
+            {
+                int level;
+                return (conditional.CasterFactGate != null &&
+                        conditional.CasterFactGate.Facts.Any(fact => TryParse(fact.Key, out level))) ||
+                    HasUnresolved(conditional.WhenTrue) || HasUnresolved(conditional.WhenFalse);
+            }
+            var sequence = expression as SequenceEffectExpression;
+            if (sequence != null) return sequence.Children.Any(HasUnresolved);
+            var targeted = expression as TargetedEffectExpression;
+            if (targeted != null) return HasUnresolved(targeted.Child);
+            var referenced = expression as ReferencedAbilityExpression;
+            return referenced != null && HasUnresolved(referenced.Child);
+        }
     }
 
     // A conditional on facts of the unit the action runs on: Value is the

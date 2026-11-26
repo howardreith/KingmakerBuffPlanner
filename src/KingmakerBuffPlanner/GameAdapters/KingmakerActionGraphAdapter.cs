@@ -24,6 +24,9 @@ namespace KingmakerBuffPlanner.GameAdapters
         private readonly HashSet<BlueprintAbility> _activeAbilityObjects =
             new HashSet<BlueprintAbility>(ReferenceEqualityComparer<BlueprintAbility>.Instance);
         private readonly List<BlueprintAbility> _referenced = new List<BlueprintAbility>();
+        // The abilities being adapted, innermost last: the blueprint whose
+        // context runs the action now (MechanicsContext.AssociatedBlueprint).
+        private readonly List<BlueprintAbility> _abilityStack = new List<BlueprintAbility>();
 
         // Missing-beneficial-buffs recovery (R11-F1): every ability this
         // adapter followed through a reference (ContextActionCastSpell, a
@@ -53,6 +56,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                 return new DiscoveryNode(DiscoveryNodeKind.Unknown, id, sourceContract: "ability-cycle");
             _activeAbilities.Add(id);
             _activeAbilityObjects.Add(ability);
+            _abilityStack.Add(ability);
             try
             {
                 var children = new List<DiscoveryNode>();
@@ -79,6 +83,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             }
             finally
             {
+                _abilityStack.RemoveAt(_abilityStack.Count - 1);
                 _activeAbilities.Remove(id);
                 _activeAbilityObjects.Remove(ability);
             }
@@ -127,12 +132,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                     "ContextActionEnchantWornItem");
             var magicFang = action as MagicFang;
             if (magicFang != null)
-                return new DiscoveryNode(DiscoveryNodeKind.Sequence, "MagicFang.Enchantment",
-                    (magicFang.Enchantment ?? new Kingmaker.Blueprints.Items.Ecnchantments.BlueprintItemEnchantment[0])
-                        .Where(e => e != null).OrderBy(e => e.AssetGuid, StringComparer.Ordinal)
-                        .Select(e => Effect(EffectKind.WornItemEnchantment, e.AssetGuid,
-                            EffectTarget.CurrentTarget, "MagicFang")).ToArray(),
-                    sourceContract: "MagicFang");
+                return AdaptMagicFang(magicFang,
+                    _abilityStack.Count == 0 ? null : _abilityStack[_abilityStack.Count - 1]);
             if (action is ContextActionSpawnMonster)
                 return new DiscoveryNode(DiscoveryNodeKind.Unknown,
                     DescribeType(action.GetType()), sourceContract: "excluded-summoning-action");
@@ -300,6 +301,125 @@ namespace KingmakerBuffPlanner.GameAdapters
                 .ToArray();
             ActionListMembers.Add(type, members);
             return members;
+        }
+
+        // Greater Magic Fang repair. Native 2.1.7b MagicFang.RunAction (read
+        // from its IL; pinned in the regression): an ordinary casting applies
+        // Enchantment[0]; a greater one applies exactly ONE element,
+        // Enchantment[Math.Min(EnchantLevel.Calculate(context), n) - 1], to the
+        // target's empty-hand weapon and its natural weapons. The elements are
+        // alternative tiers, never simultaneous effects, and the array order
+        // is the tier order (Call of the Wild replaces the array with its own
+        // five), so it is kept, never sorted. The tier is bound to the
+        // provider's caster level through CasterLevelPredicate gates. A level
+        // contract this adapter cannot prove is unknown, never "every tier"
+        // or "any tier".
+        private static DiscoveryNode AdaptMagicFang(MagicFang action, BlueprintAbility ability)
+        {
+            Kingmaker.Blueprints.Items.Ecnchantments.BlueprintItemEnchantment[] enchantments =
+                action.Enchantment ?? new Kingmaker.Blueprints.Items.Ecnchantments.BlueprintItemEnchantment[0];
+            if (!action.Greater)
+                return enchantments.Length == 0 || enchantments[0] == null
+                    ? new DiscoveryNode(DiscoveryNodeKind.Unknown, "MagicFang",
+                        sourceContract: "MagicFang:enchantment-missing")
+                    : new DiscoveryNode(DiscoveryNodeKind.Sequence, "MagicFang.Enchantment",
+                        new[] { MagicFangTier(enchantments[0]) }, sourceContract: "MagicFang");
+            int[] tiers = MagicFangTierIndices(action.EnchantLevel, enchantments.Length, ability);
+            if (tiers == null || tiers.Skip(1).Any(index => enchantments[index] == null))
+                return new DiscoveryNode(DiscoveryNodeKind.Unknown, "MagicFang",
+                    sourceContract: "MagicFang:enchant-level-unverified");
+            DiscoveryNode selection = MagicFangTier(enchantments[tiers[1]]);
+            for (int level = 2; level < tiers.Length; level++)
+            {
+                if (tiers[level] == tiers[level - 1]) continue;
+                selection = new DiscoveryNode(DiscoveryNodeKind.Conditional, "MagicFang.EnchantLevel",
+                    whenTrue: MagicFangTier(enchantments[tiers[level]]), whenFalse: selection,
+                    conditionContract: "MagicFang.EnchantLevel:caster-level-at-least-" +
+                        level.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    sourceContract: "MagicFang",
+                    casterFactGate: new CasterFactGate(false, new[]
+                    {
+                        new KeyValuePair<string, bool>(CasterLevelPredicate.Key(level), false)
+                    }));
+            }
+            return selection.Kind == DiscoveryNodeKind.Effect
+                ? new DiscoveryNode(DiscoveryNodeKind.Sequence, "MagicFang.Enchantment", new[] { selection },
+                    sourceContract: "MagicFang")
+                : selection;
+        }
+
+        private static DiscoveryNode MagicFangTier(
+            Kingmaker.Blueprints.Items.Ecnchantments.BlueprintItemEnchantment enchantment)
+        {
+            return Effect(EffectKind.WornItemEnchantment, enchantment.AssetGuid, EffectTarget.CurrentTarget,
+                "MagicFang");
+        }
+
+        // Caster levels the planner binds a tier for (1..MagicFangLevelProbe;
+        // the selection at the probe must also hold for every higher level).
+        internal const int MagicFangLevelProbe = 40;
+
+        // The element index native MagicFang selects at each caster level
+        // 1..MagicFangLevelProbe (index 0 unused), or null when that cannot be
+        // proven: EnchantLevel must be a constant or the rank of exactly one
+        // ContextRankConfig of the casting ability (MechanicsContext.
+        // RecalculateRanks reads AssociatedBlueprint's rank configs) based on
+        // caster level, with no ability-params calculator replacing the
+        // context's parameters, giving a valid index at every level, never
+        // decreasing as the level rises, and unchanged beyond the probe. The
+        // rank itself is computed by that config's own native
+        // ApplyProgression and ApplyMinMax (ContextRankConfig.GetValue), so no
+        // progression formula is restated here.
+        internal static int[] MagicFangTierIndices(ContextValue enchantLevel, int count, BlueprintAbility ability)
+        {
+            try
+            {
+                if (enchantLevel == null || count < 1) return null;
+                Func<int, int> value;
+                if (enchantLevel.ValueType == ContextValueType.Simple)
+                {
+                    int constant = enchantLevel.Value;
+                    value = level => constant;
+                }
+                else if (enchantLevel.ValueType == ContextValueType.Rank)
+                {
+                    BlueprintComponent[] components = ability == null ? null : ability.ComponentsArray;
+                    if (components == null || components.Any(component =>
+                            component is Kingmaker.UnitLogic.Mechanics.Components.ContextAbilityParamsCalculator))
+                        return null;
+                    object rank = FieldValue(enchantLevel, "ValueRank");
+                    var configs = components.OfType<Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig>()
+                        .Where(candidate => Equals(FieldValue(candidate, "m_Type"), rank)).ToList();
+                    if (rank == null || configs.Count != 1 ||
+                        NamedValue(configs[0], "m_BaseValueType") != "CasterLevel")
+                        return null;
+                    const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+                    Type type = typeof(Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig);
+                    MethodInfo progression = type.GetMethod("ApplyProgression", flags, null, new[] { typeof(int) }, null);
+                    MethodInfo minMax = type.GetMethod("ApplyMinMax", flags, null, new[] { typeof(int) }, null);
+                    if (progression == null || minMax == null || progression.ReturnType != typeof(int) ||
+                        minMax.ReturnType != typeof(int))
+                        return null;
+                    object rankConfig = configs[0];
+                    value = level => (int)minMax.Invoke(rankConfig, new object[]
+                    {
+                        (int)progression.Invoke(rankConfig, new object[] { level })
+                    });
+                }
+                else return null;
+                var indices = new int[MagicFangLevelProbe + 1];
+                for (int level = 1; level <= MagicFangLevelProbe; level++)
+                {
+                    indices[level] = Math.Min(value(level), count) - 1;
+                    if (indices[level] < 0 || indices[level] >= count ||
+                        (level > 1 && indices[level] < indices[level - 1]))
+                        return null;
+                }
+                foreach (int beyond in new[] { MagicFangLevelProbe + 1, 100, 1000 })
+                    if (Math.Min(value(beyond), count) - 1 != indices[MagicFangLevelProbe]) return null;
+                return indices;
+            }
+            catch (Exception) { return null; }
         }
 
         private static DiscoveryNode Effect(EffectKind kind, string id, EffectTarget target, string contract,

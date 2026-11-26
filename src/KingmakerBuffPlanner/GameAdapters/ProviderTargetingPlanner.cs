@@ -276,6 +276,26 @@ namespace KingmakerBuffPlanner.GameAdapters
             return decision;
         }
 
+        // The caster facts one provider's expression gates on, as the option
+        // builder reads them: a caster-level predicate (Greater Magic Fang's
+        // tier) is answered from the provider's effective caster level and
+        // left unread when that level is unknown (0); every other key is the
+        // native read (null: unread, never false).
+        internal static IReadOnlyDictionary<string, bool> CasterFacts(EffectExpression expression,
+            int effectiveCasterLevel, Func<string, bool?> nativeFact)
+        {
+            var facts = new Dictionary<string, bool>(StringComparer.Ordinal);
+            foreach (string id in EffectConditionBinding.FactIds(expression))
+            {
+                int level;
+                bool? value = CasterLevelPredicate.TryParse(id, out level)
+                    ? CasterLevelPredicate.Read(id, effectiveCasterLevel)
+                    : nativeFact == null ? null : nativeFact(id);
+                if (value.HasValue) facts[id] = value.Value;
+            }
+            return facts;
+        }
+
         // The planning option for one provider and its targeting decision.
         internal static ProviderPlanningOption BuildOption(ProviderSnapshot provider,
             ProviderTargetingDecision decision, CastExecutionStrategy strategy, string strategyReason,
