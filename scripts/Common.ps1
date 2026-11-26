@@ -94,15 +94,26 @@ function Assert-KbpLocalBuildConfiguration {
         if ($parent -eq $dir) { break }
         $dir = $parent
     }
-    # Inside the repository only tracked MSBuild configuration applies (an ignored or new Directory.Build file or project
-    # .user file is refused); no environment variable may select further imports; no per-user import hooks.
-    $untracked = @(& git -C $root ls-files --others -- ':(glob)**/Directory.Build.props' ':(glob)**/Directory.Build.targets' ':(glob)**/Directory.Build.rsp' ':(glob)**/*.csproj.user')
+    # Inside the repository only tracked MSBuild configuration may apply to the production project: the Directory.Build
+    # files MSBuild searches from src\KingmakerBuffPlanner up to the repository root, the root Directory.Build.rsp (the
+    # build enters through the root solution) and the production project's own .user file. An ignored or new one is
+    # refused; configuration that belongs only to another project (such as the test project's .user file) does not apply.
+    $applicable = @('src/KingmakerBuffPlanner/Directory.Build.props', 'src/KingmakerBuffPlanner/Directory.Build.targets',
+        'src/Directory.Build.props', 'src/Directory.Build.targets', 'Directory.Build.props', 'Directory.Build.targets',
+        'Directory.Build.rsp', 'src/KingmakerBuffPlanner/KingmakerBuffPlanner.csproj.user')
+    $untracked = @(& git -C $root ls-files --others -- $applicable)
     if ($LASTEXITCODE -ne 0) { throw 'git ls-files failed while checking the local build configuration.' }
     if ($untracked.Count -gt 0) { throw "Untracked MSBuild configuration files apply to the build: $($untracked -join ', ')" }
+    # Project-extension imports: Microsoft.Common imports obj\KingmakerBuffPlanner.csproj.*.props and *.targets from the
+    # production project (normally package-restore output; this project restores no packages). Such files are ignored by
+    # Git and invisible to the evaluated inventory, so any one present is refused at build and reuse.
+    $extensions = @(Get-ChildItem -LiteralPath (Join-Path $root 'src\KingmakerBuffPlanner\obj') -File -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like 'KingmakerBuffPlanner.csproj.*.props' -or $_.Name -like 'KingmakerBuffPlanner.csproj.*.targets' })
+    if ($extensions.Count -gt 0) { throw "Project-extension imports apply to the production build: $(@($extensions | ForEach-Object { $_.FullName }) -join ', ')" }
     foreach ($name in @('DirectoryBuildPropsPath', 'DirectoryBuildTargetsPath', 'ImportDirectoryBuildProps', 'ImportDirectoryBuildTargets',
             'CustomBeforeMicrosoftCommonProps', 'CustomAfterMicrosoftCommonProps', 'CustomBeforeMicrosoftCommonTargets', 'CustomAfterMicrosoftCommonTargets',
             'CustomBeforeMicrosoftCSharpProps', 'CustomAfterMicrosoftCSharpProps', 'CustomBeforeMicrosoftCSharpTargets', 'CustomAfterMicrosoftCSharpTargets',
-            'MSBuildUserExtensionsPath', 'ImportUserLocationsByWildcardBeforeMicrosoftCommonProps', 'ImportUserLocationsByWildcardAfterMicrosoftCommonProps',
+            'MSBuildUserExtensionsPath', 'MSBuildProjectExtensionsPath', 'BaseIntermediateOutputPath', 'ImportUserLocationsByWildcardBeforeMicrosoftCommonProps', 'ImportUserLocationsByWildcardAfterMicrosoftCommonProps',
             'ImportUserLocationsByWildcardBeforeMicrosoftCommonTargets', 'ImportUserLocationsByWildcardAfterMicrosoftCommonTargets')) {
         if (-not [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable($name))) { throw "The environment variable $name selects MSBuild imports; unset it before building." }
     }

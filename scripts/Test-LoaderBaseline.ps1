@@ -402,6 +402,36 @@ try {
     Expect-Rejected 'build-with-untracked-directory-build-targets-rejected' (Invoke-Isolated @('-File', (Join-Path $base 'scripts\Build.ps1'))) 'Untracked MSBuild configuration files apply to the build'
     Remove-Item -LiteralPath $untrackedTargets
     Expect-Accepted 'receipt-after-local-imports-removed-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
+    # R1-F3: the same production-only target as an ignored project-extension import (obj\KingmakerBuffPlanner.csproj.*.targets).
+    # MSBuild's preprocessor shows the production project would import it; reuse and Build.ps1 refuse it; removed, the
+    # receipt is accepted again.
+    $extensionTargets = Join-Path $base 'src\KingmakerBuffPlanner\obj\KingmakerBuffPlanner.csproj.local.targets'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $extensionTargets) -Force | Out-Null
+    Copy-Item -LiteralPath $localTargets -Destination $extensionTargets
+    $preprocessed = Join-Path $temp 'project-extension-preprocessed.xml'
+    $pp = Invoke-MSBuildIsolated @($project, "/pp:$preprocessed")
+    $ppText = if (Test-Path -LiteralPath $preprocessed) { [IO.File]::ReadAllText($preprocessed) } else { '' }
+    Add-Case 'project-extension-target-is-imported-by-msbuild' ($pp.ExitCode -eq 0 -and $ppText.Contains('KingmakerBuffPlanner.csproj.local.targets') -and $ppText.Contains('<KbpVersion>9.9.9</KbpVersion>')) ("preprocess exit $($pp.ExitCode); imported: $($ppText.Contains('KingmakerBuffPlanner.csproj.local.targets'))")
+    Expect-Rejected 'receipt-with-project-extension-import-rejected' (Test-FrozenReceipt) 'Project-extension imports apply to the production build: .*KingmakerBuffPlanner\.csproj\.local\.targets'
+    Expect-Rejected 'build-with-project-extension-import-rejected' (Invoke-Isolated @('-File', (Join-Path $base 'scripts\Build.ps1'))) 'Project-extension imports apply to the production build'
+    Remove-Item -LiteralPath $extensionTargets
+    Expect-Accepted 'receipt-after-project-extension-import-removed-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
+    # R5-F2: an ignored .user file of the test project (not part of the production solution) does not stop the production
+    # build or invalidate the unchanged receipt; the production project's own .user file is still refused.
+    $userText = "<Project><PropertyGroup><KbpVersion>9.9.9</KbpVersion></PropertyGroup></Project>"
+    $testUser = Join-Path $base 'tests\KingmakerBuffPlanner.Tests\KingmakerBuffPlanner.Tests.csproj.user'
+    [IO.File]::WriteAllText($testUser, $userText)
+    Expect-Accepted 'receipt-with-test-project-user-file-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
+    $testUserBuild = Invoke-Isolated @('-File', (Join-Path $base 'scripts\Build.ps1'))
+    Add-Case 'build-with-test-project-user-file-succeeds' ($testUserBuild.ExitCode -eq 0) ("exit $($testUserBuild.ExitCode); " + (Get-Reason $testUserBuild.Output))
+    Expect-Accepted 'receipt-after-build-with-test-project-user-file-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
+    Remove-Item -LiteralPath $testUser
+    $productionUser = Join-Path $base 'src\KingmakerBuffPlanner\KingmakerBuffPlanner.csproj.user'
+    [IO.File]::WriteAllText($productionUser, $userText)
+    Expect-Rejected 'receipt-with-production-project-user-file-rejected' (Test-FrozenReceipt) 'Untracked MSBuild configuration files apply to the build: src/KingmakerBuffPlanner/KingmakerBuffPlanner\.csproj\.user'
+    Expect-Rejected 'build-with-production-project-user-file-rejected' (Invoke-Isolated @('-File', (Join-Path $base 'scripts\Build.ps1'))) 'Untracked MSBuild configuration files apply to the build'
+    Remove-Item -LiteralPath $productionUser
+    Expect-Accepted 'receipt-after-production-user-file-removed-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
 
     # 9. The runtime transaction stages only its own copy of the admitted package; a package replaced after admission is
     #    refused before anything is staged or activated (fixture game folder; FixtureMode roots in the temporary folder).
@@ -453,11 +483,14 @@ try {
     # producing receipt are refused; the matching clean pair is accepted.
     $common = Join-Path $base 'scripts\Common.ps1'
     $validatorScript = Join-Path $base 'scripts\validate-package.ps1'
+    # Two independent producing receipts are read; an edit applies to the second producer only (the first stays clean).
     $reconcile = { param($releaseZip, $receiptEdit)
+        $r1 = Join-Path $inputs ('release-receipt-' + [Guid]::NewGuid().ToString('N') + '.json')
+        Copy-Item -LiteralPath $receiptA -Destination $r1
         $r = Join-Path $inputs ('release-receipt-' + [Guid]::NewGuid().ToString('N') + '.json')
         Copy-Item -LiteralPath $receiptA -Destination $r
         if ($receiptEdit) { Edit-Json $r $receiptEdit }
-        Invoke-Script (". $(Quote $common); `$v = Join-Path $(Quote $inputs) ('release-validation-' + [Guid]::NewGuid().ToString('N') + '.json'); & $(Quote $validatorScript) -PackagePath $(Quote $releaseZip) -ReportPath `$v | Out-Null; `$m = Get-Content -LiteralPath $(Quote $r) -Raw | ConvertFrom-Json; `$b = [pscustomobject]@{ Manifest = `$m; PackageSha256 = [string]`$m.packageSha256 }; Assert-KbpReleaseReconciliation -ReleaseHead $(Quote ([string]$ma.commit)) -Builds @(`$b, `$b) -ValidatedRelease (Get-Content -LiteralPath `$v -Raw | ConvertFrom-Json) -ReleasePackageSha256 (Get-KbpSha256 $(Quote $releaseZip)); 'RECONCILED'")
+        Invoke-Script (". $(Quote $common); `$v = Join-Path $(Quote $inputs) ('release-validation-' + [Guid]::NewGuid().ToString('N') + '.json'); & $(Quote $validatorScript) -PackagePath $(Quote $releaseZip) -ReportPath `$v | Out-Null; `$m1 = Get-Content -LiteralPath $(Quote $r1) -Raw | ConvertFrom-Json; `$m = Get-Content -LiteralPath $(Quote $r) -Raw | ConvertFrom-Json; `$b1 = [pscustomobject]@{ Manifest = `$m1; PackageSha256 = [string]`$m1.packageSha256 }; `$b = [pscustomobject]@{ Manifest = `$m; PackageSha256 = [string]`$m.packageSha256 }; Assert-KbpReleaseReconciliation -ReleaseHead $(Quote ([string]$ma.commit)) -Builds @(`$b1, `$b) -ValidatedRelease (Get-Content -LiteralPath `$v -Raw | ConvertFrom-Json) -ReleasePackageSha256 (Get-KbpSha256 $(Quote $releaseZip)); 'RECONCILED'")
     }
     Expect-Accepted 'release-reconciliation-matching-clean-pair-accepted' (& $reconcile $zipA $null) 'RECONCILED'
     # The validator admits packages under artifacts only, so the substituted copy is placed there.
@@ -466,7 +499,8 @@ try {
     Expect-Rejected 'release-reconciliation-substituted-release-copy-rejected' (& $reconcile $substituted $null) 'does not match the deterministic build'
     Remove-Item -LiteralPath $substituted
     Expect-Rejected 'release-reconciliation-dirty-producing-receipt-rejected' (& $reconcile $zipA { param($j) $j.sourceDirty = $true }) 'does not name the clean release commit'
-    # A malformed clean flag (an empty array, the string "false", the number 0) on one producing receipt is refused.
+    # A malformed clean flag (an empty array, the string "false", the number 0) on the second producing receipt, with the
+    # first receipt clean, is refused.
     foreach ($bad in @(@('empty-array', @()), @('string-false', 'false'), @('number-zero', 0))) {
         $badValue = $bad[1]
         Expect-Rejected "release-reconciliation-$($bad[0])-dirty-flag-rejected" (& $reconcile $zipA { param($j) $j.sourceDirty = $badValue }) 'does not name the clean release commit'
@@ -478,20 +512,53 @@ try {
     $releaseManifest = Join-Path $base ("artifacts\release\" + $ma.version + '\release-manifest.json')
     $rm = if (Test-Path -LiteralPath $releaseManifest) { Get-Content -LiteralPath $releaseManifest -Raw | ConvertFrom-Json } else { $null }
     Add-Case 'release-manifest-from-validated-release-zip' ($rel.ExitCode -eq 0 -and $rm -and $rm.embeddedCommit -eq $commit -and $rm.commit -eq $commit -and $rm.dllSha256 -eq $ma.dllSha256) ("exit $($rel.ExitCode); commit $($rm.commit) embedded $($rm.embeddedCommit) DLL $($rm.dllSha256) MVID $($rm.assemblyMvid)")
-    # The versioned release above is the previous release: a Build-Release whose producing builds disagree (a disposable
-    # instrumented copy changes the second package digest) is refused, and the previous ZIP and manifest keep their hashes.
+    # The versioned release above is the previous release. Disposable instrumented copies of Build-Release are written
+    # under the ignored artifacts folder (the checkout stays clean, so both producing builds really run) with their
+    # script root pointing at the checkout's scripts.
     $releaseDir = Split-Path -Parent $releaseManifest
-    $releaseFiles = { @(Get-ChildItem -LiteralPath $releaseDir -File | Sort-Object Name | ForEach-Object { $_.Name + '=' + (Get-KbpSha256 $_.FullName) }) -join ';' }
+    $releaseFiles = { param($dir = $releaseDir) @(Get-ChildItem -LiteralPath $dir -File | Sort-Object Name | ForEach-Object { $_.Name + '=' + (Get-KbpSha256 $_.FullName) }) -join ';' }
     $releaseBefore = & $releaseFiles
-    $releaseText = [IO.File]::ReadAllText((Join-Path $base 'scripts\Build-Release.ps1'))
-    $releaseAnchor = '$secondHash = Get-KbpSha256 $secondPackage'
-    if ($releaseText.IndexOf($releaseAnchor) -lt 0) { throw 'Build-Release.ps1 anchor not found.' }
-    $disagreeing = Join-Path $base 'scripts\Build-Release-instrumented.ps1'
-    [IO.File]::WriteAllText($disagreeing, $releaseText.Replace($releaseAnchor, $releaseAnchor + "`r`n`$secondHash = ('0' * 64)"))
+    $releaseText = [IO.File]::ReadAllText((Join-Path $base 'scripts\Build-Release.ps1')).Replace('$PSScriptRoot', "'" + (Join-Path $base 'scripts') + "'")
+    $instrumentRelease = { param([string]$Anchor, [string]$Insert, [string]$Name)
+        if ($releaseText.IndexOf($Anchor) -lt 0) { throw "Build-Release.ps1 anchor not found: $Anchor" }
+        $path = Join-Path $base ('artifacts\' + $Name + '.ps1')
+        [IO.File]::WriteAllText($path, $releaseText.Replace($Anchor, $Anchor + "`r`n" + $Insert))
+        return $path
+    }
+    $cleanBeforeRelease = @(& git -C $base status --porcelain).Count
+    # R4-F1: the first producer is replaced by an internally consistent but different pair (its ZIP re-written with one
+    # entry timestamp changed, its receipt naming that ZIP's digest); the second producer is the genuine build. The
+    # inter-build reconciliation refuses, and the previous ZIP and manifest keep their hashes.
+    $altInsert = @(
+        '$altPackage = Join-Path ([IO.Path]::GetTempPath()) (''kbp-alt-producer-'' + [Guid]::NewGuid().ToString(''N'') + ''.zip'')',
+        'Copy-Item -LiteralPath $firstPackage -Destination $altPackage',
+        'Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem',
+        '$altZip = [IO.Compression.ZipFile]::Open($altPackage, ''Update''); try { $altEntry = $altZip.Entries[0]; $altEntry.LastWriteTime = $altEntry.LastWriteTime.AddMinutes(2) } finally { $altZip.Dispose() }',
+        '$firstPackage = $altPackage; $firstHash = Get-KbpSha256 $altPackage; $firstManifest.packageSha256 = $firstHash',
+        'Write-Host (''ALT PRODUCER package '' + $firstHash + '' DLL '' + [string]$firstManifest.dllSha256)') -join "`r`n"
+    $disagreeing = & $instrumentRelease '$firstManifest = Get-Content -LiteralPath ($firstPackage + ''.build-local.json'') -Raw | ConvertFrom-Json' $altInsert 'release-disagreeing-producers'
     $relBad = Invoke-Isolated @('-File', $disagreeing)
     Remove-Item -LiteralPath $disagreeing -Force
     $prepareLeft = @(Get-ChildItem -LiteralPath (Join-Path $base 'artifacts\release') -Directory -Force -Filter '.prepare-*').Count
-    Add-Case 'release-with-disagreeing-builds-keeps-previous-release' ($relBad.ExitCode -ne 0 -and $releaseBefore -notmatch '^$' -and (& $releaseFiles) -ceq $releaseBefore -and $prepareLeft -eq 0) ("exit $($relBad.ExitCode); previous ZIP and manifest unchanged: $((& $releaseFiles) -ceq $releaseBefore); private folders left $prepareLeft; " + (Get-Reason $relBad.Output))
+    $mismatch = [regex]::Match(($relBad.Output -replace '\s+', ' '), 'Clean-head deterministic build failed: package [0-9a-f]{64}/[0-9a-f]{64} DLL [0-9a-f]{64}/[0-9a-f]{64}').Value
+    Add-Case 'release-with-disagreeing-builds-keeps-previous-release' ($cleanBeforeRelease -eq 0 -and $relBad.ExitCode -ne 0 -and $mismatch -and $relBad.Output -match 'ALT PRODUCER' -and $releaseBefore -notmatch '^$' -and (& $releaseFiles) -ceq $releaseBefore -and $prepareLeft -eq 0) ("clean checkout: $($cleanBeforeRelease -eq 0); exit $($relBad.ExitCode); $mismatch; previous release before/after: $releaseBefore / $(& $releaseFiles); private folders left: $prepareLeft")
+    # R5-F1: the versioned path is occupied right after the previous release is moved aside. Promotion and restoration
+    # are refused, the occupant is untouched, and the previous ZIP and manifest survive at the reported recovery path.
+    $occupyInsert = '[void](New-Item -ItemType Directory -Path $finalReleaseRoot); [IO.File]::WriteAllText((Join-Path $finalReleaseRoot ''occupant.txt''), ''occupant'')'
+    $occupied = & $instrumentRelease 'if (Test-Path -LiteralPath $finalReleaseRoot) { [IO.Directory]::Move($finalReleaseRoot, $previousRelease) }' $occupyInsert 'release-occupied-destination'
+    $relOccupied = Invoke-Isolated @('-File', $occupied)
+    Remove-Item -LiteralPath $occupied -Force
+    $recovery = [regex]::Match(($relOccupied.Output -replace '\s+', ' '), 'preserved at (\S+\\previous)\.').Groups[1].Value
+    $recoveredFiles = if ($recovery -and (Test-Path -LiteralPath $recovery)) { & $releaseFiles $recovery } else { '' }
+    $occupant = @(Get-ChildItem -LiteralPath $releaseDir -Force | ForEach-Object { $_.Name }) -join ','
+    Add-Case 'release-occupied-destination-keeps-previous-release-at-recovery-path' ($relOccupied.ExitCode -ne 0 -and $recovery -and $recoveredFiles -ceq $releaseBefore -and $occupant -ceq 'occupant.txt') ("exit $($relOccupied.ExitCode); recovery path reported: $([bool]$recovery); previous release there: $recoveredFiles; versioned path holds: $occupant")
+    # Fixture restoration for the cases below: the occupant is removed and the preserved previous release moved back.
+    if ($recovery -and (Test-Path -LiteralPath $recovery)) {
+        Remove-Item -LiteralPath $releaseDir -Recurse -Force
+        [IO.Directory]::Move($recovery, $releaseDir)
+        Remove-Item -LiteralPath (Split-Path -Parent $recovery) -Recurse -Force
+    }
+    Add-Case 'release-fixture-restored-after-occupied-destination' ((& $releaseFiles) -ceq $releaseBefore) ("previous release restored: $((& $releaseFiles) -ceq $releaseBefore)")
     $installGame = Join-Path $temp 'install fixture game'
     New-Item -ItemType Directory -Path (Join-Path $installGame 'Mods') -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $installGame 'Kingmaker.exe') -Value 'fixture' -Encoding Ascii
