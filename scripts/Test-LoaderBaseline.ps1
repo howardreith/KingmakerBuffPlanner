@@ -540,15 +540,19 @@ try {
     $relBad = Invoke-Isolated @('-File', $disagreeing)
     Remove-Item -LiteralPath $disagreeing -Force
     $prepareLeft = @(Get-ChildItem -LiteralPath (Join-Path $base 'artifacts\release') -Directory -Force -Filter '.prepare-*').Count
-    $mismatch = [regex]::Match(($relBad.Output -replace '\s+', ' '), 'Clean-head deterministic build failed: package [0-9a-f]{64}/[0-9a-f]{64} DLL [0-9a-f]{64}/[0-9a-f]{64}').Value
-    Add-Case 'release-with-disagreeing-builds-keeps-previous-release' ($cleanBeforeRelease -eq 0 -and $relBad.ExitCode -ne 0 -and $mismatch -and $relBad.Output -match 'ALT PRODUCER' -and $releaseBefore -notmatch '^$' -and (& $releaseFiles) -ceq $releaseBefore -and $prepareLeft -eq 0) ("clean checkout: $($cleanBeforeRelease -eq 0); exit $($relBad.ExitCode); $mismatch; previous release before/after: $releaseBefore / $(& $releaseFiles); private folders left: $prepareLeft")
+    # Console wrapping can split long digests, so the error is matched with all whitespace removed.
+    $mm = [regex]::Match(($relBad.Output -replace '\s+', ''), 'Clean-headdeterministicbuildfailed:package([0-9a-f]{64})/([0-9a-f]{64})DLL([0-9a-f]{64})/([0-9a-f]{64})')
+    $mismatch = if ($mm.Success) { "inter-build mismatch: package $($mm.Groups[1].Value)/$($mm.Groups[2].Value) DLL $($mm.Groups[3].Value)/$($mm.Groups[4].Value)" } else { 'no inter-build mismatch reported: ' + (Get-Reason $relBad.Output) }
+    Add-Case 'release-with-disagreeing-builds-keeps-previous-release' ($cleanBeforeRelease -eq 0 -and $relBad.ExitCode -ne 0 -and $mm.Success -and $mm.Groups[1].Value -cne $mm.Groups[2].Value -and $relBad.Output -match 'ALT PRODUCER' -and $releaseBefore -notmatch '^$' -and (& $releaseFiles) -ceq $releaseBefore -and $prepareLeft -eq 0) ("clean checkout: $($cleanBeforeRelease -eq 0); exit $($relBad.ExitCode); $mismatch; previous release before/after: $releaseBefore / $(& $releaseFiles); private folders left: $prepareLeft")
     # R5-F1: the versioned path is occupied right after the previous release is moved aside. Promotion and restoration
     # are refused, the occupant is untouched, and the previous ZIP and manifest survive at the reported recovery path.
     $occupyInsert = '[void](New-Item -ItemType Directory -Path $finalReleaseRoot); [IO.File]::WriteAllText((Join-Path $finalReleaseRoot ''occupant.txt''), ''occupant'')'
     $occupied = & $instrumentRelease 'if (Test-Path -LiteralPath $finalReleaseRoot) { [IO.Directory]::Move($finalReleaseRoot, $previousRelease) }' $occupyInsert 'release-occupied-destination'
     $relOccupied = Invoke-Isolated @('-File', $occupied)
     Remove-Item -LiteralPath $occupied -Force
-    $recovery = [regex]::Match(($relOccupied.Output -replace '\s+', ' '), 'preserved at (\S+\\previous)\.').Groups[1].Value
+    # The preserved private folder is found on disk; the (possibly console-wrapped) error must name it.
+    $kept = @(Get-ChildItem -LiteralPath (Join-Path $base 'artifacts\release') -Directory -Force -Filter '.prepare-*' | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'previous') })
+    $recovery = if ($kept.Count -eq 1 -and ($relOccupied.Output -replace '\s+', '').Contains(((Join-Path $kept[0].FullName 'previous') -replace '\s+', '') + '.')) { Join-Path $kept[0].FullName 'previous' } else { '' }
     $recoveredFiles = if ($recovery -and (Test-Path -LiteralPath $recovery)) { & $releaseFiles $recovery } else { '' }
     $occupant = @(Get-ChildItem -LiteralPath $releaseDir -Force | ForEach-Object { $_.Name }) -join ','
     Add-Case 'release-occupied-destination-keeps-previous-release-at-recovery-path' ($relOccupied.ExitCode -ne 0 -and $recovery -and $recoveredFiles -ceq $releaseBefore -and $occupant -ceq 'occupant.txt') ("exit $($relOccupied.ExitCode); recovery path reported: $([bool]$recovery); previous release there: $recoveredFiles; versioned path holds: $occupant")
