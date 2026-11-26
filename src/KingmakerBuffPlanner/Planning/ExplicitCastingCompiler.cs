@@ -1413,9 +1413,12 @@ namespace KingmakerBuffPlanner.Planning
             if (payload == null || !CasterLevelPredicate.HasUnresolved(payload)) return null;
             EffectExpression bound = option == null ? payload : option.BindCasterLevel(payload);
             if (CasterLevelPredicate.HasUnresolved(bound)) return "unresolved:" + casting.CastingId;
+            // Review round 2: each effect with its recipient role and action
+            // path, so the same identities applied to different recipients
+            // are different grants.
             return string.Join(",", EffectApplicationLifetime.Leaves(bound)
-                .Select(leaf => leaf.Kind + ":" + leaf.EffectId).Distinct(StringComparer.Ordinal)
-                .OrderBy(value => value, StringComparer.Ordinal).ToArray());
+                .Select(leaf => leaf.Kind + ":" + leaf.EffectId + "@" + leaf.Target + ":" + leaf.ActionPath)
+                .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray());
         }
 
         // Review R9-F1: every application of the payload is a permanent

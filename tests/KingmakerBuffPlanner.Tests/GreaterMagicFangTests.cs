@@ -188,10 +188,12 @@ namespace KingmakerBuffPlanner.Tests
                 pool.PoolKey, 1, new string[0], providers);
         }
 
-        // Casters who know the spell, each with a spell-level pool. Only the
-        // live reads are injected (the spellbook, the slot balance, the
-        // caster level and native AbilityData.CanTarget per unit); the
-        // providers, their expression, targets and options are production.
+        // Casters who know the spell. The druid is a prepared caster: each
+        // slot is its own native token with the spell prepared in it; any
+        // other caster is spontaneous, with a spell-level pool. Only the live
+        // reads are injected (the spellbook, the slots, the caster level and
+        // native AbilityData.CanTarget per unit); the providers, their
+        // expression, targets and options are production.
         private static GmfParty GmfPartyOf(NativeBlueprintDump dump, string spell, Func<string, bool> nativeCanTarget,
             params Tuple<string, int, int>[] casters)
         {
@@ -199,12 +201,24 @@ namespace KingmakerBuffPlanner.Tests
             PartyProviderAdmission admission = MbbAdmission(dump);
             var providers = new List<ProviderSnapshot>();
             var pools = new List<ResourcePoolSnapshot>();
+            int spellLevel = spell == GmfAbility ? 3 : 1;
             foreach (Tuple<string, int, int> caster in casters)
             {
-                ResourcePoolSnapshot pool = PartyProviderAdmission.SpontaneousLevelPool(caster.Item1,
-                    "book-" + caster.Item1, spell == GmfAbility ? 3 : 1, caster.Item3, Math.Max(1, caster.Item3));
+                string book = "book-" + caster.Item1;
+                bool prepared = caster.Item1 == "druid";
+                ResourceTokenSnapshot[] tokens = prepared ? Enumerable.Range(0, caster.Item3).Select(index =>
+                    new ResourceTokenSnapshot(caster.Item1 + "|" + PreparedSlotIds.Format(spellLevel, 0, index),
+                        MbbSpellKey(spell), spellLevel, PreparedSlotKind.Common, true, true, null)).ToArray()
+                    : new ResourceTokenSnapshot[0];
+                ResourcePoolSnapshot pool = prepared
+                    ? new ResourcePoolSnapshot(PartyProviderAdmission.PoolKey(caster.Item1, book, "prepared-" + spellLevel),
+                        ResourcePoolKind.PreparedSlots, tokens.Length, tokens.Length, tokens)
+                    : PartyProviderAdmission.SpontaneousLevelPool(caster.Item1, book, spellLevel, caster.Item3,
+                        Math.Max(1, caster.Item3));
                 pools.Add(pool);
-                MbbExpect(GmfAdmit(dump, admission, caster.Item1, spell, caster.Item2, pool, providers) != null,
+                MbbExpect(admission.AdmitSpell(caster.Item1, book, prepared, "Spellbook",
+                        MbbRead(dump, spell, spell, SourceKind.Spellbook, caster.Item2), spellLevel, 0, pool.PoolKey, 1,
+                        tokens.Select(token => token.TokenId), providers) != null,
                     "The production admission refused " + spell + " for " + caster.Item1 + ".");
             }
             var effects = new Dictionary<string, EffectExpression>(admission.EffectsBySource, StringComparer.Ordinal);
@@ -324,7 +338,10 @@ namespace KingmakerBuffPlanner.Tests
             private readonly Dictionary<CastStep, EffectBaseline> _baselines = new Dictionary<CastStep, EffectBaseline>();
             private int _instance;
             internal int CasterLevel;
+            // Spontaneous slots, and prepared slot tokens (true: unspent).
             internal int Slots;
+            internal readonly Dictionary<string, bool> Tokens = new Dictionary<string, bool>(StringComparer.Ordinal);
+            internal readonly List<string> SpentTokens = new List<string>();
             // "native", or "buff-only" (no natural weapon took the enchantment).
             internal string Application = "native";
             internal Func<string, bool> NativeCanTarget = id => true;
@@ -345,6 +362,8 @@ namespace KingmakerBuffPlanner.Tests
                 return _active.TryGetValue(unit, out values) ? values.ToArray() : new ObservedEffectInstance[0];
             }
 
+            internal int Remaining { get { return Tokens.Count != 0 ? Tokens.Count(token => token.Value) : Slots; } }
+
             internal string[] Effects(string unit)
             {
                 return Read(unit).Select(value => value.Kind + ":" + value.EffectId)
@@ -355,24 +374,32 @@ namespace KingmakerBuffPlanner.Tests
             {
                 string target = step.TargetUnitIds.FirstOrDefault();
                 if (target == null || !NativeCanTarget(target)) return CastRuntimeValidation.Fail("target-invalid");
-                return Slots >= step.Reservation.Units ? CastRuntimeValidation.Pass()
-                    : CastRuntimeValidation.Fail("simulated-exhausted-source");
+                bool available = step.Reservation.TokenIds.Count != 0
+                    ? step.Reservation.TokenIds.All(id => Tokens.ContainsKey(id) && Tokens[id])
+                    : Slots >= step.Reservation.Units;
+                return available ? CastRuntimeValidation.Pass() : CastRuntimeValidation.Fail("simulated-exhausted-source");
             }
 
             public InstantCastResult Fire(CastStep step)
             {
                 _baselines[step] = new EffectBaseline(step.EffectObservationUnitIds.ToDictionary(id => id, Read,
                     StringComparer.Ordinal));
-                int before = Slots;
-                Slots -= step.Reservation.Units;
+                int before = Remaining;
+                if (step.Reservation.TokenIds.Count != 0)
+                    foreach (string token in step.Reservation.TokenIds)
+                    {
+                        Tokens[token] = false;
+                        SpentTokens.Add(token);
+                    }
+                else Slots -= step.Reservation.Units;
                 string target = step.TargetUnitIds[0];
                 Fired.Add(target);
                 Put(target, EffectKind.Buff, _buff, step.Provider.CasterUnitId);
                 if (Application != "buff-only")
                     Put(target, EffectKind.WornItemEnchantment,
                         _tiers[_greater ? Math.Min(GmfNativeRank(CasterLevel), _tiers.Length) - 1 : 0], null);
-                return new InstantCastResult(true, true, false, Slots < before, true, "simulated-native-magic-fang",
-                    AvailableCountJudgement.Violation(step.Reservation, before, Slots));
+                return new InstantCastResult(true, true, false, Remaining < before, true, "simulated-native-magic-fang",
+                    AvailableCountJudgement.Violation(step.Reservation, before, Remaining));
             }
 
             internal void Put(string unit, EffectKind kind, string effect, string caster)
@@ -400,6 +427,18 @@ namespace KingmakerBuffPlanner.Tests
 
             public IAnimatedCastOperation StartAnimated(CastStep step)
             { return new GmfOperation(this, step, Fire(step)); }
+        }
+
+        // The world for a party: its prepared tokens, its spontaneous slots.
+        private static GmfWorld GmfWorldFor(GmfParty party, string buff, string[] tiers, bool greater, int casterLevel)
+        {
+            var world = new GmfWorld(buff, tiers, greater) { CasterLevel = casterLevel };
+            foreach (ResourcePoolSnapshot pool in party.Snapshot.ResourcePools)
+            {
+                foreach (ResourceTokenSnapshot token in pool.Tokens) world.Tokens[token.TokenId] = token.Available;
+                if (pool.Kind == ResourcePoolKind.SpontaneousLevel) world.Slots += pool.Remaining;
+            }
+            return world;
         }
 
         private sealed class GmfOperation : IAnimatedCastOperation
@@ -687,7 +726,12 @@ namespace KingmakerBuffPlanner.Tests
                         GmfFang(ability).EnchantLevel.ValueType = ContextValueType.Simple;
                         GmfFang(ability).EnchantLevel.Value = 0;
                     } },
-                { "missing element", ability => GmfFang(ability).Enchantment[2] = null }
+                { "missing element", ability => GmfFang(ability).Enchantment[2] = null },
+                { "overflowing step", ability =>
+                    {
+                        GmfSet(GmfRankConfig(ability), "m_Progression", ContextRankProgression.MultiplyByModifier);
+                        GmfSet(GmfRankConfig(ability), "m_StepLevel", 43000000);
+                    } }
             };
             foreach (KeyValuePair<string, Action<BlueprintAbility>> modification in modifications)
             {
@@ -706,6 +750,33 @@ namespace KingmakerBuffPlanner.Tests
                     providers.Count == 0,
                     "Modified (" + modification.Key + ") Greater Magic Fang was admitted with its buff alone.");
             }
+            // Review round 2: cast through a referenced ability (a native
+            // ContextActionCastSpell wrapper), Greater Magic Fang runs in a
+            // context of its own whose caster level is not the wrapper
+            // provider's: its tier is not bound to it.
+            BlueprintAbility inner = GmfDump().Get<BlueprintAbility>(GmfAbility);
+            var cast = GmfUnityDetached<ContextActionCastSpell>();
+            GmfSet(cast, "Spell", inner);
+            var list = GmfDetached<Kingmaker.ElementsSystem.ActionList>();
+            GmfSet(list, "Actions", new Kingmaker.ElementsSystem.GameAction[] { cast });
+            var runAction = GmfUnityDetached<AbilityEffectRunAction>();
+            GmfSet(runAction, "Actions", list);
+            BlueprintAbility wrapper = NativeBlueprintDump.Stub<BlueprintAbility>("0000000000000000000000000000c0a5");
+            GmfSet(wrapper, "Components", new BlueprintComponent[] { runAction });
+            DiscoveryScanResult nested = GmfScanResult(wrapper);
+            MbbExpect(!GmfLeaves(nested.Expression).Any(leaf => leaf.StartsWith(
+                    EffectKind.WornItemEnchantment.ToString(), StringComparison.Ordinal)) &&
+                nested.Diagnostics.Any(value => value.Detail == "MagicFang:enchant-level-unverified"),
+                "Greater Magic Fang cast through a wrapper was bound to the wrapper's caster level: " +
+                string.Join(",", GmfLeaves(nested.Expression)));
+        }
+
+        // A detached Unity-derived native object that compares as non-null.
+        private static T GmfUnityDetached<T>() where T : class
+        {
+            T value = GmfDetached<T>();
+            GmfSet(value, "m_CachedPtr", new IntPtr(1));
+            return value;
         }
 
         private static ObservedEffectInstance GmfSeen(EffectKind kind, string effect, string key, long end = 100,
@@ -784,6 +855,15 @@ namespace KingmakerBuffPlanner.Tests
                     !AppliedEffectJudgement.Reached(expected, refusal.Value.Key, after),
                     "Greater Magic Fang reached (unscoped) from " + refusal.Key + ".");
             }
+            // Review round 2: the tier seen by an earlier progress read but
+            // gone at the read that judges the cast proves nothing.
+            var progressBaseline = new EffectBaseline(GmfUnits().ToDictionary(unit => unit.UnitId,
+                unit => (IEnumerable<ObservedEffectInstance>)none, StringComparer.Ordinal));
+            progressBaseline.RecordObservation(new Dictionary<string, IEnumerable<ObservedEffectInstance>>
+                { { "ranger-pet", new[] { buff, tier(3, "t3-new") } } });
+            MbbExpect(!AppliedEffectJudgement.AllReached(new[] { "ranger-pet" }, expected, progressBaseline,
+                    unit => unit == "ranger-pet" ? new[] { buff, tier(2, "t2-new") } : none, null, "druid"),
+                "A +3 seen only by an earlier progress read confirmed the cast.");
             // An unknown caster level: whatever tier appears, nothing proves this cast's.
             EffectExpression unresolved = GmfBind(party.Raw, 0);
             MbbExpect(CasterLevelPredicate.HasUnresolved(unresolved) &&
@@ -839,6 +919,16 @@ namespace KingmakerBuffPlanner.Tests
             CastPlan classic = GmfClassicPlan(party, new[] { "ranger-pet" }, stronger);
             MbbExpect(classic.Steps.Count == 1 && classic.Steps[0].Reservation.Units == 1,
                 "Classic skipped the +3 casting over an earlier +4.");
+            // Classic presence: even the cast's own tier and buff present
+            // (the tier could be an Oil of Enhancement on a manufactured
+            // weapon - the snapshot does not say which item has it) never
+            // skip the casting, as in the casting-first policy.
+            CastPlan sameTier = GmfClassicPlan(party, new[] { "ranger-pet" }, GmfLive(
+                new Dictionary<string, ActiveEffectInstance[]>
+                    { { "ranger-pet", new[] { buff(GmfBuff, 12), tier(GmfTiers[2]) } } }));
+            MbbExpect(sameTier.Steps.Count == 1 && sameTier.Outcomes.All(outcome => outcome.Kind == TargetOutcomeKind.Fulfilled),
+                "Classic took an existing +3 as Greater Magic Fang already active: " +
+                string.Join(",", sameTier.Outcomes.Select(outcome => outcome.Kind + ":" + outcome.Reason)));
             // The setup view (no caster bound) with +1 and the buff present.
             var weak = GmfLive(new Dictionary<string, ActiveEffectInstance[]>
                 { { "ranger-pet", new[] { buff(GmfBuff, 4), tier(GmfTiers[0]) } } });
@@ -882,9 +972,12 @@ namespace KingmakerBuffPlanner.Tests
                         IReadOnlyList<CastStep> steps = GmfSteps(party, order, classic, out explicitSteps, out classicPlan,
                             label);
                         MbbExpect(steps.Select(step => step.TargetUnitIds.Single()).SequenceEqual(order) &&
-                            steps.All(step => step.Reservation.Units == 1),
-                            label + ": the castings did not plan in order with one slot each.");
-                        var world = new GmfWorld(GmfBuff, GmfTiers, true) { CasterLevel = 12, Slots = 2 };
+                            steps.All(step => step.Reservation.Units == 1 && step.Reservation.TokenIds.Count == 1) &&
+                            steps.Select(step => step.Reservation.TokenIds.Single()).Distinct(StringComparer.Ordinal)
+                                .Count() == 2,
+                            label + ": the castings did not plan in order with one prepared slot each: " +
+                            string.Join(",", steps.Select(step => string.Join("+", step.Reservation.TokenIds))));
+                        GmfWorld world = GmfWorldFor(party, GmfBuff, GmfTiers, true, 12);
                         if (classic)
                         {
                             int? halted;
@@ -902,8 +995,10 @@ namespace KingmakerBuffPlanner.Tests
                                 label + ": halted after " + outcome.HaltedAfterCastingId + " " + outcome.HaltReason + "; " +
                                 string.Join(" | ", outcome.Entries.Select(entry => entry.FinalStatus + ":" + entry.Detail)));
                         }
-                        MbbExpect(world.Fired.SequenceEqual(order) && world.Slots == 0,
-                            label + ": fired " + string.Join(",", world.Fired) + " with " + world.Slots + " slots left.");
+                        MbbExpect(world.Fired.SequenceEqual(order) && world.Remaining == 0 &&
+                            world.SpentTokens.SequenceEqual(steps.Select(step => step.Reservation.TokenIds.Single())),
+                            label + ": fired " + string.Join(",", world.Fired) + ", spent " +
+                            string.Join(",", world.SpentTokens) + ", " + world.Remaining + " slots left.");
                         foreach (string pet in order)
                             MbbExpect(world.Effects(pet).SequenceEqual(GmfExpected(GmfBuff, GmfTiers[2])),
                                 label + ": " + pet + " has " + string.Join(",", world.Effects(pet)));
@@ -959,7 +1054,7 @@ namespace KingmakerBuffPlanner.Tests
                         IReadOnlyList<CastStep> steps = GmfSteps(party, order, classic, out explicitSteps, out classicPlan,
                             label);
                         MbbExpect(steps.Count == 2, label + ": " + steps.Count + " steps.");
-                        var world = new GmfWorld(GmfBuff, GmfTiers, true) { CasterLevel = 12, Slots = 2 };
+                        GmfWorld world = GmfWorldFor(party, GmfBuff, GmfTiers, true, 12);
                         scenario.Value(world);
                         bool rejected = scenario.Key.StartsWith("cast-time", StringComparison.Ordinal);
                         if (classic)
@@ -982,8 +1077,8 @@ namespace KingmakerBuffPlanner.Tests
                                 string.Join(" | ", outcome.Entries.Select(entry => entry.FinalStatus + ":" + entry.Detail)));
                         }
                         MbbExpect(world.Fired.SequenceEqual(rejected ? new string[0] : new[] { "ranger-pet" }) &&
-                            world.Slots == (rejected ? 2 : 1),
-                            label + ": fired " + string.Join(",", world.Fired) + " with " + world.Slots + " slots left.");
+                            world.Remaining == (rejected ? 2 : 1),
+                            label + ": fired " + string.Join(",", world.Fired) + " with " + world.Remaining + " slots left.");
                     }
         }
 
@@ -1060,7 +1155,7 @@ namespace KingmakerBuffPlanner.Tests
                     CastPlan classicPlan;
                     IReadOnlyList<CastStep> steps = GmfSteps(party, order, classic, out explicitSteps, out classicPlan,
                         "ordinary Magic Fang");
-                    var world = new GmfWorld(GmfOrdinaryBuff, new[] { GmfTiers[0] }, false) { CasterLevel = 12, Slots = 2 };
+                    GmfWorld world = GmfWorldFor(party, GmfOrdinaryBuff, new[] { GmfTiers[0] }, false, 12);
                     bool confirmed;
                     if (classic)
                     {
@@ -1068,7 +1163,7 @@ namespace KingmakerBuffPlanner.Tests
                         confirmed = GmfRunClassic(world, classicPlan, animated, out halted).Confirmed == 2 && halted == null;
                     }
                     else confirmed = GmfRunExplicit(world, explicitSteps, animated).AllConfirmed;
-                    MbbExpect(confirmed && steps.Count == 2 && world.Slots == 0 &&
+                    MbbExpect(confirmed && steps.Count == 2 && world.Remaining == 0 &&
                         order.All(pet => world.Effects(pet).SequenceEqual(GmfExpected(GmfOrdinaryBuff, GmfTiers[0]))),
                         "Ordinary Magic Fang did not confirm on both pets (" + (classic ? "classic" : "casting-first") +
                         ", " + (animated ? "animated" : "instant") + ").");

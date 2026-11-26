@@ -414,6 +414,21 @@ namespace KingmakerBuffPlanner.Domain.Effects
         // Two six-second rounds.
         public const double MinimumCoverageSeconds = 12;
 
+        // Greater Magic Fang repair (review): native MagicFang.EnchantSlot
+        // removes a temporary instance of the enchantment it selected and
+        // adds it again on every cast, so a Magic Fang tier is proven only by
+        // an instance the attempt applied, visible when it is judged. An old
+        // instance (a tier an earlier cast left, which a cast selecting
+        // another tier does not touch) proves nothing. A permanent instance
+        // of the same blueprint, which EnchantSlot leaves untouched,
+        // therefore never confirms: the cast is reported unconfirmed and the
+        // run stops (conservative).
+        public static bool ReappliedEachCast(EffectLeafExpression leaf)
+        {
+            return leaf != null && leaf.Kind == EffectKind.WornItemEnchantment &&
+                string.Equals(leaf.SourceContract, "MagicFang", StringComparison.Ordinal);
+        }
+
         public static bool IsTransient(EffectLeafExpression leaf)
         {
             return leaf != null && leaf.MaximumDurationSeconds.HasValue &&

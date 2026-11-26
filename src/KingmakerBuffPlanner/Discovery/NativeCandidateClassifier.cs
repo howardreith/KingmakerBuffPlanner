@@ -176,7 +176,10 @@ namespace KingmakerBuffPlanner.Discovery
             // contract, a missing element) applies an enhancement the planner
             // cannot name; its buff alone would otherwise be planned and
             // confirmed without it.
-            if (diagnosticFacts.Any(d => d != null && string.Equals(d.Code, "unknown-node", StringComparison.Ordinal) &&
+            // Current rules only: the historical (Pre040) verdict stays as
+            // recorded, so before/after audits show the change.
+            if (AuditRules && diagnosticFacts.Any(d => d != null &&
+                    string.Equals(d.Code, "unknown-node", StringComparison.Ordinal) &&
                     (d.Detail ?? string.Empty).StartsWith("MagicFang:", StringComparison.Ordinal)))
                 return Exclude("magic-fang-enchantment-unverified",
                     "The enhancement a MagicFang action applies could not be proven from its native contract.");

@@ -130,10 +130,14 @@ namespace KingmakerBuffPlanner.GameAdapters
                 return Effect(EffectKind.WornItemEnchantment, enchant.Enchantment.AssetGuid,
                     enchant.ToCaster ? EffectTarget.Caster : EffectTarget.CurrentTarget,
                     "ContextActionEnchantWornItem");
+            // Review round 2: the rank is bound to the provider's caster level
+            // only for the cast ability's own action. A referenced ability
+            // (ContextActionCastSpell, a sticky-touch delivery) runs in a
+            // context of its own whose caster level is not the provider's, so
+            // a rank there is not bound (an unknown node).
             var magicFang = action as MagicFang;
             if (magicFang != null)
-                return AdaptMagicFang(magicFang,
-                    _abilityStack.Count == 0 ? null : _abilityStack[_abilityStack.Count - 1]);
+                return AdaptMagicFang(magicFang, _abilityStack.Count == 1 ? _abilityStack[0] : null);
             if (action is ContextActionSpawnMonster)
                 return new DiscoveryNode(DiscoveryNodeKind.Unknown,
                     DescribeType(action.GetType()), sourceContract: "excluded-summoning-action");
@@ -374,7 +378,8 @@ namespace KingmakerBuffPlanner.GameAdapters
         // non-decreasing function of the level for a non-negative
         // m_StepLevel (2.1.7b ApplyProgression IL), so an index unchanged from
         // the probe up to level 10000 is constant there; a Custom table can
-        // change anywhere, so it is not bound.
+        // change anywhere, so it is not bound. Only the cast ability's own
+        // action is bound (see AdaptAction).
         internal static int[] MagicFangTierIndices(ContextValue enchantLevel, int count, BlueprintAbility ability)
         {
             try
@@ -395,11 +400,16 @@ namespace KingmakerBuffPlanner.GameAdapters
                     object rank = FieldValue(enchantLevel, "ValueRank");
                     var configs = components.OfType<Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig>()
                         .Where(candidate => Equals(FieldValue(candidate, "m_Type"), rank)).ToList();
+                    // Review round 2: step and start are bounded, so no native
+                    // int arithmetic overflows up to the level-10000 probe.
                     object step = FieldValue(configs[0], "m_StepLevel");
+                    object start = FieldValue(configs[0], "m_StartLevel");
                     if (rank == null || configs.Count != 1 ||
                         NamedValue(configs[0], "m_BaseValueType") != "CasterLevel" ||
                         NamedValue(configs[0], "m_Progression") == null ||
-                        NamedValue(configs[0], "m_Progression") == "Custom" || !(step is int) || (int)step < 0)
+                        NamedValue(configs[0], "m_Progression") == "Custom" ||
+                        !(step is int) || (int)step < 0 || (int)step > 1000 ||
+                        !(start is int) || (int)start < 0 || (int)start > 1000)
                         return null;
                     const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
                     Type type = typeof(Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig);

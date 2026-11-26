@@ -195,6 +195,12 @@ namespace KingmakerBuffPlanner.Planning
         {
             ISet<ActiveEffectMarker> markers = activeEffects.GetEffects(targetId);
             List<EffectLeafExpression> leaves = EffectApplicationLifetime.Leaves(request.Source.Effects).ToList();
+            // Greater Magic Fang repair (review round 2): the snapshot does not
+            // say which weapon carries an enchantment (an Oil of Enhancement on
+            // a sword has the same blueprint as a tier), and an enchantment's
+            // caster level is unread, so - as in the casting-first policy - a
+            // Greater Magic Fang tier never shows the casting is already active.
+            bool tierSelection = CasterLevelPredicate.HasUnresolved(request.Source.Effects);
             bool permanentOnly = leaves.Count != 0 && leaves.All(leaf => leaf.PermanentApplication);
             IList<ProviderPlanningOption> candidates = sourceOptions.Count != 0
                 ? sourceOptions.ToList() : new List<ProviderPlanningOption> { null };
@@ -231,6 +237,7 @@ namespace KingmakerBuffPlanner.Planning
                 {
                     var marker = new ActiveEffectMarker(leaf.Kind, leaf.EffectId);
                     string owner = role == EffectTarget.Caster ? caster : targetId;
+                    if (tierSelection && EffectApplicationLifetime.ReappliedEachCast(leaf)) return false;
                     // Review R10 (R9-F1): an effect made only of permanent
                     // native applications that an earlier funded step of this
                     // routine certainly left on the unit (a resistance chosen
