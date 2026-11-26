@@ -63,18 +63,27 @@ $releaseManifest = [ordered]@{
 $releaseManifest | ConvertTo-Json -Depth 5 | Set-Content `
     -LiteralPath (Join-Path $releaseRoot 'release-manifest.json') -Encoding UTF8
 # Replace the versioned release: the previous directory is moved aside and the prepared one moved in. Directory.Move
-# refuses an existing destination, so an occupied versioned path is never merged into. The private folder (holding the
-# previous release while it is aside) is removed only after the new release is in place or the previous one is back at
-# its versioned path; otherwise it is kept and the error names the recovery path.
+# refuses an existing destination, so an occupied versioned path is never merged into. The private folder is marked kept
+# BEFORE the previous release is moved into it; the mark is cleared only once the new release is in place or the previous
+# one is back at its versioned path. Any other exit, including an interruption right after the move, leaves the private
+# folder in place and names the recovery path.
 $previousRelease = Join-Path $privateRelease 'previous'
-if (Test-Path -LiteralPath $finalReleaseRoot) { [IO.Directory]::Move($finalReleaseRoot, $previousRelease) }
-try { [IO.Directory]::Move($releaseRoot, $finalReleaseRoot) }
+if (Test-Path -LiteralPath $finalReleaseRoot) {
+    $keepPrivateRelease = $true
+    [IO.Directory]::Move($finalReleaseRoot, $previousRelease)
+}
+try {
+    [IO.Directory]::Move($releaseRoot, $finalReleaseRoot)
+    $keepPrivateRelease = $false
+}
 catch {
     $promotionError = $_.Exception.Message
     if (Test-Path -LiteralPath $previousRelease) {
-        try { [IO.Directory]::Move($previousRelease, $finalReleaseRoot) }
+        try {
+            [IO.Directory]::Move($previousRelease, $finalReleaseRoot)
+            $keepPrivateRelease = $false
+        }
         catch {
-            $keepPrivateRelease = $true
             throw "The new release could not be promoted ($promotionError) and the previous release could not be restored to $finalReleaseRoot ($($_.Exception.Message)); the previous release is preserved at $previousRelease."
         }
     }
@@ -82,7 +91,13 @@ catch {
 }
 }
 finally {
-    if (-not $keepPrivateRelease -and (Test-Path -LiteralPath $privateRelease)) { Remove-Item -LiteralPath $privateRelease -Recurse -Force -ErrorAction SilentlyContinue }
+    if ($keepPrivateRelease -and (Test-Path -LiteralPath $previousRelease)) {
+        Write-Warning "The previous release was not restored to $finalReleaseRoot; it is preserved at $previousRelease."
+    }
+    elseif (Test-Path -LiteralPath $privateRelease) {
+        # Promotion or restoration was confirmed, or the previous release never left its versioned path.
+        Remove-Item -LiteralPath $privateRelease -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 $releasePackage = Join-Path $finalReleaseRoot "KingmakerBuffPlanner-$version.zip"
 Write-Host "Release build: PASS=3 FAIL=0 deterministic=2 sha256=$($releaseManifest.packageSha256)"

@@ -113,12 +113,30 @@ above), `scripts/Build-Release.ps1` (promotion and recovery of the previous rele
 import list contains an ignored `obj\KingmakerBuffPlanner.csproj.local.targets` that changes the generated version
 only for a real compile, and reuse and `Build.ps1` refuse it (accepted again once removed); the test project's ignored
 `.user` file leaves the production build and the unchanged receipt accepted, while the production project's own
-`.user` file is refused; two internally consistent producing builds that differ (the first producer's ZIP re-written
-with one entry timestamp changed and its receipt naming that ZIP) fail the inter-build reconciliation in a clean
-checkout with the previous release unchanged; an occupied versioned path leaves the previous release at the reported
+`.user` file is refused; a first producer whose ZIP was re-written with one entry timestamp changed (its receipt naming
+that ZIP) fails the inter-build reconciliation in a clean checkout with the previous release unchanged (correction,
+round 7: that substituted ZIP would not pass the standalone validator, whose fixed-timestamp check it breaks, so this
+case showed the refusal of differing package digests, not a disagreement between two valid packages; the recorded
+output in `loader-baseline-r6.json` is unchanged); an occupied versioned path leaves the previous release at the reported
 private recovery path with the occupant untouched; and a malformed clean flag on the second producing receipt alone,
 with the first clean, is refused. Records: [`docs/evidence/umm-0311/`](evidence/umm-0311/INDEX.md). The round-5
 retained pair below was built from the round-5 tooling; the controller gate builds the round-6 candidate itself.
+
+## Round 7 (2026-11-26): release recovery, letter case, valid disagreeing producers
+
+Round 7 changes `scripts/Build-Release.ps1` (the private folder is marked kept before the previous release is moved into
+it and released only after a confirmed promotion or restoration; otherwise a warning names the recovery path),
+`scripts/Common.ps1` (the existing applicable configuration paths are matched with Git's case-insensitive `:(icase)`
+pathspec, as Windows resolves them; the list is unchanged) and the boundary suite. `scripts/Test-LoaderBaseline.ps1` on
+a temporary clone of the round-7 code: a terminating unwind injected immediately after the backup move leaves the
+previous ZIP, manifest and notes at the reported recovery path with their original hashes (the occupied-destination
+control is kept); a differently cased production `.user` file with a real-compile-only setting is imported by MSBuild
+and refused by reuse and `Build.ps1`, and accepted again once removed (the test project's `.user` file stays accepted);
+and two producer ZIPs that each pass the standalone validator (the second build, and the first build's ZIP re-written
+with every entry stored without compression, same entries and fixed timestamps) fail the inter-build reconciliation with
+distinct package digests and the same DLL, the previous release unchanged and the alternate ZIP removed. The
+four-profile static audit is repeated on the DLL packaged from the round-7 code (records in
+[`docs/evidence/umm-0311/`](evidence/umm-0311/INDEX.md); the round-5 audit stays attached to its own DLL).
 
 ## Frozen product of round 5 (history)
 
@@ -132,7 +150,8 @@ documentation commit in one clone, stamped with each revision. `scripts/Test-Loa
 `-CandidatePackage`); records in [`docs/evidence/umm-0311/`](evidence/umm-0311/INDEX.md). Cases added in round 5: an
 import selected by `DirectoryBuildTargetsPath` and an untracked `src\Directory.Build.targets` refused (reuse and
 `Build.ps1`); a pre-state cleanup failure (owned ZIP held) still releases the lock and names the copy; malformed clean
-flags refused; a release whose producing builds disagree keeps the previous release; a request replaced at the write
+flags refused; a release whose first producing receipt names a different package keeps the previous release (round-7
+correction: the round-5 case substituted a package digest, not a second valid package); a request replaced at the write
 boundary leaves the retained request (loader row, non-ASCII text) unchanged; a mixed-case owner loader ID resolves to
 the canonical row. The controller gate builds the candidate commit, so its DLL has its own digest.
 

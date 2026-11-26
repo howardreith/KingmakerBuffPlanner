@@ -432,6 +432,19 @@ try {
     Expect-Rejected 'build-with-production-project-user-file-rejected' (Invoke-Isolated @('-File', (Join-Path $base 'scripts\Build.ps1'))) 'Untracked MSBuild configuration files apply to the build'
     Remove-Item -LiteralPath $productionUser
     Expect-Accepted 'receipt-after-production-user-file-removed-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
+    # R6-F1: the production project's .user file in another letter case, with a setting that applies only to a real
+    # compile. Windows resolves the name and MSBuild's preprocessor shows the import; reuse and Build.ps1 refuse it;
+    # removed, the receipt is accepted again. (The test project's .user file stays accepted above.)
+    $casedUser = Join-Path $base 'src\KingmakerBuffPlanner\kingmakerbuffplanner.CSPROJ.USER'
+    [IO.File]::WriteAllText($casedUser, "<Project><PropertyGroup Condition=`"'`$(SkipCompilerExecution)' != 'true'`"><KbpVersion>9.9.8</KbpVersion></PropertyGroup></Project>")
+    $casedPreprocessed = Join-Path $temp 'cased-user-preprocessed.xml'
+    $pp = Invoke-MSBuildIsolated @($project, "/pp:$casedPreprocessed")
+    $ppText = if (Test-Path -LiteralPath $casedPreprocessed) { [IO.File]::ReadAllText($casedPreprocessed) } else { '' }
+    Add-Case 'differently-cased-production-user-file-is-imported-by-msbuild' ($pp.ExitCode -eq 0 -and $ppText.Contains('<KbpVersion>9.9.8</KbpVersion>')) ("preprocess exit $($pp.ExitCode); real-compile-only setting imported: $($ppText.Contains('<KbpVersion>9.9.8</KbpVersion>'))")
+    Expect-Rejected 'receipt-with-differently-cased-production-user-file-rejected' (Test-FrozenReceipt) 'Untracked MSBuild configuration files apply to the build: src/KingmakerBuffPlanner/kingmakerbuffplanner\.CSPROJ\.USER'
+    Expect-Rejected 'build-with-differently-cased-production-user-file-rejected' (Invoke-Isolated @('-File', (Join-Path $base 'scripts\Build.ps1'))) 'Untracked MSBuild configuration files apply to the build'
+    Remove-Item -LiteralPath $casedUser
+    Expect-Accepted 'receipt-after-differently-cased-user-file-removed-accepted' (Test-FrozenReceipt) 'RECEIPT ACCEPTED'
 
     # 9. The runtime transaction stages only its own copy of the admitted package; a package replaced after admission is
     #    refused before anything is staged or activated (fixture game folder; FixtureMode roots in the temporary folder).
@@ -526,28 +539,51 @@ try {
         return $path
     }
     $cleanBeforeRelease = @(& git -C $base status --porcelain).Count
-    # R4-F1: the first producer is replaced by an internally consistent but different pair (its ZIP re-written with one
-    # entry timestamp changed, its receipt naming that ZIP's digest); the second producer is the genuine build. The
-    # inter-build reconciliation refuses, and the previous ZIP and manifest keep their hashes.
+    # R4-F1: the first producer is replaced by a different but valid package: its ZIP re-written under the disposable
+    # checkout's artifacts with every entry stored without compression (same names, order, bytes and fixed timestamps),
+    # and its receipt naming that ZIP. Both producer ZIPs pass the standalone validator inside the instrumented release;
+    # the inter-build reconciliation then refuses, and the previous ZIP, manifest and notes keep their hashes.
     $altInsert = @(
-        '$altPackage = Join-Path ([IO.Path]::GetTempPath()) (''kbp-alt-producer-'' + [Guid]::NewGuid().ToString(''N'') + ''.zip'')',
-        'Copy-Item -LiteralPath $firstPackage -Destination $altPackage',
         'Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem',
-        '$altZip = [IO.Compression.ZipFile]::Open($altPackage, ''Update''); try { $altEntry = $altZip.Entries[0]; $altEntry.LastWriteTime = $altEntry.LastWriteTime.AddMinutes(2) } finally { $altZip.Dispose() }',
-        '$firstPackage = $altPackage; $firstHash = Get-KbpSha256 $altPackage; $firstManifest.packageSha256 = $firstHash',
+        '$altDir = Join-Path $root ''artifacts\alt-producer''; [void](New-Item -ItemType Directory -Path $altDir -Force); $altPackage = Join-Path $altDir (''KingmakerBuffPlanner-'' + $version + ''.zip'')',
+        '$altIn = [IO.Compression.ZipFile]::OpenRead($firstPackage); $altOut = [IO.Compression.ZipFile]::Open($altPackage, ''Create'')',
+        'try { foreach ($e in $altIn.Entries) { $n = $altOut.CreateEntry($e.FullName, [IO.Compression.CompressionLevel]::NoCompression); $n.LastWriteTime = $e.LastWriteTime; $s = $e.Open(); $d = $n.Open(); try { $s.CopyTo($d) } finally { $d.Dispose(); $s.Dispose() } } } finally { $altOut.Dispose(); $altIn.Dispose() }',
+        'foreach ($v in @(@(''ALT'', $altPackage), @(''SECOND'', $secondPackage))) { $vr = Join-Path $altDir ($v[0] + ''-validation.json''); & (Join-Path $root ''scripts\validate-package.ps1'') -PackagePath $v[1] -ReportPath $vr; $vj = Get-Content -LiteralPath $vr -Raw | ConvertFrom-Json; Write-Host (''VALIDATOR PASS '' + $v[0] + '' package '' + [string]$vj.package_sha256 + '' DLL '' + [string]$vj.dll_sha256) }',
+        '$firstPackage = $altPackage; $firstHash = Get-KbpSha256 $altPackage; $firstManifest.packageSha256 = $firstHash; $builds[0] = [pscustomobject]@{ Manifest = $firstManifest; PackageSha256 = $firstHash }',
         'Write-Host (''ALT PRODUCER package '' + $firstHash + '' DLL '' + [string]$firstManifest.dllSha256)') -join "`r`n"
-    $disagreeing = & $instrumentRelease '$firstManifest = Get-Content -LiteralPath ($firstPackage + ''.build-local.json'') -Raw | ConvertFrom-Json' $altInsert 'release-disagreeing-producers'
+    $disagreeing = & $instrumentRelease '$builds = @([pscustomobject]@{ Manifest = $firstManifest; PackageSha256 = $firstHash }, [pscustomobject]@{ Manifest = $secondManifest; PackageSha256 = $secondHash })' $altInsert 'release-disagreeing-producers'
     $relBad = Invoke-Isolated @('-File', $disagreeing)
     Remove-Item -LiteralPath $disagreeing -Force
     $prepareLeft = @(Get-ChildItem -LiteralPath (Join-Path $base 'artifacts\release') -Directory -Force -Filter '.prepare-*').Count
     # Console wrapping can split long digests, so the error is matched with all whitespace removed.
     $mm = [regex]::Match(($relBad.Output -replace '\s+', ''), 'Clean-headdeterministicbuildfailed:package([0-9a-f]{64})/([0-9a-f]{64})DLL([0-9a-f]{64})/([0-9a-f]{64})')
+    $altDirectory = Join-Path $base 'artifacts\alt-producer'
+    $vAlt = [regex]::Match(($relBad.Output -replace '\s+', ''), 'VALIDATORPASSALTpackage([0-9a-f]{64})DLL([0-9a-f]{64})')
+    $vSecond = [regex]::Match(($relBad.Output -replace '\s+', ''), 'VALIDATORPASSSECONDpackage([0-9a-f]{64})DLL([0-9a-f]{64})')
+    Remove-Item -LiteralPath $altDirectory -Recurse -Force -ErrorAction SilentlyContinue
+    $altCleaned = -not (Test-Path -LiteralPath $altDirectory)
     $mismatch = if ($mm.Success) { "inter-build mismatch: package $($mm.Groups[1].Value)/$($mm.Groups[2].Value) DLL $($mm.Groups[3].Value)/$($mm.Groups[4].Value)" } else { 'no inter-build mismatch reported: ' + (Get-Reason $relBad.Output) }
-    Add-Case 'release-with-disagreeing-builds-keeps-previous-release' ($cleanBeforeRelease -eq 0 -and $relBad.ExitCode -ne 0 -and $mm.Success -and $mm.Groups[1].Value -cne $mm.Groups[2].Value -and $relBad.Output -match 'ALT PRODUCER' -and $releaseBefore -notmatch '^$' -and (& $releaseFiles) -ceq $releaseBefore -and $prepareLeft -eq 0) ("clean checkout: $($cleanBeforeRelease -eq 0); exit $($relBad.ExitCode); $mismatch; previous release before/after: $releaseBefore / $(& $releaseFiles); private folders left: $prepareLeft")
-    # R5-F1: the versioned path is occupied right after the previous release is moved aside. Promotion and restoration
+    Add-Case 'release-with-disagreeing-builds-keeps-previous-release' ($cleanBeforeRelease -eq 0 -and $relBad.ExitCode -ne 0 -and $mm.Success -and $mm.Groups[1].Value -cne $mm.Groups[2].Value -and $relBad.Output -match 'ALT PRODUCER' -and
+        $vAlt.Success -and $vSecond.Success -and $vAlt.Groups[1].Value -ceq $mm.Groups[1].Value -and $vSecond.Groups[1].Value -ceq $mm.Groups[2].Value -and $vAlt.Groups[2].Value -ceq $vSecond.Groups[2].Value -and $altCleaned -and
+        $releaseBefore -notmatch '^$' -and (& $releaseFiles) -ceq $releaseBefore -and $prepareLeft -eq 0) ("validator PASS for both producers: $($vAlt.Success -and $vSecond.Success) (ALT $($vAlt.Groups[1].Value), SECOND $($vSecond.Groups[1].Value)); alt artifacts removed: $altCleaned; " + "clean checkout: $($cleanBeforeRelease -eq 0); exit $($relBad.ExitCode); $mismatch; previous release before/after: $releaseBefore / $(& $releaseFiles); private folders left: $prepareLeft")
+    # R5-F1: a terminating unwind injected immediately after the previous release is moved aside. The private folder was
+    # marked kept before the move, so the previous ZIP, manifest and notes survive at the reported recovery path.
+    $unwound = & $instrumentRelease '[IO.Directory]::Move($finalReleaseRoot, $previousRelease)' 'throw ''FIXTURE: unwind immediately after the backup move''' 'release-unwind-after-backup-move'
+    $relUnwound = Invoke-Isolated @('-File', $unwound)
+    Remove-Item -LiteralPath $unwound -Force
+    $keptUnwound = @(Get-ChildItem -LiteralPath (Join-Path $base 'artifacts\release') -Directory -Force -Filter '.prepare-*' | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'previous') })
+    $unwoundRecovery = if ($keptUnwound.Count -eq 1 -and ($relUnwound.Output -replace '\s+', '').Contains(((Join-Path $keptUnwound[0].FullName 'previous') -replace '\s+', '') + '.')) { Join-Path $keptUnwound[0].FullName 'previous' } else { '' }
+    $unwoundFiles = if ($unwoundRecovery) { & $releaseFiles $unwoundRecovery } else { '' }
+    Add-Case 'release-unwind-after-backup-move-keeps-previous-release-at-recovery-path' ($relUnwound.ExitCode -ne 0 -and $relUnwound.Output -match 'FIXTURE: unwind immediately after the backup move' -and $unwoundRecovery -and $unwoundFiles -ceq $releaseBefore -and -not (Test-Path -LiteralPath $releaseDir)) ("exit $($relUnwound.ExitCode); recovery path reported: $([bool]$unwoundRecovery); previous release there: $unwoundFiles; versioned path present: $(Test-Path -LiteralPath $releaseDir)")
+    if ($unwoundRecovery) {
+        [IO.Directory]::Move($unwoundRecovery, $releaseDir)
+        Remove-Item -LiteralPath (Split-Path -Parent $unwoundRecovery) -Recurse -Force
+    }
+    Add-Case 'release-fixture-restored-after-unwind' ((& $releaseFiles) -ceq $releaseBefore) ("previous release restored: $((& $releaseFiles) -ceq $releaseBefore)")
+    # R5-F1 (control): the versioned path is occupied right after the previous release is moved aside. Promotion and restoration
     # are refused, the occupant is untouched, and the previous ZIP and manifest survive at the reported recovery path.
     $occupyInsert = '[void](New-Item -ItemType Directory -Path $finalReleaseRoot); [IO.File]::WriteAllText((Join-Path $finalReleaseRoot ''occupant.txt''), ''occupant'')'
-    $occupied = & $instrumentRelease 'if (Test-Path -LiteralPath $finalReleaseRoot) { [IO.Directory]::Move($finalReleaseRoot, $previousRelease) }' $occupyInsert 'release-occupied-destination'
+    $occupied = & $instrumentRelease '[IO.Directory]::Move($finalReleaseRoot, $previousRelease)' $occupyInsert 'release-occupied-destination'
     $relOccupied = Invoke-Isolated @('-File', $occupied)
     Remove-Item -LiteralPath $occupied -Force
     # The preserved private folder is found on disk; the (possibly console-wrapped) error must name it.

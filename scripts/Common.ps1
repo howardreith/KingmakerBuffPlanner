@@ -101,7 +101,9 @@ function Assert-KbpLocalBuildConfiguration {
     $applicable = @('src/KingmakerBuffPlanner/Directory.Build.props', 'src/KingmakerBuffPlanner/Directory.Build.targets',
         'src/Directory.Build.props', 'src/Directory.Build.targets', 'Directory.Build.props', 'Directory.Build.targets',
         'Directory.Build.rsp', 'src/KingmakerBuffPlanner/KingmakerBuffPlanner.csproj.user')
-    $untracked = @(& git -C $root ls-files --others -- $applicable)
+    # Windows resolves these names in any letter case (MSBuild then imports the file), so they are matched with Git's
+    # case-insensitive pathspec magic.
+    $untracked = @(& git -C $root ls-files --others -- @($applicable | ForEach-Object { ':(icase)' + $_ }))
     if ($LASTEXITCODE -ne 0) { throw 'git ls-files failed while checking the local build configuration.' }
     if ($untracked.Count -gt 0) { throw "Untracked MSBuild configuration files apply to the build: $($untracked -join ', ')" }
     # Project-extension imports: Microsoft.Common imports obj\KingmakerBuffPlanner.csproj.*.props and *.targets from the
