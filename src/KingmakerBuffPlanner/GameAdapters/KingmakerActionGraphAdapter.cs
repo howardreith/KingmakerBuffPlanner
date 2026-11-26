@@ -369,7 +369,12 @@ namespace KingmakerBuffPlanner.GameAdapters
         // decreasing as the level rises, and unchanged beyond the probe. The
         // rank itself is computed by that config's own native
         // ApplyProgression and ApplyMinMax (ContextRankConfig.GetValue), so no
-        // progression formula is restated here.
+        // progression formula is restated here. Review: only the formula
+        // progressions are accepted - every one except Custom is a
+        // non-decreasing function of the level for a non-negative
+        // m_StepLevel (2.1.7b ApplyProgression IL), so an index unchanged from
+        // the probe up to level 10000 is constant there; a Custom table can
+        // change anywhere, so it is not bound.
         internal static int[] MagicFangTierIndices(ContextValue enchantLevel, int count, BlueprintAbility ability)
         {
             try
@@ -390,8 +395,11 @@ namespace KingmakerBuffPlanner.GameAdapters
                     object rank = FieldValue(enchantLevel, "ValueRank");
                     var configs = components.OfType<Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig>()
                         .Where(candidate => Equals(FieldValue(candidate, "m_Type"), rank)).ToList();
+                    object step = FieldValue(configs[0], "m_StepLevel");
                     if (rank == null || configs.Count != 1 ||
-                        NamedValue(configs[0], "m_BaseValueType") != "CasterLevel")
+                        NamedValue(configs[0], "m_BaseValueType") != "CasterLevel" ||
+                        NamedValue(configs[0], "m_Progression") == null ||
+                        NamedValue(configs[0], "m_Progression") == "Custom" || !(step is int) || (int)step < 0)
                         return null;
                     const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
                     Type type = typeof(Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig);
@@ -415,7 +423,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                         (level > 1 && indices[level] < indices[level - 1]))
                         return null;
                 }
-                foreach (int beyond in new[] { MagicFangLevelProbe + 1, 100, 1000 })
+                foreach (int beyond in new[] { MagicFangLevelProbe + 1, 100, 1000, 10000 })
                     if (Math.Min(value(beyond), count) - 1 != indices[MagicFangLevelProbe]) return null;
                 return indices;
             }

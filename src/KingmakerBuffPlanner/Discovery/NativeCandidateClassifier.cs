@@ -171,6 +171,15 @@ namespace KingmakerBuffPlanner.Discovery
                 diagnostics.Any(d => Contains(d, "excluded-summoning-action")))
                 return Exclude("summoning",
                     "Summoning is outside the product definition; after-spawn buffs are not planner effects.");
+            // Greater Magic Fang repair (review): a MagicFang action whose
+            // enchantment the adapter could not prove (an unproven level
+            // contract, a missing element) applies an enhancement the planner
+            // cannot name; its buff alone would otherwise be planned and
+            // confirmed without it.
+            if (diagnosticFacts.Any(d => d != null && string.Equals(d.Code, "unknown-node", StringComparison.Ordinal) &&
+                    (d.Detail ?? string.Empty).StartsWith("MagicFang:", StringComparison.Ordinal)))
+                return Exclude("magic-fang-enchantment-unverified",
+                    "The enhancement a MagicFang action applies could not be proven from its native contract.");
             if (facts.HasVariants)
                 return Exclude("non-castable-variant-container",
                     "The parent is an unresolved choice container; independently eligible concrete children are cataloged instead.");

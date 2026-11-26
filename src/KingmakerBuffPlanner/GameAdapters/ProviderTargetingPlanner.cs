@@ -89,6 +89,18 @@ namespace KingmakerBuffPlanner.GameAdapters
                     EffectExpressionTargetAnalysis.Contains(expression, EffectTarget.AmbiguousAreaRecipients),
                 InfusedPersonal = infusedPersonal
             };
+            // Greater Magic Fang repair (review): a caster-level tier
+            // selection this provider's caster facts leave unresolved (its
+            // caster level was unreadable) cannot say what the cast applies,
+            // so it could never be confirmed: no target is offered and
+            // nothing is reserved.
+            if (CasterLevelPredicate.HasUnresolved(EffectConditionBinding.Bind(expression, casterFacts)))
+            {
+                decision.ReachableIds = new string[0];
+                decision.Anchors = new string[0];
+                decision.TargetClass = "CasterLevelUnread";
+                return decision;
+            }
             IEnumerable<UnitSnapshot> reachable;
             string[] anchors;
             bool personal = EffectExpressionTargetAnalysis.ContainsOnly(expression, EffectTarget.Caster);

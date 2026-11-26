@@ -360,6 +360,17 @@ namespace KingmakerBuffPlanner.Domain.Planning
             return target != null && EffectsByTarget.TryGetValue(target, out bound) ? bound :
                 EffectRecipientBinding.Bind(EffectConditionBinding.Bind(expression, CasterFacts), rule => null);
         }
+        // Greater Magic Fang repair (review): only the caster-level tier
+        // selection bound from this provider's caster facts. The Classic
+        // planner keeps its steps' expression otherwise unbound; this makes a
+        // step expect the one tier its provider applies.
+        public EffectExpression BindCasterLevel(EffectExpression expression)
+        {
+            int level;
+            return EffectConditionBinding.Bind(expression, CasterFacts
+                .Where(fact => CasterLevelPredicate.TryParse(fact.Key, out level))
+                .ToDictionary(fact => fact.Key, fact => fact.Value, StringComparer.Ordinal));
+        }
         public bool RequiresAnimatedExecution
         {
             get

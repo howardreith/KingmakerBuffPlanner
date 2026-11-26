@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -45,6 +47,16 @@ namespace KingmakerBuffPlanner.Domain.Effects
                 return value.Append(']').ToString();
             }
             var conditional = expression as ConditionalEffectExpression;
+            // Greater Magic Fang repair (review): which tier a caster-level
+            // selection applies depends on the caster, and catalogue identity
+            // excludes the caster. The selection is described by its tiers in
+            // effect-id order - also how earlier versions described Magic
+            // Fang's tiers (one sequence of every element, sorted by GUID) - so
+            // saved spell identities keep matching.
+            var tiers = new List<EffectLeafExpression>();
+            if (conditional != null && CasterLevelTiers(conditional, tiers))
+                return "sequence[" + string.Join(";", tiers.OrderBy(tier => tier.EffectId, StringComparer.Ordinal)
+                    .Select(tier => Describe(tier)).ToArray()) + "]";
             if (conditional != null)
                 return "conditional(" + Escape(conditional.ConditionContract) + "," +
                     Describe(conditional.WhenTrue) + "," + Describe(conditional.WhenFalse) + ")";
@@ -56,6 +68,20 @@ namespace KingmakerBuffPlanner.Domain.Effects
             if (referenced != null) return "ability-reference(" + Describe(referenced.Child) + ")";
             throw new InvalidOperationException("Unknown effect expression type: " +
                 expression.GetType().FullName);
+        }
+
+        // A chain of conditionals gated only by caster-level predicates whose
+        // branches are leaves or further such conditionals: its leaves.
+        private static bool CasterLevelTiers(EffectExpression expression, List<EffectLeafExpression> tiers)
+        {
+            var leaf = expression as EffectLeafExpression;
+            if (leaf != null) { tiers.Add(leaf); return true; }
+            var conditional = expression as ConditionalEffectExpression;
+            int level;
+            return conditional != null && conditional.RecipientFactGate == null &&
+                conditional.CasterFactGate != null && conditional.CasterFactGate.Facts.Count != 0 &&
+                conditional.CasterFactGate.Facts.All(fact => CasterLevelPredicate.TryParse(fact.Key, out level)) &&
+                CasterLevelTiers(conditional.WhenTrue, tiers) && CasterLevelTiers(conditional.WhenFalse, tiers);
         }
 
         private static string Escape(string value)

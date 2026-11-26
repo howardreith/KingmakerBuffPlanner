@@ -207,6 +207,11 @@ namespace KingmakerBuffPlanner.Planning
                 // predicate stays unresolved.
                 EffectExpression bound = option == null ? request.Source.Effects
                     : BindKnownState(option, request.Source.Effects, targetId);
+                // Greater Magic Fang repair (review): with the caster-level
+                // tier unbound (no provider, or an unknown caster level) no
+                // present tier shows what this casting would apply.
+                if (CasterLevelPredicate.HasUnresolved(bound))
+                    return new EffectPresenceResult(EffectPresenceKind.Absent, new string[0]);
                 // Review R9 (R8-F4): a skip that depends on the target's
                 // relation to the caster needs that relation read and friendly;
                 // an unread relation (a target outside every measured disk) or a
@@ -400,7 +405,7 @@ namespace KingmakerBuffPlanner.Planning
                 context.Steps.Add(new CastStep(request.Source.SourceId, request.AssignmentId,
                     selection.Option.Provider.Key, selection.Anchor, new[] { targetId },
                     recipients, selection.Reservation, selection.MaterialReservation,
-                    request.Source.Effects, false,
+                    selection.Option.BindCasterLevel(request.Source.Effects), false,
                     selection.Option.ExecutionStrategy, selection.Option.ExecutionStrategyReason,
                     selection.AppliedEnhancementIds,
                     EnhancementUsage(selection.AppliedEnhancementIds, context.Enhancements),
@@ -458,7 +463,8 @@ namespace KingmakerBuffPlanner.Planning
                 context.Steps.Add(new CastStep(request.Source.SourceId, request.AssignmentId,
                     selection.Option.Provider.Key, selection.Anchor, covered, recipients,
                     selection.Reservation, selection.MaterialReservation,
-                    EffectRecipientFactBinding.BindFriendlyRelation(request.Source.Effects), true,
+                    EffectRecipientFactBinding.BindFriendlyRelation(
+                        selection.Option.BindCasterLevel(request.Source.Effects)), true,
                     selection.Option.ExecutionStrategy, selection.Option.ExecutionStrategyReason,
                     selection.AppliedEnhancementIds,
                     EnhancementUsage(selection.AppliedEnhancementIds, context.Enhancements),

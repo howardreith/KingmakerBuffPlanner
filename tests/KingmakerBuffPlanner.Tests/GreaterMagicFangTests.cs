@@ -20,7 +20,9 @@ using KingmakerBuffPlanner.Domain.Planning;
 using KingmakerBuffPlanner.Domain.Providers;
 using KingmakerBuffPlanner.Execution;
 using KingmakerBuffPlanner.GameAdapters;
+using KingmakerBuffPlanner.Persistence;
 using KingmakerBuffPlanner.Planning;
+using KingmakerBuffPlanner.UI;
 
 namespace KingmakerBuffPlanner.Tests
 {
@@ -30,10 +32,11 @@ namespace KingmakerBuffPlanner.Tests
     // that discovery required all five enhancement tiers at once, so no cast
     // was ever confirmed and the run stopped after the first pet.
     //
-    // These regressions run the production adapter, scanner, admission,
-    // targeting, compiler, gate, converter, judgement, both executors and
-    // both run halters on the committed native 2.1.7b blueprints. Only the
-    // game boundary is simulated: GmfWorld applies what native MagicFang and
+    // These regressions run the production adapter, scanner, classifier,
+    // admission, targeting, both planners (casting-first compiler, gate and
+    // converter; Classic CastPlanner), judgement, both executors and both run
+    // halters on the committed native 2.1.7b blueprints. Only the game
+    // boundary is simulated: GmfWorld applies what native MagicFang and
     // ContextActionApplyBuff apply (its tier from its own restatement of the
     // native formula) and reports the instances the readers would see.
     internal static partial class Program
@@ -51,17 +54,30 @@ namespace KingmakerBuffPlanner.Tests
             "746ee366e50611146821d61e391edf16"
         };
 
+        // Call of the Wild's pattern: five ordered enchantments of its own,
+        // here with identities sorted differently from their positions.
+        private static readonly string[] GmfReplacementTiers =
+        {
+            "f5c0000000000000000000000000c0e1", "a4c0000000000000000000000000c0e2",
+            "e3c0000000000000000000000000c0e3", "b2c0000000000000000000000000c0e4",
+            "c1c0000000000000000000000000c0e5"
+        };
+
         // The regressions that read native fixture blueprints (kept by the
         // explicit fixture capture with the missing-beneficial-buffs ones).
         private static readonly KeyValuePair<string, Action>[] GmfNativeRegressions =
         {
             Mbb("greater-magic-fang-discovery-binds-the-native-tier-to-caster-level", TestGmfDiscovery),
+            Mbb("greater-magic-fang-catalogue-identity-is-unchanged", TestGmfIdentity),
             Mbb("greater-magic-fang-replacement-enchantments-follow-array-order", TestGmfReplacementEnchantments),
+            Mbb("greater-magic-fang-unproven-enchantment-is-never-admitted", TestGmfUnprovenContracts),
             Mbb("greater-magic-fang-confirmation-needs-the-cast-tier-and-buff-fresh-on-the-recipient",
                 TestGmfConfirmation),
             Mbb("greater-magic-fang-existing-effects-keep-the-casting-policy", TestGmfExistingEffects),
             Mbb("greater-magic-fang-druid-casts-on-pets-of-two-masters-in-either-order", TestGmfTwoPets),
             Mbb("greater-magic-fang-refusals-and-unconfirmed-casts-still-stop-the-run", TestGmfRefusals),
+            Mbb("greater-magic-fang-unknown-caster-level-plans-nothing", TestGmfUnknownCasterLevel),
+            Mbb("greater-magic-fang-weaker-funded-tier-never-satisfies-a-stronger-one", TestGmfForecastTiers),
             Mbb("greater-magic-fang-neighbours-keep-their-semantics", TestGmfNeighbours)
         };
 
@@ -104,6 +120,18 @@ namespace KingmakerBuffPlanner.Tests
                 .Single(action => action is MagicFang);
         }
 
+        private static ContextRankConfig GmfRankConfig(BlueprintAbility ability)
+        {
+            return ability.ComponentsArray.OfType<ContextRankConfig>()
+                .Single(value => Equals(GmfField(value, "m_Type"), GmfFang(ability).EnchantLevel.ValueRank));
+        }
+
+        private static void GmfReplaceTiers(BlueprintAbility ability, string[] ids)
+        {
+            GmfFang(ability).Enchantment = ids.Select(id =>
+                (BlueprintItemEnchantment)NativeBlueprintDump.Stub<BlueprintWeaponEnchantment>(id)).ToArray();
+        }
+
         // Every leaf as "Kind:id", sorted.
         private static string[] GmfLeaves(EffectExpression expression)
         {
@@ -142,50 +170,70 @@ namespace KingmakerBuffPlanner.Tests
             internal PartyProviderSnapshot Snapshot;
             internal List<ProviderPlanningOption> Options;
             internal Dictionary<string, EffectExpression> Effects;
-            internal ProviderSnapshot Provider;
-            internal string SourceId;
-            internal ProviderPlanningOption Option { get { return Options.Single(); } }
+            internal List<ProviderSnapshot> Providers;
+            internal ProviderSnapshot Provider { get { return Providers[0]; } }
+            internal ProviderPlanningOption Option { get { return Options[0]; } }
+            internal string SourceId
+            {
+                get { return CatalogSourceIdentity.For(Provider.Key.Ability, Raw); }
+            }
             internal EffectExpression Raw { get { return Effects[Provider.Key.Ability.Canonical]; } }
         }
 
-        // A Druid who knows the spell, with its spell-level pool. Only the
+        private static ProviderSnapshot GmfAdmit(NativeBlueprintDump dump, PartyProviderAdmission admission,
+            string caster, string spell, int casterLevel, ResourcePoolSnapshot pool, List<ProviderSnapshot> providers)
+        {
+            return admission.AdmitSpell(caster, "book-" + caster, false, "Spellbook",
+                MbbRead(dump, spell, spell, SourceKind.Spellbook, casterLevel), spell == GmfAbility ? 3 : 1, 0,
+                pool.PoolKey, 1, new string[0], providers);
+        }
+
+        // Casters who know the spell, each with a spell-level pool. Only the
         // live reads are injected (the spellbook, the slot balance, the
         // caster level and native AbilityData.CanTarget per unit); the
-        // provider, its expression, targets and option are production.
-        private static GmfParty GmfDruidParty(NativeBlueprintDump dump, string spell, int casterLevel, int slots,
-            Func<string, bool> nativeCanTarget = null)
+        // providers, their expression, targets and options are production.
+        private static GmfParty GmfPartyOf(NativeBlueprintDump dump, string spell, Func<string, bool> nativeCanTarget,
+            params Tuple<string, int, int>[] casters)
         {
             List<UnitSnapshot> units = GmfUnits();
             PartyProviderAdmission admission = MbbAdmission(dump);
-            int spellLevel = spell == GmfAbility ? 3 : 1;
-            ResourcePoolSnapshot pool = PartyProviderAdmission.SpontaneousLevelPool("druid", "book-druid", spellLevel,
-                slots, Math.Max(1, slots));
             var providers = new List<ProviderSnapshot>();
-            ProviderSnapshot provider = admission.AdmitSpell("druid", "book-druid", false, "Druid",
-                MbbRead(dump, spell, spell, SourceKind.Spellbook, casterLevel), spellLevel, 0, pool.PoolKey, 1,
-                new string[0], providers);
-            MbbExpect(provider != null && providers.Count == 1, "The production admission refused " + spell + ".");
+            var pools = new List<ResourcePoolSnapshot>();
+            foreach (Tuple<string, int, int> caster in casters)
+            {
+                ResourcePoolSnapshot pool = PartyProviderAdmission.SpontaneousLevelPool(caster.Item1,
+                    "book-" + caster.Item1, spell == GmfAbility ? 3 : 1, caster.Item3, Math.Max(1, caster.Item3));
+                pools.Add(pool);
+                MbbExpect(GmfAdmit(dump, admission, caster.Item1, spell, caster.Item2, pool, providers) != null,
+                    "The production admission refused " + spell + " for " + caster.Item1 + ".");
+            }
             var effects = new Dictionary<string, EffectExpression>(admission.EffectsBySource, StringComparer.Ordinal);
-            EffectExpression expression = effects[provider.Key.Ability.Canonical];
             BlueprintAbility blueprint = dump.Get<BlueprintAbility>(spell);
             AlliedAreaCoverage area = new KingmakerAreaCoverageResolver().Resolve(blueprint, blueprint);
-            IReadOnlyDictionary<string, bool> facts = ProviderTargetingPlanner.CasterFacts(expression,
-                provider.EffectiveCasterLevel, id => null);
-            ProviderTargetingDecision decision = ProviderTargetingPlanner.Decide(provider, expression, units, true,
-                false, area, nativeCanTarget ?? (id => true), (from, to) => 1f, facts, (unit, fact) => null,
-                fact => false);
+            var options = providers.Select(provider =>
+            {
+                EffectExpression expression = effects[provider.Key.Ability.Canonical];
+                IReadOnlyDictionary<string, bool> facts = ProviderTargetingPlanner.CasterFacts(expression,
+                    provider.EffectiveCasterLevel, id => null);
+                ProviderTargetingDecision decision = ProviderTargetingPlanner.Decide(provider, expression, units, true,
+                    false, area, nativeCanTarget ?? (id => true), (from, to) => 1f, facts, (unit, fact) => null,
+                    fact => false);
+                return ProviderTargetingPlanner.BuildOption(provider, decision, CastExecutionStrategy.DirectRuleCast,
+                    "ordinary-direct-rule-cast", facts);
+            }).ToList();
             return new GmfParty
             {
-                Snapshot = new PartyProviderSnapshot(units, providers, new[] { pool }),
-                Options = new List<ProviderPlanningOption>
-                {
-                    ProviderTargetingPlanner.BuildOption(provider, decision, CastExecutionStrategy.DirectRuleCast,
-                        "ordinary-direct-rule-cast", facts)
-                },
+                Snapshot = new PartyProviderSnapshot(units, providers, pools),
+                Options = options,
                 Effects = effects,
-                Provider = provider,
-                SourceId = CatalogSourceIdentity.For(provider.Key.Ability, expression)
+                Providers = providers
             };
+        }
+
+        private static GmfParty GmfDruidParty(NativeBlueprintDump dump, string spell, int casterLevel, int slots,
+            Func<string, bool> nativeCanTarget = null)
+        {
+            return GmfPartyOf(dump, spell, nativeCanTarget, Tuple.Create("druid", casterLevel, slots));
         }
 
         private static ActiveEffectSnapshot GmfLive(IDictionary<string, ActiveEffectInstance[]> instances = null)
@@ -214,6 +262,19 @@ namespace KingmakerBuffPlanner.Tests
             return ExplicitCastingStepConverter.Convert(plan, gate, party.Options, party.Effects);
         }
 
+        // The Classic planner: one routine request per target, in order.
+        private static CastPlan GmfClassicPlan(GmfParty party, IEnumerable<string> targets,
+            ActiveEffectSnapshot live = null)
+        {
+            BuffCastRequest[] requests = targets.Select((target, index) => new BuffCastRequest(
+                new BuffSourceDefinition(party.SourceId, party.Provider.Key.Ability, party.Raw,
+                    CastGroupingKind.PerTarget),
+                new[] { target }, ExistingEffectPolicy.SkipAlreadyActive, null, new EnhancementRequest[0],
+                "gmf-" + index, null, null, null, index)).ToArray();
+            return new CastPlanner().PlanRoutine(party.Snapshot, requests, party.Options,
+                new ProviderSelectionPolicy(null, null, null), live ?? GmfLive());
+        }
+
         private static void GmfDrain(System.Collections.IEnumerator run)
         {
             int moves = 0;
@@ -236,7 +297,7 @@ namespace KingmakerBuffPlanner.Tests
             return outcome;
         }
 
-        // Classic: the halting runner over the same steps.
+        // Classic: the halting runner over the Classic planner's plan.
         private static ExecutionReport GmfRunClassic(GmfWorld world, CastPlan plan, bool animated,
             out int? haltedAfter)
         {
@@ -360,12 +421,36 @@ namespace KingmakerBuffPlanner.Tests
             public void Dispose() { }
         }
 
+        // The planned steps of one run, by path: the casting-first
+        // projection's or the Classic planner's.
+        private static IReadOnlyList<CastStep> GmfSteps(GmfParty party, string[] order, bool classic,
+            out ExplicitStepConversion explicitSteps, out CastPlan classicPlan, string label)
+        {
+            explicitSteps = null;
+            classicPlan = null;
+            if (classic)
+            {
+                classicPlan = GmfClassicPlan(party, order);
+                MbbExpect(classicPlan.Outcomes.All(outcome => outcome.Kind == TargetOutcomeKind.Fulfilled),
+                    label + ": Classic planned " + string.Join(",", classicPlan.Outcomes.Select(outcome =>
+                        outcome.UnitId + "=" + outcome.Kind + ":" + outcome.Reason)));
+                return classicPlan.Steps;
+            }
+            ExplicitCastingPlan plan = GmfCompile(party, order);
+            MbbExpect(plan.Castings.All(casting => casting.Readiness == ResolvedCastingReadiness.Ready &&
+                    casting.Cost.Sum(cost => cost.Units) == 1),
+                label + ": " + string.Join(" / ", plan.Castings.Select(casting => casting.CastingId + "=" +
+                    casting.Readiness + ":" + string.Join(",", casting.ReadinessReasons))));
+            explicitSteps = GmfConvert(party, plan);
+            MbbExpect(explicitSteps.Converted, label + ": " + explicitSteps.Refusal);
+            return explicitSteps.Plan.Steps;
+        }
+
         // Native 2.1.7b contract (Assembly-CSharp metadata and IL; nothing is
         // executed): what MagicFang.RunAction selects and enchants, what
         // EnchantSlot does to an existing instance, how ContextRankConfig
-        // computes the rank the adapter binds, and that UnitBody's
-        // CurrentEquipmentSlots does not reach the empty-hand weapon or the
-        // additional limbs.
+        // computes the rank the adapter binds, and which weapons UnitBody's
+        // CurrentEquipmentSlots and polymorph-aware hand getters reach.
         private static void TestGmfNativeContract()
         {
             MethodInfo run = typeof(MagicFang).GetMethod("RunAction", BindingFlags.Instance | BindingFlags.Public);
@@ -417,14 +502,18 @@ namespace KingmakerBuffPlanner.Tests
                 .Single(type => type.Name.StartsWith("<get_CurrentEquipmentSlots>", StringComparison.Ordinal));
             List<string> slots = MbbIlMembers(iterator.GetMethod("MoveNext",
                 BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public));
-            MbbExpect(slots.Any(member => member.EndsWith("HandsEquipmentSet::PrimaryHand", StringComparison.Ordinal)) &&
-                !slots.Any(member => member.Contains("EmptyHandWeapon") || member.Contains("AdditionalLimbs")),
+            MbbExpect(slots.Any(member => member.EndsWith("UnitBody::get_CurrentHandsEquipmentSet", StringComparison.Ordinal)) &&
+                !slots.Any(member => member.Contains("EmptyHandWeapon") || member.Contains("AdditionalLimbs") ||
+                    member.Contains("Polymo")),
                 "Native UnitBody.CurrentEquipmentSlots changed which weapons it reaches.");
+            List<string> primary = MbbIlMembers(typeof(UnitBody).GetProperty("PrimaryHand").GetGetMethod());
+            MbbExpect(primary.Any(member => member.EndsWith("UnitBody::get_IsPolymorphed", StringComparison.Ordinal)) &&
+                primary.Any(member => member.EndsWith("UnitBody::m_PolymoprphHandsEquipmentSet", StringComparison.Ordinal)),
+                "Native UnitBody.PrimaryHand no longer follows the polymorph hand set.");
             // The fixture's own data: the rank the adapter binds.
             BlueprintAbility greater = GmfDump().Get<BlueprintAbility>(GmfAbility);
             MagicFang fang = GmfFang(greater);
-            ContextRankConfig config = greater.ComponentsArray.OfType<ContextRankConfig>()
-                .Single(value => Equals(GmfField(value, "m_Type"), fang.EnchantLevel.ValueRank));
+            ContextRankConfig config = GmfRankConfig(greater);
             MbbExpect(fang.Greater && fang.EnchantLevel.ValueType == ContextValueType.Rank &&
                 fang.Enchantment.Select(value => value.AssetGuid).SequenceEqual(GmfTiers) &&
                 GmfField(config, "m_BaseValueType").ToString() == "CasterLevel" &&
@@ -498,42 +587,61 @@ namespace KingmakerBuffPlanner.Tests
                 GmfParty party = GmfDruidParty(dump, GmfAbility, level, 1);
                 EffectExpression bound = party.Option.BindEffects(party.Raw, "ranger-pet");
                 MbbExpect(party.Provider.EffectiveCasterLevel == level &&
-                    GmfLeaves(bound).SequenceEqual(GmfExpected(GmfBuff, GmfTiers[GmfNativeRank(level) - 1])),
+                    GmfLeaves(bound).SequenceEqual(GmfExpected(GmfBuff, GmfTiers[GmfNativeRank(level) - 1])) &&
+                    GmfLeaves(party.Option.BindCasterLevel(party.Raw)).SequenceEqual(GmfLeaves(bound)),
                     "The admitted level-" + level + " provider expects " + string.Join(",", GmfLeaves(bound)) + ".");
             }
-            // Ordinary Magic Fang: the buff and Enchantment[0] at every level,
-            // under its unchanged catalogue identity.
+            // Ordinary Magic Fang: the buff and Enchantment[0] at every level.
             EffectExpression ordinary = GmfScan(dump.Get<BlueprintAbility>(GmfOrdinaryAbility));
             foreach (int level in new[] { 0, 1, 12, 40 })
                 MbbExpect(GmfLeaves(GmfBind(ordinary, level)).SequenceEqual(GmfExpected(GmfOrdinaryBuff, GmfTiers[0])),
                     "Ordinary Magic Fang changed at caster level " + level + ".");
-            MbbExpect(EffectAggregateIdentity.Describe(ordinary) == GmfOrdinaryIdentity,
-                "Ordinary Magic Fang's catalogue identity changed: " + EffectAggregateIdentity.Describe(ordinary));
         }
 
-        // The semantic identity ordinary Magic Fang had before the repair
-        // (recorded from the baseline 9137987 adapter on the same fixture).
-        private const string GmfOrdinaryIdentity = "ability-reference(sequence[sequence[sequence[" +
-            "leaf(2,32:d704f90f54f813043a525f304f6c0050,0)];leaf(0,32:e7646b1dfdd22ce4ab340f295938ab8e,0)]])";
+        // The identity earlier versions gave Magic Fang: one sequence of every
+        // array element in GUID order, then the duration buff.
+        private static string GmfPriorIdentity(string buff, IEnumerable<string> tiers)
+        {
+            return "ability-reference(sequence[sequence[sequence[" + string.Join(";", tiers
+                .OrderBy(id => id, StringComparer.Ordinal).Select(id => "leaf(2,32:" + id + ",0)").ToArray()) +
+                "];leaf(0,32:" + buff + ",0)]])";
+        }
+
+        // Saved castings and assignments name a spell by its effect
+        // aggregate. The repaired graphs keep the identity the pre-repair
+        // adapter gave them - native, with replacement tiers, and ordinary
+        // (this regression also passes on the 9137987 baseline, which is what
+        // establishes the expected strings).
+        private static void TestGmfIdentity()
+        {
+            NativeBlueprintDump dump = GmfDump();
+            EffectExpression greater = GmfScan(dump.Get<BlueprintAbility>(GmfAbility));
+            MbbExpect(EffectAggregateIdentity.Describe(greater) == GmfPriorIdentity(GmfBuff, GmfTiers),
+                "Greater Magic Fang's catalogue identity changed: " + EffectAggregateIdentity.Describe(greater));
+            BlueprintAbility replaced = GmfDump().Get<BlueprintAbility>(GmfAbility);
+            GmfReplaceTiers(replaced, GmfReplacementTiers);
+            MbbExpect(EffectAggregateIdentity.Describe(GmfScan(replaced)) == GmfPriorIdentity(GmfBuff, GmfReplacementTiers),
+                "Greater Magic Fang with replacement tiers changed identity: " +
+                EffectAggregateIdentity.Describe(GmfScan(replaced)));
+            EffectExpression ordinary = GmfScan(dump.Get<BlueprintAbility>(GmfOrdinaryAbility));
+            MbbExpect(EffectAggregateIdentity.Describe(ordinary) == GmfPriorIdentity(GmfOrdinaryBuff, new[] { GmfTiers[0] }),
+                "Ordinary Magic Fang's catalogue identity changed: " + EffectAggregateIdentity.Describe(ordinary));
+            AbilityKey key = MbbSpellKey(GmfAbility);
+            MbbExpect(CatalogSourceIdentity.For(key, greater) == EffectAggregateIdentity.For(greater, key.Canonical) &&
+                EffectAggregateIdentity.IsAggregate(CatalogSourceIdentity.For(key, greater)),
+                "Greater Magic Fang is no longer a spell aggregate.");
+        }
 
         // 8. Call of the Wild replaces MagicFangGreater's array with five
         // ordered enchantments of its own; the binding follows the ARRAY
-        // ORDER, whatever the identities (here sorted differently from their
-        // positions), and never a native GUID.
+        // ORDER, whatever the identities, and never a native GUID.
         private static void TestGmfReplacementEnchantments()
         {
-            string[] replaced =
-            {
-                "f5c0000000000000000000000000c0e1", "a4c0000000000000000000000000c0e2",
-                "e3c0000000000000000000000000c0e3", "b2c0000000000000000000000000c0e4",
-                "c1c0000000000000000000000000c0e5"
-            };
             foreach (bool reversed in new[] { false, true })
             {
                 BlueprintAbility ability = GmfDump().Get<BlueprintAbility>(GmfAbility);
-                string[] order = reversed ? replaced.Reverse().ToArray() : replaced;
-                GmfFang(ability).Enchantment = order.Select(id =>
-                    (BlueprintItemEnchantment)NativeBlueprintDump.Stub<BlueprintWeaponEnchantment>(id)).ToArray();
+                string[] order = reversed ? GmfReplacementTiers.Reverse().ToArray() : GmfReplacementTiers;
+                GmfReplaceTiers(ability, order);
                 EffectExpression raw = GmfScan(ability);
                 MbbExpect(!GmfLeaves(raw).Any(leaf => GmfTiers.Any(leaf.EndsWith)),
                     "A replaced Greater Magic Fang still expects a native enchantment.");
@@ -544,34 +652,47 @@ namespace KingmakerBuffPlanner.Tests
                         " expect " + string.Join(",", GmfLeaves(GmfBind(raw, level))) + ".");
             }
             BlueprintAbility ordinary = GmfDump().Get<BlueprintAbility>(GmfOrdinaryAbility);
-            GmfFang(ordinary).Enchantment[0] = NativeBlueprintDump.Stub<BlueprintWeaponEnchantment>(replaced[0]);
-            MbbExpect(GmfLeaves(GmfBind(GmfScan(ordinary), 12)).SequenceEqual(GmfExpected(GmfOrdinaryBuff, replaced[0])),
+            GmfFang(ordinary).Enchantment[0] = NativeBlueprintDump.Stub<BlueprintWeaponEnchantment>(GmfReplacementTiers[0]);
+            MbbExpect(GmfLeaves(GmfBind(GmfScan(ordinary), 12)).SequenceEqual(GmfExpected(GmfOrdinaryBuff,
+                    GmfReplacementTiers[0])),
                 "A replaced ordinary Magic Fang enchantment is not the expected one.");
+            // A constant level is provable: the native index of that constant.
+            BlueprintAbility constant = GmfDump().Get<BlueprintAbility>(GmfAbility);
+            GmfFang(constant).EnchantLevel.ValueType = ContextValueType.Simple;
+            GmfFang(constant).EnchantLevel.Value = 9;
+            MbbExpect(GmfLeaves(GmfBind(GmfScan(constant), 3)).SequenceEqual(GmfExpected(GmfBuff, GmfTiers[4])),
+                "A constant enchant level of 9 is not the last tier.");
+        }
 
-            // Robustness (deliberately modified blueprints, not observations of
-            // the installed game): a level contract the adapter cannot prove
-            // leaves the tier unknown - never every tier, never any tier.
+        // Robustness (deliberately modified blueprints, not observations of
+        // the installed game): a level contract the adapter cannot prove
+        // leaves the tier unknown - never every tier, never any tier - and
+        // the classifier refuses the spell, so its buff is never planned and
+        // confirmed alone.
+        private static void TestGmfUnprovenContracts()
+        {
             var modifications = new Dictionary<string, Action<BlueprintAbility>>
             {
                 { "no rank config", ability => GmfSet(ability, "Components", ability.ComponentsArray
-                    .Where(component => !(component is ContextRankConfig) ||
-                        !Equals(GmfField(component, "m_Type"), GmfFang(ability).EnchantLevel.ValueRank)).ToArray()) },
+                    .Where(component => !ReferenceEquals(component, GmfRankConfig(ability))).ToArray()) },
                 { "two rank configs", ability => GmfSet(ability, "Components", ability.ComponentsArray
-                    .Concat(ability.ComponentsArray.OfType<ContextRankConfig>().Where(component =>
-                        Equals(GmfField(component, "m_Type"), GmfFang(ability).EnchantLevel.ValueRank))).ToArray()) },
-                { "class-level rank", ability => GmfSet(ability.ComponentsArray.OfType<ContextRankConfig>().Single(
-                        component => Equals(GmfField(component, "m_Type"), GmfFang(ability).EnchantLevel.ValueRank)),
-                    "m_BaseValueType", ContextRankBaseValueType.ClassLevel) },
+                    .Concat(new BlueprintComponent[] { GmfRankConfig(ability) }).ToArray()) },
+                { "class-level rank", ability => GmfSet(GmfRankConfig(ability), "m_BaseValueType",
+                    ContextRankBaseValueType.ClassLevel) },
+                { "custom progression", ability => GmfSet(GmfRankConfig(ability), "m_Progression",
+                    ContextRankProgression.Custom) },
                 { "shared value", ability => GmfFang(ability).EnchantLevel.ValueType = ContextValueType.Shared },
                 { "constant zero", ability =>
                     {
                         GmfFang(ability).EnchantLevel.ValueType = ContextValueType.Simple;
                         GmfFang(ability).EnchantLevel.Value = 0;
-                    } }
+                    } },
+                { "missing element", ability => GmfFang(ability).Enchantment[2] = null }
             };
             foreach (KeyValuePair<string, Action<BlueprintAbility>> modification in modifications)
             {
-                BlueprintAbility ability = GmfDump().Get<BlueprintAbility>(GmfAbility);
+                NativeBlueprintDump dump = GmfDump();
+                BlueprintAbility ability = dump.Get<BlueprintAbility>(GmfAbility);
                 modification.Value(ability);
                 DiscoveryScanResult result = GmfScanResult(ability);
                 MbbExpect(!GmfLeaves(result.Expression).Any(leaf => leaf.StartsWith(
@@ -579,13 +700,12 @@ namespace KingmakerBuffPlanner.Tests
                     result.Diagnostics.Any(value => value.Detail == "MagicFang:enchant-level-unverified"),
                     "Modified (" + modification.Key + ") Greater Magic Fang was not left unknown: " +
                     string.Join(",", GmfLeaves(result.Expression)));
+                var providers = new List<ProviderSnapshot>();
+                ResourcePoolSnapshot pool = PartyProviderAdmission.SpontaneousLevelPool("druid", "book-druid", 3, 2, 2);
+                MbbExpect(GmfAdmit(dump, MbbAdmission(dump), "druid", GmfAbility, 12, pool, providers) == null &&
+                    providers.Count == 0,
+                    "Modified (" + modification.Key + ") Greater Magic Fang was admitted with its buff alone.");
             }
-            // A constant level is provable: the native index of that constant.
-            BlueprintAbility constant = GmfDump().Get<BlueprintAbility>(GmfAbility);
-            GmfFang(constant).EnchantLevel.ValueType = ContextValueType.Simple;
-            GmfFang(constant).EnchantLevel.Value = 9;
-            MbbExpect(GmfLeaves(GmfBind(GmfScan(constant), 3)).SequenceEqual(GmfExpected(GmfBuff, GmfTiers[4])),
-                "A constant enchant level of 9 is not the last tier.");
         }
 
         private static ObservedEffectInstance GmfSeen(EffectKind kind, string effect, string key, long end = 100,
@@ -595,9 +715,17 @@ namespace KingmakerBuffPlanner.Tests
                 kind == EffectKind.Buff ? "druid" : null);
         }
 
+        private static KeyValuePair<IEnumerable<ObservedEffectInstance>, IDictionary<string, ObservedEffectInstance[]>> Pair(
+            IEnumerable<ObservedEffectInstance> before, IDictionary<string, ObservedEffectInstance[]> after)
+        {
+            return new KeyValuePair<IEnumerable<ObservedEffectInstance>, IDictionary<string, ObservedEffectInstance[]>>(
+                before, after);
+        }
+
         // 2 and 3. Confirmation on the intended recipient needs the buff AND
-        // the cast's own tier, with something fresh; nothing weaker, stronger,
-        // unrelated, suppressed, misplaced or old proves the application.
+        // the cast's own tier freshly applied (native EnchantSlot re-adds it
+        // on every cast); nothing weaker, stronger, unrelated, suppressed,
+        // misplaced or left over from an earlier cast proves the application.
         private static void TestGmfConfirmation()
         {
             NativeBlueprintDump dump = GmfDump();
@@ -616,39 +744,56 @@ namespace KingmakerBuffPlanner.Tests
             Func<string, ObservedEffectInstance[], IDictionary<string, ObservedEffectInstance[]>> on =
                 (unit, values) => new Dictionary<string, ObservedEffectInstance[]>(StringComparer.Ordinal) { { unit, values } };
             ObservedEffectInstance buff = GmfSeen(EffectKind.Buff, GmfBuff, "buff-1");
-            Func<int, ObservedEffectInstance> tier = rank => GmfSeen(EffectKind.WornItemEnchantment, GmfTiers[rank - 1],
-                "tier-" + rank);
-            MbbExpect(reached(none, on("ranger-pet", new[] { buff, tier(3) }), expected),
+            ObservedEffectInstance oldBuff = GmfSeen(EffectKind.Buff, GmfBuff, "buff-0");
+            Func<int, string, ObservedEffectInstance> tier = (rank, key) => GmfSeen(EffectKind.WornItemEnchantment,
+                GmfTiers[rank - 1], key);
+            MbbExpect(reached(none, on("ranger-pet", new[] { buff, tier(3, "t3-new") }), expected),
                 "The buff and the cast's +3 on the other character's pet did not confirm.");
+            MbbExpect(reached(new[] { oldBuff, tier(3, "t3-old") }, on("ranger-pet", new[] { buff, tier(3, "t3-new") }),
+                    expected),
+                "A recast that re-applied +3 over an earlier +3 did not confirm.");
             var refused = new Dictionary<string, KeyValuePair<IEnumerable<ObservedEffectInstance>,
                 IDictionary<string, ObservedEffectInstance[]>>>
             {
-                { "missing buff", Pair(none, on("ranger-pet", new[] { tier(3) })) },
+                { "missing buff", Pair(none, on("ranger-pet", new[] { tier(3, "t3") })) },
                 { "missing enchantment", Pair(none, on("ranger-pet", new[] { buff })) },
-                { "weaker tier", Pair(none, on("ranger-pet", new[] { buff, tier(2) })) },
-                { "stronger tier", Pair(none, on("ranger-pet", new[] { buff, tier(4) })) },
-                { "unrelated buff", Pair(none, on("ranger-pet", new[] { GmfSeen(EffectKind.Buff, GmfOrdinaryBuff, "o"), tier(3) })) },
-                { "wrong recipient", Pair(none, on("druid-pet", new[] { buff, tier(3) })) },
-                { "suppressed buff", Pair(none, on("ranger-pet", new[] { GmfSeen(EffectKind.Buff, GmfBuff, "s", 100, true), tier(3) })) },
-                { "unchanged old instances", Pair(new[] { buff, tier(3) }, on("ranger-pet", new[] { buff, tier(3) })) }
+                { "weaker tier", Pair(none, on("ranger-pet", new[] { buff, tier(2, "t2") })) },
+                { "stronger tier", Pair(none, on("ranger-pet", new[] { buff, tier(4, "t4") })) },
+                { "unrelated buff", Pair(none, on("ranger-pet", new[] { GmfSeen(EffectKind.Buff, GmfOrdinaryBuff, "o"), tier(3, "t3") })) },
+                { "wrong recipient", Pair(none, on("druid-pet", new[] { buff, tier(3, "t3") })) },
+                { "suppressed buff", Pair(none, on("ranger-pet", new[] { GmfSeen(EffectKind.Buff, GmfBuff, "s", 100, true), tier(3, "t3") })) },
+                { "unchanged old instances", Pair(new[] { oldBuff, tier(3, "t3-old") },
+                    on("ranger-pet", new[] { oldBuff, tier(3, "t3-old") })) },
+                // Native EnchantSlot at another caster level left the earlier
+                // +3 untouched and applied +2: the fresh buff does not make the
+                // old +3 this cast's.
+                { "old tier left while another was applied", Pair(new[] { oldBuff, tier(3, "t3-old") },
+                    on("ranger-pet", new[] { buff, tier(3, "t3-old"), tier(2, "t2-new") })) },
+                // A permanent instance of the tier, which EnchantSlot never
+                // touches: unproven, so unconfirmed (conservative).
+                { "unchanged instance of the tier under a fresh buff", Pair(new[] { oldBuff, tier(3, "t3-old") },
+                    on("ranger-pet", new[] { buff, tier(3, "t3-old") })) }
             };
             foreach (KeyValuePair<string, KeyValuePair<IEnumerable<ObservedEffectInstance>,
                 IDictionary<string, ObservedEffectInstance[]>>> refusal in refused)
+            {
                 MbbExpect(!reached(refusal.Value.Key, refusal.Value.Value, expected),
                     "Greater Magic Fang confirmed from " + refusal.Key + ".");
+                ObservedEffectInstance[] after;
+                MbbExpect(!refusal.Value.Value.TryGetValue("ranger-pet", out after) ||
+                    !AppliedEffectJudgement.Reached(expected, refusal.Value.Key, after),
+                    "Greater Magic Fang reached (unscoped) from " + refusal.Key + ".");
+            }
             // An unknown caster level: whatever tier appears, nothing proves this cast's.
-            GmfParty unknown = GmfDruidParty(dump, GmfAbility, 0, 1);
-            EffectExpression unresolved = unknown.Option.BindEffects(unknown.Raw, "ranger-pet");
+            EffectExpression unresolved = GmfBind(party.Raw, 0);
             MbbExpect(CasterLevelPredicate.HasUnresolved(unresolved) &&
-                !Enumerable.Range(1, 5).Any(rank => reached(none, on("ranger-pet", new[] { buff, tier(rank) }), unresolved)),
-                "A cast whose caster level was unknown was confirmed.");
-        }
-
-        private static KeyValuePair<IEnumerable<ObservedEffectInstance>, IDictionary<string, ObservedEffectInstance[]>> Pair(
-            IEnumerable<ObservedEffectInstance> before, IDictionary<string, ObservedEffectInstance[]> after)
-        {
-            return new KeyValuePair<IEnumerable<ObservedEffectInstance>, IDictionary<string, ObservedEffectInstance[]>>(
-                before, after);
+                !Enumerable.Range(1, 5).Any(rank => reached(none, on("ranger-pet", new[] { buff, tier(rank, "t") }),
+                    unresolved)) &&
+                !AppliedEffectJudgement.StillCovered(unresolved, new[] { oldBuff, tier(3, "t3") },
+                    new[] { oldBuff, tier(3, "t3") }) &&
+                AppliedEffectJudgement.StillCovered(expected, new[] { oldBuff, tier(3, "t3") },
+                    new[] { oldBuff, tier(3, "t3") }),
+                "A Greater Magic Fang whose caster level was unknown was confirmed or kept as covered.");
         }
 
         // Existing effects (casting-first policy, unchanged): a weaker earlier
@@ -657,46 +802,65 @@ namespace KingmakerBuffPlanner.Tests
         // beside it (enhancement bonuses do not stack), so it casts; and an
         // enchantment's caster level is unreadable, so even the same tier is
         // never provably sufficient. Neither enchantment nor buff is ever
-        // accepted alone.
+        // accepted alone, and the caster-free setup view never calls a tier
+        // complete coverage.
         private static void TestGmfExistingEffects()
         {
             NativeBlueprintDump dump = GmfDump();
             GmfParty party = GmfDruidParty(dump, GmfAbility, 12, 1);
             EffectExpression expected = party.Option.BindEffects(party.Raw, "ranger-pet");
             var requirement = new ExistingEffectRequirement(12, 0, 7200, true, null, true, "druid");
-            Func<int, ActiveEffectInstance> buff = level => new ActiveEffectInstance(EffectKind.Buff, GmfBuff, 5000, level,
-                0, false, true, "druid");
-            Func<int, ActiveEffectInstance> tier = rank => new ActiveEffectInstance(EffectKind.WornItemEnchantment,
-                GmfTiers[rank - 1], null, null, null);
+            Func<string, int, ActiveEffectInstance> buff = (id, level) => new ActiveEffectInstance(EffectKind.Buff, id,
+                5000, level, 0, false, true, "druid");
+            Func<string, ActiveEffectInstance> tier = id => new ActiveEffectInstance(EffectKind.WornItemEnchantment, id,
+                null, null, null);
             Func<ActiveEffectInstance[], ExistingEffectRecipientAssessment> assess = instances =>
                 ExistingEffectSufficiency.AssessScoped("druid", "ranger-pet", expected,
                     unit => unit == "ranger-pet" ? instances : new ActiveEffectInstance[0], null, requirement);
-            MbbExpect(assess(new[] { buff(8), tier(2) }).Verdict == ExistingEffectVerdict.NotPresent,
+            MbbExpect(assess(new[] { buff(GmfBuff, 8), tier(GmfTiers[1]) }).Verdict == ExistingEffectVerdict.NotPresent,
                 "An earlier +2 satisfied a +3 casting.");
-            MbbExpect(assess(new[] { buff(16), tier(4) }).Verdict == ExistingEffectVerdict.NotPresent,
+            MbbExpect(assess(new[] { buff(GmfBuff, 16), tier(GmfTiers[3]) }).Verdict == ExistingEffectVerdict.NotPresent,
                 "An earlier +4 was taken as the +3 casting's own effect.");
-            ExistingEffectRecipientAssessment same = assess(new[] { buff(12), tier(3) });
+            ExistingEffectRecipientAssessment same = assess(new[] { buff(GmfBuff, 12), tier(GmfTiers[2]) });
             MbbExpect(same.Verdict == ExistingEffectVerdict.Insufficient &&
                 same.Reasons.Any(reason => reason.StartsWith("caster-level-unverified", StringComparison.Ordinal)),
                 "An existing +3 became provably sufficient: " + same.Verdict + " " + string.Join(",", same.Reasons));
-            MbbExpect(assess(new[] { buff(20) }).Verdict == ExistingEffectVerdict.NotPresent &&
-                assess(new[] { tier(3) }).Verdict == ExistingEffectVerdict.NotPresent,
+            MbbExpect(assess(new[] { buff(GmfBuff, 20) }).Verdict == ExistingEffectVerdict.NotPresent &&
+                assess(new[] { tier(GmfTiers[2]) }).Verdict == ExistingEffectVerdict.NotPresent,
                 "The buff or the enchantment alone was taken as the effect.");
-            // The compiler with that live state: the casting stays Ready and
-            // reserves one slot.
-            ResolvedCasting casting = GmfCompile(party, new[] { "ranger-pet" }, GmfLive(
-                new Dictionary<string, ActiveEffectInstance[]> { { "ranger-pet", new[] { buff(16), tier(4) } } }))
-                .Castings.Single();
+            // Both planners with that live state: the casting stays planned
+            // and reserves one slot.
+            ActiveEffectSnapshot stronger = GmfLive(new Dictionary<string, ActiveEffectInstance[]>
+                { { "ranger-pet", new[] { buff(GmfBuff, 16), tier(GmfTiers[3]) } } });
+            ResolvedCasting casting = GmfCompile(party, new[] { "ranger-pet" }, stronger).Castings.Single();
             MbbExpect(casting.Readiness == ResolvedCastingReadiness.Ready && casting.Cost.Sum(cost => cost.Units) == 1,
                 "An earlier +4 changed the +3 casting: " + casting.Readiness + " " +
                 string.Join(",", casting.ReadinessReasons));
+            CastPlan classic = GmfClassicPlan(party, new[] { "ranger-pet" }, stronger);
+            MbbExpect(classic.Steps.Count == 1 && classic.Steps[0].Reservation.Units == 1,
+                "Classic skipped the +3 casting over an earlier +4.");
+            // The setup view (no caster bound) with +1 and the buff present.
+            var weak = GmfLive(new Dictionary<string, ActiveEffectInstance[]>
+                { { "ranger-pet", new[] { buff(GmfBuff, 4), tier(GmfTiers[0]) } } });
+            var catalogue = new PlannerSetupModel(BuffPlannerProfile.CreateDefault("gmf-campaign"), party.Snapshot,
+                weak, party.Effects, party.Options, ignored => { });
+            MbbExpect(catalogue.GetPresence(party.SourceId, "ranger-pet") == EffectPresenceKind.Partial,
+                "The setup view called +1 complete Greater Magic Fang coverage: " +
+                catalogue.GetPresence(party.SourceId, "ranger-pet"));
+            GmfParty ordinary = GmfDruidParty(dump, GmfOrdinaryAbility, 12, 1);
+            var ordinaryCatalogue = new PlannerSetupModel(BuffPlannerProfile.CreateDefault("gmf-campaign"),
+                ordinary.Snapshot, GmfLive(new Dictionary<string, ActiveEffectInstance[]>
+                    { { "ranger-pet", new[] { buff(GmfOrdinaryBuff, 4), tier(GmfTiers[0]) } } }),
+                ordinary.Effects, ordinary.Options, ignored => { });
+            MbbExpect(ordinaryCatalogue.GetPresence(ordinary.SourceId, "ranger-pet") == EffectPresenceKind.Complete,
+                "Ordinary Magic Fang's setup presence changed.");
         }
 
         // 4. The report: one Druid, two pets of different masters. Native
-        // targeting admits both; both castings plan, convert, cast and
-        // confirm - in either order, instant and animated, through the
-        // casting-first coordinator and the Classic halting runner - and
-        // exactly two slots are spent.
+        // targeting admits both; both castings plan, cast and confirm - in
+        // either order, instant and animated, through the casting-first
+        // compiler/converter/coordinator and through the Classic planner and
+        // halting runner - and exactly two slots are spent.
         private static void TestGmfTwoPets()
         {
             NativeBlueprintDump dump = GmfDump();
@@ -713,20 +877,18 @@ namespace KingmakerBuffPlanner.Tests
                         MbbExpect(order.All(party.Option.ReachableTargetIds.Contains),
                             label + ": native targeting did not offer both pets: " +
                             string.Join(",", party.Option.ReachableTargetIds));
-                        ExplicitCastingPlan plan = GmfCompile(party, order);
-                        MbbExpect(plan.Castings.All(casting => casting.Readiness == ResolvedCastingReadiness.Ready &&
-                                casting.Cost.Sum(cost => cost.Units) == 1),
-                            label + ": " + string.Join(" / ", plan.Castings.Select(casting => casting.CastingId + "=" +
-                                casting.Readiness + ":" + string.Join(",", casting.ReadinessReasons))));
-                        ExplicitStepConversion steps = GmfConvert(party, plan);
-                        MbbExpect(steps.Converted && steps.Plan.Steps.Select(step => step.TargetUnitIds.Single())
-                                .SequenceEqual(order),
-                            label + ": the castings did not convert in order: " + steps.Refusal);
+                        ExplicitStepConversion explicitSteps;
+                        CastPlan classicPlan;
+                        IReadOnlyList<CastStep> steps = GmfSteps(party, order, classic, out explicitSteps, out classicPlan,
+                            label);
+                        MbbExpect(steps.Select(step => step.TargetUnitIds.Single()).SequenceEqual(order) &&
+                            steps.All(step => step.Reservation.Units == 1),
+                            label + ": the castings did not plan in order with one slot each.");
                         var world = new GmfWorld(GmfBuff, GmfTiers, true) { CasterLevel = 12, Slots = 2 };
                         if (classic)
                         {
                             int? halted;
-                            ExecutionReport report = GmfRunClassic(world, steps.Plan, animated, out halted);
+                            ExecutionReport report = GmfRunClassic(world, classicPlan, animated, out halted);
                             MbbExpect(halted == null && report.Confirmed == 2 && report.ResourcesSpent == 2 &&
                                 report.Failed == 0,
                                 label + ": halted after " + halted + "; " + string.Join(" | ", report.Records.Select(
@@ -734,7 +896,7 @@ namespace KingmakerBuffPlanner.Tests
                         }
                         else
                         {
-                            ExplicitCastingRunOutcome outcome = GmfRunExplicit(world, steps, animated);
+                            ExplicitCastingRunOutcome outcome = GmfRunExplicit(world, explicitSteps, animated);
                             MbbExpect(outcome.AllConfirmed && outcome.Entries.Count == 2 &&
                                 outcome.Entries.All(entry => entry.Confirmed && entry.ResourceSpentReported),
                                 label + ": halted after " + outcome.HaltedAfterCastingId + " " + outcome.HaltReason + "; " +
@@ -745,7 +907,7 @@ namespace KingmakerBuffPlanner.Tests
                         foreach (string pet in order)
                             MbbExpect(world.Effects(pet).SequenceEqual(GmfExpected(GmfBuff, GmfTiers[2])),
                                 label + ": " + pet + " has " + string.Join(",", world.Effects(pet)));
-                        foreach (CastStep step in steps.Plan.Steps)
+                        foreach (CastStep step in steps)
                             MbbExpect(GmfLeaves(step.ExpectedEffects).SequenceEqual(GmfExpected(GmfBuff, GmfTiers[2])) &&
                                 step.ExpectedRecipientUnitIds.SequenceEqual(step.TargetUnitIds),
                                 label + ": a step expects " + string.Join(",", GmfLeaves(step.ExpectedEffects)) + " on " +
@@ -755,8 +917,9 @@ namespace KingmakerBuffPlanner.Tests
 
         // 5. Preserved refusals: native target rejection (while planning and
         // at cast time) and a genuinely unconfirmed cast (no natural weapon
-        // took the enchantment, or the native context's caster level gave
-        // another tier) still stop every later casting.
+        // took the enchantment, the native context's caster level gave
+        // another tier, or it did so beside an old copy of the planned tier)
+        // still stop every later casting on both paths.
         private static void TestGmfRefusals()
         {
             NativeBlueprintDump dump = GmfDump();
@@ -767,15 +930,22 @@ namespace KingmakerBuffPlanner.Tests
             ExplicitCastingPlan refusedPlan = GmfCompile(refusedParty, new[] { "ranger-pet" });
             ResolvedCasting blocked = refusedPlan.Castings.Single();
             ExplicitStepConversion refusedSteps = GmfConvert(refusedParty, refusedPlan);
+            CastPlan refusedClassic = GmfClassicPlan(refusedParty, new[] { "ranger-pet" });
             MbbExpect(blocked.Readiness != ResolvedCastingReadiness.Ready && blocked.Cost.Count == 0 &&
-                (!refusedSteps.Converted || refusedSteps.Plan.Steps.Count == 0),
+                (!refusedSteps.Converted || refusedSteps.Plan.Steps.Count == 0) && refusedClassic.Steps.Count == 0,
                 "A natively refused pet was planned: " + blocked.Readiness);
             string[] order = { "ranger-pet", "druid-pet" };
             var cases = new Dictionary<string, Action<GmfWorld>>
             {
                 { "cast-time target rejection", world => world.NativeCanTarget = id => id != "ranger-pet" },
                 { "no natural weapon enchanted", world => world.Application = "buff-only" },
-                { "native context caster level 8", world => world.CasterLevel = 8 }
+                { "native context caster level 8", world => world.CasterLevel = 8 },
+                { "caster level 8 beside an old +3", world =>
+                    {
+                        world.CasterLevel = 8;
+                        world.Put("ranger-pet", EffectKind.Buff, GmfBuff, "druid");
+                        world.Put("ranger-pet", EffectKind.WornItemEnchantment, GmfTiers[2], null);
+                    } }
             };
             foreach (KeyValuePair<string, Action<GmfWorld>> scenario in cases)
                 foreach (bool animated in new[] { false, true })
@@ -784,15 +954,18 @@ namespace KingmakerBuffPlanner.Tests
                         string label = scenario.Key + "/" + (animated ? "animated" : "instant") + "/" +
                             (classic ? "classic" : "casting-first");
                         GmfParty party = GmfDruidParty(dump, GmfAbility, 12, 2);
-                        ExplicitStepConversion steps = GmfConvert(party, GmfCompile(party, order));
-                        MbbExpect(steps.Converted && steps.Plan.Steps.Count == 2, label + ": " + steps.Refusal);
+                        ExplicitStepConversion explicitSteps;
+                        CastPlan classicPlan;
+                        IReadOnlyList<CastStep> steps = GmfSteps(party, order, classic, out explicitSteps, out classicPlan,
+                            label);
+                        MbbExpect(steps.Count == 2, label + ": " + steps.Count + " steps.");
                         var world = new GmfWorld(GmfBuff, GmfTiers, true) { CasterLevel = 12, Slots = 2 };
                         scenario.Value(world);
                         bool rejected = scenario.Key.StartsWith("cast-time", StringComparison.Ordinal);
                         if (classic)
                         {
                             int? halted;
-                            ExecutionReport report = GmfRunClassic(world, steps.Plan, animated, out halted);
+                            ExecutionReport report = GmfRunClassic(world, classicPlan, animated, out halted);
                             MbbExpect(halted == 0 && report.Confirmed == 0 &&
                                 report.Records.Any(record => record.Status == (rejected
                                     ? CastExecutionStatus.FailedValidation : CastExecutionStatus.TimedOutUnconfirmed)) &&
@@ -802,7 +975,7 @@ namespace KingmakerBuffPlanner.Tests
                         }
                         else
                         {
-                            ExplicitCastingRunOutcome outcome = GmfRunExplicit(world, steps, animated);
+                            ExplicitCastingRunOutcome outcome = GmfRunExplicit(world, explicitSteps, animated);
                             MbbExpect(outcome.Halted && !outcome.AllConfirmed &&
                                 outcome.HaltedAfterCastingId == "gmf-0" && !outcome.Entries.Any(entry => entry.Confirmed),
                                 label + ": halted after " + outcome.HaltedAfterCastingId + "; " +
@@ -814,26 +987,92 @@ namespace KingmakerBuffPlanner.Tests
                     }
         }
 
+        // An unreadable caster level (0) leaves the tier unresolved: neither
+        // planner offers a target or reserves a slot, so nothing is cast that
+        // could never be confirmed.
+        private static void TestGmfUnknownCasterLevel()
+        {
+            NativeBlueprintDump dump = GmfDump();
+            GmfParty party = GmfDruidParty(dump, GmfAbility, 0, 2);
+            MbbExpect(party.Option.ReachableTargetIds.Count == 0 && party.Option.LegalAnchorIds.Count == 0,
+                "A provider with an unknown caster level offered targets: " +
+                string.Join(",", party.Option.ReachableTargetIds));
+            ResolvedCasting casting = GmfCompile(party, new[] { "ranger-pet" }).Castings.Single();
+            ExplicitStepConversion steps = GmfConvert(party, GmfCompile(party, new[] { "ranger-pet" }));
+            CastPlan classic = GmfClassicPlan(party, new[] { "ranger-pet" }, GmfLive(
+                new Dictionary<string, ActiveEffectInstance[]>
+                {
+                    { "ranger-pet", new[]
+                        {
+                            new ActiveEffectInstance(EffectKind.Buff, GmfBuff, 5000, 4, 0, false, true, "druid"),
+                            new ActiveEffectInstance(EffectKind.WornItemEnchantment, GmfTiers[0], null, null, null)
+                        } }
+                }));
+            MbbExpect(casting.Readiness != ResolvedCastingReadiness.Ready && casting.Cost.Count == 0 &&
+                (!steps.Converted || steps.Plan.Steps.Count == 0) && classic.Steps.Count == 0 &&
+                classic.Outcomes.All(outcome => outcome.Kind != TargetOutcomeKind.Fulfilled &&
+                    outcome.Kind != TargetOutcomeKind.SkippedAlreadyActive),
+                "An unknown caster level was planned or skipped as active: " + casting.Readiness + " / " +
+                string.Join(",", classic.Outcomes.Select(outcome => outcome.Kind + ":" + outcome.Reason)));
+        }
+
+        // The one-pass forecast: a funded casting grants a free structural
+        // repeat only to a casting that applies the same tier. A level-8
+        // Druid's +2 never satisfies a level-12 caster's +3 on the same pet;
+        // a second level-8 casting is still satisfied.
+        private static void TestGmfForecastTiers()
+        {
+            NativeBlueprintDump dump = GmfDump();
+            foreach (int rangerLevel in new[] { 12, 8 })
+            {
+                GmfParty party = GmfPartyOf(dump, GmfAbility, null, Tuple.Create("druid", 8, 1),
+                    Tuple.Create("ranger", rangerLevel, 1));
+                ExplicitCastingPlan plan = new ExplicitCastingCompiler().Compile(CastingDocument(
+                        DirectCasting("druid-cast", "long", "druid", "ranger-pet", party.SourceId, party.Provider.Key.Ability),
+                        DirectCasting("ranger-cast", "long", "ranger", "ranger-pet", party.SourceId,
+                            party.Providers[1].Key.Ability)),
+                    party.Snapshot, party.Options, party.Effects, null, "long", null, true, GmfLive());
+                ResolvedCasting first = plan.CastingById("druid-cast"), second = plan.CastingById("ranger-cast");
+                bool stronger = rangerLevel == 12;
+                MbbExpect(first.Readiness == ResolvedCastingReadiness.Ready && first.Cost.Sum(cost => cost.Units) == 1 &&
+                    (stronger
+                        ? second.Readiness == ResolvedCastingReadiness.Ready && second.Cost.Sum(cost => cost.Units) == 1
+                        : second.Readiness == ResolvedCastingReadiness.AlreadySatisfied && second.Cost.Count == 0),
+                    "Level-" + rangerLevel + " casting after a level-8 one: " + second.Readiness + " cost " +
+                    second.Cost.Sum(cost => cost.Units) + " [" + string.Join(",", second.ReadinessReasons) + "]");
+            }
+        }
+
         // 6. Neighbours: ordinary Magic Fang still casts and confirms on both
-        // pets with its buff and Enchantment[0]; an ordinary sequence of
-        // independent effects still needs every effect; and an effect aimed
-        // at a pet (ContextActionsOnPet) still reaches only the caster's own.
+        // pets with its buff and Enchantment[0] on both paths; an ordinary
+        // sequence of independent effects still needs every effect; and an
+        // effect aimed at a pet (ContextActionsOnPet) still reaches only the
+        // caster's own.
         private static void TestGmfNeighbours()
         {
             NativeBlueprintDump dump = GmfDump();
             string[] order = { "ranger-pet", "druid-pet" };
             foreach (bool animated in new[] { false, true })
-            {
-                GmfParty party = GmfDruidParty(dump, GmfOrdinaryAbility, 12, 2);
-                ExplicitStepConversion steps = GmfConvert(party, GmfCompile(party, order));
-                MbbExpect(steps.Converted && steps.Plan.Steps.Count == 2, "Ordinary Magic Fang: " + steps.Refusal);
-                var world = new GmfWorld(GmfOrdinaryBuff, new[] { GmfTiers[0] }, false) { CasterLevel = 12, Slots = 2 };
-                ExplicitCastingRunOutcome outcome = GmfRunExplicit(world, steps, animated);
-                MbbExpect(outcome.AllConfirmed && world.Slots == 0 &&
-                    order.All(pet => world.Effects(pet).SequenceEqual(GmfExpected(GmfOrdinaryBuff, GmfTiers[0]))),
-                    "Ordinary Magic Fang did not confirm on both pets: " + string.Join(" | ",
-                        outcome.Entries.Select(entry => entry.FinalStatus + ":" + entry.Detail)));
-            }
+                foreach (bool classic in new[] { false, true })
+                {
+                    GmfParty party = GmfDruidParty(dump, GmfOrdinaryAbility, 12, 2);
+                    ExplicitStepConversion explicitSteps;
+                    CastPlan classicPlan;
+                    IReadOnlyList<CastStep> steps = GmfSteps(party, order, classic, out explicitSteps, out classicPlan,
+                        "ordinary Magic Fang");
+                    var world = new GmfWorld(GmfOrdinaryBuff, new[] { GmfTiers[0] }, false) { CasterLevel = 12, Slots = 2 };
+                    bool confirmed;
+                    if (classic)
+                    {
+                        int? halted;
+                        confirmed = GmfRunClassic(world, classicPlan, animated, out halted).Confirmed == 2 && halted == null;
+                    }
+                    else confirmed = GmfRunExplicit(world, explicitSteps, animated).AllConfirmed;
+                    MbbExpect(confirmed && steps.Count == 2 && world.Slots == 0 &&
+                        order.All(pet => world.Effects(pet).SequenceEqual(GmfExpected(GmfOrdinaryBuff, GmfTiers[0]))),
+                        "Ordinary Magic Fang did not confirm on both pets (" + (classic ? "classic" : "casting-first") +
+                        ", " + (animated ? "animated" : "instant") + ").");
+                }
             var sequence = new SequenceEffectExpression(new EffectExpression[]
             {
                 new EffectLeafExpression(EffectKind.Buff, "first-effect", EffectTarget.CurrentTarget, "fixture", "first"),
@@ -857,15 +1096,16 @@ namespace KingmakerBuffPlanner.Tests
                 "A pet-directed effect reached " + string.Join(",", petDecision.ReachableIds));
         }
 
-        // 7. Observation: the planner's item read on a detached native
-        // UnitBody (no Unity call) reaches every weapon native MagicFang
-        // enchants - the hand slots, the empty-hand weapon and the
-        // additional (or polymorph) limbs - and each item once.
+        // 7. Observation: the planner's item read on detached native UnitBody
+        // instances (no Unity call) reaches every weapon native MagicFang
+        // enchants - the hand slots, the polymorph hand set, the empty-hand
+        // weapon and the additional (or polymorph) limbs - and each item once.
         private static void TestGmfNaturalWeaponObservation()
         {
             ItemEntity claw = GmfDetached<ItemEntityWeapon>(), otherClaw = GmfDetached<ItemEntityWeapon>(),
                 bite = GmfDetached<ItemEntityWeapon>(), unarmed = GmfDetached<ItemEntityWeapon>(),
-                armor = GmfDetached<ItemEntityArmor>(), polymorphBite = GmfDetached<ItemEntityWeapon>();
+                armor = GmfDetached<ItemEntityArmor>(), sword = GmfDetached<ItemEntityWeapon>(),
+                polymorphClaw = GmfDetached<ItemEntityWeapon>(), polymorphBite = GmfDetached<ItemEntityWeapon>();
             // A bear companion (AnimalCompanionUnitBear: Claw1d4 in both hands,
             // Bite1d6 as an additional limb, WeaponEmptyHand), with barding.
             GmfExpectItems(KingmakerEnchantedItems.Read(GmfBody(claw, otherClaw, armor, unarmed, new[] { bite })),
@@ -874,11 +1114,14 @@ namespace KingmakerBuffPlanner.Tests
             // which the hand slots never return.
             GmfExpectItems(KingmakerEnchantedItems.Read(GmfBody(null, null, null, unarmed, new ItemEntity[0])),
                 new[] { unarmed }, "empty hands");
-            // Polymorphed: the polymorph limbs, not the unit's own.
-            UnitBody polymorphed = GmfBody(null, null, null, unarmed, new[] { bite });
+            // Polymorphed with a sword in the ordinary hand set: the polymorph
+            // hand set and limbs (what native MagicFang enchants) are read.
+            UnitBody polymorphed = GmfBody(sword, null, null, unarmed, new[] { bite });
+            GmfSet(polymorphed, "m_PolymoprphHandsEquipmentSet", GmfHands(polymorphClaw, null));
             GmfSet(polymorphed, "m_PolymorphAdditionalLimbs", GmfLimbs(new[] { polymorphBite }));
             GmfSet(polymorphed, "<IsPolymorphed>k__BackingField", true);
-            GmfExpectItems(KingmakerEnchantedItems.Read(polymorphed), new[] { unarmed, polymorphBite }, "polymorphed");
+            GmfExpectItems(KingmakerEnchantedItems.Read(polymorphed), new[] { sword, unarmed, polymorphClaw, polymorphBite },
+                "polymorphed");
             // One instance reached through several sources is observed once.
             GmfExpectItems(KingmakerEnchantedItems.Read(GmfBody(claw, null, null, claw, new[] { bite, claw, null })),
                 new[] { claw, bite }, "duplicated item");
@@ -908,10 +1151,8 @@ namespace KingmakerBuffPlanner.Tests
             }).ToList();
         }
 
-        private static UnitBody GmfBody(ItemEntity primary, ItemEntity secondary, ItemEntity armor,
-            ItemEntity emptyHand, IEnumerable<ItemEntity> limbs)
+        private static HandsEquipmentSet GmfHands(ItemEntity primary, ItemEntity secondary)
         {
-            var body = GmfDetached<UnitBody>();
             var hands = GmfDetached<HandsEquipmentSet>();
             var primarySlot = GmfDetached<HandSlot>();
             var secondarySlot = GmfDetached<HandSlot>();
@@ -919,7 +1160,14 @@ namespace KingmakerBuffPlanner.Tests
             GmfSet(secondarySlot, "m_Item", secondary);
             GmfSet(hands, "PrimaryHand", primarySlot);
             GmfSet(hands, "SecondaryHand", secondarySlot);
-            GmfSet(body, "m_HandsEquipmentSets", new[] { hands });
+            return hands;
+        }
+
+        private static UnitBody GmfBody(ItemEntity primary, ItemEntity secondary, ItemEntity armor,
+            ItemEntity emptyHand, IEnumerable<ItemEntity> limbs)
+        {
+            var body = GmfDetached<UnitBody>();
+            GmfSet(body, "m_HandsEquipmentSets", new[] { GmfHands(primary, secondary) });
             GmfSet(body, "m_CurrentHandsEquipmentSetIndex", 0);
             if (armor != null)
             {

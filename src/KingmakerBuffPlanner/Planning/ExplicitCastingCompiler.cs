@@ -586,7 +586,8 @@ namespace KingmakerBuffPlanner.Planning
                     (projectEffects || HasOnlyPermanentApplications(casting, effectsBySource)) &&
                     casting.ExistingEffectPolicy == ExistingEffectPolicy.SkipAlreadyActive &&
                     IsStructurallySatisfied(casting, matched, grantedByUnit,
-                        HasCasterRelativePayload(casting, effectsBySource)))
+                        HasCasterRelativePayload(casting, effectsBySource),
+                        CasterLevelTier(casting, resolved, effectsBySource)))
                 {
                     // R5-F4: like a live skip, only its beneficiaries' effects.
                     removalState.Admit(casting.RoutineId, casting.CastingId,
@@ -651,10 +652,11 @@ namespace KingmakerBuffPlanner.Planning
                         // R9-F1: within one routine in every view).
                         InvalidateRemovedGrants(changes, grantedByUnit, grantEffects);
                         bool casterRelative = HasCasterRelativePayload(casting, effectsBySource);
+                        string tier = CasterLevelTier(casting, resolved, effectsBySource);
                         if (casterRelative)
-                            InvalidateOtherCasterGrants(changes, StructuralGrantKey(casting, true),
+                            InvalidateOtherCasterGrants(changes, StructuralGrantKey(casting, true, tier),
                                 grantedByUnit, grantEffects);
-                        ProjectEffects(casting, matched, grantedByUnit, changes, grantEffects, casterRelative);
+                        ProjectEffects(casting, matched, grantedByUnit, changes, grantEffects, casterRelative, tier);
                     }
                     continue;
                 }
@@ -1369,7 +1371,8 @@ namespace KingmakerBuffPlanner.Planning
             ResolvedCasting casting,
             IReadOnlyList<CastEnhancementSnapshot> matchedEnhancements,
             Dictionary<string, HashSet<string>> grantedByUnit,
-            bool casterRelative)
+            bool casterRelative,
+            string tier)
         {
             if (matchedEnhancements != null && matchedEnhancements.Count != 0)
                 return false;
@@ -1379,7 +1382,7 @@ namespace KingmakerBuffPlanner.Planning
             {
                 HashSet<string> granted;
                 if (!grantedByUnit.TryGetValue(unitId, out granted) ||
-                    !granted.Contains(StructuralGrantKey(casting, casterRelative)))
+                    !granted.Contains(StructuralGrantKey(casting, casterRelative, tier)))
                     return false;
             }
             return true;
@@ -1389,11 +1392,30 @@ namespace KingmakerBuffPlanner.Planning
         // casting never makes another copy's casting (and charges) redundant.
         // Review R8-F1: neither does another caster's casting of a payload
         // whose benefit depends on its caster (Firebrand).
-        private static string StructuralGrantKey(ResolvedCasting casting, bool casterRelative)
+        private static string StructuralGrantKey(ResolvedCasting casting, bool casterRelative, string tier)
         {
             string key = casting.Ability.SourceKind == SourceKind.Item && casting.Provider != null
                 ? casting.Provider.Canonical : casting.Ability.Canonical;
+            if (tier != null) key += "|tier:" + tier;
             return casterRelative ? key + "|caster:" + casting.CasterUnitId : key;
+        }
+
+        // Greater Magic Fang repair (review): castings of one ability with a
+        // caster-level tier selection apply different tiers, so a structural
+        // grant names the tier its provider applies (the bound effects); a
+        // tier this provider leaves unresolved matches nothing. Null for
+        // every payload without such a selection (their keys are unchanged).
+        private static string CasterLevelTier(ResolvedCasting casting, ProviderPlanningOption option,
+            IReadOnlyDictionary<string, EffectExpression> effectsBySource)
+        {
+            EffectExpression payload = DiscoveredEffectLookup.ForAbility(
+                effectsBySource, casting.Ability, casting.SourceId);
+            if (payload == null || !CasterLevelPredicate.HasUnresolved(payload)) return null;
+            EffectExpression bound = option == null ? payload : option.BindCasterLevel(payload);
+            if (CasterLevelPredicate.HasUnresolved(bound)) return "unresolved:" + casting.CastingId;
+            return string.Join(",", EffectApplicationLifetime.Leaves(bound)
+                .Select(leaf => leaf.Kind + ":" + leaf.EffectId).Distinct(StringComparer.Ordinal)
+                .OrderBy(value => value, StringComparer.Ordinal).ToArray());
         }
 
         // Review R9-F1: every application of the payload is a permanent
@@ -1423,11 +1445,12 @@ namespace KingmakerBuffPlanner.Planning
             Dictionary<string, HashSet<string>> grantedByUnit,
             EffectChanges changes,
             Dictionary<string, Dictionary<string, HashSet<string>>> grantEffects,
-            bool casterRelative)
+            bool casterRelative,
+            string tier)
         {
             if (matchedEnhancements != null && matchedEnhancements.Count != 0)
                 return;
-            string key = StructuralGrantKey(casting, casterRelative);
+            string key = StructuralGrantKey(casting, casterRelative, tier);
             foreach (string unitId in casting.PredictedBeneficiaryUnitIds)
             {
                 // Review R2-F1: a funded cast grants a free structural repeat

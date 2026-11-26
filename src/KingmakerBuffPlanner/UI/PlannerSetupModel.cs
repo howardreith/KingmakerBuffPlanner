@@ -260,8 +260,14 @@ namespace KingmakerBuffPlanner.UI
         {
             EffectExpression expression;
             if (!_effects.TryGetValue(sourceId, out expression)) return EffectPresenceKind.Absent;
-            return new EffectPresenceEvaluator().EvaluateTyped(expression,
+            EffectPresenceKind kind = new EffectPresenceEvaluator().EvaluateTyped(expression,
                 _activeEffects.GetEffects(unitId), new HashSet<string>(StringComparer.Ordinal)).Kind;
+            // Greater Magic Fang repair (review): this source-level view binds
+            // no caster, so a caster-level tier selection is unresolved: a
+            // present tier shows the effect is there, not that it is as strong
+            // as the caster who would cast it.
+            return kind == EffectPresenceKind.Complete && CasterLevelPredicate.HasUnresolved(expression)
+                ? EffectPresenceKind.Partial : kind;
         }
 
         public bool IsTargetLegal(SetupSourceRow source, string unitId)

@@ -268,13 +268,14 @@ namespace KingmakerBuffPlanner.Execution
                 Func<ObservedEffectInstance, bool> matches = value => value.Kind == leaf.Kind &&
                     value.EffectId == leaf.EffectId && FromCaster(leaf, value, caster);
                 var matching = instances.Where(matches).ToList();
-                if (transient)
+                bool appliedAnew = requireFresh && AppliedAnewEachCast(leaf);
+                if (transient || appliedAnew)
                 {
                     // Delivered by THIS attempt, at this read or an earlier
                     // post-submission read; never old presence.
                     bool delivered = matching.Any(value => baseline.IsFresh(owner, value)) ||
                         baseline.SeenAfterSubmission(owner).Any(seen => matches(seen.Instance) && baseline.IsFresh(owner, seen.Instance));
-                    if (delivered && owner == recipient && !durableExpected) freshPrimary = true;
+                    if (delivered && owner == recipient && (appliedAnew || !durableExpected)) freshPrimary = true;
                     return delivered;
                 }
                 if (owner == recipient && matching.Any(value => baseline.IsFresh(owner, value))) freshPrimary = true;
@@ -295,6 +296,20 @@ namespace KingmakerBuffPlanner.Execution
                         FromCaster(leaf, value, caster));
                 });
             }, null).Kind == EffectPresenceKind.Complete;
+        }
+
+        // Greater Magic Fang repair (review): native MagicFang.EnchantSlot
+        // removes a temporary instance of the enchantment it selected and
+        // adds it again on every cast, so a Magic Fang tier is proven only by
+        // an instance this attempt applied. An old instance (a tier an
+        // earlier cast left, which a cast selecting another tier does not
+        // touch) proves nothing. A permanent instance of the same blueprint,
+        // which EnchantSlot leaves untouched, therefore never confirms: the
+        // cast is reported unconfirmed and the run stops (conservative).
+        internal static bool AppliedAnewEachCast(EffectLeafExpression leaf)
+        {
+            return leaf != null && leaf.Kind == EffectKind.WornItemEnchantment &&
+                string.Equals(leaf.SourceContract, "MagicFang", StringComparison.Ordinal);
         }
 
         private static bool FromCaster(EffectLeafExpression leaf, ObservedEffectInstance value, string caster)
@@ -413,12 +428,15 @@ namespace KingmakerBuffPlanner.Execution
             // buff does not show that the buff itself landed).
             var leaves = new HashSet<string>(StringComparer.Ordinal);
             CollectLeafMarkers(expected, leaves);
-            return live.Any(value =>
+            Func<ObservedEffectInstance, bool> fresh = value =>
             {
-                if (!leaves.Contains(value.Kind + ":" + value.EffectId)) return false;
                 long end;
                 return !ends.TryGetValue(value.Identity, out end) || value.EndTimeTicks > end;
-            });
+            };
+            if (EffectApplicationLifetime.Leaves(expected).Where(AppliedAnewEachCast).Any(leaf =>
+                    !live.Any(value => value.Kind == leaf.Kind && value.EffectId == leaf.EffectId && fresh(value))))
+                return false;
+            return live.Any(value => leaves.Contains(value.Kind + ":" + value.EffectId) && fresh(value));
         }
 
         private static void CollectLeafMarkers(EffectExpression expression, ISet<string> leaves)
@@ -526,7 +544,7 @@ namespace KingmakerBuffPlanner.Execution
             IEnumerable<ObservedEffectInstance> before, IEnumerable<ObservedEffectInstance> after)
         {
             return expected != null && before != null && after != null && !HasCasterRelativeLeaf(expected) &&
-                Complete(expected, before) && Complete(expected, after);
+                !CasterLevelPredicate.HasUnresolved(expected) && Complete(expected, before) && Complete(expected, after);
         }
 
         private static bool Complete(EffectExpression expected, IEnumerable<ObservedEffectInstance> instances)
