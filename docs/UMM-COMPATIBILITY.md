@@ -53,9 +53,14 @@ compiled against the installed loader (the published 0.6.20 DLL references Unity
   the DLL, a receipt is reusable only at its own commit.
 - Bounded local configuration: the ignored `GamePath.props` may only set `KingmakerInstallDir` (no conditions,
   imports, items, targets or other properties); no `Directory.Build.props`/`.targets`/`.rsp` outside the
-  repository, and none inside it that Git does not track, nor an untracked project `.user` file; no environment
-  variable that selects MSBuild imports (`DirectoryBuildTargetsPath`, `CustomAfterMicrosoftCommonTargets` and the
-  related names); no per-user MSBuild `ImportBefore`/`ImportAfter` hook. A setting that only a production compile
+  repository; inside it, no file Git does not track among the configuration that applies to the production project
+  (the `Directory.Build.props`/`.targets` on the path from `src\KingmakerBuffPlanner` to the repository root, the root
+  `Directory.Build.rsp` and the production project's own `.user` file; another project's local files, such as the
+  test project's `.user` file, do not apply); no project-extension import
+  (`src\KingmakerBuffPlanner\obj\KingmakerBuffPlanner.csproj.*.props`/`.targets`, which MSBuild imports and this
+  project never generates, since it restores no packages); no environment variable that selects or relocates MSBuild
+  imports (`DirectoryBuildTargetsPath`, `CustomAfterMicrosoftCommonTargets`, `MSBuildProjectExtensionsPath`,
+  `BaseIntermediateOutputPath` and the related names); no per-user MSBuild `ImportBefore`/`ImportAfter` hook. A setting that only a production compile
   would see could otherwise change the DLL without changing the evaluated inventory, so it is refused by
   `Build.ps1` (and so `Build-Local.ps1` and `Build-Release.ps1`) and by every receipt admission. Direct MSBuild
   produces no receipt and is not a reuse route. Relocating byte-identical game references remains supported.
@@ -88,11 +93,36 @@ compiled against the installed loader (the published 0.6.20 DLL references Unity
   embedded revision) and their own packages and agree with each other, and the validated release ZIP must be
   byte-identical to them with the same DLL, MVID and embedded revision before the release manifest is written.
   The release is prepared and reconciled in a private folder; the versioned release directory is replaced only
-  after its ZIP and manifest are ready, so a refusal leaves the previous release untouched.
+  after its ZIP and manifest are ready, so a refusal leaves the previous release untouched. Promotion refuses an
+  occupied versioned path (no merge into it); the private folder holding the previous release is removed only after
+  the new release is in place or the previous one is back at its versioned path, and otherwise kept, with its path
+  named in the error.
 
-## Current frozen product (2026-11-24, round 5)
+## Round 6 (2026-11-26): tooling corrections; product source unchanged since `04c55bc`
 
-Product code and build tooling are frozen at `c2a594c` (the product source is unchanged since round 2; round 5
+The last production-source change is `04c55bc` (2026-11-23): it changed four compiled `RuntimeTesting` files, adding
+the selected loader row to the runtime request and the installed loader identity to the result
+(`git diff --name-status 75aeeff..c2a594c -- src` lists exactly `RuntimeLoaderIdentity.cs`, `RuntimeTestHost.cs`,
+`RuntimeTestProtocol.cs` and `RuntimeTestResultModels.cs`). Every later commit changes build, release or runtime
+tooling, tests, documentation or committed evidence only. Round-2 protocol observations stay attached to the protocol
+and artifact of the round-2 freeze `75aeeff`; they do not carry over to the request and result fields `04c55bc` added.
+
+Round 6 changes `scripts/Common.ps1` (the production-project configuration scope and the project-extension refusal
+above), `scripts/Build-Release.ps1` (promotion and recovery of the previous release above) and the boundary suite.
+`scripts/Test-LoaderBaseline.ps1` on a temporary clone of the round-6 code: the production project's preprocessed
+import list contains an ignored `obj\KingmakerBuffPlanner.csproj.local.targets` that changes the generated version
+only for a real compile, and reuse and `Build.ps1` refuse it (accepted again once removed); the test project's ignored
+`.user` file leaves the production build and the unchanged receipt accepted, while the production project's own
+`.user` file is refused; two internally consistent producing builds that differ (the first producer's ZIP re-written
+with one entry timestamp changed and its receipt naming that ZIP) fail the inter-build reconciliation in a clean
+checkout with the previous release unchanged; an occupied versioned path leaves the previous release at the reported
+private recovery path with the occupant untouched; and a malformed clean flag on the second producing receipt alone,
+with the first clean, is refused. Records: [`docs/evidence/umm-0311/`](evidence/umm-0311/INDEX.md). The round-5
+retained pair below was built from the round-5 tooling; the controller gate builds the round-6 candidate itself.
+
+## Frozen product of round 5 (history)
+
+Product code and build tooling were frozen at `c2a594c` (the last production-source change was `04c55bc`; `c2a594c`
 changed build and runtime tooling). `Build-Local.ps1` in a dedicated worktree at `c2a594c` built the retained pair:
 ZIP SHA-256 `e8c19adf7aea9a0d92f0a631300b61439d449fe00caa5b6ca9b79951d700b480`, DLL SHA-256
 `a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda`, MVID `eb7e8a92-d678-45b3-a9a2-065ae10511c0`,
