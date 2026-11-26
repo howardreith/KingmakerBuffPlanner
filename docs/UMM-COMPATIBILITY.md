@@ -155,8 +155,10 @@ documentation commit in one clone, stamped with each revision. `scripts/Test-Loa
 `-CandidatePackage`); records in [`docs/evidence/umm-0311/`](evidence/umm-0311/INDEX.md). Cases added in round 5: an
 import selected by `DirectoryBuildTargetsPath` and an untracked `src\Directory.Build.targets` refused (reuse and
 `Build.ps1`); a pre-state cleanup failure (owned ZIP held) still releases the lock and names the copy; malformed clean
-flags refused; a release whose first producing receipt names a different package keeps the previous release (round-7
-correction: the round-5 case substituted a package digest, not a second valid package); a request replaced at the write
+flags refused; a release run from an instrumented copy that made the checkout dirty refused with "Release packaging
+requires a clean Git worktree" before building, leaving the previous ZIP and manifest unchanged and no private folder
+(round-7 correction: as `loader-baseline.json` records, that case never reached the inter-build comparison; rounds 6 and
+7 exercised it); a request replaced at the write
 boundary leaves the retained request (loader row, non-ASCII text) unchanged; a mixed-case owner loader ID resolves to
 the canonical row. The controller gate builds the candidate commit, so its DLL has its own digest.
 
