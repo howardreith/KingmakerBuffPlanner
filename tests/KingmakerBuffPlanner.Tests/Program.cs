@@ -491,6 +491,7 @@ namespace KingmakerBuffPlanner.Tests
                 RunControllerRoutineTests(root);
                 RunMissingBeneficialBuffsTests(root);
                 RunMissingBeneficialBuffsAuditTests();
+                RunGreaterMagicFangTests();
             }
             finally
             {

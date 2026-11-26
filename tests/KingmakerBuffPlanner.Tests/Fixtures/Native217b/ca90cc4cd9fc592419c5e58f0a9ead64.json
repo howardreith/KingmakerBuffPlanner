@@ -1,0 +1,16 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "m_Flags": "IsFromSpell, StayOnDeath",
+  "FxOnStart": "Resource::NULL",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [],
+  "m_DisplayName": "LocalizedString:13dcf4b3-5af4-4f4f-8b98-643c7a041d35:Magic Fang, Greater",
+  "m_Description": "LocalizedString:8d8ea3c6-3d82-4e73-b770-bd1825c9d5ad:Greater magic fang gives all natural weapons or unarmed strikes of the subject a +1 enhancement bonus on attack and damage rolls per four caster levels (maximum +5). The spell can affect a slam attack, fist, bite, or any other natural weapon.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "MagicFangGreater"
+  },
+  "Components": [],
+  "m_AssetGuid": "ca90cc4cd9fc592419c5e58f0a9ead64",
+  "name": "MagicFangGreaterBuff"
+}

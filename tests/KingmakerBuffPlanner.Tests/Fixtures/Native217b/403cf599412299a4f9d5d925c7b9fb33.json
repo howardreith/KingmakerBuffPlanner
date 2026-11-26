@@ -1,0 +1,135 @@
+{
+  "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility, Assembly-CSharp",
+  "CanTargetFriends": true,
+  "CanTargetSelf": true,
+  "EffectOnAlly": "Helpful",
+  "Animation": "Touch",
+  "AnimationStyle": "CastActionOmni",
+  "ActionType": "Standard",
+  "AvailableMetamagic": "Quicken, Extend, Heighten, Reach",
+  "LocalizedDuration": "LocalizedString:00b2e4c2-aafe-487b-b890-d57473373da7:1 minute/level",
+  "LocalizedSavingThrow": "LocalizedString::",
+  "MaterialComponent": {
+    "$id": "1",
+    "$type": "Kingmaker.UnitLogic.Abilities.Blueprints.BlueprintAbility+MaterialComponentData, Assembly-CSharp",
+    "Count": 1
+  },
+  "ResourceAssetIds": [
+    "352469f228a3b1f4cb269c7ab0409b8e"
+  ],
+  "m_DisplayName": "LocalizedString:bb033b22-2309-49cb-a16f-fdade9dc6c37:Magic Fang",
+  "m_Description": "LocalizedString:c249d0f9-19ac-476a-b1c0-bd4b0d4cf86f:Magic fang gives all natural weapons or unarmed strikes of the subject a +1 enhancement bonus on attack and damage rolls. The spell can affect a slam attack, fist, bite, or any other natural weapon.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "MagicFang"
+  },
+  "Components": [
+    {
+      "$id": "2",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellComponent, Assembly-CSharp",
+      "School": "Transmutation",
+      "name": "$SpellComponent$893e9d72-aca6-430e-be41-75088e2a420e"
+    },
+    {
+      "$id": "3",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:bad8638d40639d04fa2f80a1cac67d6b:DruidSpellList",
+      "SpellLevel": 1,
+      "name": "$SpellListComponent$449350ef-3032-4a1b-8770-5ee5f25a9a73"
+    },
+    {
+      "$id": "4",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.AbilityEffectRunAction, Assembly-CSharp",
+      "Actions": {
+        "$id": "5",
+        "$type": "Kingmaker.ElementsSystem.ActionList, Assembly-CSharp",
+        "Actions": [
+          {
+            "$id": "6",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.MagicFang, Assembly-CSharp",
+            "Enchantment": [
+              "Blueprint:d704f90f54f813043a525f304f6c0050:TemporaryEnhancement1"
+            ],
+            "EnchantLevel": {
+              "$id": "7",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+            },
+            "DurationValue": {
+              "$id": "8",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+              "m_IsExtendable": true,
+              "Rate": "Minutes",
+              "DiceCountValue": {
+                "$id": "9",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              },
+              "BonusValue": {
+                "$id": "10",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                "ValueType": "Rank"
+              }
+            },
+            "name": "$MagicFang$131c535d-a5f3-432f-a565-5ec8428734ac"
+          },
+          {
+            "$id": "11",
+            "$type": "Kingmaker.UnitLogic.Mechanics.Actions.ContextActionApplyBuff, Assembly-CSharp",
+            "Buff": "Blueprint:e7646b1dfdd22ce4ab340f295938ab8e:MagicFangBuff",
+            "DurationValue": {
+              "$id": "12",
+              "$type": "Kingmaker.UnitLogic.Mechanics.ContextDurationValue, Assembly-CSharp",
+              "m_IsExtendable": true,
+              "Rate": "Minutes",
+              "DiceCountValue": {
+                "$id": "13",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp"
+              },
+              "BonusValue": {
+                "$id": "14",
+                "$type": "Kingmaker.UnitLogic.Mechanics.ContextValue, Assembly-CSharp",
+                "ValueType": "Rank"
+              }
+            },
+            "AsChild": true,
+            "name": "$ContextActionApplyBuff$bdc14d34-e17a-40bf-8364-2577f0e96652"
+          }
+        ]
+      },
+      "name": "$AbilityEffectRunAction$5a77c482-1f2b-4f3d-83fc-e222ea94b6cb"
+    },
+    {
+      "$id": "15",
+      "$type": "Kingmaker.UnitLogic.Mechanics.Components.ContextRankConfig, Assembly-CSharp",
+      "m_FeatureList": [],
+      "m_CustomProgression": [],
+      "m_Max": 20,
+      "m_Class": [],
+      "name": "$ContextRankConfig$34fd4efa-316f-47a4-b80f-66472a258724"
+    },
+    {
+      "$id": "16",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:29f3c338532390546bc5347826a655c4:RangerSpellList",
+      "SpellLevel": 1,
+      "name": "$SpellListComponent$341c732f-5365-4c8f-a4f1-6acd58e9887c"
+    },
+    {
+      "$id": "17",
+      "$type": "Kingmaker.UnitLogic.Abilities.Components.Base.AbilitySpawnFx, Assembly-CSharp",
+      "PrefabLink": "Resource:352469f228a3b1f4cb269c7ab0409b8e:CommonTransmutationBuff00",
+      "Anchor": "SelectedTarget",
+      "PositionAnchor": "None",
+      "OrientationAnchor": "None",
+      "name": "$AbilitySpawnFx$21bd5a02-18a7-41ae-a4b3-7315f3fbc5e2"
+    },
+    {
+      "$id": "18",
+      "$type": "Kingmaker.Blueprints.Classes.Spells.SpellListComponent, Assembly-CSharp",
+      "SpellList": "Blueprint:d0ccda70fddc0e346a227068502771c1:AnimalDomainSpellList",
+      "SpellLevel": 1,
+      "name": "$SpellListComponent$673e9c16-9552-463e-9ecf-fa3b15696515"
+    }
+  ],
+  "m_AssetGuid": "403cf599412299a4f9d5d925c7b9fb33",
+  "name": "MagicFang"
+}

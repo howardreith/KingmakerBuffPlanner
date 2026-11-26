@@ -211,6 +211,17 @@ namespace KingmakerBuffPlanner.Tests
             return blueprint;
         }
 
+        // A detached reference stub of an identity outside the native dump
+        // (a blueprint another mod adds, e.g. Call of the Wild's replacement
+        // Magic Fang enchantments): identity only, like a referenced fixture.
+        internal static T Stub<T>(string guid) where T : BlueprintScriptableObject
+        {
+            var blueprint = (T)Detached(typeof(T));
+            SetField(blueprint, "m_AssetGuid", guid);
+            SetField(blueprint, "Components", new BlueprintComponent[0]);
+            return blueprint;
+        }
+
         private static Type NativeType(string fullName)
         {
             string name = (fullName ?? string.Empty).Split(',')[0].Trim();

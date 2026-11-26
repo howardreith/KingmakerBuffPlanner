@@ -1,0 +1,16 @@
+{
+  "$type": "Kingmaker.UnitLogic.Buffs.Blueprints.BlueprintBuff, Assembly-CSharp",
+  "m_Flags": "IsFromSpell",
+  "FxOnStart": "Resource::NULL",
+  "FxOnRemove": "Resource::NULL",
+  "ResourceAssetIds": [],
+  "m_DisplayName": "LocalizedString:bb033b22-2309-49cb-a16f-fdade9dc6c37:Magic Fang",
+  "m_Description": "LocalizedString:c249d0f9-19ac-476a-b1c0-bd4b0d4cf86f:Magic fang gives all natural weapons or unarmed strikes of the subject a +1 enhancement bonus on attack and damage rolls. The spell can affect a slam attack, fist, bite, or any other natural weapon.",
+  "m_Icon": {
+    "$type": "UnityEngine.Sprite, UnityEngine.CoreModule",
+    "name": "MagicFang"
+  },
+  "Components": [],
+  "m_AssetGuid": "e7646b1dfdd22ce4ab340f295938ab8e",
+  "name": "MagicFangBuff"
+}

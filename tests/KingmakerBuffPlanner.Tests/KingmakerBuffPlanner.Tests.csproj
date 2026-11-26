@@ -71,6 +71,8 @@
     <Compile Include="MissingBeneficialBuffsTests.cs" />
     <Compile Include="MissingBeneficialBuffsRecoveryTests.cs" />
     <Compile Include="MissingBeneficialBuffsRecoveryExportTests.cs" />
+    <Compile Include="GreaterMagicFangTests.cs" />
+    <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\KingmakerEnchantedItems.cs"><Link>GameAdapters\KingmakerEnchantedItems.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\KingmakerActionGraphAdapter.cs"><Link>GameAdapters\KingmakerActionGraphAdapter.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\KingmakerBuffSourceDiscovery.cs"><Link>GameAdapters\KingmakerBuffSourceDiscovery.cs</Link></Compile>
     <Compile Include="..\..\src\KingmakerBuffPlanner\GameAdapters\KingmakerAreaCoverageResolver.cs"><Link>GameAdapters\KingmakerAreaCoverageResolver.cs</Link></Compile>

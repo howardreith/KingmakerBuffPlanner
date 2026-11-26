@@ -1,0 +1,19 @@
+{
+  "$type": "Kingmaker.Blueprints.Items.Ecnchantments.BlueprintWeaponEnchantment, Assembly-CSharp",
+  "m_EnchantName": "LocalizedString:5bba8e3a-3b53-4748-a37f-e646c8a90026:Temporary Enhancement +5",
+  "m_Description": "LocalizedString:6f800704-dab9-47ad-a521-37c0166afd4b:Attacks with this weapon get an additional +5 enhancement bonus on both attack and damage rolls.",
+  "m_Prefix": "LocalizedString::",
+  "m_Suffix": "LocalizedString::",
+  "m_EnchantmentCost": 5,
+  "Components": [
+    {
+      "$id": "1",
+      "$type": "Kingmaker.Designers.Mechanics.Facts.WeaponEnhancementBonus, Assembly-CSharp",
+      "EnhancementBonus": 5,
+      "Stack": true,
+      "name": "$WeaponEnhancementBonus$f1459788-04d5-4128-ad25-dace4b8dee42"
+    }
+  ],
+  "m_AssetGuid": "746ee366e50611146821d61e391edf16",
+  "name": "TemporaryEnhancement5"
+}

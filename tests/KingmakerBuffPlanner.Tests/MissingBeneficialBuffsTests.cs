@@ -240,7 +240,9 @@ namespace KingmakerBuffPlanner.Tests
             NativeBlueprintDump.CaptureSource = source;
             try
             {
-                foreach (KeyValuePair<string, Action> regression in MbbRegressions)
+                // The Greater Magic Fang native regressions read the same
+                // committed fixture subset, so the capture keeps theirs too.
+                foreach (KeyValuePair<string, Action> regression in MbbRegressions.Concat(GmfNativeRegressions))
                 {
                     // The Dance facts come from the export, not the dump.
                     if (regression.Key.Contains("irresistible-dance")) continue;
