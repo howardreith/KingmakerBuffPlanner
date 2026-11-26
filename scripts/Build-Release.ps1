@@ -11,26 +11,38 @@ if ($LASTEXITCODE -ne 0 -or $status.Count -ne 0) {
     throw 'Release packaging requires a clean Git worktree.'
 }
 $version = Get-KbpVersion
+$releaseHead = (& git -C $root rev-parse HEAD).Trim()
+# Each deterministic build's receipt is read while its output is current; both must name the clean release commit and
+# agree with their packages, and the release ZIP (validated below) must equal both.
 $firstPackage = & (Join-Path $PSScriptRoot 'Build-Local.ps1') | Select-Object -Last 1
 $firstHash = Get-KbpSha256 $firstPackage
-$firstDllHash = (Get-Content -LiteralPath ($firstPackage + '.build-local.json') -Raw | ConvertFrom-Json).dllSha256
+$firstManifest = Get-Content -LiteralPath ($firstPackage + '.build-local.json') -Raw | ConvertFrom-Json
 $secondPackage = & (Join-Path $PSScriptRoot 'Build-Local.ps1') | Select-Object -Last 1
 $secondHash = Get-KbpSha256 $secondPackage
 $secondManifest = Get-Content -LiteralPath ($secondPackage + '.build-local.json') -Raw | ConvertFrom-Json
-if ($firstHash -cne $secondHash -or $firstDllHash -cne [string]$secondManifest.dllSha256) {
-    throw "Clean-head deterministic build failed: package $firstHash/$secondHash DLL $firstDllHash/$($secondManifest.dllSha256)"
-}
+$builds = @([pscustomobject]@{ Manifest = $firstManifest; PackageSha256 = $firstHash }, [pscustomobject]@{ Manifest = $secondManifest; PackageSha256 = $secondHash })
 
-$releaseRoot = Join-Path $root "artifacts\release\$version"
-if (Test-Path -LiteralPath $releaseRoot) {
-    $resolvedRelease = [IO.Path]::GetFullPath($releaseRoot)
-    [void](Assert-KbpPathWithin -Path $resolvedRelease -Root (Join-Path $root 'artifacts\release'))
-    Remove-Item -LiteralPath $resolvedRelease -Recurse -Force
-}
-New-Item -ItemType Directory -Path $releaseRoot | Out-Null
+# The replacement release is prepared and reconciled in a private folder under artifacts\release; the versioned release
+# directory is replaced only after the ZIP and manifest are ready, so a refusal leaves the previous release untouched.
+$releaseParent = Join-Path $root 'artifacts\release'
+$finalReleaseRoot = Join-Path $releaseParent $version
+[void](Assert-KbpPathWithin -Path ([IO.Path]::GetFullPath($finalReleaseRoot)) -Root $releaseParent)
+$privateRelease = Join-Path $releaseParent ('.prepare-' + [Guid]::NewGuid().ToString('N'))
+$releaseRoot = Join-Path $privateRelease $version
+New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
+$keepPrivateRelease = $false
+try {
 $releasePackage = Join-Path $releaseRoot "KingmakerBuffPlanner-$version.zip"
 Copy-Item -LiteralPath $secondPackage -Destination $releasePackage
-& (Join-Path $PSScriptRoot 'validate-package.ps1') -PackagePath $releasePackage
+$releaseValidation = Join-Path ([IO.Path]::GetTempPath()) ('kbp-release-validation-' + [Guid]::NewGuid().ToString('N') + '.json')
+try {
+    & (Join-Path $PSScriptRoot 'validate-package.ps1') -PackagePath $releasePackage -ReportPath $releaseValidation
+    $validatedRelease = Get-Content -LiteralPath $releaseValidation -Raw | ConvertFrom-Json
+}
+finally { Remove-Item -LiteralPath $releaseValidation -Force -ErrorAction SilentlyContinue }
+$releaseCommit = (& git -C $root rev-parse HEAD).Trim()
+if ($releaseCommit -cne $releaseHead) { throw 'HEAD changed while building the release.' }
+Assert-KbpReleaseReconciliation -ReleaseHead $releaseHead -Builds $builds -ValidatedRelease $validatedRelease -ReleasePackageSha256 (Get-KbpSha256 $releasePackage)
 Copy-Item -LiteralPath (Join-Path $root 'docs\RELEASE-NOTES-DRAFT.md') `
     -Destination (Join-Path $releaseRoot 'RELEASE-NOTES-DRAFT.md')
 
@@ -38,16 +50,55 @@ $releaseManifest = [ordered]@{
     schemaVersion = 1
     generator = 'scripts/Build-Release.ps1'
     version = $version
-    commit = (& git -C $root rev-parse HEAD).Trim()
-    packagePath = $releasePackage
-    packageSha256 = Get-KbpSha256 $releasePackage
-    dllSha256 = [string]$secondManifest.dllSha256
-    assemblyMvid = [string]$secondManifest.assemblyMvid
+    commit = $releaseCommit
+    packagePath = (Join-Path $finalReleaseRoot "KingmakerBuffPlanner-$version.zip")
+    packageSha256 = [string]$validatedRelease.package_sha256
+    dllSha256 = [string]$validatedRelease.dll_sha256
+    assemblyMvid = [string]$validatedRelease.dll_mvid
+    embeddedCommit = [string]$validatedRelease.embedded_commit
     deterministicBuilds = 2
     validated = $true
     publicationStatus = 'local-only'
 }
 $releaseManifest | ConvertTo-Json -Depth 5 | Set-Content `
     -LiteralPath (Join-Path $releaseRoot 'release-manifest.json') -Encoding UTF8
+# Replace the versioned release: the previous directory is moved aside and the prepared one moved in. Directory.Move
+# refuses an existing destination, so an occupied versioned path is never merged into. The private folder is marked kept
+# BEFORE the previous release is moved into it; the mark is cleared only once the new release is in place or the previous
+# one is back at its versioned path. Any other exit, including an interruption right after the move, leaves the private
+# folder in place and names the recovery path.
+$previousRelease = Join-Path $privateRelease 'previous'
+if (Test-Path -LiteralPath $finalReleaseRoot) {
+    $keepPrivateRelease = $true
+    [IO.Directory]::Move($finalReleaseRoot, $previousRelease)
+}
+try {
+    [IO.Directory]::Move($releaseRoot, $finalReleaseRoot)
+    $keepPrivateRelease = $false
+}
+catch {
+    $promotionError = $_.Exception.Message
+    if (Test-Path -LiteralPath $previousRelease) {
+        try {
+            [IO.Directory]::Move($previousRelease, $finalReleaseRoot)
+            $keepPrivateRelease = $false
+        }
+        catch {
+            throw "The new release could not be promoted ($promotionError) and the previous release could not be restored to $finalReleaseRoot ($($_.Exception.Message)); the previous release is preserved at $previousRelease."
+        }
+    }
+    throw
+}
+}
+finally {
+    if ($keepPrivateRelease -and (Test-Path -LiteralPath $previousRelease)) {
+        Write-Warning "The previous release was not restored to $finalReleaseRoot; it is preserved at $previousRelease."
+    }
+    elseif (Test-Path -LiteralPath $privateRelease) {
+        # Promotion or restoration was confirmed, or the previous release never left its versioned path.
+        Remove-Item -LiteralPath $privateRelease -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+$releasePackage = Join-Path $finalReleaseRoot "KingmakerBuffPlanner-$version.zip"
 Write-Host "Release build: PASS=3 FAIL=0 deterministic=2 sha256=$($releaseManifest.packageSha256)"
 Write-Output $releasePackage

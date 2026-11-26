@@ -53,10 +53,24 @@ if ($release.schemaVersion -ne 1 -or -not [bool]$release.validated -or
 }
 $package = (Resolve-Path -LiteralPath ([string]$release.packagePath)).Path
 [void](Assert-KbpPathWithin -Path $package -Root (Join-Path $root 'artifacts\release'))
-if ((Get-KbpSha256 $package) -cne [string]$release.packageSha256) {
-    throw 'Release package hash does not match its manifest.'
-}
-& (Join-Path $PSScriptRoot 'validate-package.ps1') -PackagePath $package
+# Preflight, before any state, staging or transaction: validate a private copy of the release ZIP and reconcile every
+# identity the release manifest claims (ZIP and DLL digests, MVID, embedded source revision) with that copy; the install
+# then stages exactly this copy.
+$privatePackageRoot = Join-Path $root ('artifacts\.install-package-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $privatePackageRoot | Out-Null
+try {
+$privatePackage = Join-Path $privatePackageRoot 'release.zip'
+[IO.File]::Copy($package, $privatePackage)
+$installValidation = Join-Path $privatePackageRoot 'validation.json'
+& (Join-Path $PSScriptRoot 'validate-package.ps1') -PackagePath $privatePackage -ReportPath $installValidation
+$validatedRelease = Get-Content -LiteralPath $installValidation -Raw | ConvertFrom-Json
+$releaseMismatch = @()
+if ([string]$validatedRelease.package_sha256 -cne [string]$release.packageSha256) { $releaseMismatch += 'package SHA-256' }
+if ([string]$validatedRelease.dll_sha256 -cne [string]$release.dllSha256) { $releaseMismatch += 'DLL SHA-256' }
+if ([string]$validatedRelease.dll_mvid -cne [string]$release.assemblyMvid) { $releaseMismatch += 'MVID' }
+if ([string]$validatedRelease.embedded_commit -cne [string]$release.commit) { $releaseMismatch += 'embedded source revision' }
+if ($release.PSObject.Properties.Name -contains 'embeddedCommit' -and ([string]$release.embeddedCommit -cne [string]$release.commit -or [string]$release.embeddedCommit -cne [string]$validatedRelease.embedded_commit)) { $releaseMismatch += 'embeddedCommit field' }
+if ($releaseMismatch.Count -ne 0) { throw "Release manifest does not match the validated release package: $($releaseMismatch -join ', '); nothing was staged." }
 if (-not $KingmakerInstallDir) { $KingmakerInstallDir = Get-KbpGamePath }
 $game = (Resolve-Path -LiteralPath $KingmakerInstallDir).Path
 Assert-KbpNotRunning
@@ -113,7 +127,7 @@ $state = [ordered]@{
 Write-KbpJsonAtomic $statePath $state
 $activated = $false
 try {
-    $stagedPlanner = Expand-KbpPackageToStaging -PackagePath $package -StagingRunRoot $stageRoot
+    $stagedPlanner = Expand-KbpPackageToStaging -PackagePath $privatePackage -StagingRunRoot $stageRoot
     Assert-KbpPlannerPrimaryIdentity $stagedPlanner $version
     if ((Get-KbpSha256 (Join-Path $stagedPlanner 'KingmakerBuffPlanner.dll')) -cne [string]$release.dllSha256) {
         throw 'Staged DLL hash does not match the release manifest.'
@@ -188,3 +202,5 @@ finally {
         }
     }
 }
+}
+finally { if ([IO.Directory]::Exists($privatePackageRoot)) { [IO.Directory]::Delete($privatePackageRoot, $true) } }

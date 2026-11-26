@@ -604,14 +604,27 @@ function Get-KbpCompatibilitySourcePath($Expected, [string]$LiveModsPath) {
     return Join-Path $LiveModsPath ([string]$Expected.directoryName)
 }
 
+# Writes the runtime request and returns the decoded snapshot of the bytes just written: the launcher keeps it in memory
+# and checks the result against it, never against a later read of the evidence file.
+function Save-KbpRuntimeRequest([string]$Path, $Request) {
+    # The retained request is decoded from the exact serialization passed to the atomic writer (never a reread of the
+    # destination, which another process could replace, and independent of the reader's default encoding).
+    $json = ($Request | ConvertTo-Json -Depth 20) + [Environment]::NewLine
+    Write-KbpTextAtomic $Path $json
+    return ($json | ConvertFrom-Json)
+}
+
 function Write-KbpJsonAtomic([string]$Path, $Value) {
+    Write-KbpTextAtomic $Path (($Value | ConvertTo-Json -Depth 20) + [Environment]::NewLine)
+}
+
+function Write-KbpTextAtomic([string]$Path, [string]$json) {
     $directory = Split-Path -Parent $Path
     if (-not (Test-Path -LiteralPath $directory -PathType Container)) {
         throw "Atomic JSON destination directory is missing: $directory"
     }
     $temporary = Join-Path $directory ('.' + [IO.Path]::GetFileName($Path) + '.' + [Guid]::NewGuid().ToString('N') + '.tmp')
     try {
-        $json = ($Value | ConvertTo-Json -Depth 20) + [Environment]::NewLine
         $bytes = [Text.UTF8Encoding]::new($false).GetBytes($json)
         $stream = [IO.File]::Open($temporary, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
         try { $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) }
@@ -819,6 +832,9 @@ function Enter-KbpRuntimeTransaction {
         [switch]$FixtureMode,
         [int[]]$KnownKingmakerProcessIds,
         $CompatibilityProfile,
+        # The digest admitted by the receipt/validation preflight: the transaction copies the package once into its own
+        # folder, refuses a copy with another digest before anything is activated, and extracts only that copy.
+        [string]$ExpectedPackageSha256,
         # The bounded retry of the two directory moves (a transient sharing
         # lock on the live Mods folder refused the first move of live run
         # casting-qual-select-20260924-45bff28-01); tests shorten it.
@@ -894,10 +910,17 @@ function Enter-KbpRuntimeTransaction {
     })
     $originalBackup = Join-Path $backupRunRoot 'Mods.original'
     $stagedQuarantine = Join-Path $backupRunRoot 'Mods.staged'
+    $ownedPackage = Join-Path $backupRunRoot 'package.zip'
+    [IO.File]::Copy($package, $ownedPackage)
+    $ownedPackageSha256 = Get-KbpSha256 $ownedPackage
+    if ($ExpectedPackageSha256 -and $ownedPackageSha256 -cne $ExpectedPackageSha256) {
+        Remove-Item -LiteralPath $ownedPackage -Force
+        throw "The package changed after admission (admitted $ExpectedPackageSha256, now $ownedPackageSha256); nothing was staged or activated."
+    }
     $state = [ordered]@{
         schemaVersion = 1; runId = $RunId; token = $token; status = 'Preparing'
-        createdAtUtc = [DateTime]::UtcNow.ToString('o'); packagePath = $package
-        packageSha256 = Get-KbpSha256 $package; gameRoot = $game; modsPath = $mods
+        createdAtUtc = [DateTime]::UtcNow.ToString('o'); packagePath = $package; ownedPackagePath = $ownedPackage
+        packageSha256 = $ownedPackageSha256; gameRoot = $game; modsPath = $mods
         originalExisted = $originalExisted; originalManifest = $originalManifest
         originalBackup = $originalBackup; stagedQuarantine = $stagedQuarantine
         stagingRunRoot = $stagingRunRoot; lockPath = $lockPath
@@ -917,22 +940,37 @@ function Enter-KbpRuntimeTransaction {
         # lock without a record to restore from.
         $preStateFailure = $_
         if (-not (Test-Path -LiteralPath $statePath)) {
-            foreach ($owned in @($backupRunRoot, $transactionRoot)) {
-                if ((Test-Path -LiteralPath $owned -PathType Container) -and
-                    @(Get-ChildItem -LiteralPath $owned -Force).Count -eq 0) {
-                    Remove-Item -LiteralPath $owned -Force
-                }
+            # The transaction's own package copy (complete or partial) lives only in this run's backup folder.
+            # Each cleanup step is attempted on its own; a failed step names the owned path that still needs cleanup,
+            # and the token-checked lock release is attempted regardless.
+            $cleanupFailures = @()
+            $ownedCopy = Join-Path $backupRunRoot 'package.zip'
+            try {
+                if ([IO.Path]::GetFullPath($ownedCopy).StartsWith([IO.Path]::GetFullPath($backupRunRoot).TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) -and
+                    (Test-Path -LiteralPath $ownedCopy -PathType Leaf)) { Remove-Item -LiteralPath $ownedCopy -Force -ErrorAction Stop }
             }
-            try { Remove-KbpOwnedLock $lockPath $RunId $token }
-            catch {
-                throw ("Runtime entry failed before its state existed (" + $preStateFailure.Exception.Message +
-                    ") and its lock could not be released: " + $_.Exception.Message)
+            catch { $cleanupFailures += "owned package copy $ownedCopy ($($_.Exception.Message))" }
+            foreach ($owned in @($backupRunRoot, $transactionRoot)) {
+                try {
+                    if ((Test-Path -LiteralPath $owned -PathType Container) -and
+                        @(Get-ChildItem -LiteralPath $owned -Force).Count -eq 0) {
+                        Remove-Item -LiteralPath $owned -Force -ErrorAction Stop
+                    }
+                }
+                catch { $cleanupFailures += "owned folder $owned ($($_.Exception.Message))" }
+            }
+            $lockFailure = $null
+            try { Remove-KbpOwnedLock $lockPath $RunId $token } catch { $lockFailure = $_.Exception.Message }
+            if ($cleanupFailures.Count -gt 0 -or $lockFailure) {
+                throw ("Runtime entry failed before its state existed (" + $preStateFailure.Exception.Message + ")" +
+                    $(if ($lockFailure) { "; its lock could not be released: $lockFailure" } else { '; its lock was released' }) +
+                    $(if ($cleanupFailures.Count -gt 0) { '; still to clean up: ' + ($cleanupFailures -join '; ') } else { '' }))
             }
         }
         throw $preStateFailure
     }
     try {
-        $mod = Expand-KbpPackageToStaging -PackagePath $package -StagingRunRoot $stagingRunRoot
+        $mod = Expand-KbpPackageToStaging -PackagePath $ownedPackage -StagingRunRoot $stagingRunRoot
         $stagedMods = Join-Path $stagingRunRoot 'Mods'
         New-Item -ItemType Directory -Path $stagedMods | Out-Null
         Move-Item -LiteralPath $mod -Destination (Join-Path $stagedMods 'KingmakerBuffPlanner')

@@ -5,7 +5,7 @@ Mr. Bard's Kingmaker Buff Planner was published as Kingmaker Buff Planner throug
 ## Requirements
 
 - Pathfinder: Kingmaker Enhanced Plus Edition 2.1.7b.
-- Unity Mod Manager 0.28.2 installed for Kingmaker.
+- Unity Mod Manager installed for Kingmaker. Published releases through 0.6.20 declare 0.28.2 in their `Info.json`. Builds from the UMM 0.31.1 baseline candidate (not yet released) declare and compile against 0.31.1 and need 0.31.1 or later; no loader version has been run in game for that candidate (see [UMM compatibility](UMM-COMPATIBILITY.md)).
 - The release ZIP for Mr. Bard's Kingmaker Buff Planner. Call of the Wild is optional and is not bundled.
 
 ## Install

@@ -1,0 +1,332 @@
+<!-- agent-review:v1 enrollment=kbp-codex-kingmaker-buff-planner-umm-0311-baseline-20261123182207-144d key=r05-review part=1/1 sha256=61766d837c3b6dc603466c9d2bf88b7728576f3234de5a4d6e908549d8df958a -->
+### Codex GPT-6.2 Astra — review — round 5 — candidate `e636c2c563`
+
+**Decision:** `changes_required` — The pinned compile baseline and the candidate’s focused gate are supported. Frozen-package reuse can still miss a production input, and release replacement can delete the previous validated release if promotion and recovery fail. Two release fixtures also fall short of their claimed observations.
+
+Continuation for Claude
+
+Within the enrolled budget, address the build-input findings together. Bind receipt admission to the imports that can affect the production project, while allowing configuration belonging only to the separate test project. Preserve the byte-identical reference relocation control.
+
+Keep the previous release recoverable through promotion and rollback. Exercise the public release path in a clean disposable checkout with two individually valid producers that disagree. Require the specific reconciliation error and compare the previous ZIP and manifest hashes. Use independent receipts for the malformed-flag cases. Correct the evidence summary and the production-source chronology, then run the affected offline checks and the configured focused gate. Keep native qualification, publication and the other repositories outside this correction. If the review budget is exhausted, preserve the draft and report the outstanding findings.
+
+#### Findings
+
+**R1-F3** · P1 · required_gap · blocks readiness — An ignored project-extension target can still leave a stale receipt admissible
+- Location: `scripts/Common.ps1:99`; acceptance: mission.md:156, mission.md:194
+- Trigger: After freezing the package, a project-extension target under the production project’s obj directory changes the generated version only for real compilation.
+- Expected: A material local import invalidates frozen reuse or is refused consistently by the production build and receipt reader.
+- Actual: The production project uses the standard MSBuild project-extension imports. A file such as obj/KingmakerBuffPlanner.csproj.nuget.g.targets is ignored by Git, falls outside the configuration scan at line 99 and is omitted by the fingerprint’s --exclude-standard enumeration. A setting active only during real compilation disappears from the SkipCompilerExecution inventory used at admission. The recorded DirectoryBuildTargetsPath and Directory.Build.targets refusals cover different paths.
+- Why it blocks / does not: At the same clean HEAD, the launcher can admit the old package even though a current production build would generate different DLL bytes.
+- Requested correction: Account for the effective production-project imports, or disable unsupported project-extension imports consistently during build and reuse. Keep the reference relocation control.
+- Requested evidence: In a clean temporary checkout, exercise a production-only BuildInfo change through the ignored project-extension target. Show the old receipt refused and the restored configuration accepted.
+
+**R4-F1** · P2 · evidence_gap · blocks readiness — The release-preservation fixture passes before either build runs
+- Location: `scripts/Test-LoaderBaseline.ps1:494`; acceptance: mission.md:194, mission.md:200, mission.md:255
+- Trigger: Run release-with-disagreeing-builds-keeps-previous-release against the seeded versioned release.
+- Expected: The seeded release survives a refusal caused by two individually valid producing builds disagreeing.
+- Actual: The fixture writes Build-Release-instrumented.ps1 under the clone’s tracked scripts directory. The retained case at loader-baseline.json line 438 reports “Release packaging requires a clean Git worktree.” Neither producing build ran. The assertion accepts any nonzero exit. Its injected digest also disagrees with its own receipt before the two producers can be compared.
+- Why it blocks / does not: The reported pass cannot detect a regression that deletes the previous release on a deterministic-build disagreement.
+- Requested correction: Keep the disposable checkout clean, supply two internally consistent but different producers and require the inter-build reconciliation error. Correct the recorded interpretation of this case.
+- Requested evidence: Capture the specific mismatch, the previous ZIP and manifest hashes before and after refusal, and the private-directory cleanup result.
+
+**R5-F1** · P1 · defect · blocks readiness — Failed release promotion can delete the rollback copy
+- Location: `scripts/Build-Release.ps1:75`; acceptance: mission.md:155, mission.md:194, mission.md:255
+- Trigger: The previous release has been moved aside and the prepared directory cannot be promoted or restored to the versioned path.
+- Expected: The previous release remains at its canonical path or at an identified recovery path until promotion or restoration has succeeded.
+- Actual: After moving the old version to .prepare-<id>/previous, the catch restores it only when the final path is absent. If that path is occupied, or the rollback move throws, the outer finally recursively deletes the private directory containing the previous ZIP and manifest.
+- Why it blocks / does not: A failed replacement can destroy the last validated release and its recovery copy.
+- Requested correction: Make promotion refuse an occupied destination and condition backup deletion on confirmed promotion or restoration. Retain and report the backup path when recovery fails.
+- Requested evidence: In a private fixture, occupy the final path after the previous directory is moved aside. Verify refusal, preservation of the previous ZIP and manifest hashes, and an accurate recovery path.
+
+**R4-F4** · P2 · evidence_gap · blocks readiness — The clean-flag fixture changes both producer inputs
+- Location: `scripts/Test-LoaderBaseline.ps1:460`; acceptance: mission.md:155, mission.md:194, mission.md:200
+- Trigger: Run a malformed sourceDirty case through the release reconciliation fixture.
+- Expected: Changing only one producing receipt’s sourceDirty field causes refusal while a matching clean pair is accepted.
+- Actual: The production helper now checks for Boolean false inside its producer loop. The fixture reads one edited manifest into $b and passes @($b, $b). The reported empty-array, string and numeric refusals therefore all encounter an invalid first producer.
+- Why it blocks / does not: The requested observation for one malformed producer paired with a clean producer is still missing. These cases would also pass if reconciliation checked only the first receipt.
+- Requested correction: Construct two independent receipt objects and mutate only the selected producer.
+- Requested evidence: Keep the clean-pair control and show the specific refusal with the first receipt clean and the second containing an empty array or the string false.
+
+**R5-F2** · P2 · defect · blocks readiness — A test-project user file blocks an unrelated production build
+- Location: `scripts/Common.ps1:99`; acceptance: mission.md:153, mission.md:156, mission.md:189
+- Trigger: Run Build.ps1 or admit a frozen receipt while the separate test project has local user settings.
+- Expected: Production build and reuse checks consider configuration that can apply to the production solution or project.
+- Actual: The new repository-wide git ls-files glob rejects every untracked *.csproj.user. That includes tests/KingmakerBuffPlanner.Tests/KingmakerBuffPlanner.Tests.csproj.user, which .gitignore explicitly covers. The production solution contains only KingmakerBuffPlanner and never imports the test project’s user file.
+- Why it blocks / does not: A developer’s test-project settings can now stop an ordinary production build or invalidate an otherwise usable frozen package.
+- Requested correction: Scope the configuration check to the production project and its effective imports and search directories.
+- Requested evidence: With an ignored user file belonging only to the test project, show the production build and unchanged receipt succeed. Retain a refusal for an effective production override.
+
+**R5-F3** · P2 · required_gap · blocks readiness — The compatibility guide dates production-source continuity one round too early
+- Location: `docs/UMM-COMPATIBILITY.md:95`; acceptance: mission.md:233, mission.md:251, mission.md:255
+- Trigger: Use the current frozen-product section to determine whether round-2 protocol evidence applies.
+- Expected: The compatibility record names the last production-source change accurately and keeps earlier evidence attached to its original protocol and artifact.
+- Actual: The current guide says product source is unchanged since round 2. Git shows four compiled RuntimeTesting files changed between the round-2 freeze 75aeeff and c2a594c. Commit 04c55bc changed the loader request and installed-identity result fields.
+- Why it blocks / does not: The stated continuity crosses a compiled protocol change and misidentifies which source the historical observations cover.
+- Requested correction: Identify 04c55bc as the last production-source change and distinguish it from the later tooling and evidence commits.
+- Requested evidence: Check the revised chronology against git diff --name-status 75aeeff..c2a594c -- src and the production-source commit log.
+
+#### Prior finding assessments
+
+- **R1-F3** — `fix_rejected` — The named environment redirect and conventional untracked Directory.Build.targets are now refused. The ignored project-extension import still permits the same production-only divergence.
+- **R4-F1** — `fix_rejected` — Reconciliation now precedes the directory swap in source. The required disagreement fixture stopped at the clean-worktree guard, leaving preservation on the original failure path unverified.
+- **R4-F2** — `fix_verified` — Private-copy cleanup errors are collected before the independent token-checked lock release. The held-ZIP fixture recorded the injected write failure, unchanged Mods entries, no remaining lock and the owned path requiring cleanup.
+- **R4-F3** — `fix_verified` — Save-KbpRuntimeRequest retains the JSON string passed to the atomic writer. The boundary fixture recorded the original 0.31.1 row and non-ASCII text after replacement, and the reader refused the 0.33.4 result.
+- **R4-F4** — `fix_rejected` — The production type check is present for every receipt. The claimed one-receipt mutation was never exercised because the fixture supplies the same edited object in both positions.
+- **R4-F5** — `fix_verified` — The guide supplies -CandidatePackage and explains the reduced run. The script resolves the ZIP from the PowerShell location. The 40-case export includes all eight matching deployment/wrapper observations, both crossed-row refusals and the unchanged fixture check.
+- **R4-F6** — `fix_verified` — The resolver canonicalizes the ID before opening and checking the row. The recorded Owner-0.33.0 case returned owner-0.33.0 with the same component identity.
+
+#### Evidence assessment
+
+- **Inspected:** Read the mission, repository instructions, validation policy, full feature diff, correction diff, developer report, transcript notice and all seven pending ledger entries.; Compared the production project and build wrappers with the compiler inventory, package validator, frozen-receipt reader, release reconciliation and installer. Traced request retention and loader selection through the launcher, deployment wrapper and result reader.; The frozen c2a594c records identify ZIP e8c19adf7aea9a0d92f0a631300b61439d449fe00caa5b6ca9b79951d700b480, DLL a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda and MVID eb7e8a92-d678-45b3-a9a2-065ae10511c0. The package read-back and static audit agree on that identity.; The committed suites report 99/99 boundary cases and 40/40 loader-identity cases. I compared the release-case details with their assertions. The static audit reports eight types and 24 members resolved on all four measured loader rows.
+- **Executed verification:** The controller receipt at e636c2c records source validation 47/47, one successful Release build and localization tests 14/14 in 10.4 seconds. The DLL SHA-256 is 4f57c8d9f0b578d5cd8e096009d099170b571b9592e7f575af1d233c611fe995. I verified the gate log hash.; Read-only checks confirmed the candidate HEAD, documentation-only changes after c2a594c, all 12 indexed evidence-export hashes and all 247 repository source/resource hashes represented in the retained compiler receipt.; The feature diff passed git diff --check. The changed JSON and MSBuild XML parsed, and eight relevant documentation links resolved.
+- **Source inspection only:** The remaining production-import and unrelated-file cases follow from the project import paths, Git exclusions, configuration scan and skipped-compiler evaluation. I did not run MSBuild for these cases.; The release swap and failed-rollback finding follows from the Move-Item, catch and finally paths. The supplied release-preservation case ended at the clean-worktree check.; The Boolean guard applies to each producer in source. The committed malformed-flag fixture supplies the same edited producer twice.
+- **Required gaps:** Show refusal of a production-only project-extension input and acceptance with a harmless test-project configuration.; Show that a clean release fixture reaches the inter-build mismatch and preserves the prior ZIP and manifest. Show that a failed swap with an unavailable rollback destination retains a recoverable previous release.; Exercise one malformed receipt alongside one genuine clean receipt and correct the source-history statement.
+- **Limitations:** The controller withheld the mixed foreground transcript. The candidate gate has an independent execution receipt. The frozen suites have committed case outputs, but their full command lines and caller working directories are unavailable.; The read-only review used the exported package read-back. Builds, package creation and game workflows were not rerun. Local PowerShell policy also prevented an independent invocation of the reconciliation helper.; Native behavior and combined-stack behavior remain NOT RUN. Matching deployment fixtures reached a separate host guard after clearing the loader check. They establish offline preflight behavior.
+
+#### Summary
+
+- **Delivered behavior:** Buff Planner 0.6.20 declares UMM 0.31.1. The retained production DLL references UnityModManager 0.31.1.0 and 0Harmony12 1.2.0.1. Static checks cover 0.31.1, 0.32.4, owner 0.33.0 and 0.33.4. Offline records support loader selection, retained-request matching and pre-state lock cleanup.
+- **Scope reviewed:** Final correction review of Buff Planner draft PR #26 at the specified candidate, covering the seven pending findings and the changed build, release, runtime-identity and evidence paths.
+- **Pending later-phase work:** none
+- **Unresolved questions:** none
+- **Remaining owner review:** Decide how to proceed with draft PR #26 if the enrolled five-round budget is exhausted.; Authorize a disposable game environment if native compatibility qualification is pursued.
+
+#### Provenance (controller-recorded)
+
+| | Requested | Observed |
+|---|---|---|
+| Model | `gpt-6.2-astra` | `gpt-6.2-astra` (turns ['gpt-6.2-astra']) |
+| Reasoning effort | `max` | `max` (turns ['max']) |
+| Sandbox / approvals | read-only / never | `read-only` / `never` |
+
+Owner guidance bound to this review: none.
+
+Owner amendments bound to this review: none.
+
+Codex CLI `0.170.0`, thread `01a20e5a-7d34-74e0-846f-a46220727eee`, duration 770.4s, response sha256 `3c793b55abdbbf621ed0f44120c820bbe1cd0bb06d773150b318b76f647a2efa`, request `kbp-codex-kingmaker-buff-planner-umm-0311-baseline-20261123182207-144d-r05-c2c6c8`. Observed values come from the Codex session rollout's recorded thread settings, not from the model's own statements; the serving backend's model identity is not separately exposed.
+
+<details><summary>Complete structured review (agent-review.review.v1)</summary>
+
+```json
+{
+  "candidate_commit": "e636c2c56367c6fd621b39cbabb11374203c8bf8",
+  "checkpoint_id": "final",
+  "checkpoint_type": "final",
+  "decision": "changes_required",
+  "decision_rationale": "The pinned compile baseline and the candidate\u2019s focused gate are supported. Frozen-package reuse can still miss a production input, and release replacement can delete the previous validated release if promotion and recovery fail. Two release fixtures also fall short of their claimed observations.\n\nContinuation for Claude\n\nWithin the enrolled budget, address the build-input findings together. Bind receipt admission to the imports that can affect the production project, while allowing configuration belonging only to the separate test project. Preserve the byte-identical reference relocation control.\n\nKeep the previous release recoverable through promotion and rollback. Exercise the public release path in a clean disposable checkout with two individually valid producers that disagree. Require the specific reconciliation error and compare the previous ZIP and manifest hashes. Use independent receipts for the malformed-flag cases. Correct the evidence summary and the production-source chronology, then run the affected offline checks and the configured focused gate. Keep native qualification, publication and the other repositories outside this correction. If the review budget is exhausted, preserve the draft and report the outstanding findings.",
+  "evidence_assessment": {
+    "executed_verification": [
+      "The controller receipt at e636c2c records source validation 47/47, one successful Release build and localization tests 14/14 in 10.4 seconds. The DLL SHA-256 is 4f57c8d9f0b578d5cd8e096009d099170b571b9592e7f575af1d233c611fe995. I verified the gate log hash.",
+      "Read-only checks confirmed the candidate HEAD, documentation-only changes after c2a594c, all 12 indexed evidence-export hashes and all 247 repository source/resource hashes represented in the retained compiler receipt.",
+      "The feature diff passed git diff --check. The changed JSON and MSBuild XML parsed, and eight relevant documentation links resolved."
+    ],
+    "inspected": [
+      "Read the mission, repository instructions, validation policy, full feature diff, correction diff, developer report, transcript notice and all seven pending ledger entries.",
+      "Compared the production project and build wrappers with the compiler inventory, package validator, frozen-receipt reader, release reconciliation and installer. Traced request retention and loader selection through the launcher, deployment wrapper and result reader.",
+      "The frozen c2a594c records identify ZIP e8c19adf7aea9a0d92f0a631300b61439d449fe00caa5b6ca9b79951d700b480, DLL a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda and MVID eb7e8a92-d678-45b3-a9a2-065ae10511c0. The package read-back and static audit agree on that identity.",
+      "The committed suites report 99/99 boundary cases and 40/40 loader-identity cases. I compared the release-case details with their assertions. The static audit reports eight types and 24 members resolved on all four measured loader rows."
+    ],
+    "limitations": [
+      "The controller withheld the mixed foreground transcript. The candidate gate has an independent execution receipt. The frozen suites have committed case outputs, but their full command lines and caller working directories are unavailable.",
+      "The read-only review used the exported package read-back. Builds, package creation and game workflows were not rerun. Local PowerShell policy also prevented an independent invocation of the reconciliation helper.",
+      "Native behavior and combined-stack behavior remain NOT RUN. Matching deployment fixtures reached a separate host guard after clearing the loader check. They establish offline preflight behavior."
+    ],
+    "required_gaps": [
+      "Show refusal of a production-only project-extension input and acceptance with a harmless test-project configuration.",
+      "Show that a clean release fixture reaches the inter-build mismatch and preserves the prior ZIP and manifest. Show that a failed swap with an unavailable rollback destination retains a recoverable previous release.",
+      "Exercise one malformed receipt alongside one genuine clean receipt and correct the source-history statement."
+    ],
+    "source_inspection_only": [
+      "The remaining production-import and unrelated-file cases follow from the project import paths, Git exclusions, configuration scan and skipped-compiler evaluation. I did not run MSBuild for these cases.",
+      "The release swap and failed-rollback finding follows from the Move-Item, catch and finally paths. The supplied release-preservation case ended at the clean-worktree check.",
+      "The Boolean guard applies to each producer in source. The committed malformed-flag fixture supplies the same edited producer twice."
+    ]
+  },
+  "findings": [
+    {
+      "acceptance_ids": [
+        "mission.md:156",
+        "mission.md:194"
+      ],
+      "actual": "The production project uses the standard MSBuild project-extension imports. A file such as obj/KingmakerBuffPlanner.csproj.nuget.g.targets is ignored by Git, falls outside the configuration scan at line 99 and is omitted by the fingerprint\u2019s --exclude-standard enumeration. A setting active only during real compilation disappears from the SkipCompilerExecution inventory used at admission. The recorded DirectoryBuildTargetsPath and Directory.Build.targets refusals cover different paths.",
+      "blocking_rationale": "At the same clean HEAD, the launcher can admit the old package even though a current production build would generate different DLL bytes.",
+      "blocks_readiness": true,
+      "category": "required_gap",
+      "expected": "A material local import invalidates frozen reuse or is refused consistently by the production build and receipt reader.",
+      "id": "R1-F3",
+      "location": {
+        "file": "scripts/Common.ps1",
+        "line": 99
+      },
+      "priority": "P1",
+      "requested_correction": "Account for the effective production-project imports, or disable unsupported project-extension imports consistently during build and reuse. Keep the reference relocation control.",
+      "requested_evidence": "In a clean temporary checkout, exercise a production-only BuildInfo change through the ignored project-extension target. Show the old receipt refused and the restored configuration accepted.",
+      "title": "An ignored project-extension target can still leave a stale receipt admissible",
+      "trigger": "After freezing the package, a project-extension target under the production project\u2019s obj directory changes the generated version only for real compilation."
+    },
+    {
+      "acceptance_ids": [
+        "mission.md:194",
+        "mission.md:200",
+        "mission.md:255"
+      ],
+      "actual": "The fixture writes Build-Release-instrumented.ps1 under the clone\u2019s tracked scripts directory. The retained case at loader-baseline.json line 438 reports \u201cRelease packaging requires a clean Git worktree.\u201d Neither producing build ran. The assertion accepts any nonzero exit. Its injected digest also disagrees with its own receipt before the two producers can be compared.",
+      "blocking_rationale": "The reported pass cannot detect a regression that deletes the previous release on a deterministic-build disagreement.",
+      "blocks_readiness": true,
+      "category": "evidence_gap",
+      "expected": "The seeded release survives a refusal caused by two individually valid producing builds disagreeing.",
+      "id": "R4-F1",
+      "location": {
+        "file": "scripts/Test-LoaderBaseline.ps1",
+        "line": 494
+      },
+      "priority": "P2",
+      "requested_correction": "Keep the disposable checkout clean, supply two internally consistent but different producers and require the inter-build reconciliation error. Correct the recorded interpretation of this case.",
+      "requested_evidence": "Capture the specific mismatch, the previous ZIP and manifest hashes before and after refusal, and the private-directory cleanup result.",
+      "title": "The release-preservation fixture passes before either build runs",
+      "trigger": "Run release-with-disagreeing-builds-keeps-previous-release against the seeded versioned release."
+    },
+    {
+      "acceptance_ids": [
+        "mission.md:155",
+        "mission.md:194",
+        "mission.md:255"
+      ],
+      "actual": "After moving the old version to .prepare-<id>/previous, the catch restores it only when the final path is absent. If that path is occupied, or the rollback move throws, the outer finally recursively deletes the private directory containing the previous ZIP and manifest.",
+      "blocking_rationale": "A failed replacement can destroy the last validated release and its recovery copy.",
+      "blocks_readiness": true,
+      "category": "defect",
+      "expected": "The previous release remains at its canonical path or at an identified recovery path until promotion or restoration has succeeded.",
+      "id": "R5-F1",
+      "location": {
+        "file": "scripts/Build-Release.ps1",
+        "line": 75
+      },
+      "priority": "P1",
+      "requested_correction": "Make promotion refuse an occupied destination and condition backup deletion on confirmed promotion or restoration. Retain and report the backup path when recovery fails.",
+      "requested_evidence": "In a private fixture, occupy the final path after the previous directory is moved aside. Verify refusal, preservation of the previous ZIP and manifest hashes, and an accurate recovery path.",
+      "title": "Failed release promotion can delete the rollback copy",
+      "trigger": "The previous release has been moved aside and the prepared directory cannot be promoted or restored to the versioned path."
+    },
+    {
+      "acceptance_ids": [
+        "mission.md:155",
+        "mission.md:194",
+        "mission.md:200"
+      ],
+      "actual": "The production helper now checks for Boolean false inside its producer loop. The fixture reads one edited manifest into $b and passes @($b, $b). The reported empty-array, string and numeric refusals therefore all encounter an invalid first producer.",
+      "blocking_rationale": "The requested observation for one malformed producer paired with a clean producer is still missing. These cases would also pass if reconciliation checked only the first receipt.",
+      "blocks_readiness": true,
+      "category": "evidence_gap",
+      "expected": "Changing only one producing receipt\u2019s sourceDirty field causes refusal while a matching clean pair is accepted.",
+      "id": "R4-F4",
+      "location": {
+        "file": "scripts/Test-LoaderBaseline.ps1",
+        "line": 460
+      },
+      "priority": "P2",
+      "requested_correction": "Construct two independent receipt objects and mutate only the selected producer.",
+      "requested_evidence": "Keep the clean-pair control and show the specific refusal with the first receipt clean and the second containing an empty array or the string false.",
+      "title": "The clean-flag fixture changes both producer inputs",
+      "trigger": "Run a malformed sourceDirty case through the release reconciliation fixture."
+    },
+    {
+      "acceptance_ids": [
+        "mission.md:153",
+        "mission.md:156",
+        "mission.md:189"
+      ],
+      "actual": "The new repository-wide git ls-files glob rejects every untracked *.csproj.user. That includes tests/KingmakerBuffPlanner.Tests/KingmakerBuffPlanner.Tests.csproj.user, which .gitignore explicitly covers. The production solution contains only KingmakerBuffPlanner and never imports the test project\u2019s user file.",
+      "blocking_rationale": "A developer\u2019s test-project settings can now stop an ordinary production build or invalidate an otherwise usable frozen package.",
+      "blocks_readiness": true,
+      "category": "defect",
+      "expected": "Production build and reuse checks consider configuration that can apply to the production solution or project.",
+      "id": "R5-F2",
+      "location": {
+        "file": "scripts/Common.ps1",
+        "line": 99
+      },
+      "priority": "P2",
+      "requested_correction": "Scope the configuration check to the production project and its effective imports and search directories.",
+      "requested_evidence": "With an ignored user file belonging only to the test project, show the production build and unchanged receipt succeed. Retain a refusal for an effective production override.",
+      "title": "A test-project user file blocks an unrelated production build",
+      "trigger": "Run Build.ps1 or admit a frozen receipt while the separate test project has local user settings."
+    },
+    {
+      "acceptance_ids": [
+        "mission.md:233",
+        "mission.md:251",
+        "mission.md:255"
+      ],
+      "actual": "The current guide says product source is unchanged since round 2. Git shows four compiled RuntimeTesting files changed between the round-2 freeze 75aeeff and c2a594c. Commit 04c55bc changed the loader request and installed-identity result fields.",
+      "blocking_rationale": "The stated continuity crosses a compiled protocol change and misidentifies which source the historical observations cover.",
+      "blocks_readiness": true,
+      "category": "required_gap",
+      "expected": "The compatibility record names the last production-source change accurately and keeps earlier evidence attached to its original protocol and artifact.",
+      "id": "R5-F3",
+      "location": {
+        "file": "docs/UMM-COMPATIBILITY.md",
+        "line": 95
+      },
+      "priority": "P2",
+      "requested_correction": "Identify 04c55bc as the last production-source change and distinguish it from the later tooling and evidence commits.",
+      "requested_evidence": "Check the revised chronology against git diff --name-status 75aeeff..c2a594c -- src and the production-source commit log.",
+      "title": "The compatibility guide dates production-source continuity one round too early",
+      "trigger": "Use the current frozen-product section to determine whether round-2 protocol evidence applies."
+    }
+  ],
+  "prior_finding_assessments": [
+    {
+      "assessment": "fix_rejected",
+      "finding_id": "R1-F3",
+      "rationale": "The named environment redirect and conventional untracked Directory.Build.targets are now refused. The ignored project-extension import still permits the same production-only divergence."
+    },
+    {
+      "assessment": "fix_rejected",
+      "finding_id": "R4-F1",
+      "rationale": "Reconciliation now precedes the directory swap in source. The required disagreement fixture stopped at the clean-worktree guard, leaving preservation on the original failure path unverified."
+    },
+    {
+      "assessment": "fix_verified",
+      "finding_id": "R4-F2",
+      "rationale": "Private-copy cleanup errors are collected before the independent token-checked lock release. The held-ZIP fixture recorded the injected write failure, unchanged Mods entries, no remaining lock and the owned path requiring cleanup."
+    },
+    {
+      "assessment": "fix_verified",
+      "finding_id": "R4-F3",
+      "rationale": "Save-KbpRuntimeRequest retains the JSON string passed to the atomic writer. The boundary fixture recorded the original 0.31.1 row and non-ASCII text after replacement, and the reader refused the 0.33.4 result."
+    },
+    {
+      "assessment": "fix_rejected",
+      "finding_id": "R4-F4",
+      "rationale": "The production type check is present for every receipt. The claimed one-receipt mutation was never exercised because the fixture supplies the same edited object in both positions."
+    },
+    {
+      "assessment": "fix_verified",
+      "finding_id": "R4-F5",
+      "rationale": "The guide supplies -CandidatePackage and explains the reduced run. The script resolves the ZIP from the PowerShell location. The 40-case export includes all eight matching deployment/wrapper observations, both crossed-row refusals and the unchanged fixture check."
+    },
+    {
+      "assessment": "fix_verified",
+      "finding_id": "R4-F6",
+      "rationale": "The resolver canonicalizes the ID before opening and checking the row. The recorded Owner-0.33.0 case returned owner-0.33.0 with the same component identity."
+    }
+  ],
+  "request_id": "kbp-codex-kingmaker-buff-planner-umm-0311-baseline-20261123182207-144d-r05-c2c6c8",
+  "round": 5,
+  "schema_version": "agent-review.review.v1",
+  "summary": {
+    "delivered_behavior": "Buff Planner 0.6.20 declares UMM 0.31.1. The retained production DLL references UnityModManager 0.31.1.0 and 0Harmony12 1.2.0.1. Static checks cover 0.31.1, 0.32.4, owner 0.33.0 and 0.33.4. Offline records support loader selection, retained-request matching and pre-state lock cleanup.",
+    "pending_later_phase_work": [],
+    "remaining_owner_review": [
+      "Decide how to proceed with draft PR #26 if the enrolled five-round budget is exhausted.",
+      "Authorize a disposable game environment if native compatibility qualification is pursued."
+    ],
+    "scope_reviewed": "Final correction review of Buff Planner draft PR #26 at the specified candidate, covering the seven pending findings and the changed build, release, runtime-identity and evidence paths.",
+    "unresolved_questions": []
+  }
+}
+```
+</details>
+
+_Model-generated review by Codex using the requested model, posted by the agent-review controller through the owner's GitHub account. Not a human review or approval._

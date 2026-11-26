@@ -105,6 +105,12 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 throw new InvalidDataException("advanced-profile-without-advanced-copy");
             if (request.ExpectedOptionalMods == null || request.ExpectedBlueprintGuids == null)
                 throw new InvalidDataException("compatibility-expectations");
+            if (request.ExpectedLoader != null &&
+                (!IsSafeIdentifier(request.ExpectedLoader.LoaderId) ||
+                 !IsExpectedAssembly(request.ExpectedLoader.UnityModManager) ||
+                 !IsExpectedAssembly(request.ExpectedLoader.Harmony12) ||
+                 !IsExpectedAssembly(request.ExpectedLoader.Harmony2)))
+                throw new InvalidDataException("loader-expectation");
             foreach (RuntimeExpectedOptionalMod mod in request.ExpectedOptionalMods)
                 if (mod == null || !IsSafeIdentifier(mod.UmmId) || !IsSafeIdentifier(mod.AssemblyName) ||
                     !IsSha256(mod.AssemblySha256) || string.IsNullOrWhiteSpace(mod.Version))
@@ -169,6 +175,15 @@ namespace KingmakerBuffPlanner.RuntimeTesting
                 int.TryParse(parts[0], out width) && int.TryParse(parts[1], out height) &&
                 width >= 640 && width <= 7680 && height >= 480 && height <= 4320;
         }
+
+        private static bool IsExpectedAssembly(RuntimeExpectedAssembly assembly)
+
+        {
+
+            return assembly != null && IsSha256(assembly.Sha256) && System.Version.TryParse(assembly.Version, out _);
+
+        }
+
 
         private static bool IsSha256(string value)
         {
@@ -871,6 +886,24 @@ namespace KingmakerBuffPlanner.RuntimeTesting
 
         [JsonProperty("parameters", Required = Required.Always, Order = 15)]
         public Dictionary<string, object> Parameters { get; set; }
+
+        // The measured loader row the launcher selected; the launcher always sends it and the result reader requires it.
+        [JsonProperty("expectedLoader", Order = 16)]
+        public RuntimeExpectedLoader ExpectedLoader { get; set; }
+    }
+
+    internal sealed class RuntimeExpectedLoader
+    {
+        [JsonProperty("loaderId", Required = Required.Always, Order = 1)] public string LoaderId { get; set; }
+        [JsonProperty("unityModManager", Required = Required.Always, Order = 2)] public RuntimeExpectedAssembly UnityModManager { get; set; }
+        [JsonProperty("harmony12", Required = Required.Always, Order = 3)] public RuntimeExpectedAssembly Harmony12 { get; set; }
+        [JsonProperty("harmony2", Required = Required.Always, Order = 4)] public RuntimeExpectedAssembly Harmony2 { get; set; }
+    }
+
+    internal sealed class RuntimeExpectedAssembly
+    {
+        [JsonProperty("version", Required = Required.Always, Order = 1)] public string Version { get; set; }
+        [JsonProperty("sha256", Required = Required.Always, Order = 2)] public string Sha256 { get; set; }
     }
 
     internal sealed class RuntimeExpectedOptionalMod
