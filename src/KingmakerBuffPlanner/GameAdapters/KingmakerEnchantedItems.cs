@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Kingmaker.Items;
 using Kingmaker.Items.Slots;
+using KingmakerBuffPlanner.Domain.Effects;
+using KingmakerBuffPlanner.Execution;
 
 namespace KingmakerBuffPlanner.GameAdapters
 {
@@ -17,32 +21,81 @@ namespace KingmakerBuffPlanner.GameAdapters
     // worn-equipment slots, and an empty hand's MaybeItem is null, so the
     // native hands, the empty-hand weapon and the limb weapons are read too.
     // An item reached more than once is observed once.
+    //
+    // PR #29 review: two reads, because "could not read" is not "read and
+    // found nothing". Cast confirmation takes ReadComplete: an unreadable
+    // source throws, so KingmakerEffectInstanceReader.ReadBaseline fails and
+    // nothing is cast, and a later read that fails confirms nothing. A
+    // baseline that silently omitted an existing enchantment would let that
+    // unchanged enchantment, once readable, pass as freshly applied. The
+    // planning view (KingmakerActiveEffectSnapshotBuilder) takes Read, which
+    // omits an unreadable extra source: there an omitted enchantment can only
+    // look absent, which makes the planner cast, never skip.
     internal static class KingmakerEnchantedItems
     {
         internal static IReadOnlyList<ItemEntity> Read(UnitBody body)
         {
-            if (body == null) return new ItemEntity[0];
+            return Read(body, false);
+        }
+
+        internal static IReadOnlyList<ItemEntity> ReadComplete(UnitBody body)
+        {
+            return Read(body, true);
+        }
+
+        private static IReadOnlyList<ItemEntity> Read(UnitBody body, bool complete)
+        {
+            if (body == null)
+            {
+                if (complete) throw new InvalidOperationException("unit-body-unreadable");
+                return new ItemEntity[0];
+            }
             var slots = body.CurrentEquipmentSlots
                 .Select(slot => slot == null ? null : slot.MaybeItem).ToList();
             ItemEntity emptyHand = null;
             var natural = new List<ItemEntity>();
-            // An unreadable extra source is not observed; what it would show
-            // then never confirms or satisfies anything.
             try { emptyHand = body.EmptyHandWeapon; }
-            catch (Exception) { emptyHand = null; }
+            catch (Exception) when (!complete) { emptyHand = null; }
             try
             {
                 foreach (HandSlot hand in new[] { body.PrimaryHand, body.SecondaryHand })
                     natural.Add(hand == null ? null : hand.MaybeItem);
             }
-            catch (Exception) { /* the ordinary hand set is already among the slots */ }
+            catch (Exception) when (!complete) { /* the ordinary hand set is already among the slots */ }
             try
             {
                 List<WeaponSlot> additional = body.AdditionalLimbs;
                 if (additional != null) natural.AddRange(additional.Select(slot => slot == null ? null : slot.MaybeItem));
             }
-            catch (Exception) { /* limbs unread */ }
+            catch (Exception) when (!complete) { /* limbs unread */ }
             return Distinct(slots, emptyHand, natural);
+        }
+
+        // Cast confirmation's read (KingmakerEffectInstanceReader): the
+        // unit's instances of the expected worn-item enchantments, from every
+        // item the complete read observes. An unreadable item source throws.
+        internal static List<ObservedEffectInstance> Instances(UnitBody body, HashSet<string> ids)
+        {
+            var instances = new List<ObservedEffectInstance>();
+            foreach (ItemEntity item in ReadComplete(body))
+            {
+                if (item.Enchantments == null) continue;
+                foreach (var enchantment in item.Enchantments)
+                {
+                    if (enchantment == null || enchantment.Blueprint == null ||
+                        !ids.Contains(enchantment.Blueprint.AssetGuid)) continue;
+                    instances.Add(new ObservedEffectInstance(EffectKind.WornItemEnchantment,
+                        enchantment.Blueprint.AssetGuid, Identity(enchantment),
+                        enchantment.EndTime.Ticks, false));
+                }
+            }
+            return instances;
+        }
+
+        // A process-local identity of a native instance (reference identity).
+        internal static string Identity(object instance)
+        {
+            return RuntimeHelpers.GetHashCode(instance).ToString(CultureInfo.InvariantCulture);
         }
 
         // The slot items, then the empty-hand weapon, then the native hand and

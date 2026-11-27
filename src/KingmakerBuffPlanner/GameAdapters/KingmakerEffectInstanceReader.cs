@@ -200,18 +200,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     // Review R9-F2: the applying caster (null when unread).
                     KingmakerActiveEffectSnapshotBuilder.CasterId(buff)));
             }
-            foreach (ItemEntity item in KingmakerEnchantedItems.Read(unit.Descriptor.Body))
-            {
-                if (item.Enchantments == null) continue;
-                foreach (var enchantment in item.Enchantments)
-                {
-                    if (enchantment == null || enchantment.Blueprint == null ||
-                        !ids.Contains(enchantment.Blueprint.AssetGuid)) continue;
-                    instances.Add(new ObservedEffectInstance(EffectKind.WornItemEnchantment,
-                        enchantment.Blueprint.AssetGuid, Key(enchantment),
-                        enchantment.EndTime.Ticks, false));
-                }
-            }
+            instances.AddRange(KingmakerEnchantedItems.Instances(unit.Descriptor.Body, ids));
             return instances;
         }
 
@@ -231,7 +220,7 @@ namespace KingmakerBuffPlanner.GameAdapters
 
         private static string Key(object instance)
         {
-            return RuntimeHelpers.GetHashCode(instance).ToString(CultureInfo.InvariantCulture);
+            return KingmakerEnchantedItems.Identity(instance);
         }
 
         private static string ContextDetail(Buff buff)

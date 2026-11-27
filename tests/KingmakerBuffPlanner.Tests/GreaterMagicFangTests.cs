@@ -73,6 +73,8 @@ namespace KingmakerBuffPlanner.Tests
             Mbb("greater-magic-fang-unproven-enchantment-is-never-admitted", TestGmfUnprovenContracts),
             Mbb("greater-magic-fang-confirmation-needs-the-cast-tier-and-buff-fresh-on-the-recipient",
                 TestGmfConfirmation),
+            Mbb("greater-magic-fang-unreadable-weapon-baseline-never-confirms-an-old-tier",
+                TestGmfIncompleteWeaponBaseline),
             Mbb("greater-magic-fang-existing-effects-keep-the-casting-policy", TestGmfExistingEffects),
             Mbb("greater-magic-fang-druid-casts-on-pets-of-two-masters-in-either-order", TestGmfTwoPets),
             Mbb("greater-magic-fang-refusals-and-unconfirmed-casts-still-stop-the-run", TestGmfRefusals),
@@ -874,6 +876,127 @@ namespace KingmakerBuffPlanner.Tests
                 AppliedEffectJudgement.StillCovered(expected, new[] { oldBuff, tier(3, "t3") },
                     new[] { oldBuff, tier(3, "t3") }),
                 "A Greater Magic Fang whose caster level was unknown was confirmed or kept as covered.");
+        }
+
+        // PR #29 review: "could not read" is not "read and found nothing".
+        // The production enchantment read on detached native objects. The pet
+        // is polymorphed and its polymorph hand set cannot be read before the
+        // cast (native UnitBody.PrimaryHand dereferences
+        // m_PolymoprphHandsEquipmentSet and throws), so the old +3 on its
+        // polymorph claw is not seen. The cast applies +2 (a different caster
+        // level) and refreshes the buff, and afterwards the claw is readable
+        // with its unchanged +3. KingmakerEffectInstanceReader.ReadBaseline
+        // turns a read that throws into a refused baseline (nothing is cast);
+        // a read that returned only the readable remainder would make the old
+        // +3 look freshly applied and confirm the cast.
+        private static void TestGmfIncompleteWeaponBaseline()
+        {
+            NativeBlueprintDump dump = GmfDump();
+            GmfParty party = GmfDruidParty(dump, GmfAbility, 12, 1);
+            EffectExpression expected = party.Option.BindEffects(party.Raw, "ranger-pet");
+            var ids = new HashSet<string>(GmfTiers.Concat(new[] { GmfBuff }), StringComparer.Ordinal);
+            var none = new ObservedEffectInstance[0];
+            ObservedEffectInstance oldBuff = GmfSeen(EffectKind.Buff, GmfBuff, "buff-old");
+            ObservedEffectInstance freshBuff = GmfSeen(EffectKind.Buff, GmfBuff, "buff-new");
+            // ReadBaseline's contract: a read that throws is no baseline.
+            Func<UnitBody, List<ObservedEffectInstance>> baseline = body =>
+            {
+                try { return KingmakerEnchantedItems.Instances(body, ids).Concat(new[] { oldBuff }).ToList(); }
+                catch (Exception) { return null; }
+            };
+            Func<UnitBody, List<ObservedEffectInstance>> after = body =>
+                KingmakerEnchantedItems.Instances(body, ids).Concat(new[] { freshBuff }).ToList();
+            Func<List<ObservedEffectInstance>, List<ObservedEffectInstance>, bool> confirms = (before, seen) =>
+                AppliedEffectJudgement.AllReached(new[] { "ranger-pet" }, expected,
+                    new EffectBaseline(GmfUnits().ToDictionary(unit => unit.UnitId,
+                        unit => unit.UnitId == "ranger-pet" ? (IEnumerable<ObservedEffectInstance>)before : none,
+                        StringComparer.Ordinal)),
+                    unit => unit == "ranger-pet" ? (IEnumerable<ObservedEffectInstance>)seen : none, null, "druid");
+
+            ItemEntityWeapon claw = GmfEnchanted(GmfEnchantment(GmfTiers[2])), unarmed = GmfEnchanted(),
+                bite = GmfEnchanted();
+            UnitBody pet = GmfPolymorphed(unarmed, bite);
+            bool readFailed = GmfThrows(() => KingmakerEnchantedItems.ReadComplete(pet)) &&
+                GmfThrows(() => KingmakerEnchantedItems.Instances(pet, ids));
+            List<ObservedEffectInstance> unreadable = baseline(pet);
+            GmfSet(pet, "m_PolymoprphHandsEquipmentSet", GmfHands(claw, null));
+            GmfCast(claw, GmfTiers[1]);
+            List<ObservedEffectInstance> recovered = after(pet);
+            MbbExpect(recovered.Count(value => value.EffectId == GmfTiers[2]) == 1 &&
+                recovered.Count(value => value.EffectId == GmfTiers[1]) == 1,
+                "The recovered read does not show the old +3 and the new +2.");
+            // What the refusal prevents: a baseline without the +3 would confirm.
+            MbbExpect(confirms(new List<ObservedEffectInstance> { oldBuff }, recovered),
+                "The hazard is not reproduced: a baseline without the +3 no longer confirms the old +3.");
+            MbbExpect(unreadable == null || !confirms(unreadable, recovered),
+                "An old +3 hidden by an unreadable baseline confirmed a cast that applied +2.");
+            MbbExpect(unreadable == null && readFailed,
+                "A pre-cast read that could not see the polymorph hands was accepted as a baseline (" +
+                (unreadable == null ? 0 : unreadable.Count) + " instances).");
+            // The planning view keeps the readable items (an omitted one only
+            // makes the planner cast).
+            GmfExpectItems(KingmakerEnchantedItems.Read(GmfPolymorphed(unarmed, bite)),
+                new ItemEntity[] { unarmed, bite }, "planning view with unreadable polymorph hands");
+
+            // A complete baseline that sees the old +3: the same cast is refused.
+            ItemEntityWeapon seenClaw = GmfEnchanted(GmfEnchantment(GmfTiers[2]));
+            UnitBody visible = GmfPolymorphed(unarmed, bite);
+            GmfSet(visible, "m_PolymoprphHandsEquipmentSet", GmfHands(seenClaw, null));
+            List<ObservedEffectInstance> complete = baseline(visible);
+            GmfCast(seenClaw, GmfTiers[1]);
+            MbbExpect(complete != null && complete.Count(value => value.EffectId == GmfTiers[2]) == 1 &&
+                !confirms(complete, after(visible)),
+                "A complete baseline holding the old +3 did not refuse a cast that applied +2.");
+
+            // A complete baseline, then the cast's own +3 newly applied: confirmed.
+            ItemEntityWeapon bareClaw = GmfEnchanted();
+            UnitBody bare = GmfPolymorphed(unarmed, bite);
+            GmfSet(bare, "m_PolymoprphHandsEquipmentSet", GmfHands(bareClaw, null));
+            List<ObservedEffectInstance> empty = baseline(bare);
+            GmfCast(bareClaw, GmfTiers[2]);
+            MbbExpect(empty != null && confirms(empty, after(bare)),
+                "A complete baseline followed by a newly applied +3 and a fresh buff did not confirm.");
+        }
+
+        private static UnitBody GmfPolymorphed(ItemEntity emptyHand, ItemEntity limb)
+        {
+            UnitBody body = GmfBody(null, null, null, emptyHand, new ItemEntity[0]);
+            GmfSet(body, "<IsPolymorphed>k__BackingField", true);
+            GmfSet(body, "m_PolymorphAdditionalLimbs", GmfLimbs(new[] { limb }));
+            return body;
+        }
+
+        // A detached native enchantment of a blueprint, temporary (an end time).
+        private static ItemEnchantment GmfEnchantment(string blueprint)
+        {
+            var enchantment = GmfDetached<ItemEnchantment>();
+            BlueprintWeaponEnchantment stub = NativeBlueprintDump.Stub<BlueprintWeaponEnchantment>(blueprint);
+            GmfSet(stub, "m_CachedPtr", new IntPtr(1));
+            GmfSet(enchantment, "Blueprint", stub);
+            GmfSet(enchantment, "<EndTime>k__BackingField", TimeSpan.FromMinutes(10));
+            return enchantment;
+        }
+
+        // A detached weapon whose native Enchantments getter returns these
+        // (ItemEntity.UpdateCachedEnchantments keeps the cache while the
+        // enchantment collection is absent).
+        private static ItemEntityWeapon GmfEnchanted(params ItemEnchantment[] enchantments)
+        {
+            var weapon = GmfDetached<ItemEntityWeapon>();
+            GmfSet(weapon, "m_CachedEnchantments", enchantments.ToList());
+            return weapon;
+        }
+
+        // Native EnchantSlot adds a new temporary instance of the tier.
+        private static void GmfCast(ItemEntityWeapon weapon, string tier)
+        {
+            ((List<ItemEnchantment>)GmfField(weapon, "m_CachedEnchantments")).Add(GmfEnchantment(tier));
+        }
+
+        private static bool GmfThrows(Action read)
+        {
+            try { read(); return false; }
+            catch (Exception) { return true; }
         }
 
         // Existing effects (casting-first policy, unchanged): a weaker earlier
