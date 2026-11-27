@@ -1,7 +1,6 @@
 # Greater Magic Fang repair
 
-Status: draft PR with offline evidence only. **Not run in the game.**
-The version is unchanged (0.6.21 after merging `main`); the change is unreleased.
+Status: merged and released as 0.6.22, an owner-authorized pre-runtime release on offline evidence only. **Not run in the game.**
 
 - Branch: `codex/kingmaker-buff-planner-greater-magic-fang`, from `main`
   `913798712f3685236c8f9d5cc1e8c04ea9fc9248` (0.6.20). `main` at
@@ -309,8 +308,8 @@ in the [owner checklist](MANUAL-ACCEPTANCE.md#greater-magic-fang--owner-in-game-
    two-pet acceptance.
 9. Regenerate `planning/NATIVE-BUFF-CATALOG.json` at the next guarded
    catalogue run.
-10. `CHANGELOG.md` already headed the 0.6.20 content "Unreleased - missing
-    beneficial buffs" before this branch.
+10. Resolved with the 0.6.22 release: `CHANGELOG.md` had headed the 0.6.20
+    content "Unreleased - missing beneficial buffs" and had no 0.6.21 entry.
 
 ## Next action
 

@@ -1,12 +1,17 @@
 # Changelog
 
-## Unreleased - Greater Magic Fang repair
+## 0.6.22 - 2026-11-26 - Greater Magic Fang repair
 
 - Greater Magic Fang can be cast on several pets in one run, including pets of other party members. Before, only the first casting went ahead (often on the Druid's own pet) and every later one was stopped. The planner had expected all five enhancement tiers at once; it now expects the duration buff and the single tier the caster's level gives (+1 per four levels, up to +5), including Call of the Wild's replacement tiers.
 - Magic Fang enhancements on unarmed strikes and extra natural weapons (a bite from an additional limb, polymorph limbs) are now seen, so those casts can be confirmed.
-- Not yet verified in a running game. [Record](docs/GREATER-MAGIC-FANG-REPAIR.md).
+- An existing Magic Fang is still recast rather than skipped; the recast spends a slot or spell.
+- Owner-authorized pre-runtime release; not yet verified in a running game. [Release notes](docs/RELEASE-NOTES-0.6.22.md), [record](docs/GREATER-MAGIC-FANG-REPAIR.md).
 
-## Unreleased - missing beneficial buffs
+## 0.6.21 - 2026-11-26 - Unity Mod Manager 0.31.1 baseline
+
+- Declares and compiles against Unity Mod Manager 0.31.1 (pinned references); planner behavior unchanged from 0.6.20. [Release notes](docs/RELEASE-NOTES-0.6.21.md).
+
+## 0.6.20 - 2026-11-22 - missing beneficial buffs
 
 - Good Hope and Firebelly appear among castable buffs again. Their game data marks them "harmful to allies" although they cannot target an enemy; evidence-backed entries in the override file now set that flag aside for exactly their own buffs (and the Call of the Wild / Gunslinger variants that apply them). Every other ability marked harmful to allies, including Irresistible Dance, stays excluded.
 - The wizard's Abjuration resistance selections (Acid, Cold, Electricity, Fire, Sonic) and the transmuter's Physical Enhancement selections are offered as personal buffs. Planning two of them in one routine is refused, because each choice replaces the others; re-selecting the active one is skipped, and a skip that an earlier switch in the same routine would undo is refused instead of being counted as covered. The older Classic planner applies the same rule.
