@@ -74,9 +74,16 @@ namespace KingmakerBuffPlanner.GameAdapters
         // Cast confirmation's read (KingmakerEffectInstanceReader): the
         // unit's instances of the expected worn-item enchantments, from every
         // item the complete read observes. An unreadable item source throws.
-        internal static List<ObservedEffectInstance> Instances(UnitBody body, HashSet<string> ids)
+        // A step that expects no worn-item enchantment reads no item (PR #29
+        // review round 4): no item instance could match its expected effects,
+        // so an unreadable weapon must not refuse or fail a buff-only cast.
+        internal static List<ObservedEffectInstance> Instances(UnitBody body, EffectExpression expected,
+            HashSet<string> ids)
         {
             var instances = new List<ObservedEffectInstance>();
+            if (expected == null || !EffectApplicationLifetime.Leaves(expected)
+                    .Any(leaf => leaf.Kind == EffectKind.WornItemEnchantment))
+                return instances;
             foreach (ItemEntity item in ReadComplete(body))
             {
                 if (item.Enchantments == null) continue;

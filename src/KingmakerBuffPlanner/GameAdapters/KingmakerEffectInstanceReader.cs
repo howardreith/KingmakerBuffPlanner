@@ -49,7 +49,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                         failure = "recipient-not-in-party:" + unitId;
                         return null;
                     }
-                    read[unitId] = Instances(unit, ids);
+                    read[unitId] = Instances(unit, step.ExpectedEffects, ids);
                 }
                 return new EffectBaseline(read);
             }
@@ -111,7 +111,7 @@ namespace KingmakerBuffPlanner.GameAdapters
             {
                 UnitEntityData unit;
                 observed[unitId] = units.TryGetValue(unitId, out unit) && unit.Descriptor != null
-                    ? Instances(unit, ids) : null;
+                    ? Instances(unit, step.ExpectedEffects, ids) : null;
             }
             return observed;
         }
@@ -183,7 +183,8 @@ namespace KingmakerBuffPlanner.GameAdapters
                 .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal);
         }
 
-        private static List<ObservedEffectInstance> Instances(UnitEntityData unit, HashSet<string> ids)
+        private static List<ObservedEffectInstance> Instances(UnitEntityData unit, EffectExpression expected,
+            HashSet<string> ids)
         {
             var instances = new List<ObservedEffectInstance>();
             foreach (Buff buff in unit.Descriptor.Buffs.Enumerable)
@@ -200,7 +201,7 @@ namespace KingmakerBuffPlanner.GameAdapters
                     // Review R9-F2: the applying caster (null when unread).
                     KingmakerActiveEffectSnapshotBuilder.CasterId(buff)));
             }
-            instances.AddRange(KingmakerEnchantedItems.Instances(unit.Descriptor.Body, ids));
+            instances.AddRange(KingmakerEnchantedItems.Instances(unit.Descriptor.Body, expected, ids));
             return instances;
         }
 

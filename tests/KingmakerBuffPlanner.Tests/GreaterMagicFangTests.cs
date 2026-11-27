@@ -901,11 +901,11 @@ namespace KingmakerBuffPlanner.Tests
             // ReadBaseline's contract: a read that throws is no baseline.
             Func<UnitBody, List<ObservedEffectInstance>> baseline = body =>
             {
-                try { return KingmakerEnchantedItems.Instances(body, ids).Concat(new[] { oldBuff }).ToList(); }
+                try { return KingmakerEnchantedItems.Instances(body, expected, ids).Concat(new[] { oldBuff }).ToList(); }
                 catch (Exception) { return null; }
             };
             Func<UnitBody, List<ObservedEffectInstance>> after = body =>
-                KingmakerEnchantedItems.Instances(body, ids).Concat(new[] { freshBuff }).ToList();
+                KingmakerEnchantedItems.Instances(body, expected, ids).Concat(new[] { freshBuff }).ToList();
             Func<List<ObservedEffectInstance>, List<ObservedEffectInstance>, bool> confirms = (before, seen) =>
                 AppliedEffectJudgement.AllReached(new[] { "ranger-pet" }, expected,
                     new EffectBaseline(GmfUnits().ToDictionary(unit => unit.UnitId,
@@ -917,7 +917,7 @@ namespace KingmakerBuffPlanner.Tests
                 bite = GmfEnchanted();
             UnitBody pet = GmfPolymorphed(unarmed, bite);
             bool readFailed = GmfThrows(() => KingmakerEnchantedItems.ReadComplete(pet)) &&
-                GmfThrows(() => KingmakerEnchantedItems.Instances(pet, ids));
+                GmfThrows(() => KingmakerEnchantedItems.Instances(pet, expected, ids));
             List<ObservedEffectInstance> unreadable = baseline(pet);
             GmfSet(pet, "m_PolymoprphHandsEquipmentSet", GmfHands(claw, null));
             GmfCast(claw, GmfTiers[1]);
@@ -933,6 +933,19 @@ namespace KingmakerBuffPlanner.Tests
             MbbExpect(unreadable == null && readFailed,
                 "A pre-cast read that could not see the polymorph hands was accepted as a baseline (" +
                 (unreadable == null ? 0 : unreadable.Count) + " instances).");
+            // Review round 4 (Codex): a step that expects no enchantment reads
+            // no item, so the same unreadable body neither refuses nor fails
+            // a buff-only cast.
+            var buffOnly = new SequenceEffectExpression(new EffectExpression[]
+            {
+                new EffectLeafExpression(EffectKind.Buff, GmfBuff, EffectTarget.CurrentTarget, "ContextActionApplyBuff", "buff")
+            });
+            UnitBody stillUnreadable = GmfPolymorphed(unarmed, bite);
+            MbbExpect(GmfThrows(() => KingmakerEnchantedItems.ReadComplete(stillUnreadable)) &&
+                !GmfThrows(() => KingmakerEnchantedItems.Instances(stillUnreadable, buffOnly, ids)) &&
+                KingmakerEnchantedItems.Instances(stillUnreadable, buffOnly, ids).Count == 0 &&
+                GmfThrows(() => KingmakerEnchantedItems.Instances(stillUnreadable, expected, ids)),
+                "An unreadable weapon decided a cast that expects no enchantment, or no longer refuses one that does.");
             // The planning view keeps the readable items (an omitted one only
             // makes the planner cast).
             GmfExpectItems(KingmakerEnchantedItems.Read(GmfPolymorphed(unarmed, bite)),
