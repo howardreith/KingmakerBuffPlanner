@@ -313,6 +313,6 @@ in the [owner checklist](MANUAL-ACCEPTANCE.md#greater-magic-fang--owner-in-game-
 
 ## Next action
 
-Owner review of the draft PR. After that, either approve a Druid fixture for
-the live two-pet check, or accept the change on offline evidence plus the
-owner checklist.
+Released as 0.6.22 ([release record](RELEASE-0.6.22-RECORD.md)). Remaining:
+the owner's in-game checklist, or an approved Druid fixture for the guarded
+live two-pet check (follow-up 8).
