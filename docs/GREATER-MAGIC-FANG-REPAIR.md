@@ -1,15 +1,23 @@
 # Greater Magic Fang repair
 
 Status: draft PR with offline evidence only. **Not run in the game.**
-Version 0.6.20 is unchanged; the change is unreleased.
+The version is unchanged (0.6.21 after merging `main`); the change is unreleased.
 
 - Branch: `codex/kingmaker-buff-planner-greater-magic-fang`, from `main`
-  `913798712f3685236c8f9d5cc1e8c04ea9fc9248` (0.6.20).
-- Product commits: `3f79a8e` (tier binding), `b4ef4d7` (natural-weapon
-  observation), `b4f713c` (review round 1) and `8a1a15b` (review round 2,
-  the final product source). `4593639` holds the regressions and fixtures. The
-  records commit also fixes the round-3 test nit; it changes no production
-  source.
+  `913798712f3685236c8f9d5cc1e8c04ea9fc9248` (0.6.20). `main` at
+  `ef458740e0477b0558f867274fb12974776031a1` (0.6.21) was merged in
+  `7a71cb1`. That merge was clean: `main` changed runtime-loader identity,
+  version stamps and the production csproj, none of which this repair touches.
+- Product commits:
+  - `3f79a8e`: tier binding;
+  - `b4ef4d7`: natural-weapon observation;
+  - `b4f713c`: review round 1;
+  - `8a1a15b`: review round 2;
+  - `3b2c537`: review round 4, the incomplete weapon baseline;
+  - `741a881`: the Codex check of `3b2c537`, scoping the strict read.
+
+  `4593639` holds the regressions and fixtures. The `df7e1ca` records commit
+  also fixes the round-3 test nit; it changes no production source.
 
 ## Report
 
@@ -121,21 +129,37 @@ pins them against the referenced assembly.
    - A one-pass structural grant names the tier its provider applied.
 5. **Identity.** A caster-level selection is described by its tiers in GUID
    order, which is the identity earlier versions produced. Saved castings and
-   assignments keep matching, for native and replacement arrays alike.
-6. **Observation.** Both effect readers use `KingmakerEnchantedItems.Read`,
-   which reads:
+   assignments keep matching for the configurations covered here: the native
+   blueprints and Call of the Wild's standard replacement array. Follow-ups 2
+   and 3 describe modified-blueprint configurations where the identity or the
+   bound array can differ.
+6. **Observation.** Both effect readers observe these items, each instance
+   once:
    - the slot items;
    - the empty-hand weapon;
    - the native hand getters, including the polymorph set;
-   - the limb items, each instance once.
+   - the limb items.
+
+   "Could not read" is kept distinct from "read and found nothing" (review
+   round 4):
+   - **Cast confirmation** (`KingmakerEffectInstanceReader`) uses
+     `KingmakerEnchantedItems.ReadComplete`. If any item source cannot be
+     read, it throws. `ReadBaseline` then fails, so nothing is cast, and a
+     failed later read confirms nothing.
+   - **The planning view** (`KingmakerActiveEffectSnapshotBuilder`) uses the
+     best-effort `Read`, which leaves out an unreadable extra source. An
+     enchantment left out there can only look absent, which makes the planner
+     cast rather than skip.
 
 ## Policy notes and limits
 
 - **Existing Magic Fang always recasts.** A worn enchantment's caster level
   and source item are not read, so an existing Magic Fang is never provably
   sufficient. This is unchanged from before for ordinary Magic Fang in
-  casting-first, and now also holds for Greater Magic Fang in Classic. The
-  recast is native-harmless: enhancement bonuses do not stack.
+  casting-first, and now also holds for Greater Magic Fang in Classic.
+  Enhancement bonuses do not stack, so the recast does not change the game
+  state for the worse. It does spend a prepared slot or a spell, which is a
+  cost the user sees (follow-up 1).
 - **Permanent instances halt the run.** A permanent instance of the selected
   tier is left untouched by `EnchantSlot`, so it never confirms a cast. The
   run stops instead; this is conservative.
@@ -158,6 +182,11 @@ powershell.exe` from Bash with `.\scripts\Test-Development.ps1 -Only …`.
 | Fixture capture | `evidence-native-fixtures-missing-beneficial-buffs-capture` | full 61 / referenced 63; adds 9 blueprints and 10 index lines; existing fixtures byte-identical, and unchanged on re-capture |
 | Greater Magic Fang regressions | `greater-magic-fang` on `8a1a15b` | PASS=13 FAIL=0 |
 | Complete offline program plus fixture verification | all 174 registered prefixes plus `…-verify` on `8a1a15b` | PASS=871 FAIL=0, source validation 47/0, 46 s |
+| Round-4 reproduction | `greater-magic-fang` with the new regression on the extracted read, with confirmation still on the best-effort read (behavior of `df7e1ca`) | PASS=13 FAIL=1: "An old +3 hidden by an unreadable baseline confirmed a cast that applied +2." |
+| Greater Magic Fang regressions | `greater-magic-fang` on `3b2c537`, and on `741a881` | PASS=14 FAIL=0 each |
+| Scoping reproduction | `greater-magic-fang` on `741a881` with its guard disabled | PASS=13 FAIL=1: the buff-only control failed |
+| Complete offline program plus fixture verification | all 174 registered prefixes plus `…-verify` after merging `main` 0.6.21 (`7a71cb1`, before `741a881`) | PASS=872 FAIL=0, source validation 47/0, 42 s |
+| Complete offline program plus fixture verification | the same on the final HEAD, clean tree | see the PR description, which also records the DLL hash |
 
 **What fails at the baseline.**
 - Discovery binding, replacement arrays, unproven contracts, confirmation,
@@ -220,6 +249,36 @@ in the [owner checklist](MANUAL-ACCEPTANCE.md#greater-magic-fang--owner-in-game-
   One became moot: an unreadable second provider in Classic presence. Two are
   follow-ups (2 and 3).
 - **Round 3** on `8a1a15b`: no blocking issue for the native Druid two-pet case; Codex ran all 13 regressions and they passed. It raised one test nit, now fixed: the prepared-slot fixture used non-native token IDs. Its four should-fix findings need modified or mod-only blueprints, and are follow-ups 4–7.
+- **Round 4**, an owner-supplied review of `df7e1ca`, raised one P2 finding,
+  fixed in `3b2c537`. The new weapon reader swallowed read failures, so a
+  pre-cast baseline could leave out an existing enchantment. Once readable,
+  that unchanged enchantment looked freshly applied and could confirm a cast
+  that applied another tier.
+  - **Reproduction:** the regression
+    `greater-magic-fang-unreadable-weapon-baseline-never-confirms-an-old-tier`
+    reproduced it through the production read on detached native objects.
+    The failure is genuine native behaviour, not a stub: native
+    `UnitBody.PrimaryHand` throws on a polymorphed body with no polymorph
+    hand set. It was not observed in a running game.
+  - **What the review also confirmed:** the rest of the repair.
+  - **What it asked for in wording:** the identity claim is now limited to the
+    configurations covered, and the recast cost is now stated.
+  - **Codex check of `3b2c537`** (`codex exec -s read-only`): no blocking
+    finding. Codex traced every confirmation read through the strict read and
+    the best-effort read to planning only. It also noted that runtime
+    fixture selection uses the planning snapshot to choose a target, but
+    execution still takes its own strict baseline.
+    - **Should-fix, fixed in `741a881`:** the strict read ran for every
+      step, so a buff-only cast on a unit with an unreadable weapon source
+      would have been refused. A step without a worn-item enchantment leaf
+      now reads no item, since no item instance could match it. The
+      regression's buff-only control fails with the guard disabled (13/1)
+      and passes with it (14/0).
+    - **Nit, recorded, not fixed:** the regression restates `ReadBaseline`'s
+      catch-to-refusal instead of calling it. Production `ReadBaseline` reads
+      the live party through `Game.Instance`, which does not run offline. Its
+      catch-all and its callers' refusal before submission are unchanged by
+      this repair.
 
 ## Follow-ups (not in this PR)
 
