@@ -1,0 +1,213 @@
+{
+    "schema":  "kbp.runtime-loader-identity-tests.v2",
+    "rows":  [
+                 "0.31.1",
+                 "0.32.4",
+                 "0.33.4",
+                 "owner-0.33.0"
+             ],
+    "passed":  40,
+    "total":  40,
+    "cases":  [
+                  {
+                      "name":  "preflight-row-0.31.1-matching-loader-accepted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "preflight-row-0.32.4-matching-loader-accepted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "preflight-row-0.33.4-matching-loader-accepted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "preflight-row-owner-0.33.0-matching-loader-accepted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "preflight-cross-row-0.31.1-files-under-0.32.4-row-refused",
+                      "passed":  true,
+                      "detail":  "refused: Installed loader does not match loader row 0.32.4: unityModManager expected=0.32.4.0/1387468bc3af41c50fe51859a3bb7af4922891aa8f13a6187e7a348ceaabfd88 observed=UnityModManager 0.31.1.0/2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4; harmony2 expected=2.3.6.0/df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80 observed=0Harmony 2.3.1.1/5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f"
+                  },
+                  {
+                      "name":  "preflight-harmony2-only-mismatch-refused",
+                      "passed":  true,
+                      "detail":  "refused: Installed loader does not match loader row 0.33.4: harmony2 expected=2.4.3.0/ddc070b57f695ece6f92c43cf82cf4d863c69685de96a99ebd9d2fa1d8fa7a19 observed=0Harmony 2.3.6.0/df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80"
+                  },
+                  {
+                      "name":  "loader-row-unknown-id-refused",
+                      "passed":  true,
+                      "detail":  "refused: Cannot validate argument on parameter \u0027LoaderId\u0027. The argument \"unknown-row\" does not belong to the set \"0.31.1,0.32.4,owner-0.33.0,0.33.4\" specified by the ValidateSet attribute. Supply an argument that is in the set and then try the command again."
+                  },
+                  {
+                      "name":  "installation-preflight-matching-row-accepted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "installation-preflight-harmony2-only-mismatch-refused",
+                      "passed":  true,
+                      "detail":  "refused: Installed loader does not match loader row 0.31.1: harmony2 expected=2.3.1.1/5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f observed=0Harmony 2.3.6.0/df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80"
+                  },
+                  {
+                      "name":  "profile-test-entry-point-refuses-harmony2-only-mismatch",
+                      "passed":  true,
+                      "detail":  "exit 1"
+                  },
+                  {
+                      "name":  "profile-test-entry-point-accepts-matching-row",
+                      "passed":  true,
+                      "detail":  "exit 0: Compatibility profile: PASS=1 FAIL=0 id=native-only mods=0 loader=0.31.1"
+                  },
+                  {
+                      "name":  "deploy-and-launcher-run-the-shared-preflight-before-staging",
+                      "passed":  true,
+                      "detail":  "Deploy-Local and the launcher call Assert-KbpInstallationPreflight (with the selected row and the caller\u0027s KingmakerInstallDir) before any staging or request"
+                  },
+                  {
+                      "name":  "result-row-0.31.1-admitted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "result-row-0.32.4-admitted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "result-row-0.33.4-admitted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "result-row-owner-0.33.0-admitted",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "result-cross-row-refused",
+                      "passed":  true,
+                      "detail":  "refused: Runtime result identity/hash mismatch: ummVersion expected=0.33.0.0 observed=0.31.1.0; ummSha256 expected=63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691 observed=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4; harmony2Version expected=2.3.6.0 observed=2.3.1.1; harmony2Sha256 expected=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80 observed=5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f; ummInstalledSha256 expected=63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691 observed=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4; harmony2InstalledSha256 expected=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80 observed=5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f"
+                  },
+                  {
+                      "name":  "result-harmony2-only-mismatch-refused",
+                      "passed":  true,
+                      "detail":  "refused: Runtime result identity/hash mismatch: harmony2Version expected=2.4.3.0 observed=2.3.6.0; harmony2Sha256 expected=ddc070b57f695ece6f92c43cf82cf4d863c69685de96a99ebd9d2fa1d8fa7a19 observed=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80; harmony2InstalledSha256 expected=ddc070b57f695ece6f92c43cf82cf4d863c69685de96a99ebd9d2fa1d8fa7a19 observed=df043f05c6e43602fa8e8f38f52a3a2cf962aab7a65a9d85573ea25f01a63e80"
+                  },
+                  {
+                      "name":  "result-loaded-versus-installed-mismatch-refused",
+                      "passed":  true,
+                      "detail":  "refused: Runtime result identity/hash mismatch: ummInstalledSha256 expected=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4 observed=1387468bc3af41c50fe51859a3bb7af4922891aa8f13a6187e7a348ceaabfd88"
+                  },
+                  {
+                      "name":  "result-earlier-shape-without-harmony2-refused",
+                      "passed":  true,
+                      "detail":  "refused: Runtime result identity/hash mismatch: harmony2Version expected=2.3.1.1 observed=(absent); harmony2Sha256 expected=5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f observed=(absent)"
+                  },
+                  {
+                      "name":  "result-for-request-without-loader-row-refused",
+                      "passed":  true,
+                      "detail":  "refused: Runtime request carries no expected loader row."
+                  },
+                  {
+                      "name":  "retained-request-refuses-other-row-result-after-file-changed",
+                      "passed":  true,
+                      "detail":  "refused: Runtime result identity/hash mismatch: ummVersion expected=0.31.1.0 observed=0.33.4.0; ummSha256 expected=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4 observed=c5ed5617457f597d7befb272f9fe311d7128c647fd427a114c197bea13475239; harmony2Version expected=2.3.1.1 observed=2.4.3.0; harmony2Sha256 expected=5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f observed=ddc070b57f695ece6f92c43cf82cf4d863c69685de96a99ebd9d2fa1d8fa7a19; ummInstalledSha256 expected=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4 observed=c5ed5617457f597d7befb272f9fe311d7128c647fd427a114c197bea13475239; harmony2InstalledSha256 expected=5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f observed=ddc070b57f695ece6f92c43cf82cf4d863c69685de96a99ebd9d2fa1d8fa7a19"
+                  },
+                  {
+                      "name":  "retained-request-admits-its-own-row-result",
+                      "passed":  true,
+                      "detail":  "accepted"
+                  },
+                  {
+                      "name":  "retained-request-survives-replacement-at-the-write-boundary",
+                      "passed":  true,
+                      "detail":  "retained row 0.31.1.0 (file now 0.33.4.0); note preserved: True"
+                  },
+                  {
+                      "name":  "boundary-retained-request-refuses-the-replacement-row-result",
+                      "passed":  true,
+                      "detail":  "refused: Runtime result identity/hash mismatch: ummVersion expected=0.31.1.0 observed=0.33.4.0; ummSha256 expected=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4 observed=c5ed5617457f597d7befb272f9fe311d7128c647fd427a114c197bea13475239; harmony2Version expected=2.3.1.1 observed=2.4.3.0; harmony2Sha256 expected=5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f observed=ddc070b57f695ece6f92c43cf82cf4d863c69685de96a99ebd9d2fa1d8fa7a19; ummInstalledSha256 expected=2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4 observed=c5ed5617457f597d7befb272f9fe311d7128c647fd427a114c197bea13475239; harmony2InstalledSha256 expected=5f7ad0df1eb08e81f66d4006d3a9e5cb40fc05e381f36d7bd0513f334f6a251f observed=ddc070b57f695ece6f92c43cf82cf4d863c69685de96a99ebd9d2fa1d8fa7a19"
+                  },
+                  {
+                      "name":  "mixed-case-owner-loader-id-resolves-to-the-canonical-row",
+                      "passed":  true,
+                      "detail":  "loaderId owner-0.33.0"
+                  },
+                  {
+                      "name":  "request-carries-selected-row",
+                      "passed":  true,
+                      "detail":  "expectedLoader 0.32.4"
+                  },
+                  {
+                      "name":  "compatibility-identity-binds-loader-row",
+                      "passed":  true,
+                      "detail":  "native-only + 0.31.1 3da95c694bc0b87a244360d69856ef426f8dd2370e81f9098307c9f5a8230eba; + owner-0.33.0 9e6cdbc5ecf4a7997cd5e35ead4e0b50d18d1ee373c95e393db0e3c20889ff68"
+                  },
+                  {
+                      "name":  "launcher-forwards-loader-row-to-both-deployment-calls",
+                      "passed":  true,
+                      "detail":  "Deploy-Local calls 2, with -LoaderId $LoaderId 2; launcher rows: 0.31.1, 0.32.4, owner-0.33.0, 0.33.4"
+                  },
+                  {
+                      "name":  "deploy-local-whatif-row-0.31.1-clears-loader-check",
+                      "passed":  true,
+                      "detail":  "loader check cleared; independent host guard afterwards: Unresolved runtime transaction exists: zhcn19-zh-auto-01 status=ModsRestoredPendingDisplay At <repo>\\scripts\\RuntimeHarness (exit 1)"
+                  },
+                  {
+                      "name":  "compatibility-wrapper-whatif-row-0.31.1-clears-loader-check",
+                      "passed":  true,
+                      "detail":  "loader check cleared; independent host guard afterwards: Unresolved runtime transaction exists: zhcn19-zh-auto-01 status=ModsRestoredPendingDisplay At <repo>\\scripts\\RuntimeHarness (exit 1)"
+                  },
+                  {
+                      "name":  "deploy-local-whatif-row-0.32.4-clears-loader-check",
+                      "passed":  true,
+                      "detail":  "loader check cleared; independent host guard afterwards: Unresolved runtime transaction exists: zhcn19-zh-auto-01 status=ModsRestoredPendingDisplay At <repo>\\scripts\\RuntimeHarness (exit 1)"
+                  },
+                  {
+                      "name":  "compatibility-wrapper-whatif-row-0.32.4-clears-loader-check",
+                      "passed":  true,
+                      "detail":  "loader check cleared; independent host guard afterwards: Unresolved runtime transaction exists: zhcn19-zh-auto-01 status=ModsRestoredPendingDisplay At <repo>\\scripts\\RuntimeHarness (exit 1)"
+                  },
+                  {
+                      "name":  "deploy-local-whatif-row-0.33.4-clears-loader-check",
+                      "passed":  true,
+                      "detail":  "loader check cleared; independent host guard afterwards: Unresolved runtime transaction exists: zhcn19-zh-auto-01 status=ModsRestoredPendingDisplay At <repo>\\scripts\\RuntimeHarness (exit 1)"
+                  },
+                  {
+                      "name":  "compatibility-wrapper-whatif-row-0.33.4-clears-loader-check",
+                      "passed":  true,
+                      "detail":  "loader check cleared; independent host guard afterwards: Unresolved runtime transaction exists: zhcn19-zh-auto-01 status=ModsRestoredPendingDisplay At <repo>\\scripts\\RuntimeHarness (exit 1)"
+                  },
+                  {
+                      "name":  "deploy-local-whatif-row-owner-0.33.0-clears-loader-check",
+                      "passed":  true,
+                      "detail":  "loader check cleared; independent host guard afterwards: Unresolved runtime transaction exists: zhcn19-zh-auto-01 status=ModsRestoredPendingDisplay At <repo>\\scripts\\RuntimeHarness (exit 1)"
+                  },
+                  {
+                      "name":  "compatibility-wrapper-whatif-row-owner-0.33.0-clears-loader-check",
+                      "passed":  true,
+                      "detail":  "loader check cleared; independent host guard afterwards: Unresolved runtime transaction exists: zhcn19-zh-auto-01 status=ModsRestoredPendingDisplay At <repo>\\scripts\\RuntimeHarness (exit 1)"
+                  },
+                  {
+                      "name":  "deploy-local-whatif-crossed-row-refused",
+                      "passed":  true,
+                      "detail":  "exit 1; Installed loader does not match loader row 0.32.4: unityModManager expected=0.32.4.0/1387468bc3af41c50fe51859a3bb7af4922891aa8f13a6187e7a348ceaabfd88 observed=UnityModManager 0.31.1.0/2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4"
+                  },
+                  {
+                      "name":  "compatibility-wrapper-whatif-crossed-row-refused",
+                      "passed":  true,
+                      "detail":  "exit 1; Installed loader does not match loader row 0.32.4: unityModManager expected=0.32.4.0/1387468bc3af41c50fe51859a3bb7af4922891aa8f13a6187e7a348ceaabfd88 observed=UnityModManager 0.31.1.0/2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4"
+                  },
+                  {
+                      "name":  "deploy-row-fixtures-unchanged",
+                      "passed":  true,
+                      "detail":  "every private game Mods folder is still empty (WhatIf staged nothing)"
+                  }
+              ]
+}

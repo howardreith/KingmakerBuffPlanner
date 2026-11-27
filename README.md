@@ -255,8 +255,13 @@ belong to their respective owners.
 
 ## Build, package, and release
 
-The project targets .NET Framework 4.7 and C# 7.3 against exact locally
-installed Kingmaker, Unity, and UMM references with Copy Local disabled.
+The project targets .NET Framework 4.7 and C# 7.3 against the exact locally
+installed Kingmaker and Unity references (configured in ignored `GamePath.props`)
+and the pinned UnityModManager 0.31.1 / 0Harmony12 1.2.0.1 compile references,
+with Copy Local disabled. The installed Unity Mod Manager is never compiled
+against. Cache preparation, package validation, the boundary suite and the
+static loader audit are described in [Build and release](docs/BUILD-AND-RELEASE.md#loader-compile-baseline-umm-0311)
+and [UMM compatibility](docs/UMM-COMPATIBILITY.md).
 
 ```powershell
 .\scripts\Test-SourceOnly.ps1

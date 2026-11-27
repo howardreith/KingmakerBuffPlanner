@@ -1,0 +1,18 @@
+{
+    "schema":  "kbp.package-validation.v1",
+    "package_sha256":  "e8c19adf7aea9a0d92f0a631300b61439d449fe00caa5b6ca9b79951d700b480",
+    "dll_sha256":  "a384dc44feafefa53e34410d5d56f501a4d660f44a7eb08db818b93c1bf5bbda",
+    "dll_mvid":  "eb7e8a92-d678-45b3-a9a2-065ae10511c0",
+    "embedded_commit":  "c2a594ce7124cba35c63523b6ad4a039c84cdbc3",
+    "manager_version":  "0.31.1",
+    "dll_loader_references":  [
+                                  {
+                                      "name":  "0Harmony12",
+                                      "version":  "1.2.0.1"
+                                  },
+                                  {
+                                      "name":  "UnityModManager",
+                                      "version":  "0.31.1.0"
+                                  }
+                              ]
+}

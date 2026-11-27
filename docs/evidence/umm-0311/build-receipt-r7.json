@@ -1,0 +1,1456 @@
+{
+    "schemaVersion":  1,
+    "generator":  "scripts/Build-Local.ps1",
+    "version":  "0.6.20",
+    "commit":  "a76174b9767bdc131840a90027fbe080e8334420",
+    "sourceDirty":  false,
+    "buildInputsSha256":  "b756a48c9153cc5694cb3b9c62778d12cb36bb021615a9992a5c481cea6ee434",
+    "compilerInputs":  [
+                           {
+                               "kind":  "compiler",
+                               "name":  "csc.exe",
+                               "sha256":  "f895c265b8fa8ed9601f6d8ec87d1e2079f5e851c70d0719a90007564ae8f6ab"
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/noconfig",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/nowarn:1701,1702",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/fullpaths",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/nostdlib+",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/warn:4",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/define:TRACE",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/highentropyva+",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "artifacts/references/0Harmony12.dll",
+                               "sha256":  "aa1cd48317254985d8b700cc74953477d1b40c3022ce9aa4c95ed2b8327e1292"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "Assembly-CSharp-firstpass.dll",
+                               "sha256":  "069a7362ce5e3ccd597206174aec13743c2db5a1bfbc2a42f15a5fbd1ea30d30"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "Assembly-CSharp.dll",
+                               "sha256":  "3b6450ffec440e296e586f71c711b195aed144b28d53e1cbb29406d18fef5afb"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "mscorlib.dll",
+                               "sha256":  "d33b4c6f04319d41348244f2506bb787abe7afa0e2ee464693082817d4124de1"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "Newtonsoft.Json.dll",
+                               "sha256":  "3a23988f473e9e8304fbbcfff16872cca919bd1a1f3dee1e374acc1f0cbbbc80"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "Rewired_Core.dll",
+                               "sha256":  "3a149b2cfbbff63e1867b71bb211fcec5081214adefdc5ba05acc9763998e987"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "System.Core.dll",
+                               "sha256":  "d2570c87ba2f6b7e9d577cf2f9c864bd523a34dcb13165122b2dc0eef8cf0278"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "System.dll",
+                               "sha256":  "e31e3988eaff4fdc9cb28ca6ba0980f7204c5be0cb79e2dc4e56682833fd55da"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "UniRx.dll",
+                               "sha256":  "bfee7eca22156d8b95c149ba1383f065124b7b44a62ed4eafc32a5e67f6bc68a"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "UnityEngine.CoreModule.dll",
+                               "sha256":  "3a76df7f709d465e3273502e08edbffb536b1c2f78c3a132b8668e59fddd2803"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "UnityEngine.dll",
+                               "sha256":  "50b79c57f46bf4e060bb27461b6d4fac6f078e08b57e776c7a811554c4899fd6"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "UnityEngine.ImageConversionModule.dll",
+                               "sha256":  "1b30743ab1830b9b45e79f88c1acefd7517eafcef4fd1a7a3eb853a07ca5bb17"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "UnityEngine.IMGUIModule.dll",
+                               "sha256":  "327b1d34eab0ada754186a03dac40f23de627867124777ec35c6c040b210079a"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "UnityEngine.ScreenCaptureModule.dll",
+                               "sha256":  "814ede6a1cc2c267e477af7510c4731f91478f3b08fad6a20b829dc817896760"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "UnityEngine.TextRenderingModule.dll",
+                               "sha256":  "9ece6f5f1d1221809aeee9c591d67a38d51cde32dc6f525719f2ae2b20bf7fac"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "UnityEngine.UI.dll",
+                               "sha256":  "4dee942e8974492511733e5482f89fde39e3964008f072ec9c12d05e40a9080d"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "UnityEngine.UIModule.dll",
+                               "sha256":  "51b32055e2a03c78d3e7b2d7d8a6425ee80d415c1e07ea0ec7b1dd84eddc9f12"
+                           },
+                           {
+                               "kind":  "reference",
+                               "name":  "artifacts/references/UnityModManager.dll",
+                               "sha256":  "2e038ff23ab01d538dfef792096e1f5c04802d1edac3660db20d0d54c167c2c4"
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/debug:pdbonly",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/filealign:512",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/optimize+",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/pathmap:<repo>\\src\\KingmakerBuffPlanner=/_/src/KingmakerBuffPlanner",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "output",
+                               "name":  "/out:KingmakerBuffPlanner.dll",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/subsystemversion:6.00",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "file-option",
+                               "name":  "/resource:src/KingmakerBuffPlanner/Localization/enGB.json,KBP.Text.enGB.json",
+                               "sha256":  "d19beafeeca21d82552efaf1a96b98635c13847b70b53c13cb0b68159b92c5db"
+                           },
+                           {
+                               "kind":  "file-option",
+                               "name":  "/resource:src/KingmakerBuffPlanner/Localization/zhCN.json,KBP.Text.zhCN.json",
+                               "sha256":  "07162bb993d87ce26bb2f5054faa7a1a099f9c66197fa2cac659daf0dd7e99a8"
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/target:library",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/warnaserror+",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/utf8output",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/deterministic+",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "option",
+                               "name":  "/langversion:7.3",
+                               "sha256":  ""
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Discovery/ActionGraphScanner.cs",
+                               "sha256":  "54afd18326b2275c9a7bac01186893b4f6dd1eef2f2218bb4a447aa9c3283871"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Discovery/AreaRecipientSemantics.cs",
+                               "sha256":  "65b511bfbe30847ac88ad52ba3015a73c5870ca626a6aa7895c65bde1578e97f"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Discovery/BlueprintOwnershipIndex.cs",
+                               "sha256":  "bfaed79e3b40cb2ba74ef787b36a134c4b1672fac39fa7236f5bd96dc1cf7f0d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Discovery/DiscoveryNode.cs",
+                               "sha256":  "78e7e723738f6c5182803dc3d1e9cd95d004b4a649548894ff21493811007634"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Discovery/EffectOverrideRegistry.cs",
+                               "sha256":  "5777def7cbd68ae5f422b5079c5dd5b800b52b0c6d1b562d4853406b466cb9df"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Discovery/NativeAccessibilityIndex.cs",
+                               "sha256":  "180aac1dc427b6f4f7c07d2cccf265db8d4b56bc1b48b6fccffc412ed6016681"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Discovery/NativeCandidateClassifier.cs",
+                               "sha256":  "2789ad6108f822257e156a24d5396b7afb1418d1a888c66779d3de09e058f733"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Discovery/NativeCatalogAudit.cs",
+                               "sha256":  "bf20d8a2b416a995d6a8330b4c9572f38666c92017b76c3c8db8f8b0fdcf50b5"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Discovery/NativeCatalogExporter.cs",
+                               "sha256":  "e79ab51864d65d75e2bdf454003add80e93e3f4b8d0bb0e96cbbaffd68bd43bc"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Discovery/SelectableAbilityVariants.cs",
+                               "sha256":  "94647ddfc9bc8890464cc787f97123817a6d7198a85fc97635e31d93ba9003f9"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Effects/EffectExpression.cs",
+                               "sha256":  "995e4ca7b97dbb663fc2b5c3e7be280447ac455c3957072a0c9a2f5c97cda34e"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Effects/EffectRecipientBinding.cs",
+                               "sha256":  "8c649fbad5216a35d80454644de745cd41e1e968336c605b71d7aeb22a883d0d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Effects/EffectAggregateIdentity.cs",
+                               "sha256":  "abe6d3e29b8d8205549251646f21efc21abc3d423e7b511532b3c6af5b27b3b2"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Effects/DiscoveredEffectLookup.cs",
+                               "sha256":  "30f3155453f543981f04656c81f182e8085fd087bd764f38b917d1719ba5dba5"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Effects/CatalogSourceIdentity.cs",
+                               "sha256":  "c38a2eef4b45503e953f46f01f807cf411064038273e5daae23e5cefffbc3c07"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Identity/StableKeys.cs",
+                               "sha256":  "f1655c8ae2a6f3ac8ffc9878432bc4182b51735ec8f379943de0d3378de18767"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Identity/ItemSourceSelector.cs",
+                               "sha256":  "cf348604e986b2ef3e87fdf32d89a79f3be51a9a86a8e17bd154c2eb382187ed"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Authoring/CastingIntentModels.cs",
+                               "sha256":  "466b3b3e1a51a023e53649419b59cb54ee3f082ead8258b987118232890547d1"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Providers/ProviderSnapshots.cs",
+                               "sha256":  "7270ac6972ee18327e9f5f7bac74eacf5890f7441be2c967b39b59310b8c5406"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Planning/PlanningModels.cs",
+                               "sha256":  "1827bc6e763992dfe8a8f2427448acbad78e24f00bb5a27bceb6fb54dbc0d6eb"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Planning/CastEnhancements.cs",
+                               "sha256":  "67ee99ae7d9403459fb9974d4dbbc9f3db4dcfac73dd57b2859ba517db6a3b7a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Planning/EffectiveTargeting.cs",
+                               "sha256":  "7c1629ff3de671a1424c185b4900f0306cc0b93bf746a5c989951a4ec0c2b0af"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Planning/PowerfulChangeEligibility.cs",
+                               "sha256":  "0ebc2c9c295e9461c3f29e915d7bced3e1e54bc4bb85c62270edfc99433ed125"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/ExecutionModels.cs",
+                               "sha256":  "0453890409d082738b4d097ade346e50e6a31f28b6a5d0693f35143b64768ed3"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/AnimatedCastExecutor.cs",
+                               "sha256":  "54525a95a8c33ebebedd7b8a25b5634d40cc43d4b27f2a0f7cf7a7f8be8e8cbb"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/InstantCastExecutor.cs",
+                               "sha256":  "1ae09952d9afd7f894a55992a5c2ac31d1ff084827f9721219cd4fc61586959c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/MaterialComponentAvailability.cs",
+                               "sha256":  "09ffca3ac591f5d72ca1f36f8e27c127671a5e9ae5b3009c0d799a70884234aa"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/HybridCastExecutor.cs",
+                               "sha256":  "fbe2655b8a57324096192acd37a4f40274d41a3e7f4a51d594fbde82c85feeed"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/ExplicitCastingRunCoordinator.cs",
+                               "sha256":  "e4c8892bf774dd19974bb6967014e5ab6ccdcfc8287e950226bdf4721bb662d2"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/SingleCastProbe.cs",
+                               "sha256":  "9530fd521fead6b5521472a3ccd64cf6d2c06944a5b369dabcf89a3b25db8f1d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/AtWillCantripChoice.cs",
+                               "sha256":  "cea56188a36a3712757883033aa9e48a41d739c799dcb8feee504100708d0bb6"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/ClassicCastQualification.cs",
+                               "sha256":  "cf835592c4c20c7e2d25297a6b7d389f04324af265cb2e5fb78ea84debd9688b"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/CastingFirstGrant.cs",
+                               "sha256":  "d47c22c32a368cd999995e54f262f01b990ab9de22f5a458858da23d7d53492c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/HaltingPlanRunner.cs",
+                               "sha256":  "55f1da22a49db97e44f484d4380e4a8365d366a645386e5382f861de1bec70f5"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/FactSourceChoice.cs",
+                               "sha256":  "7ee171856d838d168cb6d4e1525f484d1ed3322e9a0dc73d453ba82c13bd67cf"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/PreparedSlotChoice.cs",
+                               "sha256":  "4f4c31514c8fb6e598db25f98f11d8d92257a0c16ead375a4a3c3793ca3be0de"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/AvailableCountJudgement.cs",
+                               "sha256":  "e6e6e8b924fc46883c39dc5391f626c236c487ec4d676b440b3aa4e95b107c0a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerFactResources.cs",
+                               "sha256":  "103dbe4d730106e26ebdc2aea546cc40208f822d54a8867a64531bb8687417a0"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/WorldGatedEnumerator.cs",
+                               "sha256":  "7d4d0fe7f6fa70e2091448f7c8416e00011b63fff1799bc585ea27d3dd75782f"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ClassicRunScreenPolicy.cs",
+                               "sha256":  "cad9e95b5c46b07f7c7f7365ab7315d4bb6cc5a780e5a56e6d6e9747dcb90eb3"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ClassicRoutineAdmission.cs",
+                               "sha256":  "8b1c26c06c286e51d60535d870fbaad0359a396441edbd43f08fca99eb97c9a9"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/AppliedEffectJudgement.cs",
+                               "sha256":  "f61e22dc5c243111ac4d5326ef732c9878bb44854bc94021bf7cfec08ea630ae"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/LegacyProfileFixture.cs",
+                               "sha256":  "b8f4188b66a2148e2b46a97cad7ae4fc40be817869002e1b84a5853bdfb3818b"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimeLoaderIdentity.cs",
+                               "sha256":  "77cec4aa9ef7e90e5356eb9b7c4ee719e4f6bbc93b2abaab07726dde642d337b"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/BlueprintReferenceIndex.cs",
+                               "sha256":  "4c8b8e0791b29654830495ef958c2711252692f685708664688764c9193b553d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/NativePaperDonorInventory.cs",
+                               "sha256":  "8295377426fd1349da083e2c1a76f5feab5a705ce5785318f80a771bc9c5be70"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/NativePaperReferenceCapture.cs",
+                               "sha256":  "8f0f7e5ec6031f5bd92571f325ebf0d4a1b4dae7afbc618855e7cfcabeb80fc4"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimeSpellbookRemovalHost.cs",
+                               "sha256":  "ad67995247726cdf286030d16b656f5897e0017d893980a5bfa6fad8541473d0"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Persistence/PersistenceMessages.cs",
+                               "sha256":  "f2f76cfaa0b4b89a201dc520d21a343fac0196410c7f151540405087a72de251"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/PhysicalWorkspaceRecord.cs",
+                               "sha256":  "d650041b1c57cef1022931bca216d1a950ec376e4aee99db51414300d139b5fc"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/PhysicalSearchObservation.cs",
+                               "sha256":  "63117147e307d1f5b289fff4095685d7c95f62f3b298868b9afa7b9d2a7365a9"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimePhysicalSearchHost.cs",
+                               "sha256":  "507dafd4edbe6e563398222f394b5f6ef3fdd5483064ddbd3ac1df0c591c74f6"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/ProblemNavigationRecord.cs",
+                               "sha256":  "d363978a213d53bf2c8fd7b9087b06206988cf357c78e165e12fa714e095fde0"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimeProblemNavigationHost.cs",
+                               "sha256":  "cf80bb64362f4a41194a98712454b6f81069cae38dec4dc8a17a1b324c0ce690"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimePolicyAuthoringHost.cs",
+                               "sha256":  "214ad410c8b549112a9f82ccebd3460bef33fe38ce70e010a62e97d832d9f73c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/SpellbookEntryRecord.cs",
+                               "sha256":  "e35082465ab4bc8a4ae7153cc05b8bd2dcf1118e19ee7dcaa3c364a004a0a4ab"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimeSpellbookEntryHost.cs",
+                               "sha256":  "b159110a3048ff6d1b7dea81f193f2619a27f3dfc11f60bac88d2f62d05744b9"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/NativeUiRecord.cs",
+                               "sha256":  "5bd5b23c4ab107c2abc03cdf8c2edef1704620bdae6c1eaffae2c5a3ce096919"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/NativeUiCaptureBoundary.cs",
+                               "sha256":  "62adb1b2ddace1be3efb5c009c7e9116168cd8149ccf551c846a31bf39a3d9ea"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/NativeUiStateJson.cs",
+                               "sha256":  "8d8e2cb64d0850877eb509c46b6862620060244119198ce0190dbfc3d23226c2"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/NativeUiPauseRestoration.cs",
+                               "sha256":  "a9f9ae47c7fd5a323a2c6d2898fb5ca62523c62a00bfa50cae7f185dcae7ee7a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/NativeUiFacts.cs",
+                               "sha256":  "f3ec6e13ff578268a42d2c45a1da7c3b2559d806b543b01cdc020144d46cbac0"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimeNativeUiHost.cs",
+                               "sha256":  "f58afcbd033dab5b7b4af6fb5f77a2082fa4bbb1e02cf3c7134300afbc0b3d9d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimePlaytestUiProbe.cs",
+                               "sha256":  "7774ed157ef42b177627df05ee3078ebe67b2cb3a8cadfa506649b2a9ea1d070"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimeHeroismFixturePreparation.cs",
+                               "sha256":  "c47f1f0d5dac6e582e14fab7b681ffa2ff0a246383a559f724031b28aca5108c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/HeroismFixturePreparationPolicy.cs",
+                               "sha256":  "bf3981941b5d9616c6eef6a47f7169ed1078d85b950f0c5759ee344512905331"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/CastingCapabilityInventory.cs",
+                               "sha256":  "13db62ea4dcd6627bd2a3a6075e8f432ab64078266893e268ffa04064290ad74"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/CastingQualification.cs",
+                               "sha256":  "b301503963b67bb9432df3d8569ab626259cf362b3a6199f72e4ae3e7e8dd2ed"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/HeroismQualification.cs",
+                               "sha256":  "47ea751bf87476163d7ce5e8479588eaf39b62533241005dcf159558d59f0206"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/CastingQualificationDriver.cs",
+                               "sha256":  "89bce4a7051db0cfb97d185446e6a9c7c346b78dd58ed4451d9dcdfd48573eec"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Execution/SingleCastProbeObservation.cs",
+                               "sha256":  "a7624d47b1c6a0ecb1a278f53470be10f812d77d6ba092e2f5062e0ad1c2d9b3"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerProbeObserver.cs",
+                               "sha256":  "65307aa197fb6ea0bd402f22917f643e0c2aeb3d65a295400276cadf6778a35e"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerEffectInstanceReader.cs",
+                               "sha256":  "a7bdf1b62e3f9a017490967af6eb4b5a220c159452d329e89ed1da2d37de0f12"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Diagnostics/ShareCastDiagnostics.cs",
+                               "sha256":  "42d34a372b4cfc48033ff458ab92e57a91ca81b7977118b800ae76aeec584fb5"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Compatibility/BrownFurPowerfulChangeProfile.cs",
+                               "sha256":  "9d599810f04603e0c0d5df44831b8651fb8ee0f59e5f542a0971f8d650400eff"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Compatibility/BrownFurPowerfulChangeCompatibility.cs",
+                               "sha256":  "ea16cb7ca8aa145b34f138cd19139fa2b9a3ad9c3b7f0f97e26a4d721bcd69b6"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Compatibility/BrownFurShareTransmutationProfile.cs",
+                               "sha256":  "a63d5922583ac3df2d6d0d10d820da7b8a1d7f61ab29dc2225ceb6621f37ddd9"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Compatibility/BrownFurShareTransmutationCompatibility.cs",
+                               "sha256":  "0c2710d21e04f50bd7b33015c690746e08f11bfc332c18578cb75eb17ef99160"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Compatibility/SpellbookRoleResolver.cs",
+                               "sha256":  "82c012ac2b59d80bee7c908abff913ffaa9c8b559f21c91d3615d3a7db9fecdf"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Compatibility/CallOfTheWildMetamagicNames.cs",
+                               "sha256":  "3b8a1daf851d92af3e7ec974dfa7cdfb81acbbc86c1b0fada202bceadd486ee2"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerActionGraphAdapter.cs",
+                               "sha256":  "ca2c3bf3dd6923b0e330613ae379986d58e8985a537414089112b8bf4064d098"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerAreaCoverageResolver.cs",
+                               "sha256":  "f3425458f4d18487bccc48c0343e0e3eec8fa82aa50accc5d486384bc50fb78e"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerActiveEffectSnapshotBuilder.cs",
+                               "sha256":  "4ec0111bab43c7423ea130773f1b4d02ec22cf579e16247f15f1171e130599dd"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerAbilityVariants.cs",
+                               "sha256":  "4c18256057095ac0152b581869df1ee6d3ea1b26a24991df6ad9dc72576028e2"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerGameLog.cs",
+                               "sha256":  "07cc8a95a3ea76ab9e8cf2b5c06f792b4ec642fb64461d3d94df1e7a6b95bd91"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerAnimatedCastAdapter.cs",
+                               "sha256":  "5e9d9849cf2a66a54b17815388ce16dafe07767122eeb6051ba4847861205597"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerBuffSourceDiscovery.cs",
+                               "sha256":  "c447d029805ccd68a4c64f2b6031893bd37b7d7ad08fc07deec581f08c83e6fa"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerAtWillCantrips.cs",
+                               "sha256":  "88253dbca46fd7d2dff4f888035a98f96ff83588176734d3d9b8080ab7f5199c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerCantripDiagnostics.cs",
+                               "sha256":  "14034a637ad6b417c7a84631d7dc4d08fa1bc7c4798768cc601f3b7849ce04c0"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerAreaDiagnostics.cs",
+                               "sha256":  "a89f0c2e120a3bd095d43f6910a84f81c7bffe264f4ede9178de37555275f995"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerCastEnhancementAdapter.cs",
+                               "sha256":  "a9c29d9df208399b87a7c4b60dae0b824a33a9f066bd5c3c19eebace3874fccf"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/CastEnhancementNaming.cs",
+                               "sha256":  "e4e94e97eb17de3334a9d3d3d083a98b55caa3085ef038e3855cc625b3afa6cd"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerPowerfulChangeBlueprintAnalyzer.cs",
+                               "sha256":  "0d79bb27e204a7eea5391b048705a6a5d8d57a92425f2e756f0c7ac2dcef106a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerInstantCastAdapter.cs",
+                               "sha256":  "6f8e98a859ddab5d27a3269ff874cce8381ecbc4adddc81a3451d91e3a638a1f"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerPartySnapshotBuilder.cs",
+                               "sha256":  "fbcf531209c135686e03f90bac1fb21b6902fca484db63873085ca69300f5e1a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/PartyProviderAdmission.cs",
+                               "sha256":  "cab64ef9425583fd706252f383f92f5eebd2100deaa3fc0b867322b65ff1988d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/ProviderTargetingPlanner.cs",
+                               "sha256":  "bc432aabf08e11439db0470bd25f7fd035a36dfd5a6b5d71b4b366b2a4f77f81"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerSpellbookRoleAdapter.cs",
+                               "sha256":  "851fcde1015cce91b672213056c8b36d5d1c0a99d970d43917848533b9abcdd9"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerSpellbookMembershipAdapter.cs",
+                               "sha256":  "c494f285840d40f94087f7de2525b64fe707e3da30c38c8d72f3dc9712f5e2c8"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerProviderOptionBuilder.cs",
+                               "sha256":  "e8bf7c9b35c883543313844d663e81a4030d5206d75b7011c84d2bffd464d8e6"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerShareTargetingModifier.cs",
+                               "sha256":  "842c92e090150cdd820a1d10a45bf9ec9ec4bcccd01f553e84fd692d869b69a9"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/ShareCastingModifierAdapter.cs",
+                               "sha256":  "b64a04721bfbd42a481e9052930923b4ec9f4b3a287c4986542499470290b064"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/EnhancementLeaseCleanup.cs",
+                               "sha256":  "a9901d28726a64cb230dad4d751a1015c6890f35d6e6cd607d91eb311a9f24b7"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Infrastructure/AtomicFile.cs",
+                               "sha256":  "550991561580e6e977035df8818818490ab036b22afc7432d679134c272881d5"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Infrastructure/Hashing.cs",
+                               "sha256":  "829b25c9cbe4d4bc795803c753764d94668d7f1eb469607028cdc9e3104d7c6d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Infrastructure/ModLog.cs",
+                               "sha256":  "ff354dbc9d5d809f5c21b2c81ac7a42d82363305fa92f9a8d0569cf003f72690"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Localization/PlannerText.cs",
+                               "sha256":  "f46ffaeaf5aa51e6da4eb2bb8d7cf05b23834ba474bf39987010ecae065f231a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerLanguage.cs",
+                               "sha256":  "9d1a983969cb9bf17b99b5bb3d35f654efce03bcffde1a75b09801423f0a62ad"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/GameAdapters/KingmakerDurationAdapter.cs",
+                               "sha256":  "0cd7baa5e7849e0e7e7eda545b15f2a3735bdfdb0b380b647d5a1007c7c235c9"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Main.cs",
+                               "sha256":  "0976b377c26571b7856b32860f50dc0659816034e17ade62952b81931e9b4f26"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Infrastructure/PlannerUpdateFrameGate.cs",
+                               "sha256":  "b79262ef192d31a7c12a9316386b5609658da5a586028fffe45313fdff51e9cf"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/ResourceLedger.cs",
+                               "sha256":  "f3d2230ecc8462cb5b111e6371ade13bd6cb4fab4ca94623e711196f88c50565"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/RoutinePlanService.cs",
+                               "sha256":  "a1967391693b9aa1205d9e0108b6b05fc6dee183ecfad2ac3daeb54be18c0e25"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/CastingAuthoringService.cs",
+                               "sha256":  "2ff4487d57b81de99fbd1c3a1d6449c14e218e77bdf3ecdd7129eb1d85c6e5e3"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/CastingSourceIdentityMigration.cs",
+                               "sha256":  "772ab41c4b44a304c84d69c7c1ed189cc82c209682aff6939eab7b534c1faae4"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/ExplicitCastingCompiler.cs",
+                               "sha256":  "f8622690fb838d3b804f8882ee46ab74ead6d467037c37b2ff8c44c810af16e1"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/ItemSourceResolution.cs",
+                               "sha256":  "3958de4cc1ef77655249c30d2f4d4edb76c4ac66157bd6b085fd2250e24f8019"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/CastingBudget.cs",
+                               "sha256":  "f8ae74a5ac22994c28d34990ca90699b26b8827f5c7d13ca4832a8323770eb56"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/CastingForecast.cs",
+                               "sha256":  "89d50fea9b5d977e31b19396ec378966ace999c63bb204a169214a01e402896b"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/CastingExecutionGate.cs",
+                               "sha256":  "28deb67efd982acbdb6e48ee8a9807e69912b173e8d95f0e5d0db57cc821d42f"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/CastingTargetingModifiers.cs",
+                               "sha256":  "807f9acdea6eb703e012a6f08c7ecde71c8b393807ec4ef5fc35e1d15844f632"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/CastingReviewCoordinator.cs",
+                               "sha256":  "e07a5963b88f8552bcd9da7f960b8c8d713a917dbbb1d924d3d7894c60a53067"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/ExplicitCastingStepConverter.cs",
+                               "sha256":  "95e22745f58ca192e2520f40287bb48d96882e39c9f7606a8add7259101f3da4"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/EffectPresenceEvaluator.cs",
+                               "sha256":  "d55c05b5dc257e18a54c5dff928d5e61860c57293ab251480a380f7cc063e017"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/ExistingEffectAssessment.cs",
+                               "sha256":  "bdcbe5ce8820a13ede45655b876e747f47b3d18d87921f192305cf60f388e10a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/CastPlanner.cs",
+                               "sha256":  "cfd04a9c098be535db6e8019e5c21acd07db11298ec9e8177774c6e722f7efe0"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Persistence/ProfileModels.cs",
+                               "sha256":  "b5d8b882da0dd5d2853109c0a2ae9b3ae1a8c02443ac9ae456fa047299bfcf5c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Persistence/ProfileRepository.cs",
+                               "sha256":  "6d2957a230f48fc3ea131047b7d7f2b4dab5530e53af0abd8b5ca69fd32d399d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Persistence/CastingPlanProfileModels.cs",
+                               "sha256":  "f1393613553e690dbf6216898395686458ba335c6dbde44c2789a2cce61f3378"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Persistence/CastingPlanRepository.cs",
+                               "sha256":  "b652500f23383023dc41106008bc3799d7b9eb476ac24969c3999089d9a2779a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Persistence/CastingReviewStore.cs",
+                               "sha256":  "4ba00d9c1256f4450d1a7af070d064261981f810119c29b74060cd76a818cffa"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Persistence/PlannerModeStore.cs",
+                               "sha256":  "cb055804980da41d7ae19dbb58dc01f411215d6edfd0aa3d857e002286823c85"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Persistence/CastingPlanMigrationService.cs",
+                               "sha256":  "778742baed309e035ee56cbc635fdc5d374b0167ae86189b833cad8aaddc19ac"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Persistence/CastingPlanImporter.cs",
+                               "sha256":  "fc84038af279891caf5c3ccd4625c3b869cb1e7035d86fa30a260abac58f1157"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Properties/AssemblyInfo.cs",
+                               "sha256":  "8ece7b5572b791e2d60fb04f4fa3ca8803da4d6863a6b8d6bc3a97ffe949766a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimeTestHost.cs",
+                               "sha256":  "58ef64a9ca120a64d9a2590f335c351f9742233ef341622c4903e0f2493d9a33"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/AdvancedCopyInspection.cs",
+                               "sha256":  "3b410717d257ea620d1c8a834d2462befab74c8e9f4a74c32ecce2e34129be9c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimeTestResultModels.cs",
+                               "sha256":  "fd09479f21e60b0b30c931832bd29333fb36e11d8d673e499a9195cbe73a6295"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/WorkspaceScenarioContracts.cs",
+                               "sha256":  "0bb7b73762f5f471d68eb603b134e691de9733b0fd61d9aa1e55b0948bef8ef4"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/HoverOwnershipRecord.cs",
+                               "sha256":  "c6f5aa2d48383e4ecdbad3856fd6b825034dc5c8fb991bc7fbe0b5f5a61a02a3"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/WorkspaceBudgetEvidence.cs",
+                               "sha256":  "93bcc24a02eba1f1cfa988fb4ee4c15083adb35b620cb0b1ad1cba2c835e8139"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Planning/CastEnhancementRelevance.cs",
+                               "sha256":  "23767623e7f3d94f1ac28a83d4efe4188e5b5fdadde129a6b85472de5299512d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/PlannerHoverProbe.cs",
+                               "sha256":  "6a18312db5781402aaad25b55e0d580b144b70b7d99fe4c7a204759fc6a75b1e"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/LiveCampaignSaveLoader.cs",
+                               "sha256":  "9ef9880676e15ca56c2727fad2673c36f9d252e5edb4b98d56d8010acf2afd16"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/UiInputIsolationProbe.cs",
+                               "sha256":  "2066963e0d5b3ddc165e465ac44a5679574c857b5a1ab64c5888149cf890e8a6"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/HarmonyPatchInventoryExporter.cs",
+                               "sha256":  "604e31f84f19fec9644837458d22ce24053d0f07b278f3c52b674ffd4a2ef9c8"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/NativeUiContractProbe.cs",
+                               "sha256":  "1ad31f8750dc4507d1e3e2a84ccb2772b480eed3b74d75d4415eb29744c9d666"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimePaths.cs",
+                               "sha256":  "0677c285a4bf6ed4edf62f6a4b0bea2c4906231aa743ae708c355217cce7358c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimePerformanceDiagnostics.cs",
+                               "sha256":  "49c8972b192bbca8be77e892c4b77c3109f1669fc26b93de9793ef815bb1dbec"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/RuntimeTestProtocol.cs",
+                               "sha256":  "1eb77ca0bc486678cffa12d897de4c37fb77e0c3021dd69f467c98ec7260b46f"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/MenuRenderDiagnostic.cs",
+                               "sha256":  "bdf6714c7183014bddd2dd79315fcc1603e60b5276959c31f2a9562cf2a0a5b5"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/MenuFrameStats.cs",
+                               "sha256":  "53f43f7a2029c72f618075ea8cd4daacc6c52efd5aeb45883eb7837af20fb74c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/LoadedAssemblyIdentity.cs",
+                               "sha256":  "dff8c6736102fda5827e8b28a9d3a538f8e0314b02bf93f5aba27574c1149d34"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/MainMenuLoadContracts.cs",
+                               "sha256":  "436ccaaea7092d53ec8e7719ddd4b91cfd30dddaf329e45bc2af3cec1b57dce6"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/RuntimeTesting/GuardedReadOnlySaver.cs",
+                               "sha256":  "41d05c86ae59dfda066ea841133f4731b00d371f6ff12153aa6fa8a03163fe8a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerSetupModel.cs",
+                               "sha256":  "2c63ea4d8d997f3efb1253f7db1c597255a61337c8c804a98a37474479c51eaa"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingWorkspaceModels.cs",
+                               "sha256":  "d36255d8c7354051a5bf351c4807e4bac8fecc926ecf624d938bb5deef4dee2c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/WorkspaceFooterModels.cs",
+                               "sha256":  "ac1c24e789125a797f1be708da1109611c77e56fc466a5f2e1fad68f89cfa242"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingWorkspaceScreenView.Tooltips.cs",
+                               "sha256":  "973e275f602712a8aad7b9b3cec2cbfa282b99dfb15061874716fdf9ac8c163c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingWorkspaceSession.cs",
+                               "sha256":  "e2fa2c63f9f014e91659b209fda8f7523ccbca65d815851ad618fb326ce2c33e"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingWorkspaceSession.ClearPlan.cs",
+                               "sha256":  "330990b10ea2b69d575cac0edbec3cb13e126ba37b99a986447279062c4cc209"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingWorkspaceSession.Graph.cs",
+                               "sha256":  "8920596bc475f9296fe079c43a9dfaee34ea4912f45d4a62efa7df68012c7eb6"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingWorkspaceResources.cs",
+                               "sha256":  "013d89b7b0601a1c7a253978d1519dcb1556d3b377f291d5545aeff2c1f64375"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingWorkspaceSession.DirectManipulation.cs",
+                               "sha256":  "988ecd31983aa73a2a3e83ddf1e40f57d4e9c351bdc5196d21bb9f9ced5d51e1"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingWorkspaceSession.SpellbookReconciliation.cs",
+                               "sha256":  "4228270915cef9725ea9025fcab3c5dbafa7f433b36fa504d35654ff57c1c180"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Planning/SpellbookRemovalReconciliation.cs",
+                               "sha256":  "d8a92cb0611c9f12c606625e60a34c167f67d085fd4c9e50d4ab55c413f6826c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/Domain/Providers/SpellbookMembership.cs",
+                               "sha256":  "a83cca335fcb4abc3379fe1c39b308c73bcc712f06fb3db510af33d3ef29ec5f"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingProblemNavigation.cs",
+                               "sha256":  "5630788bf6146e435b5ddb13463547c28dbdcd81f98f3fb7b3a109f3d85b1a4c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingGraphModels.cs",
+                               "sha256":  "fbdaec2167654d282714314725468effc675ffcef85431d40352bb27d03b1692"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerButtonPalette.cs",
+                               "sha256":  "5c027ce928b89463ebfbd99fe8b84f6cbf0bb5958b536744686b11d4283136c1"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingExecutionHost.cs",
+                               "sha256":  "4372de6f3ccaa59c6b641d8f1e69587d7c675749ad981317bb64d5616aad22e6"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/NativeCastingSessionPolicy.cs",
+                               "sha256":  "0dcbfd3cf82e8374f5a5bdd4b1621c3a19f6be6b029fd89a70bff7a4df8d1ced"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingRunPresentation.cs",
+                               "sha256":  "34ef76f24852c82ede5b43caac85095de83e27046822fd87ed60ceb29fb8dbe1"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerSettingsText.cs",
+                               "sha256":  "5d68e23380e6c50a1f6fbc8d151b2d35c86e17f17694fa7e820186e0f829ff19"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingWorkspaceSessionBinding.cs",
+                               "sha256":  "1084c87a61ed2d17ebbaf274447012ea9dd0f0532b0be92906def4ba01bd11bf"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingSessionRecovery.cs",
+                               "sha256":  "92f7dd188979f1fbe3b5b153415ea39bffde1addcb3d3e9d717823bcc224bed2"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingWorkspaceScreenView.cs",
+                               "sha256":  "209a1af2ef5309a95f3586498ee2b48ff587c6d2c164fce0499d52f5f6a6ab45"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingWorkspaceScreenView.ClearPlan.cs",
+                               "sha256":  "66bd1ffad837dec72cb6ba8960a12e0ec1fd8b0facac2825c994de4d637ecacb"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/WorkspaceKeyboardInput.cs",
+                               "sha256":  "8e59f5fb2167e9ea4c370a20efdf2eafbd56706c267ac0ec424de49966545b94"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CastingWorkspaceDevSelection.cs",
+                               "sha256":  "138c2062ea48c011715884803b27e539ad797115aba08799bd1ef147f11f3f41"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerPresentationModels.cs",
+                               "sha256":  "a75d069d267f394d736f68283f80adf81b3c9a35fbf1e6d13ddff47e36729725"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerScreenViewModel.cs",
+                               "sha256":  "972f75f3c13537036637fad57f3136e382cfbac59d5176e377cd28cb04e423d1"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/BuffGridMetrics.cs",
+                               "sha256":  "ce1c68bdab4702b0591395a57fb4d5b673f9e04d0372002bcfd220e7b6a3e385"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerViews.cs",
+                               "sha256":  "bc53c9fae8cbe53099438072fcb715849643bac897c339f989d4830cdcb88519"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerHotkey.cs",
+                               "sha256":  "5999c11c7337b6550a21b795e587f7f0927dd9525cfc99d5ba848f916a7a53dc"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerImeGuard.cs",
+                               "sha256":  "68ce37364ccd1831a6f314bbade00cb52431d49d06d3faf9837d1da00a73293c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerHotkeyBinding.cs",
+                               "sha256":  "8743a4197ddba6d405be443408f18092141900365f87f2ddca2ebf157b3e2e5d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CatalogUiDiagnostics.cs",
+                               "sha256":  "7e378dc826aabec02a9ceed2906362c1cbbc5eb4a5df3de30c6b74dc8a0bfffb"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/CatalogLayoutDiagnostics.cs",
+                               "sha256":  "b2e405c56201211f08aff9819f0cf05edfd4deb87f109259f4946de697666efd"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/BuffPlannerUiContracts.cs",
+                               "sha256":  "0cee6340b60629fa8d213958f3c333b13a5035463a374c2de22046d115f56aff"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/NativeTextMaterialSelection.cs",
+                               "sha256":  "f0db0d8c5238fd65329faf480924d72fef2a71d50bc44f96ed20a70a09a53907"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerNativeKit.cs",
+                               "sha256":  "15b855702e89440e4137641e244485f77f87977f9487048df8efa3ef368a5a4b"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/HudStepGeometry.cs",
+                               "sha256":  "61fb4fd8dd71f46bd5dbb67ad691f81176abc9e5b8f4fca5d6b5937c890d7620"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/HudCellArt.cs",
+                               "sha256":  "27e3f462c607743bce00a2a31db1ef95d461be8a9dd94f37ce0f47667a03313a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/NativeHudArt.cs",
+                               "sha256":  "2d6b612300529602237514e72d07fc8c8e3573ded64f07ced150fbd95170d96d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/NativeDescriptionPresenter.cs",
+                               "sha256":  "67684513bb502507918f7bb94bf6fcb9d48c760f6b9a041ea92406fe1da68e69"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/BuffPlannerHudButtonController.cs",
+                               "sha256":  "6fd5ac5d005969dae5a2fc07731540abf8802792fb0c1a572af540bcdaa76715"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/BuffPlannerScreenController.cs",
+                               "sha256":  "604fb0e1c512b9884d291f18743301ce3b99a521a93594b01f6cff5ea000af7a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/BuffPlannerScreenView.cs",
+                               "sha256":  "5198aaf6b615c2412b5b1e080ff93f8d47f669d107f8cbedf27eb902ad520edf"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/KingmakerPlannerInputBoundary.cs",
+                               "sha256":  "9f8d76c632436225c1086f634ab50f07eeb435300b0303cdc9f20cb944a1d7d0"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/KingmakerUiFactory.cs",
+                               "sha256":  "683be9b02c08041aa869fa3a6f8e7c26f8c8d88121f10f6f57f10eabd753c907"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerPointerSink.cs",
+                               "sha256":  "c7fff27afb86bf6434190ad883749b75731f07c399a11fd5d019de13bbd1870d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerPointerOwnership.cs",
+                               "sha256":  "2ff0f2d05b68cf2972ed7ef418fb8951e802479b829bd24b1368439fc3279288"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerUiSession.cs",
+                               "sha256":  "c5dfac5d68a48e2f321743c388f886aa9b08cc59fd2f05673e0ad25b678f8677"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/BuffPlannerUiRoot.cs",
+                               "sha256":  "5881eecacafcd38b922f184cf7b393f9ca5535b8e6cfe2109257b08e6ea539c2"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/AssignmentPresentationModels.cs",
+                               "sha256":  "01d5a4afb93e3740d51de2c6bbb6c1c51b4faad14ffb7df8fe9e43e97f31ac41"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/SequentialForecastPlanner.cs",
+                               "sha256":  "a8f2f4defe67690ab1a58319eeff4b958be552eae15c06d1cf3935b171ae9927"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerReviewState.cs",
+                               "sha256":  "05d9b056ea0e802e362e35364d9d969b54d403fed92f8de2fbef890e7c311fd2"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerReviewCoordinator.cs",
+                               "sha256":  "022e071c9b1c564c3e21dc6725777f53eaba4ca8446f04cf4769711f673f5336"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/AssignmentEligibility.cs",
+                               "sha256":  "2c2eb1ff1182f29a178a415434064e80dd1d24b4599da88049f7e1e1e44ee9f8"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/SpellbookHandoffStateMachine.cs",
+                               "sha256":  "acc74c8218c0a22aa85b19663caf589b13d996a631c92c83c5fa606589e65500"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/SpellbookWindowLocator.cs",
+                               "sha256":  "69c366b5db47a6e4a14d25a8c551f27a949c1a758d9b778fa90b78e279a6f742"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/SourceTabLayout.cs",
+                               "sha256":  "bfced0971807a18ec4d2750f611c6f477ce1e7c42a72b6aee9a65baafbdc6999"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/SpellbookFooterLayout.cs",
+                               "sha256":  "c9764e4b772cee10d129518d2bd7a5940f68cb7ae072351790d1e1e0b66ca8dd"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/SpellbookHandoffFaults.cs",
+                               "sha256":  "70f3a8386d53736ea6531f50f716603fb0d0c30867d6faeb2adfc16dc32b2985"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/BuffPlannerSpellbookEntryController.cs",
+                               "sha256":  "a98af5e2a33f90df0c493171ee98ecd5549b59b84dca1043da8281f374e3afdf"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/NativeThemeModel.cs",
+                               "sha256":  "a129e041ae31058a89010f3e082484387513531d5781a5aa3e386556da234887"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/NativeThemeDonorLookup.cs",
+                               "sha256":  "6f4ff93a63b32268fbca095cec2a69413c26c5940f33b9f182257c626b53dd8c"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/NativeThemeResolver.cs",
+                               "sha256":  "af20ead3940ecc395990222f8182c3bbfff7a1568dba75aa890a66884a1e53dc"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/NativeThemeRecovery.cs",
+                               "sha256":  "745ebc77b6bb3a87171a34262f19ab9fa239151f92a58b0e1d9072ec72acd47b"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControlCaptionFit.cs",
+                               "sha256":  "e16ff2e21b5c40bffa65e2027f25387c51731de736362678c6b13850c1086633"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerNativeTheme.cs",
+                               "sha256":  "aa4aa6627a56c33f96e1e3f6b7fb2f2c7c4cdc3371004ed5317a8f0b8bb30895"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerRoutineModel.cs",
+                               "sha256":  "248315a659f89d458f6b814cde4116abafb16efaad137bc947a0feb8c876dbc4"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerPresentationHost.cs",
+                               "sha256":  "db19c4d8e7fb55b15c303814adb8c534cee0d02e073cd226ea7f086f544095ee"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerWorkspaceFocus.cs",
+                               "sha256":  "df8b6247a8171b9be3d840270cada600452cfb20914303300be5f90992a796ff"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerOwnedItems.cs",
+                               "sha256":  "ad7cd08b6cb87387ed54d5e651e5a4bcdbec6ee1396c4c8665f69e73e60d67dd"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerWorkspaceNavigator.cs",
+                               "sha256":  "d38ff0a01969a980a829dd88a99f16dbd80c796af105a9a151e704cbd1bec5ab"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerNativeMenuCard.cs",
+                               "sha256":  "6a850639637a148122c8501127f19f54774521a8956393f9c4a92083f0fa2700"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerMenuLayerCapture.cs",
+                               "sha256":  "c2e71a041a76e1fcae31a6b33bd1e2a6ccac56f585f6cf49dcf564a6c4bd74d5"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerTransitionInputGuard.cs",
+                               "sha256":  "5f22521bfee9e99e302036aeb235c45f37bf3397d77166f128eb6f54f78923cb"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerWorkspaceTextProbe.cs",
+                               "sha256":  "65cf987edc543bfe1a19f9136b0207f6b908eceabf78ac892ed1eac2ad6399a6"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerLayerOwnership.cs",
+                               "sha256":  "4b83f536c9ebc1695fcf09cad9af54faf656e485873bd1dbc39ca146adcd024d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerEntryRegistry.cs",
+                               "sha256":  "5f082ce7ec54f43e9f2f79d572fd669a4dfb0c3f8fcfd1d0d7096bcaf3936fcf"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerRoutineView.cs",
+                               "sha256":  "f888b7ce138805588ccfd804b8a36d08e4d49f5473200f66d42ef61ddf1732ae"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerEditorInputBoundary.cs",
+                               "sha256":  "b2dd89ac6ad126b85d166b91fc0150b29758df402c3242d705694700ef77757a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerSpellbookIntegration.cs",
+                               "sha256":  "158f49eb48615e6481b750b74837b7ede1f555e2e4511b548ce0762908df416a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerSurfaceHandoff.cs",
+                               "sha256":  "f9a346d5104469f407168c09cab1fba054190a239e8733cbd64c69c17a54ad8d"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerQueuedModeAction.cs",
+                               "sha256":  "cdc424f69cd339fe6fcc0cc5c593f638bc87e38a4d420aec04510f25f1b4d79a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerRoutineMenu.cs",
+                               "sha256":  "128e3e9a18b1fc3ae937c0224e56bda65e481a81d9d600408e65b508c5abc1df"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ControllerRoutineIntegration.cs",
+                               "sha256":  "ee3a2972e5453328ee874852e1cf081be739d2cd6a5699cfbd30c2d610268016"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerNativeThemeSurface.cs",
+                               "sha256":  "92a22d8a4647008f5ab83dedde3ed8aa05b9e5f2c698256c22c0cbe0f3a16b85"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/NativeSpriteContract.cs",
+                               "sha256":  "a9b35efcd55adbf8eb51b958915760f9bd213d8e35badd1a462e581e4d013e13"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/ParchmentTreatment.cs",
+                               "sha256":  "7cb70314a79f4d82ec79011388bd080069e49bb25db8a986bc08dd73ffc78024"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerParchmentPalette.cs",
+                               "sha256":  "2e62cb7583d1d028bf5ecce24cf85fe0e949dbfe495cb77b03704839e8047f72"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "src/KingmakerBuffPlanner/UI/PlannerParchment.cs",
+                               "sha256":  "c27b63c4132253933ef34ddd34d3d00a8b35647a6cf772889be9beb98dd7b59a"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "obj:BuildInfo.Generated.cs",
+                               "sha256":  "b7afb544fd6970e0998f3626c80fe7198931fdcb6ef5fa8f358c0bf7f5de785b"
+                           },
+                           {
+                               "kind":  "compile",
+                               "name":  "generated:.NETFramework,Version=v4.7.AssemblyAttributes.cs",
+                               "sha256":  "1555ebe6741e05c08c49de3019df3761b92ef583871c838b4262de2ff67fac4e"
+                           }
+                       ],
+    "packagePath":  "<repo>\\artifacts\\local-runtime\\0.6.20\\KingmakerBuffPlanner-0.6.20-local-runtime.zip",
+    "packageSha256":  "23048581aa870e6639861ee88011ec6128bc774ca1592049da0b476309e00060",
+    "dllSha256":  "684b28efdba53369ebd5c9b199e02c04c6b3c76f697426684a7935f607f91184",
+    "assemblyMvid":  "5a94f398-42b6-42df-a682-4e20167cb829",
+    "embeddedCommit":  "a76174b9767bdc131840a90027fbe080e8334420",
+    "loaderReferences":  [
+                             {
+                                 "name":  "0Harmony12",
+                                 "version":  "1.2.0.1"
+                             },
+                             {
+                                 "name":  "UnityModManager",
+                                 "version":  "0.31.1.0"
+                             }
+                         ],
+    "validated":  true
+}

@@ -1,0 +1,338 @@
+{
+  "B": "913798712f3685236c8f9d5cc1e8c04ea9fc9248",
+  "H": "7ad30694889088c3d1d03f98f62b142a29923d46",
+  "M": "913798712f3685236c8f9d5cc1e8c04ea9fc9248",
+  "amendment_revision": null,
+  "amendment_sha256": "none",
+  "checkpoint_id": "final",
+  "checkpoint_type": "final",
+  "fatal": false,
+  "guidance_revision": null,
+  "guidance_sha256": "none",
+  "invocation": {
+    "completed": true,
+    "duration_s": 926.9,
+    "errors": [],
+    "exit_code": 0,
+    "failed": false,
+    "observed": {
+      "approval_policy": "never",
+      "cli_version": "0.170.0",
+      "network": "restricted",
+      "observed_effort": "max",
+      "observed_model": "gpt-6.2-astra",
+      "plan_type": "pro",
+      "rollout_found": true,
+      "sandbox": "read-only",
+      "source": "Codex session rollout (CLI-recorded thread settings; not model-authored)",
+      "subagent_suspected": false,
+      "turn_efforts": [
+        "max"
+      ],
+      "turn_models": [
+        "gpt-6.2-astra"
+      ],
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 3710976,
+        "input_tokens": 3891903,
+        "output_tokens": 31351,
+        "reasoning_output_tokens": 16796,
+        "total_tokens": 3923254
+      }
+    },
+    "requested": {
+      "effort": "max",
+      "model": "gpt-6.2-astra",
+      "sandbox": "read-only"
+    },
+    "thread_id": "01a20b55-437c-7cb3-8c29-229a3d5c7c1a",
+    "timed_out": false
+  },
+  "mission": {
+    "id": "kingmaker-umm-0311-mission-20261123",
+    "sha256": "f7d990f396c858ad663020133baba66e0cefb57f2b8be54a26d96186f86b24d5"
+  },
+  "ok": true,
+  "path": "~\\.agent-review\\state\\kbp-codex-kingmaker-buff-planner-umm-0311-baseline-20261123182207-144d\\rounds\\r03\\envelope-1.json",
+  "pr": 26,
+  "project_sha256": "c083b85d6953515b027c07ba8a8b6deacd95a926daa60434b6f725ad9c55f9f4",
+  "protocol": "agent-review.v1",
+  "publication": "r03-review",
+  "published": [
+    {
+      "comment_id": 7120203733,
+      "of": 1,
+      "part": 1,
+      "url": "https://github.com/howardreith/KingmakerBuffPlanner/pull/26#issuecomment-7120203733"
+    }
+  ],
+  "raw_result_if_rejected": null,
+  "reasons": [],
+  "repository": "howardreith/KingmakerBuffPlanner",
+  "request_id": "kbp-codex-kingmaker-buff-planner-umm-0311-baseline-20261123182207-144d-r03-05fe5c",
+  "response_sha256": "6be2216ba5e2d7a6b813d659ab6ab3305988c6c1148dd450cb7f4bf47a6b5133",
+  "result": {
+    "candidate_commit": "7ad30694889088c3d1d03f98f62b142a29923d46",
+    "checkpoint_id": "final",
+    "checkpoint_type": "final",
+    "decision": "changes_required",
+    "decision_rationale": "The production build uses the pinned 0.31.1 references, and the retained DLL is identifiable across all four static audits. The launcher still rejects every matching non-owner loader at deployment. Frozen reuse and release packaging also have paths that can certify the wrong inputs.\n\n## Continuation for Claude\n\nCarry the selected loader through both deployment calls and keep the admitted request as the authority for result validation. Exercise the real deployment preflight against private matching and mismatching loader folders. Bind frozen reuse to production-effective compiler inputs. Bind the release copy to the two clean producing builds and reconcile its embedded revision in the installer. Clean up the transaction-owned ZIP if entry fails before a state record exists.\n\nUpdate the compatibility guide to identify the current frozen product, the stamp experiment and the controller build separately. Use the focused fixture cases in the findings, the configured controller gate and documentation checks. Keep the work within Buff Planner PR #26 and its existing guards. Native and combined-stack status can remain NOT RUN under the documented installation constraint.",
+    "evidence_assessment": {
+      "executed_verification": [
+        "The controller receipt and matching log confirm scripts/Test-Development.ps1 -Only localization at H. Source validation passed 47/47, the Release build passed 1/1, and localization passed 14/14 in a 10.1-second gate. The DLL SHA-256 was 9d817d0d0178a717c5569f043ea948d6c859db850b2a684f57e8bb2c88726173.",
+        "Read-only checks confirmed HEAD, the enrolled mission hash, a clean git diff --check, all 13 indexed Git-blob SHA-256 values and all 52 listed documentation link targets.",
+        "I matched all 245 in-tree C# source hashes in the retained compiler inventory to the snapshot. The receipt, validator, inventory and API audit agree on the frozen DLL and MVID. Reversing the documented export normalization reproduced the raw sidecar SHA-256 a59cc6e44066aca9204c5b6a2e4680a547e6ab24274e9eee68b4dff1e3582945.",
+        "The committed machine-readable outputs record 71/71 boundary cases at 5cd32d0 and 23/23 loader-identity cases. The static audit resolved eight types and 24 members on 0.31.1, 0.32.4, owner 0.33.0 and 0.33.4. I cross-checked each row\u2019s three component identities against the inventory."
+      ],
+      "inspected": [
+        "The enrolled mission, AGENTS.md, validation policy, feature diff, round-three correction diff, prior ledger, developer report and controller evidence.",
+        "The production project and pin targets, build and release scripts, ZIP validator, receipt reader, installer, deployment transaction and their focused fixtures.",
+        "The loader profiles, launcher and profile entry points, request and result models, in-process observations, compatibility guide and frozen evidence."
+      ],
+      "limitations": [
+        "The foreground transcript was withheld. The controller independently attests the focused gate. The other run counts come from committed structured outputs.",
+        "The read-only review did not rerun builds, installation or runtime workflows, or open the raw ZIP in the external frozen worktree.",
+        "Settings, language, planner UI, persisted plans, casting and fresh-process reload remain untested in game on every loader row. The combined stack was also untested."
+      ],
+      "required_gaps": [
+        "End-to-end loader selection, direct deployment evidence and result validation against the originally admitted request.",
+        "Frozen-reuse invalidation for production-effective compiler changes.",
+        "Release ZIP and receipt reconciliation, including the new embeddedCommit field.",
+        "Recovery from a transaction-entry failure after the private ZIP has been copied.",
+        "Current compatibility documentation with artifact-specific provenance."
+      ],
+      "source_inspection_only": [
+        "The non-owner deployment refusal follows from the arguments at both call sites and the callee\u2019s default. The suite\u2019s deploy-and-launcher case inspects source strings.",
+        "The compiler-context, mutable-request, release-copy and pre-state cleanup findings follow from their producer and consumer code. The supplied cases do not exercise those failure paths."
+      ]
+    },
+    "findings": [
+      {
+        "acceptance_ids": [
+          "mission.md:237",
+          "mission.md:239",
+          "mission.md:242"
+        ],
+        "actual": "The launcher checks the selected row at line 333. Both Deploy-Local.ps1 calls, at lines 389 and 471, omit -LoaderId. Each child therefore checks owner-0.33.0. Enter-KingmakerCompatibilityProfile.ps1 also exposes no way to forward a non-owner selection.",
+        "blocking_rationale": "A legitimate baseline installation cannot get through the normal launch path with its frozen candidate. The same failure affects 0.32.4 and 0.33.4.",
+        "blocks_readiness": true,
+        "category": "defect",
+        "expected": "The initial preflight, deployment preflight, transaction and request use the same selected loader.",
+        "id": "R1-F1",
+        "location": {
+          "file": "scripts/Invoke-KingmakerRuntimeTest.ps1",
+          "line": 389
+        },
+        "priority": "P1",
+        "requested_correction": "Forward -LoaderId at both deployment calls and through the public compatibility-entry wrapper. Keep the existing default for callers that omit it.",
+        "requested_evidence": "Use private fixtures to show the loader argument reaching both deployment calls for the four supported rows. A matching non-owner row should clear the loader check, and a crossed row should be refused.",
+        "title": "Both deployment calls drop the launcher\u2019s selected loader",
+        "trigger": "Select -LoaderId 0.31.1 with a matching 0.31.1 installation."
+      },
+      {
+        "acceptance_ids": [
+          "mission.md:156",
+          "mission.md:194"
+        ],
+        "actual": "Receipt reuse evaluates MSBuild with SkipCompilerExecution=true and temporary output paths. GamePath.props is absent from the tracked fingerprint inputs. A KbpVersion assignment conditioned on real compilation changes production BuildInfo while leaving the reuse evaluation unchanged. The producer compares the two inventories only when building a new package. The inventory also sorts Csc arguments and omits the selected compiler identity, previously represented at least by CscToolPath and CscToolExe.",
+        "blocking_rationale": "The old package can remain eligible at the same HEAD after an input that changes the production DLL has changed.",
+        "blocks_readiness": true,
+        "category": "required_gap",
+        "expected": "Reuse detects changes to the effective producing compile, including generated values, compiler selection and order-sensitive inputs.",
+        "id": "R1-F3",
+        "location": {
+          "file": "scripts/Common.ps1",
+          "line": 76
+        },
+        "priority": "P1",
+        "requested_correction": "Bind or explicitly constrain production-only local settings during reuse. Preserve compiler argument order and record the effective compiler identity. Keep support for relocating byte-identical game references.",
+        "requested_evidence": "At one HEAD, change a production-conditioned generated value through the ignored props and show refusal of the old receipt or of the unsupported override. Cover a compiler selection or order change and retain unchanged and restored-input controls.",
+        "title": "Frozen reuse can still miss a change to the producing compile",
+        "trigger": "After freezing a clean package, change a local build setting that applies only during real compilation, or select a different compiler with the same arguments."
+      },
+      {
+        "acceptance_ids": [
+          "mission.md:155",
+          "mission.md:194",
+          "mission.md:202"
+        ],
+        "actual": "Build-Release compares the first and second package hashes, then copies the second path later. It compares the validated release digest only with a fresh hash of that destination. It never compares it with $secondHash or $secondManifest.packageSha256. It also ignores the producing receipts\u2019 sourceDirty flags after its initial worktree check.",
+        "blocking_rationale": "A valid replacement ZIP containing the same DLL and different packaged data can receive a release receipt claiming two deterministic builds. A dirty producing build can likewise retain the clean HEAD attribution.",
+        "blocks_readiness": true,
+        "category": "defect",
+        "expected": "The release ZIP digest equals the digest established by both clean producing builds and their receipts.",
+        "id": "R3-F1",
+        "location": {
+          "file": "scripts/Build-Release.ps1",
+          "line": 41
+        },
+        "priority": "P1",
+        "requested_correction": "Retain and check each producing receipt while its output is current. Require clean, matching source identities and compare the validated release ZIP digest with the deterministic build digest before issuing the release manifest.",
+        "requested_evidence": "Use the same-DLL, different-data ZIP fixture to show that a substituted release copy is refused. Show refusal of a dirty producing receipt and acceptance of the matching clean pair.",
+        "title": "The release ZIP can differ from both deterministic builds",
+        "trigger": "The versioned local package is replaced after the second hash is recorded and before the release copy is made."
+      },
+      {
+        "acceptance_ids": [
+          "mission.md:239",
+          "mission.md:240",
+          "mission.md:242"
+        ],
+        "actual": "At result time the launcher reopens runtime-request.json and takes its expected loader from that file. The completion digest still uses the original in-memory loader. Those authorities can diverge if the request file changes after launch.",
+        "blocking_rationale": "A result matching the replacement request can be admitted under a completion record for the originally selected loader.",
+        "blocks_readiness": true,
+        "category": "defect",
+        "expected": "Result validation and completion use the request admitted before launch.",
+        "id": "R3-F2",
+        "location": {
+          "file": "scripts/Invoke-KingmakerRuntimeTest.ps1",
+          "line": 1104
+        },
+        "priority": "P2",
+        "requested_correction": "Validate against the retained request, or retain its decoded snapshot before launch. Make the reader accept the request representation the launcher supplies.",
+        "requested_evidence": "In a private result-reader fixture, change the on-disk request after admission. A result for a different loader must still be refused against the original request.",
+        "title": "Result validation rereads mutable expectations",
+        "trigger": "The request file in the evidence directory changes between launch and result collection."
+      },
+      {
+        "acceptance_ids": [
+          "mission.md:155",
+          "mission.md:194"
+        ],
+        "actual": "Build-Release adds embeddedCommit to release-manifest.json. Install-Local compares the measured DLL stamp with release.commit only. A conflicting release.embeddedCommit passes reconciliation.",
+        "blocking_rationale": "The installer accepts a release receipt that gives two different source identities for the same DLL.",
+        "blocks_readiness": true,
+        "category": "defect",
+        "expected": "Every source revision asserted by the release receipt agrees with the validated DLL.",
+        "id": "R3-F3",
+        "location": {
+          "file": "scripts/Install-Local.ps1",
+          "line": 71
+        },
+        "priority": "P2",
+        "requested_correction": "Reconcile embeddedCommit with the measured stamp and commit when present, or use one authoritative revision field in newly produced release manifests.",
+        "requested_evidence": "Change only embeddedCommit in a genuine release receipt and show refusal before state or staging. Retain the matching-pair control.",
+        "title": "Install preflight ignores the new embeddedCommit field",
+        "trigger": "Supply the correct ZIP, DLL digest, MVID and commit with a different well-formed embeddedCommit."
+      },
+      {
+        "acceptance_ids": [
+          "mission.md:235",
+          "mission.md:240"
+        ],
+        "actual": "The transaction copies package.zip into the backup directory before writing transaction.json. On a hash or state-write error, the pre-state catch removes only empty directories. It releases the lock but leaves the owned ZIP and backup directory, which the next entry rejects as an existing run-owned path.",
+        "blocking_rationale": "A failed direct deployment can leave an unrecoverable-by-script run directory even though it created no transaction record and never touched Mods.",
+        "blocks_readiness": true,
+        "category": "defect",
+        "expected": "A failure before the state record exists releases the lock and removes the private copy and newly created run directories.",
+        "id": "R3-F4",
+        "location": {
+          "file": "scripts/RuntimeHarness.Common.ps1",
+          "line": 930
+        },
+        "priority": "P2",
+        "requested_correction": "Clean up the transaction-owned package in the pre-state failure path, including partial copies, while preserving ownership checks for every removal.",
+        "requested_evidence": "In fixture mode, force a state-write failure after the copy. Verify unchanged Mods, absence of the owned ZIP and lock, and successful retry with the same run ID.",
+        "title": "A pre-state failure can strand the transaction\u2019s private ZIP",
+        "trigger": "Writing the first transaction state fails after package.zip has been copied."
+      },
+      {
+        "acceptance_ids": [
+          "mission.md:200",
+          "mission.md:237",
+          "mission.md:242"
+        ],
+        "actual": "The suite invokes the shared helper and the standalone profile script with real fixture files. Its deployment case reads the two script files and compares substring positions. It never invokes Deploy-Local with the matching or mismatching fixture.",
+        "blocking_rationale": "The requested observation at the public deployment boundary is missing. The source-string assertion also passed with the forwarding defect in R1-F1.",
+        "blocks_readiness": true,
+        "category": "evidence_gap",
+        "expected": "The actual deployment preflight accepts the matching row and refuses a Harmony2-only mismatch against the caller\u2019s game directory.",
+        "id": "R2-F1",
+        "location": {
+          "file": "scripts/Test-RuntimeLoaderIdentity.ps1",
+          "line": 107
+        },
+        "priority": "P2",
+        "requested_correction": "Replace the source-string assertion with bounded behavioral coverage of Deploy-Local using a valid temporary package, a private game directory and -WhatIf.",
+        "requested_evidence": "Capture the direct deployment mismatch refusal before staging and the matching loader clearing the same check. Identify any subsequent independent host guard separately and verify the fixture remains unchanged.",
+        "title": "Direct deployment lacks the requested matching and mismatch evidence",
+        "trigger": "Use the 23/23 identity-suite record to qualify the direct deployment preflight."
+      },
+      {
+        "acceptance_ids": [
+          "mission.md:251",
+          "mission.md:255"
+        ],
+        "actual": "The current guide says product code froze at 75aeeff and only documentation changed afterward. It cites 62/62 and 21/21 while linking to records for 5cd32d0 with 71/71 and 23/23. The stamp experiment used f33b945 as the later source commit. H has a separate controller build.",
+        "blocking_rationale": "A reader following the primary compatibility guide is given the wrong product revision for the linked static audit and validation evidence.",
+        "blocks_readiness": true,
+        "category": "required_gap",
+        "expected": "The guide identifies the artifact tested on the four loaders and attaches earlier results to their historical commits.",
+        "id": "R3-F5",
+        "location": {
+          "file": "docs/UMM-COMPATIBILITY.md",
+          "line": 73
+        },
+        "priority": "P2",
+        "requested_correction": "Add the current frozen product and its evidence. Keep the round-two account explicitly historical with commit-specific references. Attribute the stamp experiment to its measured commits and the H gate to its own DLL.",
+        "requested_evidence": "Cross-check the revised text against the retained receipt, API audit, stamp comparison, Git diff and controller receipt. A documentation-only correction can establish continuity from Git.",
+        "title": "The compatibility guide points readers to the previous frozen product",
+        "trigger": "Read the compatibility guide to determine which DLL received the four static API checks."
+      }
+    ],
+    "prior_finding_assessments": [
+      {
+        "assessment": "fix_rejected",
+        "finding_id": "R1-F1",
+        "rationale": "The independent loader rows, request fields, loaded-assembly observations and completion digest are present. Both nested deployment calls still fall back to owner 0.33.0, so the original non-owner launch failure persists."
+      },
+      {
+        "assessment": "fix_verified",
+        "finding_id": "R1-F2",
+        "rationale": "The installer now validates a private release copy and rejects the original wrong-commit, wrong-MVID and wrong-DLL cases before staging. The matching fixture cleared reconciliation and then encountered an existing lab transaction. R3-F3 concerns the newly added duplicate revision field."
+      },
+      {
+        "assessment": "fix_rejected",
+        "finding_id": "R1-F3",
+        "rationale": "The retained receipt now contains a content hash for generated BuildInfo. Reuse still evaluates a different compilation context, and the 71 cases contain no same-HEAD generated-value override. Production-only values can remain invisible to the reader."
+      },
+      {
+        "assessment": "fix_verified",
+        "finding_id": "R1-F6",
+        "rationale": "The read-back identifies a persistent worktree at 5cd32d0, the ZIP and raw sidecar, and matching DLL hash, MVID and embedded commit. The stamp comparison was at f33b945. Git establishes documentation-only continuity to H, whose controller DLL has its own digest. R3-F5 covers the stale guide."
+      },
+      {
+        "assessment": "fix_rejected",
+        "finding_id": "R2-F1",
+        "rationale": "Both public scripts now call the shared installation check with KingmakerInstallDir. The profile entry point has positive and negative fixture observations. The requested equivalent deployment observations are still missing."
+      },
+      {
+        "assessment": "fix_verified",
+        "finding_id": "R2-F2",
+        "rationale": "The launcher passes the admitted ZIP digest. The transaction hashes its own copy, refuses different bytes before activation and extracts that copy. The fixture records rejection of a different-data archive and matching package and staged-DLL hashes on acceptance."
+      },
+      {
+        "assessment": "fix_verified",
+        "finding_id": "R2-F3",
+        "rationale": "The build guide identifies the default downloads and gives the local fixture parameters used by both suites. The script parameter names and fixture hash checks agree with those instructions."
+      }
+    ],
+    "request_id": "kbp-codex-kingmaker-buff-planner-umm-0311-baseline-20261123182207-144d-r03-05fe5c",
+    "round": 3,
+    "schema_version": "agent-review.review.v1",
+    "summary": {
+      "delivered_behavior": "Buff Planner 0.6.20 declares UMM 0.31.1. The retained package at 5cd32d0 has ZIP SHA-256 4a4b117d5f011b985f83aeb32d686714a9ba8db7292ec8462759fd3c3538131b. Its DLL has SHA-256 7c7fe1506da3b586b06e9a1310669add89409de0ee2248bf7c0f34324fbbf897, MVID 653c355d-9dbb-4675-9bf1-98aef4477d96, and references UnityModManager 0.31.1.0 and 0Harmony12 1.2.0.1. All four loader rows have static API evidence.",
+      "pending_later_phase_work": [],
+      "remaining_owner_review": [
+        "Final disposition of draft PR #26 after correction and controller handoff.",
+        "Availability and authorization of a disposable game installation if native compatibility qualification is later desired."
+      ],
+      "scope_reviewed": "The complete Buff Planner portion of the enrolled mission at the fixed final candidate, with correction-round inspection of the seven pending findings and their directly affected consumers.",
+      "unresolved_questions": []
+    }
+  },
+  "round": 3,
+  "validated_at": "2026-11-24T02:29:53Z",
+  "workflow_fingerprint": "6d613defe7bfe2f01a5818a2cd41b281965f438c45a0ca37ce15957e4dcffe19"
+}

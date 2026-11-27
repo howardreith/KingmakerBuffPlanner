@@ -5,8 +5,12 @@
 Release creation is performed on the configured Windows Kingmaker development
 machine. It requires:
 
-- the exact local Pathfinder: Kingmaker and Unity Mod Manager references already
-  configured through ignored `GamePath.props`;
+- the exact local Pathfinder: Kingmaker and Unity references configured through
+  ignored `GamePath.props` (Unity Mod Manager and Harmony 1.2 are not taken from
+  the installation; see [Loader compile baseline](#loader-compile-baseline-umm-0311)).
+  `GamePath.props` may only set `KingmakerInstallDir`, and no `Directory.Build.props`
+  or `Directory.Build.targets` outside the repository may apply: builds and receipt
+  reuse refuse anything else;
 - Visual Studio/MSBuild and the .NET Framework 4.7 targeting pack;
 - Windows PowerShell 5.1 or newer;
 - Git and GitHub CLI (`gh`);
@@ -14,6 +18,79 @@ machine. It requires:
 
 No game, Unity, Unity Mod Manager, Harmony, or third-party mod binary is
 committed or uploaded as source.
+
+## Loader compile baseline (UMM 0.31.1)
+
+`Info.json` declares UMM 0.31.1 and the DLL is compiled against the pinned
+UnityModManager 0.31.1.0 and 0Harmony12 1.2.0.1 bytes defined in
+`scripts/loader-reference-pins.json` (contract and evidence:
+[UMM compatibility](UMM-COMPATIBILITY.md)). Every build script fetches and
+verifies them; nothing falls back to the installed loader.
+
+```powershell
+# Prepare the ignored reference cache (download, archive/DLL SHA-256 and identity checks),
+# or only verify an existing cache. Relative paths follow the current PowerShell location.
+.\scripts\Get-PinnedLoaderReferences.ps1
+.\scripts\Get-PinnedLoaderReferences.ps1 -VerifyOnly -ReferenceDirectory artifacts\references
+
+# Build and validate a local package; the receipt is <zip>.build-local.json.
+.\scripts\Build-Local.ps1
+.\scripts\validate-package.ps1 -PackagePath artifacts\local-runtime\<version>\KingmakerBuffPlanner-<version>-local-runtime.zip -ReportPath artifacts\package-validation.json
+
+# Boundary suite (temporary clone of HEAD) and runtime loader identity checks. By default they download their
+# hash-checked fixtures: the published 0.6.20 release ZIP and the author's UnityModManager 0.32.4 NuGet package
+# (suite), and the official UnityModManager 0.31.1/0.32.4/0.33.4 and Lib.Harmony 2.3.1.1/2.3.6/2.4.3 packages
+# (identity checks). For an offline run, pass local copies:
+.\scripts\Test-LoaderBaseline.ps1 -LegacyReleaseZip <KingmakerBuffPlanner-0.6.20.zip> -WrongLoaderPackage <unitymodmanager.0.32.4.nupkg>
+.\scripts\Test-RuntimeLoaderIdentity.ps1 -PackageDirectory <folder with the six .nupkg files> -CandidatePackage artifacts\local-runtime\<version>\KingmakerBuffPlanner-<version>-local-runtime.zip
+```
+
+`-CandidatePackage` (a relative path is resolved from the current PowerShell location) is needed for the
+deployment checks: `Deploy-Local.ps1 -WhatIf` and the compatibility wrapper on private game directories for each
+loader row, the crossed-row refusals and the unchanged-fixture check. Without it the identity suite runs only its
+row, preflight and result-admission checks.
+
+The bounded local build configuration (only `KingmakerInstallDir` in `GamePath.props`; no outside or untracked
+`Directory.Build.*` file or project `.user` file; no environment variable that selects MSBuild imports; no per-user
+MSBuild import hooks) is enforced by `Build.ps1`, `Build-Local.ps1`, `Build-Release.ps1` (through them) and every
+receipt admission. Direct MSBuild produces no receipt and is not a reuse route.
+
+Runtime runs select the loader they expect with `-LoaderId` (`0.31.1`, `0.32.4`, `owner-0.33.0` - the
+default, the owner's measured installation - or `0.33.4`; rows in `compatibility/loaders/`), independently of
+`-CompatibilityProfileId`. `Invoke-KingmakerRuntimeTest.ps1`, `Deploy-Local.ps1` and
+`compatibility/Test-KingmakerCompatibilityProfile.ps1` run the same installation preflight (the profile's
+optional-mod fixtures and the selected loader row against the caller's `KingmakerInstallDir`) before
+anything is staged.
+
+`validate-package.ps1` works offline on a supplied ZIP: it applies the same
+pin-definition contract as the build, inspects one private snapshot, requires
+the packaged `ManagerVersion` to equal the pinned minimum and the packaged DLL
+to reference exactly the pinned loader assemblies (no other UnityModManager or
+Harmony assembly), and reports the ZIP digest, DLL digest, MVID and embedded
+source revision. Runtime qualification reuses a `Build-Local.ps1` receipt only
+when it records a clean producing commit, the current build-input fingerprint
+(including MSBuild-resolved local references and compiler settings) and the
+identities of the revalidated package.
+
+Static loader API audit (static evidence only). The tool's source is committed
+as `docs/evidence/umm-0311/loader-api-audit-Program.cs.txt` and
+`loader-api-audit-csproj.txt`; the profile components are the official NuGet
+packages listed with their SHA-256 in `docs/evidence/umm-0311/loader-profiles.md`:
+
+```powershell
+dotnet build -c Release <copy of the LoaderApiAudit project>
+LoaderApiAudit.exe --mod artifacts\build\Release\KingmakerBuffPlanner.dll --json api-audit.json `
+  --assemblies UnityModManager,0Harmony12,0Harmony `
+  --profile "0.31.1=<p>\0.31.1\UnityModManager.dll;<p>\0.31.1\0Harmony.dll;<p>\0.31.1\0Harmony12.dll" `
+  --profile "0.32.4=<p>\0.32.4\UnityModManager.dll;<p>\0.32.4\0Harmony.dll;<p>\0.32.4\0Harmony12.dll" `
+  --profile "owner-0.33.0=<p>\owner-0.33.0\UnityModManager.dll;<p>\owner-0.33.0\0Harmony.dll;<p>\owner-0.33.0\0Harmony12.dll" `
+  --profile "0.33.4=<p>\0.33.4\UnityModManager.dll;<p>\0.33.4\0Harmony.dll;<p>\0.33.4\0Harmony12.dll"
+```
+
+Native status: no loader version (0.31.1, 0.32.4, the owner's 0.33.0 or 0.33.4)
+has been run in game for the baseline candidate, and no combined stack with
+other mods was exercised; runtime runs additionally require the installed
+loader to match the compatibility profile's verified loader identity.
 
 ## Qualified local release build
 

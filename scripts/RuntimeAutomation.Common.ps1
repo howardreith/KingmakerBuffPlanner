@@ -19,7 +19,52 @@ function Read-KbpBuildManifest([string]$PackagePath) {
         $manifest.validated -ne $true) {
         throw 'Build-local manifest does not match the exact package and clean HEAD.'
     }
+    Assert-KbpFrozenBuildReceipt $manifest $PackagePath
     return $manifest
+}
+
+# A receipt is reusable for runtime qualification only when it names a clean producing source, the current build
+# inputs (including MSBuild-resolved local references), and the package/DLL it was made from. The package is
+# revalidated from one private snapshot before anything is staged, and every recorded identity must agree with it.
+function Assert-KbpFrozenBuildReceipt($Manifest, [string]$PackagePath) {
+    $names = @($Manifest.PSObject.Properties.Name)
+    foreach ($field in @('commit', 'buildInputsSha256', 'packageSha256', 'dllSha256', 'embeddedCommit')) {
+        if ($names -notcontains $field -or -not ($Manifest.$field -is [string])) { throw "Build receipt has no string $field; rebuild with Build-Local.ps1." }
+    }
+    if ([string]$Manifest.commit -cnotmatch '^[0-9a-f]{40}$' -or [string]$Manifest.embeddedCommit -cnotmatch '^[0-9a-f]{40}$' -or
+        (@('buildInputsSha256', 'packageSha256', 'dllSha256') | Where-Object { [string]$Manifest.$_ -cnotmatch '^[0-9a-f]{64}$' })) {
+        throw 'Build receipt digests or revisions are malformed; rebuild with Build-Local.ps1.'
+    }
+    if ($names -notcontains 'assemblyMvid' -or -not ($Manifest.assemblyMvid -is [string]) -or [string]$Manifest.assemblyMvid -cnotmatch '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$') {
+        throw 'Build receipt MVID is malformed; rebuild with Build-Local.ps1.'
+    }
+    if ($names -notcontains 'sourceDirty' -or -not ($Manifest.sourceDirty -is [bool])) { throw 'Build receipt has no boolean sourceDirty; rebuild with Build-Local.ps1.' }
+    if ($Manifest.sourceDirty) { throw 'Build receipt is from a dirty development build; only a clean build is eligible for frozen reuse.' }
+    $current = @(Get-KbpCompilerInputs 'Release' ([string]$Manifest.commit))
+    $recorded = @($Manifest.compilerInputs)
+    if ($recorded.Count -ne $current.Count) { throw 'Build inputs changed since this package was built: the receipt compiler inputs differ from the inputs MSBuild resolves now (entry count); rebuild with Build-Local.ps1.' }
+    for ($i = 0; $i -lt $current.Count; $i++) {
+        foreach ($field in @('kind', 'name', 'sha256')) {
+            if (-not ($recorded[$i].$field -is [string]) -or [string]$recorded[$i].$field -cne [string]$current[$i].$field) {
+                throw "Build inputs changed since this package was built: the receipt compiler inputs differ from the inputs MSBuild resolves now (entry $i $field); rebuild with Build-Local.ps1."
+            }
+        }
+    }
+    if ([string]$Manifest.buildInputsSha256 -cne (Get-KbpBuildInputFingerprint 'Release' $current)) {
+        throw 'Build inputs changed since this package was built (source, project, pins, wrappers or resolved local references); rebuild with Build-Local.ps1.'
+    }
+    $report = Join-Path ([IO.Path]::GetTempPath()) ('kbp-receipt-validation-' + [Guid]::NewGuid().ToString('N') + '.json')
+    try {
+        & (Join-Path $PSScriptRoot 'validate-package.ps1') -PackagePath $PackagePath -ReportPath $report | Out-Null
+        $validated = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+    }
+    finally { Remove-Item -LiteralPath $report -Force -ErrorAction SilentlyContinue }
+    $mismatches = @()
+    if ([string]$validated.package_sha256 -cne [string]$Manifest.packageSha256) { $mismatches += 'package SHA-256' }
+    if ([string]$validated.dll_sha256 -cne [string]$Manifest.dllSha256) { $mismatches += 'DLL SHA-256' }
+    if ([string]$validated.dll_mvid -cne [string]$Manifest.assemblyMvid) { $mismatches += 'MVID' }
+    if ([string]$validated.embedded_commit -cne [string]$Manifest.embeddedCommit -or [string]$Manifest.embeddedCommit -cne [string]$Manifest.commit) { $mismatches += 'embedded source revision' }
+    if ($mismatches.Count -ne 0) { throw "Build receipt does not match the validated package: $($mismatches -join ', ')." }
 }
 
 function Get-KbpTimestampedLogLines([string]$Path, [DateTime]$NotBefore) {
@@ -144,7 +189,7 @@ function New-KbpRuntimeRequest {
         [int]$TimeoutSeconds, [bool]$ExitAfterCompletion,
         [ValidateSet('native-only', 'call-of-the-wild', 'human-reproduction', 'full-user', 'advanced-gunslinger-0136')][string]$ProfileId = 'native-only',
         [object[]]$ExpectedOptionalMods = @(), [string[]]$ExpectedBlueprintGuids = @(),
-        [hashtable]$Parameters = @{},
+        [hashtable]$Parameters = @{}, $ExpectedLoader,
         [ValidateSet('mod-load-smoke', 'native-buff-catalog', 'ui-root-smoke', 'live-ui-bootstrap', 'ui-native-contract-probe', 'final-no-save-core', 'performance-probe', 'launch-render-diagnostic', 'menu-input-diagnostic', 'live-workspace-qual', 'live-workspace-reload', 'live-workspace-import', 'live-workspace-manual', 'live-cast-probe-select', 'live-cast-probe', 'live-advanced-inspect', 'live-cast-qual-select', 'live-cast-qual', 'live-classic-select', 'live-classic-cast', 'live-workspace-physical', 'live-workspace-removal', 'live-workspace-native-ui', 'live-heroism-fixture-prepare')][string]$Scenario = 'mod-load-smoke')
     # This ValidateSet must equal the launcher's -Scenario set exactly
     # (Test-RuntimeHarness builds a request for every launcher scenario).
@@ -164,6 +209,11 @@ function New-KbpRuntimeRequest {
         expectedOptionalMods = @($ExpectedOptionalMods)
         expectedBlueprintGuids = @($ExpectedBlueprintGuids)
         parameters = $Parameters
+        expectedLoader = if ($null -eq $ExpectedLoader) { $null } else { [ordered]@{
+            loaderId = [string]$ExpectedLoader.loaderId
+            unityModManager = [ordered]@{ version = [string]$ExpectedLoader.unityModManager.version; sha256 = [string]$ExpectedLoader.unityModManager.sha256 }
+            harmony12 = [ordered]@{ version = [string]$ExpectedLoader.harmony12.version; sha256 = [string]$ExpectedLoader.harmony12.sha256 }
+            harmony2 = [ordered]@{ version = [string]$ExpectedLoader.harmony2.version; sha256 = [string]$ExpectedLoader.harmony2.sha256 } } }
     }
 }
 
@@ -452,7 +502,17 @@ function Wait-KbpNewKingmakerProcess {
 }
 
 function Assert-KbpRuntimeResult {
+    # The loader row the request carried (expectedLoader) is the expected identity of every loader assembly the game
+    # actually loaded and of the installed files beside them.
     param($Result, $Request, $BuildManifest)
+    $ExpectedLoader = if ($Request.PSObject.Properties.Name -contains 'expectedLoader') { $Request.expectedLoader } else { $null }
+    if ($null -eq $ExpectedLoader) { throw 'Runtime request carries no expected loader row.' }
+    foreach ($component in @('unityModManager', 'harmony12', 'harmony2')) {
+        $row = $ExpectedLoader.$component
+        if ($null -eq $row -or [string]$row.version -cnotmatch '^[0-9]+([.][0-9]+){3}$' -or [string]$row.sha256 -cnotmatch '^[0-9a-f]{64}$') {
+            throw "Expected loader identity is incomplete: $component"
+        }
+    }
     $checks = [ordered]@{
         schemaVersion = [pscustomobject]@{ expected = 1; observed = $Result.schemaVersion }
         runId = [pscustomobject]@{ expected = $Request.runId; observed = $Result.runId }
@@ -465,14 +525,18 @@ function Assert-KbpRuntimeResult {
         assemblySha256 = [pscustomobject]@{ expected = $BuildManifest.dllSha256; observed = $Result.assemblySha256 }
         gameVersion = [pscustomobject]@{ expected = '2.1.7'; observed = $Result.gameVersion }
         gameExecutableSha256 = [pscustomobject]@{ expected = '94a779c5423199fcb0470bd89884a3b3875dee2072eb1a7b1d7bc8e67accb1a1'; observed = $Result.gameExecutableSha256 }
-        # UMM was updated on this machine from 0.32.4 to 0.33.0 between
-        # missions (2026-09-18); the pin records the verified installed
-        # identity (file version + SHA-256 of UnityModManager.dll) so the
-        # exact-match contract continues against the real environment.
-        ummVersion = [pscustomobject]@{ expected = '0.33.0.0'; observed = $Result.ummVersion }
-        ummSha256 = [pscustomobject]@{ expected = '63e5baf7b1738e4091b5fd17ccb738ecdb4d1dbf246061dfd55dc52835d52691'; observed = $Result.ummSha256 }
-        harmonyVersion = [pscustomobject]@{ expected = '1.2.0.1'; observed = $Result.harmonyVersion }
-        harmonySha256 = [pscustomobject]@{ expected = 'aa1cd48317254985d8b700cc74953477d1b40c3022ce9aa4c95ed2b8327e1292'; observed = $Result.harmonySha256 }
+        # The loader the game actually ran (UnityModManager, 0Harmony12 and the bound Harmony2 module) must be the
+        # compatibility profile's verified identity; a result without the Harmony2 fields is not admitted.
+        ummVersion = [pscustomobject]@{ expected = [string]$ExpectedLoader.unityModManager.version; observed = $Result.ummVersion }
+        ummSha256 = [pscustomobject]@{ expected = [string]$ExpectedLoader.unityModManager.sha256; observed = $Result.ummSha256 }
+        harmonyVersion = [pscustomobject]@{ expected = [string]$ExpectedLoader.harmony12.version; observed = $Result.harmonyVersion }
+        harmonySha256 = [pscustomobject]@{ expected = [string]$ExpectedLoader.harmony12.sha256; observed = $Result.harmonySha256 }
+        harmony2Version = [pscustomobject]@{ expected = [string]$ExpectedLoader.harmony2.version; observed = $(if ($Result.PSObject.Properties.Name -contains 'harmony2Version') { $Result.harmony2Version } else { '(absent)' }) }
+        harmony2Sha256 = [pscustomobject]@{ expected = [string]$ExpectedLoader.harmony2.sha256; observed = $(if ($Result.PSObject.Properties.Name -contains 'harmony2Sha256') { $Result.harmony2Sha256 } else { '(absent)' }) }
+        # The installed files beside the loaded assemblies must be the same identity (loaded-versus-installed).
+        ummInstalledSha256 = [pscustomobject]@{ expected = [string]$ExpectedLoader.unityModManager.sha256; observed = $(if ($Result.PSObject.Properties.Name -contains 'ummInstalledSha256') { $Result.ummInstalledSha256 } else { '(absent)' }) }
+        harmonyInstalledSha256 = [pscustomobject]@{ expected = [string]$ExpectedLoader.harmony12.sha256; observed = $(if ($Result.PSObject.Properties.Name -contains 'harmonyInstalledSha256') { $Result.harmonyInstalledSha256 } else { '(absent)' }) }
+        harmony2InstalledSha256 = [pscustomobject]@{ expected = [string]$ExpectedLoader.harmony2.sha256; observed = $(if ($Result.PSObject.Properties.Name -contains 'harmony2InstalledSha256') { $Result.harmony2InstalledSha256 } else { '(absent)' }) }
     }
     $mismatches = @()
     foreach ($name in $checks.Keys) {
@@ -2268,11 +2332,19 @@ function Assert-KbpAdvancedFixtureBinding {
 # profile id, as one SHA-256. Evidence from a run with another identity
 # never qualifies a later run.
 function Get-KbpCompatibilityIdentityDigest {
-    param([Parameter(Mandatory = $true)]$Profile)
+    param([Parameter(Mandatory = $true)]$Profile, $Loader)
     $lines = @('profile|' + [string]$Profile.profileId) + @(@($Profile.mods) | ForEach-Object {
         [string]$_.directoryName + '|' + [string]$_.version + '|' + [string]$_.directoryManifestSha256 + '|' +
             [string]$_.fileCount + '|' + [string]$_.totalBytes
     } | Sort-Object)
+    # The verified loader identity is part of the compatibility identity, so allowances and earlier passes recorded
+    # under one loader are not admitted under another.
+    if ($null -ne $Loader) {
+        $lines += 'loader|' + [string]$Loader.loaderId
+        foreach ($component in @('unityModManager', 'harmony12', 'harmony2')) {
+            $lines += 'loader|' + $component + '|' + [string]$Loader.$component.version + '|' + [string]$Loader.$component.sha256
+        }
+    }
     $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($lines -join "`n") + "`n")
     $hasher = [Security.Cryptography.SHA256]::Create()
     try { return ([BitConverter]::ToString($hasher.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant() }
