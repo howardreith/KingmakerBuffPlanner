@@ -40,6 +40,13 @@ if ($CloseUnverifiableComparison -and -not $pending) {
 if (-not $PSCmdlet.ShouldProcess($RunId, 'restore and hash-verify the exact pre-run Mods state')) { return }
 function Invoke-LocalRecovery {
     $transaction = Read-KbpJson $statePath
+    # The run's Kingmaker native-test reservation must still be its own before
+    # any registry, display, save or Mods step (docs/NATIVE-RESERVATION.md).
+    $transactionReservation = Get-KbpStateReservationToken $transaction
+    if ([string]$transaction.status -cne 'Restored' -and $null -ne $transactionReservation) {
+        Assert-KbpNativeReservationHeld -StateRoot $StateRoot -Token $transactionReservation -RunId $RunId `
+            -IncidentDirectory (Split-Path -Parent $statePath)
+    }
     if ($RestoreModsOnly -or $null -ne $transaction.PSObject.Properties['modsRecovery']) {
         if ($SkipProtectedSaveComparison -or $CloseUnverifiableComparison) { throw 'Display recovery requires clean save evidence.' }
         . (Join-Path $PSScriptRoot 'RuntimeDisplayRecovery.ps1')

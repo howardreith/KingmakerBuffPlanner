@@ -4,6 +4,9 @@ function Assert-KbpDisplayRecoveryOwner($State) {
     Assert-KbpNoForeignRuntimeLease
     Assert-KbpFixtureLockAbsent (Get-KbpDefaultFixtureLockPath $script:KbpRuntimeStateRoot)
     Assert-KbpOwnedLock $State.lockPath $State.runId $State.token
+    $reservationToken = Get-KbpStateReservationToken $State
+    if ($null -ne $reservationToken) { Assert-KbpNativeReservationHeld -StateRoot $script:KbpRuntimeStateRoot -Token $reservationToken -RunId ([string]$State.runId) `
+        -IncidentDirectory (Join-Path $script:KbpRuntimeStateRoot ('transactions\' + [string]$State.runId)) }
 }
 
 function Get-KbpRecoveryManifestDigest($Manifest) {
@@ -54,7 +57,11 @@ function Invoke-KbpDisplayRecovery([string]$RunId, [string]$StateRoot, [string]$
         throw 'Display recovery transaction identity or paths disagree.'
     }
     $resuming = $null -ne $s.PSObject.Properties['modsRecovery']
-    if ($s.status -ceq 'Restored' -and $resuming -and -not (Test-Path -LiteralPath $s.lockPath)) { return $s }
+    if ($s.status -ceq 'Restored' -and $resuming -and -not (Test-Path -LiteralPath $s.lockPath)) {
+        $finishedToken = Get-KbpStateReservationToken $s
+        if ($null -ne $finishedToken) { [void](Complete-KbpRunReservation -StateRoot $StateRoot -RunId $RunId -Token $finishedToken -IfHeld) }
+        return $s
+    }
     Assert-KbpDisplayRecoveryOwner $s
     if ((-not $resuming -and ($s.status -cne 'Active' -or -not $ModsOnly -or $s.restorationVerified)) -or
         ($resuming -and $s.status -cnotin @('RecoveringMods','ModsRestoredPendingDisplay','Restored'))) {
@@ -204,5 +211,7 @@ function Invoke-KbpDisplayRecovery([string]$RunId, [string]$StateRoot, [string]$
     $s.restoredAtUtc = [DateTime]::UtcNow.ToString('o')
     Write-KbpJsonAtomic $statePath $s
     Remove-KbpOwnedLock $s.lockPath $RunId $s.token
+    $finishedToken = Get-KbpStateReservationToken $s
+    if ($null -ne $finishedToken) { [void](Complete-KbpRunReservation -StateRoot $StateRoot -RunId $RunId -Token $finishedToken) }
     return $s
 }

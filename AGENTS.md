@@ -77,6 +77,7 @@ Preserve branch semantics. Do not flatten conditional alternatives into an undif
 - Only repository-owned guarded scripts may stage/deploy/launch runtime scenarios.
 - Before live use satisfy the existing launcher safety/source and `-WhatIf` purity requirements; the offline development selector does not bypass them.
 - Live `Mods` staging must be transactional, locked, recoverable, and restored exactly.
+- Native-test automation coordinates with other Kingmaker labs only through the neutral Kingmaker native-test reservation (`docs/NATIVE-RESERVATION.md`, participation in `docs/VALIDATION-POLICY.md`): acquired before this lab's own lock, released last after verified restoration. No lab depends on another; this lab works alone.
 - Only `KBP_AUTOMATION_WORKING` may be mutable. `KBP_AUTOMATION_BASELINE` is immutable and every other save is protected.
 - Stop on unexpected Steam, account, cloud, update, purchase, or credential UI.
 - Never claim runtime qualification from compilation, detached reflection, or a main-menu load alone.

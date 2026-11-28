@@ -46,6 +46,10 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 #     fake process name; production always uses the default.
 #   - One writer through the shared owned lock; interrupted transactions are
 #     detected and only recovered through -Recover using the ownership record.
+#   - Every mutating mode first acquires the Kingmaker native-test reservation
+#     (docs/NATIVE-RESERVATION.md), then the fixture lock, and releases the
+#     reservation last, only once the lock is released; an interrupted run
+#     keeps both for -Recover (which adopts only this run's own reservation).
 #   - Everything is staged and verified outside SaveRoot first; publication
 #     happens only after the archive and manifest exist. Failures roll back
 #     exactly the owned published/staged paths and never touch anything else.
@@ -387,9 +391,12 @@ if ($Recover) {
         Write-Host "Recovery WhatIf PASS: would roll back run $RunId; no artifact, record, or lock changed."
         return
     }
+    $recoveryReservation = Enter-KbpNativeReservation -RunId $RunId -Purpose 'fixture-recovery' -StateRoot $StateRoot `
+        -AdoptToken ([string](Get-KbpRecordField $existing 'reservationToken'))
     Invoke-KbpOwnedRollback $existing
     Remove-KbpOwnedLock $lockPath $existing.runId $existing.token
-    Write-Host "Recovery PASS: rolled back owned partial artifacts of $RunId; lock released."
+    [void](Exit-KbpNativeReservation -StateRoot $StateRoot -Token $recoveryReservation.token)
+    Write-Host "Recovery PASS: rolled back owned partial artifacts of $RunId; lock and reservation released."
     return
 }
 
@@ -444,7 +451,9 @@ if ($Teardown) {
         # dry run) and hold it across the deletion.
         New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
         $teardownToken = [Guid]::NewGuid().ToString('N')
-        New-KbpOwnedLock $lockPath $RunId $teardownToken
+        $teardownReservation = Enter-KbpNativeReservation -RunId $RunId -Purpose 'fixture-teardown' -StateRoot $StateRoot
+        try { New-KbpOwnedLock $lockPath $RunId $teardownToken }
+        catch { [void](Exit-KbpNativeReservation -StateRoot $StateRoot -Token $teardownReservation.token); throw }
         $deleted = $false
         $deleting = $false
         try {
@@ -452,6 +461,10 @@ if ($Teardown) {
             # runtime entry re-checks this lock once it holds its own), before
             # anything is deleted.
             Assert-KbpFixturePreconditions
+            # The protected baseline is taken again now that the reservation
+            # and lock are held (a change before them is not this teardown's).
+            $protectedBefore = Get-KbpProtectedInventory -Root $SaveRoot `
+                -ExcludeNames @($manifest.baseline.fileName, $manifest.working.fileName)
             $deleting = $true
             Remove-Item -LiteralPath $baselinePath -Force
             Remove-Item -LiteralPath $workingPath -Force
@@ -462,6 +475,7 @@ if ($Teardown) {
             # deletion keeps it for the owner's inspection.
             if ($deleted -or -not $deleting) {
                 Remove-KbpOwnedLock $lockPath $RunId $teardownToken
+                [void](Exit-KbpNativeReservation -StateRoot $StateRoot -Token $teardownReservation.token)
             }
         }
         $protectedAfter = Get-KbpProtectedInventory -Root $SaveRoot `
@@ -554,9 +568,11 @@ $token = [Guid]::NewGuid().ToString('N')
 New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
 $script:rollbackSucceeded = $false
 $script:failAfterJournal = $FailAfterJournal
-New-KbpOwnedLock $lockPath $RunId $token
+$bootstrapReservation = Enter-KbpNativeReservation -RunId $RunId -Purpose 'fixture-bootstrap' -StateRoot $StateRoot
+try { New-KbpOwnedLock $lockPath $RunId $token }
+catch { [void](Exit-KbpNativeReservation -StateRoot $StateRoot -Token $bootstrapReservation.token); throw }
 $transaction = [ordered]@{
-    schemaVersion = 1; runId = $RunId; token = $token
+    schemaVersion = 1; runId = $RunId; token = $token; reservationToken = [string]$bootstrapReservation.token
     status = 'Staging'; createdAtUtc = [DateTime]::UtcNow.ToString('o')
     saveRoot = $SaveRoot; seedPath = $seed.FullName
     gameId = [string]$seedHeader.GameId; gameName = [string]$seedHeader.GameName
@@ -567,6 +583,9 @@ try {
     New-Item -ItemType Directory -Path $stagingRoot | Out-Null
     New-Item -ItemType Directory -Path $ArchiveRoot | Out-Null
     Write-KbpJsonAtomic $transactionPath $transaction
+    # The protected-save baseline is taken again now that the reservation and
+    # lock are held (a change before them is not this bootstrap's).
+    foreach ($file in $allSaves) { $protectedBefore[$file.Name] = Get-KbpSha256 $file.FullName }
 
     $stagedBaseline = Join-Path $stagingRoot $baselineName
     $stagedWorking = Join-Path $stagingRoot $workingName
@@ -681,6 +700,13 @@ finally {
                 Remove-KbpOwnedLock $lockPath $lockRecord.runId $lockRecord.token
             }
         } catch { }
+    }
+    # The reservation goes last, only once this run's lock is gone after a
+    # completed or rolled-back bootstrap; otherwise it stays for -Recover.
+    if (-not (Test-Path -LiteralPath $lockPath) -and
+        ($script:rollbackSucceeded -or $transaction.status -ceq 'Completed')) {
+        try { [void](Exit-KbpNativeReservation -StateRoot $StateRoot -Token $bootstrapReservation.token) }
+        catch { Write-Warning "The fixture run's Kingmaker native-test reservation could not be released: $($_.Exception.Message)" }
     }
 }
 
