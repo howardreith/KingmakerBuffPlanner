@@ -28,7 +28,16 @@ param(
     [ValidateSet('', 'baseline', 'working')]
     [string]$FailAfterJournal = '',
     # Test-only: make the rollback itself fail (foreign content in staging).
-    [switch]$FailRollback
+    [switch]$FailRollback,
+    # Test-only: interrupt -Recover right after it took over the run's
+    # reservation, or right after it removed the fixture lock.
+    [ValidateSet('', 'Adopted', 'LockRemoved')]
+    [string]$FailAfterRecoveryStep = '',
+    # Test-only (harness test roots only): pause before admission, or at the
+    # final protected-save comparison, until <TestSignalRoot>\resume-<point>.
+    [ValidateSet('', 'BeforeAdmission', 'FinalComparison')]
+    [string]$TestPauseAt = '',
+    [string]$TestSignalRoot
 )
 
 Set-StrictMode -Version Latest
@@ -88,6 +97,43 @@ if ([string]::IsNullOrWhiteSpace($StateRoot)) {
 }
 $lockPath = Join-Path $StateRoot 'fixture.lock'
 $runRoot = Join-Path $StateRoot $RunId
+# Every target the selected mode can change (only a bootstrap writes the
+# archive); a private test reservation is refused unless all of them are
+# harness test roots.
+$fixtureTargets = if ($Recover -or $Teardown) { @($StateRoot, $SaveRoot) } else { @($StateRoot, $SaveRoot, $ArchiveRoot) }
+
+function Wait-KbpFixtureTestPause([string]$Point) {
+    if ($TestPauseAt -cne $Point) { return }
+    if (-not (Test-KbpHarnessTestPath $SaveRoot) -or -not (Test-KbpHarnessTestPath $StateRoot) -or
+        -not (Test-KbpHarnessTestPath $TestSignalRoot)) { throw 'A fixture test pause is refused outside harness test roots.' }
+    [IO.File]::WriteAllText((Join-Path $TestSignalRoot "paused-$Point"), [string]$PID)
+    $until = (Get-Date).AddSeconds(120)
+    while (-not (Test-Path -LiteralPath (Join-Path $TestSignalRoot "resume-$Point"))) {
+        if ((Get-Date) -gt $until) { throw "Test pause $Point was never resumed." }
+        Start-Sleep -Milliseconds 50
+    }
+}
+
+# A protected-save change observed by a fixture operation is an incident:
+# the first record is kept (written once) and the operation's reservation and
+# lock stay for the owner.
+function Write-KbpFixtureIncident([string]$Name, $Detail) {
+    New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
+    $path = Join-Path $StateRoot $Name
+    if (Test-Path -LiteralPath $path) { return }
+    $text = ([ordered]@{ schemaVersion = 1; runId = $RunId; detail = $Detail; recordedAtUtc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json -Depth 6)
+    try {
+        $stream = [IO.File]::Open($path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        try { $bytes = [Text.UTF8Encoding]::new($false).GetBytes($text); $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) }
+        finally { $stream.Dispose() }
+    } catch [IO.IOException] { }
+}
+
+function Set-KbpJournalReleased($Journal) {
+    if ($Journal -is [System.Collections.IDictionary]) { $Journal['reservationReleasedAtUtc'] = [DateTime]::UtcNow.ToString('o') }
+    else { $Journal | Add-Member -NotePropertyName reservationReleasedAtUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force }
+    Write-KbpJsonAtomic $transactionPath $Journal
+}
 $stagingRoot = Join-Path $runRoot 'staging'
 $transactionPath = Join-Path $runRoot 'transaction.json'
 
@@ -367,36 +413,77 @@ function Invoke-KbpOwnedRollback {
 }
 
 # --- Recover mode: roll back a specific interrupted run only. ---
+# It takes over the run's own reservation by the token its journal stored
+# (refused while the bootstrap writer still runs; a missing or replaced
+# reservation is an incident), keeps that same token so an interrupted
+# recovery is itself recoverable, and releases the reservation last. It also
+# finishes a release interrupted after the lock was removed.
 if ($Recover) {
     # Real process state first — recovery mutates the save directory too.
     Assert-KbpFixturePreconditions
-    if (-not (Test-Path -LiteralPath $lockPath)) {
-        throw "No fixture lock exists; nothing to recover at $StateRoot."
-    }
     $existing = Get-KbpTransaction
     if ($null -eq $existing) { throw "No transaction record found for run $RunId." }
     if ($existing.runId -cne $RunId) { throw "Transaction belongs to $($existing.runId), not $RunId." }
-    $lock = Read-KbpJson $lockPath
-    if ($existing.status -ceq 'Completed') {
-        throw "Run $RunId already completed; use -Teardown instead."
+    $expectedToken = [string](Get-KbpRecordField $existing 'reservationToken')
+    $released = $null -ne (Get-KbpRecordField $existing 'reservationReleasedAtUtc')
+    $drift = @(Get-KbpRecordField $existing 'protectedSaveDrift' | Where-Object { $_ })
+    if ($drift.Count -ne 0) {
+        throw "Run $RunId observed protected-save changes ($($drift -join ', ')); its lock and reservation stay until the owner has reviewed them."
     }
+    $terminal = @('Completed', 'RolledBack') -ccontains [string]$existing.status
+    if (-not (Test-Path -LiteralPath $lockPath)) {
+        if ($terminal -and $expectedToken -and -not $released) {
+            if (-not $PSCmdlet.ShouldProcess($runRoot, "finish the interrupted reservation release of run $RunId")) {
+                Write-Host "Recovery WhatIf PASS: would finish the reservation release of run $RunId; nothing changed."
+                return
+            }
+            [void](Enter-KbpNativeReservation -RunId $RunId -Purpose 'fixture-recovery' -StateRoot $StateRoot -Targets $fixtureTargets `
+                -RecoverToken $expectedToken -IncidentDirectory $runRoot)
+            Exit-KbpNativeReservation -StateRoot $StateRoot -Token $expectedToken -RunId $RunId -Targets $fixtureTargets `
+                -IncidentDirectory $runRoot -Progress "run $($existing.status); lock already removed"
+            Set-KbpJournalReleased $existing
+            Write-Host "Recovery PASS: finished the reservation release of $RunId."
+            return
+        }
+        throw "No fixture lock exists; nothing to recover at $StateRoot."
+    }
+    $lock = Read-KbpJson $lockPath
     # The lock must belong to THIS transaction's run and carry its token:
     # a foreign or ambiguous lock is preserved, never released.
     if ([string](Get-KbpRecordField $lock 'runId') -cne [string](Get-KbpRecordField $existing 'runId') -or
         [string](Get-KbpRecordField $lock 'token') -cne [string](Get-KbpRecordField $existing 'token')) {
         throw "Fixture lock does not match the transaction record (lock run $($lock.runId) vs transaction run $($existing.runId)); refusing to release a foreign lock."
     }
-    if (-not $PSCmdlet.ShouldProcess($runRoot,
-        "roll back owned partial artifacts of interrupted run $RunId")) {
-        Write-Host "Recovery WhatIf PASS: would roll back run $RunId; no artifact, record, or lock changed."
+    $action = if ([string]$existing.status -ceq 'Completed') { "finish the interrupted cleanup of completed run $RunId" }
+        else { "roll back owned partial artifacts of interrupted run $RunId" }
+    if (-not $PSCmdlet.ShouldProcess($runRoot, $action)) {
+        Write-Host "Recovery WhatIf PASS: would $action; no artifact, record, or lock changed."
         return
     }
-    $recoveryReservation = Enter-KbpNativeReservation -RunId $RunId -Purpose 'fixture-recovery' -StateRoot $StateRoot `
-        -AdoptToken ([string](Get-KbpRecordField $existing 'reservationToken'))
-    Invoke-KbpOwnedRollback $existing
+    if ($expectedToken) {
+        [void](Enter-KbpNativeReservation -RunId $RunId -Purpose 'fixture-recovery' -StateRoot $StateRoot -Targets $fixtureTargets `
+            -RecoverToken $expectedToken -IncidentDirectory $runRoot)
+    } else {
+        # A journal from before this lab took part: a free reservation only,
+        # journaled before anything is rolled back.
+        $expectedToken = [string](Enter-KbpNativeReservation -RunId $RunId -Purpose 'fixture-recovery' -StateRoot $StateRoot -Targets $fixtureTargets).token
+        $existing | Add-Member -NotePropertyName reservationToken -NotePropertyValue $expectedToken -Force
+        Write-KbpJsonAtomic $transactionPath $existing
+    }
+    if ($FailAfterRecoveryStep -ceq 'Adopted') { throw 'Injected interruption after the recovery took over the reservation.' }
+    if ([string]$existing.status -cne 'Completed') {
+        Assert-KbpNativeReservationHeld -StateRoot $StateRoot -Token $expectedToken -RunId $RunId -Targets $fixtureTargets `
+            -IncidentDirectory $runRoot -Progress "recovery admitted; journal $($existing.status); nothing rolled back"
+        Invoke-KbpOwnedRollback $existing
+    }
+    Assert-KbpNativeReservationHeld -StateRoot $StateRoot -Token $expectedToken -RunId $RunId -Targets $fixtureTargets `
+        -IncidentDirectory $runRoot -Progress "journal $($existing.status); lock not yet removed"
     Remove-KbpOwnedLock $lockPath $existing.runId $existing.token
-    [void](Exit-KbpNativeReservation -StateRoot $StateRoot -Token $recoveryReservation.token)
-    Write-Host "Recovery PASS: rolled back owned partial artifacts of $RunId; lock and reservation released."
+    if ($FailAfterRecoveryStep -ceq 'LockRemoved') { throw 'Injected interruption after the recovery removed the fixture lock.' }
+    Exit-KbpNativeReservation -StateRoot $StateRoot -Token $expectedToken -RunId $RunId -Targets $fixtureTargets `
+        -IncidentDirectory $runRoot -Progress "journal $($existing.status); lock removed"
+    Set-KbpJournalReleased $existing
+    Write-Host "Recovery PASS: $action; lock and reservation released."
     return
 }
 
@@ -449,11 +536,16 @@ if ($Teardown) {
         }
         # The mutation gate is behind us: take the lock now (never during a
         # dry run) and hold it across the deletion.
+        Wait-KbpFixtureTestPause 'BeforeAdmission'
         New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
         $teardownToken = [Guid]::NewGuid().ToString('N')
-        $teardownReservation = Enter-KbpNativeReservation -RunId $RunId -Purpose 'fixture-teardown' -StateRoot $StateRoot
+        $teardownLease = Enter-KbpNativeReservation -RunId $RunId -Purpose 'fixture-teardown' -StateRoot $StateRoot -Targets $fixtureTargets
         try { New-KbpOwnedLock $lockPath $RunId $teardownToken }
-        catch { [void](Exit-KbpNativeReservation -StateRoot $StateRoot -Token $teardownReservation.token); throw }
+        catch {
+            Exit-KbpNativeReservation -StateRoot $StateRoot -Token $teardownLease.token -RunId $RunId -Targets $fixtureTargets -Progress 'teardown refused before its lock'
+            throw
+        }
+        # $deleted means deleted AND the protected saves verified unchanged.
         $deleted = $false
         $deleting = $false
         try {
@@ -461,27 +553,43 @@ if ($Teardown) {
             # runtime entry re-checks this lock once it holds its own), before
             # anything is deleted.
             Assert-KbpFixturePreconditions
-            # The protected baseline is taken again now that the reservation
-            # and lock are held (a change before them is not this teardown's).
+            # The pair and the protected baseline are validated again now that
+            # the reservation and lock are held: what is deleted is what was
+            # validated under ownership.
+            foreach ($fixture in @(
+                    @{ Path = $baselinePath; Role = 'BASELINE'; Hash = [string]$manifest.baseline.sha256 },
+                    @{ Path = $workingPath; Role = 'WORKING'; Hash = $null })) {
+                Assert-KbpOwnedArtifactPath -Path $fixture.Path -Role $fixture.Role -GameId ([string]$manifest.gameId)
+                if (-not [string]::IsNullOrWhiteSpace($fixture.Hash) -and (Get-KbpSha256 $fixture.Path) -cne $fixture.Hash) {
+                    throw "Sealed baseline hash drifted: $($fixture.Path)"
+                }
+            }
             $protectedBefore = Get-KbpProtectedInventory -Root $SaveRoot `
                 -ExcludeNames @($manifest.baseline.fileName, $manifest.working.fileName)
+            Assert-KbpNativeReservationHeld -StateRoot $StateRoot -Token $teardownLease.token -RunId $RunId -Targets $fixtureTargets -Progress 'teardown admitted; nothing deleted'
             $deleting = $true
             Remove-Item -LiteralPath $baselinePath -Force
             Remove-Item -LiteralPath $workingPath -Force
+            # The final protected comparison runs under both guards; a change
+            # keeps the incident, the lock and the reservation.
+            Wait-KbpFixtureTestPause 'FinalComparison'
+            $protectedAfter = Get-KbpProtectedInventory -Root $SaveRoot `
+                -ExcludeNames @($manifest.baseline.fileName, $manifest.working.fileName)
+            if (($protectedBefore -join "`n") -cne ($protectedAfter -join "`n")) {
+                Write-KbpFixtureIncident ("teardown-incident-" + $RunId + ".json") ([ordered]@{ before = @($protectedBefore); after = @($protectedAfter) })
+                throw 'Teardown touched a protected save; investigate immediately. Its lock and reservation stay for the owner.'
+            }
+            Assert-KbpNativeReservationHeld -StateRoot $StateRoot -Token $teardownLease.token -RunId $RunId -Targets $fixtureTargets -Progress 'pair deleted; protected saves verified'
             $deleted = $true
         }
         finally {
             # A refusal before any deletion releases the lock; an interrupted
-            # deletion keeps it for the owner's inspection.
+            # deletion or an unverified comparison keeps it (and the
+            # reservation) for the owner's inspection.
             if ($deleted -or -not $deleting) {
                 Remove-KbpOwnedLock $lockPath $RunId $teardownToken
-                [void](Exit-KbpNativeReservation -StateRoot $StateRoot -Token $teardownReservation.token)
+                Exit-KbpNativeReservation -StateRoot $StateRoot -Token $teardownLease.token -RunId $RunId -Targets $fixtureTargets -Progress 'teardown finished'
             }
-        }
-        $protectedAfter = Get-KbpProtectedInventory -Root $SaveRoot `
-            -ExcludeNames @($manifest.baseline.fileName, $manifest.working.fileName)
-        if (($protectedBefore -join "`n") -cne ($protectedAfter -join "`n")) {
-            throw 'Teardown touched a protected save; investigate immediately.'
         }
         Write-Host "Fixture teardown PASS: removed exactly the manifest-owned pair; $($protectedBefore.Count) other save(s) byte-identical."
     return
@@ -520,6 +628,10 @@ if (-not (Test-Path -LiteralPath $SaveRoot -PathType Container)) {
 }
 Assert-KbpFixturePreconditions
 
+# The bootstrap's inputs and destinations. Read once for the preflight and
+# WhatIf, and again - authoritatively - once the reservation and lock are
+# held; the mutation uses only the second reading.
+function Get-KbpBootstrapPlan {
 $automationFiles = @(Get-ChildItem -LiteralPath $SaveRoot -Filter ('*' + $fixturePrefix + '*') -File |
     Where-Object { $_.Name -notmatch ('^Manual_[0-9]+_' + $seedLabel + '\.zks$') })
 if ($automationFiles.Count -ne 0) {
@@ -557,6 +669,16 @@ if ((Test-Path -LiteralPath $baselinePath) -or (Test-Path -LiteralPath $workingP
 }
 $protectedBefore = @{}
 foreach ($file in $allSaves) { $protectedBefore[$file.Name] = Get-KbpSha256 $file.FullName }
+return [pscustomobject]@{ Seed = $seed; SeedHeader = $seedHeader; SeedSha256 = $protectedBefore[$seed.Name]; AllSaves = $allSaves
+    BaselineName = $baselineName; WorkingName = $workingName; BaselinePath = $baselinePath; WorkingPath = $workingPath
+    ProtectedBefore = $protectedBefore }
+}
+function Get-KbpBootstrapPlanKey($Plan) {
+    return ([ordered]@{ seed = $Plan.Seed.FullName; seedSha256 = $Plan.SeedSha256; baseline = $Plan.BaselineName; working = $Plan.WorkingName
+        saves = @($Plan.AllSaves | ForEach-Object { $_.Name } | Sort-Object) } | ConvertTo-Json -Compress)
+}
+$plan = Get-KbpBootstrapPlan
+$seed = $plan.Seed; $baselineName = $plan.BaselineName; $workingName = $plan.WorkingName
 
 if (-not $PSCmdlet.ShouldProcess($SaveRoot,
     "create the disposable fixture pair $baselineName and $workingName from the seed")) {
@@ -564,15 +686,40 @@ if (-not $PSCmdlet.ShouldProcess($SaveRoot,
     return
 }
 
+Wait-KbpFixtureTestPause 'BeforeAdmission'
 $token = [Guid]::NewGuid().ToString('N')
 New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
 $script:rollbackSucceeded = $false
+$script:protectedDrift = @()
 $script:failAfterJournal = $FailAfterJournal
-$bootstrapReservation = Enter-KbpNativeReservation -RunId $RunId -Purpose 'fixture-bootstrap' -StateRoot $StateRoot
+$bootstrapLease = Enter-KbpNativeReservation -RunId $RunId -Purpose 'fixture-bootstrap' -StateRoot $StateRoot -Targets $fixtureTargets
 try { New-KbpOwnedLock $lockPath $RunId $token }
-catch { [void](Exit-KbpNativeReservation -StateRoot $StateRoot -Token $bootstrapReservation.token); throw }
+catch {
+    Exit-KbpNativeReservation -StateRoot $StateRoot -Token $bootstrapLease.token -RunId $RunId -Targets $fixtureTargets -Progress 'bootstrap refused before its lock'
+    throw
+}
+# Authoritative inputs under the reservation and lock; a change since the
+# preflight (another bootstrap published, the seed or save set changed)
+# refuses before anything is written.
+try {
+    Assert-KbpFixturePreconditions
+    if (Test-Path -LiteralPath $runRoot) { throw "Run paths already exist: $runRoot" }
+    $ownedPlan = Get-KbpBootstrapPlan
+    if ((Get-KbpBootstrapPlanKey $ownedPlan) -cne (Get-KbpBootstrapPlanKey $plan)) {
+        throw 'The fixture inputs changed before this bootstrap held its reservation and lock; nothing was written.'
+    }
+}
+catch {
+    $admissionFailure = $_
+    Remove-KbpOwnedLock $lockPath $RunId $token
+    Exit-KbpNativeReservation -StateRoot $StateRoot -Token $bootstrapLease.token -RunId $RunId -Targets $fixtureTargets -Progress 'bootstrap refused under ownership'
+    throw $admissionFailure
+}
+$seed = $ownedPlan.Seed; $seedHeader = $ownedPlan.SeedHeader; $allSaves = $ownedPlan.AllSaves
+$baselineName = $ownedPlan.BaselineName; $workingName = $ownedPlan.WorkingName
+$baselinePath = $ownedPlan.BaselinePath; $workingPath = $ownedPlan.WorkingPath; $protectedBefore = $ownedPlan.ProtectedBefore
 $transaction = [ordered]@{
-    schemaVersion = 1; runId = $RunId; token = $token; reservationToken = [string]$bootstrapReservation.token
+    schemaVersion = 1; runId = $RunId; token = $token; reservationToken = [string]$bootstrapLease.token
     status = 'Staging'; createdAtUtc = [DateTime]::UtcNow.ToString('o')
     saveRoot = $SaveRoot; seedPath = $seed.FullName
     gameId = [string]$seedHeader.GameId; gameName = [string]$seedHeader.GameName
@@ -583,9 +730,6 @@ try {
     New-Item -ItemType Directory -Path $stagingRoot | Out-Null
     New-Item -ItemType Directory -Path $ArchiveRoot | Out-Null
     Write-KbpJsonAtomic $transactionPath $transaction
-    # The protected-save baseline is taken again now that the reservation and
-    # lock are held (a change before them is not this bootstrap's).
-    foreach ($file in $allSaves) { $protectedBefore[$file.Name] = Get-KbpSha256 $file.FullName }
 
     $stagedBaseline = Join-Path $stagingRoot $baselineName
     $stagedWorking = Join-Path $stagingRoot $workingName
@@ -653,19 +797,35 @@ try {
     # move, so an interruption at any point leaves the published file
     # represented in the recovery record. Recovery validates identity before
     # removing anything, so a bystander at the same pathname is refused.
+    Assert-KbpNativeReservationHeld -StateRoot $StateRoot -Token $bootstrapLease.token -RunId $RunId -Targets $fixtureTargets `
+        -IncidentDirectory $runRoot -Progress 'staged and archived; nothing published'
     Publish-KbpStagedFixture -StagedPath $stagedBaseline -DestinationPath $baselinePath
     if ($FailAfterMove -ceq 'baseline') { throw "Injected failure after publishing baseline." }
+    Assert-KbpNativeReservationHeld -StateRoot $StateRoot -Token $bootstrapLease.token -RunId $RunId -Targets $fixtureTargets `
+        -IncidentDirectory $runRoot -Progress 'baseline published; working not yet'
     Publish-KbpStagedFixture -StagedPath $stagedWorking -DestinationPath $workingPath
     if ($FailAfterMove -ceq 'working') { throw "Injected failure after publishing working." }
     $transaction.status = 'Published'
     Write-KbpJsonAtomic $transactionPath $transaction
     if ($FailAfterStage -ceq 'Published') { throw "Injected failure after stage Published." }
 
-    foreach ($file in $allSaves) {
-        if ((Get-KbpSha256 $file.FullName) -cne $protectedBefore[$file.Name]) {
-            throw "A protected save changed during bootstrap: $($file.Name)"
-        }
+    Wait-KbpFixtureTestPause 'FinalComparison'
+    $changed = @(foreach ($file in $allSaves) {
+        $now = if (Test-Path -LiteralPath $file.FullName -PathType Leaf) { Get-KbpSha256 $file.FullName } else { '<removed>' }
+        if ($now -cne $protectedBefore[$file.Name]) { $file.Name }
+    })
+    if ($changed.Count -ne 0) {
+        # Kept separately from the cleanup of this run's own files: the
+        # rollback below removes those, but the incident, the lock and the
+        # reservation stay for the owner.
+        $script:protectedDrift = $changed
+        $transaction.protectedSaveDrift = $changed
+        Write-KbpJsonAtomic $transactionPath $transaction
+        Write-KbpFixtureIncident (Join-Path $RunId 'protected-save-incident.json') ([ordered]@{ changed = $changed })
+        throw "A protected save changed during bootstrap: $($changed -join ', ')"
     }
+    Assert-KbpNativeReservationHeld -StateRoot $StateRoot -Token $bootstrapLease.token -RunId $RunId -Targets $fixtureTargets `
+        -IncidentDirectory $runRoot -Progress 'published; protected saves verified'
     if ((Test-Path -LiteralPath $stagedBaseline) -or (Test-Path -LiteralPath $stagedWorking)) {
         throw 'Staging residue after publication; rolling back.'
     }
@@ -690,23 +850,22 @@ catch {
     throw
 }
 finally {
-    # Release the lock only on success or completed rollback, and only after
-    # verifying it still belongs to this run.
-    if (Test-Path -LiteralPath $lockPath) {
+    # Release the lock only on success or completed rollback without an
+    # observed protected-save change, and only after verifying it still
+    # belongs to this run.
+    $releasable = ($script:rollbackSucceeded -or $transaction.status -ceq 'Completed') -and $script:protectedDrift.Count -eq 0
+    if ($releasable -and (Test-Path -LiteralPath $lockPath)) {
         try {
             $lockRecord = Read-KbpJson $lockPath
-            if ($lockRecord.runId -ceq $RunId -and
-                ($script:rollbackSucceeded -or $transaction.status -ceq 'Completed')) {
-                Remove-KbpOwnedLock $lockPath $lockRecord.runId $lockRecord.token
-            }
+            if ($lockRecord.runId -ceq $RunId) { Remove-KbpOwnedLock $lockPath $lockRecord.runId $lockRecord.token }
         } catch { }
     }
-    # The reservation goes last, only once this run's lock is gone after a
-    # completed or rolled-back bootstrap; otherwise it stays for -Recover.
-    if (-not (Test-Path -LiteralPath $lockPath) -and
-        ($script:rollbackSucceeded -or $transaction.status -ceq 'Completed')) {
-        try { [void](Exit-KbpNativeReservation -StateRoot $StateRoot -Token $bootstrapReservation.token) }
-        catch { Write-Warning "The fixture run's Kingmaker native-test reservation could not be released: $($_.Exception.Message)" }
+    # The reservation goes last, only once this run's lock is gone; otherwise
+    # it stays for -Recover (or the owner). A failed release fails the run.
+    if ($releasable -and -not (Test-Path -LiteralPath $lockPath)) {
+        Exit-KbpNativeReservation -StateRoot $StateRoot -Token $bootstrapLease.token -RunId $RunId -Targets $fixtureTargets `
+            -IncidentDirectory $runRoot -Progress "bootstrap $($transaction.status); lock removed"
+        Set-KbpJournalReleased $transaction
     }
 }
 

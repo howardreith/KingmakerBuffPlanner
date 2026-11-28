@@ -438,10 +438,38 @@ if ((Test-Path -LiteralPath $evidence) -or (Test-Path -LiteralPath $transactionR
 }
 $transactionEntered = $false
 $process = $null
-# Final review C1: no run starts while an earlier run's protected-save
-# violation waits for the owner's review.
-Assert-KbpNoUnacknowledgedSaveViolation
-New-Item -ItemType Directory -Path $evidence | Out-Null
+# Kingmaker native-test reservation (docs/NATIVE-RESERVATION.md): this
+# launcher owns it from here - before its first run write - through
+# deployment, the run, restoration and its final shared-state observation,
+# and releases it last. The admission inputs read above (disposable save
+# pair, installed loader, session display) are taken again under it and must
+# be unchanged; a refused launch writes nothing. WhatIf never gets here.
+$launchTargets = @($script:KbpRuntimeStateRoot, $script:KbpRuntimeStagingRoot, $script:KbpRuntimeBackupRoot,
+    $script:KbpRuntimeEvidenceRoot, (Get-KbpGamePath))
+$launchAdmission = Enter-KbpLaunchReservation -RunId $runId -StateRoot $script:KbpRuntimeStateRoot -Targets $launchTargets `
+    -PreflightDigest (Get-KbpAdmissionDigest ([ordered]@{ savePair = $savePair; loader = $installedLoader; display = $admissionDisplaySnapshot })) `
+    -ReadInputs {
+        [ordered]@{
+            savePair = if ($null -ne $savePair) { Get-KbpDisposableSavePair -Family $FixtureFamily } else { $null }
+            loader = Assert-KbpInstallationPreflight -Profile $compatibilityProfile -Loader $loaderIdentity
+            display = if ($null -ne $admissionDisplaySnapshot) { Get-KbpSessionDisplaySnapshot } else { $null }
+        }
+    }
+$launchToken = [string]$launchAdmission.Lease.token
+$reservationFailure = $null
+try {
+    # Final review C1: no run starts while an earlier run's protected-save
+    # violation waits for the owner's review.
+    Assert-KbpNoUnacknowledgedSaveViolation
+    New-Item -ItemType Directory -Path $evidence | Out-Null
+}
+catch {
+    $earlyFailure = $_
+    if (-not (Test-Path -LiteralPath $evidence)) {
+        Exit-KbpNativeReservation -StateRoot $script:KbpRuntimeStateRoot -Token $launchToken -RunId $runId -Targets $launchTargets -Progress 'launch refused before its first write'
+    }
+    throw $earlyFailure
+}
 # Protected-save comparison: every save-folder file once this run holds its
 # deployment lock (below), compared before the lock is released. Only the
 # run WORKING copy may change; a changed or removed file always fails the
@@ -468,43 +496,63 @@ $runFailure = $null
 $runSucceeded = $false
 $result = $null
 try {
-    $statePath = & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package -ExpectedPackageSha256 $buildManifest.packageSha256 `
-        -RunId $runId -CompatibilityProfileId $CompatibilityProfileId -LoaderId $LoaderId `
-        -Confirm:$false | Select-Object -Last 1
-    $transactionEntered = $true
     # Final review C2 and its re-review: the saves are read only once this
     # run holds its lock (the other lab checks it), the baseline is kept
     # beside the transaction before anything runs, and the WORKING save bound
-    # above (and by any allowance) must still be the same bytes.
-    if ($null -ne $savePair) {
-        $protectedBefore = Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot
-        $protectedBaselinePath = Save-KbpProtectedSaveBaseline -TransactionDirectory (Split-Path -Parent $statePath) `
-            -RunId $runId -Scenario $Scenario -FixtureFamily $FixtureFamily `
-            -WorkingFileName ([string]$savePair.working.fileName) -SaveRoot $protectedSaveRoot -Snapshot $protectedBefore
-        $workingBefore = $protectedBefore[[string]$savePair.working.fileName]
-        if ($null -eq $workingBefore -or [string]$workingBefore.sha256 -cne [string]$savePair.working.sha256) {
-            throw "The WORKING save changed after it was bound: $($savePair.working.fileName)"
+    # above (and by any allowance) must still be the same bytes. Every
+    # restoration baseline the scenario needs (protected saves, the Heroism
+    # working backup, the physical display and the game registry) is taken
+    # and journaled inside the entry, after its lock and before it stages or
+    # activates anything; a baseline that cannot be taken stops the entry
+    # with the live Mods folder untouched.
+    $baselineCapture = @{}
+    $captureBaselines = {
+        param([string]$TransactionDirectory)
+        if ($null -ne $savePair) {
+            $capturedSaves = Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot
+            $capturedWorking = $capturedSaves[[string]$savePair.working.fileName]
+            if ($null -eq $capturedWorking -or [string]$capturedWorking.sha256 -cne [string]$savePair.working.sha256) {
+                throw "The WORKING save changed after it was bound: $($savePair.working.fileName)"
+            }
+            $baselineCapture.protectedBefore = $capturedSaves
+            $baselineCapture.protectedBaselinePath = Save-KbpProtectedSaveBaseline -TransactionDirectory $TransactionDirectory `
+                -RunId $runId -Scenario $Scenario -FixtureFamily $FixtureFamily `
+                -WorkingFileName ([string]$savePair.working.fileName) -SaveRoot $protectedSaveRoot -Snapshot $capturedSaves
+            if ($Scenario -ceq 'live-heroism-fixture-prepare') {
+                Save-KbpHeroismWorkingBackup -WorkingPath $savePair.working.path -EvidenceDirectory $evidence `
+                    -ExpectedSha256 $savePair.working.sha256 -RunId $runId
+            }
         }
-        if ($Scenario -ceq 'live-heroism-fixture-prepare') {
-            Save-KbpHeroismWorkingBackup -WorkingPath $savePair.working.path -EvidenceDirectory $evidence `
-                -ExpectedSha256 $savePair.working.sha256 -RunId $runId
+        if ($null -ne $displaySize) {
+            # Re-read only after the runtime lock is held. This is the physical
+            # state the run owns for verification; a pre-lock user change is not
+            # misattributed to the run.
+            $capturedDisplay = Get-KbpSessionDisplaySnapshot
+            if (-not (Test-KbpDisplayModeSupported -Size $displaySize `
+                    -DisplaySize ([string]$capturedDisplay.primarySize))) {
+                throw "DisplayMode $DisplayMode no longer fits the session display $($capturedDisplay.primarySize); nothing was launched."
+            }
+            $baselineCapture.displayPhysicalBefore = $capturedDisplay
+            $baselineCapture.displayPhysicalPath = Join-Path $TransactionDirectory 'display-physical.json'
+            Save-KbpPhysicalDisplaySnapshotFile -Path $baselineCapture.displayPhysicalPath `
+                -Snapshot $capturedDisplay -RunId $runId -ExpectedWindowSize $displaySize
+            $baselineCapture.displayRegistryPath = Join-Path $TransactionDirectory 'display-registry.json'
+            Save-KbpRegistrySnapshotFile -Path $baselineCapture.displayRegistryPath -KeyPath $script:KbpGameRegistryKey `
+                -Snapshot (Get-KbpRegistryValueSnapshot -KeyPath $script:KbpGameRegistryKey) -RunId $runId
         }
     }
+    $statePath = & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package -ExpectedPackageSha256 $buildManifest.packageSha256 `
+        -RunId $runId -CompatibilityProfileId $CompatibilityProfileId -LoaderId $LoaderId -ReservationToken $launchToken `
+        -CaptureBaselines $captureBaselines -Confirm:$false | Select-Object -Last 1
+    $transactionEntered = $true
+    if ($null -ne $savePair) {
+        $protectedBefore = $baselineCapture.protectedBefore
+        $protectedBaselinePath = $baselineCapture.protectedBaselinePath
+    }
     if ($null -ne $displaySize) {
-        # Re-read only after the runtime lock is held. This is the physical
-        # state the run owns for verification; a pre-lock user change is not
-        # misattributed to the run.
-        $displayPhysicalBefore = Get-KbpSessionDisplaySnapshot
-        if (-not (Test-KbpDisplayModeSupported -Size $displaySize `
-                -DisplaySize ([string]$displayPhysicalBefore.primarySize))) {
-            throw "DisplayMode $DisplayMode no longer fits the session display $($displayPhysicalBefore.primarySize); nothing was launched."
-        }
-        $displayPhysicalPath = Join-Path $script:KbpRuntimeStateRoot "transactions\$runId\display-physical.json"
-        Save-KbpPhysicalDisplaySnapshotFile -Path $displayPhysicalPath `
-            -Snapshot $displayPhysicalBefore -RunId $runId -ExpectedWindowSize $displaySize
-        $displayRegistryPath = Join-Path $script:KbpRuntimeStateRoot "transactions\$runId\display-registry.json"
-        Save-KbpRegistrySnapshotFile -Path $displayRegistryPath -KeyPath $script:KbpGameRegistryKey `
-            -Snapshot (Get-KbpRegistryValueSnapshot -KeyPath $script:KbpGameRegistryKey) -RunId $runId
+        $displayPhysicalBefore = $baselineCapture.displayPhysicalBefore
+        $displayPhysicalPath = $baselineCapture.displayPhysicalPath
+        $displayRegistryPath = $baselineCapture.displayRegistryPath
         # The snapshot above is the owner's exact state; the windowed values
         # apply to this run only and are restored by it (the game's saved
         # options otherwise override Unity's command-line screen flags).
@@ -1260,7 +1308,7 @@ finally {
             $restoreFailure = "Mods restoration withheld until the protected saves of $runId are compared (Restore-Local.ps1 -RunId $runId compares, then restores)."
         }
         else {
-            try { & (Join-Path $PSScriptRoot 'Restore-Local.ps1') -RunId $runId -SkipProtectedSaveComparison -Confirm:$false }
+            try { & (Join-Path $PSScriptRoot 'Restore-Local.ps1') -RunId $runId -SkipProtectedSaveComparison -RetainReservation -Confirm:$false }
             catch {
                 $restoreFailure = "Mods restoration failed for $runId (Restore-Local.ps1 -RunId $runId recovers it once the cause is fixed): " +
                     $_.Exception.Message
@@ -1345,6 +1393,19 @@ finally {
             catch { Write-Warning "Orchestration record not updated: $($_.Exception.Message)" }
         }
     }
+    # The completion record above made this launcher's last shared-state
+    # observation (the game processes); only now does the reservation go, and
+    # only once every obligation of the run is settled (otherwise it stays
+    # for Restore-Local.ps1 -RunId).
+    try {
+        $launchReleased = Complete-KbpLaunchReservation -RunId $runId -StateRoot $script:KbpRuntimeStateRoot -Token $launchToken `
+            -EvidenceRoot $script:KbpRuntimeEvidenceRoot -Targets $launchTargets
+        if (-not $launchReleased) { Write-Warning "Run $runId keeps its Kingmaker native-test reservation (see above)." }
+    }
+    catch {
+        $reservationFailure = 'Kingmaker native-test reservation: ' + $_.Exception.Message
+        Write-Warning $reservationFailure
+    }
 }
 # Final review C1: every failure is reported together - the run's own, the
 # restoration's, the protected saves' and a missing completion record - so a
@@ -1354,6 +1415,7 @@ if ($null -ne $runFailure) { $failureParts.Add($runFailure.Exception.Message) }
 if ($null -ne $restoreFailure) { $failureParts.Add('Restoration: ' + $restoreFailure) }
 if ($null -ne $protectedSaveFailure) { $failureParts.Add('Protected saves: ' + $protectedSaveFailure) }
 if ($null -ne $completionFailure) { $failureParts.Add($completionFailure) }
+if ($null -ne $reservationFailure) { $failureParts.Add($reservationFailure) }
 if ($failureParts.Count -eq 1 -and $null -ne $runFailure) { throw $runFailure }
 if ($failureParts.Count -ne 0) { throw ($failureParts -join ' | ') }
 # Re-review (harness): an incomplete run never exits as a success, even when

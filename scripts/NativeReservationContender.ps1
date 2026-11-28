@@ -6,8 +6,6 @@ param(
     [Parameter(Mandatory = $true)][string]$Signals,
     [Parameter(Mandatory = $true)][string]$LabRoot,
     [Parameter(Mandatory = $true)][string]$PackagePath,
-    [Parameter(Mandatory = $true)][string]$MutexName,
-    [Parameter(Mandatory = $true)][string]$RecordPath,
     # Announce <Name>.ready, then wait at the shared start barrier (<Signals>\start).
     [switch]$Barrier
 )
@@ -15,16 +13,20 @@ param(
 # A disposable contender for scripts\Test-NativeReservation.ps1 only: a separate
 # Windows PowerShell process running this lab's actual admission
 # (Enter-KbpRuntimeTransaction) or restoration (Restore-KbpRuntimeTransaction)
-# in FixtureMode against a stand-in lab under artifacts\runtime-harness-tests,
-# with the test's private reservation convention shared by two stand-in labs.
-# It writes <Name>.active / .restoring / .restored, or <Name>.refused with the
-# message, into the signal folder. It never touches the game, the live Mods
-# folder, the lab's roots or the machine-wide reservation.
+# in FixtureMode against a stand-in lab. Its reservation is the private one the
+# test names in KBP_TEST_RESERVATION_ROOT (inherited); every path it writes -
+# the stand-in lab, the package, the signal folder and that reservation - must
+# lie inside this checkout's artifacts\runtime-harness-tests, or it refuses
+# before doing anything. It writes <Name>.active / .restoring / .restored, or
+# <Name>.refused with the message, into the signal folder.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1')
-if (-not (Test-KbpHarnessTestPath $LabRoot)) { throw 'A reservation contender runs only inside a harness test root.' }
-$script:KbpReservationOverride = [pscustomobject]@{ MutexName = $MutexName; RecordPath = $RecordPath }
+foreach ($bounded in @($LabRoot, $PackagePath, $Signals, [string]$env:KBP_TEST_RESERVATION_ROOT)) {
+    if ([string]::IsNullOrWhiteSpace($bounded) -or -not (Test-KbpHarnessTestPath $bounded)) {
+        throw "A reservation contender runs only inside a harness test root (refused: '$bounded')."
+    }
+}
 
 function Write-ContenderSignal([string]$What, [string]$Text = '') {
     [IO.File]::WriteAllText((Join-Path $Signals "$Name.$What"), $Text)

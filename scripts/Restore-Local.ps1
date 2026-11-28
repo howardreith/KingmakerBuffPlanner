@@ -12,7 +12,10 @@ param(
     [switch]$CloseUnverifiableComparison,
     # Test seams: the lab's own roots unless a test names others.
     [string]$StateRoot,
-    [string]$EvidenceRoot)
+    [string]$EvidenceRoot,
+    # The public launcher keeps the Kingmaker native-test reservation through
+    # its final observation and releases it itself.
+    [switch]$RetainReservation)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -40,13 +43,13 @@ if ($CloseUnverifiableComparison -and -not $pending) {
 if (-not $PSCmdlet.ShouldProcess($RunId, 'restore and hash-verify the exact pre-run Mods state')) { return }
 function Invoke-LocalRecovery {
     $transaction = Read-KbpJson $statePath
-    # The run's Kingmaker native-test reservation must still be its own before
-    # any registry, display, save or Mods step (docs/NATIVE-RESERVATION.md).
-    $transactionReservation = Get-KbpStateReservationToken $transaction
-    if ([string]$transaction.status -cne 'Restored' -and $null -ne $transactionReservation) {
-        Assert-KbpNativeReservationHeld -StateRoot $StateRoot -Token $transactionReservation -RunId $RunId `
-            -IncidentDirectory (Split-Path -Parent $statePath)
-    }
+    # One recovery admission rule for every route, before any registry,
+    # display, save-evidence or Mods step (docs/NATIVE-RESERVATION.md): the
+    # journal is valid and this process becomes the reservation's writer
+    # (the journaled token, its writer exited; or a free reservation for a
+    # transaction recorded before this lab took part). The run mutex below
+    # serializes recovering processes of the same run.
+    [void](Enter-KbpTransactionRecovery -State $transaction -StatePath $statePath -StateRoot $StateRoot -ExtraTargets @($EvidenceRoot))
     if ($RestoreModsOnly -or $null -ne $transaction.PSObject.Properties['modsRecovery']) {
         if ($SkipProtectedSaveComparison -or $CloseUnverifiableComparison) { throw 'Display recovery requires clean save evidence.' }
         . (Join-Path $PSScriptRoot 'RuntimeDisplayRecovery.ps1')
@@ -140,7 +143,7 @@ if ($pending) {
 }
 # Re-review (harness): a restoration failure never hides a save violation.
 try {
-    $state = Restore-KbpRuntimeTransaction -RunId $RunId -StateRoot $StateRoot
+    $state = Restore-KbpRuntimeTransaction -RunId $RunId -StateRoot $StateRoot -EvidenceRoot $EvidenceRoot -RetainReservation:$RetainReservation
 }
 catch {
     if ($null -ne $saveFailure) { throw ($saveFailure + ' | Restoration: ' + $_.Exception.Message) }

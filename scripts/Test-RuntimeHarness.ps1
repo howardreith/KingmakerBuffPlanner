@@ -9,11 +9,30 @@ $repo = Get-KbpRepositoryRoot
 $package = Join-Path $repo ('artifacts\local-runtime\' + (Get-KbpVersion) + '\KingmakerBuffPlanner-' + (Get-KbpVersion) + '-local-runtime.zip')
 if (-not (Test-Path -LiteralPath $package -PathType Leaf)) { throw 'Build the validated local package before runtime harness tests.' }
 $root = Join-Path $repo ('artifacts\runtime-harness-tests\' + [Guid]::NewGuid().ToString('N'))
+# A private Kingmaker native-test reservation inside the test root (inherited
+# by child processes); the machine-wide reservation is never touched.
+$priorReservationRoot = $env:KBP_TEST_RESERVATION_ROOT
+$env:KBP_TEST_RESERVATION_ROOT = Join-Path $root 'reservation'
 $stateRoot = Join-Path $root 'state'
 $stagingRoot = Join-Path $root 'staging'
 $backupRoot = Join-Path $root 'backups'
 foreach ($path in @($stateRoot, $stagingRoot, $backupRoot)) { New-Item -ItemType Directory -Path $path -Force | Out-Null }
 $passed = 0
+# A stand-in for a fixture run interrupted while it held its reservation: the
+# journal's token is registered again to a writer process that has exited.
+function Set-TestInterruptedFixtureLease([string]$JournalPath, [string]$FixtureStateRoot) {
+    $journal = Read-KbpJson $JournalPath
+    if ($null -ne $journal.PSObject.Properties['reservationReleasedAtUtc']) { $journal.PSObject.Properties.Remove('reservationReleasedAtUtc') }
+    Write-KbpJsonAtomic $JournalPath $journal
+    $ping = Start-Process -FilePath (Join-Path $env:WINDIR 'System32\PING.EXE') -ArgumentList @('-n', '1', '127.0.0.1') -WindowStyle Hidden -PassThru
+    [void]$ping.WaitForExit(10000)
+    $leasePath = Join-Path $env:KBP_TEST_RESERVATION_ROOT 'reservation.v1.json'
+    New-Item -ItemType Directory -Path $env:KBP_TEST_RESERVATION_ROOT -Force | Out-Null
+    [IO.File]::WriteAllText($leasePath, ([ordered]@{ protocol = 'kingmaker-native-test-reservation/1'; lab = 'KingmakerBuffPlanner'
+        runId = [string]$journal.runId; purpose = 'fixture-bootstrap'; token = [string]$journal.reservationToken; holderProcessId = $ping.Id
+        holderStartUtc = '2020-01-01T00:00:00.0000000Z'; host = $env:COMPUTERNAME; createdUtc = [DateTime]::UtcNow.ToString('o')
+        stateRoot = [IO.Path]::GetFullPath($FixtureStateRoot).TrimEnd('\') } | ConvertTo-Json))
+}
 try {
     Assert-KbpNotRunning -KnownProcessIds $null
     $passed++
@@ -1065,6 +1084,7 @@ try {
     $aTransaction = Read-KbpJson (Join-Path $mixedState 'r1-a\transaction.json')
     $aTransaction.status = 'Published'
     Write-KbpJsonAtomic (Join-Path $mixedState 'r1-a\transaction.json') $aTransaction
+    Set-TestInterruptedFixtureLease (Join-Path $mixedState 'r1-a\transaction.json') $mixedState
     # Lock belongs to a DIFFERENT run.
     New-KbpOwnedLock (Join-Path $mixedState 'fixture.lock') 'r1-b' ([Guid]::NewGuid().ToString('N'))
     $mixedSavesBefore = @(Get-ChildItem -LiteralPath $mixedRoot -Filter 'KBP_AUTOMATION*' -File |
@@ -1712,12 +1732,21 @@ try {
     $modsAt = $finallyText.IndexOf("Restore-Local.ps1') -RunId `$runId")
     $savesAt = $finallyText.IndexOf('Complete-KbpProtectedSaveComparison -BaselinePath')
     $recordAt = $finallyText.IndexOf('New-KbpRunCompletionRecord')
-    $enteredAt = $launcherText.IndexOf('$transactionEntered = $true')
-    $snapshotAt = $launcherText.IndexOf('Save-KbpRegistrySnapshotFile -Path $displayRegistryPath')
-    $physicalSnapshotAt = $launcherText.IndexOf('Save-KbpPhysicalDisplaySnapshotFile -Path $displayPhysicalPath')
+    # The registry and physical-display snapshots are taken by the launcher's
+    # baseline capture, which the entry runs after its lock (and the
+    # reservation) and before it stages or activates anything.
+    $captureAt = $launcherText.IndexOf('$captureBaselines = {')
+    $snapshotAt = $launcherText.IndexOf('Save-KbpRegistrySnapshotFile -Path $baselineCapture.displayRegistryPath')
+    $physicalSnapshotAt = $launcherText.IndexOf('Save-KbpPhysicalDisplaySnapshotFile -Path $baselineCapture.displayPhysicalPath')
+    $capturePassedAt = $launcherText.IndexOf('-CaptureBaselines $captureBaselines')
+    $harnessEntryText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1') -Raw
+    $entryLockAt = $harnessEntryText.IndexOf('New-KbpOwnedLock $lockPath $RunId $token')
+    $entryCaptureAt = $harnessEntryText.IndexOf('if ($null -ne $CaptureBaselines) { [void](& $CaptureBaselines $transactionRoot) }')
+    $entryStageAt = $harnessEntryText.IndexOf('$mod = Expand-KbpPackageToStaging -PackagePath $ownedPackage')
     if ($registryAt -lt 0 -or $physicalAt -lt $registryAt -or $savesAt -lt $physicalAt -or
         $modsAt -lt $savesAt -or $recordAt -lt $modsAt -or
-        $enteredAt -lt 0 -or $snapshotAt -lt $enteredAt -or $physicalSnapshotAt -lt $enteredAt -or
+        $captureAt -lt 0 -or $snapshotAt -lt $captureAt -or $physicalSnapshotAt -lt $captureAt -or
+        $capturePassedAt -lt $snapshotAt -or $entryLockAt -lt 0 -or $entryCaptureAt -lt $entryLockAt -or $entryStageAt -lt $entryCaptureAt -or
         $finallyText -notmatch '\$restoreFailure = if \(\$null -eq \$restoreFailure\) \{ \$displayFailure \}') {
         throw 'Display/game-settings restoration is not inside the finally before the record, or drops its failure.'
     }
@@ -2030,12 +2059,15 @@ try {
         $directory = Join-Path $Root ('transactions\' + $Run)
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
         New-Item -ItemType Directory -Path (Join-Path $rlEvidence $Run) -Force | Out-Null
-        # A stand-in: schema 0 is never restorable, so a restoration fails at
-        # once, before any lease wait or Mods path; its lock is a test file.
+        # A stand-in: a valid journal (so recovery admission takes a private
+        # reservation for it, one per run) whose status 'Deployed' no entry
+        # ever writes, so a restoration fails at once, before any lease wait
+        # or Mods path; its lock is a test file.
+        $env:KBP_TEST_RESERVATION_ROOT = Join-Path $rlRoot ('reservation-' + $Run)
         $lock = Join-Path $rlRoot ($Run + '.lock')
         if ($HoldLock) { New-KbpOwnedLock $lock $Run 't' }
         Write-KbpJsonAtomic (Join-Path $directory 'transaction.json') ([ordered]@{
-            schemaVersion = 0; runId = $Run; status = $Status; lockPath = $lock; token = 't' })
+            schemaVersion = 1; runId = $Run; status = $Status; lockPath = $lock; token = 't' })
         return (Save-KbpProtectedSaveBaseline -TransactionDirectory $directory -RunId $Run -Scenario 'live-cast-qual' `
             -FixtureFamily 'Automation' -WorkingFileName 'Manual_2_WORKING.zks' -SaveRoot $RecordedSaveRoot `
             -Snapshot (Get-KbpSaveFolderSnapshot -SaveRoot $saveFolder))
@@ -2158,11 +2190,16 @@ try {
     # compares only an entered run, keeps the lock while a comparison is
     # unfinished, refuses a PASS after its abort, keeps the rehearsal to the
     # manual session, and never exits a success with an incomplete record.
-    $enteredAt2 = $launcherText.IndexOf('$transactionEntered = $true')
-    $snapshotAt2 = $launcherText.IndexOf('$protectedBefore = Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot')
-    $baselineAt2 = $launcherText.IndexOf('$protectedBaselinePath = Save-KbpProtectedSaveBaseline')
+    # The saves are read by the baseline capture the entry runs under its
+    # lock (asserted with the display snapshots above); the WORKING save is
+    # checked before the baseline is journaled.
+    $enteredAt2 = $launcherText.IndexOf('$captureBaselines = {')
+    $snapshotAt2 = $launcherText.IndexOf('$capturedSaves = Get-KbpSaveFolderSnapshot -SaveRoot $protectedSaveRoot')
     $workingAt2 = $launcherText.IndexOf('throw "The WORKING save changed after it was bound:')
-    if ($enteredAt2 -lt 0 -or $snapshotAt2 -lt $enteredAt2 -or $baselineAt2 -lt $snapshotAt2 -or $workingAt2 -lt $baselineAt2 -or
+    $baselineAt2 = $launcherText.IndexOf('$baselineCapture.protectedBaselinePath = Save-KbpProtectedSaveBaseline')
+    $passedAt2 = $launcherText.IndexOf('-CaptureBaselines $captureBaselines')
+    if ($enteredAt2 -lt 0 -or $snapshotAt2 -lt $enteredAt2 -or $workingAt2 -lt $snapshotAt2 -or $baselineAt2 -lt $workingAt2 -or
+        $passedAt2 -lt $baselineAt2 -or
         ([regex]::Matches($launcherText, 'Get-KbpSaveFolderSnapshot -SaveRoot \$protectedSaveRoot')).Count -ne 1 -or
         -not $launcherText.Contains('if ($transactionEntered -and $null -ne $protectedBefore) {') -or
         -not $launcherText.Contains("elseif (`$restoreDecision -ceq 'withheld-pending') {") -or
@@ -2236,6 +2273,7 @@ try {
     $passed++
 }
 finally {
+    $env:KBP_TEST_RESERVATION_ROOT = $priorReservationRoot
     if (Test-Path -LiteralPath $root) {
         $resolved = [IO.Path]::GetFullPath($root)
         [void](Assert-KbpPathWithin -Path $resolved -Root (Join-Path $repo 'artifacts\runtime-harness-tests'))

@@ -6,7 +6,13 @@ param(
     [ValidateSet('0.31.1', '0.32.4', 'owner-0.33.0', '0.33.4')][string]$LoaderId = 'owner-0.33.0',
     [string]$KingmakerInstallDir,
     # The digest the caller admitted (the launcher passes its receipt's package digest).
-    [ValidatePattern('^([0-9a-f]{64})?$')][string]$ExpectedPackageSha256
+    [ValidatePattern('^([0-9a-f]{64})?$')][string]$ExpectedPackageSha256,
+    # The Kingmaker native-test reservation the public launcher already holds
+    # for this run (it keeps ownership); standalone deployment acquires its own.
+    [ValidatePattern('^([0-9a-f]{32})?$')][string]$ReservationToken,
+    # The launcher's restoration baselines, taken inside the entry after its
+    # lock and before anything is staged or activated.
+    [scriptblock]$CaptureBaselines
 )
 
 Set-StrictMode -Version Latest
@@ -43,4 +49,5 @@ if (-not $PSCmdlet.ShouldProcess(
 Enter-KbpRuntimeTransaction -PackagePath $PackagePath -KingmakerInstallDir $KingmakerInstallDir `
     -StateRoot $script:KbpRuntimeStateRoot -StagingRoot $script:KbpRuntimeStagingRoot `
     -BackupRoot $script:KbpRuntimeBackupRoot -RunId $RunId `
-    -CompatibilityProfile $compatibilityProfile -ExpectedPackageSha256 $ExpectedPackageSha256
+    -CompatibilityProfile $compatibilityProfile -ExpectedPackageSha256 $ExpectedPackageSha256 -ReservationToken $ReservationToken `
+    -CaptureBaselines $CaptureBaselines

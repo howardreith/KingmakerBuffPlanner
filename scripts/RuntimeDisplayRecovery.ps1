@@ -1,12 +1,17 @@
 # Restore-Local serializes recovery attempts for the same run.
-function Assert-KbpDisplayRecoveryOwner($State) {
+function Assert-KbpDisplayRecoveryOwner($State, [switch]$BeforeAdmission) {
     Assert-KbpNotRunning
     Assert-KbpNoForeignRuntimeLease
     Assert-KbpFixtureLockAbsent (Get-KbpDefaultFixtureLockPath $script:KbpRuntimeStateRoot)
     Assert-KbpOwnedLock $State.lockPath $State.runId $State.token
+    if ($BeforeAdmission) { return }
+    # The recovery admission (Invoke-KbpDisplayRecovery) made this process the
+    # reservation's writer; it is checked again before each recovery move.
     $reservationToken = Get-KbpStateReservationToken $State
-    if ($null -ne $reservationToken) { Assert-KbpNativeReservationHeld -StateRoot $script:KbpRuntimeStateRoot -Token $reservationToken -RunId ([string]$State.runId) `
-        -IncidentDirectory (Join-Path $script:KbpRuntimeStateRoot ('transactions\' + [string]$State.runId)) }
+    if ($null -eq $reservationToken) { throw 'Display recovery has no Kingmaker native-test reservation.' }
+    Assert-KbpNativeReservationHeld -StateRoot $script:KbpRuntimeStateRoot -Token $reservationToken -RunId ([string]$State.runId) `
+        -Targets (Get-KbpTransactionTargets $State $script:KbpRuntimeStateRoot) `
+        -IncidentDirectory (Join-Path $script:KbpRuntimeStateRoot ('transactions\' + [string]$State.runId)) -Progress ([string]$State.status)
 }
 
 function Get-KbpRecoveryManifestDigest($Manifest) {
@@ -58,11 +63,16 @@ function Invoke-KbpDisplayRecovery([string]$RunId, [string]$StateRoot, [string]$
     }
     $resuming = $null -ne $s.PSObject.Properties['modsRecovery']
     if ($s.status -ceq 'Restored' -and $resuming -and -not (Test-Path -LiteralPath $s.lockPath)) {
-        $finishedToken = Get-KbpStateReservationToken $s
-        if ($null -ne $finishedToken) { [void](Complete-KbpRunReservation -StateRoot $StateRoot -RunId $RunId -Token $finishedToken -IfHeld) }
+        # A release interrupted after the finished recovery: admitted, then released.
+        $finishedToken = Enter-KbpTransactionRecovery -State $s -StatePath $statePath -StateRoot $StateRoot -ExtraTargets @($EvidenceRoot)
+        $s = Read-KbpJson $statePath
+        if ($null -ne $finishedToken) {
+            [void](Complete-KbpRunReservation -StateRoot $StateRoot -RunId $RunId -Token $finishedToken -EvidenceRoot $EvidenceRoot `
+                -Targets (Get-KbpTransactionTargets $s $StateRoot))
+        }
         return $s
     }
-    Assert-KbpDisplayRecoveryOwner $s
+    Assert-KbpDisplayRecoveryOwner $s -BeforeAdmission
     if ((-not $resuming -and ($s.status -cne 'Active' -or -not $ModsOnly -or $s.restorationVerified)) -or
         ($resuming -and $s.status -cnotin @('RecoveringMods','ModsRestoredPendingDisplay','Restored'))) {
         throw 'Transaction phase is ineligible for display recovery.'
@@ -155,6 +165,13 @@ function Invoke-KbpDisplayRecovery([string]$RunId, [string]$StateRoot, [string]$
     if ($sentinel.schemaVersion -ne 1 -or $sentinel.runId -cne $RunId -or $sentinel.token -cne $s.token -or
         $sentinel.statePath -cne $statePath) { throw 'Candidate sentinel does not own this transaction.' }
     $observed = @(Get-KbpDirectoryManifest $candidate)
+    # Recovery admission after every read-only check and before the first
+    # display, save-evidence or Mods write: this process becomes the
+    # reservation's writer (or takes a free one for a transaction recorded
+    # before this lab took part).
+    $recoveryToken = Enter-KbpTransactionRecovery -State $s -StatePath $statePath -StateRoot $StateRoot -ExtraTargets @($EvidenceRoot)
+    $s | Add-Member -NotePropertyName reservationToken -NotePropertyValue $recoveryToken -Force
+    Assert-KbpDisplayRecoveryOwner $s
     if (-not $resuming) {
         if (-not (Test-Path -LiteralPath $originalDisplay)) { [IO.File]::Copy($displayPath, $originalDisplay, $false) }
         if ((Get-KbpSha256 $originalDisplay) -cne (Get-KbpSha256 $displayPath)) { throw 'Archived display evidence differs.' }
@@ -211,7 +228,7 @@ function Invoke-KbpDisplayRecovery([string]$RunId, [string]$StateRoot, [string]$
     $s.restoredAtUtc = [DateTime]::UtcNow.ToString('o')
     Write-KbpJsonAtomic $statePath $s
     Remove-KbpOwnedLock $s.lockPath $RunId $s.token
-    $finishedToken = Get-KbpStateReservationToken $s
-    if ($null -ne $finishedToken) { [void](Complete-KbpRunReservation -StateRoot $StateRoot -RunId $RunId -Token $finishedToken) }
-    return $s
+    [void](Complete-KbpRunReservation -StateRoot $StateRoot -RunId $RunId -Token (Get-KbpStateReservationToken $s) -EvidenceRoot $EvidenceRoot `
+        -Targets (Get-KbpTransactionTargets $s $StateRoot))
+    return (Read-KbpJson $statePath)
 }
