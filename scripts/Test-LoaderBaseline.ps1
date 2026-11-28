@@ -38,6 +38,7 @@ $base = Join-Path $temp 'clone with space'
 $inputs = Join-Path $temp 'inputs'
 New-Item -ItemType Directory -Path $inputs -Force | Out-Null
 $cases = [Collections.Generic.List[object]]::new()
+$priorReservationRoot = $env:KBP_TEST_RESERVATION_ROOT
 
 function ConvertTo-PlainText($Records) { return (@($Records | ForEach-Object { "$_" }) -join "`n") }
 function Invoke-Isolated([string[]]$Arguments) {
@@ -449,7 +450,11 @@ try {
     # 9. The runtime transaction stages only its own copy of the admitted package; a package replaced after admission is
     #    refused before anything is staged or activated (fixture game folder; FixtureMode roots in the temporary folder).
     $harness = Join-Path $base 'scripts\RuntimeHarness.Common.ps1'
-    $fixtureRoot = Join-Path $temp 'transaction fixture'
+    # Inside the clone's harness test root, with a private Kingmaker
+    # native-test reservation there (inherited by the isolated child
+    # processes; restored in the finally below).
+    $fixtureRoot = Join-Path $base 'artifacts\runtime-harness-tests\transaction fixture'
+    $env:KBP_TEST_RESERVATION_ROOT = Join-Path $base 'artifacts\runtime-harness-tests\reservation'
     $txRoots = @('state', 'staging', 'backups') | ForEach-Object { $d = Join-Path $fixtureRoot $_; New-Item -ItemType Directory -Path $d -Force | Out-Null; $d }
     $fixtureGame = Join-Path $fixtureRoot 'game'
     New-Item -ItemType Directory -Path (Join-Path $fixtureGame 'Mods\Existing') -Force | Out-Null
@@ -674,5 +679,6 @@ try {
     if ($failed.Count -gt 0) { throw "$($failed.Count) loader-baseline check(s) failed." }
 }
 finally {
+    $env:KBP_TEST_RESERVATION_ROOT = $priorReservationRoot
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }

@@ -668,6 +668,220 @@ function Remove-KbpOwnedLock([string]$LockPath, [string]$RunId, [string]$Token) 
     Remove-Item -LiteralPath $LockPath -Force
 }
 
+# --- Kingmaker native-test reservation, protocol 1 (docs/NATIVE-RESERVATION.md) ---
+# A machine-wide convention the participating Kingmaker labs each implement on
+# their own; it names no other lab and needs none to exist. This lab's rule is
+# deliberately small and fails closed: a participating tool acquires the
+# reservation before any mutable read and releases it last, only after its
+# own verification succeeded. A refusal before any shared change releases it;
+# anything unresolved after a shared change keeps it for the owner
+# (docs/VALIDATION-POLICY.md, manual procedure). Nothing is adopted or resumed
+# automatically.
+$script:KbpReservationProtocol = 'kingmaker-native-test-reservation/1'
+$script:KbpReservationLab = 'KingmakerBuffPlanner'
+$script:KbpReservationMutexName = 'Global\KingmakerNativeTest.Reservation.v1'
+$script:KbpReservationRecordPath = Join-Path $env:ProgramData 'KingmakerNativeTest\reservation.v1.json'
+
+# The production convention, unless the offline-test seam
+# KBP_TEST_RESERVATION_ROOT names a private reservation folder inside this
+# checkout's artifacts\runtime-harness-tests. Production entrypoints never set
+# it; tests set it and restore it in finally. Private mode is refused unless
+# every mutable target of the operation lies in a harness test root too.
+function Get-KbpReservationConvention {
+    param([string[]]$Targets = @())
+    $privateRoot = [string]$env:KBP_TEST_RESERVATION_ROOT
+    if ([string]::IsNullOrWhiteSpace($privateRoot)) {
+        return [pscustomobject]@{ MutexName = $script:KbpReservationMutexName; RecordPath = $script:KbpReservationRecordPath; Private = $false }
+    }
+    if (-not (Test-KbpHarnessTestPath $privateRoot)) {
+        throw "KBP_TEST_RESERVATION_ROOT is not inside this checkout's artifacts\runtime-harness-tests: $privateRoot"
+    }
+    foreach ($target in @($Targets | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })) {
+        if (-not (Test-KbpHarnessTestPath ([string]$target))) {
+            throw "A private test reservation is refused for a shared target: $target"
+        }
+    }
+    $full = [IO.Path]::GetFullPath($privateRoot).TrimEnd('\')
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $digest = -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($full.ToLowerInvariant()))[0..7] | ForEach-Object { $_.ToString('x2') }) }
+    finally { $sha.Dispose() }
+    return [pscustomobject]@{ MutexName = 'Global\KbpHarnessTestReservation-' + $digest; RecordPath = Join-Path $full 'reservation.v1.json'; Private = $true }
+}
+
+# Runs $Body while holding the reservation mutex: a short critical section
+# around the lease record, never held across a transaction. An abandoned mutex
+# is owned all the same; the record stays the authority.
+function Invoke-KbpUnderReservationMutex($Convention, [scriptblock]$Body) {
+    $mutex = New-Object System.Threading.Mutex($false, [string]$Convention.MutexName)
+    $owned = $false
+    try {
+        try { $owned = $mutex.WaitOne([TimeSpan]::FromSeconds(10)) }
+        catch [System.Threading.AbandonedMutexException] { $owned = $true }
+        if (-not $owned) { throw "The Kingmaker native-test reservation mutex stayed busy: $($Convention.MutexName)" }
+        return (& $Body)
+    }
+    finally {
+        if ($owned) { $mutex.ReleaseMutex() }
+        $mutex.Dispose()
+    }
+}
+
+# Whether a JSON object's top-level keys repeat (PowerShell's conversion would
+# silently keep the last value).
+function Test-KbpJsonDuplicateKeys([string]$Text) {
+    $keys = New-Object 'System.Collections.Generic.HashSet[string]'
+    $depth = 0; $i = 0; $expectKey = $false
+    while ($i -lt $Text.Length) {
+        $c = $Text[$i]
+        if ($c -eq '"') {
+            $builder = New-Object System.Text.StringBuilder
+            $i++
+            while ($i -lt $Text.Length -and $Text[$i] -ne '"') {
+                if ($Text[$i] -eq '\' -and $i + 1 -lt $Text.Length) { [void]$builder.Append($Text[$i]); $i++ }
+                [void]$builder.Append($Text[$i]); $i++
+            }
+            $j = $i + 1
+            while ($j -lt $Text.Length -and [char]::IsWhiteSpace($Text[$j])) { $j++ }
+            if ($depth -eq 1 -and $expectKey -and $j -lt $Text.Length -and $Text[$j] -eq ':') {
+                if (-not $keys.Add($builder.ToString())) { return $true }
+            }
+            $expectKey = $false
+        }
+        elseif ($c -eq '{' -or $c -eq '[') { $depth++; $expectKey = ($c -eq '{' -and $depth -eq 1) }
+        elseif ($c -eq '}' -or $c -eq ']') { $depth-- }
+        elseif ($c -eq ',' -and $depth -eq 1) { $expectKey = $true }
+        $i++
+    }
+    return $false
+}
+
+# The lease record, or $null when the resources are free. Valid UTF-8 (an
+# optional UTF-8 BOM aside), one JSON object without repeated keys, and the
+# documented common fields: protocol (exact), lab, runId, token (any non-empty
+# string), holderProcessId (positive integer) and holderStartUtc. This lab's
+# own records must also carry its 32-hex token and its state root. Anything
+# else is ambiguous: it refuses and is never changed.
+function Read-KbpReservationRecord($Convention) {
+    $path = [string]$Convention.RecordPath
+    if (-not (Test-Path -LiteralPath $path)) { return $null }
+    $record = $null
+    try {
+        $bytes = [IO.File]::ReadAllBytes($path)
+        $offset = if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { 3 } else { 0 }
+        $text = [Text.UTF8Encoding]::new($false, $true).GetString($bytes, $offset, $bytes.Length - $offset)
+        if (-not (Test-KbpJsonDuplicateKeys $text)) { $record = $text | ConvertFrom-Json }
+    }
+    catch { $record = $null }
+    $valid = $null -ne $record -and $record -is [pscustomobject]
+    if ($valid) {
+        foreach ($field in @('protocol', 'lab', 'runId', 'token', 'holderProcessId', 'holderStartUtc')) {
+            if ($null -eq $record.PSObject.Properties[$field]) { $valid = $false }
+        }
+    }
+    $valid = $valid -and $record.protocol -is [string] -and [string]$record.protocol -ceq $script:KbpReservationProtocol -and
+        $record.lab -is [string] -and -not [string]::IsNullOrEmpty([string]$record.lab) -and
+        $record.runId -is [string] -and
+        $record.token -is [string] -and -not [string]::IsNullOrEmpty([string]$record.token) -and
+        ($record.holderProcessId -is [int] -or $record.holderProcessId -is [long]) -and [long]$record.holderProcessId -gt 0 -and
+        $record.holderStartUtc -is [string]
+    if ($valid -and [string]$record.lab -ceq $script:KbpReservationLab) {
+        $valid = [string]$record.token -cmatch '^[0-9a-f]{32}$' -and $null -ne $record.PSObject.Properties['stateRoot'] -and
+            $record.stateRoot -is [string] -and -not [string]::IsNullOrEmpty([string]$record.stateRoot)
+    }
+    if (-not $valid) {
+        throw "The Kingmaker native-test reservation record is unreadable, malformed or of an unknown protocol; it is left for the owner: $path"
+    }
+    return $record
+}
+
+# Reserves the shared Kingmaker native-test resources for one run of this lab,
+# or refuses naming the holder. A present record is a reservation whoever
+# wrote it and whether or not its writer still runs.
+function Enter-KbpNativeReservation {
+    param(
+        [Parameter(Mandatory = $true)][string]$RunId,
+        [Parameter(Mandatory = $true)][string]$Purpose,
+        [Parameter(Mandatory = $true)][string]$StateRoot,
+        [string[]]$Targets = @())
+    $leaseConvention = Get-KbpReservationConvention -Targets (@($StateRoot) + @($Targets))
+    $stateFull = [IO.Path]::GetFullPath($StateRoot).TrimEnd('\')
+    return Invoke-KbpUnderReservationMutex $leaseConvention {
+        $directory = Split-Path -Parent $leaseConvention.RecordPath
+        [void][IO.Directory]::CreateDirectory($directory)
+        if (((Get-Item -LiteralPath $directory -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "The Kingmaker native-test reservation folder is a link: $directory"
+        }
+        $current = Read-KbpReservationRecord $leaseConvention
+        if ($null -ne $current) {
+            throw ("Kingmaker native-test resources are reserved by $($current.lab) run $($current.runId) " +
+                "(process $($current.holderProcessId)); $($leaseConvention.RecordPath)")
+        }
+        $lease = [ordered]@{
+            protocol = $script:KbpReservationProtocol; lab = $script:KbpReservationLab; runId = $RunId; purpose = $Purpose
+            token = [Guid]::NewGuid().ToString('N'); holderProcessId = $PID
+            holderStartUtc = (Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o'); host = $env:COMPUTERNAME
+            createdUtc = [DateTime]::UtcNow.ToString('o'); stateRoot = $stateFull
+        }
+        $temporary = $leaseConvention.RecordPath + '.' + $lease.token + '.tmp'
+        $text = [Text.UTF8Encoding]::new($false).GetBytes(($lease | ConvertTo-Json))
+        $stream = [IO.File]::Open($temporary, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        try { $stream.Write($text, 0, $text.Length); $stream.Flush($true) } finally { $stream.Dispose() }
+        [IO.File]::Move($temporary, $leaseConvention.RecordPath)
+        [pscustomobject]$lease
+    }
+}
+
+# Refuses unless the record is this lab's reservation for exactly this run,
+# token and state root. A lost, replaced or unreadable record stops the caller
+# before its next shared change; the record is left alone.
+function Assert-KbpNativeReservation {
+    param([string]$RunId, [string]$Token, [string]$StateRoot, [string[]]$Targets = @())
+    $leaseConvention = Get-KbpReservationConvention -Targets (@($StateRoot) + @($Targets))
+    $current = $null
+    $readFailure = $null
+    try { $current = Read-KbpReservationRecord $leaseConvention } catch { $readFailure = 'an unreadable or malformed record' }
+    $stateFull = [IO.Path]::GetFullPath($StateRoot).TrimEnd('\')
+    if ($null -eq $readFailure -and $null -ne $current -and [string]$current.lab -ceq $script:KbpReservationLab -and
+        [string]$current.token -ceq $Token -and [string]$current.runId -ceq $RunId -and
+        ([string]$current.stateRoot).Equals($stateFull, [StringComparison]::OrdinalIgnoreCase)) { return }
+    $holder = if ($null -ne $readFailure) { $readFailure } elseif ($null -eq $current) { 'no record' } else { "$($current.lab) run $($current.runId)" }
+    throw ("Run $RunId does not hold its Kingmaker native-test reservation (now: $holder; $($leaseConvention.RecordPath)). " +
+        "Nothing more was changed; the owner resolves the transaction (docs/VALIDATION-POLICY.md).")
+}
+
+# Releases this run's reservation, under the mutex and only while it is still
+# exactly this run's; otherwise it is left alone and the release fails.
+function Exit-KbpNativeReservation {
+    param([string]$RunId, [string]$Token, [string]$StateRoot, [string[]]$Targets = @())
+    $leaseConvention = Get-KbpReservationConvention -Targets (@($StateRoot) + @($Targets))
+    Invoke-KbpUnderReservationMutex $leaseConvention {
+        Assert-KbpNativeReservation -RunId $RunId -Token $Token -StateRoot $StateRoot -Targets $Targets
+        Remove-Item -LiteralPath $leaseConvention.RecordPath -Force
+    }
+}
+
+function Get-KbpStateReservationToken($State) {
+    if ($null -eq $State -or $null -eq $State.PSObject.Properties['reservationToken']) { return $null }
+    $token = [string]$State.reservationToken
+    if ([string]::IsNullOrEmpty($token)) { return $null }
+    return $token
+}
+
+# Whether a run left nothing unresolved of its own in this lab: no run folder
+# and no lock of its own, or a transaction Restored, verified and unlocked.
+function Test-KbpRunSettled([string]$StateRoot, [string]$RunId) {
+    $statePath = Join-Path $StateRoot ('transactions\' + $RunId + '\transaction.json')
+    $lockPath = Join-Path $StateRoot 'deployment.lock'
+    $ownLock = $false
+    if (Test-Path -LiteralPath $lockPath) { try { $ownLock = [string](Read-KbpJson $lockPath).runId -ceq $RunId } catch { $ownLock = $true } }
+    if ($ownLock) { return $false }
+    if (-not (Test-Path -LiteralPath (Join-Path $StateRoot ('transactions\' + $RunId)))) { return $true }
+    if (-not (Test-Path -LiteralPath $statePath -PathType Leaf)) { return $false }
+    $state = $null
+    try { $state = Read-KbpJson $statePath } catch { return $false }
+    return [string]$state.status -ceq 'Restored' -and $state.restorationVerified -is [bool] -and $state.restorationVerified
+}
+
 # Focused re-review: a harness test path is inside this checkout's
 # artifacts\runtime-harness-tests and reached without a junction, link or
 # mount point on the way; every other path is treated as the lab's own.
@@ -839,7 +1053,11 @@ function Enter-KbpRuntimeTransaction {
         # lock on the live Mods folder refused the first move of live run
         # casting-qual-select-20260924-45bff28-01); tests shorten it.
         [ValidateRange(1, 20)][int]$MoveAttempts = 10,
-        [ValidateRange(0, 10000)][int]$MoveDelayMilliseconds = 3000
+        [ValidateRange(0, 10000)][int]$MoveDelayMilliseconds = 3000,
+        # The Kingmaker native-test reservation the calling tool (Deploy-Local
+        # or the launcher) already holds for exactly this run; it stays the
+        # caller's. Without it the entry acquires its own.
+        [string]$ReservationToken
     )
     if ($PSBoundParameters.ContainsKey('KnownKingmakerProcessIds')) {
         Assert-KbpNotRunning -KnownProcessIds $KnownKingmakerProcessIds
@@ -858,6 +1076,26 @@ function Enter-KbpRuntimeTransaction {
             throw 'Public runtime transaction roots must be the exact project-owned lab roots.'
         }
     }
+    # The Kingmaker native-test reservation comes first (docs/NATIVE-RESERVATION.md):
+    # borrowed only for exactly this run, token and state root, or acquired here.
+    $leaseTargets = @($StateRoot, $StagingRoot, $BackupRoot, $game)
+    if ([string]::IsNullOrEmpty($ReservationToken)) {
+        $entryToken = [string](Enter-KbpNativeReservation -RunId $RunId -Purpose 'runtime-transaction' -StateRoot $StateRoot -Targets $leaseTargets).token
+        $ownsLease = $true
+    } else {
+        Assert-KbpNativeReservation -RunId $RunId -Token $ReservationToken -StateRoot $StateRoot -Targets $leaseTargets
+        $entryToken = $ReservationToken
+        $ownsLease = $false
+    }
+    # A separate process restoring this run (Restore-Local holds the same
+    # per-run mutex) cannot interleave with this entry.
+    $runMutex = [Threading.Mutex]::new($false, ('Global\KbpRestore-' + $RunId.ToLowerInvariant()))
+    $runMutexHeld = $false
+    try {
+    try { $runMutexHeld = $runMutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $runMutexHeld = $true }
+    $lockTaken = $false
+    try {
+    if (-not $runMutexHeld) { throw "Another process is restoring run $RunId." }
     Assert-KbpNoUnresolvedTransaction $StateRoot
 
     $token = [Guid]::NewGuid().ToString('N')
@@ -868,6 +1106,7 @@ function Enter-KbpRuntimeTransaction {
     foreach ($path in @($transactionRoot, $stagingRunRoot, $backupRunRoot)) {
         if (Test-Path -LiteralPath $path) { throw "Run-owned path already exists: $path" }
     }
+    $lockTaken = $true
     New-KbpOwnedLock $lockPath $RunId $token
     $fixtureLock = Get-KbpDefaultFixtureLockPath $StateRoot
     if ($PSBoundParameters.ContainsKey('KnownKingmakerProcessIds')) {
@@ -876,6 +1115,18 @@ function Enter-KbpRuntimeTransaction {
     } else {
         Confirm-KbpLockedWithoutForeignLease -LockPath $lockPath -RunId $RunId -Token $token -SkipForeignLease:$FixtureMode `
             -FixtureLockPath $fixtureLock
+    }
+    }
+    catch {
+        # Refused before any shared change: an own reservation is released,
+        # unless this entry's own lock remains (then it stays for the owner).
+        $admissionFailure = $_
+        $lockRemains = $false
+        if ($lockTaken -and (Test-Path -LiteralPath $lockPath)) {
+            try { $lockRemains = [string](Read-KbpJson $lockPath).token -ceq $token } catch { $lockRemains = $true }
+        }
+        if ($ownsLease -and -not $lockRemains) { Exit-KbpNativeReservation -RunId $RunId -Token $entryToken -StateRoot $StateRoot -Targets $leaseTargets }
+        throw $admissionFailure
     }
     $statePath = Join-Path $transactionRoot 'transaction.json'
     try {
@@ -918,7 +1169,7 @@ function Enter-KbpRuntimeTransaction {
         throw "The package changed after admission (admitted $ExpectedPackageSha256, now $ownedPackageSha256); nothing was staged or activated."
     }
     $state = [ordered]@{
-        schemaVersion = 1; runId = $RunId; token = $token; status = 'Preparing'
+        schemaVersion = 1; runId = $RunId; token = $token; status = 'Preparing'; reservationToken = $entryToken
         createdAtUtc = [DateTime]::UtcNow.ToString('o'); packagePath = $package; ownedPackagePath = $ownedPackage
         packageSha256 = $ownedPackageSha256; gameRoot = $game; modsPath = $mods
         originalExisted = $originalExisted; originalManifest = $originalManifest
@@ -961,6 +1212,10 @@ function Enter-KbpRuntimeTransaction {
             }
             $lockFailure = $null
             try { Remove-KbpOwnedLock $lockPath $RunId $token } catch { $lockFailure = $_.Exception.Message }
+            # Nothing shared was changed: an own reservation goes last, once nothing of the run remains.
+            if ($ownsLease -and $cleanupFailures.Count -eq 0 -and -not $lockFailure) {
+                Exit-KbpNativeReservation -RunId $RunId -Token $entryToken -StateRoot $StateRoot -Targets $leaseTargets
+            }
             if ($cleanupFailures.Count -gt 0 -or $lockFailure) {
                 throw ("Runtime entry failed before its state existed (" + $preStateFailure.Exception.Message + ")" +
                     $(if ($lockFailure) { "; its lock could not be released: $lockFailure" } else { '; its lock was released' }) +
@@ -1005,15 +1260,16 @@ function Enter-KbpRuntimeTransaction {
         Write-KbpJsonAtomic $statePath $state
 
         $originalMoveAttempts = 0
+        $leaseCheck = { Assert-KbpNativeReservation -RunId $RunId -Token $entryToken -StateRoot $StateRoot -Targets $leaseTargets }
         if ($originalExisted) {
             $originalMoveAttempts = Move-KbpDirectoryWithRetry -Source $mods -Destination $originalBackup `
-                -Attempts $MoveAttempts -DelayMilliseconds $MoveDelayMilliseconds
+                -Attempts $MoveAttempts -DelayMilliseconds $MoveDelayMilliseconds -BeforeAttempt $leaseCheck
         }
         $state.status = 'OriginalMoved'
         $state.originalMoveAttempts = [int]$originalMoveAttempts
         Write-KbpJsonAtomic $statePath $state
         [void](Move-KbpDirectoryWithRetry -Source $stagedMods -Destination $mods `
-            -Attempts $MoveAttempts -DelayMilliseconds $MoveDelayMilliseconds)
+            -Attempts $MoveAttempts -DelayMilliseconds $MoveDelayMilliseconds -BeforeAttempt $leaseCheck)
         $state.status = 'Active'
         $state.activatedAtUtc = [DateTime]::UtcNow.ToString('o')
         Write-KbpJsonAtomic $statePath $state
@@ -1025,7 +1281,7 @@ function Enter-KbpRuntimeTransaction {
             # Final review C8: the process ids are passed on only when the
             # caller gave them; passing an unbound (null) list would switch
             # off the live running-game check of the restoration.
-            $restoreArguments = @{ RunId = $RunId; StateRoot = $StateRoot; FixtureMode = $FixtureMode }
+            $restoreArguments = @{ RunId = $RunId; StateRoot = $StateRoot; FixtureMode = $FixtureMode; BorrowedToken = $entryToken }
             if ($PSBoundParameters.ContainsKey('KnownKingmakerProcessIds')) {
                 $restoreArguments.KnownKingmakerProcessIds = $KnownKingmakerProcessIds
             }
@@ -1034,7 +1290,16 @@ function Enter-KbpRuntimeTransaction {
         catch {
             throw "Runtime entry failed and restoration also failed. Entry: $($entryFailure.Exception.Message) Restore: $($_.Exception.Message)"
         }
+        # The rollback verified the run's restoration: an own reservation goes last.
+        if ($ownsLease -and (Test-KbpRunSettled $StateRoot $RunId)) {
+            Exit-KbpNativeReservation -RunId $RunId -Token $entryToken -StateRoot $StateRoot -Targets $leaseTargets
+        }
         throw $entryFailure
+    }
+    }
+    finally {
+        if ($runMutexHeld) { $runMutex.ReleaseMutex() }
+        $runMutex.Dispose()
     }
 }
 
@@ -1072,8 +1337,12 @@ function Move-KbpDirectoryWithRetry {
         [Parameter(Mandatory = $true)][string]$Source,
         [Parameter(Mandatory = $true)][string]$Destination,
         [int]$Attempts = 10,
-        [int]$DelayMilliseconds = 3000)
+        [int]$DelayMilliseconds = 3000,
+        # Run before every attempt (the reservation's ownership check); a
+        # failure stops the move before it happens.
+        [scriptblock]$BeforeAttempt)
     for ($attempt = 1; ; $attempt++) {
+        if ($null -ne $BeforeAttempt) { & $BeforeAttempt }
         try {
             Move-Item -LiteralPath $Source -Destination $Destination -ErrorAction Stop
             return $attempt
@@ -1093,7 +1362,10 @@ function Restore-KbpRuntimeTransaction {
         [Parameter(Mandatory = $true)][string]$RunId,
         [Parameter(Mandatory = $true)][string]$StateRoot,
         [switch]$FixtureMode,
-        [int[]]$KnownKingmakerProcessIds
+        [int[]]$KnownKingmakerProcessIds,
+        # The reservation the calling tool holds for exactly this run (its
+        # token must be the journaled one); the caller releases it.
+        [string]$BorrowedToken
     )
     if ($PSBoundParameters.ContainsKey('KnownKingmakerProcessIds')) {
         Assert-KbpNotRunning -KnownProcessIds $KnownKingmakerProcessIds
@@ -1105,12 +1377,45 @@ function Restore-KbpRuntimeTransaction {
         throw "Display recovery for $RunId must be finalized through Restore-Local.ps1."
     }
     if ($state.status -ceq 'Restored') { return $state }
+    foreach ($field in @('status', 'token', 'lockPath', 'modsPath', 'originalExisted', 'originalBackup', 'stagedQuarantine', 'stagingRunRoot')) {
+        if ($null -eq $state.PSObject.Properties[$field]) { throw "Runtime transaction state identity is invalid (no $field)." }
+    }
     Assert-KbpOwnedLock $state.lockPath $RunId $state.token
+    # The Kingmaker native-test reservation: the caller's for exactly this run,
+    # the journaled one (a standalone restoration continues only the
+    # transaction its record names), or, for a transaction recorded before this
+    # lab took part, a free one taken now and journaled. Anything else refuses.
+    $leaseTargets = @($StateRoot, [string]$state.modsPath, [string]$state.originalBackup, [string]$state.stagedQuarantine,
+        [string]$state.stagingRunRoot, [string]$state.lockPath) | Where-Object { -not [string]::IsNullOrEmpty($_) }
+    $journaledToken = Get-KbpStateReservationToken $state
+    $releaseLease = $false
+    if (-not [string]::IsNullOrEmpty($BorrowedToken)) {
+        if ($journaledToken -cne $BorrowedToken) { throw "Run $RunId's journal does not name the caller's reservation; nothing was restored." }
+        $restoreToken = $BorrowedToken
+    } elseif ($null -ne $journaledToken) {
+        $restoreToken = $journaledToken
+        $releaseLease = $true
+    } else {
+        $restoreToken = [string](Enter-KbpNativeReservation -RunId $RunId -Purpose 'runtime-restore' -StateRoot $StateRoot -Targets $leaseTargets).token
+        $state | Add-Member -NotePropertyName reservationToken -NotePropertyValue $restoreToken -Force
+        Write-KbpJsonAtomic $statePath $state
+        $releaseLease = $true
+    }
+    $leaseCheck = { Assert-KbpNativeReservation -RunId $RunId -Token $restoreToken -StateRoot $StateRoot -Targets $leaseTargets }
+    & $leaseCheck
     # Serialized with the owner's other lab (review C3): this run's Mods
     # folder is never moved while that lab's runtime lease is held.
     if (-not $FixtureMode) { Wait-KbpNoForeignRuntimeLease }
     $mods = [string]$state.modsPath
     $preActivationNoOp = $false
+    # The original tree must match the recorded manifest at its current
+    # location before any move that would install it.
+    $assertBackup = {
+        if (-not (Test-Path -LiteralPath $state.originalBackup -PathType Container)) { throw 'Original Mods backup is missing.' }
+        if (-not (Test-KbpManifestEqual @($state.originalManifest) @(Get-KbpDirectoryManifest $state.originalBackup))) {
+            throw 'Original Mods backup does not match the recorded original manifest; nothing was moved.'
+        }
+    }
     try {
         if (Test-Path -LiteralPath $mods -PathType Container) {
             $sentinelPath = Join-Path $mods '.kbp-runtime-sentinel.json'
@@ -1138,20 +1443,19 @@ function Restore-KbpRuntimeTransaction {
                     throw 'Live Mods ownership sentinel does not match transaction state.'
                 }
                 if (Test-Path -LiteralPath $state.stagedQuarantine) { throw 'Staged quarantine already exists.' }
+                if ($state.originalExisted) { & $assertBackup }
                 $currentStaged = @(Get-KbpDirectoryManifest $mods)
                 $state.stagedMutationObserved = -not (Test-KbpManifestEqual @($state.stagedManifest) $currentStaged)
                 if ($state.stagedMutationObserved) { $state.observedStagedManifest = $currentStaged }
-                [void](Move-KbpDirectoryWithRetry -Source $mods -Destination $state.stagedQuarantine)
+                [void](Move-KbpDirectoryWithRetry -Source $mods -Destination $state.stagedQuarantine -BeforeAttempt $leaseCheck)
             }
         }
 
         if ($state.originalExisted) {
             if (-not $preActivationNoOp) {
-                if (-not (Test-Path -LiteralPath $state.originalBackup -PathType Container)) {
-                    throw 'Original Mods backup is missing.'
-                }
+                & $assertBackup
                 if (Test-Path -LiteralPath $mods) { throw 'Mods destination is occupied during restore.' }
-                [void](Move-KbpDirectoryWithRetry -Source $state.originalBackup -Destination $mods)
+                [void](Move-KbpDirectoryWithRetry -Source $state.originalBackup -Destination $mods -BeforeAttempt $leaseCheck)
                 $restoredManifest = @(Get-KbpDirectoryManifest $mods)
                 if (-not (Test-KbpManifestEqual @($state.originalManifest) $restoredManifest)) {
                     throw 'Restored Mods manifest/hash mismatch.'
@@ -1161,6 +1465,7 @@ function Restore-KbpRuntimeTransaction {
         }
         elseif (Test-Path -LiteralPath $mods) { throw 'Mods must remain absent because it was absent before entry.' }
 
+        & $leaseCheck
         if (Test-Path -LiteralPath $state.stagedQuarantine -PathType Container) {
             $quarantineSentinel = Read-KbpJson (Join-Path $state.stagedQuarantine '.kbp-runtime-sentinel.json')
             if ($quarantineSentinel.runId -cne $RunId -or $quarantineSentinel.token -cne $state.token) {
@@ -1178,11 +1483,15 @@ function Restore-KbpRuntimeTransaction {
             [void](Assert-KbpPathWithin -Path $stagePath -Root (Split-Path -Parent $stagePath))
             Remove-Item -LiteralPath $stagePath -Recurse -Force
         }
+        & $leaseCheck
         $state.status = 'Restored'
         $state.restorationVerified = $true
         $state.restoredAtUtc = [DateTime]::UtcNow.ToString('o')
         Write-KbpJsonAtomic $statePath $state
         Remove-KbpOwnedLock $state.lockPath $RunId $state.token
+        # Released last, after the verified restoration and its lock; a failed
+        # restoration (below) keeps it for the owner.
+        if ($releaseLease) { Exit-KbpNativeReservation -RunId $RunId -Token $restoreToken -StateRoot $StateRoot -Targets $leaseTargets }
         return $state
     }
     catch {

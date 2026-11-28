@@ -87,6 +87,27 @@ $runRoot = Join-Path $StateRoot $RunId
 $stagingRoot = Join-Path $runRoot 'staging'
 $transactionPath = Join-Path $runRoot 'transaction.json'
 
+# Kingmaker native-test reservation (docs/NATIVE-RESERVATION.md): a real
+# (non-WhatIf) invocation reserves before any mutable read and holds it for
+# the whole process; it is released last, only after this script's own
+# verification succeeded (and its fixture lock is gone), or when it stopped
+# before changing the save folder. Anything else keeps it for the owner;
+# nothing is adopted or resumed automatically.
+$fixtureLease = $null
+$fixtureMutated = $false
+$fixtureVerified = $false
+$script:fixtureLeaseLost = $false
+$fixtureTargets = if ($Recover -or $Teardown) { @($StateRoot, $SaveRoot) } else { @($StateRoot, $SaveRoot, $ArchiveRoot) }
+if (-not [bool]$WhatIfPreference) {
+    $fixtureLease = Enter-KbpNativeReservation -RunId $RunId -Purpose 'fixture' -StateRoot $StateRoot -Targets $fixtureTargets
+}
+function Assert-KbpFixtureLease {
+    if ($null -eq $fixtureLease) { return }
+    try { Assert-KbpNativeReservation -RunId $RunId -Token $fixtureLease.token -StateRoot $StateRoot -Targets $fixtureTargets }
+    catch { $script:fixtureLeaseLost = $true; throw }
+}
+try {
+
 function Read-KbpSaveHeader {
     param([string]$Path)
     $archive = $null; $reader = $null
@@ -387,8 +408,11 @@ if ($Recover) {
         Write-Host "Recovery WhatIf PASS: would roll back run $RunId; no artifact, record, or lock changed."
         return
     }
+    Assert-KbpFixtureLease
+    $fixtureMutated = $true
     Invoke-KbpOwnedRollback $existing
     Remove-KbpOwnedLock $lockPath $existing.runId $existing.token
+    $fixtureVerified = $true
     Write-Host "Recovery PASS: rolled back owned partial artifacts of $RunId; lock released."
     return
 }
@@ -452,6 +476,8 @@ if ($Teardown) {
             # runtime entry re-checks this lock once it holds its own), before
             # anything is deleted.
             Assert-KbpFixturePreconditions
+            Assert-KbpFixtureLease
+            $fixtureMutated = $true
             $deleting = $true
             Remove-Item -LiteralPath $baselinePath -Force
             Remove-Item -LiteralPath $workingPath -Force
@@ -469,6 +495,7 @@ if ($Teardown) {
         if (($protectedBefore -join "`n") -cne ($protectedAfter -join "`n")) {
             throw 'Teardown touched a protected save; investigate immediately.'
         }
+        $fixtureVerified = $true
         Write-Host "Fixture teardown PASS: removed exactly the manifest-owned pair; $($protectedBefore.Count) other save(s) byte-identical."
     return
 }
@@ -634,8 +661,11 @@ try {
     # move, so an interruption at any point leaves the published file
     # represented in the recovery record. Recovery validates identity before
     # removing anything, so a bystander at the same pathname is refused.
+    Assert-KbpFixtureLease
+    $fixtureMutated = $true
     Publish-KbpStagedFixture -StagedPath $stagedBaseline -DestinationPath $baselinePath
     if ($FailAfterMove -ceq 'baseline') { throw "Injected failure after publishing baseline." }
+    Assert-KbpFixtureLease
     Publish-KbpStagedFixture -StagedPath $stagedWorking -DestinationPath $workingPath
     if ($FailAfterMove -ceq 'working') { throw "Injected failure after publishing working." }
     $transaction.status = 'Published'
@@ -660,7 +690,9 @@ catch {
     # failed bootstrap is never reported as success. If the rollback itself
     # fails, the lock STAYS so -Recover can finish it with the transaction's
     # verified ownership; never release another operation's lock and never
-    # claim successful restoration.
+    # claim successful restoration. A lost reservation never rolls back under
+    # another holder: everything stays for the owner.
+    if ($script:fixtureLeaseLost) { throw }
     try {
         Invoke-KbpOwnedRollback $transaction
         $script:rollbackSucceeded = $true
@@ -684,8 +716,23 @@ finally {
     }
 }
 
+$fixtureVerified = $true
 Write-Host "Fixture bootstrap PASS:"
 Write-Host "  baseline $baselineName sha256=$($manifest.baseline.sha256) (sealed; offline copy archived)"
 Write-Host "  working  $workingName sha256=$($manifest.working.sha256) (only mutable fixture)"
 Write-Host "  seed     $($seed.Name) untouched; $($allSaves.Count) pre-existing save(s) byte-identical"
 Write-Host "  archive  $ArchiveRoot"
+}
+finally {
+    if ($null -ne $fixtureLease) {
+        $ownLock = $false
+        if (Test-Path -LiteralPath $lockPath) { try { $ownLock = [string](Read-KbpJson $lockPath).runId -ceq $RunId } catch { $ownLock = $true } }
+        if (-not $script:fixtureLeaseLost -and -not $ownLock -and ($fixtureVerified -or -not $fixtureMutated)) {
+            Exit-KbpNativeReservation -RunId $RunId -Token $fixtureLease.token -StateRoot $StateRoot -Targets $fixtureTargets
+        }
+        else {
+            Write-Warning "Kingmaker native-test reservation kept for the owner: fixture run $RunId is unresolved (docs/VALIDATION-POLICY.md)."
+            if ($fixtureVerified) { throw "Fixture run $RunId reported success but its fixture lock remains; its reservation stays for the owner." }
+        }
+    }
+}

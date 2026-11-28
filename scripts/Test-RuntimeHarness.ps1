@@ -9,6 +9,10 @@ $repo = Get-KbpRepositoryRoot
 $package = Join-Path $repo ('artifacts\local-runtime\' + (Get-KbpVersion) + '\KingmakerBuffPlanner-' + (Get-KbpVersion) + '-local-runtime.zip')
 if (-not (Test-Path -LiteralPath $package -PathType Leaf)) { throw 'Build the validated local package before runtime harness tests.' }
 $root = Join-Path $repo ('artifacts\runtime-harness-tests\' + [Guid]::NewGuid().ToString('N'))
+# A private Kingmaker native-test reservation inside the test root (inherited
+# by child processes; restored in finally); the machine-wide one is never used.
+$priorReservationRoot = $env:KBP_TEST_RESERVATION_ROOT
+$env:KBP_TEST_RESERVATION_ROOT = Join-Path $root 'reservation'
 $stateRoot = Join-Path $root 'state'
 $stagingRoot = Join-Path $root 'staging'
 $backupRoot = Join-Path $root 'backups'
@@ -410,7 +414,23 @@ try {
         New-TestSaveArchive -Path (Join-Path $saveRoot 'Manual_401_KBP_AUTOMATION_SEED.zks') -Name 'KBP_AUTOMATION_SEED'
         return $saveRoot
     }
-    $bootstrapScript = Join-Path $repo 'scripts\New-KbpAutomationFixture.ps1'
+    $realBootstrapScript = Join-Path $repo 'scripts\New-KbpAutomationFixture.ps1'
+    # Each fixture invocation gets its own private reservation: a run that
+    # stops after changing the save folder keeps its reservation for the
+    # owner, which must not block the next independent case.
+    function Invoke-TestBootstrap {
+        $named = @{}
+        $i = 0
+        while ($i -lt $args.Count) {
+            $token = [string]$args[$i]
+            if ($token.EndsWith(':')) { $named[$token.TrimStart('-').TrimEnd(':')] = $args[$i + 1]; $i += 2; continue }
+            if ($i + 1 -lt $args.Count -and -not ([string]$args[$i + 1]).StartsWith('-')) { $named[$token.TrimStart('-')] = $args[$i + 1]; $i += 2 }
+            else { $named[$token.TrimStart('-')] = $true; $i++ }
+        }
+        $env:KBP_TEST_RESERVATION_ROOT = Join-Path $root ('reservation-' + [Guid]::NewGuid().ToString('N'))
+        & $realBootstrapScript @named
+    }
+    $bootstrapScript = ${function:Invoke-TestBootstrap}
     $stateRoot = Join-Path $root 'fixture-state'
 
     # Reproduce the reviewed bypass: an explicitly supplied null id list must
@@ -630,7 +650,8 @@ try {
         throw 'O1-C: WhatIf did not reach the decision boundary purely.'
     }
     $ErrorActionPreference = 'Continue'
-    $declineOut = ('N' | & powershell.exe -NoProfile -Command ("& '" + $bootstrapScript +
+    $env:KBP_TEST_RESERVATION_ROOT = Join-Path $root ('reservation-' + [Guid]::NewGuid().ToString('N'))
+    $declineOut = ('N' | & powershell.exe -NoProfile -Command ("& '" + $realBootstrapScript +
         "' -RunId 'o1-fresh-declined' -SaveRoot '" + $o1Saves + "' -StateRoot '" + $o1State +
         "' -ArchiveRoot '" + (Join-Path $root 'archive-o1-fresh-declined') + "' -Confirm") 2>&1) -join "`n"
     $ErrorActionPreference = 'Stop'
@@ -2030,29 +2051,32 @@ try {
         $directory = Join-Path $Root ('transactions\' + $Run)
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
         New-Item -ItemType Directory -Path (Join-Path $rlEvidence $Run) -Force | Out-Null
-        # A stand-in: schema 0 is never restorable, so a restoration fails at
-        # once, before any lease wait or Mods path; its lock is a test file.
+        # A stand-in: a valid journal (so recovery admission takes a private
+        # reservation for it, one per run) without a Mods path, so a
+        # restoration fails at once, before any Mods move; its lock is a
+        # test file.
+        $env:KBP_TEST_RESERVATION_ROOT = Join-Path $rlRoot ('reservation-' + $Run)
         $lock = Join-Path $rlRoot ($Run + '.lock')
         if ($HoldLock) { New-KbpOwnedLock $lock $Run 't' }
         Write-KbpJsonAtomic (Join-Path $directory 'transaction.json') ([ordered]@{
-            schemaVersion = 0; runId = $Run; status = $Status; lockPath = $lock; token = 't' })
+            schemaVersion = 1; runId = $Run; status = $Status; lockPath = $lock; token = 't' })
         return (Save-KbpProtectedSaveBaseline -TransactionDirectory $directory -RunId $Run -Scenario 'live-cast-qual' `
             -FixtureFamily 'Automation' -WorkingFileName 'Manual_2_WORKING.zks' -SaveRoot $RecordedSaveRoot `
             -Snapshot (Get-KbpSaveFolderSnapshot -SaveRoot $saveFolder))
     }
-    $skipBaseline = New-RlTransaction 'rl-skip' 'Deployed' $saveFolder
+    $skipBaseline = New-RlTransaction 'rl-skip' 'Active' $saveFolder
     $skipRefused = $false
     try { & $restoreScript -RunId 'rl-skip' -SkipProtectedSaveComparison -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
     catch { $skipRefused = $_.Exception.Message -like 'Refusing -SkipProtectedSaveComparison*' }
     if (-not $skipRefused -or [bool](Read-KbpJson $skipBaseline).compared) {
         throw 'Restore-Local skipped a pending protected-save comparison.'
     }
-    $failBaseline = New-RlTransaction 'rl-fail' 'Deployed' (Join-Path $rlRoot 'missing-saves') -HoldLock
+    $failBaseline = New-RlTransaction 'rl-fail' 'Active' (Join-Path $rlRoot 'missing-saves') -HoldLock
     $failKept = $false
     try { & $restoreScript -RunId 'rl-fail' -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
     catch { $failKept = $_.Exception.Message -like '*the Mods folder was not restored and the run''s lock is kept*' }
     if (-not $failKept -or [bool](Read-KbpJson $failBaseline).compared -or
-        [string](Read-KbpJson (Join-Path $rlState 'transactions\rl-fail\transaction.json')).status -cne 'Deployed') {
+        [string](Read-KbpJson (Join-Path $rlState 'transactions\rl-fail\transaction.json')).status -cne 'Active') {
         throw 'Restore-Local went on after a protected-save comparison that could not be made.'
     }
     # Focused re-review: the way out of a comparison that can never be made -
@@ -2073,7 +2097,7 @@ try {
     if (-not $closeRefused) { throw 'A comparison that is not pending was closed again.' }
     # Targeted review: closing tries the comparison first - one that can
     # be made is made (here clean, so nothing is recorded).
-    $null = New-RlTransaction 'rl-closeok' 'Deployed' $saveFolder -HoldLock
+    $null = New-RlTransaction 'rl-closeok' 'Active' $saveFolder -HoldLock
     $closeOkMessage = ''
     try { & $restoreScript -RunId 'rl-closeok' -CloseUnverifiableComparison -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
     catch { $closeOkMessage = $_.Exception.Message }
@@ -2082,7 +2106,7 @@ try {
         throw ('A comparison that could be made was closed as unverifiable: ' + $closeOkMessage)
     }
     # A pending comparison whose lock is no longer the run's is never made.
-    $noLockBaseline = New-RlTransaction 'rl-nolock' 'Deployed' $saveFolder
+    $noLockBaseline = New-RlTransaction 'rl-nolock' 'Active' $saveFolder
     $noLockMessage = ''
     try { & $restoreScript -RunId 'rl-nolock' -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
     catch { $noLockMessage = $_.Exception.Message }
@@ -2093,7 +2117,7 @@ try {
     # An unreadable baseline blocks every entry with the way out named, and
     # is closed as unverifiable (kept aside) by that way out.
     $corruptState = Join-Path $rlRoot 'corrupt-state'
-    $corruptBaseline = New-RlTransaction 'rl-corrupt' 'Deployed' $saveFolder -HoldLock -Root $corruptState
+    $corruptBaseline = New-RlTransaction 'rl-corrupt' 'Active' $saveFolder -HoldLock -Root $corruptState
     [IO.File]::WriteAllText($corruptBaseline, '{ not json')
     $corruptBlocks = ''
     try { Assert-KbpNoPendingProtectedSaveComparison $corruptState } catch { $corruptBlocks = $_.Exception.Message }
@@ -2115,7 +2139,7 @@ try {
         -not (Test-Path -LiteralPath (Join-Path $rlState 'protected-save-violations\rl-late.json') -PathType Leaf)) {
         throw 'Restore-Local compared, or ignored, a pending comparison whose lock was already released.'
     }
-    $null = New-RlTransaction 'rl-both' 'Deployed' $saveFolder -HoldLock
+    $null = New-RlTransaction 'rl-both' 'Active' $saveFolder -HoldLock
     [IO.File]::WriteAllText((Join-Path $saveFolder 'Manual_1_Ordinary.zks'), 'changed again')
     $bothMessage = ''
     try { & $restoreScript -RunId 'rl-both' -StateRoot $rlState -EvidenceRoot $rlEvidence -Confirm:$false }
@@ -2236,6 +2260,7 @@ try {
     $passed++
 }
 finally {
+    $env:KBP_TEST_RESERVATION_ROOT = $priorReservationRoot
     if (Test-Path -LiteralPath $root) {
         $resolved = [IO.Path]::GetFullPath($root)
         [void](Assert-KbpPathWithin -Path $resolved -Root (Join-Path $repo 'artifacts\runtime-harness-tests'))

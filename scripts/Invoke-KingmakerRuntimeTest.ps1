@@ -146,6 +146,31 @@ elseif (-not [string]::IsNullOrWhiteSpace($NativeUiStage)) {
 
 $requestedWhatIf = [bool]$WhatIfPreference
 $WhatIfPreference = $false
+# Kingmaker native-test reservation (docs/NATIVE-RESERVATION.md): a real run
+# reserves before any mutable read (session display, installed loader, saves,
+# Steam safety, run-ID availability) and holds it for the whole process; the
+# in-process deployment and restoration borrow it for exactly this run. It is
+# released last, after the final process observation and only when the run's
+# restoration is verified; a refusal before any shared change releases it;
+# anything else keeps it for the owner. WhatIf never reserves.
+$runId = if ([string]::IsNullOrWhiteSpace($RunId)) {
+    [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ') + '-' + $Scenario
+} else { $RunId }
+$launchLease = $null
+$launchLeaseSettled = $false
+$sharedMutationStarted = $false
+$launchTargets = @($script:KbpRuntimeStateRoot, $script:KbpRuntimeStagingRoot, $script:KbpRuntimeBackupRoot,
+    $script:KbpRuntimeEvidenceRoot, (Get-KbpGamePath))
+if (-not $requestedWhatIf) {
+    $launchLease = Enter-KbpNativeReservation -RunId $runId -Purpose 'runtime-launch' -StateRoot $script:KbpRuntimeStateRoot -Targets $launchTargets
+}
+$launchLeaseLost = $null
+function Test-KbpLaunchLease {
+    if ($null -eq $launchLease) { return $true }
+    try { Assert-KbpNativeReservation -RunId $runId -Token $launchLease.token -StateRoot $script:KbpRuntimeStateRoot -Targets $launchTargets; return $true }
+    catch { $script:launchLeaseLost = $_.Exception.Message; return $false }
+}
+try {
 # Review of f7726c9..1332ed8, P3-J: ValidateSet binds case-insensitively,
 # but every later comparison is case-sensitive; continue with the
 # canonical spelling of each value (for example -Scenario LIVE-CAST-QUAL).
@@ -428,9 +453,6 @@ if ($Scenario -ceq 'live-workspace-manual' -and
 }
 $ConfirmPreference = 'None'
 $WhatIfPreference = $false
-$runId = if ([string]::IsNullOrWhiteSpace($RunId)) {
-    [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ') + '-' + $Scenario
-} else { $RunId }
 $evidence = Join-Path $script:KbpRuntimeEvidenceRoot $runId
 $transactionRecord = Join-Path $script:KbpRuntimeStateRoot "transactions\$runId"
 if ((Test-Path -LiteralPath $evidence) -or (Test-Path -LiteralPath $transactionRecord)) {
@@ -468,8 +490,9 @@ $runFailure = $null
 $runSucceeded = $false
 $result = $null
 try {
+    $sharedMutationStarted = $true
     $statePath = & (Join-Path $PSScriptRoot 'Deploy-Local.ps1') -PackagePath $package -ExpectedPackageSha256 $buildManifest.packageSha256 `
-        -RunId $runId -CompatibilityProfileId $CompatibilityProfileId -LoaderId $LoaderId `
+        -RunId $runId -CompatibilityProfileId $CompatibilityProfileId -LoaderId $LoaderId -ReservationToken $launchLease.token `
         -Confirm:$false | Select-Object -Last 1
     $transactionEntered = $true
     # Final review C2 and its re-review: the saves are read only once this
@@ -607,6 +630,7 @@ try {
     $preexisting = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue | ForEach-Object Id)
     $arguments = @('-applaunch', '640820') + @(Get-KbpDisplayModeArguments -Size $displaySize) +
         @('-kbpRuntimeTestRequest', ('"' + $requestPath + '"'))
+    if (-not (Test-KbpLaunchLease)) { throw $launchLeaseLost }
     [void](Start-Process -FilePath $SteamPath -ArgumentList $arguments -PassThru)
     $process = Wait-KbpNewKingmakerProcess -PreexistingIds $preexisting -TimeoutSeconds $LaunchTimeoutSeconds
     $orchestration.stage = 'waiting-for-result'
@@ -1173,6 +1197,11 @@ finally {
         }
     }
     catch { }
+    # A lost reservation stops every shared cleanup step below (the owner resolves the run).
+    if ($transactionEntered -and -not (Test-KbpLaunchLease)) {
+        $transactionEntered = $false
+        $restoreFailure = "Kingmaker native-test reservation lost; shared cleanup was not attempted: $launchLeaseLost"
+    }
     if ($transactionEntered) {
         if ($null -ne $process) {
             try { [void]$process.WaitForExit(30000) }
@@ -1260,7 +1289,7 @@ finally {
             $restoreFailure = "Mods restoration withheld until the protected saves of $runId are compared (Restore-Local.ps1 -RunId $runId compares, then restores)."
         }
         else {
-            try { & (Join-Path $PSScriptRoot 'Restore-Local.ps1') -RunId $runId -SkipProtectedSaveComparison -Confirm:$false }
+            try { & (Join-Path $PSScriptRoot 'Restore-Local.ps1') -RunId $runId -SkipProtectedSaveComparison -ReservationToken $launchLease.token -Confirm:$false }
             catch {
                 $restoreFailure = "Mods restoration failed for $runId (Restore-Local.ps1 -RunId $runId recovers it once the cause is fixed): " +
                     $_.Exception.Message
@@ -1288,6 +1317,24 @@ finally {
         try { [IO.File]::WriteAllText((Join-Path $evidence 'display-restoration-failure.txt'), $displayFailure + [Environment]::NewLine) }
         catch { Write-Warning "Display restoration failure not recorded: $($_.Exception.Message)" }
     }
+    # The final shared-state observation, under the reservation, then its
+    # release - before the completion record, so that record reflects it.
+    $finalKingmakerExited = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0
+    if ($null -ne $launchLease) {
+        $launchVerified = -not $sharedMutationStarted -or ($finalKingmakerExited -and $null -eq $restoreFailure -and $null -eq $displayFailure -and
+            $null -eq $protectedSaveFailure -and (Test-KbpRunSettled $script:KbpRuntimeStateRoot $runId))
+        $leaseFailure = $null
+        if ($launchVerified) {
+            try { Exit-KbpNativeReservation -RunId $runId -Token $launchLease.token -StateRoot $script:KbpRuntimeStateRoot -Targets $launchTargets }
+            catch { $leaseFailure = 'Kingmaker native-test reservation release failed: ' + $_.Exception.Message }
+        }
+        else { $leaseFailure = "Kingmaker native-test reservation kept for the owner: run $runId is not verified restored (docs/VALIDATION-POLICY.md)." }
+        $launchLeaseSettled = $true
+        Write-Warning $(if ($null -eq $leaseFailure) { "Kingmaker native-test reservation released: $runId" } else { $leaseFailure })
+        if ($null -ne $leaseFailure -and $launchVerified) {
+            $restoreFailure = if ($null -eq $restoreFailure) { $leaseFailure } else { $restoreFailure + ' | ' + $leaseFailure }
+        }
+    }
     # Review RC3: the whole-run terminal record, written last. Game-level
     # success (runtime-result.json) is kept separate: a run is complete
     # only when the harness itself succeeded, Kingmaker exited, the Mods
@@ -1302,7 +1349,7 @@ finally {
                 Get-KbpCompatibilityIdentityDigest $compatibilityProfile -Loader $loaderIdentity } else { $null }
             $completionBinding = if ($null -eq $advancedBinding) { $null } else { [string]$advancedBinding.manifestPath }
             $completionGame = if ($null -ne $result) { [string]$result.status } else { $null }
-            $completionExited = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -eq 0
+            $completionExited = $finalKingmakerExited
             $completionRecord = New-KbpRunCompletionRecord `
                 -RunId $runId -Scenario $Scenario -FixtureFamily $FixtureFamily -ProfileId $CompatibilityProfileId `
                 -CompatibilityIdentity $completionIdentity -AdvancedBindingManifest $completionBinding `
@@ -1362,4 +1409,16 @@ if ($null -ne $completionRecord -and -not [bool]$completionRecord.complete) {
     throw ("Run $runId is not complete: game=$($completionRecord.gameResultStatus) harness=$($completionRecord.harnessSucceeded) " +
         "kingmakerExited=$($completionRecord.kingmakerExited) restored=$($completionRecord.restorationVerified) " +
         "protectedSavesClean=$($completionRecord.protectedSavesClean)")
+}
+}
+finally {
+    # An early refusal or failure before any shared change releases the
+    # reservation; after a shared change it was settled above (or stays for
+    # the owner).
+    if ($null -ne $launchLease -and -not $launchLeaseSettled) {
+        if (-not $sharedMutationStarted) {
+            Exit-KbpNativeReservation -RunId $runId -Token $launchLease.token -StateRoot $script:KbpRuntimeStateRoot -Targets $launchTargets
+        }
+        else { Write-Warning "Kingmaker native-test reservation kept for the owner: run $runId stopped after a shared change." }
+    }
 }

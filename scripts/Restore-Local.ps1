@@ -12,7 +12,10 @@ param(
     [switch]$CloseUnverifiableComparison,
     # Test seams: the lab's own roots unless a test names others.
     [string]$StateRoot,
-    [string]$EvidenceRoot)
+    [string]$EvidenceRoot,
+    # The Kingmaker native-test reservation the public launcher holds for this
+    # run (it keeps and releases it); standalone recovery takes its own.
+    [ValidatePattern('^([0-9a-f]{32})?$')][string]$ReservationToken)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -38,11 +41,54 @@ if ($CloseUnverifiableComparison -and -not $pending) {
     throw "Refusing -CloseUnverifiableComparison: no protected-save comparison of run $RunId is pending."
 }
 if (-not $PSCmdlet.ShouldProcess($RunId, 'restore and hash-verify the exact pre-run Mods state')) { return }
+# Recovery admission, before any registry, display, save-evidence or Mods
+# step (docs/NATIVE-RESERVATION.md): the journal must be valid; the
+# reservation is the launcher's for exactly this run, the journaled one
+# (continued only while the record names this run, token and state root), or,
+# for a finished run or a transaction recorded before this lab took part, a
+# free one taken now. Anything else refuses and leaves everything.
+function Enter-KbpLocalRecoveryLease {
+    $journal = Read-KbpJson $statePath
+    if ($journal.schemaVersion -isnot [int] -or [int]$journal.schemaVersion -ne 1 -or [string]$journal.runId -cne $RunId -or
+        @('Preparing', 'Prepared', 'OriginalMoved', 'Active', 'RestorationFailed', 'Restored') -cnotcontains [string]$journal.status) {
+        throw "Runtime transaction state identity is invalid; recovery admits nothing: $statePath"
+    }
+    $targets = @($StateRoot, $EvidenceRoot, [string](Get-KbpRecordValue $journal 'modsPath'), [string](Get-KbpRecordValue $journal 'originalBackup'),
+        [string](Get-KbpRecordValue $journal 'stagedQuarantine'), [string](Get-KbpRecordValue $journal 'stagingRunRoot'),
+        [string](Get-KbpRecordValue $journal 'lockPath')) | Where-Object { -not [string]::IsNullOrEmpty($_) }
+    $registryFile = Join-Path (Split-Path -Parent $statePath) 'display-registry.json'
+    if ((Get-KbpReservationConvention -Targets $targets).Private -and (Test-Path -LiteralPath $registryFile)) {
+        throw 'A private test reservation is refused for a run that restores a game registry key.'
+    }
+    $journaled = Get-KbpStateReservationToken $journal
+    if (-not [string]::IsNullOrEmpty($ReservationToken)) {
+        if ($journaled -cne $ReservationToken) { throw "Run $RunId's journal does not name the launcher's reservation; nothing was changed." }
+        Assert-KbpNativeReservation -RunId $RunId -Token $ReservationToken -StateRoot $StateRoot -Targets $targets
+        return [pscustomobject]@{ Token = $ReservationToken; Own = $false; Targets = $targets }
+    }
+    if ($null -ne $journaled -and [string]$journal.status -cne 'Restored') {
+        Assert-KbpNativeReservation -RunId $RunId -Token $journaled -StateRoot $StateRoot -Targets $targets
+        return [pscustomobject]@{ Token = $journaled; Own = $true; Targets = $targets }
+    }
+    $fresh = Enter-KbpNativeReservation -RunId $RunId -Purpose 'restore-local' -StateRoot $StateRoot -Targets $targets
+    if ($null -eq $journaled) {
+        $journal | Add-Member -NotePropertyName reservationToken -NotePropertyValue ([string]$fresh.token) -Force
+        Write-KbpJsonAtomic $statePath $journal
+    }
+    return [pscustomobject]@{ Token = [string]$fresh.token; Own = $true; Targets = $targets }
+}
+
+function Get-KbpRecordValue($Record, [string]$Name) {
+    if ($null -eq $Record.PSObject.Properties[$Name]) { return $null }
+    return $Record.$Name
+}
+
 function Invoke-LocalRecovery {
     $transaction = Read-KbpJson $statePath
     if ($RestoreModsOnly -or $null -ne $transaction.PSObject.Properties['modsRecovery']) {
         if ($SkipProtectedSaveComparison -or $CloseUnverifiableComparison) { throw 'Display recovery requires clean save evidence.' }
         . (Join-Path $PSScriptRoot 'RuntimeDisplayRecovery.ps1')
+        $script:KbpRecoveryLease = [pscustomobject]@{ RunId = $RunId; Token = $recoveryLease.Token; StateRoot = $StateRoot; Targets = $recoveryLease.Targets }
         $recovered = Invoke-KbpDisplayRecovery $RunId $StateRoot $EvidenceRoot -ModsOnly:$RestoreModsOnly
         Write-Host "Mods recovery: run=$RunId phase=$($recovered.status) restorationVerified=$($recovered.restorationVerified)"
         return
@@ -133,7 +179,9 @@ if ($pending) {
 }
 # Re-review (harness): a restoration failure never hides a save violation.
 try {
-    $state = Restore-KbpRuntimeTransaction -RunId $RunId -StateRoot $StateRoot
+    $restoreBorrow = @{}
+    if ([string](Read-KbpJson $statePath).status -cne 'Restored') { $restoreBorrow.BorrowedToken = $recoveryLease.Token }
+    $state = Restore-KbpRuntimeTransaction -RunId $RunId -StateRoot $StateRoot @restoreBorrow
 }
 catch {
     if ($null -ne $saveFailure) { throw ($saveFailure + ' | Restoration: ' + $_.Exception.Message) }
@@ -150,7 +198,13 @@ $held = $false
 try {
     try { $held = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $held = $true }
     if (-not $held) { throw "Another restore is active for $RunId." }
+    $recoveryLease = Enter-KbpLocalRecoveryLease
     Invoke-LocalRecovery
+    # Released last, only after the verified recovery left the run settled;
+    # any failure above keeps it for the owner (the launcher releases its own).
+    if ($recoveryLease.Own -and (Test-KbpRunSettled $StateRoot $RunId)) {
+        Exit-KbpNativeReservation -RunId $RunId -Token $recoveryLease.Token -StateRoot $StateRoot -Targets $recoveryLease.Targets
+    }
 } finally {
     if ($held) { $mutex.ReleaseMutex() }
     $mutex.Dispose()

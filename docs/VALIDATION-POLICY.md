@@ -101,3 +101,115 @@ reporting. The publisher still runs its own aggregate and release builds; this
 patch neither supplies a publisher reuse receipt nor claims it consumes one.
 Frozen 0.4.2 evidence remains attributed to its recorded bytes; no new game
 coverage or 0.4.3 qualification is inferred from this workflow patch.
+
+## Kingmaker native-test reservation
+
+Every native-test tool of this lab takes part in the machine-wide Kingmaker
+native-test reservation (`docs/NATIVE-RESERVATION.md`, protocol 1, lab
+identity `KingmakerBuffPlanner`), implemented here on its own in
+`scripts/RuntimeHarness.Common.ps1`. It is a convention, not a dependency: no
+other lab's repository, installation, folders or scripts are needed, and this
+lab acquires and releases it the same way when installed alone.
+
+### The rule (deliberately small; it fails closed)
+
+1. A participating tool acquires the reservation as its first action after
+   argument and WhatIf handling, before any mutable read (saves, installation,
+   display, Steam, run-ID availability, this lab's state), and before this
+   lab's own lock. WhatIf never reserves.
+2. It holds the reservation for its whole process and checks it again before
+   each shared change: before every attempt of a live Mods rename, before the
+   game is launched, before cleanup, before fixture publication, deletion and
+   rollback. A lost, replaced or unreadable record stops the tool there; the
+   new record is left alone and nothing more is changed.
+3. It releases the reservation last - after its lock - and only after its own
+   existing verification succeeded (restoration verified, protected saves
+   compared clean, the run's own lock gone). A refusal or failure before any
+   shared change releases it. Anything unresolved after a shared change keeps
+   it, for the owner.
+4. Nothing is adopted, resumed or reconciled automatically. A record is a
+   reservation whoever wrote it and whether or not its writer still runs.
+
+Ownership binds lab, token, run and state root: a tool borrows the
+reservation only for exactly the run, token and state root its record names,
+and a transaction continues only while its journal names that reservation.
+
+### Participating tools
+
+- `Invoke-KingmakerRuntimeTest.ps1` (single process): reserves first; the
+  in-process `Deploy-Local.ps1` and `Restore-Local.ps1` borrow it for the run
+  (`-ReservationToken`); releases after its final process observation and
+  before the completion record, which carries a release failure.
+- `Deploy-Local.ps1` standalone (and `compatibility\Enter-KingmakerCompatibilityProfile.ps1`):
+  reserves first; the entry journals the token (`reservationToken` in
+  `transaction.json`) and the reservation stays with the active transaction;
+  it is released if the deployment was refused or rolled back verified.
+- `Restore-Local.ps1` (and `compatibility\Restore-KingmakerCompatibilityProfile.ps1`,
+  display recovery): validates the journal (schema, run, a phase this lab
+  writes) before anything, then continues only the journaled reservation
+  (lab, token, run, state root), or takes a free one for a finished run or a
+  transaction recorded before this lab took part; the per-run restore mutex
+  (also held by the entry while it runs) keeps two processes off one run. It
+  releases after the verified recovery left the run settled. Restoration
+  verifies the original Mods tree against its recorded manifest at its current
+  location before every move that would install it.
+- `New-KbpAutomationFixture.ps1` bootstrap, teardown and `-Recover` (single
+  process): reserve first (before reading the save folder), release after the
+  script's own success verification with its fixture lock gone, or when it
+  stopped before changing the save folder.
+
+Not participating, with their data boundaries:
+
+- `Install-Local.ps1` and `Restore-InstallLocal.ps1` install or roll back a
+  release in the owner's own game at the owner's request (they are denied to
+  automated agents): owner activity, not native-test automation.
+- `compatibility\Copy-KbpSealedCompatibilityFixture.ps1` copies verified bytes
+  from this lab's `runtime-backups` into this lab's sealed fixture folder
+  (`examples`); it never writes the live installation or a save.
+- `New-KbpRunAllowance.ps1` writes owner-authorized allowance records into this
+  lab's private `approvals` folder only.
+- `Confirm-KbpProtectedSaveReview.ps1` records the owner's acknowledgement of a
+  protected-save violation in this lab's state; it changes no save.
+- Read-only scripts (`Collect-KbpLiveBootstrapDiagnostics.ps1`, inspectors).
+
+### Owner procedure for a kept reservation
+
+A kept reservation means a run of this lab stopped after a shared change, or
+lost its reservation, or the record is unreadable. Every participating lab
+refuses until it is resolved:
+
+1. Read `%ProgramData%\KingmakerNativeTest\reservation.v1.json` (lab, runId,
+   holderProcessId). If it names another lab, resolve it there.
+2. Make sure no Kingmaker process and no process of that run is still running.
+3. Inspect and settle the run with this lab's existing tools: `Restore-Local.ps1
+   -RunId <run>` for a runtime transaction (it continues the journaled
+   reservation and releases it after a verified recovery); for a fixture run,
+   check the save folder, `runtime-fixture-state\<run>\transaction.json` and
+   `fixture.lock`; review any protected-save violation
+   (`Confirm-KbpProtectedSaveReview.ps1`).
+4. Only when the shared state is verified as intended, delete the record by
+   hand (then, for a fixture run, `New-KbpAutomationFixture.ps1 -Recover -RunId
+   <run>` may roll back its own partial artifacts under a fresh reservation).
+
+### Tests
+
+Offline tests never use the machine-wide reservation. The test seam
+`KBP_TEST_RESERVATION_ROOT` (never set by a production entrypoint) names a
+private reservation folder inside this checkout's
+`artifacts\runtime-harness-tests`; private mode is refused unless every
+mutable target of the operation - including the journal's lock path - lies in
+a harness test root, and a run that restores a game registry key is refused
+in private mode. Tests set it and restore it in `finally`.
+`Test-RuntimeHarness.ps1`, `Test-DisplayModsRecovery.ps1` and
+`Test-LoaderBaseline.ps1` run their transaction cases in such boundaries.
+
+`scripts/Test-NativeReservation.ps1` is the focused gate: separate processes
+run the actual entry, restoration, `Restore-Local.ps1` and fixture scripts
+against disposable stand-ins (arrival orders, simultaneous arrivals, parsing,
+run binding, loss during a blocked move, backup verification, refusal versus
+kept reservations, the per-run mutex, public recovery admission, the fixture
+script, and the launcher's and deployment's order). It runs
+`Test-DisplayModsRecovery.ps1`, `Test-RuntimeHarness.ps1` and the
+loader-baseline transaction cases with their output in the log, and observes
+the machine-wide record before and after. A required case that cannot run
+makes the gate incomplete (exit 2), never a pass.

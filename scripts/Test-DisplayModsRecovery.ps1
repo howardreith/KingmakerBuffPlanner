@@ -28,8 +28,12 @@ function Assert-Refuses([scriptblock]$Action,[string]$Pattern) {
 function Recover { Invoke-KbpDisplayRecovery $id $script:KbpRuntimeStateRoot $script:KbpRuntimeEvidenceRoot -ModsOnly }
 function Finish { Invoke-KbpDisplayRecovery $id $script:KbpRuntimeStateRoot $script:KbpRuntimeEvidenceRoot }
 
-$temp = [IO.Path]::GetTempPath()
+# A disposable boundary inside this checkout's harness test root, with a
+# private Kingmaker native-test reservation per case (restored in finally).
+$temp = Join-Path (Get-KbpRepositoryRoot) 'artifacts\runtime-harness-tests'
+New-Item -ItemType Directory -Path $temp -Force | Out-Null
 $boundary = Join-Path $temp ('kbp-mods-recovery-' + [Guid]::NewGuid().ToString('N'))
+$priorReservationRoot = $env:KBP_TEST_RESERVATION_ROOT
 $original = [pscustomobject]@{ primarySize='1920x1080'; primaryWidth=1920; primaryHeight=1080
     virtualLeft=0; virtualTop=0; virtualWidth=1920; virtualHeight=1080; monitorCount=1 }
 $mismatch = $original.PSObject.Copy()
@@ -43,6 +47,7 @@ try {
         $script:KbpRuntimeEvidenceRoot = Join-Path $script:KbpLabRoot 'evidence'
         $script:KbpRuntimeBackupRoot = Join-Path $script:KbpLabRoot 'backups'
         $script:KbpRuntimeStagingRoot = Join-Path $script:KbpLabRoot 'staging'
+        $env:KBP_TEST_RESERVATION_ROOT = Join-Path $boundary ($case + '-reservation')
         $foreign = Join-Path $script:KbpLabRoot 'foreign.lock'
         $script:KbpForeignRuntimeLeases = @($foreign)
         $id = 'display-test'
@@ -159,6 +164,7 @@ try {
     }
     Write-Host "Display Mods recovery: PASS=$passed FAIL=0"
 } finally {
+    $env:KBP_TEST_RESERVATION_ROOT = $priorReservationRoot
     if ([IO.Path]::GetFullPath($boundary) -ine $boundary -or
         (Split-Path -Parent $boundary) -ine $temp.TrimEnd('\') -or
         (Split-Path -Leaf $boundary) -notmatch '^kbp-mods-recovery-[0-9a-f]{32}$') { throw 'Unsafe fixture cleanup path.' }

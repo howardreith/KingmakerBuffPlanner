@@ -4,6 +4,12 @@ function Assert-KbpDisplayRecoveryOwner($State) {
     Assert-KbpNoForeignRuntimeLease
     Assert-KbpFixtureLockAbsent (Get-KbpDefaultFixtureLockPath $script:KbpRuntimeStateRoot)
     Assert-KbpOwnedLock $State.lockPath $State.runId $State.token
+    # Restore-Local holds the run's Kingmaker native-test reservation; it is
+    # checked again before each recovery move.
+    $lease = Get-Variable -Name KbpRecoveryLease -Scope Script -ValueOnly -ErrorAction SilentlyContinue
+    if ($null -ne $lease) {
+        Assert-KbpNativeReservation -RunId $lease.RunId -Token $lease.Token -StateRoot $lease.StateRoot -Targets $lease.Targets
+    }
 }
 
 function Get-KbpRecoveryManifestDigest($Manifest) {
