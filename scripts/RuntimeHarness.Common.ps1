@@ -783,15 +783,27 @@ function Read-KbpReservationRecord($Convention) {
     return $record
 }
 
-# Whether the record's writer still runs (same PID and start time). Only a
-# conclusive "no such process" or a different start time is "gone"; an
-# inconclusive lookup counts as alive.
+# The record's writer start time as a UTC instant, or $null if unparsable.
+function Get-KbpRecordStartInstant($Record) {
+    $parsed = [DateTime]::MinValue
+    if (-not ($Record.holderStartUtc -is [string]) -or -not [DateTime]::TryParse([string]$Record.holderStartUtc,
+            [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind, [ref]$parsed)) { return $null }
+    return $parsed.ToUniversalTime()
+}
+
+# Whether the record's writer still runs (same PID and start instant). Only a
+# conclusive "no such process" or a different start instant is "gone"; an
+# inconclusive lookup or an unparsable start time counts as alive.
 function Test-KbpReservationHolderAlive($Record) {
     $process = $null
     try { $process = [Diagnostics.Process]::GetProcessById([int]$Record.holderProcessId) }
     catch [ArgumentException] { return $false }
     catch { return $true }
-    try { return $process.StartTime.ToUniversalTime().ToString('o') -ceq [string]$Record.holderStartUtc }
+    try {
+        $recorded = Get-KbpRecordStartInstant $Record
+        if ($null -eq $recorded) { return $true }
+        return $process.StartTime.ToUniversalTime() -eq $recorded
+    }
     catch { return $true }
     finally { $process.Dispose() }
 }
@@ -803,7 +815,8 @@ function Test-KbpOwnRecord($Record, [string]$Token) {
 }
 
 function Test-KbpRecordWriterIsMe($Record) {
-    return [long]$Record.holderProcessId -eq $PID -and [string]$Record.holderStartUtc -ceq (Get-KbpProcessStartUtc)
+    $recorded = Get-KbpRecordStartInstant $Record
+    return [long]$Record.holderProcessId -eq $PID -and $null -ne $recorded -and (Get-Process -Id $PID).StartTime.ToUniversalTime() -eq $recorded
 }
 
 # The first loss of a journaled reservation is kept beside the run (written

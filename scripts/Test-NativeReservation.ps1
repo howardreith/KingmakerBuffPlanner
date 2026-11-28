@@ -370,6 +370,20 @@ try {
         Assert-That ((Get-LeaseHash) -ceq $hash) 'the peer record changed'
     }
 
+    Test-Case 'writer liveness compares start instants (any ISO form), and an unparsable start time counts as alive' {
+        param($case)
+        $start = (Get-Process -Id $PID).StartTime.ToUniversalTime()
+        $sameInstant = [pscustomobject]@{ holderProcessId = $PID; holderStartUtc = $start.ToString('yyyy-MM-ddTHH:mm:ss.fffffff') + '+00:00' }
+        $otherInstant = [pscustomobject]@{ holderProcessId = $PID; holderStartUtc = $start.AddSeconds(-1).ToString('o') }
+        $unparsable = [pscustomobject]@{ holderProcessId = $PID; holderStartUtc = 'not a time' }
+        $gone = [pscustomobject]@{ holderProcessId = (Get-DeadProcessId); holderStartUtc = $start.ToString('o') }
+        Assert-That (Test-KbpReservationHolderAlive $sameInstant) 'the same instant in another ISO form was taken as gone'
+        Assert-That (Test-KbpRecordWriterIsMe $sameInstant) 'this process was not recognized in another ISO form'
+        Assert-That (-not (Test-KbpReservationHolderAlive $otherInstant)) 'a reused PID with another start instant was taken as the writer'
+        Assert-That (Test-KbpReservationHolderAlive $unparsable) 'an unparsable start time was taken as gone'
+        Assert-That (-not (Test-KbpReservationHolderAlive $gone)) 'an exited writer was taken as alive'
+    }
+
     Test-Case 'F1/F6: recovery takes over only its journaled token after the writer exited; live writers refuse; missing or replaced records are incidents' {
         param($case)
         $lab = New-StandInLab $case 'lab'
