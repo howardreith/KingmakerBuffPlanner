@@ -565,7 +565,10 @@ try {
             continue
         }
         $log = Join-Path $LogRoot ("$($check.Name)-$($commit.Substring(0, 12)).log")
-        $output = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "$($check.Name).ps1") 2>&1 | ForEach-Object { "$_" })
+        $priorPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try { $output = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "$($check.Name).ps1") 2>&1 | ForEach-Object { "$_" }) }
+        finally { $ErrorActionPreference = $priorPreference }
         $exit = $LASTEXITCODE
         [IO.File]::WriteAllLines($log, [string[]](@("commit=$commit dirty=$dirty check=$($check.Name)") + $output + @("exit=$exit")))
         $summary = @($output | Where-Object { $_ -like "$($check.Pass)*" }) | Select-Object -Last 1
@@ -578,7 +581,11 @@ try {
     else {
         $report = Join-Path ([IO.Path]::GetTempPath()) ('kbp-loader-report-' + [Guid]::NewGuid().ToString('N') + '.json')
         $loaderLog = [IO.Path]::GetTempFileName()
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-LoaderBaseline.ps1') -ReportPath $report *> $loaderLog
+        # Native stderr is an ErrorRecord in Windows PowerShell 5.1: capture it, do not throw.
+        $priorPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-LoaderBaseline.ps1') -ReportPath $report *> $loaderLog }
+        finally { $ErrorActionPreference = $priorPreference }
         $loaderExit = $LASTEXITCODE
         $cases = @()
         if (Test-Path -LiteralPath $report) { $cases = @((Get-Content -LiteralPath $report -Raw | ConvertFrom-Json).cases); Remove-Item -LiteralPath $report -Force }
