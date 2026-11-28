@@ -6,17 +6,20 @@ param(
 )
 
 # Focused gate for the Kingmaker native-test reservation (protocol 1,
-# docs/NATIVE-RESERVATION.md) as this lab implements it. Every case runs in a
-# disposable boundary inside artifacts\runtime-harness-tests with a private
-# reservation named by KBP_TEST_RESERVATION_ROOT (inherited by every child
-# process); the machine-wide record is only observed, before and after, and
-# must be unchanged. Separate Windows PowerShell processes run the actual entry,
-# restoration, public recovery and fixture scripts. No game, live Mods folder,
-# owner save, lab root or other lab is touched. It then runs the directly
-# affected existing checks with captured, commit-bound logs. PASS/FAIL/NOT RUN
-# lines and a RESULT line; the gate passes only when every required case ran
-# and passed (exit 0); a required case that could not run makes it incomplete
-# (exit 2); any failure exits 1.
+# docs/NATIVE-RESERVATION.md) as this lab implements it: acquire before any
+# mutable read, hold for the whole tool, release last only after the tool's
+# own verification; refuse-before-change releases; anything unresolved stays
+# reserved for the owner. Every case runs in a disposable boundary inside
+# artifacts\runtime-harness-tests with a private reservation named by
+# KBP_TEST_RESERVATION_ROOT (restored in finally); the machine-wide record is
+# only observed, before and after. Separate Windows PowerShell processes run
+# the actual entry, restoration, Restore-Local and fixture scripts. No game,
+# live Mods folder, owner save, lab root or other lab is touched. It then runs
+# the directly affected existing checks (display recovery, runtime harness,
+# and the loader-baseline transaction cases) with captured, commit-bound
+# output. The gate passes only when every required case ran and passed
+# (exit 0); a required case that could not run makes it incomplete (exit 2);
+# any failure exits 1.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'RuntimeAutomation.Common.ps1')
@@ -34,9 +37,7 @@ $fixtureScript = Join-Path $PSScriptRoot 'New-KbpAutomationFixture.ps1'
 $restoreLocal = Join-Path $PSScriptRoot 'Restore-Local.ps1'
 $priorReservationRoot = $env:KBP_TEST_RESERVATION_ROOT
 $script:caseIndex = 0
-$script:case = $null
 
-# The machine-wide record, observed only: its presence and bytes.
 function Get-ProductionLeaseObservation {
     $path = $script:KbpReservationRecordPath
     if (Test-Path -LiteralPath $path -PathType Leaf) { return 'present:' + (Get-KbpSha256 $path) }
@@ -45,11 +46,11 @@ function Get-ProductionLeaseObservation {
 
 function Test-Case([string]$Name, [scriptblock]$Body) {
     $script:caseIndex++
-    $script:case = Join-Path $root ('case' + $script:caseIndex)
-    New-Item -ItemType Directory -Path (Join-Path $script:case 'signals') -Force | Out-Null
-    $env:KBP_TEST_RESERVATION_ROOT = Join-Path $script:case 'reservation'
+    $case = Join-Path $root ('case' + $script:caseIndex)
+    New-Item -ItemType Directory -Path (Join-Path $case 'signals') -Force | Out-Null
+    $env:KBP_TEST_RESERVATION_ROOT = Join-Path $case 'reservation'
     try {
-        & $Body $script:case
+        & $Body $case
         $results.Add("PASS $Name")
     }
     catch { $results.Add("FAIL ${Name}: $($_.Exception.Message)") }
@@ -77,16 +78,12 @@ function Get-LeasePath { return (Join-Path $env:KBP_TEST_RESERVATION_ROOT 'reser
 function Get-LeaseHash { return (Get-KbpSha256 (Get-LeasePath)) }
 function Get-Lease { return (Read-KbpReservationRecord (Get-KbpReservationConvention)) }
 
-# The gate's verdict: complete and passing only when nothing failed and no
-# required case was left not run.
 function Get-GateVerdict([string[]]$Lines) {
     if (@($Lines | Where-Object { $_ -like 'FAIL*' }).Count -gt 0) { return 'fail' }
     if (@($Lines | Where-Object { $_ -like 'NOT RUN*' }).Count -gt 0) { return 'incomplete' }
     if (@($Lines | Where-Object { $_ -like 'PASS*' }).Count -eq 0) { return 'incomplete' }
     return 'pass'
 }
-
-# --- stand-ins ---------------------------------------------------------------
 
 function New-StandInLab([string]$Case, [string]$Name) {
     $lab = Join-Path $Case $Name
@@ -111,20 +108,24 @@ function Get-StandInPackage([string]$Case) {
     return $package
 }
 
-function Get-ModsText([string]$Lab) { return (@(Get-KbpDirectoryManifest (Join-Path $Lab 'game\Mods')) | ConvertTo-Json -Depth 5 -Compress) }
+function Get-ModsText([string]$Lab) {
+    $mods = Join-Path $Lab 'game\Mods'
+    if (-not (Test-Path -LiteralPath $mods)) { return 'absent' }
+    return (@(Get-KbpDirectoryManifest $mods) | ConvertTo-Json -Depth 5 -Compress)
+}
 
-function Enter-InProcess([string]$Case, [string]$Lab, [string]$RunId, [string]$ReservationToken, [scriptblock]$CaptureBaselines) {
+function Enter-InProcess([string]$Case, [string]$Lab, [string]$RunId, [string]$ReservationToken) {
     $arguments = @{ PackagePath = (Get-StandInPackage $Case); KingmakerInstallDir = (Join-Path $Lab 'game')
         StateRoot = (Join-Path $Lab 'state'); StagingRoot = (Join-Path $Lab 'staging'); BackupRoot = (Join-Path $Lab 'backups')
         RunId = $RunId; FixtureMode = $true; KnownKingmakerProcessIds = @(); MoveAttempts = 1; MoveDelayMilliseconds = 0 }
     if ($ReservationToken) { $arguments.ReservationToken = $ReservationToken }
-    if ($CaptureBaselines) { $arguments.CaptureBaselines = $CaptureBaselines }
     return Enter-KbpRuntimeTransaction @arguments
 }
 
-function Restore-InProcess([string]$Lab, [string]$RunId, [switch]$RetainReservation) {
-    return Restore-KbpRuntimeTransaction -RunId $RunId -StateRoot (Join-Path $Lab 'state') -FixtureMode -KnownKingmakerProcessIds @() `
-        -RetainReservation:$RetainReservation
+function Restore-InProcess([string]$Lab, [string]$RunId, [string]$BorrowedToken) {
+    $arguments = @{ RunId = $RunId; StateRoot = (Join-Path $Lab 'state'); FixtureMode = $true; KnownKingmakerProcessIds = @() }
+    if ($BorrowedToken) { $arguments.BorrowedToken = $BorrowedToken }
+    return Restore-KbpRuntimeTransaction @arguments
 }
 
 function Start-Contender([string]$Case, [string]$Action, [string]$Name, [string]$Lab, [string]$RunId, [switch]$Barrier) {
@@ -166,14 +167,6 @@ function Wait-Signal([string]$Case, [string]$Name, [string[]]$What, [int]$Second
     throw "$Name reached none of: $($What -join ', ')"
 }
 
-function Wait-File([string]$Path, [int]$Seconds = 120) {
-    $until = (Get-Date).AddSeconds($Seconds)
-    while (-not (Test-Path -LiteralPath $Path)) {
-        if ((Get-Date) -gt $until) { throw "never appeared: $Path" }
-        Start-Sleep -Milliseconds 100
-    }
-}
-
 function Wait-Status([string]$Lab, [string]$RunId, [string]$Status, [int]$Seconds = 60) {
     $statePath = Join-Path $Lab "state\transactions\$RunId\transaction.json"
     $until = (Get-Date).AddSeconds($Seconds)
@@ -184,33 +177,21 @@ function Wait-Status([string]$Lab, [string]$RunId, [string]$Status, [int]$Second
     throw "run $RunId never reached status $Status"
 }
 
-# Keeps a file open without delete sharing, so the directory holding it cannot
-# be renamed: the actual transaction pauses in its bounded move retry.
 function Hold-File([string]$Path) {
     $handle = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
     $handles.Add($handle)
     return $handle
 }
 
-function Get-DeadProcessId {
-    $process = Start-Process -FilePath (Join-Path $env:WINDIR 'System32\PING.EXE') -ArgumentList @('-n', '1', '127.0.0.1') -WindowStyle Hidden -PassThru
-    [void]$process.WaitForExit(10000)
-    return $process.Id
-}
-
-# A record as another writer would leave it (common fields complete).
-function Set-Lease([string]$Holder, [int]$HolderProcessId, [string]$RunId, [string]$StateRoot = '', [string]$Token = '',
-    [string]$HolderStartUtc = '2020-01-01T00:00:00.0000000Z') {
+function Set-Lease([string]$Holder, [int]$HolderProcessId, [string]$RunId, [string]$StateRoot = '', [string]$Token = '') {
     New-Item -ItemType Directory -Path $env:KBP_TEST_RESERVATION_ROOT -Force | Out-Null
     if (-not $Token) { $Token = [Guid]::NewGuid().ToString('N') }
     $record = [ordered]@{ protocol = 'kingmaker-native-test-reservation/1'; lab = $Holder; runId = $RunId; purpose = 'stand-in'
-        token = $Token; holderProcessId = $HolderProcessId; holderStartUtc = $HolderStartUtc; host = $env:COMPUTERNAME
+        token = $Token; holderProcessId = $HolderProcessId; holderStartUtc = '2020-01-01T00:00:00.0000000Z'; host = $env:COMPUTERNAME
         createdUtc = [DateTime]::UtcNow.ToString('o') }
     if ($StateRoot) { $record.stateRoot = [IO.Path]::GetFullPath($StateRoot).TrimEnd('\') }
     [IO.File]::WriteAllText((Get-LeasePath), ($record | ConvertTo-Json))
 }
-
-function Get-MyStartUtc { return (Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o') }
 
 function New-SeedSaves([string]$SaveRoot) {
     New-Item -ItemType Directory -Path $SaveRoot -Force | Out-Null
@@ -226,16 +207,15 @@ function New-SeedSaves([string]$SaveRoot) {
 }
 
 function Get-TreeText([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return 'absent' }
     return (@(Get-ChildItem -LiteralPath $Path -File -Recurse | Sort-Object FullName | ForEach-Object { $_.FullName + '=' + (Get-KbpSha256 $_.FullName) }) -join "`n")
 }
-
-# --- the cases ---------------------------------------------------------------
 
 $productionBefore = Get-ProductionLeaseObservation
 try {
     New-Item -ItemType Directory -Path $root -Force | Out-Null
 
-    Test-Case 'F11/F12: production convention exact; private mode bounded; mixed shared/private targets refused' {
+    Test-Case 'convention: production values exact; private mode bounded to harness roots; mixed shared/private targets refused (R1-F11)' {
         param($case)
         $saved = $env:KBP_TEST_RESERVATION_ROOT
         $env:KBP_TEST_RESERVATION_ROOT = $null
@@ -247,34 +227,27 @@ try {
             Assert-Throws { Get-KbpReservationConvention } 'is not inside this checkout' 'a private root outside the harness root'
         }
         finally { $env:KBP_TEST_RESERVATION_ROOT = $saved }
-        $private = Get-KbpReservationConvention -Targets @((Join-Path $case 'lab'))
-        Assert-That ($private.Private -and $private.RecordPath -ceq (Get-LeasePath) -and $private.MutexName -cne 'Global\KingmakerNativeTest.Reservation.v1') 'private convention'
+        Assert-That ((Get-KbpReservationConvention -Targets @((Join-Path $case 'lab'))).RecordPath -ceq (Get-LeasePath)) 'private record path'
         Assert-Throws { Get-KbpReservationConvention -Targets @((Join-Path $case 'lab'), $script:KbpRuntimeStateRoot) } 'refused for a shared target' 'mixed targets'
-        $lab = New-StandInLab $case 'lab'
-        Assert-Throws { Enter-KbpRuntimeTransaction -PackagePath (Get-StandInPackage $case) -KingmakerInstallDir (Join-Path $env:ProgramData '.') `
-            -StateRoot (Join-Path $lab 'state') -StagingRoot (Join-Path $lab 'staging') -BackupRoot (Join-Path $lab 'backups') -RunId 'mixed' -FixtureMode -KnownKingmakerProcessIds @() } `
-            'executable is missing' 'entry with a shared game folder (refused before any reservation)'
         $outside = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $contender + '"'),
             '-Action', 'Enter', '-Name', 'outside', '-RunId', 'outside', '-Signals', ('"' + (Join-Path $case 'signals') + '"'), '-LabRoot', ('"' + $env:TEMP + '"'),
             '-PackagePath', ('"' + (Get-StandInPackage $case) + '"')) -WindowStyle Hidden -PassThru
         $processes.Add($outside)
-        Assert-That ($outside.WaitForExit(60000) -and $outside.ExitCode -ne 0) 'a contender outside the harness root was not refused'
-        Assert-That (-not (Test-Path -LiteralPath (Join-Path $case 'signals\outside.active'))) 'the bounded contender entered'
+        Assert-That ($outside.WaitForExit(60000) -and $outside.ExitCode -ne 0 -and -not (Test-Path -LiteralPath (Join-Path $case 'signals\outside.active'))) 'an unbounded contender ran'
     }
 
-    Test-Case 'a lab alone (no peer, no reservation folder yet) enters, holds across the transaction and releases' {
+    Test-Case 'a lab alone (no peer, no reservation folder yet) holds the reservation across processes and releases after verified restoration' {
         param($case)
         $lab = New-StandInLab $case 'alone'
         Assert-That (-not (Test-Path -LiteralPath $env:KBP_TEST_RESERVATION_ROOT)) 'the reservation folder pre-exists'
         $statePath = Enter-InProcess $case $lab 'alone-run'
         $lease = Get-Lease
-        Assert-That ($lease.lab -ceq 'KingmakerBuffPlanner' -and $lease.token -ceq (Read-KbpJson $statePath).reservationToken -and [int]$lease.holderProcessId -eq $PID) 'lease not journaled'
+        Assert-That ($lease.lab -ceq 'KingmakerBuffPlanner' -and $lease.runId -ceq 'alone-run' -and $lease.token -ceq (Read-KbpJson $statePath).reservationToken) 'lease not journaled'
         $restored = Restore-InProcess $lab 'alone-run'
-        Assert-That ($restored.restorationVerified -and $null -ne $restored.PSObject.Properties['reservationReleasedAtUtc']) 'no journaled release'
-        Assert-That (-not (Test-Path -LiteralPath (Get-LeasePath))) 'not released'
+        Assert-That ($restored.restorationVerified -and -not (Test-Path -LiteralPath (Get-LeasePath))) 'not released after verified restoration'
     }
 
-    Test-Case 'two labs exclude each other through the reservation alone, in either arrival order (prepared, active with writer exited, restoring)' {
+    Test-Case 'two labs exclude each other through the reservation alone, in either arrival order (prepared, active after the entry process exited, restoring)' {
         param($case)
         $first = New-StandInLab $case 'lab-one'
         $second = New-StandInLab $case 'lab-two'
@@ -306,8 +279,7 @@ try {
             Assert-That ((Wait-Signal $case "$winner-restore" @('restored', 'refused')).What -ceq 'restored') 'winner restoration failed'
             Assert-That (-not (Test-Path -LiteralPath (Get-LeasePath))) 'winner kept its reservation'
             $after = Start-Contender $case 'Enter' "$loser-after" $loserLab "$loser-after"
-            Assert-That ((Wait-Signal $case "$loser-after" @('active', 'refused')).What -ceq 'active') 'loser not admitted after release'
-            Assert-That ($after.WaitForExit(30000)) 'admitted loser did not exit'
+            Assert-That ((Wait-Signal $case "$loser-after" @('active', 'refused')).What -ceq 'active' -and $after.WaitForExit(30000)) 'loser not admitted after release'
             [void](Restore-InProcess $loserLab "$loser-after")
         }
     }
@@ -337,134 +309,72 @@ try {
         }
     }
 
-    Test-Case 'F12: partial own and non-UTF-8 records refuse byte-identical; a complete peer with another token format is identified and kept' {
+    Test-Case 'parser (R1-F12): incomplete own records, non-UTF-8 and duplicate keys refuse byte-identical; a complete peer with a long spaced token is identified and kept' {
         param($case)
         $lab = New-StandInLab $case 'lab'
         $path = Get-LeasePath
         New-Item -ItemType Directory -Path $env:KBP_TEST_RESERVATION_ROOT -Force | Out-Null
         $stateRoot = [IO.Path]::GetFullPath((Join-Path $lab 'state')).TrimEnd('\').Replace('\', '\\')
-        $common = '"protocol":"kingmaker-native-test-reservation/1","runId":"r","purpose":"p","holderProcessId":4,"holderStartUtc":"2020-01-01T00:00:00.0000000Z","host":"h","createdUtc":"2020-01-01T00:00:00.0000000Z"'
-        $ownTail = ',"lab":"KingmakerBuffPlanner","token":"0123456789abcdef0123456789abcdef","stateRoot":"' + $stateRoot + '"}'
+        $own = '{"protocol":"kingmaker-native-test-reservation/1","lab":"KingmakerBuffPlanner","runId":"r","token":"0123456789abcdef0123456789abcdef","holderProcessId":4,"holderStartUtc":"2020-01-01T00:00:00.0000000Z","stateRoot":"' + $stateRoot + '"}'
         $bad = @(
-            ('{' + $common.Replace(',"purpose":"p"', '') + $ownTail),
-            ('{' + $common.Replace(',"host":"h"', '') + $ownTail),
-            ('{' + $common.Replace(',"createdUtc":"2020-01-01T00:00:00.0000000Z"', '') + $ownTail),
-            ('{' + $common + $ownTail.Replace('0123456789abcdef0123456789abcdef', 'not-a-hex-token')),
-            ('{' + $common + $ownTail.Replace(',"stateRoot":"' + $stateRoot + '"', '')),
-            ('{' + $common.Replace('kingmaker-native-test-reservation/1', 'Kingmaker-Native-Test-Reservation/1') + $ownTail))
+            $own.Replace(',"token":"0123456789abcdef0123456789abcdef"', ''),
+            $own.Replace(',"holderProcessId":4', ''),
+            $own.Replace('"holderProcessId":4', '"holderProcessId":0'),
+            $own.Replace(',"holderStartUtc":"2020-01-01T00:00:00.0000000Z"', ''),
+            $own.Replace(',"stateRoot":"' + $stateRoot + '"', ''),
+            $own.Replace('0123456789abcdef0123456789abcdef', 'NOT-HEX'),
+            $own.Replace('kingmaker-native-test-reservation/1', 'Kingmaker-Native-Test-Reservation/1'),
+            $own.Replace('"lab":"KingmakerBuffPlanner"', '"lab":"KingmakerFlight","lab":"KingmakerBuffPlanner"'),
+            $own.Replace('"token":"0123456789abcdef0123456789abcdef"', '"token":"ffffffffffffffffffffffffffffffff","token":"0123456789abcdef0123456789abcdef"'))
         foreach ($text in $bad) {
             [IO.File]::WriteAllText($path, $text)
             $hash = Get-LeaseHash
-            Assert-Throws { Enter-InProcess $case $lab 'x' } 'malformed or of an unknown protocol' "a partial or case-changed record was accepted: $text"
+            Assert-Throws { Enter-InProcess $case $lab 'x' } 'malformed or of an unknown protocol' "accepted: $text"
             Assert-That ((Get-LeaseHash) -ceq $hash) 'a refused record changed'
         }
-        foreach ($bytes in @([Text.Encoding]::Unicode.GetBytes('{' + $common + $ownTail), [byte[]](0x7B, 0xFF, 0xFE, 0x7D))) {
+        foreach ($bytes in @([Text.Encoding]::Unicode.GetBytes($own), [byte[]](0x7B, 0xFF, 0xFE, 0x7D))) {
             [IO.File]::WriteAllBytes($path, $bytes)
             $hash = Get-LeaseHash
             Assert-Throws { Enter-InProcess $case $lab 'x' } 'malformed or of an unknown protocol' 'a non-UTF-8 record was accepted'
             Assert-That ((Get-LeaseHash) -ceq $hash) 'a non-UTF-8 record changed'
         }
-        [IO.File]::WriteAllText($path, '{' + $common + ',"lab":"KingmakerFlight","token":"Flt-7f3a2b1c-Base64+/=="}')
+        $peerToken = ('a1 ' * 100).Trim()
+        [IO.File]::WriteAllText($path, '{"protocol":"kingmaker-native-test-reservation/1","lab":"Some Peer Lab","runId":"r","token":"' + $peerToken + '","holderProcessId":4,"holderStartUtc":"whenever"}')
         $hash = Get-LeaseHash
-        Assert-Throws { Enter-InProcess $case $lab 'x' } 'reserved by KingmakerFlight run r' 'a valid peer record was not identified'
+        Assert-Throws { Enter-InProcess $case $lab 'x' } 'reserved by Some Peer Lab run r' 'a valid peer record was not identified'
         Assert-That ((Get-LeaseHash) -ceq $hash) 'the peer record changed'
     }
 
-    Test-Case 'writer liveness compares start instants (any ISO form), and an unparsable start time counts as alive' {
-        param($case)
-        $start = (Get-Process -Id $PID).StartTime.ToUniversalTime()
-        $sameInstant = [pscustomobject]@{ holderProcessId = $PID; holderStartUtc = $start.ToString('yyyy-MM-ddTHH:mm:ss.fffffff') + '+00:00' }
-        $otherInstant = [pscustomobject]@{ holderProcessId = $PID; holderStartUtc = $start.AddSeconds(-1).ToString('o') }
-        $unparsable = [pscustomobject]@{ holderProcessId = $PID; holderStartUtc = 'not a time' }
-        $gone = [pscustomobject]@{ holderProcessId = (Get-DeadProcessId); holderStartUtc = $start.ToString('o') }
-        Assert-That (Test-KbpReservationHolderAlive $sameInstant) 'the same instant in another ISO form was taken as gone'
-        Assert-That (Test-KbpRecordWriterIsMe $sameInstant) 'this process was not recognized in another ISO form'
-        Assert-That (-not (Test-KbpReservationHolderAlive $otherInstant)) 'a reused PID with another start instant was taken as the writer'
-        Assert-That (Test-KbpReservationHolderAlive $unparsable) 'an unparsable start time was taken as gone'
-        Assert-That (-not (Test-KbpReservationHolderAlive $gone)) 'an exited writer was taken as alive'
-    }
-
-    Test-Case 'F1/F6: recovery takes over only its journaled token after the writer exited; live writers refuse; missing or replaced records are incidents' {
+    Test-Case 'binding (R2-F9): a forwarded token admits only its own run and state root; a restoration continues only the journaled reservation; foreign, missing or unreadable leases refuse and leave everything' {
         param($case)
         $lab = New-StandInLab $case 'lab'
-        $peer = New-StandInLab $case 'peer'
-        $labState = Join-Path $lab 'state'
-        Set-Lease 'KingmakerBuffPlanner' (Get-DeadProcessId) 'crashed' $labState
-        $hash = Get-LeaseHash
-        Assert-Throws { Enter-InProcess $case $lab 'after-crash' } 'reserved by KingmakerBuffPlanner run crashed' 'entry over an orphan record'
-        Assert-That ((Get-LeaseHash) -ceq $hash) 'the orphan changed'
-        $incidentDir = Join-Path $case 'incident'; New-Item -ItemType Directory -Path $incidentDir -Force | Out-Null
-        $token = (Get-Lease).token
-        Set-Lease 'KingmakerBuffPlanner' $PID 'live' $labState $token
-        $claimed = Enter-KbpNativeReservation -RunId 'live' -Purpose 'test' -StateRoot $labState -RecoverToken $token
-        Assert-That ($claimed.token -ceq $token) 'self recovery'
-        $child = Start-ScriptChild $case 'claim-live' (Join-Path $case 'claim.ps1') @{}
-        [IO.File]::WriteAllText((Join-Path $case 'claim.ps1'), ('. ' + (Quote (Join-Path $PSScriptRoot 'RuntimeHarness.Common.ps1')) +
-            '; [void](Enter-KbpNativeReservation -RunId live -Purpose test -StateRoot ' + (Quote $labState) + ' -RecoverToken ' + (Quote $token) + ')'))
-        $child = Start-ScriptChild $case 'claim-live2' (Join-Path $case 'claim.ps1') @{}
-        $outcome = Wait-Signal $case 'claim-live2' @('done', 'refused')
-        Assert-That ($outcome.What -ceq 'refused' -and $outcome.Text -like "*still held by its live process $PID*") "a live writer was taken over: $($outcome.Text)"
-        $hash = Get-LeaseHash
-        Set-Lease 'KingmakerBuffPlanner' (Get-DeadProcessId) 'dead' $labState $token
-        $taken = Enter-KbpNativeReservation -RunId 'dead' -Purpose 'test' -StateRoot $labState -RecoverToken $token
-        Assert-That ($taken.token -ceq $token -and [int](Get-Lease).holderProcessId -eq $PID) 'a dead writer''s token was not taken over with the same token'
-        Assert-Throws { [void](Enter-KbpNativeReservation -RunId 'dead' -Purpose 'test' -StateRoot (Join-Path $peer 'state') -RecoverToken $token) } 'lost its Kingmaker native-test reservation' 'recovery from another state root'
-        Set-Lease 'KingmakerMountedCombat' 4 'kmc'
-        $hash = Get-LeaseHash
-        Assert-Throws { [void](Enter-KbpNativeReservation -RunId 'dead' -Purpose 'test' -StateRoot $labState -RecoverToken $token -IncidentDirectory $incidentDir) } 'lost its Kingmaker native-test reservation' 'recovery over a replaced record'
-        Assert-That ((Get-LeaseHash) -ceq $hash -and (Test-Path -LiteralPath (Join-Path $incidentDir 'reservation-incident.json'))) 'replaced record changed or no incident'
-        $first = Get-KbpSha256 (Join-Path $incidentDir 'reservation-incident.json')
-        Remove-Item -LiteralPath (Get-LeasePath) -Force
-        Assert-Throws { [void](Enter-KbpNativeReservation -RunId 'dead' -Purpose 'test' -StateRoot $labState -RecoverToken $token -IncidentDirectory $incidentDir) } 'now: no record' 'recovery over a missing record'
-        Assert-That ((Get-KbpSha256 (Join-Path $incidentDir 'reservation-incident.json')) -ceq $first) 'the first incident was replaced'
-    }
-
-    Test-Case 'F6: public Restore-Local admits before any save, registry or Mods change (foreign legacy lease, live entry writer, two same-run recoverers, Mods-only route)' {
-        param($case)
-        $lab = New-StandInLab $case 'lab'
-        $labState = Join-Path $lab 'state'; $labEvidence = Join-Path $lab 'evidence'
-        # A transaction recorded before this lab took part, with a pending protected-save comparison, under a peer's reservation.
-        [void](Enter-InProcess $case $lab 'legacy')
-        $statePath = Join-Path $labState 'transactions\legacy\transaction.json'
-        $state = Read-KbpJson $statePath
-        Remove-Item -LiteralPath (Get-LeasePath) -Force
-        $state.PSObject.Properties.Remove('reservationToken'); Write-KbpJsonAtomic $statePath $state
-        $saveRoot = Join-Path $case 'saves'; New-SeedSaves $saveRoot
-        $baseline = Save-KbpProtectedSaveBaseline -TransactionDirectory (Split-Path -Parent $statePath) -RunId 'legacy' -Scenario 'live-cast-qual' `
-            -FixtureFamily 'Automation' -WorkingFileName 'Manual_2_KBP_AUTOMATION_WORKING.zks' -SaveRoot $saveRoot -Snapshot (Get-KbpSaveFolderSnapshot -SaveRoot $saveRoot)
-        Set-Lease 'KingmakerWakingRune' 4 'wr'
-        $leaseHash = Get-LeaseHash; $labTree = Get-TreeText $lab
-        foreach ($route in @(@(), @('-RestoreModsOnly'))) {
-            $routeArgs = @{ RunId = 'legacy'; StateRoot = $labState; EvidenceRoot = $labEvidence; Confirm = $false }
-            if ($route.Count) { $routeArgs.RestoreModsOnly = $true }
-            Assert-Throws { & $restoreLocal @routeArgs } 'reserved by KingmakerWakingRune run wr' "Restore-Local $($route -join ' ') under a foreign lease"
-            Assert-That ((Get-LeaseHash) -ceq $leaseHash -and (Get-TreeText $lab) -ceq $labTree -and -not [bool](Read-KbpJson $baseline).compared) 'a refused recovery changed something'
+        $other = New-StandInLab $case 'other'
+        $lease = Enter-KbpNativeReservation -RunId 'run-a' -Purpose 'test' -StateRoot (Join-Path $lab 'state')
+        Assert-Throws { Enter-InProcess $case $lab 'run-b' $lease.token } 'does not hold its Kingmaker native-test reservation' 'a token borrowed for another run'
+        Assert-Throws { Enter-InProcess $case $other 'run-a' $lease.token } 'does not hold its Kingmaker native-test reservation' 'a token borrowed for another state root'
+        Assert-That (@(Get-ChildItem -LiteralPath (Join-Path $lab 'state') -Force).Count -eq 0 -and @(Get-ChildItem -LiteralPath (Join-Path $other 'state') -Force).Count -eq 0) 'a refused borrower created work'
+        [void](Enter-InProcess $case $lab 'run-a' $lease.token)
+        Assert-That ((Get-Lease).token -ceq $lease.token) 'the borrowed reservation changed'
+        Assert-Throws { Restore-InProcess $lab 'run-a' ([Guid]::NewGuid().ToString('N')) } 'does not name the caller' 'a restoration with another borrowed token'
+        $live = Get-ModsText $lab
+        foreach ($replacement in @('foreign', 'missing', 'unreadable')) {
+            $saved = [IO.File]::ReadAllBytes((Get-LeasePath))
+            switch ($replacement) {
+                'foreign' { Set-Lease 'KingmakerWakingRune' 4 'wr' }
+                'missing' { Remove-Item -LiteralPath (Get-LeasePath) -Force }
+                'unreadable' { [IO.File]::WriteAllText((Get-LeasePath), '{ not json') }
+            }
+            $hash = if (Test-Path -LiteralPath (Get-LeasePath)) { Get-LeaseHash } else { 'absent' }
+            Assert-Throws { Restore-InProcess $lab 'run-a' } 'does not hold its Kingmaker native-test reservation' "restoration under a $replacement lease"
+            Assert-That ((Get-ModsText $lab) -ceq $live -and $(if (Test-Path -LiteralPath (Get-LeasePath)) { Get-LeaseHash } else { 'absent' }) -ceq $hash) "the $replacement lease case changed something"
+            [IO.File]::WriteAllBytes((Get-LeasePath), $saved)
         }
-        Remove-Item -LiteralPath (Get-LeasePath) -Force
-        # A live entry writer (this process) refuses recovery from another process before any change.
-        [void](Enter-InProcess $case (New-StandInLab $case 'lab2') 'writer')
-        $lab2 = Join-Path $case 'lab2'
-        $tree2 = Get-TreeText $lab2
-        [void](Start-ScriptChild $case 'recover-live' $restoreLocal @{ RunId = 'writer'; StateRoot = (Join-Path $lab2 'state'); EvidenceRoot = (Join-Path $lab2 'evidence') })
-        $outcome = Wait-Signal $case 'recover-live' @('done', 'refused')
-        Assert-That ($outcome.What -ceq 'refused' -and $outcome.Text -like "*still held by its live process $PID*" -and (Get-TreeText $lab2) -ceq $tree2) "recovery under a live writer: $($outcome.Text)"
-        [void](Restore-InProcess $lab2 'writer')
-        # Two same-run recoverers: the second refuses while the first is inside its (held) move.
-        $lab3 = New-StandInLab $case 'lab3'
-        $entry = Start-Contender $case 'Enter' 'entry3' $lab3 'run3'
-        Assert-That ((Wait-Signal $case 'entry3' @('active', 'refused')).What -ceq 'active' -and $entry.WaitForExit(30000)) 'entry3 failed'
-        $hold = Hold-File (Join-Path $lab3 'game\Mods\KingmakerBuffPlanner\Info.json')
-        $r1 = Start-ScriptChild $case 'recover-a' $restoreLocal @{ RunId = 'run3'; StateRoot = (Join-Path $lab3 'state'); EvidenceRoot = (Join-Path $lab3 'evidence') }
-        Start-Sleep -Milliseconds 2500
-        $r2 = Start-ScriptChild $case 'recover-b' $restoreLocal @{ RunId = 'run3'; StateRoot = (Join-Path $lab3 'state'); EvidenceRoot = (Join-Path $lab3 'evidence') }
-        $second = Wait-Signal $case 'recover-b' @('done', 'refused')
-        Assert-That ($second.What -ceq 'refused' -and ($second.Text -like '*Another restore is active*' -or $second.Text -like '*still held by its live process*')) "a second same-run recoverer was admitted: $($second.Text)"
-        $hold.Dispose()
-        Assert-That ((Wait-Signal $case 'recover-a' @('done', 'refused')).What -ceq 'done') 'the first recoverer failed'
-        Assert-That (-not (Test-Path -LiteralPath (Get-LeasePath))) 'the recovered run kept its reservation'
+        $restored = Restore-InProcess $lab 'run-a' $lease.token
+        Assert-That ($restored.restorationVerified -and (Get-Lease).token -ceq $lease.token) 'a borrowing restoration released the caller''s reservation'
+        Exit-KbpNativeReservation -RunId 'run-a' -Token $lease.token -StateRoot (Join-Path $lab 'state')
     }
 
-    Test-Case 'F7: a lease replaced during a blocked Mods move stops the restoration at the next boundary; a lease removed before release fails it durably' {
+    Test-Case 'loss during a blocked move (R1-F7): the next attempt stops before moving; the replacement stays; the reservation is not released' {
         param($case)
         $lab = New-StandInLab $case 'lab'
         $entry = Start-Contender $case 'Enter' 'e' $lab 'moving'
@@ -473,244 +383,37 @@ try {
         [void](Start-Contender $case 'Restore' 'r' $lab 'moving')
         [void](Wait-Signal $case 'r' @('restoring'))
         Start-Sleep -Milliseconds 2500
+        $live = Get-ModsText $lab
         Set-Lease 'KingmakerFlight' 4 'flight-took-over'
         $replacement = Get-LeaseHash
         $hold.Dispose()
         $outcome = Wait-Signal $case 'r' @('restored', 'refused')
-        Assert-That ($outcome.What -ceq 'refused' -and $outcome.Text -like '*lost its Kingmaker native-test reservation*') "restoration went on: $($outcome.Text)"
-        Assert-That ((Get-LeaseHash) -ceq $replacement) 'the replacement record changed'
-        Assert-That (-not (Test-Path -LiteralPath (Join-Path $lab 'game\Mods')) -and (Test-Path -LiteralPath (Join-Path $lab 'backups\moving\Mods.original'))) 'a shared change followed the loss'
-        $incident = Get-Content -LiteralPath (Join-Path $lab 'state\transactions\moving\reservation-incident.json') -Raw | ConvertFrom-Json
-        Assert-That ($incident.progress -like '*staged Mods moved to quarantine*' -and $incident.observed -like '*KingmakerFlight*') "incident: $($incident | ConvertTo-Json -Compress)"
-        # Removed immediately before the final release (a fresh private boundary: the replacement above stays as evidence).
-        $env:KBP_TEST_RESERVATION_ROOT = Join-Path $case 'reservation2'
-        $lab2 = New-StandInLab $case 'lab2'
-        [void](Enter-InProcess $case $lab2 'release')
-        $restored = Restore-InProcess $lab2 'release' -RetainReservation
-        Assert-That ($restored.restorationVerified -and (Test-Path -LiteralPath (Get-LeasePath))) 'the retained reservation is gone'
-        Remove-Item -LiteralPath (Get-LeasePath) -Force
-        Assert-Throws { [void](Complete-KbpRunReservation -StateRoot (Join-Path $lab2 'state') -RunId 'release' -Token $restored.reservationToken) } 'could not release' 'release of a removed lease'
-        Assert-That ($null -eq (Read-KbpJson (Join-Path $lab2 'state\transactions\release\transaction.json')).PSObject.Properties['reservationReleasedAtUtc']) 'a failed release was journaled as done'
-        Assert-That (Test-Path -LiteralPath (Join-Path $lab2 'state\transactions\release\reservation-incident.json')) 'no incident for the failed release'
+        Assert-That ($outcome.What -ceq 'refused' -and $outcome.Text -like '*does not hold its Kingmaker native-test reservation*') "restoration went on: $($outcome.Text)"
+        Assert-That ((Get-LeaseHash) -ceq $replacement -and (Get-ModsText $lab) -ceq $live -and (Test-Path -LiteralPath (Join-Path $lab 'backups\moving\Mods.original'))) 'a move happened after the loss'
     }
 
-    Test-Case 'F8: a lock left after the Restored write keeps the reservation until a retry reconciles it; a lock the entry could not release keeps it' {
+    Test-Case 'backup verification (R1-F9): a missing or mismatched original refuses before any move, in the active and the resumed layout; the failed run keeps its reservation' {
         param($case)
-        $lab = New-StandInLab $case 'lab'
-        $statePath = Enter-InProcess $case $lab 'reconcile'
-        $state = Read-KbpJson $statePath
-        $restored = Restore-InProcess $lab 'reconcile' -RetainReservation
-        New-KbpOwnedLock (Join-Path $lab 'state\deployment.lock') 'reconcile' $state.token
-        Assert-That (-not (Complete-KbpRunReservation -StateRoot (Join-Path $lab 'state') -RunId 'reconcile' -Token $restored.reservationToken)) 'released with the lock present'
-        Assert-Throws { Enter-InProcess $case (New-StandInLab $case 'peer') 'peer' } 'reserved by KingmakerBuffPlanner run reconcile' 'a peer while the lock is unreconciled'
-        $again = Restore-InProcess $lab 'reconcile'
-        Assert-That (-not (Test-Path -LiteralPath (Join-Path $lab 'state\deployment.lock')) -and -not (Test-Path -LiteralPath (Get-LeasePath)) -and
-            $null -ne $again.PSObject.Properties['reservationReleasedAtUtc']) 'the retry did not reconcile the lock and release'
-        # Lock-removal failure during admission (the confirmation fails and cannot remove the new lock).
-        $lab2 = New-StandInLab $case 'lab2'
-        function Confirm-KbpLockedWithoutForeignLease { throw 'injected confirmation failure; its lock could not be removed' }
-        try { Assert-Throws { Enter-InProcess $case $lab2 'stuck' } 'could not release its own lock' 'entry whose lock removal failed' }
-        finally { Remove-Item -LiteralPath Function:\Confirm-KbpLockedWithoutForeignLease }
-        Assert-That ((Get-Lease).runId -ceq 'stuck') 'the reservation was released ahead of the stuck lock'
-    }
-
-    Test-Case 'F9: a missing or mismatched original backup refuses before the live Mods moves; an unavailable launcher baseline stops the entry with Mods untouched' {
-        param($case)
-        foreach ($damage in @('missing', 'mismatch')) {
-            $lab = New-StandInLab $case "lab-$damage"
-            [void](Enter-InProcess $case $lab $damage)
-            $backup = Join-Path $lab "backups\$damage\Mods.original"
-            if ($damage -ceq 'missing') { [IO.Directory]::Move($backup, (Join-Path $lab 'moved-away')) }
+        foreach ($layout in @('active-missing', 'active-mismatch', 'resumed-mismatch')) {
+            $env:KBP_TEST_RESERVATION_ROOT = Join-Path $case "reservation-$layout"
+            $lab = New-StandInLab $case "lab-$layout"
+            $statePath = Enter-InProcess $case $lab 'run'
+            $backup = Join-Path $lab 'backups\run\Mods.original'
+            if ($layout -ceq 'resumed-mismatch') {
+                [IO.Directory]::Move((Join-Path $lab 'game\Mods'), (Join-Path $lab 'backups\run\Mods.staged'))
+                $state = Read-KbpJson $statePath; $state.status = 'RestorationFailed'; Write-KbpJsonAtomic $statePath $state
+            }
+            if ($layout -ceq 'active-missing') { [IO.Directory]::Move($backup, (Join-Path $lab 'moved-away')) }
             else { [IO.File]::AppendAllText((Join-Path $backup 'Existing\Info.json'), 'altered') }
             $live = Get-ModsText $lab
-            Assert-Throws { Restore-InProcess $lab $damage } $(if ($damage -ceq 'missing') { 'backup is missing' } else { 'does not match the recorded original manifest' }) "restore with a $damage backup"
-            Assert-That ((Get-ModsText $lab) -ceq $live -and (Test-Path -LiteralPath (Join-Path $lab 'game\Mods\.kbp-runtime-sentinel.json'))) "the live Mods changed with a $damage backup"
-            Assert-That ((Get-Lease).runId -ceq $damage) 'the refused restoration released'
-            Remove-Item -LiteralPath (Get-LeasePath) -Force
+            $backupText = Get-TreeText $backup
+            Assert-Throws { Restore-InProcess $lab 'run' } $(if ($layout -ceq 'active-missing') { 'backup is missing' } else { 'does not match the recorded original manifest' }) "restore ($layout)"
+            Assert-That ((Get-ModsText $lab) -ceq $live -and (Get-TreeText $backup) -ceq $backupText) "something moved ($layout)"
+            Assert-That ((Get-Lease).runId -ceq 'run') "the failed restoration released ($layout)"
         }
-        $lab = New-StandInLab $case 'lab-baseline'
-        $before = Get-ModsText $lab
-        Assert-Throws { Enter-InProcess $case $lab 'baseline' -CaptureBaselines { param($dir) throw 'stand-in baseline unavailable' } } 'stand-in baseline unavailable' 'entry with an unavailable baseline'
-        Assert-That ((Get-ModsText $lab) -ceq $before -and -not (Test-Path -LiteralPath (Join-Path $lab 'game\Mods\KingmakerBuffPlanner'))) 'the live Mods changed'
-        Assert-That (-not (Test-Path -LiteralPath (Get-LeasePath))) 'the rolled-back entry kept its reservation'
     }
 
-    Test-Case 'F10: an unfinished preparation rollback or a string-valued marker keeps the reservation through resolution' {
-        param($case)
-        $lab = New-StandInLab $case 'lab'
-        [void](Enter-InProcess $case $lab 'prep')
-        $evidence = Join-Path $lab 'evidence\prep'; New-Item -ItemType Directory -Path $evidence -Force | Out-Null
-        $working = Join-Path $case 'Manual_2_KBP_AUTOMATION_WORKING.zks'
-        [IO.File]::WriteAllText($working, 'original')
-        $originalSha = Get-KbpSha256 $working
-        [IO.File]::WriteAllText($working, 'changed by the preparation')
-        Write-KbpJsonAtomic (Join-Path $evidence 'heroism-preparation-transaction.json') ([ordered]@{ schemaVersion = 1; runId = 'prep'; status = 'BackedUp'
-            workingPath = $working; backupPath = (Join-Path $evidence 'heroism-working-before.zks'); originalSha256 = $originalSha })
-        $restored = Restore-InProcess $lab 'prep'
-        Assert-That ($restored.restorationVerified -and (Get-Lease).runId -ceq 'prep') 'released over an unfinished preparation'
-        Assert-Throws { Enter-InProcess $case (New-StandInLab $case 'peer') 'peer' } 'reserved by KingmakerBuffPlanner run prep' 'a peer during the unfinished preparation'
-        [IO.File]::WriteAllText($working, 'original')
-        $baselinePath = Join-Path $lab 'state\transactions\prep\protected-saves-before.json'
-        [IO.File]::WriteAllText($baselinePath, '{"runId":"prep","compared":"false"}')
-        [void](Restore-InProcess $lab 'prep')
-        Assert-That ((Get-Lease).runId -ceq 'prep') 'released on a string-valued completion marker'
-        [IO.File]::WriteAllText($baselinePath, '{"runId":"prep","compared":true}')
-        [void](Restore-InProcess $lab 'prep')
-        Assert-That (-not (Test-Path -LiteralPath (Get-LeasePath))) 'not released once every obligation was settled'
-    }
-
-    Test-Case 'F5: the launcher reserves before its first write, reads admission inputs under the lease, carries it through entry and restoration and releases after its last observation' {
-        param($case)
-        $lab = New-StandInLab $case 'lab'
-        $labState = Join-Path $lab 'state'
-        $targets = @($labState, (Join-Path $lab 'staging'), (Join-Path $lab 'backups'), (Join-Path $lab 'evidence'), (Join-Path $lab 'game'))
-        $inputs = [ordered]@{ savePair = 'pair-1'; loader = 'loader-1'; display = $null }
-        $observed = @{}
-        $read = { $observed.lease = Get-Lease; $observed.count = [int]$observed.count + 1; $inputs }
-        Set-Lease 'KingmakerFlight' 4 'peer-run'
-        Assert-Throws { [void](Enter-KbpLaunchReservation -RunId 'L' -StateRoot $labState -Targets $targets -ReadInputs $read -PreflightDigest (Get-KbpAdmissionDigest $inputs)) } 'reserved by KingmakerFlight' 'a launch under a peer'
-        Assert-That ([int]$observed.count -eq 0 -and @(Get-ChildItem -LiteralPath $labState -Force).Count -eq 0) 'a refused launch read inputs or wrote transaction work'
-        Remove-Item -LiteralPath (Get-LeasePath) -Force
-        Assert-Throws { [void](Enter-KbpLaunchReservation -RunId 'L' -StateRoot $labState -Targets $targets -ReadInputs $read -PreflightDigest 'stale') } 'admission inputs changed' 'a launch whose inputs changed'
-        Assert-That (-not (Test-Path -LiteralPath (Get-LeasePath)) -and @(Get-ChildItem -LiteralPath $labState -Force).Count -eq 0) 'a refused launch kept its reservation or wrote work'
-        $admission = Enter-KbpLaunchReservation -RunId 'L' -StateRoot $labState -Targets $targets -ReadInputs $read -PreflightDigest (Get-KbpAdmissionDigest $inputs)
-        Assert-That ($observed.lease.token -ceq $admission.Lease.token -and [int]$observed.lease.holderProcessId -eq $PID) 'admission inputs were read outside the lease'
-        [void](Enter-InProcess $case $lab 'L' -ReservationToken $admission.Lease.token)
-        $restored = Restore-InProcess $lab 'L' -RetainReservation
-        Assert-That ($restored.restorationVerified -and (Get-Lease).token -ceq $admission.Lease.token) 'the launcher lost its reservation at restoration'
-        $peer = New-StandInLab $case 'peer'
-        $early = Start-Contender $case 'Enter' 'peer-early' $peer 'peer-early'
-        Assert-That ((Wait-Signal $case 'peer-early' @('active', 'refused')).What -ceq 'refused') 'a peer entered before the launcher''s final observation'
-        Assert-That (Complete-KbpLaunchReservation -RunId 'L' -StateRoot $labState -Token $admission.Lease.token -Targets $targets) 'the launcher did not release'
-        $late = Start-Contender $case 'Enter' 'peer-late' $peer 'peer-late'
-        Assert-That ((Wait-Signal $case 'peer-late' @('active', 'refused')).What -ceq 'active' -and $late.WaitForExit(30000)) 'the peer was not admitted after the release'
-        [void](Restore-InProcess $peer 'peer-late')
-        # The launcher's own order (source): WhatIf return, then reservation, then the first write, entry with the lease and the
-        # baseline capture, restoration retaining it, and release after the completion record's last observation.
-        $text = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Invoke-KingmakerRuntimeTest.ps1'))
-        $at = @{
-            whatIf = $text.IndexOf("Write-Host 'Runtime WhatIf preflight PASS")
-            reserve = $text.IndexOf('$launchAdmission = Enter-KbpLaunchReservation')
-            evidence = $text.IndexOf('New-Item -ItemType Directory -Path $evidence | Out-Null')
-            deploy = $text.IndexOf('-ReservationToken $launchToken')
-            restore = $text.IndexOf('-SkipProtectedSaveComparison -RetainReservation')
-            record = $text.IndexOf('$completionExited = @(Get-Process -Name Kingmaker')
-            release = $text.IndexOf('$launchReleased = Complete-KbpLaunchReservation') }
-        Assert-That ($at.whatIf -gt 0 -and $at.reserve -gt $at.whatIf -and $at.evidence -gt $at.reserve -and $at.deploy -gt $at.evidence -and
-            $at.restore -gt $at.deploy -and $at.record -gt $at.restore -and $at.release -gt $at.record) "launcher order: $($at | ConvertTo-Json -Compress)"
-    }
-
-    $gameRunning = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -ne 0
-    $fixtureCases = @('F1/F2: fixture -Recover refuses a live bootstrap, makes missing/replaced leases incidents, and resumes across interruptions',
-        'F3: a delayed fixture caller cannot act on inputs chosen before admission',
-        'F4: fixture verification finishes under both guards; protected-save drift keeps the incident, lock and reservation')
-    if ($gameRunning) {
-        foreach ($name in $fixtureCases) { $results.Add("NOT RUN ${name}: a Kingmaker process is running (the fixture script checks for a real game)") }
-    }
-    else {
-    Test-Case $fixtureCases[0] {
-        param($case)
-        $saveRoot = Join-Path $case 'saves'; New-SeedSaves $saveRoot
-        $state = Join-Path $case 'fixture-state'; $archive = Join-Path $case 'archive'; $signals = Join-Path $case 'signals'
-        $boot = @{ RunId = 'boot'; SaveRoot = $saveRoot; StateRoot = $state; ArchiveRoot = $archive; TestPauseAt = 'FinalComparison'; TestSignalRoot = $signals }
-        $bootstrap = Start-ScriptChild $case 'boot' $fixtureScript $boot
-        Wait-File (Join-Path $signals 'paused-FinalComparison')
-        $savesText = Get-TreeText $saveRoot; $lockHash = Get-KbpSha256 (Join-Path $state 'fixture.lock'); $leaseHash = Get-LeaseHash
-        $recover = @{ RunId = 'boot'; SaveRoot = $saveRoot; StateRoot = $state }
-        [void](Start-ScriptChild $case 'recover-live' $fixtureScript $recover @('Recover'))
-        $outcome = Wait-Signal $case 'recover-live' @('done', 'refused')
-        Assert-That ($outcome.What -ceq 'refused' -and $outcome.Text -like '*still held by its live process*') "recovery over a live bootstrap: $($outcome.Text)"
-        Assert-That ((Get-TreeText $saveRoot) -ceq $savesText -and (Get-KbpSha256 (Join-Path $state 'fixture.lock')) -ceq $lockHash -and (Get-LeaseHash) -ceq $leaseHash) 'the refused recovery changed state'
-        # The bootstrap is interrupted (its process ends at the final comparison).
-        $bootstrap.Kill(); [void]$bootstrap.WaitForExit(10000)
-        $original = [IO.File]::ReadAllBytes((Get-LeasePath))
-        Set-Lease 'KingmakerWakingRune' 4 'wr'
-        $replacement = Get-LeaseHash; $savesText = Get-TreeText $saveRoot
-        [void](Start-ScriptChild $case 'recover-replaced' $fixtureScript $recover @('Recover'))
-        $outcome = Wait-Signal $case 'recover-replaced' @('done', 'refused')
-        Assert-That ($outcome.What -ceq 'refused' -and $outcome.Text -like '*lost its Kingmaker native-test reservation*') "recovery over a replaced lease: $($outcome.Text)"
-        Assert-That ((Get-LeaseHash) -ceq $replacement -and (Get-TreeText $saveRoot) -ceq $savesText -and (Test-Path -LiteralPath (Join-Path $state 'boot\reservation-incident.json'))) 'replaced lease: state changed or no incident'
-        Remove-Item -LiteralPath (Get-LeasePath) -Force
-        [void](Start-ScriptChild $case 'recover-missing' $fixtureScript $recover @('Recover'))
-        $outcome = Wait-Signal $case 'recover-missing' @('done', 'refused')
-        Assert-That ($outcome.What -ceq 'refused' -and $outcome.Text -like '*now: no record*' -and (Get-TreeText $saveRoot) -ceq $savesText) "recovery over a missing lease: $($outcome.Text)"
-        Assert-That ((Get-Content -LiteralPath (Join-Path $state 'boot\reservation-incident.json') -Raw) -like '*KingmakerWakingRune*') 'the first incident was replaced'
-        [IO.File]::WriteAllBytes((Get-LeasePath), $original)   # the owner puts the run's own record back
-        $recoverAdopted = $recover.Clone(); $recoverAdopted.FailAfterRecoveryStep = 'Adopted'
-        [void](Start-ScriptChild $case 'recover-adopted' $fixtureScript $recoverAdopted @('Recover'))
-        Assert-That ((Wait-Signal $case 'recover-adopted' @('done', 'refused')).Text -like '*after the recovery took over*') 'no interruption after adoption'
-        $recoverLock = $recover.Clone(); $recoverLock.FailAfterRecoveryStep = 'LockRemoved'
-        [void](Start-ScriptChild $case 'recover-lock' $fixtureScript $recoverLock @('Recover'))
-        Assert-That ((Wait-Signal $case 'recover-lock' @('done', 'refused')).Text -like '*after the recovery removed the fixture lock*') 'no interruption after lock removal'
-        Assert-That (-not (Test-Path -LiteralPath (Join-Path $state 'fixture.lock')) -and (Test-Path -LiteralPath (Get-LeasePath))) 'the reservation went before the lock'
-        [void](Start-ScriptChild $case 'recover-final' $fixtureScript $recover @('Recover'))
-        Assert-That ((Wait-Signal $case 'recover-final' @('done', 'refused')).What -ceq 'done') 'the final release was not resumed'
-        Assert-That (-not (Test-Path -LiteralPath (Get-LeasePath)) -and @(Get-ChildItem -LiteralPath $saveRoot -Filter '*KBP_AUTOMATION_BASELINE*').Count -eq 0 -and
-            (Test-Path -LiteralPath (Join-Path $saveRoot 'Manual_400_PlayerCampaign.zks')) -and
-            $null -ne (Read-KbpJson (Join-Path $state 'boot\transaction.json')).PSObject.Properties['reservationReleasedAtUtc']) 'recovery did not finish cleanly'
-    }
-
-    Test-Case $fixtureCases[1] {
-        param($case)
-        $saveRoot = Join-Path $case 'saves'; New-SeedSaves $saveRoot
-        $state = Join-Path $case 'fixture-state'; $signals = Join-Path $case 'signals'
-        $delayed = Start-ScriptChild $case 'delayed' $fixtureScript @{ RunId = 'delayed'; SaveRoot = $saveRoot; StateRoot = $state; ArchiveRoot = (Join-Path $case 'archive-b')
-            TestPauseAt = 'BeforeAdmission'; TestSignalRoot = $signals }
-        Wait-File (Join-Path $signals 'paused-BeforeAdmission')
-        & $fixtureScript -RunId 'first' -SaveRoot $saveRoot -StateRoot $state -ArchiveRoot (Join-Path $case 'archive-a') -Confirm:$false | Out-Null
-        $pair = Get-TreeText $saveRoot
-        [IO.File]::WriteAllText((Join-Path $signals 'resume-BeforeAdmission'), 'go')
-        $outcome = Wait-Signal $case 'delayed' @('done', 'refused')
-        Assert-That ($outcome.What -ceq 'refused' -and ($outcome.Text -like '*Existing KBP_AUTOMATION artifact*' -or $outcome.Text -like '*inputs changed*')) "the delayed bootstrap went on: $($outcome.Text)"
-        Assert-That ((Get-TreeText $saveRoot) -ceq $pair -and -not (Test-Path -LiteralPath (Get-LeasePath)) -and -not (Test-Path -LiteralPath (Join-Path $state 'fixture.lock'))) 'the first run''s pair changed or ownership leaked'
-        # A teardown refuses a pair whose identity changed before its admission.
-        Remove-Item -LiteralPath (Join-Path $signals 'resume-BeforeAdmission'), (Join-Path $signals 'paused-BeforeAdmission') -Force
-        [void](Start-ScriptChild $case 'teardown' $fixtureScript @{ RunId = 'td'; SaveRoot = $saveRoot; StateRoot = $state; ArchiveRoot = (Join-Path $case 'archive-a')
-            TestPauseAt = 'BeforeAdmission'; TestSignalRoot = $signals } @('Teardown'))
-        Wait-File (Join-Path $signals 'paused-BeforeAdmission')
-        $baselinePath = @(Get-ChildItem -LiteralPath $saveRoot -Filter '*KBP_AUTOMATION_BASELINE*')[0].FullName
-        $zip = [IO.Compression.ZipFile]::Open($baselinePath, [IO.Compression.ZipArchiveMode]::Update)
-        try { $writer = [IO.StreamWriter]::new($zip.CreateEntry('drift.txt').Open()); try { $writer.Write('changed before admission') } finally { $writer.Dispose() } } finally { $zip.Dispose() }
-        $changedPair = Get-TreeText $saveRoot
-        [IO.File]::WriteAllText((Join-Path $signals 'resume-BeforeAdmission'), 'go')
-        $outcome = Wait-Signal $case 'teardown' @('done', 'refused')
-        Assert-That ($outcome.What -ceq 'refused' -and $outcome.Text -like '*Sealed baseline hash drifted*') "teardown acted on a changed pair: $($outcome.Text)"
-        Assert-That ((Get-TreeText $saveRoot) -ceq $changedPair -and -not (Test-Path -LiteralPath (Get-LeasePath)) -and -not (Test-Path -LiteralPath (Join-Path $state 'fixture.lock'))) 'the refused teardown deleted or kept ownership'
-    }
-
-    Test-Case $fixtureCases[2] {
-        param($case)
-        $saveRoot = Join-Path $case 'saves'; New-SeedSaves $saveRoot
-        $state = Join-Path $case 'fixture-state'; $signals = Join-Path $case 'signals'
-        & $fixtureScript -RunId 'pair' -SaveRoot $saveRoot -StateRoot $state -ArchiveRoot (Join-Path $case 'archive') -Confirm:$false | Out-Null
-        [void](Start-ScriptChild $case 'teardown' $fixtureScript @{ RunId = 'td'; SaveRoot = $saveRoot; StateRoot = $state; ArchiveRoot = (Join-Path $case 'archive')
-            TestPauseAt = 'FinalComparison'; TestSignalRoot = $signals } @('Teardown'))
-        Wait-File (Join-Path $signals 'paused-FinalComparison')
-        Assert-Throws { [void](Enter-KbpNativeReservation -RunId 'contender' -Purpose 'test' -StateRoot (Join-Path $case 'other-state')) } 'reserved by KingmakerBuffPlanner run td' 'a contender during the final comparison'
-        [IO.File]::AppendAllText((Join-Path $saveRoot 'Manual_400_PlayerCampaign.zks'), 'owner change')
-        [IO.File]::WriteAllText((Join-Path $signals 'resume-FinalComparison'), 'go')
-        $outcome = Wait-Signal $case 'teardown' @('done', 'refused')
-        Assert-That ($outcome.What -ceq 'refused' -and $outcome.Text -like '*touched a protected save*') "teardown passed over drift: $($outcome.Text)"
-        Assert-That ((Test-Path -LiteralPath (Join-Path $state 'teardown-incident-td.json')) -and (Test-Path -LiteralPath (Join-Path $state 'fixture.lock')) -and (Get-Lease).runId -ceq 'td') 'the teardown drift did not keep the incident, lock and reservation'
-        # Bootstrap drift.
-        $saveRoot2 = Join-Path $case 'saves2'; New-SeedSaves $saveRoot2
-        $state2 = Join-Path $case 'fixture-state2'
-        $env:KBP_TEST_RESERVATION_ROOT = Join-Path $case 'reservation2'
-        Remove-Item -LiteralPath (Join-Path $signals 'paused-FinalComparison'), (Join-Path $signals 'resume-FinalComparison') -Force
-        [void](Start-ScriptChild $case 'boot' $fixtureScript @{ RunId = 'boot'; SaveRoot = $saveRoot2; StateRoot = $state2; ArchiveRoot = (Join-Path $case 'archive2')
-            TestPauseAt = 'FinalComparison'; TestSignalRoot = $signals })
-        Wait-File (Join-Path $signals 'paused-FinalComparison')
-        [IO.File]::AppendAllText((Join-Path $saveRoot2 'Manual_400_PlayerCampaign.zks'), 'owner change')
-        [IO.File]::WriteAllText((Join-Path $signals 'resume-FinalComparison'), 'go')
-        $outcome = Wait-Signal $case 'boot' @('done', 'refused')
-        $journal = Read-KbpJson (Join-Path $state2 'boot\transaction.json')
-        Assert-That ($outcome.What -ceq 'refused' -and @($journal.protectedSaveDrift) -contains 'Manual_400_PlayerCampaign.zks' -and [string]$journal.status -ceq 'RolledBack') "bootstrap drift: $($outcome.Text)"
-        Assert-That (@(Get-ChildItem -LiteralPath $saveRoot2 -Filter '*KBP_AUTOMATION_BASELINE*').Count -eq 0 -and (Test-Path -LiteralPath (Join-Path $state2 'fixture.lock')) -and
-            (Get-Lease).runId -ceq 'boot' -and (Test-Path -LiteralPath (Join-Path $state2 'boot\protected-save-incident.json'))) 'the bootstrap drift did not keep the incident, lock and reservation after cleanup'
-    }
-    }
-
-    Test-Case 'refused and failed entries release their own reservation, so another contender is admitted' {
+    Test-Case 'refusals before any shared change release; a failure after one keeps the reservation for the owner' {
         param($case)
         $lab = New-StandInLab $case 'lab'
         New-KbpOwnedLock (Join-Path $lab 'state\deployment.lock') 'stale' 'token'
@@ -724,10 +427,126 @@ try {
         $peer = New-StandInLab $case 'peer'
         $process = Start-Contender $case 'Enter' 'after-refusal' $peer 'after-refusal'
         Assert-That ((Wait-Signal $case 'after-refusal' @('active', 'refused')).What -ceq 'active' -and $process.WaitForExit(30000)) 'no contender admitted after the releases'
-        [void](Restore-InProcess $peer 'after-refusal')
+        Assert-That ((Get-Lease).runId -ceq 'after-refusal') 'the active transaction does not hold the reservation'
     }
 
-    Test-Case 'F13: the gate verdict is incomplete when a required case is not run, and failing on any failure' {
+    Test-Case 'a separate Restore-Local cannot interleave with an entry still running for the same run (per-run mutex)' {
+        param($case)
+        $lab = New-StandInLab $case 'lab'
+        $hold = Hold-File (Join-Path $lab 'game\Mods\Existing\Info.json')
+        $entry = Start-Contender $case 'Enter' 'slow' $lab 'slow'
+        Wait-Status $lab 'slow' 'Prepared'
+        [void](Start-ScriptChild $case 'restore-early' $restoreLocal @{ RunId = 'slow'; StateRoot = (Join-Path $lab 'state'); EvidenceRoot = (Join-Path $lab 'evidence') })
+        $outcome = Wait-Signal $case 'restore-early' @('done', 'refused')
+        Assert-That ($outcome.What -ceq 'refused' -and $outcome.Text -like '*Another restore is active*') "a restoration interleaved with the entry: $($outcome.Text)"
+        $hold.Dispose()
+        Assert-That ((Wait-Signal $case 'slow' @('active', 'refused')).What -ceq 'active' -and $entry.WaitForExit(30000)) 'the entry failed'
+        [void](Start-ScriptChild $case 'restore-late' $restoreLocal @{ RunId = 'slow'; StateRoot = (Join-Path $lab 'state'); EvidenceRoot = (Join-Path $lab 'evidence') })
+        Assert-That ((Wait-Signal $case 'restore-late' @('done', 'refused')).What -ceq 'done' -and -not (Test-Path -LiteralPath (Get-LeasePath))) 'the standalone continuation did not restore and release'
+    }
+
+    Test-Case 'public Restore-Local admits before any change: a peer''s lease refuses the ordinary and the Mods-only route; a journal it does not know refuses' {
+        param($case)
+        $lab = New-StandInLab $case 'lab'
+        $labState = Join-Path $lab 'state'; $labEvidence = Join-Path $lab 'evidence'
+        [void](Enter-InProcess $case $lab 'legacy')
+        $statePath = Join-Path $labState 'transactions\legacy\transaction.json'
+        $state = Read-KbpJson $statePath
+        Remove-Item -LiteralPath (Get-LeasePath) -Force
+        $state.PSObject.Properties.Remove('reservationToken'); Write-KbpJsonAtomic $statePath $state
+        $saveRoot = Join-Path $case 'saves'; New-SeedSaves $saveRoot
+        $baseline = Save-KbpProtectedSaveBaseline -TransactionDirectory (Split-Path -Parent $statePath) -RunId 'legacy' -Scenario 'live-cast-qual' `
+            -FixtureFamily 'Automation' -WorkingFileName 'Manual_2_KBP_AUTOMATION_WORKING.zks' -SaveRoot $saveRoot -Snapshot (Get-KbpSaveFolderSnapshot -SaveRoot $saveRoot)
+        Set-Lease 'KingmakerWakingRune' 4 'wr'
+        $leaseHash = Get-LeaseHash; $labTree = Get-TreeText $lab
+        foreach ($modsOnly in @($false, $true)) {
+            $routeArgs = @{ RunId = 'legacy'; StateRoot = $labState; EvidenceRoot = $labEvidence; Confirm = $false }
+            if ($modsOnly) { $routeArgs.RestoreModsOnly = $true }
+            Assert-Throws { & $restoreLocal @routeArgs } 'reserved by KingmakerWakingRune run wr' "Restore-Local (Mods only: $modsOnly) under a peer's lease"
+            Assert-That ((Get-LeaseHash) -ceq $leaseHash -and (Get-TreeText $lab) -ceq $labTree -and -not [bool](Read-KbpJson $baseline).compared) 'a refused recovery changed something'
+        }
+        $state = Read-KbpJson $statePath; $state.status = 'Deployed'; Write-KbpJsonAtomic $statePath $state
+        Remove-Item -LiteralPath (Get-LeasePath) -Force
+        $labTree = Get-TreeText $lab
+        Assert-Throws { & $restoreLocal -RunId 'legacy' -StateRoot $labState -EvidenceRoot $labEvidence -Confirm:$false } 'identity is invalid' 'Restore-Local over an unknown phase'
+        Assert-That ((Get-TreeText $lab) -ceq $labTree -and -not (Test-Path -LiteralPath (Get-LeasePath))) 'an invalid journal admitted something'
+    }
+
+    $gameRunning = @(Get-Process -Name Kingmaker -ErrorAction SilentlyContinue).Count -ne 0
+    $fixtureCase = 'fixture script: reserves before any read, refuses under a held reservation, releases after verified success, keeps it after a failure that changed the saves; -Recover is refused while it is kept'
+    if ($gameRunning) { $results.Add("NOT RUN ${fixtureCase}: a Kingmaker process is running (the fixture script checks for a real game)") }
+    else {
+    Test-Case $fixtureCase {
+        param($case)
+        $saveRoot = Join-Path $case 'saves'; New-SeedSaves $saveRoot
+        $state = Join-Path $case 'fixture-state'
+        Set-Lease 'KingmakerFlight' 4 'flight'
+        $savesText = Get-TreeText $saveRoot
+        Assert-Throws { & $fixtureScript -RunId 'held' -SaveRoot $saveRoot -StateRoot $state -ArchiveRoot (Join-Path $case 'archive-held') -Confirm:$false | Out-Null } 'reserved by KingmakerFlight run flight' 'bootstrap under a held reservation'
+        Assert-That ((Get-TreeText $saveRoot) -ceq $savesText -and -not (Test-Path -LiteralPath $state)) 'the refused bootstrap read into or changed state'
+        Remove-Item -LiteralPath (Get-LeasePath) -Force
+        & $fixtureScript -RunId 'boot' -SaveRoot $saveRoot -StateRoot $state -ArchiveRoot (Join-Path $case 'archive') -Confirm:$false | Out-Null
+        Assert-That (-not (Test-Path -LiteralPath (Get-LeasePath))) 'a verified bootstrap kept its reservation'
+        & $fixtureScript -RunId 'td' -Teardown -SaveRoot $saveRoot -StateRoot $state -ArchiveRoot (Join-Path $case 'archive') -Confirm:$false | Out-Null
+        Assert-That (-not (Test-Path -LiteralPath (Get-LeasePath)) -and @(Get-ChildItem -LiteralPath $saveRoot -Filter '*KBP_AUTOMATION_BASELINE*').Count -eq 0) 'a verified teardown kept its reservation'
+        Assert-Throws { & $fixtureScript -RunId 'fail' -SaveRoot $saveRoot -StateRoot $state -ArchiveRoot (Join-Path $case 'archive-fail') -FailAfterStage 'Published' -Confirm:$false | Out-Null } 'Injected failure after stage Published' 'injected failure after publication'
+        Assert-That ((Get-Lease).runId -ceq 'fail') 'a failure after changing the saves released the reservation'
+        $leaseHash = Get-LeaseHash
+        Assert-Throws { & $fixtureScript -RunId 'fail' -Recover -SaveRoot $saveRoot -StateRoot $state -Confirm:$false | Out-Null } 'reserved by KingmakerBuffPlanner run fail' 'recovery while the reservation is kept'
+        Assert-That ((Get-LeaseHash) -ceq $leaseHash) 'the kept reservation changed'
+        $text = [IO.File]::ReadAllText($fixtureScript)
+        $leaseAt = $text.IndexOf('$fixtureLease = Enter-KbpNativeReservation')
+        Assert-That ($leaseAt -gt 0 -and $leaseAt -lt $text.IndexOf('function Assert-KbpFixtureGameClosed') -and $text.IndexOf("if (-not [bool]`$WhatIfPreference) {") -lt $leaseAt -and
+            $leaseAt -lt $text.IndexOf("Get-ChildItem -LiteralPath `$SaveRoot")) 'the fixture script does not reserve before its first mutable read'
+    }
+    }
+
+    Test-Case 'launcher and standalone deployment (R1-F5, R2-F2, R2-F6): reserve before every mutable read and the run-ID check, never under WhatIf; borrow for the run; check before launch and cleanup; release after the final observation and before the completion record' {
+        param($case)
+        $text = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Invoke-KingmakerRuntimeTest.ps1'))
+        $at = [ordered]@{
+            guard = $text.IndexOf('if (-not $requestedWhatIf) {')
+            reserve = $text.IndexOf('$launchLease = Enter-KbpNativeReservation')
+            display = $text.IndexOf('$admissionDisplaySnapshot = Get-KbpSessionDisplaySnapshot')
+            loader = $text.IndexOf('$installedLoader = Assert-KbpInstallationPreflight')
+            saves = $text.IndexOf('Get-KbpDisposableSavePair -Family $FixtureFamily')
+            steamSafety = $text.IndexOf('$steamSafety = Assert-KbpSteamSafety')
+            runIdCheck = $text.IndexOf('throw "Runtime run ID is already present and cannot be reused')
+            deploy = $text.IndexOf('-ReservationToken $launchLease.token `')
+            launchCheck = $text.IndexOf('if (-not (Test-KbpLaunchLease)) { throw $launchLeaseLost }')
+            steam = $text.IndexOf('[void](Start-Process -FilePath $SteamPath')
+            cleanupCheck = $text.IndexOf('if ($transactionEntered -and -not (Test-KbpLaunchLease)) {')
+            restore = $text.IndexOf('-SkipProtectedSaveComparison -ReservationToken $launchLease.token')
+            observe = $text.IndexOf('$finalKingmakerExited = @(Get-Process -Name Kingmaker')
+            release = $text.IndexOf('Exit-KbpNativeReservation -RunId $runId -Token $launchLease.token')
+            record = $text.IndexOf('$completionRecord = New-KbpRunCompletionRecord') }
+        $keys = @($at.Keys)
+        for ($i = 1; $i -lt $keys.Count; $i++) {
+            Assert-That ($at[$keys[$i - 1]] -ge 0 -and $at[$keys[$i]] -gt $at[$keys[$i - 1]]) "launcher order: $($keys[$i - 1]) ($($at[$keys[$i - 1]])) before $($keys[$i]) ($($at[$keys[$i]]))"
+        }
+        Assert-That ($text.Contains('$completionExited = $finalKingmakerExited')) 'the completion record does not use the final observation made under the reservation'
+        $deploy = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Deploy-Local.ps1'))
+        $deployReserve = $deploy.IndexOf('$deployLease = Enter-KbpNativeReservation')
+        Assert-That ($deployReserve -gt $deploy.IndexOf('if (-not $requestedWhatIf -and [string]::IsNullOrEmpty($ReservationToken)) {') -and
+            $deployReserve -lt $deploy.IndexOf("validate-package.ps1") -and $deployReserve -lt $deploy.IndexOf('Assert-KbpInstallationPreflight')) 'standalone deployment reads before reserving'
+    }
+
+    Test-Case 'Test-KbpRunSettled requires affirmative, typed evidence' {
+        param($case)
+        $state = Join-Path $case 'state'
+        New-Item -ItemType Directory -Path (Join-Path $state 'transactions\r') -Force | Out-Null
+        Assert-That (Test-KbpRunSettled $state 'none') 'a run with no work is unsettled'
+        $path = Join-Path $state 'transactions\r\transaction.json'
+        foreach ($case2 in @(@{ status = 'Active'; restorationVerified = $false; expect = $false }, @{ status = 'Restored'; restorationVerified = 'true'; expect = $false },
+                @{ status = 'Restored'; restorationVerified = $true; expect = $true })) {
+            Write-KbpJsonAtomic $path ([ordered]@{ status = $case2.status; restorationVerified = $case2.restorationVerified })
+            Assert-That ((Test-KbpRunSettled $state 'r') -eq $case2.expect) "settled for $($case2 | ConvertTo-Json -Compress)"
+        }
+        New-KbpOwnedLock (Join-Path $state 'deployment.lock') 'r' 't'
+        Assert-That (-not (Test-KbpRunSettled $state 'r')) 'a run with its own lock is settled'
+    }
+
+    Test-Case 'the gate verdict is incomplete when a required case is not run, and failing on any failure (R1-F13)' {
         param($case)
         Assert-That ((Get-GateVerdict @('PASS a', 'PASS b')) -ceq 'pass') 'complete run'
         Assert-That ((Get-GateVerdict @('PASS a', 'NOT RUN b: a Kingmaker process is running')) -ceq 'incomplete') 'a skipped required case passed'
@@ -735,8 +554,8 @@ try {
         Assert-That ((Get-GateVerdict @()) -ceq 'incomplete') 'an empty run passed'
     }
 
-    # --- F15/F11: the directly affected existing checks, each in its own process with its own private reservation
-    #     boundary, with commit-bound captured logs.
+    # --- the directly affected existing checks, each in its own process and private boundary, with their output in
+    #     this log and a commit-bound copy under artifacts\review-logs.
     New-Item -ItemType Directory -Path $LogRoot -Force | Out-Null
     $package = Join-Path $repo ('artifacts\local-runtime\' + (Get-KbpVersion) + '\KingmakerBuffPlanner-' + (Get-KbpVersion) + '-local-runtime.zip')
     foreach ($check in @(@{ Name = 'Test-DisplayModsRecovery'; Pass = 'Display Mods recovery: PASS=16 FAIL=0'; Needs = $null },
@@ -746,13 +565,33 @@ try {
             continue
         }
         $log = Join-Path $LogRoot ("$($check.Name)-$($commit.Substring(0, 12)).log")
-        $header = "commit=$commit dirty=$dirty check=$($check.Name) startedUtc=$([DateTime]::UtcNow.ToString('o'))"
         $output = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "$($check.Name).ps1") 2>&1 | ForEach-Object { "$_" })
         $exit = $LASTEXITCODE
-        [IO.File]::WriteAllLines($log, [string[]](@($header) + $output + @("exit=$exit finishedUtc=$([DateTime]::UtcNow.ToString('o'))")))
+        [IO.File]::WriteAllLines($log, [string[]](@("commit=$commit dirty=$dirty check=$($check.Name)") + $output + @("exit=$exit")))
         $summary = @($output | Where-Object { $_ -like "$($check.Pass)*" }) | Select-Object -Last 1
-        if ($exit -eq 0 -and $summary) { $results.Add("PASS affected existing check $($check.Name): $summary (log $log)") }
+        if ($exit -eq 0 -and $summary) { $results.Add("PASS affected existing check $($check.Name): $summary") }
         else { $results.Add("FAIL affected existing check $($check.Name): exit $exit (log $log)") }
+    }
+    # Loader-baseline (R1-F15): it tests the committed HEAD through a clone; the transaction cases are this change's
+    # affected cases and must all pass. Its other cases (package and installed-loader checks) are reported as they are.
+    if ($dirty) { $results.Add('NOT RUN affected loader-baseline transaction cases: the worktree is not clean (the suite tests committed HEAD)') }
+    else {
+        $report = Join-Path ([IO.Path]::GetTempPath()) ('kbp-loader-report-' + [Guid]::NewGuid().ToString('N') + '.json')
+        $loaderLog = [IO.Path]::GetTempFileName()
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-LoaderBaseline.ps1') -ReportPath $report *> $loaderLog
+        $loaderExit = $LASTEXITCODE
+        $cases = @()
+        if (Test-Path -LiteralPath $report) { $cases = @((Get-Content -LiteralPath $report -Raw | ConvertFrom-Json).cases); Remove-Item -LiteralPath $report -Force }
+        Copy-Item -LiteralPath $loaderLog -Destination (Join-Path $LogRoot ("Test-LoaderBaseline-$($commit.Substring(0, 12)).log")) -Force
+        Remove-Item -LiteralPath $loaderLog -Force
+        foreach ($loaderCase in $cases) { Write-Host ("LOADER {0} {1} :: {2}" -f $(if ($loaderCase.passed) { 'PASS' } else { 'FAIL' }), $loaderCase.name, $loaderCase.detail) }
+        $transactionCases = @($cases | Where-Object { [string]$_.name -like 'transaction-*' })
+        $transactionFailed = @($transactionCases | Where-Object { -not $_.passed })
+        $otherFailed = @($cases | Where-Object { [string]$_.name -notlike 'transaction-*' -and -not $_.passed })
+        if ($transactionCases.Count -ge 6 -and $transactionFailed.Count -eq 0) {
+            $results.Add("PASS affected loader-baseline transaction cases: $($transactionCases.Count)/$($transactionCases.Count) (suite exit $loaderExit; other failing cases: $(@($otherFailed | ForEach-Object { $_.name }) -join ', '))")
+        }
+        else { $results.Add("FAIL affected loader-baseline transaction cases: $($transactionFailed.Count) failed of $($transactionCases.Count) (suite exit $loaderExit)") }
     }
 }
 finally {

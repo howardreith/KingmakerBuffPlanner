@@ -29,8 +29,7 @@ function Recover { Invoke-KbpDisplayRecovery $id $script:KbpRuntimeStateRoot $sc
 function Finish { Invoke-KbpDisplayRecovery $id $script:KbpRuntimeStateRoot $script:KbpRuntimeEvidenceRoot }
 
 # A disposable boundary inside this checkout's harness test root, with a
-# private Kingmaker native-test reservation per case (inherited by any child
-# process); the machine-wide reservation is never touched.
+# private Kingmaker native-test reservation per case (restored in finally).
 $temp = Join-Path (Get-KbpRepositoryRoot) 'artifacts\runtime-harness-tests'
 New-Item -ItemType Directory -Path $temp -Force | Out-Null
 $boundary = Join-Path $temp ('kbp-mods-recovery-' + [Guid]::NewGuid().ToString('N'))

@@ -38,6 +38,7 @@ $base = Join-Path $temp 'clone with space'
 $inputs = Join-Path $temp 'inputs'
 New-Item -ItemType Directory -Path $inputs -Force | Out-Null
 $cases = [Collections.Generic.List[object]]::new()
+$priorReservationRoot = $env:KBP_TEST_RESERVATION_ROOT
 
 function ConvertTo-PlainText($Records) { return (@($Records | ForEach-Object { "$_" }) -join "`n") }
 function Invoke-Isolated([string[]]$Arguments) {
@@ -451,9 +452,8 @@ try {
     $harness = Join-Path $base 'scripts\RuntimeHarness.Common.ps1'
     # Inside the clone's harness test root, with a private Kingmaker
     # native-test reservation there (inherited by the isolated child
-    # processes); the machine-wide reservation is never touched.
+    # processes; restored in the finally below).
     $fixtureRoot = Join-Path $base 'artifacts\runtime-harness-tests\transaction fixture'
-    $priorReservationRoot = $env:KBP_TEST_RESERVATION_ROOT
     $env:KBP_TEST_RESERVATION_ROOT = Join-Path $base 'artifacts\runtime-harness-tests\reservation'
     $txRoots = @('state', 'staging', 'backups') | ForEach-Object { $d = Join-Path $fixtureRoot $_; New-Item -ItemType Directory -Path $d -Force | Out-Null; $d }
     $fixtureGame = Join-Path $fixtureRoot 'game'
@@ -495,7 +495,6 @@ try {
     $lockLeft = Test-Path -LiteralPath (Join-Path $txRoots[0] 'deployment.lock')
     Add-Case 'transaction-cleanup-failure-still-releases-the-lock' ($heldState.ExitCode -ne 0 -and $heldState.Output -match 'injected state-write failure' -and $heldState.Output -match 'its lock was released' -and $heldState.Output -match 'still to clean up: owned package copy' -and $modsBefore -ceq $modsAfter -and -not $lockLeft) ("exit $($heldState.ExitCode); Mods unchanged: $($modsBefore -ceq $modsAfter); lock left: $lockLeft; " + (Get-Reason $heldState.Output))
     Get-ChildItem -LiteralPath $txRoots[2] -Directory -Filter '*heldcopy*' -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
-    $env:KBP_TEST_RESERVATION_ROOT = $priorReservationRoot
 
     # Release reconciliation (Build-Release): the clone's receipt for the clean pair as both deterministic builds; the
     # validated release copy must be byte-identical. A substituted release copy (same DLL, different data) and a dirty
@@ -680,5 +679,6 @@ try {
     if ($failed.Count -gt 0) { throw "$($failed.Count) loader-baseline check(s) failed." }
 }
 finally {
+    $env:KBP_TEST_RESERVATION_ROOT = $priorReservationRoot
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }

@@ -104,92 +104,59 @@ coverage or 0.4.3 qualification is inferred from this workflow patch.
 
 ## Kingmaker native-test reservation
 
-Every native-test transaction of this lab takes part in the machine-wide
-Kingmaker native-test reservation (`docs/NATIVE-RESERVATION.md`, protocol 1,
-lab identity `KingmakerBuffPlanner`), implemented here on its own in
+Every native-test tool of this lab takes part in the machine-wide Kingmaker
+native-test reservation (`docs/NATIVE-RESERVATION.md`, protocol 1, lab
+identity `KingmakerBuffPlanner`), implemented here on its own in
 `scripts/RuntimeHarness.Common.ps1`. It is a convention, not a dependency: no
 other lab's repository, installation, folders or scripts are needed, and this
 lab acquires and releases it the same way when installed alone.
 
-Order: reservation, then this lab's own lock (`deployment.lock` or
-`fixture.lock`); release in reverse, the reservation last and only after
-verified restoration. The existing process, foreign-lease, lock, journal and
-protected-save checks all remain.
+### The rule (deliberately small; it fails closed)
 
-Ownership is the record's lab and token plus its registered writer process.
-Only the process that wrote or last recovered the record acts under it; any
-other process of this lab takes it over only by recovering the token its
-journal stored, under the mutex, once that writer has exited (a live writer is
-refused byte-for-byte). A missing or replaced journaled record is an incident:
-the first one is kept as `reservation-incident.json` beside the run (written
-once, with the progress made), nothing further changes, and the new record is
-left alone. Ownership is checked again before every shared write and after
-every blocking wait or bounded retry. A release whose record is missing or
-replaced fails durably; only a release the journal records
-(`reservationReleasedAtUtc`) counts as done.
+1. A participating tool acquires the reservation as its first action after
+   argument and WhatIf handling, before any mutable read (saves, installation,
+   display, Steam, run-ID availability, this lab's state), and before this
+   lab's own lock. WhatIf never reserves.
+2. It holds the reservation for its whole process and checks it again before
+   each shared change: before every attempt of a live Mods rename, before the
+   game is launched, before cleanup, before fixture publication, deletion and
+   rollback. A lost, replaced or unreadable record stops the tool there; the
+   new record is left alone and nothing more is changed.
+3. It releases the reservation last - after its lock - and only after its own
+   existing verification succeeded (restoration verified, protected saves
+   compared clean, the run's own lock gone). A refusal or failure before any
+   shared change releases it. Anything unresolved after a shared change keeps
+   it, for the owner.
+4. Nothing is adopted, resumed or reconciled automatically. A record is a
+   reservation whoever wrote it and whether or not its writer still runs.
 
-Participating entrypoints:
+Ownership binds lab, token, run and state root: a tool borrows the
+reservation only for exactly the run, token and state root its record names,
+and a transaction continues only while its journal names that reservation.
 
-- `Invoke-KingmakerRuntimeTest.ps1` (the public launcher): after its WhatIf
-  decision and before its first write, it reserves, then takes its admission
-  inputs (disposable save pair, installed loader, session display) again under
-  the reservation and refuses (releasing, nothing written) if they changed. It
-  passes the reservation through `Deploy-Local.ps1 -ReservationToken`, takes
-  every scenario restoration baseline (protected saves, Heroism working backup,
-  physical display, game registry) inside the entry after its lock and before
-  anything is staged or activated (`-CaptureBaselines`), keeps the reservation
-  through `Restore-Local.ps1 -RetainReservation`, and releases it only after the
-  completion record's last process observation, once every obligation of the run
-  is settled.
-- `Enter-KbpRuntimeTransaction` (through `Deploy-Local.ps1` standalone and
-  `compatibility\Enter-KingmakerCompatibilityProfile.ps1`): reserves (or checks
-  the launcher's reservation) before the unresolved-state scan, the lock and the
-  live Mods read; journals the token as `reservationToken`; checks ownership
-  before each live Mods rename. A clean refusal releases a reservation it took;
-  a lock it took that it could not remove keeps the reservation.
-- `Restore-KbpRuntimeTransaction` (through `Restore-Local.ps1`, the launcher's
-  restoration, an entry's own rollback and
-  `compatibility\Restore-KingmakerCompatibilityProfile.ps1`): validates the
-  journal (schema, run, a status this lab writes), recovers writership,
-  verifies the original backup against the recorded manifest before the live
-  Mods folder moves, checks ownership at every move, and on a retry after an
-  interrupted cleanup reconciles its own lock before releasing.
-- `Restore-Local.ps1` and `RuntimeDisplayRecovery.ps1`: one recovery admission
-  rule (valid journal; the journaled token recovered with its writer exited;
-  or, for a transaction recorded before this lab took part, a free reservation
-  journaled first) before any registry, display, save-evidence or Mods write;
-  the per-run restore mutex serializes recovering processes. Display recovery
-  runs its read-only checks first and admits right before its first write.
-- `New-KbpAutomationFixture.ps1` bootstrap, teardown and `-Recover`: reserve
-  before the fixture lock; under both, enumerate and validate the exact inputs
-  and destinations again (a change since the preflight refuses before
-  anything is written), take the protected baseline, recheck ownership before
-  each publication or deletion, and finish the protected-save comparison
-  before releasing. A protected-save change keeps a first incident record, the
-  lock and the reservation for the owner. `-Recover` takes over only the
-  bootstrap's journaled token (refused while that bootstrap still runs; a
-  missing or replaced record is an incident), keeps the same token so an
-  interrupted recovery is itself recoverable, and finishes a release
-  interrupted after the lock was removed.
+### Participating tools
 
-The release of a run requires affirmative, correctly typed evidence of every
-existing obligation: the transaction Restored and verified with its own lock
-gone; no unacknowledged protected-save violation; the protected-save
-comparison made (`compared` is the JSON boolean `true`); the game registry
-restored and the physical display verified (boolean `true`); and an existing
-Heroism preparation journal `Prepared` or `RolledBack` (or `BackedUp` with the
-WORKING save still at its original bytes). Otherwise the reservation stays,
-and a later `Restore-Local.ps1 -RunId` releases it.
-
-Adoption is limited to this lab's own record for the same state root and the
-token a transaction stored durably when it reserved. Nothing else is adopted
-automatically: an orphan record (an entry or teardown interrupted before its
-token was stored), another lab's record, a live writer's record and a
-malformed record are refused and left byte-identical for the owner to inspect
-and remove. Records are parsed strictly: valid UTF-8 (an optional UTF-8 BOM
-aside), every common protocol field present and typed, the protocol name
-exact; this lab's own records also need its 32-hex token and state root, while
-a peer's token may be any non-empty value.
+- `Invoke-KingmakerRuntimeTest.ps1` (single process): reserves first; the
+  in-process `Deploy-Local.ps1` and `Restore-Local.ps1` borrow it for the run
+  (`-ReservationToken`); releases after its final process observation and
+  before the completion record, which carries a release failure.
+- `Deploy-Local.ps1` standalone (and `compatibility\Enter-KingmakerCompatibilityProfile.ps1`):
+  reserves first; the entry journals the token (`reservationToken` in
+  `transaction.json`) and the reservation stays with the active transaction;
+  it is released if the deployment was refused or rolled back verified.
+- `Restore-Local.ps1` (and `compatibility\Restore-KingmakerCompatibilityProfile.ps1`,
+  display recovery): validates the journal (schema, run, a phase this lab
+  writes) before anything, then continues only the journaled reservation
+  (lab, token, run, state root), or takes a free one for a finished run or a
+  transaction recorded before this lab took part; the per-run restore mutex
+  (also held by the entry while it runs) keeps two processes off one run. It
+  releases after the verified recovery left the run settled. Restoration
+  verifies the original Mods tree against its recorded manifest at its current
+  location before every move that would install it.
+- `New-KbpAutomationFixture.ps1` bootstrap, teardown and `-Recover` (single
+  process): reserve first (before reading the save folder), release after the
+  script's own success verification with its fixture lock gone, or when it
+  stopped before changing the save folder.
 
 Not participating, with their data boundaries:
 
@@ -202,28 +169,47 @@ Not participating, with their data boundaries:
 - `New-KbpRunAllowance.ps1` writes owner-authorized allowance records into this
   lab's private `approvals` folder only.
 - `Confirm-KbpProtectedSaveReview.ps1` records the owner's acknowledgement of a
-  protected-save violation in this lab's state (`protected-save-violations\acknowledged`);
-  it changes no save, and the retained reservation of that run is released by
-  the next `Restore-Local.ps1 -RunId`.
-- Read-only scripts (`Collect-KbpLiveBootstrapDiagnostics.ps1`, inspectors)
-  mutate no shared resource.
+  protected-save violation in this lab's state; it changes no save.
+- Read-only scripts (`Collect-KbpLiveBootstrapDiagnostics.ps1`, inspectors).
+
+### Owner procedure for a kept reservation
+
+A kept reservation means a run of this lab stopped after a shared change, or
+lost its reservation, or the record is unreadable. Every participating lab
+refuses until it is resolved:
+
+1. Read `%ProgramData%\KingmakerNativeTest\reservation.v1.json` (lab, runId,
+   holderProcessId). If it names another lab, resolve it there.
+2. Make sure no Kingmaker process and no process of that run is still running.
+3. Inspect and settle the run with this lab's existing tools: `Restore-Local.ps1
+   -RunId <run>` for a runtime transaction (it continues the journaled
+   reservation and releases it after a verified recovery); for a fixture run,
+   check the save folder, `runtime-fixture-state\<run>\transaction.json` and
+   `fixture.lock`; review any protected-save violation
+   (`Confirm-KbpProtectedSaveReview.ps1`).
+4. Only when the shared state is verified as intended, delete the record by
+   hand (then, for a fixture run, `New-KbpAutomationFixture.ps1 -Recover -RunId
+   <run>` may roll back its own partial artifacts under a fresh reservation).
+
+### Tests
 
 Offline tests never use the machine-wide reservation. The test seam
-`KBP_TEST_RESERVATION_ROOT` names a private reservation folder inside this
-checkout's `artifacts\runtime-harness-tests`, inherited by child processes;
-private mode is refused unless every mutable target of the operation lies in a
-harness test root too, so a real operation can never run under a test
-reservation. `Test-RuntimeHarness.ps1`, `Test-DisplayModsRecovery.ps1` and
+`KBP_TEST_RESERVATION_ROOT` (never set by a production entrypoint) names a
+private reservation folder inside this checkout's
+`artifacts\runtime-harness-tests`; private mode is refused unless every
+mutable target of the operation - including the journal's lock path - lies in
+a harness test root, and a run that restores a game registry key is refused
+in private mode. Tests set it and restore it in `finally`.
+`Test-RuntimeHarness.ps1`, `Test-DisplayModsRecovery.ps1` and
 `Test-LoaderBaseline.ps1` run their transaction cases in such boundaries.
 
-`scripts/Test-NativeReservation.ps1` is the focused gate. Separate processes
-run the actual entry, restoration, public recovery and fixture scripts against
-disposable stand-ins: both arrival orders and simultaneous arrivals; recovery
-admission; strict parsing; lease loss during a blocked move and before release;
-an interrupted cleanup; missing baselines; unfinished preparation; the
-launcher's ownership interval; fixture recovery across interruptions, delayed
-callers and protected-save drift. It then runs `Test-DisplayModsRecovery.ps1`
-and `Test-RuntimeHarness.ps1` with commit-bound logs in `artifacts\review-logs`,
-and observes the machine-wide record before and after. A required case that
-cannot run (a real Kingmaker process is running, or the local package is not
-built) makes the gate incomplete (exit 2), never a pass.
+`scripts/Test-NativeReservation.ps1` is the focused gate: separate processes
+run the actual entry, restoration, `Restore-Local.ps1` and fixture scripts
+against disposable stand-ins (arrival orders, simultaneous arrivals, parsing,
+run binding, loss during a blocked move, backup verification, refusal versus
+kept reservations, the per-run mutex, public recovery admission, the fixture
+script, and the launcher's and deployment's order). It runs
+`Test-DisplayModsRecovery.ps1`, `Test-RuntimeHarness.ps1` and the
+loader-baseline transaction cases with their output in the log, and observes
+the machine-wide record before and after. A required case that cannot run
+makes the gate incomplete (exit 2), never a pass.
